@@ -175,6 +175,32 @@ TRAINING_STEPS = (
     "Reconhecer limites, riscos e quando chamar revisão humana",
 )
 
+BUSINESS_DEMO_CSS = """
+<style>
+.aqb-demo{border:1px solid rgba(242,193,78,.38);border-radius:22px;padding:16px;
+background:radial-gradient(circle at 88% 4%,rgba(180,140,255,.19),transparent 32%),
+linear-gradient(145deg,rgba(15,25,46,.96),rgba(7,17,31,.96));box-shadow:0 18px 45px rgba(0,0,0,.22)}
+.aqb-demo-kicker{font-size:.64rem;font-weight:900;letter-spacing:.14em;color:#f2c14e}
+.aqb-demo h2{margin:.3rem 0;color:#fff;font-size:1.35rem}.aqb-demo p{color:#d8e6f5;margin:.25rem 0}
+.aqb-chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}.aqb-chip{font-size:.63rem;font-weight:900;
+padding:4px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.15);color:#eaf3ff;background:rgba(12,31,52,.75)}
+.aqb-chip.good{color:#9cf1da;border-color:rgba(115,241,218,.28)}.aqb-chip.warn{color:#ffe7a3;border-color:rgba(242,193,78,.32)}
+.aqb-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.aqb-card{border:1px solid rgba(150,190,225,.18);
+border-radius:14px;padding:10px 11px;background:rgba(10,27,48,.72)}.aqb-card strong{display:block;color:#fff;font-size:.83rem}
+.aqb-card span{display:block;color:#cbd9e9;font-size:.71rem;line-height:1.35;margin-top:4px}
+.aqb-section{margin-top:14px}.aqb-section-title{color:#fff;font-size:.85rem;font-weight:900;margin-bottom:7px}
+.aqb-packages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.aqb-package{border:1px solid rgba(180,140,255,.22);
+border-radius:14px;padding:10px;background:rgba(21,24,56,.48)}.aqb-package b{color:#e9dcff;font-size:.8rem}.aqb-package ul{margin:6px 0 0 18px;padding:0;color:#d9e5f4;font-size:.7rem}
+.aqb-flow{display:flex;flex-wrap:wrap;gap:5px}.aqb-step{font-size:.67rem;color:#dce7f4;border:1px solid rgba(137,187,225,.2);
+border-radius:999px;padding:5px 8px;background:rgba(8,24,43,.7)}
+.aqb-radar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.aqb-alert{border-left:3px solid #f2c14e;border-radius:10px;padding:9px 10px;background:rgba(83,57,18,.24)}
+.aqb-alert b{display:block;color:#ffe7a3;font-size:.75rem}.aqb-alert span{color:#d8e6f5;font-size:.69rem;line-height:1.35}
+.aqb-note{margin-top:10px!important;font-size:.69rem!important;color:#aebfd3!important}
+@media(max-width:760px){.aqb-grid{grid-template-columns:1fr 1fr}.aqb-packages{grid-template-columns:1fr}.aqb-radar{grid-template-columns:1fr}}
+@media(max-width:430px){.aqb-grid{grid-template-columns:1fr}}
+</style>
+"""
+
 
 def _clean(value: Any, limit: int = 240) -> str:
     return " ".join(str(value or "").replace("\x00", "").split())[:limit]
@@ -345,6 +371,88 @@ def admin_training_demo(step: Any = 1) -> dict[str, Any]:
         "executes_action": False,
     }
 
+def _html_escape(value: Any) -> str:
+    text = _clean(value, 2000)
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
+
+
+def business_demo_html() -> str:
+    """Responsive HTML shell for the administrator-facing BUSINESS demo."""
+    snapshot = business_demo_snapshot()
+    radar = demo_business_radar({
+        "leads_open": 42,
+        "avg_response_hours": 3.5,
+        "abandoned_quotes": 8,
+        "returning_customers_pct": 12,
+    })
+    pillars = "".join(
+        '<article class="aqb-card"><strong>'
+        + _html_escape(item["label"])
+        + '</strong><span>'
+        + _html_escape(item["summary"])
+        + "</span></article>"
+        for item in snapshot["pillars"]
+    )
+    packages = "".join(
+        '<article class="aqb-package"><b>'
+        + _html_escape(item["label"])
+        + "</b><ul>"
+        + "".join("<li>" + _html_escape(component) + "</li>" for component in item["components"])
+        + "</ul></article>"
+        for item in snapshot["packages"]
+    )
+    flow = "".join(
+        '<span class="aqb-step">' + _html_escape(step) + "</span>"
+        for step in snapshot["client_journey"]
+    )
+    alerts = "".join(
+        '<article class="aqb-alert"><b>'
+        + _html_escape(item["title"])
+        + '</b><span>'
+        + _html_escape(item["next_action"])
+        + "</span></article>"
+        for item in radar["alerts"][:3]
+    )
+    return (
+        BUSINESS_DEMO_CSS
+        + '<section class="aqb-demo" data-business-demo="true" data-runtime="OFF">'
+        + '<div class="aqb-demo-kicker">AION BUSINESS // DEMO SEGURA</div>'
+        + "<h2>A empresa bate o olho e entende o que está acontecendo.</h2>"
+        + "<p>"
+        + _html_escape(snapshot["tagline"])
+        + "</p>"
+        + '<div class="aqb-chips">'
+        + '<span class="aqb-chip good">BUSINESS CERTIFIED</span>'
+        + '<span class="aqb-chip warn">SANDBOX / DEMO</span>'
+        + '<span class="aqb-chip">RUNTIME OFF</span>'
+        + '<span class="aqb-chip">SEM AÇÃO EXTERNA</span>'
+        + "</div>"
+        + '<div class="aqb-section-title">4 pilares</div><div class="aqb-grid">'
+        + pillars
+        + "</div>"
+        + '<div class="aqb-section"><div class="aqb-section-title">Pacotes para vender solução completa</div>'
+        + '<div class="aqb-packages">'
+        + packages
+        + "</div></div>"
+        + '<div class="aqb-section"><div class="aqb-section-title">Jornada comercial</div>'
+        + '<div class="aqb-flow">'
+        + flow
+        + "</div></div>"
+        + '<div class="aqb-section"><div class="aqb-section-title">Exemplo do Radar do Negócio · dados fictícios</div>'
+        + '<div class="aqb-radar">'
+        + alerts
+        + "</div></div>"
+        + '<p class="aqb-note">Exemplo visual somente. Os números acima são fixtures fictícios, não dados de cliente. '
+        + 'Marketplace/dropshipping permanece apenas como compatibilidade legada e não é o foco principal desta nova estrutura.</p>'
+        + "</section>"
+    )
+
 
 __all__ = [
     "SCHEMA",
@@ -356,8 +464,10 @@ __all__ = [
     "CLIENT_JOURNEY",
     "PORTAL_SECTIONS",
     "TRAINING_STEPS",
+    "BUSINESS_DEMO_CSS",
     "business_demo_snapshot",
     "demo_business_radar",
     "client_portal_demo",
     "admin_training_demo",
+    "business_demo_html",
 ]
