@@ -1045,3 +1045,19 @@ and price changes remain outside this module.
 
 ADR-0059 records this boundary.
 
+## BUSINESS Revenue Opportunity Engine
+
+`atlasquant_aion_business_revenue_opportunity_engine.py` prioritizes service
+opportunities using explicit administrator-supplied economics and operational
+inputs.
+
+The engine blocks opportunities that exceed startup budget, miss minimum margin,
+lack positive monthly contribution or have no capacity. Only eligible rows are
+scored using margin, time-to-cash proxy, repeatability, evidence readiness,
+startup efficiency, support efficiency and implementation efficiency.
+
+The score is a planning comparator, not a probability or sales forecast. No
+market prices are embedded and no sale, spend or contact is executed.
+
+ADR-0060 records this boundary.
+
