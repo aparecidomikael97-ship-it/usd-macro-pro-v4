@@ -73,3 +73,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0042 | ACCEPTED | `docs/adr/ADR-0042-business-controlled-expansion-readiness.md` |
 | ADR-0043 | ACCEPTED | `docs/adr/ADR-0043-business-post-expansion-cycle-freeze.md` |
 | ADR-0044 | ACCEPTED | `docs/adr/ADR-0044-business-expansion-cycle-audit-ledger.md` |
+| ADR-0045 | ACCEPTED | `docs/adr/ADR-0045-business-capacity-quota-guardrail.md` |
