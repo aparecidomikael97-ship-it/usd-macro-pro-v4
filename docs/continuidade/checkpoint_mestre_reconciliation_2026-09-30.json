@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_BASELINE_HANDOFF",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -149,7 +149,17 @@
     "windows_operator_default_storage": "%LOCALAPPDATA%\\AtlasQuant\\team-access-sandbox",
     "windows_operator_secrets_outside_repository": true,
     "windows_operator_reports_outside_repository": true,
-    "windows_operator_baseline_outside_repository": true
+    "windows_operator_baseline_outside_repository": true,
+    "windows_operator_handoff_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "windows_operator_session_binding": true,
+    "windows_operator_same_session_required": true,
+    "windows_operator_baseline_after_readiness_required": true,
+    "windows_operator_handoff_real_validated": false,
+    "windows_operator_baseline_accepted": false,
+    "windows_operator_lifecycle_plan_created": false,
+    "windows_operator_real_handoff_validated": false,
+    "windows_operator_real_baseline_accepted": false,
+    "windows_operator_real_lifecycle_plan_created": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -254,7 +264,8 @@
       455,
       456,
       457,
-      458
+      458,
+      459
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -284,7 +295,8 @@
     "team_access_sandbox_lifecycle_plan_pr": 455,
     "team_access_sandbox_lifecycle_auth_ledger_pr": 456,
     "team_access_sandbox_lifecycle_step_gate_pr": 457,
-    "team_access_windows_operator_kit_pr": 458
+    "team_access_windows_operator_kit_pr": 458,
+    "team_access_windows_operator_handoff_pr": 459
   },
   "decisions": [
     {
@@ -673,9 +685,25 @@
         "deploy/sandbox/team-access/Invoke-TeamAccessSandboxOperator.ps1",
         "docs/adr/ADR-0071-business-team-access-windows-operator-kit.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-WINDOWS-OPERATOR-HANDOFF",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_windows_operator_handoff.py",
+        "test_atlasquant_aion_business_team_access_windows_operator_handoff.py",
+        "validate_team_access_operator_handoff.py",
+        "docs/adr/ADR-0072-business-team-access-windows-operator-baseline-handoff.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_REAL_LIFECYCLE_PLAN_CREATION",
+    "TEAM_ACCESS_REAL_BASELINE_ADMIN_ACCEPTANCE",
+    "TEAM_ACCESS_WINDOWS_OPERATOR_BASELINE_ACCEPTANCE_DECISION",
+    "TEAM_ACCESS_WINDOWS_OPERATOR_REAL_HANDOFF_VALIDATION",
     "TEAM_ACCESS_WINDOWS_OPERATOR_REAL_BASELINE_COLLECTION",
     "TEAM_ACCESS_WINDOWS_OPERATOR_REAL_SANDBOX_START",
     "TEAM_ACCESS_WINDOWS_OPERATOR_LOCAL_SECRET_BOOTSTRAP",

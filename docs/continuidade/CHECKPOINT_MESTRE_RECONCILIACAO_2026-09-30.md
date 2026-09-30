@@ -126,6 +126,24 @@ PLAN ONLY por padrão; gravação do env exige `-Apply`, start exige
 `-ApplyStart` e baseline exige `-CollectBaseline` adicional. Nenhuma ação
 real no PC foi executada por esta camada no GitHub.
 
+Estado do Operator Baseline Handoff:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_windows_operator_handoff.py`, ADR-0072
+e testes associados. Readiness e baseline recebem o mesmo
+`operator_session_id` não sensível; sessões diferentes ou baseline anterior ao
+readiness bloqueiam. O máximo é
+`READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW`; baseline ainda
+não é aceito automaticamente e nenhum lifecycle plan real é criado.
+
+Estado do Operator Handoff readiness → baseline:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_windows_operator_handoff.py`, ADR-0072
+e testes associados. Readiness e baseline precisam carregar o mesmo
+`operator_session_id`; baseline anterior ao readiness ou sessão divergente
+bloqueiam. O máximo é
+`READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW`; baseline ainda
+não é aceito automaticamente e lifecycle continua não autorizado.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -404,3 +422,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Evidências por step ficam em ledger hash-chain sanitizado e sequencial |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-STEP-GATE | IMPLEMENTADO / EM VALIDAÇÃO | Cada step recebe preflight e pós-review próprios antes de qualquer avanço |
 | D-2026-09-30-TEAM-ACCESS-WINDOWS-OPERATOR-KIT | IMPLEMENTADO / EM VALIDAÇÃO | Fluxo Windows local ganha bootstrap, readiness, start e baseline com switches explícitos |
+| D-2026-09-30-TEAM-ACCESS-WINDOWS-OPERATOR-HANDOFF | IMPLEMENTADO / EM VALIDAÇÃO | Readiness e baseline passam a exigir o mesmo operator_session_id antes da aceitação |

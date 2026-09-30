@@ -25,6 +25,10 @@ if (-not (Test-Path -LiteralPath $readinessFile)) {
     throw "Readiness report not found."
 }
 $readiness = Get-Content -LiteralPath $readinessFile -Raw | ConvertFrom-Json
+$operatorSessionId = [string]$readiness.operator_session_id
+if ($operatorSessionId -notmatch "^[0-9a-f]{32}$") {
+    throw "Readiness report does not contain a valid operator session id."
+}
 if ($readiness.state -ne "READY_FOR_ADMIN_TEAM_ACCESS_WINDOWS_SANDBOX_START_DECISION") {
     throw "Sandbox operator readiness is blocked. Resolve the reported checks first."
 }
@@ -56,7 +60,7 @@ if (-not $CollectBaseline) {
 
 Write-Host ""
 Write-Host "Collecting sanitized baseline evidence..."
-& "$PSScriptRoot\Collect-TeamAccessSandboxEvidence.ps1" -EnvFile $EnvFile -OutputDir $EvidenceDir
+& "$PSScriptRoot\Collect-TeamAccessSandboxEvidence.ps1" -EnvFile $EnvFile -OutputDir $EvidenceDir -OperatorSessionId $operatorSessionId
 
 $evidenceFile = Join-Path $EvidenceDir "team-access-baseline-evidence.json"
 if (-not (Test-Path -LiteralPath $evidenceFile)) {

@@ -29,6 +29,7 @@ REQUIRED_CHECKS = (
 )
 
 _DIGEST64 = re.compile(r"^[0-9a-f]{64}$")
+_SESSION32 = re.compile(r"^[0-9a-f]{32}$")
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -84,12 +85,14 @@ def validate_windows_operator_readiness(
 ) -> dict[str, Any]:
     row = _mapping(report)
     checks = _mapping(row.get("checks"))
+    operator_session_id = _clean(row.get("operator_session_id"), 64).lower()
 
     gates = {
         "schema_valid": row.get("schema") == READINESS_SCHEMA,
         "state_ready": row.get("state")
         == "READY_FOR_ADMIN_TEAM_ACCESS_WINDOWS_SANDBOX_START_DECISION",
         "captured_at_valid": _timestamp_valid(row.get("captured_at")),
+        "operator_session_id_valid": bool(_SESSION32.fullmatch(operator_session_id)),
         "required_checks_complete": all(
             checks.get(name) is True for name in REQUIRED_CHECKS
         ),
@@ -104,6 +107,7 @@ def validate_windows_operator_readiness(
 
     canonical = {
         "captured_at": _clean(row.get("captured_at"), 100),
+        "operator_session_id": operator_session_id,
         "checks": {name: checks.get(name) is True for name in REQUIRED_CHECKS},
     } if ready else {}
 
@@ -118,6 +122,8 @@ def validate_windows_operator_readiness(
         "gates": gates,
         "blockers": blockers,
         "readiness_digest": _digest(canonical) if ready else "",
+        "captured_at": _clean(row.get("captured_at"), 100) if ready else "",
+        "operator_session_id": operator_session_id if ready else "",
         "secret_values_returned": False,
         "sandbox_start_authorized": False,
         "baseline_collection_authorized": False,

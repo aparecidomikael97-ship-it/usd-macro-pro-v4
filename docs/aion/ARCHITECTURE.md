@@ -1256,3 +1256,19 @@ The maximum automatic state is
 executor remains outside this kit.
 
 ADR-0071 records this boundary.
+
+
+## BUSINESS team access Windows operator baseline handoff
+
+`atlasquant_aion_business_team_access_windows_operator_handoff.py` binds one
+validated Windows readiness review to one validated sandbox baseline.
+
+The readiness script emits a non-secret `operator_session_id`; the guarded
+operator passes it to baseline collection. The handoff requires the same session
+id and rejects a baseline timestamp that predates readiness.
+
+The maximum state is
+`READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW`. It does not
+accept the baseline, create a lifecycle plan or authorize any mutation.
+
+ADR-0072 records this boundary.

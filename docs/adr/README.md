@@ -100,3 +100,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0069 | ACCEPTED | `docs/adr/ADR-0069-business-team-access-sandbox-lifecycle-evidence-ledger.md` |
 | ADR-0070 | ACCEPTED | `docs/adr/ADR-0070-business-team-access-sandbox-lifecycle-step-gate.md` |
 | ADR-0071 | ACCEPTED | `docs/adr/ADR-0071-business-team-access-windows-operator-kit.md` |
+| ADR-0072 | ACCEPTED | `docs/adr/ADR-0072-business-team-access-windows-operator-baseline-handoff.md` |
