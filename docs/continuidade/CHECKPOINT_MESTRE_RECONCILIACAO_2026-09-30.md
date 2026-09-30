@@ -217,6 +217,15 @@ exatos. A camada gera um receipt canônico e apenas um preview do ledger com
 1/10 concluído e Step 2 como próximo. Nenhum append real e nenhuma autorização
 de Step 2 são produzidos.
 
+Estado do Step 1 ledger append contract:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_step1_ledger_append_contract.py`,
+ADR-0082 e testes associados. A request de append fica presa ao
+receipt_review_digest, canonical receipt digest, source ledger GENESIS e target
+ledger preview 1/10. Mensagens genéricas não autorizam; token e acknowledgements
+precisam ser exatos. Mesmo uma decisão verificada não escreve o ledger e não
+autoriza Step 2.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -505,3 +514,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-STEP1-PROVIDER-APPLY-PLAN | IMPLEMENTADO / EM VALIDAÇÃO | Operação Keycloak é congelada sem segredo e sem comando executável |
 | D-2026-09-30-TEAM-ACCESS-STEP1-GUARDED-PROVIDER-RUNNER | IMPLEMENTADO / EM VALIDAÇÃO | Runner físico fica PLAN ONLY por padrão e exige -Apply + token exato + freshness + readback antes de qualquer ledger append |
 | D-2026-09-30-TEAM-ACCESS-STEP1-PROVIDER-RECEIPT-LEDGER-REVIEW | IMPLEMENTADO / EM VALIDAÇÃO | Receipt físico vira receipt canônico e preview 1/10 antes de qualquer append real ou Step 2 |
+| D-2026-09-30-TEAM-ACCESS-STEP1-LEDGER-APPEND-CONTRACT | IMPLEMENTADO / EM VALIDAÇÃO | Append do receipt canônico exige token exato e digests source/target congelados; writer e Step 2 seguem separados |
