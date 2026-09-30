@@ -82,3 +82,30 @@ architecture and approval gate.
 ## Registry initialization note
 
 The PostgreSQL official image runs init scripts only when the registry volume is empty. If the local sandbox volume already existed before the schema was added, destroy only the sandbox data with the guarded cleanup command and recreate it. Never do this against production data.
+
+
+## Baseline evidence collection
+
+After the sandbox is running and the two read-only verification scripts pass,
+collect a sanitized baseline package:
+
+    .\Collect-TeamAccessSandboxEvidence.ps1
+
+The file is written under:
+
+    .atlasquant_sandbox_evidence\team-access-baseline-evidence.json
+
+That directory is ignored by Git. The collector writes no password, token,
+client secret or authorization header.
+
+Validate the package from the repository root:
+
+    python validate_team_access_sandbox_evidence.py deploy/sandbox/team-access/.atlasquant_sandbox_evidence/team-access-baseline-evidence.json
+
+A valid baseline can only reach:
+
+    READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW
+
+This does not authorize account creation, MFA enrollment, registry mutation,
+session revocation or production. Those lifecycle actions remain manual sandbox
+steps and must generate separate evidence for the E2E contract.
