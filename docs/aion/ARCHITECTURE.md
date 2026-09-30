@@ -467,3 +467,17 @@ eligible for human promotion review but never auto-deploys or changes runtime.
 
 Continuous monitoring is an explicit future goal, while the current collector
 runtime remains OFF. ADR-0023 records this evidence-first evolution boundary.
+
+
+## BUSINESS commercial acquisition and client journey
+
+`atlasquant_aion_business_commercial_acquisition_demo.py` models the
+pre-client commercial path: acquisition channels, landing-page messaging,
+prospect qualification, outreach draft, contract handoff, content plan and demo
+funnel.
+
+The site CTA is diagnosis-first. Outreach is never sent automatically and
+`DO_NOT_CONTACT` blocks it. Contracts, invoices, payments and client portal
+provisioning remain future reviewed actions.
+
+ADR-0024 records this diagnostic-first commercial boundary.
