@@ -111,7 +111,12 @@ class TeamAccessPhysicalSandboxTests(unittest.TestCase):
         self.assertIn("127.0.0.1:", compose)
         self.assertNotIn("0.0.0.0:", compose)
         self.assertIn("quay.io/keycloak/keycloak:26.7.5", example)
-        self.assertIn("postgres:18.6", example)
+        self.assertIn("postgres:18.6", compose)
+        self.assertIn("quay.io/keycloak/keycloak:26.7.5", compose)
+        self.assertNotIn("${POSTGRES_IMAGE", compose)
+        self.assertNotIn("${KEYCLOAK_IMAGE", compose)
+        self.assertIn("/var/lib/postgresql", compose)
+        self.assertNotIn("/var/lib/postgresql/data", compose)
         self.assertNotIn("password=admin", compose.lower())
         self.assertIn("CHANGE_ME_", example)
 
