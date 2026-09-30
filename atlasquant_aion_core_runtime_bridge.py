@@ -22,6 +22,9 @@ from atlasquant_aion_core_voice_automation import (
 from atlasquant_aion_core_master_checkpoint_bootstrap import (
     augment_system_context_with_master_checkpoint,
 )
+from atlasquant_aion_eight_role_router import (
+    route_logical_roles,
+)
 
 
 SCHEMA = "ATLASQUANT_AION_CORE_RUNTIME_BRIDGE_V1"
@@ -288,6 +291,12 @@ def handle_runtime_intent(
                 "merge_authorized": False,
                 "deploy_authorized": False,
             },
+            "logical_role_route": {
+                "state": "NOT_EVALUATED",
+                "selected_roles": [],
+                "physical_execution_authorized": False,
+                "executes_action": False,
+            },
             **SAFETY_GATES,
         }
 
@@ -325,6 +334,10 @@ def handle_runtime_intent(
     )
     enriched_system_context, master_checkpoint_snapshot = (
         augment_system_context_with_master_checkpoint(system_context)
+    )
+    logical_role_route = route_logical_roles(
+        intent,
+        master_checkpoint_snapshot,
     )
     scoped, ingress = scoped_runtime_evidence(context, enriched_system_context)
     evidence_truth = assess(scoped.records, current)
@@ -371,6 +384,7 @@ def handle_runtime_intent(
             "merge_authorized": False,
             "deploy_authorized": False,
         },
+        "logical_role_route": logical_role_route,
         "capabilities": core.registry.snapshot(),
         "adapters": {
             "voice": voice_adapter.snapshot(),
