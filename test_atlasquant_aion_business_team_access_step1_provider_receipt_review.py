@@ -22,6 +22,7 @@ def _materialization():
         "state": "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_REVIEW",
         "operator_session_id": "c" * 32,
         "baseline_evidence_digest": "d" * 64,
+        "materialization_digest": "3" * 64,
         "plan": {
             "plan_digest": "b" * 64,
             "baseline_evidence_digest": "d" * 64,
@@ -53,12 +54,15 @@ def _packet():
 def _envelope():
     return {
         "execution_envelope_digest": "e" * 64,
+        "materialization_digest": "3" * 64,
+        "plan_digest": "b" * 64,
     }
 
 
 def _apply_plan():
     return {
         "apply_plan_digest": "a" * 64,
+        "plan_digest": "b" * 64,
         "target_username": "sandbox.operador.demo",
     }
 
@@ -208,6 +212,36 @@ class TeamAccessStep1ProviderReceiptReviewTests(unittest.TestCase):
         self.assertFalse(result["automatic_ledger_append"])
         self.assertFalse(result["executor_enabled"])
         self.assertFalse(result["production_authorized"])
+
+    def test_materialization_or_plan_drift_blocks(self):
+        materialization = _materialization()
+        materialization["materialization_digest"] = "6" * 64
+        result = validate_provider_receipt_and_preview_ledger(
+            materialization,
+            _auth(),
+            _packet(),
+            _envelope(),
+            _apply_plan(),
+            _runner(),
+            _receipt(),
+        )
+        self.assertIn(
+            "materialization_digest_matches_authorization",
+            result["blockers"],
+        )
+
+        apply_plan = _apply_plan()
+        apply_plan["plan_digest"] = "7" * 64
+        result = validate_provider_receipt_and_preview_ledger(
+            _materialization(),
+            _auth(),
+            _packet(),
+            _envelope(),
+            apply_plan,
+            _runner(),
+            _receipt(),
+        )
+        self.assertIn("plan_digest_matches_apply_plan", result["blockers"])
 
     def test_receipt_digest_binding_drift_blocks(self):
         receipt = _receipt()
