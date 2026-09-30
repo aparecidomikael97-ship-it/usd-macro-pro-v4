@@ -388,6 +388,9 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate import (
 from atlasquant_aion_business_team_access_windows_operator_kit import (
     windows_operator_policy as business_team_windows_operator_policy,
 )
+from atlasquant_aion_business_team_access_windows_operator_handoff import (
+    operator_handoff_policy as business_team_windows_operator_handoff_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7336,6 +7339,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "43 · Equipe & Acessos · Ledger Lifecycle",
             "44 · Equipe & Acessos · Step Gate",
             "45 · Equipe & Acessos · Windows Operator",
+            "46 · Equipe & Acessos · Operator Handoff",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8142,7 +8146,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Pós-step: READY_FOR_MANUAL_LEDGER_APPEND_REVIEW."
         )
 
-    else:
+    elif view == "45 · Equipe & Acessos · Windows Operator":
         operator = business_team_windows_operator_policy()
         st.write(f"Estado: **{operator.get('state')}**")
         st.markdown("**Fluxo Windows protegido:**")
@@ -8161,6 +8165,27 @@ def _render_business_stack_consolidation_v2() -> None:
             "Estado máximo do readiness local: "
             "READY_FOR_ADMIN_TEAM_ACCESS_WINDOWS_SANDBOX_START_DECISION. "
             "Lifecycle e produção continuam separados."
+        )
+
+    else:
+        handoff = business_team_windows_operator_handoff_policy()
+        st.write(f"Estado: **{handoff.get('state')}**")
+        st.markdown("**Binding obrigatório do handoff:**")
+        for item in (
+            "readiness validado",
+            "baseline validado",
+            "mesmo operator_session_id",
+            "baseline capturado após readiness",
+            "digests válidos",
+            "nenhuma autoridade de lifecycle ou produção",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O handoff apenas prova que readiness e baseline pertencem à mesma sessão lógica. "
+            "Ele não aceita o baseline e não cria autorização de lifecycle."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW."
         )
 
 
