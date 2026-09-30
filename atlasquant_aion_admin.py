@@ -217,6 +217,18 @@ from atlasquant_aion_business_integration_hub import (
     minimum_scope_plan as business_integration_scope_plan,
     secret_handling_policy as business_integration_secret_policy,
 )
+from atlasquant_aion_business_privacy_audit import (
+    access_decision as business_privacy_access_decision,
+    audit_event as business_privacy_audit_event,
+    automation_version as business_privacy_automation_version,
+    consent_record as business_privacy_consent_record,
+    data_subject_request as business_privacy_subject_request,
+    governance_snapshot as business_privacy_governance_snapshot,
+    privacy_profile as business_privacy_profile,
+    retention_review as business_privacy_retention_review,
+    role_access_matrix as business_privacy_role_access_matrix,
+    rollback_plan as business_privacy_rollback_plan,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6755,6 +6767,173 @@ def _render_business_integration_hub_demo() -> None:
         )
 
 
+
+def _render_business_privacy_audit_demo() -> None:
+    """Render privacy/LGPD and audit governance with fictional metadata only."""
+    st.markdown("#### 🛡️ Privacidade, LGPD & Auditoria · Demo")
+    st.caption(
+        "Organiza finalidade, consentimento, retenção, acesso por perfil, solicitações de dados, "
+        "versionamento e rollback. Não contém dado pessoal real e não executa exclusão/exportação."
+    )
+
+    profile = business_privacy_profile(
+        client_name="Clínica Horizonte Demo",
+        purposes=["Atendimento", "Qualificação de leads", "Suporte"],
+        data_categories=["CONTACT", "LEAD", "SUPPORT", "USAGE_METRICS"],
+        legal_basis_label="Base jurídica a validar com responsável",
+        retention_days=90,
+        controller_contact="responsavel-demo",
+    )
+    matrix = business_privacy_role_access_matrix(profile)
+
+    view = st.selectbox(
+        "Visão de governança",
+        (
+            "1 · Finalidade & consentimento",
+            "2 · Acesso por perfil",
+            "3 · Retenção / exportação / exclusão",
+            "4 · Trilha de auditoria",
+            "5 · Versionamento & rollback",
+        ),
+        key="aion_business_privacy_audit_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Finalidade & consentimento":
+        st.markdown("**Perfil de privacidade fictício**")
+        st.write(f"Cliente: **{profile.get('client_name')}**")
+        st.markdown("**Finalidades**")
+        for purpose in list(profile.get("purposes") or []):
+            st.markdown(f"- {purpose}")
+        st.markdown("**Categorias previstas**")
+        for category in list(profile.get("data_categories") or []):
+            st.markdown(f"- {category}")
+        consent = business_privacy_consent_record(
+            subject_reference="subject-demo-001",
+            purpose="Atendimento",
+            granted=True,
+            recorded_at=datetime.now(timezone.utc).isoformat(),
+            source="form-demo",
+        )
+        st.info(
+            f"Consentimento de exercício: **{consent.get('state')}** · "
+            "sujeito real não verificado."
+        )
+        st.caption(
+            "O AION não decide sozinho a base jurídica. Finalidade e base aplicável precisam "
+            "ser revisadas para o caso real."
+        )
+
+    elif view == "2 · Acesso por perfil":
+        role = st.selectbox(
+            "Perfil",
+            ["CLIENT_ADMIN", "CLIENT_OPERATOR", "AION_SUPPORT", "AION_ADMIN", "AUDITOR"],
+            key="aion_business_privacy_role",
+        )
+        category = st.selectbox(
+            "Categoria de dado",
+            list(profile.get("data_categories") or []),
+            key="aion_business_privacy_category",
+        )
+        read = business_privacy_access_decision(
+            matrix,
+            role=role,
+            category=category,
+            requested_action="READ",
+        )
+        write = business_privacy_access_decision(
+            matrix,
+            role=role,
+            category=category,
+            requested_action="WRITE",
+        )
+        a1,a2 = st.columns(2)
+        a1.metric("Leitura", "PERMITIDA DEMO" if read.get("allowed") else "NEGADA")
+        a2.metric("Escrita", "PERMITIDA DEMO" if write.get("allowed") else "NEGADA")
+        st.caption(
+            "Default deny + least privilege. Permissão demonstrativa não executa leitura/escrita externa."
+        )
+
+    elif view == "3 · Retenção / exportação / exclusão":
+        retention = business_privacy_retention_review(
+            profile,
+            created_at="2026-06-01T00:00:00Z",
+            now=datetime.now(timezone.utc),
+        )
+        st.write(f"Retenção: **{retention.get('state')}**")
+        st.write(f"Prazo configurado: **{profile.get('retention_days')} dias**")
+        request_type = st.selectbox(
+            "Solicitação de titular fictícia",
+            ["EXPORT", "DELETE", "CORRECT", "RESTRICT"],
+            key="aion_business_privacy_request_type",
+        )
+        request = business_privacy_subject_request(
+            request_type=request_type,
+            subject_reference="subject-demo-001",
+            requested_at=datetime.now(timezone.utc).isoformat(),
+            reason="Exercício de governança",
+        )
+        st.info(f"Pedido: **{request.get('state')}**")
+        st.caption(
+            "Identidade e aprovação ainda não foram verificadas. O demo não exporta, não corrige "
+            "e não exclui nenhum dado."
+        )
+
+    elif view == "4 · Trilha de auditoria":
+        events = [
+            business_privacy_audit_event(
+                actor="Mikael",
+                action="VIEW",
+                target="Radar do Cliente Demo",
+            ),
+            business_privacy_audit_event(
+                actor="Mikael",
+                action="APPROVAL",
+                target="Proposta Demo",
+                approval_reference="approval-demo-001",
+            ),
+            business_privacy_audit_event(
+                actor="AION",
+                action="DRAFT",
+                target="Follow-up Demo",
+            ),
+        ]
+        snapshot = business_privacy_governance_snapshot(profile, events)
+        g1,g2 = st.columns(2)
+        g1.metric("Eventos auditáveis", int(snapshot.get("audit_event_count") or 0))
+        g2.metric("Dados pessoais reais", "NÃO")
+        for event in events:
+            st.markdown(
+                f"- **{event.get('action')}** · {event.get('actor')} → {event.get('target')} · "
+                f"digest {str(event.get('event_digest') or '')[:12]}…"
+            )
+        st.caption(
+            "Registro de auditoria documenta ação/aprovação, mas nunca concede autoridade por si só."
+        )
+
+    else:
+        v1 = business_privacy_automation_version(
+            automation_name="followup-business-demo",
+            version="1",
+            config={"mode": "manual_review", "send": False},
+            approved_by="Mikael",
+        )
+        v2 = business_privacy_automation_version(
+            automation_name="followup-business-demo",
+            version="2",
+            config={"mode": "draft_only", "send": False, "audit": True},
+            approved_by="Mikael",
+        )
+        rollback = business_privacy_rollback_plan(v2, v1)
+        st.markdown("**Versões do exercício**")
+        st.write(f"Atual: **v{v2.get('version')}** · anterior: **v{v1.get('version')}**")
+        st.write(f"Rollback: **{rollback.get('state')}**")
+        st.warning(
+            "Rollback real exige aprovação humana. Este bloco apenas prepara referência de versão; "
+            "nenhuma configuração de produção é alterada."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6779,6 +6958,7 @@ def _render_business(
     _render_business_trend_intelligence_demo()
     _render_business_commercial_acquisition_demo()
     _render_business_integration_hub_demo()
+    _render_business_privacy_audit_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
