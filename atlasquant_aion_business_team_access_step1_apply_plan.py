@@ -386,6 +386,91 @@ def verify_step1_apply_plan(
     }
 
 
+
+
+def verify_step1_apply_plan_source_binding(
+    execution_envelope: Mapping[str, Any] | None,
+    apply_plan: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    envelope = _mapping(execution_envelope)
+    plan = _mapping(apply_plan)
+
+    envelope_binding = verify_step1_execution_envelope(envelope)
+    plan_binding = verify_step1_apply_plan(plan)
+
+    envelope_tenants = sorted(
+        {
+            _clean(item, 120)
+            for item in list(envelope.get("tenant_ids") or [])
+            if _clean(item, 120)
+        }
+    )
+    plan_tenants = sorted(
+        {
+            _clean(item, 120)
+            for item in list(plan.get("tenant_ids") or [])
+            if _clean(item, 120)
+        }
+    )
+
+    match = bool(
+        envelope_binding.get("binding_match") is True
+        and plan_binding.get("binding_match") is True
+        and _clean(
+            plan.get("execution_envelope_digest"), 80
+        ).lower()
+        == _clean(
+            envelope.get("execution_envelope_digest"), 80
+        ).lower()
+        and _clean(plan.get("plan_digest"), 80).lower()
+        == _clean(envelope.get("plan_digest"), 80).lower()
+        and _clean(plan.get("operator_session_id"), 64).lower()
+        == _clean(envelope.get("operator_session_id"), 64).lower()
+        and _clean(
+            plan.get("baseline_evidence_digest"), 80
+        ).lower()
+        == _clean(
+            envelope.get("baseline_evidence_digest"), 80
+        ).lower()
+        and plan.get("target_step_order") == envelope.get(
+            "target_step_order"
+        ) == 1
+        and _clean(plan.get("target_step_id"), 120).upper()
+        == _clean(envelope.get("target_step_id"), 120).upper()
+        == LIFECYCLE_STEP_IDS[0]
+        and _clean(plan.get("target_username"), 160)
+        == _clean(envelope.get("target_username"), 160)
+        and plan_tenants == envelope_tenants
+        and _clean(plan.get("factor_type"), 60).upper()
+        == _clean(envelope.get("factor_type"), 60).upper()
+    )
+
+    return {
+        "schema": (
+            "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_"
+            "STEP1_PROVIDER_APPLY_PLAN_SOURCE_BINDING_V1"
+        ),
+        "version": VERSION,
+        "state": (
+            "STEP1_PROVIDER_APPLY_PLAN_SOURCE_BINDING_MATCH"
+            if match
+            else "STEP1_PROVIDER_APPLY_PLAN_SOURCE_BINDING_MISMATCH"
+        ),
+        "binding_match": match,
+        "execution_envelope_digest": _clean(
+            plan.get("execution_envelope_digest"), 80
+        ).lower() if match else "",
+        "apply_plan_digest": _clean(
+            plan.get("apply_plan_digest"), 80
+        ).lower() if match else "",
+        "provider_command_generated": False,
+        "physical_execution_performed": False,
+        "automatic_execution_authorized": False,
+        "executor_enabled": False,
+        "production_authorized": False,
+        "executes_action": False,
+    }
+
 __all__ = [
     "SCHEMA",
     "VERSION",
@@ -397,4 +482,5 @@ __all__ = [
     "step1_apply_plan_policy",
     "build_step1_apply_plan",
     "verify_step1_apply_plan",
+    "verify_step1_apply_plan_source_binding",
 ]
