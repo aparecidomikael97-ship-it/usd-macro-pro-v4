@@ -9,6 +9,25 @@ from atlasquant_aion_business_expansion_cycle_audit_ledger import (
 )
 
 
+def _genesis(scope="pilot", tenants=None):
+    if tenants is None:
+        tenants = ["tenant-001"]
+    return {
+        "schema": "ATLASQUANT_AION_BUSINESS_SCOPE_EXPANSION_BOUNDARY_PACKET_V1",
+        "state": "EXPLICIT_EXPANSION_DECISION_REQUIRED",
+        "activation_verification_digest": "9" * 64,
+        "current_scope": scope,
+        "current_tenant_ids": tenants,
+        "generic_confirmation_is_authorization": False,
+        "automatic_expansion_allowed": False,
+        "scope_expansion_authorized": False,
+        "expansion_execution_authorized": False,
+        "client_actions_authorized": False,
+        "billing_authorized": False,
+        "executes_action": False,
+    }
+
+
 def _verification(
     digest_char="a",
     auth_char="b",
@@ -43,8 +62,29 @@ def _verification(
 
 
 class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
-    def test_empty_template_is_integrity_valid(self):
+    def test_unbound_genesis_is_integrity_valid_but_not_appendable(self):
         ledger = expansion_cycle_ledger_template()
+        audit = audit_expansion_cycle_ledger(ledger)
+        self.assertTrue(audit["integrity_verified"])
+        self.assertFalse(audit["genesis_bound"])
+        result = append_verified_expansion_cycle(ledger, _verification())
+        self.assertEqual(result["state"], "EXPANSION_CYCLE_APPEND_BLOCKED")
+        self.assertIn("genesis_boundary_required", result["blockers"])
+
+    def test_first_cycle_must_match_genesis_boundary(self):
+        ledger = expansion_cycle_ledger_template(_genesis())
+        verification = _verification(
+            previous_scope="pilot",
+            previous_tenants=["tenant-999"],
+            verified_scope="pilot",
+            verified_tenants=["tenant-999", "tenant-1000"],
+        )
+        result = append_verified_expansion_cycle(ledger, verification)
+        self.assertEqual(result["state"], "EXPANSION_CYCLE_APPEND_BLOCKED")
+        self.assertIn("genesis_tenant_mismatch", result["blockers"])
+
+    def test_empty_template_is_integrity_valid(self):
+        ledger = expansion_cycle_ledger_template(_genesis())
         audit = audit_expansion_cycle_ledger(ledger)
         self.assertTrue(audit["integrity_verified"])
         self.assertEqual(audit["entry_count"], 0)
@@ -53,7 +93,7 @@ class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
 
     def test_first_verified_cycle_is_recorded(self):
         result = append_verified_expansion_cycle(
-            expansion_cycle_ledger_template(),
+            expansion_cycle_ledger_template(_genesis()),
             _verification(),
         )
         self.assertEqual(result["state"], "VERIFIED_EXPANSION_CYCLE_RECORDED")
@@ -66,7 +106,7 @@ class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
 
     def test_second_cycle_requires_exact_continuity(self):
         first = append_verified_expansion_cycle(
-            expansion_cycle_ledger_template(),
+            expansion_cycle_ledger_template(_genesis()),
             _verification(),
         )["ledger"]
         second_verification = _verification(
@@ -87,7 +127,7 @@ class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
     def test_replay_is_blocked(self):
         verification = _verification()
         first = append_verified_expansion_cycle(
-            expansion_cycle_ledger_template(),
+            expansion_cycle_ledger_template(_genesis()),
             verification,
         )["ledger"]
         replay = append_verified_expansion_cycle(first, verification)
@@ -96,7 +136,7 @@ class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
 
     def test_history_drift_is_blocked(self):
         first = append_verified_expansion_cycle(
-            expansion_cycle_ledger_template(),
+            expansion_cycle_ledger_template(_genesis()),
             _verification(),
         )["ledger"]
         drift = _verification(
@@ -117,7 +157,7 @@ class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
             verified_tenants=["tenant-001"],
         )
         result = append_verified_expansion_cycle(
-            expansion_cycle_ledger_template(),
+            expansion_cycle_ledger_template(_genesis()),
             bad,
         )
         self.assertEqual(result["state"], "EXPANSION_CYCLE_APPEND_BLOCKED")
@@ -125,7 +165,7 @@ class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
 
     def test_corrupted_entry_digest_blocks_ledger(self):
         ledger = append_verified_expansion_cycle(
-            expansion_cycle_ledger_template(),
+            expansion_cycle_ledger_template(_genesis()),
             _verification(),
         )["ledger"]
         ledger["entries"][0]["entry_digest"] = "0" * 64
@@ -134,7 +174,7 @@ class BusinessExpansionCycleAuditLedgerTests(unittest.TestCase):
         self.assertIn("entry_1_digest_mismatch", audit["blockers"])
 
     def test_generic_operational_flags_can_never_be_true(self):
-        ledger = expansion_cycle_ledger_template()
+        ledger = expansion_cycle_ledger_template(_genesis())
         ledger["automatic_expansion_allowed"] = True
         audit = audit_expansion_cycle_ledger(ledger)
         self.assertFalse(audit["integrity_verified"])
