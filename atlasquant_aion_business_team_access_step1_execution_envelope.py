@@ -434,6 +434,9 @@ def build_step1_execution_envelope(
         "target_username": materialized["test_username"],
         "tenant_ids": materialized["tenant_ids"],
         "factor_type": materialized["factor_type"],
+        "decided_at": (
+            decided.isoformat() if decided is not None else ""
+        ),
         "observed_at": (
             observed_at.isoformat() if observed_at is not None else ""
         ),
@@ -470,6 +473,11 @@ def build_step1_execution_envelope(
         "baseline_evidence_digest": materialized[
             "baseline_evidence_digest"
         ] if ready else "",
+        "decided_at": (
+            decided.isoformat()
+            if ready and decided is not None
+            else ""
+        ),
         "observed_at": (
             observed_at.isoformat()
             if ready and observed_at is not None
@@ -534,6 +542,7 @@ def verify_step1_execution_envelope(
         if _clean(item, 120)
     ]
     factor = _clean(row.get("factor_type"), 60).upper()
+    decided_at = _parse_time(row.get("decided_at"))
     observed_at = _parse_time(row.get("observed_at"))
     observed_by = _clean(row.get("observed_by"), 120)
     prepared_at = _parse_time(row.get("prepared_at"))
@@ -605,6 +614,9 @@ def verify_step1_execution_envelope(
         "target_username": target_username,
         "tenant_ids": sorted(set(tenants)),
         "factor_type": factor,
+        "decided_at": (
+            decided_at.isoformat() if decided_at is not None else ""
+        ),
         "observed_at": (
             observed_at.isoformat() if observed_at is not None else ""
         ),
@@ -677,9 +689,27 @@ def verify_step1_execution_envelope(
         ),
         "tenant_scope_present": bool(tenants),
         "factor_allowed": factor in ALLOWED_FACTORS,
+        "decided_at_valid": decided_at is not None,
         "observed_at_valid": observed_at is not None,
         "observer_present": bool(observed_by),
         "prepared_at_valid": prepared_at is not None,
+        "decision_not_after_observation": bool(
+            decided_at is not None
+            and observed_at is not None
+            and decided_at <= observed_at
+        ),
+        "decision_age_at_preparation_valid": bool(
+            decided_at is not None
+            and prepared_at is not None
+            and 0 <= (prepared_at - decided_at).total_seconds()
+            <= MAX_DECISION_TO_ENVELOPE_AGE_SECONDS
+        ),
+        "observation_age_at_preparation_valid": bool(
+            observed_at is not None
+            and prepared_at is not None
+            and 0 <= (prepared_at - observed_at).total_seconds()
+            <= MAX_EXECUTION_OBSERVATION_AGE_SECONDS
+        ),
         "observation_not_after_preparation": bool(
             observed_at is not None
             and prepared_at is not None
