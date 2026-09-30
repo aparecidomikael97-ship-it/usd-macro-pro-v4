@@ -53,7 +53,11 @@
     "candidate_auto_selected": false,
     "price_auto_selected": false,
     "first_pilot_contact_authorized": false,
-    "first_pilot_billing_authorized": false
+    "first_pilot_billing_authorized": false,
+    "commercial_live_read_binding_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "commercial_live_write_enabled": false,
+    "raw_contact_pii_in_binding": false,
+    "live_connector_configuration_authorized": false
   },
   "team_access": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -372,9 +376,24 @@
         "docs/aion/AION_INDEPENDENCE_INDEX_V1.md",
         "docs/adr/ADR-0056-independence-clt-index.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-COMMERCIAL-LIVE-READ-BINDING",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_commercial_live_data_binding.py",
+        "test_atlasquant_aion_business_commercial_live_data_binding.py",
+        "docs/aion/AION_BUSINESS_COMMERCIAL_LIVE_DATA_BINDING_V1.md",
+        "docs/adr/ADR-0057-business-commercial-live-data-binding.md"
+      ]
     }
   ],
   "pending": [
+    "COMMERCIAL_LIVE_PROVIDER_SCHEMA_MAPPING",
+    "COMMERCIAL_LIVE_READ_OAUTH_SECRET_STORE",
+    "COMMERCIAL_LIVE_CONNECTOR_PROVIDER_SELECTION",
     "INDEPENDENCE_INDEX_OPTIONAL_SECURE_DATA_BINDING",
     "INDEPENDENCE_INDEX_PRIVATE_INPUT_UI",
     "BACKUP_NONPROD_RESTORE_DRILL",
@@ -382,7 +401,6 @@
     "BACKUP_SECONDARY_COPY_CONFIGURATION",
     "FIRST_PILOT_LEGAL_COMMERCIAL_REVIEW",
     "FIRST_PILOT_REAL_SEGMENT_CANDIDATE_AND_PRICING",
-    "COMMERCIAL_PIPELINE_LIVE_BINDING",
     "EIGHT_ROLE_ROUTER_RUNTIME_VALIDATION",
     "AION_CHECKPOINT_BOOTSTRAP_DEPLOY_VALIDATION",
     "FINOPS_PERSISTENT_LEDGER",
