@@ -439,3 +439,17 @@ human review; automatic upsell is always disabled.
 
 Renewal is likewise review-only and tickets never leave the demo. ADR-0021
 records this retention-before-expansion boundary.
+
+
+## BUSINESS client finance and capacity demo
+
+`atlasquant_aion_business_client_finance_demo.py` separates per-client
+implementation revenue, recurring revenue, cost stack, monthly contribution,
+margin and capacity utilization.
+
+Revenue is never treated as profit. AI, integrations, support, tools, taxes,
+refunds and other costs are explicit. Request and support quotas surface
+capacity pressure before it harms margin or service quality.
+
+Commercial review is advisory only: no automatic repricing, charging or money
+movement is possible. ADR-0022 records this financial truth boundary.

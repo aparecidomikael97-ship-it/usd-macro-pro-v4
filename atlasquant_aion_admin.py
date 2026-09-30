@@ -188,6 +188,11 @@ from atlasquant_aion_business_customer_success_demo import (
     sla_ticket as business_sla_ticket,
     success_plan as business_success_plan,
 )
+from atlasquant_aion_business_client_finance_demo import (
+    client_economics as business_client_economics,
+    portfolio_summary as business_finance_portfolio_summary,
+    pricing_review as business_pricing_review,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6023,6 +6028,195 @@ def _render_business_customer_success_demo() -> None:
         )
 
 
+
+def _render_business_client_finance_demo() -> None:
+    """Session-only client economics and capacity demo. Never moves money."""
+    st.markdown("#### 💰 Central Financeira por Cliente · Demo")
+    st.caption(
+        "Separa receita, custo, margem e capacidade por cliente. "
+        "Dados fictícios; não gera cobrança nem movimenta dinheiro."
+    )
+    simulator = st.session_state.get("aion_business_simulator_result")
+    diagnostic = (
+        simulator.get("diagnostic")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("diagnostic"), Mapping)
+        else {}
+    )
+    fit = (
+        simulator.get("fit")
+        if isinstance(simulator, Mapping) and isinstance(simulator.get("fit"), Mapping)
+        else {}
+    )
+    intake = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    company = str(intake.get("company_name") or "Empresa Demo")
+    package = str(fit.get("package_label") or "A DEFINIR")
+
+    with st.form("aion_business_client_finance_demo_form", clear_on_submit=False):
+        implementation_revenue = st.number_input(
+            "Receita de implantação fictícia (R$)",
+            min_value=0.0,
+            value=2500.0,
+            step=100.0,
+            key="aion_business_fin_implementation",
+        )
+        monthly_revenue = st.number_input(
+            "Receita mensal recorrente fictícia (R$)",
+            min_value=0.0,
+            value=1800.0,
+            step=100.0,
+            key="aion_business_fin_monthly_revenue",
+        )
+        f1,f2,f3 = st.columns(3)
+        ai_cost = f1.number_input(
+            "Custo IA (R$)", min_value=0.0, value=180.0, step=10.0,
+            key="aion_business_fin_ai",
+        )
+        integration_cost = f2.number_input(
+            "Integrações (R$)", min_value=0.0, value=120.0, step=10.0,
+            key="aion_business_fin_integrations",
+        )
+        support_cost = f3.number_input(
+            "Suporte (R$)", min_value=0.0, value=250.0, step=10.0,
+            key="aion_business_fin_support",
+        )
+        f4,f5,f6 = st.columns(3)
+        tool_cost = f4.number_input(
+            "Ferramentas (R$)", min_value=0.0, value=90.0, step=10.0,
+            key="aion_business_fin_tools",
+        )
+        tax_estimate = f5.number_input(
+            "Impostos estimados (R$)", min_value=0.0, value=180.0, step=10.0,
+            key="aion_business_fin_tax",
+        )
+        other_costs = f6.number_input(
+            "Outros custos (R$)", min_value=0.0, value=30.0, step=10.0,
+            key="aion_business_fin_other",
+        )
+        q1,q2 = st.columns(2)
+        monthly_requests = q1.number_input(
+            "Uso mensal / requisições",
+            min_value=0,
+            value=6000,
+            step=100,
+            key="aion_business_fin_requests",
+        )
+        request_quota = q2.number_input(
+            "Quota mensal / requisições",
+            min_value=1,
+            value=10000,
+            step=100,
+            key="aion_business_fin_request_quota",
+        )
+        q3,q4 = st.columns(2)
+        support_hours = q3.number_input(
+            "Horas de suporte usadas",
+            min_value=0.0,
+            value=4.0,
+            step=0.5,
+            key="aion_business_fin_support_hours",
+        )
+        support_hour_quota = q4.number_input(
+            "Quota de suporte (horas)",
+            min_value=0.5,
+            value=8.0,
+            step=0.5,
+            key="aion_business_fin_support_hour_quota",
+        )
+        payment_state = st.selectbox(
+            "Estado de pagamento fictício",
+            ["CURRENT", "DUE_SOON", "UNKNOWN", "OVERDUE_DEMO"],
+            key="aion_business_fin_payment_state",
+        )
+        calculate = st.form_submit_button("Calcular economia do cliente demo")
+
+    if calculate:
+        economics = business_client_economics({
+            "company_name": company,
+            "package_label": package,
+            "implementation_revenue": implementation_revenue,
+            "monthly_revenue": monthly_revenue,
+            "ai_cost": ai_cost,
+            "integration_cost": integration_cost,
+            "support_cost": support_cost,
+            "tool_cost": tool_cost,
+            "tax_estimate": tax_estimate,
+            "other_costs": other_costs,
+            "payment_state": payment_state,
+            "monthly_requests": monthly_requests,
+            "request_quota": request_quota,
+            "support_hours": support_hours,
+            "support_hour_quota": support_hour_quota,
+        })
+        review = business_pricing_review(economics)
+        portfolio = business_finance_portfolio_summary([economics])
+        st.session_state["aion_business_client_finance_demo_result"] = {
+            "economics": economics,
+            "review": review,
+            "portfolio": portfolio,
+        }
+
+    result = st.session_state.get("aion_business_client_finance_demo_result")
+    if not isinstance(result, Mapping):
+        st.info("Calcule o exercício para abrir a visão financeira.")
+        return
+
+    economics = result.get("economics") if isinstance(result.get("economics"), Mapping) else {}
+    eco = economics.get("economics") if isinstance(economics.get("economics"), Mapping) else {}
+    capacity = economics.get("capacity") if isinstance(economics.get("capacity"), Mapping) else {}
+    review = result.get("review") if isinstance(result.get("review"), Mapping) else {}
+
+    view = st.selectbox(
+        "Visão financeira",
+        ("1 · Receita & margem", "2 · Custos", "3 · Capacidade", "4 · Revisão comercial"),
+        key="aion_business_client_finance_view",
+        help="Uma visão por vez para manter a navegação leve no celular.",
+    )
+
+    if view == "1 · Receita & margem":
+        m1,m2,m3,m4 = st.columns(4)
+        m1.metric("Receita mensal", f"R$ {float(eco.get('monthly_revenue') or 0):,.2f}")
+        m2.metric("Custos mensais", f"R$ {float(eco.get('total_monthly_costs') or 0):,.2f}")
+        m3.metric("Contribuição", f"R$ {float(eco.get('monthly_contribution') or 0):,.2f}")
+        margin = eco.get("margin_pct")
+        m4.metric("Margem", "N/D" if margin is None else f"{float(margin):.1f}%")
+        st.caption(
+            "Receita não é lucro. A contribuição mensal é receita menos os custos informados no exercício."
+        )
+
+    elif view == "2 · Custos":
+        st.markdown("**Quebra de custos do cliente demo**")
+        for key,value in dict(eco.get("cost_breakdown") or {}).items():
+            st.write(f"{key}: **R$ {float(value or 0):,.2f}**")
+        st.caption(
+            "Custos de IA, integrações, suporte, ferramentas, impostos estimados e demais itens "
+            "devem ser acompanhados para proteger a margem."
+        )
+
+    elif view == "3 · Capacidade":
+        c1,c2,c3 = st.columns(3)
+        req_pct = capacity.get("request_utilization_pct")
+        support_pct = capacity.get("support_utilization_pct")
+        c1.metric("Uso de requisições", "N/D" if req_pct is None else f"{float(req_pct):.1f}%")
+        c2.metric("Uso de suporte", "N/D" if support_pct is None else f"{float(support_pct):.1f}%")
+        c3.metric("Estado", str(capacity.get("state") or "UNKNOWN"))
+        st.caption(
+            "Quota por cliente ajuda a evitar sobrecarga do AION e protege a margem da operação."
+        )
+
+    else:
+        st.markdown("**Revisão comercial**")
+        st.write(f"Estado: **{review.get('state') or 'UNKNOWN'}**")
+        for reason in list(review.get("reasons") or []):
+            st.markdown(f"- {reason}")
+        st.warning(
+            "Preço, cobrança e reajuste nunca mudam automaticamente. "
+            "Qualquer alteração comercial exige revisão humana e escopo atualizado."
+        )
+    st.caption(
+        "Demo financeiro. Não é contabilidade real, não emite cobrança e não movimenta dinheiro."
+    )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6043,6 +6237,7 @@ def _render_business(
     _render_business_client_portal_demo()
     _render_business_onboarding_demo()
     _render_business_customer_success_demo()
+    _render_business_client_finance_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
