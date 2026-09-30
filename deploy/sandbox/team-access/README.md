@@ -272,3 +272,21 @@ Validate locally:
 
 The validator does not execute Step 1 and does not append to the lifecycle
 ledger.
+
+
+## Step 1 manual execution envelope
+
+After a verified Step 1 decision, collect a new read-only observation using a
+local copy of:
+
+    step1-execution-observation.template.json
+
+The observation must be newer than the decision and must confirm that the
+target account is still absent through a read-only identity-provider lookup.
+
+Build the envelope:
+
+    python build_team_access_step1_execution_envelope.py <materialization.json> <step1-packet.json> <verified-step1-decision.json> <execution-observation.json> --output <step1-execution-envelope.json>
+
+The envelope expires quickly and does not generate or execute a provider
+command. Physical Step 1 execution remains a separate boundary.

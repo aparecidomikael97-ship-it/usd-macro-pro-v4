@@ -406,6 +406,9 @@ from atlasquant_aion_business_team_access_step1_preflight_package import (
 from atlasquant_aion_business_team_access_step1_decision_record import (
     step1_decision_requirements as business_team_step1_decision_requirements,
 )
+from atlasquant_aion_business_team_access_step1_execution_envelope import (
+    step1_execution_envelope_policy as business_team_step1_execution_envelope_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7360,6 +7363,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "49 · Equipe & Acessos · Authorization Package",
             "50 · Equipe & Acessos · Step 1 Preflight",
             "51 · Equipe & Acessos · Step 1 Decision",
+            "52 · Equipe & Acessos · Step 1 Execution Envelope",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8287,7 +8291,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Estado máximo: READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET."
         )
 
-    else:
+    elif view == "51 · Equipe & Acessos · Step 1 Decision":
         decision = business_team_step1_decision_requirements()
         st.write(f"Estado: **{decision.get('state')}**")
         st.markdown("**Token formal obrigatório:**")
@@ -8306,6 +8310,28 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Estado máximo: EXPLICIT_SANDBOX_STEP_1_DECISION_RECORD_VERIFIED · "
             "step_execution_performed=false · executor OFF."
+        )
+
+    else:
+        envelope = business_team_step1_execution_envelope_policy()
+        st.write(f"Estado: **{envelope.get('state')}**")
+        st.markdown("**Revalidação pós-decisão obrigatória:**")
+        for item in (
+            "nova observação depois da decisão",
+            "target account ainda ausente",
+            "lookup read-only no identity provider",
+            "mesma session + baseline",
+            "health/OIDC/registry válidos",
+            "secrets locais + produção ausente + cleanup pronto",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O envelope não gera comando e não executa Keycloak. "
+            "Ele apenas prepara a última fronteira read-only antes de um apply manual."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_APPLY · "
+            "physical_execution_performed=false."
         )
 
 
