@@ -1,0 +1,40 @@
+{
+  "realm": "atlasquant-sandbox",
+  "enabled": true,
+  "displayName": "AtlasQuant Team Access Sandbox",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": false,
+  "bruteForceProtected": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "external",
+  "eventsEnabled": true,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+  "clients": [
+    {
+      "clientId": "atlasquant-admin-sandbox",
+      "name": "AtlasQuant Admin Sandbox",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:8501/*",
+        "http://localhost:8501/*"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1:8501",
+        "http://localhost:8501"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ]
+}
