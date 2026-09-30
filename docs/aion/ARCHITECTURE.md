@@ -657,3 +657,23 @@ regression yields `ROLLBACK_REVIEW_REQUIRED`. Rollback remains human-reviewed,
 non-automatic and non-executing.
 
 ADR-0035 records this post-step verification boundary.
+
+## BUSINESS sequential consolidation progress ledger V1
+
+`atlasquant_aion_business_consolidation_progress_ledger.py` maintains the
+offline read-only progression state for verified future merge steps across
+#394–#412.
+
+Only `STEP_VERIFIED_FOR_NEXT_PREFLIGHT` receipts can enter the ledger. PRs must
+appear in exact canonical order; receipt digests and resulting main SHAs must be
+unique; and each step's rollback reference must equal the resulting main SHA of
+the previous verified step. The first step is anchored to an externally supplied
+root main SHA.
+
+A valid partial prefix yields `READY_FOR_NEXT_PREFLIGHT`. Any skip, duplicate
+or broken rollback chain yields `LEDGER_BLOCKED`. After all 19 verified steps,
+the maximum state is `CONSOLIDATION_COMPLETE_REVIEW_REQUIRED`; final CI,
+UI/mobile, final SHA and runtime posture still require human review and deploy
+remains a separate decision.
+
+ADR-0036 records this deterministic progression boundary.
