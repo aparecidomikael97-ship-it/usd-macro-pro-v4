@@ -933,3 +933,21 @@ execution or wider authority.
 
 ADR-0052 records this boundary.
 
+## BUSINESS B2B recurring revenue offer
+
+`atlasquant_aion_business_b2b_revenue_offer.py` composes the existing Business
+diagnostic, proposal, capacity, privacy, SLA, onboarding, integration and
+financial layers into one initial recurring B2B offer.
+
+The first productized offer is AION Atendimento & Automação Comercial, using an
+implementation fee plus monthly recurring revenue. Pricing is not invented by
+the system: caller-supplied verified costs and an administrator-defined minimum
+margin produce a mathematical sustainability floor. Capacity must exist before
+the offer can reach admin sales review.
+
+The commercial pipeline is sequential through qualification, diagnostic,
+proposal, contract, onboarding, delivery, customer health and renewal/expansion.
+No stage is physically advanced by this layer.
+
+ADR-0053 records this boundary.
+
