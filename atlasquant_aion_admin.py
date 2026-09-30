@@ -327,6 +327,10 @@ from atlasquant_aion_eight_role_router import (
 from atlasquant_aion_core_master_checkpoint_bootstrap import (
     master_checkpoint_bootstrap_snapshot as aion_master_checkpoint_bootstrap_snapshot,
 )
+from atlasquant_aion_business_b2b_revenue_offer import (
+    priority_offer_template as business_priority_offer_template,
+    revenue_priority_snapshot as business_revenue_priority_snapshot,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7256,6 +7260,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "24 · Gestor de Capacidade & Escala",
             "25 · FinOps & Tesouraria",
             "26 · AION · Roteador dos 8 papéis",
+            "27 · Oferta B2B & Receita",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7692,7 +7697,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Nenhum gasto, transferência, trade ou aumento de orçamento é executado por esta camada."
         )
 
-    else:
+    elif view == "26 · AION · Roteador dos 8 papéis":
         checkpoint = aion_master_checkpoint_bootstrap_snapshot()
         registry = aion_eight_role_registry(checkpoint)
         st.write(f"Estado: **{registry.get('state')}**")
@@ -7710,6 +7715,28 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "O roteador ativa somente os papéis necessários para cada tarefa, "
             "com limite de custo e sem criar oito IAs independentes."
+        )
+
+    else:
+        offer = business_priority_offer_template()
+        priority = business_revenue_priority_snapshot()
+        st.write(f"Estado: **{offer.get('state')}**")
+        st.markdown(f"**Oferta prioritária:** {offer.get('label')}")
+        st.markdown(f"**Modelo:** {offer.get('commercial_model')}")
+        st.markdown("**Entregas-base:**")
+        for item in list(offer.get("deliverables") or []):
+            st.markdown(f"- {item}")
+        st.info(
+            "Preço não é inventado pelo AION. Ele é revisado a partir do custo real, "
+            "margem mínima definida pelo administrador, capacidade e escopo."
+        )
+        st.warning(
+            "Oferta pronta internamente não significa cliente contratado. "
+            "Contato, proposta enviada, assinatura, cobrança e onboarding real continuam em gates separados."
+        )
+        st.caption(
+            "Negócios permanece como motor de receita de curto prazo; "
+            "dropshipping fora da prioridade e Trade não é necessário para bancar o ecossistema."
         )
 
 
