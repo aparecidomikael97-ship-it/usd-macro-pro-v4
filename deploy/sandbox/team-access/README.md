@@ -140,3 +140,39 @@ out-of-order steps, duplicate evidence or a broken chain.
 
 The ledger never stores passwords, tokens, raw provider responses or production
 credentials.
+
+
+## Windows operator kit
+
+The recommended local flow is now explicit and guarded.
+
+Prepare a local secret file without displaying secret values:
+
+    .\Prepare-TeamAccessSandboxEnv.ps1
+
+The command above is PLAN ONLY. To create sandbox.env.local explicitly:
+
+    .\Prepare-TeamAccessSandboxEnv.ps1 -Apply
+
+Check readiness without starting containers:
+
+    .\Get-TeamAccessSandboxReadiness.ps1
+
+Run the combined operator in PLAN ONLY mode:
+
+    .\Invoke-TeamAccessSandboxOperator.ps1
+
+Explicitly start and verify the local sandbox:
+
+    .\Invoke-TeamAccessSandboxOperator.ps1 -ApplyStart
+
+Explicitly start, verify, collect and validate the sanitized baseline:
+
+    .\Invoke-TeamAccessSandboxOperator.ps1 -ApplyStart -CollectBaseline
+
+The readiness report is stored under
+.atlasquant_sandbox_operator and that directory is ignored by Git.
+
+The operator kit never performs any lifecycle step. Account creation, MFA,
+registry writes, account disable and session revocation remain behind the
+separate lifecycle authorization and one-step gates.
