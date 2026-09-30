@@ -1153,3 +1153,22 @@ The maximum automatic application state is
 never invokes Docker or external providers.
 
 ADR-0065 records this boundary.
+
+
+## BUSINESS team access sandbox evidence
+
+`atlasquant_aion_business_team_access_sandbox_evidence.py` validates a
+sanitized baseline captured from the local physical sandbox before lifecycle
+testing.
+
+The baseline proves the expected services are running, the OIDC issuer is local,
+the registry schema exists, the pinned images match and the infrastructure
+artifacts have SHA-256 fingerprints. Local evidence files stay outside version
+control.
+
+The maximum automatic state is
+`READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW`. Account creation,
+MFA enrollment, registry writes and session revocation remain separate manual
+sandbox tests.
+
+ADR-0066 records this boundary.

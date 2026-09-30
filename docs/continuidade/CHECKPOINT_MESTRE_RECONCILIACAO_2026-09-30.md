@@ -82,6 +82,13 @@ localhost-only, usa Keycloak 26.7.5 + PostgreSQL 18.6, mantém secrets fora do G
 e exige `-Apply` explícito para iniciar containers. Nenhum container foi
 iniciado por esta camada.
 
+Estado da evidência baseline do sandbox de Equipe & Acessos:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_sandbox_evidence.py`, ADR-0066 e testes
+associados. A coleta é read-only, sanitizada e local; observa serviços, OIDC,
+schema do registry e hashes dos artefatos sem incluir secrets. O máximo é
+`READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW`.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -354,3 +361,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-PRODUCTION-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Conta individual, MFA forte, registry read-back e revogação viram gates de produção |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-E2E | IMPLEMENTADO / EM VALIDAÇÃO | Keycloak + OIDC, PostgreSQL e revogação via adapter formam o sandbox E2E |
 | D-2026-09-30-TEAM-ACCESS-PHYSICAL-SANDBOX | IMPLEMENTADO / EM VALIDAÇÃO | Sandbox local reproduzível, localhost-only e com partida manual explícita |
+| D-2026-09-30-TEAM-ACCESS-SANDBOX-EVIDENCE | IMPLEMENTADO / EM VALIDAÇÃO | Baseline local sanitizado prepara revisão antes do lifecycle manual |

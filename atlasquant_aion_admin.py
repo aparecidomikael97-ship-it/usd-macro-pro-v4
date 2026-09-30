@@ -370,6 +370,9 @@ from atlasquant_aion_business_team_access_physical_sandbox import (
     physical_sandbox_policy as business_team_physical_sandbox_policy,
     sandbox_command_plan as business_team_physical_sandbox_command_plan,
 )
+from atlasquant_aion_business_team_access_sandbox_evidence import (
+    sandbox_evidence_policy as business_team_sandbox_evidence_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7312,6 +7315,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "37 · Equipe & Acessos · Producao",
             "38 · Equipe & Acessos · Sandbox E2E",
             "39 · Equipe & Acessos · Sandbox Fisico",
+            "40 · Equipe & Acessos · Evidencias Sandbox",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7993,7 +7997,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Produção, deploy e runtime permanecem separados."
         )
 
-    else:
+    elif view == "39 · Equipe & Acessos · Sandbox Fisico":
         physical = business_team_physical_sandbox_policy()
         commands = business_team_physical_sandbox_command_plan()
         st.write(f"Estado: **{physical.get('state')}**")
@@ -8012,6 +8016,27 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Produção continua proibida nesta camada. O sandbox local precisa ser verificado "
             "antes de gerar qualquer evidência E2E."
+        )
+
+    else:
+        evidence = business_team_sandbox_evidence_policy()
+        st.write(f"Estado: **{evidence.get('state')}**")
+        st.markdown("**Baseline observado:**")
+        for item in (
+            "3 serviços Docker esperados",
+            "issuer OIDC local",
+            "schema registry_revisions + team_memberships",
+            "imagens pinadas",
+            "SHA-256 de compose, realm e schema",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A coleta é somente leitura e salva o pacote local fora do Git. "
+            "Senha, token, client secret e headers de autorização não entram na evidência."
+        )
+        st.caption(
+            "O máximo é READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW. "
+            "Conta, MFA, registry write e revogação continuam em teste manual separado."
         )
 
 
