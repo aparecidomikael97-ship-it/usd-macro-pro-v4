@@ -737,3 +737,22 @@ their own boundaries.
 
 The module performs no runtime activation, traffic switch, deploy or external
 action. ADR-0040 records this boundary.
+
+## BUSINESS post-activation verification and expansion boundary
+
+atlasquant_aion_business_post_activation_expansion_boundary.py verifies evidence
+from a future bounded runtime activation executed through a separate path. The
+observed scope and tenant set must match the authorized execution-review packet
+exactly.
+
+Application health, observability, tenant isolation, privacy guardrails,
+support readiness, billing guardrail and rollback readiness must all succeed.
+A verified receipt reaches RUNTIME_ACTIVATION_VERIFIED_SCOPE_FROZEN.
+
+Success does not authorize growth. Only a separate
+EXPLICIT_EXPANSION_DECISION_REQUIRED packet may be produced, with token
+AUTHORIZE_BUSINESS_SCOPE_EXPANSION. Automatic expansion, billing and client
+actions remain false.
+
+The module performs no activation, expansion, deploy, rollback or external
+action. ADR-0041 records this boundary.
