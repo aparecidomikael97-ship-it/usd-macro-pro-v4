@@ -172,6 +172,15 @@ from atlasquant_aion_business_client_portal_demo import (
     portal_attention_summary as business_portal_attention_summary,
     portal_section as business_portal_section,
 )
+from atlasquant_aion_business_onboarding_demo import (
+    ACCESS_CATEGORIES as BUSINESS_ONBOARDING_ACCESS_CATEGORIES,
+    PHASES as BUSINESS_ONBOARDING_PHASES,
+    build_implementation_plan as business_build_implementation_plan,
+    go_live_review_packet as business_go_live_review_packet,
+    minimum_access_plan as business_minimum_access_plan,
+    onboarding_intake as business_onboarding_intake,
+    onboarding_status as business_onboarding_status,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -5659,6 +5668,161 @@ def _render_business_client_portal_demo() -> None:
     )
 
 
+
+def _render_business_onboarding_demo() -> None:
+    """Teach the post-sale onboarding path using session-only demo data."""
+    st.markdown("#### 🧩 Onboarding + Implantação · Demo")
+    st.caption(
+        "Mostra como o cliente sai da proposta e chega à implantação controlada. "
+        "Sem credenciais reais, sem conexão externa e sem runtime."
+    )
+    simulator = st.session_state.get("aion_business_simulator_result")
+    if not isinstance(simulator, Mapping):
+        st.info(
+            "Gere primeiro um exercício no simulador. O onboarding usa o pacote e o objetivo "
+            "da mesma empresa fictícia."
+        )
+        return
+
+    diagnostic = simulator.get("diagnostic") if isinstance(simulator.get("diagnostic"), Mapping) else {}
+    fit = simulator.get("fit") if isinstance(simulator.get("fit"), Mapping) else {}
+    intake_source = diagnostic.get("intake") if isinstance(diagnostic.get("intake"), Mapping) else {}
+    company = str(intake_source.get("company_name") or "Empresa Demo")
+    package = str(fit.get("package_label") or "A DEFINIR")
+
+    with st.form("aion_business_onboarding_demo_form", clear_on_submit=False):
+        owner = st.text_input(
+            "Responsável fictício da empresa",
+            value="Responsável Demo",
+            key="aion_business_onboarding_owner",
+        )
+        goal = st.text_area(
+            "Objetivo do onboarding",
+            value=str(intake_source.get("notes") or "Implantar o pacote com escopo e métricas claras."),
+            key="aion_business_onboarding_goal",
+        )
+        access_requested = st.multiselect(
+            "Integrações que o exercício diz precisar",
+            list(BUSINESS_ONBOARDING_ACCESS_CATEGORIES),
+            default=[],
+            key="aion_business_onboarding_access",
+        )
+        create_plan = st.form_submit_button("Montar plano de implantação")
+
+    if create_plan:
+        intake = business_onboarding_intake(
+            company_name=company,
+            package_label=package,
+            business_owner=owner,
+            business_goal=goal,
+            requested_channels=list(intake_source.get("channels") or []),
+            requested_integrations=access_requested,
+        )
+        access_flags = {name: name in access_requested for name in BUSINESS_ONBOARDING_ACCESS_CATEGORIES}
+        access = business_minimum_access_plan(intake, access_flags)
+        plan = business_build_implementation_plan(intake, access)
+        st.session_state["aion_business_onboarding_demo_result"] = {
+            "intake": intake,
+            "access": access,
+            "plan": plan,
+        }
+
+    result = st.session_state.get("aion_business_onboarding_demo_result")
+    if not isinstance(result, Mapping):
+        st.info("Monte o plano para visualizar as etapas.")
+        return
+
+    intake = result.get("intake") if isinstance(result.get("intake"), Mapping) else {}
+    access = result.get("access") if isinstance(result.get("access"), Mapping) else {}
+    plan = result.get("plan") if isinstance(result.get("plan"), Mapping) else {}
+
+    stage = st.selectbox(
+        "Etapa do onboarding",
+        (
+            "1 · Escopo",
+            "2 · Dados & acessos",
+            "3 · Integrações",
+            "4 · Sandbox",
+            "5 · Validação",
+            "6 · Entrega assistida",
+            "7 · Status",
+        ),
+        key="aion_business_onboarding_stage",
+        help="Uma etapa por vez para facilitar o uso pelo celular.",
+    )
+
+    if stage == "1 · Escopo":
+        st.markdown(f"**Empresa:** {intake.get('company_name') or 'Demo'}")
+        st.markdown(f"**Pacote:** {intake.get('package_label') or 'A DEFINIR'}")
+        st.markdown(f"**Responsável:** {intake.get('business_owner') or 'A DEFINIR'}")
+        st.markdown("**Objetivo**")
+        st.write(str(intake.get("business_goal") or ""))
+        st.caption("Nenhum preço, credencial ou ação externa é definido nesta etapa.")
+
+    elif stage == "2 · Dados & acessos":
+        st.markdown("**Princípio: acesso mínimo necessário**")
+        for item in list(access.get("items") or []):
+            if isinstance(item, Mapping) and item.get("needed"):
+                st.markdown(
+                    f"- **{item.get('category')}** — {item.get('access_level')} · "
+                    "aprovação necessária"
+                )
+        st.caption("Este demo não coleta nem armazena valor de senha/token/chave.")
+
+    elif stage == "3 · Integrações":
+        requested = list(intake.get("requested_integrations") or [])
+        if requested:
+            for item in requested:
+                st.markdown(f"- {item}: **PLANEJADA PARA SANDBOX**")
+        else:
+            st.info("Nenhuma integração selecionada neste exercício.")
+        st.caption("Conexão real não é feita neste demo.")
+
+    elif stage == "4 · Sandbox":
+        st.success("Primeiro ambiente: **SANDBOX / ISOLADO**")
+        st.write(
+            "Fluxos são montados e testados antes de qualquer futura ativação operacional."
+        )
+        st.caption("Runtime produtivo continua OFF.")
+
+    elif stage == "5 · Validação":
+        plan_body = plan.get("plan") if isinstance(plan.get("plan"), Mapping) else {}
+        for item in list(plan_body.get("validation_checklist") or []):
+            st.markdown(f"- [ ] {item}")
+        st.caption("Checklist visual do demo; não registra aprovação real.")
+
+    elif stage == "6 · Entrega assistida":
+        st.write(
+            "A entrega assistida só prepara a futura transição. Ela não liga runtime, "
+            "não envia mensagens e não autoriza cobrança."
+        )
+        st.warning(
+            "Qualquer go-live real exige gate separado, evidência e aprovação humana específica."
+        )
+
+    else:
+        demo_completed = st.multiselect(
+            "Marque as fases concluídas somente neste exercício",
+            list(BUSINESS_ONBOARDING_PHASES),
+            default=[],
+            key="aion_business_onboarding_completed",
+        )
+        status = business_onboarding_status(plan, demo_completed)
+        st.progress(int(round(status.get("progress_pct") or 0)))
+        st.write(
+            f"Progresso do exercício: **{status.get('completed_count')}/{status.get('total_phases')} "
+            f"({status.get('progress_pct'):.0f}%)**"
+        )
+        packet = business_go_live_review_packet(plan, status)
+        if packet.get("state") == "LIVE_REVIEW_REQUIRED":
+            st.success("Demo concluído: pode ser preparado um pedido separado de revisão de go-live.")
+        else:
+            st.info("Ainda existem fases do exercício a concluir.")
+        st.caption(
+            "Mesmo com 100% no demo: runtime não é autorizado automaticamente e permanece OFF."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -5677,6 +5841,7 @@ def _render_business(
     _render_business_guided_training()
     _render_business_diagnostic_proposal_simulator()
     _render_business_client_portal_demo()
+    _render_business_onboarding_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,

@@ -908,6 +908,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_onboarding_demo_is_sandbox_first_and_never_collects_secrets(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_onboarding_demo()", src)
+        self.assertIn("Onboarding + Implantação · Demo", src)
+        self.assertIn("acesso mínimo necessário", src)
+        self.assertIn("não coleta nem armazena valor de senha/token/chave", src)
+        self.assertIn("SANDBOX / ISOLADO", src)
+        self.assertIn("Qualquer go-live real exige gate separado", src)
+        self.assertIn("runtime não é autorizado automaticamente", src)
+        self.assertIn("_render_business_onboarding_demo()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_client_portal_demo_is_simple_and_read_only(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_client_portal_demo()", src)
