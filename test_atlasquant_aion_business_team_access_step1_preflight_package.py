@@ -289,6 +289,9 @@ class TeamAccessStep1PreflightPackageTests(unittest.TestCase):
             "deploy/sandbox/team-access/Get-TeamAccessStep1ReadinessObservation.ps1"
         ).read_text(encoding="utf-8")
         self.assertIn("$env:LOCALAPPDATA", script)
+        self.assertIn("$LocalPrefix", script)
+        self.assertIn("$OutputResolved", script)
+        self.assertIn("outside the repository tree", script)
         self.assertIn("Test-TeamAccessSandbox.ps1", script)
         self.assertIn("Test-TeamAccessRegistry.ps1", script)
         self.assertIn("external_mutations_executed = $false", script)
