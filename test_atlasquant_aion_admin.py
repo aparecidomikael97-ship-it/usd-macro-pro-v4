@@ -908,6 +908,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_trend_intelligence_is_evidence_first_and_never_auto_launches(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_trend_intelligence_demo()", src)
+        self.assertIn("Radar de Tendências & Melhoria Contínua · Demo", src)
+        self.assertIn("Por que uma tendência não pode ser só opinião", src)
+        self.assertIn("Experimento controlado", src)
+        self.assertIn("Monitoramento contínuo real ainda está OFF", src)
+        self.assertIn("O AION observa → valida → testa → mede → submete para revisão", src)
+        self.assertIn("_render_business_trend_intelligence_demo()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_client_finance_demo_separates_revenue_profit_and_capacity(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_client_finance_demo()", src)
