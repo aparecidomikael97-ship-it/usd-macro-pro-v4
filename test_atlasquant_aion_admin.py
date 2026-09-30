@@ -1007,6 +1007,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("runtime, piloto e ações com cliente real permanecem OFF", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_deploy_verification_runtime_boundary_keeps_activation_separate(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("15 · Verificação de deploy & fronteira de runtime", src)
+        self.assertIn("Token explícito reservado para deploy-only", src)
+        self.assertIn("Checks obrigatórios depois de um deploy futuro", src)
+        self.assertIn("runtime ainda OFF", src)
+        self.assertIn("AUTHORIZE_BUSINESS_RUNTIME_ACTIVATION", src)
+        self.assertIn("não executa deploy e não ativa runtime", src)
+        self.assertIn("Mensagem genérica como 'vamos lá'", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
