@@ -42,7 +42,7 @@ Get-TeamAccessSandboxReadiness.ps1 verifica:
 - compose config válido;
 - ausência de nome de produção.
 
-O relatório não contém secrets e não inicia containers.
+O relatório não contém secrets, é gravado por padrão fora do repositório em `%LOCALAPPDATA%`, e não inicia containers.
 
 ## Operador
 
