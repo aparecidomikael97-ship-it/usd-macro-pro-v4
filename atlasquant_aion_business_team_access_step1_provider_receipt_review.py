@@ -174,12 +174,40 @@ def validate_provider_receipt_and_preview_ledger(
     )
 
     packet_ledger = _mapping(packet.get("ledger"))
+    materialization_digest = _clean(
+        materialized.get("materialization_digest"), 80
+    ).lower()
+    materialized_plan_digest = _clean(
+        lifecycle_plan.get("plan_digest"), 80
+    ).lower()
 
     gates = {
         "materialization_schema_valid": materialized.get("schema")
         == MATERIALIZATION_SCHEMA,
         "materialization_state_ready": materialized.get("state")
         == "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_REVIEW",
+        "materialization_digest_valid": bool(
+            _DIGEST64.fullmatch(materialization_digest)
+        ),
+        "materialization_digest_matches_authorization": bool(
+            materialization_digest
+            == _clean(auth.get("materialization_digest"), 80).lower()
+        ),
+        "materialization_digest_matches_envelope": bool(
+            materialization_digest
+            == _clean(envelope.get("materialization_digest"), 80).lower()
+        ),
+        "materialized_plan_digest_valid": bool(
+            _DIGEST64.fullmatch(materialized_plan_digest)
+        ),
+        "plan_digest_matches_apply_plan": bool(
+            materialized_plan_digest
+            == _clean(plan_artifact.get("plan_digest"), 80).lower()
+        ),
+        "plan_digest_matches_envelope": bool(
+            materialized_plan_digest
+            == _clean(envelope.get("plan_digest"), 80).lower()
+        ),
         "authorization_binding_match": auth_binding.get(
             "binding_match"
         ) is True,
@@ -216,6 +244,7 @@ def validate_provider_receipt_and_preview_ledger(
         ),
         "provider_receipt_schema_valid": receipt.get("schema")
         == PROVIDER_RECEIPT_SCHEMA,
+        "provider_receipt_version_valid": receipt.get("version") == VERSION,
         "provider_receipt_state_valid": receipt.get("state")
         == "STEP1_PROVIDER_APPLY_EXECUTED_PENDING_LEDGER_REVIEW",
         "apply_plan_digest_valid": bool(
@@ -303,6 +332,11 @@ def validate_provider_receipt_and_preview_ledger(
     normalized_provider_evidence = {
         "schema": PROVIDER_RECEIPT_SCHEMA,
         "version": VERSION,
+        "materialization_digest": materialization_digest,
+        "plan_digest": materialized_plan_digest,
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower(),
         "apply_plan_digest": receipt_apply_digest,
         "runner_preflight_digest": receipt_runner_digest,
         "execution_envelope_digest": receipt_envelope_digest,
@@ -379,6 +413,11 @@ def validate_provider_receipt_and_preview_ledger(
 
     review_payload = {
         "provider_evidence_digest": provider_evidence_digest,
+        "materialization_digest": materialization_digest,
+        "plan_digest": materialized_plan_digest,
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower(),
         "canonical_receipt_digest": _clean(
             canonical_receipt.get("receipt_digest"), 80
         ).lower(),
