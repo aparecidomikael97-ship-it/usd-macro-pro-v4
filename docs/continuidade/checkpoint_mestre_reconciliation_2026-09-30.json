@@ -158,7 +158,8 @@
       442,
       443,
       444,
-      445
+      445,
+      446
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -175,7 +176,8 @@
     "first_pilot_pricing_review_pr": 442,
     "backup_recovery_policy_pr": 443,
     "independence_index_pr": 444,
-    "commercial_live_read_binding_pr": 445
+    "commercial_live_read_binding_pr": 445,
+    "finops_live_cost_ledger_pr": 446
   },
   "decisions": [
     {
@@ -390,9 +392,24 @@
         "docs/aion/AION_BUSINESS_COMMERCIAL_LIVE_DATA_BINDING_V1.md",
         "docs/adr/ADR-0057-business-commercial-live-data-binding.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-FINOPS-LIVE-COST-LEDGER",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_finops_live_cost_ledger.py",
+        "test_atlasquant_aion_finops_live_cost_ledger.py",
+        "docs/aion/AION_FINOPS_LIVE_COST_LEDGER_V1.md",
+        "docs/adr/ADR-0058-finops-live-cost-ledger.md"
+      ]
     }
   ],
   "pending": [
+    "FINOPS_REAL_INVOICE_RECONCILIATION",
+    "FINOPS_LEDGER_VERSIONED_PERSISTENCE_BINDING",
+    "FINOPS_PROVIDER_READ_CONNECTOR_CONFIGURATION",
     "COMMERCIAL_LIVE_PROVIDER_SCHEMA_MAPPING",
     "COMMERCIAL_LIVE_READ_OAUTH_SECRET_STORE",
     "COMMERCIAL_LIVE_CONNECTOR_PROVIDER_SELECTION",
@@ -405,8 +422,6 @@
     "FIRST_PILOT_REAL_SEGMENT_CANDIDATE_AND_PRICING",
     "EIGHT_ROLE_ROUTER_RUNTIME_VALIDATION",
     "AION_CHECKPOINT_BOOTSTRAP_DEPLOY_VALIDATION",
-    "FINOPS_PERSISTENT_LEDGER",
-    "FINOPS_LIVE_PROVIDER_COST_BINDING",
     "CAPACITY_SCALE_LIVE_METRICS_BINDING",
     "TEAM_RBAC_PRODUCTION_BINDING",
     "BUSINESS_UPDATED_PDF"
@@ -435,7 +450,12 @@
     "persistent_financial_ledger": false,
     "automatic_spending": false,
     "automatic_transfer": false,
-    "automatic_trade": false
+    "automatic_trade": false,
+    "live_cost_contract_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "ledger_contract_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "ledger_model": "APPEND_ONLY_HASH_CHAIN",
+    "provider_connectors_configured": false,
+    "automatic_payment": false
   },
   "checkpoint_bootstrap": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",

@@ -1014,3 +1014,18 @@ The maximum automatic state is
 
 ADR-0057 records this boundary.
 
+## AION FinOps live cost ledger
+
+`atlasquant_aion_finops_live_cost_ledger.py` accepts externally attested
+read-only cost observations and converts them into a deterministic append-only
+hash chain.
+
+Direct costs require a tenant; shared costs cannot name one. The verified
+ledger can feed the existing Budget Governor and produce an administrator-driven
+tenant cost allocation view. Any retroactive change breaks digest verification.
+
+Provider connectors, physical persistence, payments, plan changes and pricing
+actions remain outside this module.
+
+ADR-0058 records this boundary.
+
