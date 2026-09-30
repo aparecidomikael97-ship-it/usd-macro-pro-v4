@@ -175,6 +175,15 @@ health/OIDC/registry/baseline expira após 900 segundos. Se qualquer pré-requis
 falhar, o Step Gate interno não é avaliado. Nenhuma decisão de Step 1 foi
 registrada e nenhuma etapa foi executada.
 
+Estado do explicit Step 1 decision record:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_step1_decision_record.py`, ADR-0077 e
+testes associados. O token formal é específico de
+CREATE_INDIVIDUAL_SANDBOX_ACCOUNT; mensagens genéricas não autorizam. No momento
+da decisão, o packet pode ter no máximo 300 segundos e a observação no máximo
+900 segundos. Nenhuma decisão real foi registrada e Step 1 continua não
+executado.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -458,3 +467,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-MATERIALIZATION | IMPLEMENTADO / EM VALIDAÇÃO | Baseline aceito pode gerar pacote real de 10 steps para revisão, sem autorização automática |
 | D-2026-09-30-TEAM-ACCESS-MATERIALIZED-LIFECYCLE-AUTHORIZATION | IMPLEMENTADO / EM VALIDAÇÃO | Authorization record passa a ficar preso ao materialization digest e package digest antes do ledger/Step Gate |
 | D-2026-09-30-TEAM-ACCESS-ZERO-LEDGER-STEP1-PREFLIGHT | IMPLEMENTADO / EM VALIDAÇÃO | Empty ledger + observação fresca formam somente o pacote para decisão manual do Step 1 |
+| D-2026-09-30-TEAM-ACCESS-EXPLICIT-STEP1-DECISION | IMPLEMENTADO / EM VALIDAÇÃO | Step 1 exige token formal, packet íntegro e freshness; decisão continua separada da execução |

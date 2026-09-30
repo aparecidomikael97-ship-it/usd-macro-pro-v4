@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -187,7 +187,15 @@
     "step1_preflight_packet_integrity_recalculated": true,
     "step1_preflight_packet_binding_required_for_future_decision": true,
     "step1_preflight_empty_ledger_digest_recalculated": true,
-    "step1_preflight_internal_preflight_digest_recalculated": true
+    "step1_preflight_internal_preflight_digest_recalculated": true,
+    "step1_decision_contract_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "step1_decision_generic_language_is_authorization": false,
+    "step1_decision_packet_max_age_seconds": 300,
+    "step1_decision_observation_max_age_seconds": 900,
+    "step1_decision_real_recorded": false,
+    "step1_manual_execution_authorized": false,
+    "step1_execution_performed": false,
+    "step1_ledger_append_authorized": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -297,7 +305,8 @@
       460,
       461,
       463,
-      464
+      464,
+      465
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -332,7 +341,8 @@
     "team_access_sandbox_baseline_acceptance_pr": 460,
     "team_access_sandbox_lifecycle_materialization_pr": 461,
     "team_access_materialized_lifecycle_authorization_pr": 463,
-    "team_access_step1_preflight_package_pr": 464
+    "team_access_step1_preflight_package_pr": 464,
+    "team_access_step1_decision_record_pr": 465
   },
   "decisions": [
     {
@@ -782,9 +792,24 @@
         "build_team_access_step1_preflight_package.py",
         "docs/adr/ADR-0076-business-team-access-zero-ledger-step1-preflight.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-EXPLICIT-STEP1-DECISION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_step1_decision_record.py",
+        "test_atlasquant_aion_business_team_access_step1_decision_record.py",
+        "validate_team_access_step1_decision.py",
+        "docs/adr/ADR-0077-business-team-access-explicit-step1-decision.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_STEP1_PHYSICAL_EXECUTION",
+    "TEAM_ACCESS_STEP1_MANUAL_EXECUTION_ENVELOPE",
+    "TEAM_ACCESS_REAL_STEP1_EXPLICIT_DECISION_RECORD",
     "TEAM_ACCESS_REAL_STEP1_EXPLICIT_DECISION",
     "TEAM_ACCESS_REAL_STEP1_PREFLIGHT_PACKET",
     "TEAM_ACCESS_REAL_STEP1_READINESS_OBSERVATION",

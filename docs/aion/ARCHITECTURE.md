@@ -1339,3 +1339,19 @@ The maximum state is
 record a decision or execute Step 1.
 
 ADR-0076 records this boundary.
+
+
+## BUSINESS team access explicit Step 1 decision
+
+`atlasquant_aion_business_team_access_step1_decision_record.py` separates the
+Step 1 preflight packet from a future explicit human decision.
+
+The decision is bound to the exact Step 1 packet digest, exact Step 1 token and
+the same administrator. Packet age is limited to 300 seconds and the underlying
+read-only observation remains limited to 900 seconds at decision time.
+
+A verified record only sets
+`manual_step1_execution_authorized=true`. It does not execute the step,
+produce a receipt or authorize a ledger append.
+
+ADR-0077 records this boundary.

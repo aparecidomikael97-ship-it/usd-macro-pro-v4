@@ -251,3 +251,24 @@ Then build the Step 1 packet from the repository root:
 The observation expires after 900 seconds. The output may reach
 READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET, but the decision is
 still not recorded and Step 1 is not executed.
+
+
+## Explicit Step 1 decision
+
+A ready Step 1 packet is not authorization. To record a future manual decision,
+copy and fill:
+
+    step1-decision-record.template.json
+
+The decision field must contain exactly:
+
+    AUTHORIZE_SANDBOX_LIFECYCLE_STEP_1_CREATE_INDIVIDUAL_SANDBOX_ACCOUNT
+
+Generic language such as "vamos lá", "ok" or "pode seguir" is rejected.
+
+Validate locally:
+
+    python validate_team_access_step1_decision.py <step1-packet.json> <decision-record.json> --output <verified-step1-decision.json>
+
+The validator does not execute Step 1 and does not append to the lifecycle
+ledger.
