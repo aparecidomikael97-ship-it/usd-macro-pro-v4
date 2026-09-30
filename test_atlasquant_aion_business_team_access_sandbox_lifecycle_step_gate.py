@@ -124,6 +124,28 @@ class TeamAccessSandboxLifecycleStepGateTests(unittest.TestCase):
         self.assertIn("target_is_next_step", result["blockers"])
         self.assertIn("baseline_digest_unchanged", result["blockers"])
 
+    def test_ledger_from_different_plan_is_rejected(self):
+        ledger = _ledger()
+        ledger["plan_digest"] = "d" * 64
+        result = build_step_execution_preflight(
+            _plan(),
+            _auth(),
+            ledger,
+            target_step_order=1,
+            baseline_evidence_digest_observed="b" * 64,
+            sandbox_health_verified=True,
+            oidc_verified=True,
+            registry_schema_verified=True,
+            secrets_local=True,
+            production_targets_absent=True,
+            cleanup_path_ready=True,
+            requested_by="admin.demo",
+        )
+        self.assertEqual(
+            result["state"], "SANDBOX_LIFECYCLE_STEP_PREFLIGHT_BLOCKED"
+        )
+        self.assertIn("ledger_ready_for_next", result["blockers"])
+
     def test_valid_receipt_can_reach_manual_append_review_only(self):
         ledger = _ledger()
         receipt = build_evidence_receipt(
