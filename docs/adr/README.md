@@ -58,3 +58,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 
 | ADR-0028 | ACCEPTED | `docs/adr/ADR-0028-business-bounded-first-pilot.md` |
 | ADR-0029 | ACCEPTED | `docs/adr/ADR-0029-business-green-stack-no-merge-authority.md` |
+| ADR-0030 | ACCEPTED | `docs/adr/ADR-0030-business-live-revalidation-before-consolidation.md` |
