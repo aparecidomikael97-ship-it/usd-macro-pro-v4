@@ -138,6 +138,19 @@ class BusinessCapacityQuotaGuardrailTests(unittest.TestCase):
         self.assertFalse(packet["automatic_expansion_allowed"])
         self.assertFalse(packet["executes_action"])
 
+    def test_forged_budget_cannot_reach_application_review(self):
+        review = build_capacity_quota_review(
+            _audit(),
+            quota_rows=_quotas(),
+            minimum_margin_pct=20,
+            reserve_capacity_pct=10,
+        )
+        review["quota_rows"][0]["ai_cost_budget"] = 999.0
+        packet = quota_application_review_packet(review)
+        self.assertEqual(packet["state"], "NOT_READY")
+        self.assertFalse(packet["quota_application_authorized"])
+        self.assertFalse(packet["executes_action"])
+
     def test_forged_tenant_set_cannot_reach_application_review(self):
         review = build_capacity_quota_review(
             _audit(),
