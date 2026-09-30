@@ -976,6 +976,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("rollback automático proibido", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_consolidation_progress_ledger_is_sequential_and_read_only(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("12 · Ledger sequencial", src)
+        self.assertIn("Requisitos da revisão final depois das 19 etapas", src)
+        self.assertIn("cadeia de rollback contínua", src)
+        self.assertIn("CONSOLIDATION_COMPLETE_REVIEW_REQUIRED", src)
+        self.assertIn("deploy e runtime continuam separados", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
