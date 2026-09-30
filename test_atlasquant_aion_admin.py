@@ -920,6 +920,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_render_business_stack_consolidation()", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_consolidation_dry_run_requires_live_revalidation(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Dry-run de consolidação · Fail-Closed", src)
+        self.assertIn("a evidência congelada não substitui revalidação GitHub ao vivo", src)
+        self.assertIn("Ver gates obrigatórios antes de qualquer decisão futura", src)
+        self.assertIn("READY_FOR_EXPLICIT_ADMIN_DECISION", src)
+        self.assertIn("Merge, deploy e runtime continuam sem autorização", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_master_readiness_separates_demo_pilot_and_live_authority(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_master_readiness()", src)
