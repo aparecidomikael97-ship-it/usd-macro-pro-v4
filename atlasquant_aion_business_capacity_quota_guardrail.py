@@ -267,11 +267,44 @@ def quota_application_review_packet(
         if _clean(item, 120)
     ]
     quota_rows = list(row.get("quota_rows") or [])
+    minimum_margin = _number(row.get("minimum_margin_pct"))
+    reserve_pct = _number(row.get("reserve_capacity_pct"))
+    ledger_digest = _clean(row.get("ledger_digest"), 128).lower()
+
+    canonical_rows = []
+    for item in quota_rows:
+        q = _mapping(item)
+        canonical_rows.append({
+            "tenant_id": _clean(q.get("tenant_id"), 120),
+            "max_ai_requests": q.get("max_ai_requests"),
+            "max_integration_calls": q.get("max_integration_calls"),
+            "max_workflow_runs": q.get("max_workflow_runs"),
+            "max_storage_mb": q.get("max_storage_mb"),
+            "ai_cost_budget": q.get("ai_cost_budget"),
+            "integration_cost_budget": q.get("integration_cost_budget"),
+            "support_cost_budget": q.get("support_cost_budget"),
+            "infra_cost_budget": q.get("infra_cost_budget"),
+            "expected_revenue": q.get("expected_revenue"),
+            "total_budgeted_cost": q.get("total_budgeted_cost"),
+            "reserve_adjusted_cost": q.get("reserve_adjusted_cost"),
+            "budgeted_margin_pct": q.get("budgeted_margin_pct"),
+            "reserve_adjusted_margin_pct": q.get("reserve_adjusted_margin_pct"),
+        })
+    expected_digest = _digest({
+        "ledger_digest": ledger_digest,
+        "minimum_margin_pct": minimum_margin,
+        "reserve_capacity_pct": reserve_pct,
+        "quota_rows": sorted(canonical_rows, key=lambda x: x["tenant_id"]),
+    })
 
     ready = bool(
         row.get("schema") == SCHEMA
         and row.get("state") == "CAPACITY_QUOTA_REVIEW_READY"
         and _DIGEST64.fullmatch(digest)
+        and digest == expected_digest
+        and _DIGEST64.fullmatch(ledger_digest)
+        and minimum_margin is not None
+        and reserve_pct is not None
         and 1 <= len(tenant_ids) <= MAX_BOUNDED_TENANTS
         and len(quota_rows) == len(tenant_ids)
         and sorted(_clean(item.get("tenant_id"), 120) for item in quota_rows)
