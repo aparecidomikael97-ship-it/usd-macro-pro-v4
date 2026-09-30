@@ -68,6 +68,13 @@ testes associados. Conta individual, MFA forte, registry persistido com read-bac
 e revogação comprovável passam a ser requisitos explícitos; o AION não executa
 essas mutações.
 
+Estado do sandbox E2E de Equipe & Acessos: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_sandbox_e2e.py`, ADR-0064 e testes
+associados. A stack de referência de sandbox fica Keycloak + OIDC,
+PostgreSQL e adapter Keycloak Admin REST. O máximo automático é
+`READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_EXIT_REVIEW`; secrets, chamadas reais,
+produção, deploy e runtime continuam fora desta camada.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -297,7 +304,7 @@ expansão.
 ## 10. Próximos blocos obrigatórios
 
 PENDENTE / APROVADO:
-- escolher identity provider, storage do registry e session-revocation connector; executar sandbox E2E do Equipe & Acessos;
+- provisionar o sandbox físico isolado de Equipe & Acessos, configurar secrets fora do repositório e executar o E2E real contra Keycloak + PostgreSQL + adapter de revogação;
 - configurar connectors reais de suporte/infra/incidentes e validar métricas do primeiro ambiente piloto;
 - definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
 - configurar connectors reais de custo/fatura e writer físico do storage versionado com read-back verification;
@@ -338,3 +345,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-CAPACITY-LIVE-METRICS | IMPLEMENTADO / EM VALIDAÇÃO | Capacity Manager recebe FinOps, suporte, infra e incidentes atestados |
 | D-2026-09-30-REVENUE-LIVE-ECONOMICS | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades usam custo FinOps e capacidade real antes do ranking |
 | D-2026-09-30-TEAM-ACCESS-PRODUCTION-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Conta individual, MFA forte, registry read-back e revogação viram gates de produção |
+| D-2026-09-30-TEAM-ACCESS-SANDBOX-E2E | IMPLEMENTADO / EM VALIDAÇÃO | Keycloak + OIDC, PostgreSQL e revogação via adapter formam o sandbox E2E |
