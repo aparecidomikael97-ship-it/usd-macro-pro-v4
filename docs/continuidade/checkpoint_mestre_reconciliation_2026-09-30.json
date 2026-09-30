@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -169,7 +169,13 @@
     "sandbox_lifecycle_materialization_automatic_authorization": false,
     "sandbox_lifecycle_materialization_acceptance_integrity_required": true,
     "sandbox_lifecycle_materialization_plan_digest_recalculated": true,
-    "sandbox_lifecycle_materialization_step_sequence_exact": true
+    "sandbox_lifecycle_materialization_step_sequence_exact": true,
+    "sandbox_lifecycle_authorization_package_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "sandbox_lifecycle_authorization_requires_materialization_binding": true,
+    "sandbox_lifecycle_authorization_package_digest_required": true,
+    "sandbox_lifecycle_ledger_requires_authorization_package": true,
+    "sandbox_lifecycle_step_gate_requires_authorization_package": true,
+    "sandbox_lifecycle_real_authorization_package_created": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -735,9 +741,25 @@
         "materialize_team_access_lifecycle_plan.py",
         "docs/adr/ADR-0074-business-team-access-sandbox-lifecycle-plan-materialization.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-MATERIALIZED-LIFECYCLE-AUTHORIZATION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_lifecycle_authorization_package.py",
+        "test_atlasquant_aion_business_team_access_lifecycle_authorization_package.py",
+        "validate_team_access_lifecycle_authorization_package.py",
+        "docs/adr/ADR-0075-business-team-access-materialized-lifecycle-authorization.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_REAL_STEP_1_PREFLIGHT",
+    "TEAM_ACCESS_REAL_EMPTY_LEDGER_BUILD",
+    "TEAM_ACCESS_REAL_AUTHORIZATION_PACKAGE_VALIDATION",
+    "TEAM_ACCESS_REAL_MATERIALIZED_LIFECYCLE_AUTHORIZATION_RECORD",
     "TEAM_ACCESS_SANDBOX_REAL_LIFECYCLE_PLAN_REVIEW",
     "TEAM_ACCESS_SANDBOX_REAL_LIFECYCLE_PLAN_MATERIALIZATION",
     "TEAM_ACCESS_SANDBOX_REAL_LIFECYCLE_PLAN_BUILD",
