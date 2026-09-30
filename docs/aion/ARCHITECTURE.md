@@ -534,3 +534,18 @@ Any future merge requires live revalidation followed by explicit administrative
 authorization.
 
 ADR-0028 records this separation between technical readiness and merge authority.
+
+## BUSINESS consolidation dry-run
+
+`atlasquant_aion_business_consolidation_dry_run.py` turns the frozen #398–#411
+stack review into a fail-closed administrative runbook. It accepts live
+revalidation evidence supplied by a trusted caller and checks repository
+identity, open/Draft posture, SHAs, bases, mergeability and required/UI checks.
+
+Frozen evidence alone yields `AWAITING_LIVE_REVALIDATION`. Complete live
+evidence can yield only `READY_FOR_EXPLICIT_ADMIN_DECISION`; it still does not
+authorize merge, rebase, auto-merge, deploy or runtime. Every hypothetical step
+requires pre-step revalidation, explicit authorization and post-step CI before
+the next step can be considered.
+
+ADR-0029 records this live-revalidation-before-consolidation rule.
