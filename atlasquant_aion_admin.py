@@ -321,6 +321,12 @@ from atlasquant_aion_finops_budget_governor import (
     finops_policy as business_finops_policy,
     revenue_routing_policy as business_revenue_routing_policy,
 )
+from atlasquant_aion_eight_role_router import (
+    role_registry as aion_eight_role_registry,
+)
+from atlasquant_aion_core_master_checkpoint_bootstrap import (
+    master_checkpoint_bootstrap_snapshot as aion_master_checkpoint_bootstrap_snapshot,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7249,6 +7255,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "23 · Equipe & Acessos / RBAC",
             "24 · Gestor de Capacidade & Escala",
             "25 · FinOps & Tesouraria",
+            "26 · AION · Roteador dos 8 papéis",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7661,7 +7668,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Nenhum cliente é aceito automaticamente e o orçamento não pode ser aumentado por esta camada."
         )
 
-    else:
+    elif view == "25 · FinOps & Tesouraria":
         finops = business_finops_policy()
         treasury = business_revenue_routing_policy()
         st.write(f"Estado: **{finops.get('state')}**")
@@ -7683,6 +7690,26 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Nenhum gasto, transferência, trade ou aumento de orçamento é executado por esta camada."
+        )
+
+    else:
+        checkpoint = aion_master_checkpoint_bootstrap_snapshot()
+        registry = aion_eight_role_registry(checkpoint)
+        st.write(f"Estado: **{registry.get('state')}**")
+        st.metric("Papéis internos", int(registry.get("role_count") or 0))
+        st.markdown("**Um único AION, funções especializadas:**")
+        for row in list(registry.get("roles") or []):
+            st.markdown(
+                f"- **{str(row.get('role_id') or '').replace('_', ' ').title()}** · "
+                f"{', '.join(list(row.get('allowed_actions') or []))}"
+            )
+        st.warning(
+            "Os papéis são lógicos e compartilham infraestrutura. "
+            "Nenhum deles ganha autoridade para executar ação crítica."
+        )
+        st.caption(
+            "O roteador ativa somente os papéis necessários para cada tarefa, "
+            "com limite de custo e sem criar oito IAs independentes."
         )
 
 

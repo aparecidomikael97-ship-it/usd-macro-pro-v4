@@ -154,6 +154,11 @@ Esses papéis podem compartilhar modelo e infraestrutura e devem ser ativados
 sob demanda para reduzir custo. Agentes especializados não ganham permissão
 independente para ações críticas.
 
+Estado do roteador dos oito papéis: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_eight_role_router.py`, integrado ao runtime bridge e à visão
+administrativa. O roteador mantém o Orquestrador e seleciona no máximo três
+papéis adicionais por tarefa; roteamento não concede autoridade operacional.
+
 ## 8. Checkpoint Mestre como memória oficial
 
 O AION deve conhecer:
@@ -200,7 +205,7 @@ PENDENTE / APROVADO:
 - oferta comercial B2B pronta para vender;
 - pipeline proposta → onboarding → entrega → saúde → renovação;
 - validação operacional do bootstrap do Checkpoint Mestre em ambientes empacotados/deployados;
-- arquitetura multiagente de oito papéis com roteamento barato;
+- validação do roteador dos oito papéis em runtime/deploy empacotado;
 - PDF atualizado da aba Negócios para visão do administrador.
 
 ## Decisões novas de 30/09
@@ -216,7 +221,7 @@ PENDENTE / APROVADO:
 | D-2026-09-30-CAPACITY-SCALE-MANAGER | IMPLEMENTADO / EM VALIDAÇÃO | Gestor de Capacidade & Escala |
 | D-2026-09-30-AION-INDEPENDENT-CHATGPT | APROVADO / PENDENTE | AION funciona sem depender do ChatGPT |
 | D-2026-09-30-CHATGPT-OPTIONAL-ARCHITECT | APROVADO / PENDENTE | ChatGPT como apoio externo opcional |
-| D-2026-09-30-EIGHT-LOGICAL-ROLES | APROVADO / PENDENTE | Oito papéis lógicos internos do AION |
+| D-2026-09-30-EIGHT-LOGICAL-ROLES | IMPLEMENTADO / EM VALIDAÇÃO | Oito papéis lógicos internos do AION |
 | D-2026-09-30-CHECKPOINT-LATEST-POINTER | IMPLEMENTADO / EM VALIDAÇÃO | Ponteiro explícito para checkpoint mais recente |
 | D-2026-09-30-ECOSYSTEM-PRIORITY-BUSINESS | APROVADO / PENDENTE | Negócios vira prioridade principal após Núcleo/AION/interface |
 | D-2026-09-30-TREASURY-BUCKETS | IMPLEMENTADO / EM VALIDAÇÃO | Tesouraria separada entre Negócios, Trader e Investimentos |

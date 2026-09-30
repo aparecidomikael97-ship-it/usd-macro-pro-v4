@@ -115,7 +115,13 @@
         "id": "customer_success",
         "name": "Sucesso do Cliente / Comercial"
       }
-    ]
+    ],
+    "router_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "router_module": "atlasquant_aion_eight_role_router.py",
+    "max_active_roles_per_task": 4,
+    "orchestrator_always_present": true,
+    "physical_execution_authorized": false,
+    "permission_escalation_allowed": false
   },
   "business_stack": {
     "draft_prs": [
@@ -129,7 +135,8 @@
       436,
       437,
       438,
-      439
+      439,
+      440
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -140,7 +147,8 @@
     "team_access_rbac_pr": 436,
     "capacity_scale_manager_pr": 437,
     "finops_budget_treasury_pr": 438,
-    "core_master_checkpoint_bootstrap_pr": 439
+    "core_master_checkpoint_bootstrap_pr": 439,
+    "eight_role_router_pr": 440
   },
   "decisions": [
     {
@@ -217,9 +225,16 @@
     },
     {
       "id": "D-2026-09-30-EIGHT-LOGICAL-ROLES",
-      "state": "APROVADO / PENDENTE",
-      "implemented": false,
-      "validated": false
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_eight_role_router.py",
+        "test_atlasquant_aion_eight_role_router.py",
+        "docs/aion/AION_EIGHT_ROLE_ROUTER_V1.md",
+        "docs/adr/ADR-0047-aion-eight-logical-roles.md",
+        "docs/adr/ADR-0052-aion-eight-role-router.md"
+      ]
     },
     {
       "id": "D-2026-09-30-CHECKPOINT-LATEST-POINTER",
@@ -284,6 +299,7 @@
     }
   ],
   "pending": [
+    "EIGHT_ROLE_ROUTER_RUNTIME_VALIDATION",
     "AION_CHECKPOINT_BOOTSTRAP_DEPLOY_VALIDATION",
     "FINOPS_PERSISTENT_LEDGER",
     "FINOPS_LIVE_PROVIDER_COST_BINDING",
@@ -292,7 +308,6 @@
     "BACKUP_RECOVERY_TESTABLE_POLICY",
     "B2B_OFFER_READY_TO_SELL",
     "COMMERCIAL_PIPELINE_END_TO_END",
-    "EIGHT_ROLE_MULTIAGENT_ROUTER",
     "BUSINESS_UPDATED_PDF"
   ],
   "ecosystem_priority": {
