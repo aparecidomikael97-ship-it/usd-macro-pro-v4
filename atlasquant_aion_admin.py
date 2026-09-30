@@ -274,6 +274,10 @@ from atlasquant_aion_business_consolidation_post_merge_verification import (
 from atlasquant_aion_business_consolidation_progress_ledger import (
     progress_ledger_template as business_consolidation_progress_ledger_template,
 )
+from atlasquant_aion_business_consolidation_completion_review import (
+    completion_review_template as business_consolidation_completion_review_template,
+    final_admin_decision_request as business_final_admin_decision_request,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7189,6 +7193,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "10 · Pacote de revisão de execução",
             "11 · Verificação pós-merge",
             "12 · Ledger sequencial",
+            "13 · Revisão final da consolidação",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7344,7 +7349,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "regressão: ROLLBACK_REVIEW_REQUIRED · rollback automático proibido."
         )
 
-    else:
+    elif view == "12 · Ledger sequencial":
         ledger = business_consolidation_progress_ledger_template()
         st.write(f"Estado: **{ledger.get('state')}**")
         st.write(
@@ -7360,6 +7365,28 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Mesmo completo: CONSOLIDATION_COMPLETE_REVIEW_REQUIRED · "
             "deploy e runtime continuam separados."
+        )
+
+    else:
+        review = business_consolidation_completion_review_template()
+        request = business_final_admin_decision_request(review)
+        st.write(f"Estado: **{review.get('state')}**")
+        st.markdown("**Evidências obrigatórias para fechar tecnicamente a consolidação:**")
+        for item in list(review.get("requirements") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Checks finais obrigatórios na main:**")
+        for item in list(review.get("required_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A consolidação só pode chegar a READY_FOR_FINAL_ADMIN_REVIEW depois de 19 etapas "
+            "verificadas, SHA final da main coerente, CI/UI/mobile verdes, runtime BUSINESS OFF "
+            "e decisão de deploy mantida separada."
+        )
+        st.markdown("**Acknowledgement final exigirá token explícito:**")
+        st.code(str(review.get("required_decision_token") or ""), language=None)
+        st.caption(
+            "Mensagens genéricas como 'vamos lá', 'ok' ou 'pode seguir' não encerram a consolidação. "
+            "Mesmo o acknowledgement técnico não autoriza deploy, produção, piloto ou runtime."
         )
 
 
