@@ -55,12 +55,17 @@
     "physical_session_revocation": false
   },
   "capacity_scale": {
-    "status": "APROVADO / PENDENTE",
+    "status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "manager_required": true,
     "measured_admission": true,
     "protect_margin": true,
     "protect_support": true,
-    "protect_stability": true
+    "protect_stability": true,
+    "current_layer": "READ_ONLY_ADMISSION_CAPACITY_PLANNER",
+    "initial_budget_cap_brl": 200,
+    "live_metrics_bound": false,
+    "provider_costs_bound": false,
+    "physical_customer_admission": false
   },
   "external_ai_relationship": {
     "aion_must_run_without_chatgpt_subscription": true,
@@ -171,9 +176,15 @@
     },
     {
       "id": "D-2026-09-30-CAPACITY-SCALE-MANAGER",
-      "state": "APROVADO / PENDENTE",
-      "implemented": false,
-      "validated": false
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_capacity_scale_manager.py",
+        "test_atlasquant_aion_business_capacity_scale_manager.py",
+        "docs/aion/AION_BUSINESS_CAPACITY_SCALE_MANAGER_V1.md",
+        "docs/adr/ADR-0049-business-capacity-scale-manager.md"
+      ]
     },
     {
       "id": "D-2026-09-30-AION-INDEPENDENT-CHATGPT",
@@ -206,8 +217,8 @@
     }
   ],
   "pending": [
+    "CAPACITY_SCALE_LIVE_METRICS_BINDING",
     "TEAM_RBAC_PRODUCTION_BINDING",
-    "CAPACITY_SCALE_MANAGER",
     "BACKUP_RECOVERY_TESTABLE_POLICY",
     "BUDGET_GOVERNOR_200_BRL",
     "B2B_OFFER_READY_TO_SELL",
