@@ -284,6 +284,22 @@ class TeamAccessStep1PreflightPackageTests(unittest.TestCase):
         )
         self.assertFalse(result["step_execution_authorized"])
 
+    def test_windows_observation_helper_is_read_only_and_external_local(self):
+        script = Path(
+            "deploy/sandbox/team-access/Get-TeamAccessStep1ReadinessObservation.ps1"
+        ).read_text(encoding="utf-8")
+        self.assertIn("$env:LOCALAPPDATA", script)
+        self.assertIn("Test-TeamAccessSandbox.ps1", script)
+        self.assertIn("Test-TeamAccessRegistry.ps1", script)
+        self.assertIn("external_mutations_executed = $false", script)
+        self.assertNotIn("Start-TeamAccessSandbox.ps1", script)
+        self.assertNotIn("docker compose up", script)
+        self.assertNotIn("docker compose down", script)
+        self.assertNotIn("CREATE USER", script.upper())
+        self.assertNotIn("INSERT INTO", script.upper())
+        self.assertNotIn("UPDATE ", script.upper())
+        self.assertNotIn("DELETE FROM", script.upper())
+
     def test_module_has_no_network_process_or_executor_imports(self):
         source = Path(
             "atlasquant_aion_business_team_access_step1_preflight_package.py"
