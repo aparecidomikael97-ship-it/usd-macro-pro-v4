@@ -115,6 +115,11 @@ class TeamAccessPhysicalSandboxTests(unittest.TestCase):
         self.assertNotIn("password=admin", compose.lower())
         self.assertIn("CHANGE_ME_", example)
 
+    def test_local_secret_env_is_explicitly_gitignored(self):
+        ignore = Path(".gitignore").read_text(encoding="utf-8")
+        self.assertIn("**/sandbox.env.local", ignore)
+        self.assertNotIn("CHANGE_ME_LONG_RANDOM_ADMIN_PASSWORD\nKC_DB_PASSWORD", ignore)
+
     def test_module_imports_no_network_process_or_docker_executor(self):
         source = Path(
             "atlasquant_aion_business_team_access_physical_sandbox.py"
