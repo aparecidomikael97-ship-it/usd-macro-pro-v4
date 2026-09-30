@@ -262,6 +262,9 @@ from atlasquant_aion_business_consolidation_decision_request import (
 from atlasquant_aion_business_consolidation_authorization_record import (
     authorization_record_requirements as business_consolidation_authorization_requirements,
 )
+from atlasquant_aion_business_consolidation_execution_preflight import (
+    execution_preflight_template as business_consolidation_execution_preflight_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7173,6 +7176,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "6 · Dry-run fail-closed",
             "7 · Pedido de decisão vinculado",
             "8 · Contrato de autorização explícita",
+            "9 · Preflight de execução",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7267,7 +7271,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Ele não executa merge, deploy, piloto ou runtime."
         )
 
-    else:
+    elif view == "8 · Contrato de autorização explícita":
         contract = business_consolidation_authorization_requirements()
         st.write(f"Estado: **{contract.get('state')}**")
         st.markdown("**Token explícito obrigatório:**")
@@ -7281,6 +7285,23 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Mesmo um registro explícito validado não executa merge. "
             "Deploy, piloto e runtime continuam fronteiras separadas."
+        )
+
+    else:
+        preflight = business_consolidation_execution_preflight_template()
+        st.write(f"Estado: **{preflight.get('state')}**")
+        st.markdown("**Gates da última barreira antes de qualquer merge físico:**")
+        for item in list(preflight.get("requirements") or []):
+            st.markdown(f"- {item}")
+        st.markdown("**Depois de cada etapa futura:**")
+        for item in list(preflight.get("post_step_requirements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O máximo deste preflight é MERGE_EXECUTION_REVIEW_REQUIRED. "
+            "Ele não executa nem autoriza fisicamente merge."
+        )
+        st.caption(
+            "Ordem sequencial obrigatória · stop-on-drift · BUSINESS runtime OFF · deploy separado."
         )
 
 
