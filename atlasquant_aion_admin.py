@@ -412,6 +412,9 @@ from atlasquant_aion_business_team_access_step1_execution_envelope import (
 from atlasquant_aion_business_team_access_step1_apply_plan import (
     step1_apply_plan_policy as business_team_step1_apply_plan_policy,
 )
+from atlasquant_aion_business_team_access_step1_provider_runner import (
+    provider_runner_policy as business_team_step1_provider_runner_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7368,6 +7371,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "51 · Equipe & Acessos · Step 1 Decision",
             "52 · Equipe & Acessos · Step 1 Execution Envelope",
             "53 · Equipe & Acessos · Step 1 Apply Plan",
+            "54 · Equipe & Acessos · Step 1 Provider Runner",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8338,7 +8342,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "physical_execution_performed=false."
         )
 
-    else:
+    elif view == "53 · Equipe & Acessos · Step 1 Apply Plan":
         apply_plan = business_team_step1_apply_plan_policy()
         st.write(f"Estado: **{apply_plan.get('state')}**")
         st.markdown("**Operação congelada do provider:**")
@@ -8356,6 +8360,28 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_STEP1_PROVIDER_APPLY_PLAN_REVIEW · "
             "physical_execution_performed=false."
+        )
+
+    else:
+        runner = business_team_step1_provider_runner_policy()
+        st.write(f"Estado: **{runner.get('state')}**")
+        st.markdown("**Proteções do runner físico:**")
+        for item in (
+            "PLAN ONLY por padrão",
+            "-Apply obrigatório para mutação",
+            "token físico exato derivado do apply_plan_digest",
+            "execution envelope com até 120 segundos",
+            "localhost-only + sandbox-only",
+            "lookup exato antes e depois do POST",
+            "receipt sanitizado sem append automático",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Esta tela mostra apenas a policy. Ela não executa o runner e não cria a conta sandbox."
+        )
+        st.caption(
+            "Mensagens genéricas como 'vamos lá' não são autorização física. "
+            "Produção/deploy/runtime permanecem OFF."
         )
 
 
