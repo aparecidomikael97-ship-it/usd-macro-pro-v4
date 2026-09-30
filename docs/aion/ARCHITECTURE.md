@@ -824,3 +824,18 @@ reserve is applied.
 A green review reaches CAPACITY_QUOTA_REVIEW_READY only. Applying quotas,
 billing, runtime changes, expansion and client actions remain separate. ADR-0045
 records this boundary.
+
+## BUSINESS quota application authorization boundary
+
+atlasquant_aion_business_quota_application_authorization.py separates a reviewed
+capacity plan from any future application of real tenant limits. The exact token
+AUTHORIZE_BUSINESS_QUOTA_APPLICATION plus all acknowledgements and an actor are
+required to record authorization.
+
+Even then, application remains non-executing until a separate preflight confirms
+a change window, monitoring, rollback/restoration, dry-run, support and incident
+response readiness. The maximum automatic state is
+QUOTA_APPLICATION_EXECUTION_REVIEW_REQUIRED.
+
+The module never applies quotas, changes billing or runtime, expands scope or
+calls external systems. ADR-0046 records this boundary.
