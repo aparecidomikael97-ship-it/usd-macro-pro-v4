@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT_PLUS_STEP1_EXECUTION_ENVELOPE_PLUS_STEP1_PROVIDER_APPLY_PLAN",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT_PLUS_STEP1_EXECUTION_ENVELOPE_PLUS_STEP1_PROVIDER_APPLY_PLAN_PLUS_STEP1_GUARDED_PROVIDER_RUNNER",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -217,7 +217,18 @@
     "step1_provider_apply_plan_path": "/admin/realms/atlasquant-sandbox/users",
     "step1_provider_apply_plan_real_created": false,
     "step1_provider_apply_plan_source_binding_required": true,
-    "step1_provider_apply_plan_digest_recalculated": true
+    "step1_provider_apply_plan_digest_recalculated": true,
+    "step1_provider_runner_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "step1_provider_runner_plan_only_default": true,
+    "step1_provider_runner_apply_switch_required": true,
+    "step1_provider_runner_exact_token_required": true,
+    "step1_provider_runner_envelope_max_age_seconds": 120,
+    "step1_provider_runner_localhost_only": true,
+    "step1_provider_runner_pre_post_lookup_required": true,
+    "step1_provider_runner_receipt_sanitized": true,
+    "step1_provider_runner_automatic_ledger_append": false,
+    "step1_provider_runner_real_apply_executed": false,
+    "step1_provider_runner_real_receipt_created": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -330,7 +341,8 @@
       464,
       465,
       466,
-      467
+      467,
+      468
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -368,7 +380,8 @@
     "team_access_step1_preflight_package_pr": 464,
     "team_access_step1_decision_record_pr": 465,
     "team_access_step1_execution_envelope_pr": 466,
-    "team_access_step1_provider_apply_plan_pr": 467
+    "team_access_step1_provider_apply_plan_pr": 467,
+    "team_access_step1_guarded_provider_runner_pr": 468
   },
   "decisions": [
     {
@@ -854,9 +867,26 @@
         "build_team_access_step1_apply_plan.py",
         "docs/adr/ADR-0079-business-team-access-step1-provider-apply-plan.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-STEP1-GUARDED-PROVIDER-RUNNER",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_step1_provider_runner.py",
+        "test_atlasquant_aion_business_team_access_step1_provider_runner.py",
+        "validate_team_access_step1_provider_runner.py",
+        "deploy/sandbox/team-access/Invoke-TeamAccessStep1Provider.ps1",
+        "docs/adr/ADR-0080-business-team-access-step1-guarded-provider-runner.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_REAL_STEP1_LEDGER_APPEND_REVIEW",
+    "TEAM_ACCESS_REAL_STEP1_PROVIDER_RECEIPT_VALIDATION",
+    "TEAM_ACCESS_REAL_STEP1_PHYSICAL_APPLY",
+    "TEAM_ACCESS_REAL_STEP1_PROVIDER_RUNNER_PLAN_ONLY",
     "TEAM_ACCESS_STEP1_PROVIDER_COMMAND_RUNNER_REVIEW",
     "TEAM_ACCESS_REAL_STEP1_PROVIDER_APPLY_PLAN",
     "TEAM_ACCESS_STEP1_POST_EXECUTION_RECEIPT",

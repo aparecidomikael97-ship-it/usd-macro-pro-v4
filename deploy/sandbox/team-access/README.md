@@ -308,3 +308,23 @@ The maximum state is:
     READY_FOR_ADMIN_TEAM_ACCESS_STEP1_PROVIDER_APPLY_PLAN_REVIEW
 
 No account is created by this command.
+
+
+## Guarded Step 1 provider runner
+
+The provider runner is PLAN ONLY by default:
+
+    .\Invoke-TeamAccessStep1Provider.ps1
+
+It validates the current execution envelope and apply plan, checks freshness
+and prints the exact non-secret physical apply token. It performs no provider
+mutation in this mode.
+
+A physical sandbox apply requires both switches:
+
+    .\Invoke-TeamAccessStep1Provider.ps1 -Apply -AuthorizationToken <exact-token>
+
+The runner is restricted to localhost Keycloak sandbox, checks that the target
+username is absent immediately before the POST, requires HTTP 201, performs an
+exact readback, and writes a sanitized receipt under LOCALAPPDATA. It never
+appends the lifecycle ledger automatically.

@@ -113,3 +113,5 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0078 | ACCEPTED | `docs/adr/ADR-0078-business-team-access-step1-manual-execution-envelope.md` |
 
 | ADR-0079 | ACCEPTED | `docs/adr/ADR-0079-business-team-access-step1-provider-apply-plan.md` |
+
+| ADR-0080 | ACCEPTED | `docs/adr/ADR-0080-business-team-access-step1-guarded-provider-runner.md` |
