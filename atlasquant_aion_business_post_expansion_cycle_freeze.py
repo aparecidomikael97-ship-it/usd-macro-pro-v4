@@ -80,6 +80,13 @@ def _tenant_ids(value: Any) -> list[str]:
     return result
 
 
+def _scope_rank(scope: str) -> int:
+    try:
+        return ALLOWED_SCOPES.index(scope)
+    except ValueError:
+        return -1
+
+
 def post_expansion_verification_requirements() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
@@ -139,10 +146,25 @@ def verify_expansion_receipt(
             and 1 <= len(current_tenants) <= MAX_BOUNDED_TENANTS
         )
     )
+    current_rank = _scope_rank(current_scope)
+    proposed_rank = _scope_rank(proposed_scope)
     proposed_bound_ok = bool(
         proposed_scope in {"pilot", "bounded_production"}
         and 1 <= len(proposed_tenants) <= MAX_BOUNDED_TENANTS
         and set(current_tenants).issubset(set(proposed_tenants))
+        and proposed_rank in {current_rank, current_rank + 1}
+        and (
+            proposed_rank == current_rank + 1
+            or len(proposed_tenants) > len(current_tenants)
+        )
+        and not (
+            current_scope == "sandbox"
+            and proposed_scope != "pilot"
+        )
+        and not (
+            current_scope == "bounded_production"
+            and proposed_scope != "bounded_production"
+        )
     )
     scope_match = actual_scope == proposed_scope
     tenants_match = sorted(actual_tenants) == sorted(proposed_tenants)
