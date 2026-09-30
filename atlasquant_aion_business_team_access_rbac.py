@@ -420,6 +420,9 @@ def team_access_decision(
             username and username == member_user
         ),
         "membership_active": active,
+        "owner_requires_admin_identity": bool(
+            profile != "BUSINESS_OWNER" or base_role == "ADMIN"
+        ),
         "strong_auth_verified": bool(
             not strong_required or strong_verified
         ),
