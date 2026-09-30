@@ -38,7 +38,7 @@ services:
       - team_access_sandbox
 
   keycloak:
-    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.7.4}
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.7.5}
     restart: "no"
     command:
       - start-dev
