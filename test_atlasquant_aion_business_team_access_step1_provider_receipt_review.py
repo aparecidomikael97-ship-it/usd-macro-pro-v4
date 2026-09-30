@@ -7,6 +7,7 @@ from atlasquant_aion_business_team_access_step1_provider_receipt_review import (
     PROVIDER_RECEIPT_SCHEMA,
     provider_receipt_review_policy,
     validate_provider_receipt_and_preview_ledger,
+    verify_provider_receipt_review,
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger import (
     GENESIS_DIGEST,
@@ -242,6 +243,24 @@ class TeamAccessStep1ProviderReceiptReviewTests(unittest.TestCase):
             _receipt(),
         )
         self.assertIn("plan_digest_matches_apply_plan", result["blockers"])
+
+    def test_ready_review_has_recomputable_integrity(self):
+        result = self._run()
+        binding = verify_provider_receipt_review(result)
+        self.assertTrue(binding["binding_match"])
+        self.assertEqual(
+            binding["state"],
+            "STEP1_PROVIDER_RECEIPT_REVIEW_BINDING_MATCH",
+        )
+        self.assertEqual(
+            binding["receipt_review_digest"],
+            result["receipt_review_digest"],
+        )
+
+        result["provider_user_id"] = "tampered-user"
+        binding = verify_provider_receipt_review(result)
+        self.assertFalse(binding["binding_match"])
+        self.assertIn("review_digest_integrity", binding["blockers"])
 
     def test_receipt_digest_binding_drift_blocks(self):
         receipt = _receipt()
