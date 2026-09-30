@@ -376,6 +376,12 @@ from atlasquant_aion_business_team_access_sandbox_evidence import (
 from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
     lifecycle_plan_policy as business_team_sandbox_lifecycle_policy,
 )
+from atlasquant_aion_business_team_access_sandbox_lifecycle_authorization import (
+    authorization_record_requirements as business_team_sandbox_lifecycle_auth_requirements,
+)
+from atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger import (
+    lifecycle_ledger_template as business_team_sandbox_lifecycle_ledger_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7320,6 +7326,8 @@ def _render_business_stack_consolidation_v2() -> None:
             "39 · Equipe & Acessos · Sandbox Fisico",
             "40 · Equipe & Acessos · Evidencias Sandbox",
             "41 · Equipe & Acessos · Lifecycle Sandbox",
+            "42 · Equipe & Acessos · Autorizacao Lifecycle",
+            "43 · Equipe & Acessos · Ledger Lifecycle",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8043,7 +8051,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Conta, MFA, registry write e revogação continuam em teste manual separado."
         )
 
-    else:
+    elif view == "41 · Equipe & Acessos · Lifecycle Sandbox":
         lifecycle = business_team_sandbox_lifecycle_policy()
         st.write(f"Estado: **{lifecycle.get('state')}**")
         st.markdown("**Ciclo manual controlado:**")
@@ -8064,6 +8072,43 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION. "
             "Produção continua fora deste fluxo."
+        )
+
+    elif view == "42 · Equipe & Acessos · Autorizacao Lifecycle":
+        auth = business_team_sandbox_lifecycle_auth_requirements()
+        st.write(f"Estado: **{auth.get('state')}**")
+        st.markdown("**Token explícito obrigatório:**")
+        st.code(str(auth.get("required_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(auth.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Não existe autorização real registrada nesta tela. Mensagens genéricas como "
+            "'vamos lá' não criam o registro formal e o executor permanece desligado."
+        )
+        st.caption(
+            "Um registro futuro válido fica preso ao plan digest e baseline digest exatos. "
+            "Produção, deploy e runtime continuam não autorizados."
+        )
+
+    else:
+        ledger = business_team_sandbox_lifecycle_ledger_template()
+        st.write(f"Estado: **{ledger.get('state')}**")
+        st.metric("Etapas do lifecycle", int(ledger.get("total_steps") or 0))
+        st.markdown("**Próxima etapa esperada:**")
+        st.code(
+            f"{ledger.get('next_expected_step_order')} · "
+            f"{ledger.get('next_expected_step_id')}",
+            language=None,
+        )
+        st.warning(
+            "O ledger é append-only e hash-chain. Ele aceita somente recibos sanitizados "
+            "na ordem 1→10; não armazena senha, token ou evidência bruta."
+        )
+        st.caption(
+            "Mesmo uma cadeia completa para em "
+            "SANDBOX_LIFECYCLE_EVIDENCE_COMPLETE_REVIEW_REQUIRED. "
+            "Nenhum próximo passo é executado automaticamente."
         )
 
 
