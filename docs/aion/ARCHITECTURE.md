@@ -1411,3 +1411,21 @@ The access token is ephemeral and never written to the receipt. The sanitized
 receipt remains pending separate lifecycle-ledger review.
 
 ADR-0080 records this boundary.
+
+
+## BUSINESS team access Step 1 provider receipt review
+
+`atlasquant_aion_business_team_access_step1_provider_receipt_review.py`
+validates the sanitized physical Step 1 provider receipt against the exact
+materialization, authorization package, preflight packet, execution envelope,
+apply plan and runner preflight.
+
+It derives a provider evidence digest, builds the canonical lifecycle receipt
+for Step 1 and creates an in-memory ledger preview. The preview must show exactly
+one completed step and Step 2 as next expected.
+
+The maximum state is
+`READY_FOR_ADMIN_TEAM_ACCESS_STEP1_LEDGER_APPEND_REVIEW`. No persisted ledger
+is modified and Step 2 remains unauthorized.
+
+ADR-0081 records this boundary.
