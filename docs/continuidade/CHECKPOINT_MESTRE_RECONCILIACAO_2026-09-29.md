@@ -59,10 +59,12 @@ Investimentos e AION/AI. Os especialistas são AION Trader Expert, AION
 Business Expert, AION Investment Expert e o AION completo. Não são quatro IAs
 independentes.
 
-Os quatro fechamentos obrigatórios, ainda pendentes, são Specialist Router,
+Os quatro fechamentos obrigatórios têm contrato local: Specialist Router,
 permissões por domínio, memória e evidência isoladas por domínio, e AION
-Specialist Certification Gate. Nenhum especialista está certificado por este
-registro. O contrato Skill/Plugin Certification V1 é outro artefato.
+Specialist Certification Gate. O estado desses fechamentos é
+IMPLEMENTADO / EM VALIDAÇÃO. Nenhum especialista está certificado por este
+registro, e o runtime futuro permanece desligado. O contrato Skill/Plugin
+Certification V1 é outro artefato.
 
 ## Negócios
 
@@ -125,9 +127,9 @@ escolhe tributação. Não certifica especialista.
 | --- | --- | --- |
 | D-AION-SINGLE-NUCLEUS | APROVADO / PENDENTE | AION é um núcleo central único |
 | D-ADMIN-DOORS-FOUR | APROVADO / PENDENTE | Quatro portas ADMIN do ecossistema |
-| D-SPECIALISTS-NOT-INDEPENDENT-AIS | APROVADO / PENDENTE | Especialistas de domínio, não IAs independentes |
-| D-FOUR-CLOSURES | APROVADO / PENDENTE | Quatro fechamentos obrigatórios do AION |
-| D-SPECIALIST-CERTIFICATION-REQUIRED | APROVADO / PENDENTE | Certificação obrigatória de especialista |
+| D-SPECIALISTS-NOT-INDEPENDENT-AIS | IMPLEMENTADO / EM VALIDAÇÃO | Especialistas de domínio, não IAs independentes |
+| D-FOUR-CLOSURES | IMPLEMENTADO / EM VALIDAÇÃO | Quatro fechamentos obrigatórios do AION |
+| D-SPECIALIST-CERTIFICATION-REQUIRED | IMPLEMENTADO / EM VALIDAÇÃO | Certificação obrigatória de especialista |
 | D-BUSINESS-FIVE-FRONTS | APROVADO / PENDENTE | Cinco frentes atuais de Negócios |
 | D-BUSINESS-OPERATIONAL-GUIDELINE | APROVADO / PENDENTE | Diretriz operacional de Negócios sem promessa fixa de 90% |
 | D-HUMAN-APPROVAL-HIGH-IMPACT | APROVADO / PENDENTE | Aprovação humana explícita para ações de alto impacto |
@@ -171,7 +173,7 @@ escolhe tributação. Não certifica especialista.
 | G-PRODUCTION-DEPLOYED-SHA | UNVERIFIED | SHA implantado em produção |
 | G-NEXTGEN-MODULE-COMPLETENESS | UNVERIFIED | Quais módulos NextGen já estão implementados de ponta a ponta |
 | G-ADR-TAX-AND-REGULATION | UNVERIFIED | Tributação e regra regulatória de American Depositary Receipts |
-| G-SPECIALIST-CERTIFICATION-STATUS | UNVERIFIED | Status de certificação dos especialistas atuais |
+| G-SPECIALIST-CERTIFICATION-STATUS | UNVERIFIED | Status de certificação dos especialistas atuais; o gate existe e ninguém foi certificado |
 | G-NINETY-PERCENT-MEASUREMENT | UNVERIFIED | Medição da cobertura operacional próxima de 90% |
 | G-DEV-BRANCH-POLICY | NEEDS HUMAN RECONCILIATION | Se atlasquant-dev continua sendo a única branch de desenvolvimento |
 | G-WYCKOFF-PRIORITY | UNVERIFIED | Prioridade de Wyckoff |
