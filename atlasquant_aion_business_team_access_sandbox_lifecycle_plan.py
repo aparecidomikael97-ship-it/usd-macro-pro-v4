@@ -93,7 +93,7 @@ def lifecycle_plan_policy() -> dict[str, Any]:
 def build_lifecycle_test_plan(
     baseline_review: Mapping[str, Any] | None,
     *,
-    baseline_acceptance: Mapping[str, Any] | None,
+    baseline_acceptance: Mapping[str, Any] | None = None,
     test_username: Any,
     tenant_ids: Sequence[Any] | None,
     factor_type: Any,
