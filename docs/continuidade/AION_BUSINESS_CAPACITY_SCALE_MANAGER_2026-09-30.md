@@ -25,6 +25,8 @@ Criado o Gestor de Capacidade & Escala:
 
 ## Estado
 
+Draft PR #437 — AION BUSINESS: capacity and scale manager V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente:
