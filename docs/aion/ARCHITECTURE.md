@@ -1187,3 +1187,33 @@ The maximum automatic state is
 `READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION`.
 
 ADR-0067 records this boundary.
+
+
+## BUSINESS team access sandbox lifecycle authorization
+
+`atlasquant_aion_business_team_access_sandbox_lifecycle_authorization.py`
+validates an explicit human authorization record for one exact sandbox
+lifecycle plan and baseline.
+
+Generic language is not authorization. The record must carry the exact decision
+token, all required acknowledgements, the expected administrator identity and
+timezone-aware timestamp. Plan or baseline drift invalidates the binding.
+
+A verified record still leaves the executor disabled and grants no production,
+deploy or runtime authority.
+
+ADR-0068 records this boundary.
+
+## BUSINESS team access sandbox lifecycle evidence ledger
+
+`atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger.py`
+maintains a ten-step append-only logical evidence chain.
+
+Each receipt stores only sanitized evidence digests and minimal metadata. The
+first receipt binds to a zero genesis digest; every next receipt binds to the
+previous receipt digest. Order drift, duplicates or chain breaks fail closed.
+
+Even a complete ten-step ledger stops at
+`SANDBOX_LIFECYCLE_EVIDENCE_COMPLETE_REVIEW_REQUIRED`.
+
+ADR-0069 records this boundary.
