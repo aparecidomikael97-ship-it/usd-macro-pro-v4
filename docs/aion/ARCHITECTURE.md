@@ -259,3 +259,27 @@ A reconciliação do Checkpoint Mestre de `2026-09-15` a `2026-09-29` está em
 complementa `docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md` e
 não o apaga. O gate documental é
 `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.
+
+
+## Validação do Núcleo e prontidão do BUSINESS
+
+`atlasquant_aion_core_validation.py` adiciona uma camada read-only entre
+hardening e certificação. Ela não consulta produção por conta própria e não
+transforma presença de código em prova de deploy.
+
+A identidade de produção só fica verificada quando o chamador fornece um SHA
+observado do ambiente e a comparação com o SHA esperado resulta em match em alvo
+não local. O Checkpoint Mestre só pode retornar `VALIDADO` quando integridade,
+digest, identidade de produção, drill de rollback em sandbox, referências de
+evidência e aprovação humana booleana exata estiverem presentes.
+
+O drill de rollback deste estágio restaura somente uma cópia em memória e
+confere digest canônico. Ele prova a mecânica do restore sem gravar o runtime.
+O BUSINESS pode chegar a `READY_FOR_CERTIFICATION_REVIEW` quando oferta,
+escopo, demo, treinamento, portal, LGPD, margem, suporte, aprovação humana e
+pacote de prova estiverem evidenciados. Esse estado permanece abaixo de
+`CERTIFIED`; runtime, pagamento, publicação e demais ações externas continuam
+desligados.
+
+ADR-0011 registra essa separação entre validação do Núcleo, prontidão de produto
+e certificação formal do especialista.
