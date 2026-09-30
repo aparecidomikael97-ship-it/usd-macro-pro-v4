@@ -109,3 +109,34 @@ A valid baseline can only reach:
 This does not authorize account creation, MFA enrollment, registry mutation,
 session revocation or production. Those lifecycle actions remain manual sandbox
 steps and must generate separate evidence for the E2E contract.
+
+
+## Lifecycle authorization record
+
+After a real baseline has been collected and the lifecycle plan has been built,
+the next boundary is an explicit human authorization record. Start from:
+
+    lifecycle-authorization-record.template.json
+
+The record must be bound to the exact plan digest and baseline digest. Generic
+phrases such as "ok", "pode seguir" or "vamos lá" are not authorization.
+
+A valid future decision uses the exact token defined by ADR-0067:
+
+    AUTHORIZE_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST
+
+All acknowledgements must be true and the executor must remain disabled.
+
+## Lifecycle evidence receipts
+
+Each of the ten manual sandbox steps produces only a sanitized evidence digest.
+Use the shape in:
+
+    lifecycle-evidence-receipt.template.json
+
+Receipts are chained in order. Step 1 starts from the 64-zero genesis digest;
+every later receipt references the previous receipt digest. The ledger rejects
+out-of-order steps, duplicate evidence or a broken chain.
+
+The ledger never stores passwords, tokens, raw provider responses or production
+credentials.
