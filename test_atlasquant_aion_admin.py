@@ -938,6 +938,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("não executa merge, deploy, piloto ou runtime", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_explicit_authorization_contract_rejects_generic_language(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("8 · Contrato de autorização explícita", src)
+        self.assertIn("Token explícito obrigatório", src)
+        self.assertIn("Acknowledgements obrigatórios", src)
+        self.assertIn("Mensagens genéricas como ok, vamos lá ou pode seguir não são autorização de consolidação", src)
+        self.assertIn("Mesmo um registro explícito validado não executa merge", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
