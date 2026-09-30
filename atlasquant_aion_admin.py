@@ -409,6 +409,9 @@ from atlasquant_aion_business_team_access_step1_decision_record import (
 from atlasquant_aion_business_team_access_step1_execution_envelope import (
     step1_execution_envelope_policy as business_team_step1_execution_envelope_policy,
 )
+from atlasquant_aion_business_team_access_step1_apply_plan import (
+    step1_apply_plan_policy as business_team_step1_apply_plan_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7364,6 +7367,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "50 · Equipe & Acessos · Step 1 Preflight",
             "51 · Equipe & Acessos · Step 1 Decision",
             "52 · Equipe & Acessos · Step 1 Execution Envelope",
+            "53 · Equipe & Acessos · Step 1 Apply Plan",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8312,7 +8316,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "step_execution_performed=false · executor OFF."
         )
 
-    else:
+    elif view == "52 · Equipe & Acessos · Step 1 Execution Envelope":
         envelope = business_team_step1_execution_envelope_policy()
         st.write(f"Estado: **{envelope.get('state')}**")
         st.markdown("**Revalidação pós-decisão obrigatória:**")
@@ -8331,6 +8335,26 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Estado máximo: READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_APPLY · "
+            "physical_execution_performed=false."
+        )
+
+    else:
+        apply_plan = business_team_step1_apply_plan_policy()
+        st.write(f"Estado: **{apply_plan.get('state')}**")
+        st.markdown("**Operação congelada do provider:**")
+        st.markdown(f"- provider: {apply_plan.get('provider')}")
+        st.markdown(f"- realm: {apply_plan.get('realm')}")
+        st.markdown(f"- método: {apply_plan.get('method')}")
+        st.code(str(apply_plan.get("relative_path") or ""), language=None)
+        st.markdown(
+            f"- HTTP esperado: {apply_plan.get('expected_http_status')}"
+        )
+        st.warning(
+            "O Apply Plan não contém token, password, credentials ou comando executável. "
+            "Ele só congela a forma da futura operação sandbox."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_STEP1_PROVIDER_APPLY_PLAN_REVIEW · "
             "physical_execution_performed=false."
         )
 
