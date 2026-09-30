@@ -385,6 +385,10 @@ def build_step1_preflight_package(
 
     payload = {
         "materialization_digest": materialized["materialization_digest"],
+        "plan_digest": materialized["plan_digest"],
+        "authorization_record_digest": _clean(
+            auth.get("record_digest"), 80
+        ).lower(),
         "authorization_package_digest": _clean(
             auth.get("authorization_package_digest"), 80
         ).lower(),
@@ -421,6 +425,10 @@ def build_step1_preflight_package(
         "step1_packet_digest": _digest(payload) if ready else "",
         "materialization_digest": materialized["materialization_digest"]
         if ready else "",
+        "plan_digest": materialized["plan_digest"] if ready else "",
+        "authorization_record_digest": _clean(
+            auth.get("record_digest"), 80
+        ).lower() if ready else "",
         "authorization_package_digest": _clean(
             auth.get("authorization_package_digest"), 80
         ).lower() if ready else "",
@@ -469,6 +477,10 @@ def verify_step1_preflight_package(
     materialization_digest = _clean(
         row.get("materialization_digest"), 80
     ).lower()
+    plan_digest = _clean(row.get("plan_digest"), 80).lower()
+    authorization_record_digest = _clean(
+        row.get("authorization_record_digest"), 80
+    ).lower()
     authorization_package_digest = _clean(
         row.get("authorization_package_digest"), 80
     ).lower()
@@ -491,6 +503,8 @@ def verify_step1_preflight_package(
 
     payload = {
         "materialization_digest": materialization_digest,
+        "plan_digest": plan_digest,
+        "authorization_record_digest": authorization_record_digest,
         "authorization_package_digest": authorization_package_digest,
         "ledger_digest": ledger_digest,
         "preflight_digest": preflight_digest,
@@ -505,6 +519,34 @@ def verify_step1_preflight_package(
         "target_step_id": LIFECYCLE_STEP_IDS[0],
     }
 
+    ledger = _mapping(row.get("ledger"))
+    preflight = _mapping(row.get("preflight"))
+
+    expected_ledger_payload = {
+        "plan_digest": plan_digest,
+        "authorization_record_digest": authorization_record_digest,
+        "authorization_package_digest": authorization_package_digest,
+        "materialization_digest": materialization_digest,
+        "entries": [],
+        "completed_count": 0,
+        "chain_head_digest": GENESIS_DIGEST,
+    }
+    expected_ledger_digest = _digest(expected_ledger_payload)
+
+    expected_preflight_payload = {
+        "plan_digest": plan_digest,
+        "authorization_record_digest": authorization_record_digest,
+        "authorization_package_digest": authorization_package_digest,
+        "materialization_digest": materialization_digest,
+        "ledger_digest": ledger_digest,
+        "chain_head_digest": GENESIS_DIGEST,
+        "target_step_order": 1,
+        "target_step_id": LIFECYCLE_STEP_IDS[0],
+        "baseline_evidence_digest": baseline_digest,
+        "requested_by": observation_by,
+    }
+    expected_preflight_digest = _digest(expected_preflight_payload)
+
     gates = {
         "schema_valid": row.get("schema") == SCHEMA,
         "state_ready": row.get("state")
@@ -512,12 +554,45 @@ def verify_step1_preflight_package(
         "materialization_digest_valid": bool(
             _DIGEST64.fullmatch(materialization_digest)
         ),
+        "plan_digest_valid": bool(_DIGEST64.fullmatch(plan_digest)),
+        "authorization_record_digest_valid": bool(
+            _DIGEST64.fullmatch(authorization_record_digest)
+        ),
         "authorization_package_digest_valid": bool(
             _DIGEST64.fullmatch(authorization_package_digest)
         ),
         "ledger_digest_valid": bool(_DIGEST64.fullmatch(ledger_digest)),
+        "ledger_digest_integrity": bool(
+            _DIGEST64.fullmatch(ledger_digest)
+            and ledger_digest == expected_ledger_digest
+            and _clean(ledger.get("ledger_digest"), 80).lower()
+            == ledger_digest
+            and ledger.get("state")
+            == "READY_FOR_FIRST_SANDBOX_LIFECYCLE_STEP"
+            and ledger.get("completed_count") == 0
+            and list(ledger.get("entries") or []) == []
+            and ledger.get("chain_head_digest") == GENESIS_DIGEST
+            and ledger.get("next_expected_step_order") == 1
+            and ledger.get("next_expected_step_id") == LIFECYCLE_STEP_IDS[0]
+        ),
         "preflight_digest_valid": bool(
             _DIGEST64.fullmatch(preflight_digest)
+        ),
+        "preflight_digest_integrity": bool(
+            _DIGEST64.fullmatch(preflight_digest)
+            and preflight_digest == expected_preflight_digest
+            and _clean(preflight.get("preflight_digest"), 80).lower()
+            == preflight_digest
+            and preflight.get("state")
+            == "READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_DECISION"
+            and preflight.get("target_step_order") == 1
+            and preflight.get("target_step_id") == LIFECYCLE_STEP_IDS[0]
+            and preflight.get("step_execution_authorized") is False
+            and preflight.get("automatic_execution_authorized") is False
+            and preflight.get("automatic_ledger_append") is False
+            and preflight.get("executor_enabled") is False
+            and preflight.get("production_authorized") is False
+            and preflight.get("executes_action") is False
         ),
         "operator_session_valid": bool(_SESSION32.fullmatch(session_id)),
         "baseline_digest_valid": bool(
