@@ -146,7 +146,7 @@ def _observation():
         "cleanup_path_ready": True,
         "secret_material_included": False,
         "production_targeted": False,
-        "external_side_effects_executed": False,
+        "external_mutations_executed": False,
     }
 
 
@@ -170,7 +170,7 @@ class TeamAccessStep1PreflightPackageTests(unittest.TestCase):
         self.assertFalse(row["oidc_verified"])
         self.assertFalse(row["registry_schema_verified"])
         self.assertFalse(row["cleanup_path_ready"])
-        self.assertFalse(row["external_side_effects_executed"])
+        self.assertFalse(row["external_mutations_executed"])
 
     def test_valid_inputs_build_zero_ledger_and_step1_decision_packet(self):
         result = build_step1_preflight_package(
