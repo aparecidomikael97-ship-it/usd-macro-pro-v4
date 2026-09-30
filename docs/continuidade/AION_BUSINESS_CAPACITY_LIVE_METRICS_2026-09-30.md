@@ -26,6 +26,10 @@ Draft PR #449 — AION BUSINESS: live capacity metrics binding V1.
 
 IMPLEMENTADO / EM VALIDAÇÃO.
 
+Validação final do HEAD reexecutada após reconciliação com a #448. CI verde
+continua sendo evidência técnica, sem autorizar admissão de cliente, quota,
+orçamento, merge, deploy ou runtime.
+
 Ainda pendente:
 - configurar connectors reais de suporte/infra/incidentes;
 - bind físico do FinOps ledger persistido;
