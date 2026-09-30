@@ -151,6 +151,11 @@ def record_quota_application_authorization(
         "capacity_review_digest": capacity_review_digest if accepted else "",
         "tenant_ids": tenants if accepted else [],
         "actor": actor_text if accepted else "",
+        "acknowledgements": (
+            {name: True for name in QUOTA_ACKNOWLEDGEMENTS}
+            if accepted
+            else {}
+        ),
         "quota_application_authorized": accepted,
         "quota_application_execution_authorized": False,
         "billing_authorized": False,
@@ -177,6 +182,17 @@ def quota_application_preflight(
         row.get("capacity_review_digest"), 128
     ).lower()
     tenants = _tenant_ids(row.get("tenant_ids"))
+    actor_text = _clean(row.get("actor"), 120)
+    acknowledgements = _mapping(row.get("acknowledgements"))
+    expected_authorization_digest = _digest({
+        "capacity_review_digest": capacity_review_digest,
+        "tenant_ids": sorted(tenants),
+        "actor": actor_text,
+        "acknowledgements": {
+            name: acknowledgements.get(name) is True
+            for name in QUOTA_ACKNOWLEDGEMENTS
+        },
+    })
     change_window = _clean(change_window_ref, 300)
     monitoring = _clean(monitoring_plan_ref, 300)
     rollback = _clean(rollback_plan_ref, 300)
@@ -188,7 +204,13 @@ def quota_application_preflight(
         and row.get("quota_application_authorized") is True
         and row.get("quota_application_execution_authorized") is False
         and _DIGEST64.fullmatch(authorization_digest)
+        and authorization_digest == expected_authorization_digest
         and _DIGEST64.fullmatch(capacity_review_digest)
+        and bool(actor_text)
+        and all(
+            acknowledgements.get(name) is True
+            for name in QUOTA_ACKNOWLEDGEMENTS
+        )
         and 1 <= len(tenants) <= MAX_BOUNDED_TENANTS
         and len(set(tenants)) == len(tenants)
         and row.get("billing_authorized") is False
@@ -261,18 +283,30 @@ def quota_application_execution_review_packet(
     auth_digest = _clean(row.get("authorization_digest"), 128).lower()
     capacity_digest = _clean(row.get("capacity_review_digest"), 128).lower()
     tenants = _tenant_ids(row.get("tenant_ids"))
+    change_window = _clean(row.get("change_window_ref"), 300)
+    monitoring = _clean(row.get("monitoring_plan_ref"), 300)
+    rollback = _clean(row.get("rollback_plan_ref"), 300)
+    expected_preflight_digest = _digest({
+        "authorization_digest": auth_digest,
+        "capacity_review_digest": capacity_digest,
+        "tenant_ids": sorted(tenants),
+        "change_window_ref": change_window,
+        "monitoring_plan_ref": monitoring,
+        "rollback_plan_ref": rollback,
+    })
 
     ready = bool(
         row.get("schema") == "ATLASQUANT_AION_BUSINESS_QUOTA_APPLICATION_PREFLIGHT_V1"
         and row.get("state") == "QUOTA_APPLICATION_EXECUTION_REVIEW_REQUIRED"
         and _DIGEST64.fullmatch(digest)
+        and digest == expected_preflight_digest
         and _DIGEST64.fullmatch(auth_digest)
         and _DIGEST64.fullmatch(capacity_digest)
         and 1 <= len(tenants) <= MAX_BOUNDED_TENANTS
         and len(set(tenants)) == len(tenants)
-        and bool(_clean(row.get("change_window_ref"), 300))
-        and bool(_clean(row.get("monitoring_plan_ref"), 300))
-        and bool(_clean(row.get("rollback_plan_ref"), 300))
+        and bool(change_window)
+        and bool(monitoring)
+        and bool(rollback)
         and row.get("quota_application_authorized") is True
         and row.get("quota_application_execution_authorized") is False
         and row.get("billing_authorized") is False
