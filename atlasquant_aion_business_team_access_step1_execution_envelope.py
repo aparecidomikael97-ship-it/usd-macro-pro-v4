@@ -18,6 +18,7 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_materialization impo
     SCHEMA as MATERIALIZATION_SCHEMA,
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
+    ALLOWED_FACTORS,
     LIFECYCLE_STEP_IDS,
 )
 from atlasquant_aion_business_team_access_step1_decision_record import (
@@ -675,6 +676,7 @@ def verify_step1_execution_envelope(
             target_username.startswith("sandbox.")
         ),
         "tenant_scope_present": bool(tenants),
+        "factor_allowed": factor in ALLOWED_FACTORS,
         "observed_at_valid": observed_at is not None,
         "observer_present": bool(observed_by),
         "prepared_at_valid": prepared_at is not None,
@@ -788,7 +790,13 @@ def verify_step1_execution_envelope_source_binding(
         == materialized["baseline_evidence_digest"]
         and _clean(row.get("target_username"), 160)
         == materialized["test_username"]
-        and sorted(set(row.get("tenant_ids") or []))
+        and sorted(
+            {
+                _clean(item, 120)
+                for item in list(row.get("tenant_ids") or [])
+                if _clean(item, 120)
+            }
+        )
         == materialized["tenant_ids"]
         and _clean(row.get("factor_type"), 60).upper()
         == materialized["factor_type"]
