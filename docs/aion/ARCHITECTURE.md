@@ -1029,3 +1029,19 @@ actions remain outside this module.
 
 ADR-0058 records this boundary.
 
+## AION FinOps ledger persistence & invoice reconciliation
+
+`atlasquant_aion_finops_ledger_persistence_reconciliation.py` adds a
+version-manifest chain above the verified live-cost ledger. Each manifest binds
+its version number to the previous manifest digest, storage reference, creator,
+timestamp and exact ledger identity.
+
+The version chain rejects gaps, reorder, replay and digest tampering. Invoice
+reconciliation requires a read-only attested invoice, matching provider/period,
+a verified ledger and a total inside a bounded tolerance.
+
+Physical storage writes, provider calls, invoice payment, subscription changes
+and price changes remain outside this module.
+
+ADR-0059 records this boundary.
+
