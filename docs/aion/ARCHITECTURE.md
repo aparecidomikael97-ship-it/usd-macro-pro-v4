@@ -692,3 +692,16 @@ closure requires the exact acknowledgement token
 does not authorize deploy, production release, pilot or runtime.
 
 ADR-0037 records this final consolidation boundary.
+
+
+## BUSINESS release boundary handoff
+
+`atlasquant_aion_business_release_boundary_handoff.py` separates a technically
+acknowledged consolidation from any later deployment or runtime decision.
+
+The handoff binds the final main SHA, technical acknowledgement digest, target
+environment, deploy-plan reference, rollback SHA and monitoring-plan reference.
+BUSINESS runtime must remain OFF and runtime authority must stay separate.
+
+The highest automatic state is `READY_FOR_SEPARATE_DEPLOY_DECISION`. No deploy
+is authorized or executed. ADR-0038 records this boundary.
