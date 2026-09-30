@@ -985,6 +985,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("deploy e runtime continuam separados", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_consolidation_completion_review_requires_explicit_final_acknowledgement(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("13 · Revisão final da consolidação", src)
+        self.assertIn("Evidências obrigatórias para fechar tecnicamente a consolidação", src)
+        self.assertIn("Checks finais obrigatórios na main", src)
+        self.assertIn("READY_FOR_FINAL_ADMIN_REVIEW", src)
+        self.assertIn('review.get("required_decision_token")', src)
+        self.assertIn("Mensagens genéricas como 'vamos lá'", src)
+        self.assertIn("não autoriza deploy, produção, piloto ou runtime", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)

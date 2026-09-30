@@ -677,3 +677,18 @@ UI/mobile, final SHA and runtime posture still require human review and deploy
 remains a separate decision.
 
 ADR-0036 records this deterministic progression boundary.
+
+
+## BUSINESS consolidation completion review
+
+`atlasquant_aion_business_consolidation_completion_review.py` is the final
+read-only gate after a complete #394–#412 progress ledger. It revalidates the
+final main SHA, all final CI checks, UI/mobile success, BUSINESS runtime OFF and
+the requirement that deploy remain a separate decision.
+
+The highest automatic state is `READY_FOR_FINAL_ADMIN_REVIEW`. Technical
+closure requires the exact acknowledgement token
+`ACKNOWLEDGE_BUSINESS_CONSOLIDATION_COMPLETE`, but even a valid acknowledgement
+does not authorize deploy, production release, pilot or runtime.
+
+ADR-0037 records this final consolidation boundary.
