@@ -36,3 +36,5 @@ Treinamento somente em sessão e com fixtures. Runtime BUSINESS continua OFF.
 Após CI verde, o próximo bloco pode evoluir para o simulador de diagnóstico e
 proposta: preencher respostas fictícias → gerar briefing → montar pacote →
 mostrar Portal/Radar → gerar rascunho de proposta, ainda sem envio.
+
+Conclusão do treinamento é evidência de prática, não autorização operacional.
