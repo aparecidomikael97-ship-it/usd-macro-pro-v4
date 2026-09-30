@@ -1429,3 +1429,20 @@ The maximum state is
 is modified and Step 2 remains unauthorized.
 
 ADR-0081 records this boundary.
+
+
+## BUSINESS team access Step 1 ledger append contract
+
+`atlasquant_aion_business_team_access_step1_ledger_append_contract.py`
+separates provider-receipt validation from the administrative decision to
+persist the canonical Step 1 lifecycle receipt.
+
+The request binds the receipt-review digest, canonical receipt digest, current
+GENESIS ledger digest and target 1/10 ledger-preview digest. An exact explicit
+token and all acknowledgements are required.
+
+The maximum state is
+`EXPLICIT_STEP1_LEDGER_APPEND_DECISION_VERIFIED`. No persisted ledger is
+modified and Step 2 remains unauthorized.
+
+ADR-0082 records this boundary.
