@@ -17,7 +17,7 @@
   },
   "economics": {
     "initial_monthly_budget_cap_brl": 200,
-    "hard_runtime_enforcement_status": "PENDING",
+    "hard_runtime_enforcement_status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "priorities": [
       "data_integrity",
       "backup",
@@ -28,7 +28,12 @@
       "cheap_or_local_models_first",
       "paid_api_only_when_valuable"
     ],
-    "scale_from_customer_revenue": true
+    "scale_from_customer_revenue": true,
+    "finops_budget_governor": "atlasquant_aion_finops_budget_governor.py",
+    "initial_max_trader_allocation_pct": 30,
+    "business_revenue_primary_ecosystem_funding": true,
+    "trader_profit_retained_in_trader_bucket": true,
+    "trade_return_target_is_guarantee": false
   },
   "monetization": {
     "priority_offer": "B2B Atendimento & Automação Comercial com AION",
@@ -122,7 +127,8 @@
       433,
       434,
       436,
-      437
+      437,
+      438
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -131,7 +137,8 @@
     "quota_application_authorized_by_this_checkpoint": false,
     "checkpoint_master_pr": 435,
     "team_access_rbac_pr": 436,
-    "capacity_scale_manager_pr": 437
+    "capacity_scale_manager_pr": 437,
+    "finops_budget_treasury_pr": 438
   },
   "decisions": [
     {
@@ -142,9 +149,15 @@
     },
     {
       "id": "D-2026-09-30-COST-CAP-200",
-      "state": "APROVADO / PENDENTE",
-      "implemented": false,
-      "validated": false
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_finops_budget_governor.py",
+        "test_atlasquant_aion_finops_budget_governor.py",
+        "docs/aion/AION_FINOPS_BUDGET_TREASURY_V1.md",
+        "docs/adr/ADR-0050-finops-budget-treasury.md"
+      ]
     },
     {
       "id": "D-2026-09-30-DATA-INTEGRITY-FIRST",
@@ -216,17 +229,81 @@
         "atlasquant_aion_checkpoint_latest.py",
         "test_atlasquant_aion_checkpoint_latest.py"
       ]
+    },
+    {
+      "id": "D-2026-09-30-ECOSYSTEM-PRIORITY-BUSINESS",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-TREASURY-BUCKETS",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_finops_budget_governor.py",
+        "docs/aion/AION_FINOPS_BUDGET_TREASURY_V1.md",
+        "docs/adr/ADR-0050-finops-budget-treasury.md"
+      ]
+    },
+    {
+      "id": "D-2026-09-30-TRADER-INITIAL-CAP-30",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_finops_budget_governor.py",
+        "test_atlasquant_aion_finops_budget_governor.py"
+      ]
+    },
+    {
+      "id": "D-2026-09-30-TRADE-TARGET-NOT-GUARANTEE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_finops_budget_governor.py",
+        "test_atlasquant_aion_finops_budget_governor.py"
+      ]
     }
   ],
   "pending": [
+    "FINOPS_PERSISTENT_LEDGER",
+    "FINOPS_LIVE_PROVIDER_COST_BINDING",
     "CAPACITY_SCALE_LIVE_METRICS_BINDING",
     "TEAM_RBAC_PRODUCTION_BINDING",
     "BACKUP_RECOVERY_TESTABLE_POLICY",
-    "BUDGET_GOVERNOR_200_BRL",
     "B2B_OFFER_READY_TO_SELL",
     "COMMERCIAL_PIPELINE_END_TO_END",
     "AION_CHECKPOINT_BOOTSTRAP_INTEGRATION",
     "EIGHT_ROLE_MULTIAGENT_ROUTER",
     "BUSINESS_UPDATED_PDF"
-  ]
+  ],
+  "ecosystem_priority": {
+    "status": "APROVADO / PENDENTE",
+    "structural_first": [
+      "AION_CORE",
+      "AION",
+      "INTERFACE"
+    ],
+    "primary_after_structural_close": "BUSINESS",
+    "parallel_lower_priority": [
+      "TRADER",
+      "INVESTMENTS"
+    ],
+    "trader_validation_continues": true,
+    "investments_long_term_patrimony": true
+  },
+  "finops": {
+    "status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "monthly_cap_brl": 200,
+    "warning_pct": 70,
+    "critical_pct": 85,
+    "live_provider_cost_binding": false,
+    "persistent_financial_ledger": false,
+    "automatic_spending": false,
+    "automatic_transfer": false,
+    "automatic_trade": false
+  }
 }

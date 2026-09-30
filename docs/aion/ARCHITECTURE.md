@@ -890,3 +890,20 @@ budget automatically. Customer admission remains a separate explicit decision.
 
 ADR-0049 records this boundary.
 
+## FinOps Budget Governor & Treasury
+
+atlasquant_aion_finops_budget_governor.py governs the initial R$200/month
+ecosystem planning cap and separates the economic roles of Business, Trader and
+Investments.
+
+Business is the primary initial funding source for the ecosystem. Trader profit
+is retained in the Trader bucket and the initial policy caps Trader allocation
+at 30% of total ecosystem capital. Investments remain focused on long-term
+patrimony. Trade targets are planning inputs only and never become guarantees or
+expected-return claims.
+
+The module is read-only: no spending, transfer, billing change, trade or budget
+increase is executed.
+
+ADR-0050 records this boundary.
+
