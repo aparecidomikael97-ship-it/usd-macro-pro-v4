@@ -208,6 +208,15 @@ from atlasquant_aion_business_commercial_acquisition_demo import (
     outreach_draft as business_outreach_draft,
     qualify_prospect as business_qualify_prospect,
 )
+from atlasquant_aion_business_integration_hub import (
+    INTEGRATIONS as BUSINESS_INTEGRATIONS,
+    connection_review_packet as business_integration_connection_review,
+    hub_snapshot as business_integration_hub_snapshot,
+    integration_health as business_integration_health,
+    integration_record as business_integration_record,
+    minimum_scope_plan as business_integration_scope_plan,
+    secret_handling_policy as business_integration_secret_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6587,6 +6596,165 @@ def _render_business_commercial_acquisition_demo() -> None:
         )
 
 
+
+def _render_business_integration_hub_demo() -> None:
+    """Render read-only readiness for future BUSINESS integrations."""
+    st.markdown("#### 🔌 Hub de Integrações · Readiness Demo")
+    st.caption(
+        "Mostra quais sistemas o AION Business poderá integrar e quais permissões mínimas seriam "
+        "necessárias. Nenhuma credencial real é pedida e nenhuma conexão externa acontece aqui."
+    )
+
+    demo_records = [
+        business_integration_record(
+            integration="WHATSAPP_BUSINESS",
+            display_name="WhatsApp Business Demo",
+            purpose="Atendimento e follow-up",
+            account_reference="demo-whatsapp",
+            config_complete=True,
+            auth_review_complete=True,
+            read_probe_ok=True,
+            last_check_at=datetime.now(timezone.utc).isoformat(),
+        ),
+        business_integration_record(
+            integration="EMAIL",
+            display_name="E-mail Demo",
+            purpose="Atendimento e propostas",
+            account_reference="demo-email",
+            config_complete=True,
+            auth_review_complete=False,
+        ),
+        business_integration_record(
+            integration="CRM",
+            display_name="CRM Demo",
+            purpose="Pipeline comercial",
+            account_reference="demo-crm",
+            config_complete=True,
+            auth_review_complete=False,
+        ),
+        business_integration_record(
+            integration="PAYMENTS",
+            display_name="Pagamentos Demo",
+            purpose="Leitura futura de cobrança",
+            account_reference="demo-payments",
+            config_complete=False,
+        ),
+    ]
+    snapshot = business_integration_hub_snapshot(demo_records)
+    secret_policy = business_integration_secret_policy()
+
+    view = st.selectbox(
+        "Visão do Hub de Integrações",
+        (
+            "1 · Estado geral",
+            "2 · Permissões mínimas",
+            "3 · Saúde das integrações",
+            "4 · Segurança de credenciais",
+            "5 · Pedido de conexão futuro",
+        ),
+        key="aion_business_integration_hub_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Estado geral":
+        h1,h2,h3 = st.columns(3)
+        h1.metric("Integrações mapeadas", int(snapshot.get("configured_count") or 0))
+        h2.metric("Saudáveis read-only", int(snapshot.get("healthy_read_only_count") or 0))
+        h3.metric("Conexões reais", int(snapshot.get("real_connections_active") or 0))
+        st.markdown("**Catálogo previsto**")
+        for name in BUSINESS_INTEGRATIONS:
+            status = next(
+                (
+                    row.get("state")
+                    for row in demo_records
+                    if isinstance(row, Mapping) and row.get("integration") == name
+                ),
+                "NOT_CONFIGURED",
+            )
+            st.markdown(f"- **{name}** — {status}")
+        st.caption(
+            "WhatsApp, e-mail, formulários, calendário, CRM, pagamentos, redes sociais e analytics "
+            "fazem parte do Hub previsto."
+        )
+
+    elif view == "2 · Permissões mínimas":
+        integration = st.selectbox(
+            "Integração para revisar",
+            list(BUSINESS_INTEGRATIONS),
+            key="aion_business_integration_scope_target",
+        )
+        plan = business_integration_scope_plan(
+            integration,
+            use_case="AION Business · operação do cliente",
+        )
+        st.markdown("**Princípio: LEAST PRIVILEGE**")
+        for scope,state in dict(plan.get("scopes") or {}).items():
+            st.markdown(f"- **{scope}** — {state}")
+        st.warning(
+            "Enviar mensagem, publicar conteúdo, emitir cobrança ou alterar dados externos nunca "
+            "é liberado só porque a integração existe."
+        )
+
+    elif view == "3 · Saúde das integrações":
+        for row in demo_records:
+            if not isinstance(row, Mapping):
+                continue
+            health = business_integration_health(row, now=datetime.now(timezone.utc))
+            st.markdown(
+                f"**{row.get('display_name')}** · {health.get('state')} · "
+                f"read-only={health.get('read_only')}"
+            )
+            age = health.get("last_check_age_hours")
+            st.caption(
+                "Última evidência: N/D"
+                if age is None else
+                f"Última evidência há {float(age):.1f}h"
+            )
+        st.caption(
+            "Saúde aqui é demonstrativa; nenhum probe real de fornecedor foi executado."
+        )
+
+    elif view == "4 · Segurança de credenciais":
+        st.markdown("**Política de segredo**")
+        st.write(f"Modo: **{secret_policy.get('policy')}**")
+        st.markdown("- Senha/token/chave real: **não inserir neste demo**")
+        st.markdown("- Segredo em log: **proibido**")
+        st.markdown("- Segredo em checkpoint/UI state: **proibido**")
+        st.markdown(
+            f"- Produção futura: **{secret_policy.get('future_secret_storage')}**"
+        )
+        st.caption(
+            "Quando integrações reais forem liberadas, credenciais precisarão de armazenamento "
+            "dedicado, rotação e menor privilégio possível."
+        )
+
+    else:
+        selected = st.selectbox(
+            "Sistema para preparar revisão",
+            ["EMAIL", "CRM", "WHATSAPP_BUSINESS"],
+            key="aion_business_integration_review_target",
+        )
+        record = next(
+            (
+                row for row in demo_records
+                if isinstance(row, Mapping) and row.get("integration") == selected
+            ),
+            {},
+        )
+        scope = business_integration_scope_plan(selected)
+        packet = business_integration_connection_review(
+            record,
+            scope,
+            requested_by="Mikael",
+        )
+        st.write(f"Estado: **{packet.get('state')}**")
+        st.write(f"Escopo de aprovação: **{packet.get('approval_scope')}**")
+        st.caption(
+            "O packet só prepara futura revisão. OAuth não é executado, credencial não é armazenada "
+            "e nenhum write scope é concedido."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6610,6 +6778,7 @@ def _render_business(
     _render_business_client_finance_demo()
     _render_business_trend_intelligence_demo()
     _render_business_commercial_acquisition_demo()
+    _render_business_integration_hub_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
