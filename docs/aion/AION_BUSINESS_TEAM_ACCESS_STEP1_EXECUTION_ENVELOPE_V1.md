@@ -45,3 +45,21 @@ No momento de preparar o envelope:
 READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_APPLY
 
 O CLI não gera comando de provider e não cria a conta.
+
+
+## Integridade do envelope
+
+O resultado pronto expõe somente metadados/digests sanitizados necessários para
+`verify_step1_execution_envelope` recalcular:
+
+- execution observation digest;
+- execution envelope digest;
+- materialization/packet/decision bindings;
+- target, tenant scope e factor;
+- timestamps de decisão, observação e preparo;
+- janelas máximas de 120 segundos.
+
+`verify_step1_execution_envelope_source_binding` também compara o envelope com
+materialization, packet e decision record originais.
+
+Nenhuma dessas verificações executa o provider.
