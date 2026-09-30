@@ -152,6 +152,25 @@ class BusinessTeamAccessRbacTests(unittest.TestCase):
         self.assertFalse(decision["allowed"])
         self.assertIn("strong_auth_verified", decision["blockers"])
 
+    def test_business_owner_profile_requires_base_admin_identity(self):
+        owner = membership_record(
+            username="maria",
+            profile="BUSINESS_OWNER",
+            tenant_ids=["client-a"],
+        )
+        decision = team_access_decision(
+            _staff(),
+            owner,
+            tenant_id="client-a",
+            action="manage_team",
+            strong_auth_verified=True,
+        )
+        self.assertFalse(decision["allowed"])
+        self.assertIn(
+            "owner_requires_admin_identity",
+            decision["blockers"],
+        )
+
     def test_critical_actions_are_never_granted_by_team_profile(self):
         owner = membership_record(
             username="maria",
