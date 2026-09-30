@@ -9,7 +9,9 @@ This Python module itself is read-only. It performs no network or process I/O.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
 from typing import Any, Mapping
+import json
 import re
 
 from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
@@ -39,6 +41,17 @@ def _mapping(value: Any) -> dict[str, Any]:
 
 def _clean(value: Any, limit: int = 500) -> str:
     return " ".join(str(value or "").replace("\x00", "").split())[:limit]
+
+
+def _digest(value: Any) -> str:
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _parse_time(value: Any) -> datetime | None:
@@ -205,6 +218,17 @@ def build_provider_runner_preflight(
     common_ready = not common_blockers
 
     if not wants_apply:
+        plan_payload = {
+            "apply_plan_digest": digest,
+            "execution_envelope_digest": _clean(
+                envelope.get("execution_envelope_digest"), 80
+            ).lower(),
+            "base_url": _clean(base_url, 200),
+            "evaluated_at": (
+                evaluated.isoformat() if evaluated is not None else ""
+            ),
+            "apply_requested": False,
+        } if common_ready else {}
         return {
             "schema": SCHEMA,
             "version": VERSION,
@@ -219,6 +243,9 @@ def build_provider_runner_preflight(
             "base_url": _clean(base_url, 200) if common_ready else "",
             "local_port": port if common_ready else None,
             "apply_plan_digest": digest if common_ready else "",
+            "runner_preflight_digest": (
+                _digest(plan_payload) if common_ready else ""
+            ),
             "required_physical_apply_token": (
                 required_token if common_ready else ""
             ),
@@ -246,6 +273,17 @@ def build_provider_runner_preflight(
         name for name, passed in apply_gates.items() if not passed
     ]
     ready = not blockers
+    apply_payload = {
+        "apply_plan_digest": digest,
+        "execution_envelope_digest": _clean(
+            envelope.get("execution_envelope_digest"), 80
+        ).lower(),
+        "base_url": _clean(base_url, 200),
+        "evaluated_at": (
+            evaluated.isoformat() if evaluated is not None else ""
+        ),
+        "apply_requested": True,
+    } if ready else {}
 
     return {
         "schema": SCHEMA,
@@ -261,6 +299,7 @@ def build_provider_runner_preflight(
         "base_url": _clean(base_url, 200) if ready else "",
         "local_port": port if ready else None,
         "apply_plan_digest": digest if ready else "",
+        "runner_preflight_digest": _digest(apply_payload) if ready else "",
         "required_physical_apply_token": (
             required_token if common_ready else ""
         ),
