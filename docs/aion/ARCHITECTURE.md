@@ -862,3 +862,17 @@ The latest master-checkpoint reconciliation is discovered through
 `docs/continuidade/checkpoint_mestre_latest.json` and validated read-only by
 `atlasquant_aion_checkpoint_latest.py`.
 
+## BUSINESS team access / RBAC
+
+atlasquant_aion_business_team_access_rbac.py extends the existing AtlasQuant
+identity/session layer with Business memberships, fixed profiles, explicit
+tenant scope and strong-auth enforcement.
+
+The layer does not create a parallel identity system. It binds the authenticated
+username to a Business membership and makes the AION consume the same
+permission decision as the interface. Cross-tenant access and automatic
+permission escalation remain false. Critical actions keep their independent
+approval gates.
+
+ADR-0048 records this boundary.
+
