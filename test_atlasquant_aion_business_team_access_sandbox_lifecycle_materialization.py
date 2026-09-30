@@ -3,7 +3,13 @@ import unittest
 from pathlib import Path
 
 from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import (
+    DECISION_TOKEN,
+    REQUIRED_ACKNOWLEDGEMENTS,
     SCHEMA as ACCEPTANCE_SCHEMA,
+    validate_baseline_acceptance,
+)
+from atlasquant_aion_business_team_access_windows_operator_handoff import (
+    SCHEMA as HANDOFF_SCHEMA,
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_materialization import (
     lifecycle_materialization_policy,
@@ -44,19 +50,37 @@ def _raw_baseline():
 
 
 def _acceptance(baseline_digest):
-    return {
-        "schema": ACCEPTANCE_SCHEMA,
-        "state": "EXPLICIT_SANDBOX_BASELINE_ACCEPTANCE_VERIFIED",
-        "acceptance_record_verified": True,
-        "baseline_accepted": True,
-        "lifecycle_plan_input_authorized": True,
-        "baseline_evidence_digest": baseline_digest,
+    handoff = {
+        "schema": HANDOFF_SCHEMA,
+        "state": "READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW",
         "operator_session_id": SESSION,
-        "acceptance_record_digest": "e" * 64,
+        "readiness_digest": "e" * 64,
+        "baseline_evidence_digest": baseline_digest,
+        "reviewed_by": "admin.demo",
+        "handoff_digest": "f" * 64,
+        "baseline_accepted": False,
+        "lifecycle_plan_authorized": False,
         "lifecycle_execution_authorized": False,
         "production_authorized": False,
         "executes_action": False,
     }
+    record = {
+        "schema": ACCEPTANCE_SCHEMA,
+        "decision": DECISION_TOKEN,
+        "handoff_digest": "f" * 64,
+        "baseline_evidence_digest": baseline_digest,
+        "readiness_digest": "e" * 64,
+        "operator_session_id": SESSION,
+        "approved_by": "admin.demo",
+        "approved_at": "2026-09-30T21:25:00+00:00",
+        "sandbox_only": True,
+        "production_targeted": False,
+        "secret_material_included": False,
+        "acknowledgements": {
+            name: True for name in REQUIRED_ACKNOWLEDGEMENTS
+        },
+    }
+    return validate_baseline_acceptance(handoff, record)
 
 
 class TeamAccessSandboxLifecycleMaterializationTests(unittest.TestCase):
@@ -112,6 +136,28 @@ class TeamAccessSandboxLifecycleMaterializationTests(unittest.TestCase):
         self.assertIn("acceptance_schema_valid", result["blockers"])
         self.assertIn("plan_ready", result["blockers"])
         self.assertEqual(result["plan"], {})
+
+    def test_tampered_acceptance_integrity_blocks_materialization(self):
+        from atlasquant_aion_business_team_access_sandbox_evidence import (
+            validate_baseline_evidence,
+        )
+        baseline_review = validate_baseline_evidence(_raw_baseline())
+        acceptance = _acceptance(baseline_review["evidence_digest"])
+        acceptance["approved_at"] = "2026-09-30T21:26:00+00:00"
+
+        result = materialize_lifecycle_plan(
+            _raw_baseline(),
+            acceptance,
+            test_username="sandbox.operador.demo",
+            tenant_ids=["tenant-a"],
+            factor_type="PASSKEY",
+            requested_by="admin.demo",
+        )
+        self.assertEqual(
+            result["state"],
+            "TEAM_ACCESS_SANDBOX_LIFECYCLE_MATERIALIZATION_BLOCKED",
+        )
+        self.assertIn("acceptance_binding_match", result["blockers"])
 
     def test_wrong_acceptance_baseline_digest_blocks(self):
         acceptance = _acceptance("f" * 64)
