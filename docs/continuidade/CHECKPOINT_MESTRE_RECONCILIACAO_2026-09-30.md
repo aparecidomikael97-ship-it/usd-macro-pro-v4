@@ -75,6 +75,13 @@ PostgreSQL e adapter Keycloak Admin REST. O máximo automático é
 `READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_EXIT_REVIEW`; secrets, chamadas reais,
 produção, deploy e runtime continuam fora desta camada.
 
+Estado do sandbox físico de Equipe & Acessos: **IMPLEMENTADO / EM VALIDAÇÃO**
+em `atlasquant_aion_business_team_access_physical_sandbox.py`, bundle
+`deploy/sandbox/team-access/`, ADR-0065 e testes associados. O ambiente fica
+localhost-only, usa Keycloak 26.7.5 + PostgreSQL 18.6, mantém secrets fora do Git
+e exige `-Apply` explícito para iniciar containers. Nenhum container foi
+iniciado por esta camada.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -304,7 +311,7 @@ expansão.
 ## 10. Próximos blocos obrigatórios
 
 PENDENTE / APROVADO:
-- provisionar o sandbox físico isolado de Equipe & Acessos, configurar secrets fora do repositório e executar o E2E real contra Keycloak + PostgreSQL + adapter de revogação;
+- executar manualmente o sandbox físico isolado já preparado, configurar secrets somente no arquivo local ignorado pelo Git, validar OIDC/containers e então executar o E2E real contra Keycloak + PostgreSQL + adapter de revogação;
 - configurar connectors reais de suporte/infra/incidentes e validar métricas do primeiro ambiente piloto;
 - definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
 - configurar connectors reais de custo/fatura e writer físico do storage versionado com read-back verification;
@@ -346,3 +353,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-REVENUE-LIVE-ECONOMICS | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades usam custo FinOps e capacidade real antes do ranking |
 | D-2026-09-30-TEAM-ACCESS-PRODUCTION-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Conta individual, MFA forte, registry read-back e revogação viram gates de produção |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-E2E | IMPLEMENTADO / EM VALIDAÇÃO | Keycloak + OIDC, PostgreSQL e revogação via adapter formam o sandbox E2E |
+| D-2026-09-30-TEAM-ACCESS-PHYSICAL-SANDBOX | IMPLEMENTADO / EM VALIDAÇÃO | Sandbox local reproduzível, localhost-only e com partida manual explícita |
