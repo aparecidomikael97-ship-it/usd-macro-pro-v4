@@ -208,6 +208,15 @@ mutação exige `-Apply` e token físico exato derivado do
 o provider fica preso a localhost/sandbox e há lookup exato antes e depois do
 POST. Nenhum APPLY real foi executado neste checkpoint.
 
+Estado do Step 1 provider receipt + ledger review:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_step1_provider_receipt_review.py`,
+ADR-0081 e testes associados. O receipt físico precisa permanecer preso ao
+apply plan, runner preflight, execution envelope, session, baseline e username
+exatos. A camada gera um receipt canônico e apenas um preview do ledger com
+1/10 concluído e Step 2 como próximo. Nenhum append real e nenhuma autorização
+de Step 2 são produzidos.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -495,3 +504,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-STEP1-EXECUTION-ENVELOPE | IMPLEMENTADO / EM VALIDAÇÃO | Nova observação pós-decisão prepara somente a fronteira read-only do apply manual |
 | D-2026-09-30-TEAM-ACCESS-STEP1-PROVIDER-APPLY-PLAN | IMPLEMENTADO / EM VALIDAÇÃO | Operação Keycloak é congelada sem segredo e sem comando executável |
 | D-2026-09-30-TEAM-ACCESS-STEP1-GUARDED-PROVIDER-RUNNER | IMPLEMENTADO / EM VALIDAÇÃO | Runner físico fica PLAN ONLY por padrão e exige -Apply + token exato + freshness + readback antes de qualquer ledger append |
+| D-2026-09-30-TEAM-ACCESS-STEP1-PROVIDER-RECEIPT-LEDGER-REVIEW | IMPLEMENTADO / EM VALIDAÇÃO | Receipt físico vira receipt canônico e preview 1/10 antes de qualquer append real ou Step 2 |
