@@ -908,6 +908,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_client_finance_demo_separates_revenue_profit_and_capacity(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_client_finance_demo()", src)
+        self.assertIn("Central Financeira por Cliente · Demo", src)
+        self.assertIn("Receita não é lucro", src)
+        self.assertIn("Quebra de custos do cliente demo", src)
+        self.assertIn("Quota por cliente ajuda a evitar sobrecarga", src)
+        self.assertIn("Preço, cobrança e reajuste nunca mudam automaticamente", src)
+        self.assertIn("não emite cobrança e não movimenta dinheiro", src)
+        self.assertIn("_render_business_client_finance_demo()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_customer_success_demo_prioritizes_health_before_upsell(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_customer_success_demo()", src)
