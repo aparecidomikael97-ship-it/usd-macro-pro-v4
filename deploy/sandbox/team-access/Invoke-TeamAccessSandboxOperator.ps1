@@ -1,22 +1,26 @@
 param(
-    [string]$EnvFile = "$PSScriptRoot\sandbox.env.local",
+    [string]$EnvFile = (Join-Path $env:LOCALAPPDATA "AtlasQuant\team-access-sandbox\team-access-sandbox.env"),
+    [string]$OperatorDir = (Join-Path $env:LOCALAPPDATA "AtlasQuant\team-access-sandbox\operator"),
+    [string]$EvidenceDir = (Join-Path $env:LOCALAPPDATA "AtlasQuant\team-access-sandbox\evidence"),
     [switch]$ApplyStart,
     [switch]$CollectBaseline
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $env:LOCALAPPDATA) {
+    throw "LOCALAPPDATA is required for the default operator paths."
+}
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
-$EvidenceDir = "$PSScriptRoot\.atlasquant_sandbox_evidence"
 
 Write-Host "AtlasQuant Team Access Sandbox Operator"
 Write-Host "--------------------------------------"
 
-& "$PSScriptRoot\Get-TeamAccessSandboxReadiness.ps1" -EnvFile $EnvFile
+& "$PSScriptRoot\Get-TeamAccessSandboxReadiness.ps1" -EnvFile $EnvFile -OutputDir $OperatorDir
 if ($LASTEXITCODE -ne 0) {
     throw "Operator readiness command failed."
 }
 
-$readinessFile = "$PSScriptRoot\.atlasquant_sandbox_operator\windows-operator-readiness.json"
+$readinessFile = Join-Path $OperatorDir "windows-operator-readiness.json"
 if (-not (Test-Path -LiteralPath $readinessFile)) {
     throw "Readiness report not found."
 }
