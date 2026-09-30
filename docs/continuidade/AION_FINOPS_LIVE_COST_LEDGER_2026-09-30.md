@@ -23,6 +23,8 @@ Empilhado sobre a Draft PR #445.
 
 ## Estado
 
+Draft PR #446 — AION FinOps: live provider cost ledger V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente:
