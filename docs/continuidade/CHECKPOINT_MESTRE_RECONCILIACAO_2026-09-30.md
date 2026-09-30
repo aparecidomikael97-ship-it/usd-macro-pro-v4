@@ -135,6 +135,13 @@ bloqueiam. O máximo é
 `READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW`; baseline ainda
 não é aceito automaticamente e lifecycle continua não autorizado.
 
+Estado do baseline acceptance explícito:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_sandbox_baseline_acceptance.py`,
+ADR-0073 e testes associados. Aceitação futura fica presa ao handoff digest,
+baseline digest, readiness digest e operator session id exatos. O lifecycle
+builder agora bloqueia baseline técnico sem acceptance record verificado.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -414,3 +421,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-STEP-GATE | IMPLEMENTADO / EM VALIDAÇÃO | Cada step recebe preflight e pós-review próprios antes de qualquer avanço |
 | D-2026-09-30-TEAM-ACCESS-WINDOWS-OPERATOR-KIT | IMPLEMENTADO / EM VALIDAÇÃO | Fluxo Windows local ganha bootstrap, readiness, start e baseline com switches explícitos |
 | D-2026-09-30-TEAM-ACCESS-WINDOWS-OPERATOR-HANDOFF | IMPLEMENTADO / EM VALIDAÇÃO | Readiness e baseline passam a exigir o mesmo operator_session_id antes da aceitação |
+| D-2026-09-30-TEAM-ACCESS-SANDBOX-BASELINE-ACCEPTANCE | IMPLEMENTADO / EM VALIDAÇÃO | Baseline técnico precisa de acceptance explícito antes de alimentar o lifecycle plan |
