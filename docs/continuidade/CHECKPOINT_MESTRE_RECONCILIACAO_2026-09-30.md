@@ -62,6 +62,12 @@ testes associados. FinOps, suporte, infraestrutura e incidentes entram somente
 como evidência read-only atestada e recente antes de alimentar o Capacity & Scale
 Manager existente.
 
+Estado do binding de produção de Equipe & Acessos: **IMPLEMENTADO / EM VALIDAÇÃO**
+em `atlasquant_aion_business_team_access_production_binding.py`, ADR-0063 e
+testes associados. Conta individual, MFA forte, registry persistido com read-back
+e revogação comprovável passam a ser requisitos explícitos; o AION não executa
+essas mutações.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -291,7 +297,7 @@ expansão.
 ## 10. Próximos blocos obrigatórios
 
 PENDENTE / APROVADO:
-- binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
+- escolher identity provider, storage do registry e session-revocation connector; executar sandbox E2E do Equipe & Acessos;
 - configurar connectors reais de suporte/infra/incidentes e validar métricas do primeiro ambiente piloto;
 - definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
 - configurar connectors reais de custo/fatura e writer físico do storage versionado com read-back verification;
@@ -331,3 +337,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-REVENUE-OPPORTUNITY-ENGINE | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades de receita passam por gates econômicos antes do ranking |
 | D-2026-09-30-CAPACITY-LIVE-METRICS | IMPLEMENTADO / EM VALIDAÇÃO | Capacity Manager recebe FinOps, suporte, infra e incidentes atestados |
 | D-2026-09-30-REVENUE-LIVE-ECONOMICS | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades usam custo FinOps e capacidade real antes do ranking |
+| D-2026-09-30-TEAM-ACCESS-PRODUCTION-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Conta individual, MFA forte, registry read-back e revogação viram gates de produção |
