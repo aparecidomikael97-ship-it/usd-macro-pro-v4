@@ -415,6 +415,9 @@ from atlasquant_aion_business_team_access_step1_apply_plan import (
 from atlasquant_aion_business_team_access_step1_provider_runner import (
     provider_runner_policy as business_team_step1_provider_runner_policy,
 )
+from atlasquant_aion_business_team_access_step1_provider_receipt_review import (
+    provider_receipt_review_policy as business_team_step1_provider_receipt_review_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7372,6 +7375,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "52 · Equipe & Acessos · Step 1 Execution Envelope",
             "53 · Equipe & Acessos · Step 1 Apply Plan",
             "54 · Equipe & Acessos · Step 1 Provider Runner",
+            "55 · Equipe & Acessos · Step 1 Receipt Review",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8362,7 +8366,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "physical_execution_performed=false."
         )
 
-    else:
+    elif view == "54 · Equipe & Acessos · Step 1 Provider Runner":
         runner = business_team_step1_provider_runner_policy()
         st.write(f"Estado: **{runner.get('state')}**")
         st.markdown("**Proteções do runner físico:**")
@@ -8382,6 +8386,27 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Mensagens genéricas como 'vamos lá' não são autorização física. "
             "Produção/deploy/runtime permanecem OFF."
+        )
+
+    else:
+        review = business_team_step1_provider_receipt_review_policy()
+        st.write(f"Estado: **{review.get('state')}**")
+        st.markdown("**Review pós-execução:**")
+        for item in (
+            "receipt físico preso ao apply plan",
+            "runner preflight íntegro",
+            "mesma session + baseline + username",
+            "receipt canônico do lifecycle",
+            "ledger preview exatamente 1/10",
+            "Step 2 apenas como next expected",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O review não grava o ledger. Ele só prova que o append do Step 1 seria coerente."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_STEP1_LEDGER_APPEND_REVIEW · "
+            "Step 2 continua não autorizado."
         )
 
 
