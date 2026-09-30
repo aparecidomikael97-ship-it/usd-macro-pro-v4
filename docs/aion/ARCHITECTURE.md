@@ -368,3 +368,17 @@ marketplace tooling remains compatibility-only and is explicitly labeled.
 
 The demo does not activate runtime or execute external actions. ADR-0016 records
 the presentation boundary.
+
+
+## BUSINESS guided administrator training
+
+`atlasquant_aion_business_training.py` provides an offline, fixture-only
+training layer for the BUSINESS administrator. It teaches problem discovery,
+diagnosis, Radar reading, package fit, delivery explanation, objections and a
+simulated sales conversation.
+
+The AION Business workspace renders the training as a session-only lab. No
+training completion grants operational authority. Unknown objections fail safe
+by instructing the administrator not to invent an answer.
+
+ADR-0017 records that administrator training precedes real BUSINESS use.
