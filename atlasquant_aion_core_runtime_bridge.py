@@ -19,6 +19,9 @@ from atlasquant_aion_core_voice_automation import (
     AtlasQuantVoiceAdapter,
     CheckpointAutomationAdapter,
 )
+from atlasquant_aion_core_master_checkpoint_bootstrap import (
+    augment_system_context_with_master_checkpoint,
+)
 
 
 SCHEMA = "ATLASQUANT_AION_CORE_RUNTIME_BRIDGE_V1"
@@ -278,6 +281,13 @@ def handle_runtime_intent(
             "evidence": {"status": "UNKNOWN", "records": []},
             "evidence_ingress": {"input_rows": 0, "accepted_records": 0, "rejected_records": 0},
             "persistence": persistence_contract(False),
+            "master_checkpoint": {
+                "state": "NOT_EVALUATED",
+                "evidence_ready": False,
+                "runtime_authorized": False,
+                "merge_authorized": False,
+                "deploy_authorized": False,
+            },
             **SAFETY_GATES,
         }
 
@@ -313,7 +323,10 @@ def handle_runtime_intent(
         ),
         clock=lambda: current,
     )
-    scoped, ingress = scoped_runtime_evidence(context, system_context)
+    enriched_system_context, master_checkpoint_snapshot = (
+        augment_system_context_with_master_checkpoint(system_context)
+    )
+    scoped, ingress = scoped_runtime_evidence(context, enriched_system_context)
     evidence_truth = assess(scoped.records, current)
     try:
         result = core.handle(
@@ -345,6 +358,18 @@ def handle_runtime_intent(
         "persistence": {
             **persistence_contract(isinstance(legacy_checkpoint, Mapping)),
             "checkpoint_state": str(checkpoint_state.get("state") or "UNKNOWN"),
+        },
+        "master_checkpoint": {
+            "state": str(master_checkpoint_snapshot.get("state") or "UNKNOWN"),
+            "reason": str(master_checkpoint_snapshot.get("reason") or ""),
+            "latest_date": str(master_checkpoint_snapshot.get("latest_date") or ""),
+            "snapshot_digest": str(master_checkpoint_snapshot.get("snapshot_digest") or ""),
+            "decision_count": len(master_checkpoint_snapshot.get("decisions") or []),
+            "pending_count": len(master_checkpoint_snapshot.get("pending") or []),
+            "evidence_ready": master_checkpoint_snapshot.get("evidence_ready") is True,
+            "runtime_authorized": False,
+            "merge_authorized": False,
+            "deploy_authorized": False,
         },
         "capabilities": core.registry.snapshot(),
         "adapters": {

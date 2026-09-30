@@ -102,3 +102,19 @@ Physical execution and external actions remain false/blocked.
 
 The checkpoint bridge itself remains network-free; only the pre-existing master
 checkpoint save flow may perform the separately approved external persistence.
+
+## Automatic Core bootstrap from the latest reconciliation
+
+The AION Core runtime bridge now uses
+`atlasquant_aion_core_master_checkpoint_bootstrap.py` to validate the canonical
+`checkpoint_mestre_latest.json` pointer and expose a bounded read-only snapshot
+as Core evidence.
+
+This makes approved decisions, pending work, economics, ecosystem priority and
+multiagent roles available to the Core without creating another persistence
+layer. If the latest pointer or manifest fails validation, the bootstrap is
+blocked and no Checkpoint Mestre evidence is injected.
+
+The bootstrap cannot save memory, authorize execution, merge, deploy, activate
+runtime, move money, publish or trade.
+
