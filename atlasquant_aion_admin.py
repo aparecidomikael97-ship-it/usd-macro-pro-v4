@@ -394,6 +394,9 @@ from atlasquant_aion_business_team_access_windows_operator_handoff import (
 from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import (
     baseline_acceptance_requirements as business_team_baseline_acceptance_requirements,
 )
+from atlasquant_aion_business_team_access_sandbox_lifecycle_materialization import (
+    lifecycle_materialization_policy as business_team_lifecycle_materialization_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7344,6 +7347,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "45 · Equipe & Acessos · Windows Operator",
             "46 · Equipe & Acessos · Operator Handoff",
             "47 · Equipe & Acessos · Baseline Acceptance",
+            "48 · Equipe & Acessos · Lifecycle Plan",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8192,7 +8196,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW."
         )
 
-    else:
+    elif view == "47 · Equipe & Acessos · Baseline Acceptance":
         acceptance = business_team_baseline_acceptance_requirements()
         st.write(f"Estado: **{acceptance.get('state')}**")
         st.markdown("**Token explícito obrigatório:**")
@@ -8207,6 +8211,26 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Acceptance permite apenas usar o baseline como input do plano. "
             "Não cria plano automaticamente e não autoriza lifecycle/produção."
+        )
+
+    else:
+        materialization = business_team_lifecycle_materialization_policy()
+        st.write(f"Estado: **{materialization.get('state')}**")
+        st.markdown("**Materialização do plano exige:**")
+        for item in (
+            "baseline bruto revalidado",
+            "baseline acceptance explícito",
+            "username sandbox",
+            "tenant scope",
+            "MFA forte permitido",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A materialização só produz o pacote das 10 etapas e seus digests. "
+            "A autorização formal do lifecycle continua separada."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_REVIEW."
         )
 
 
