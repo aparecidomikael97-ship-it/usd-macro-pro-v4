@@ -66,6 +66,9 @@ receita para ampliar infraestrutura, IA, voz, vídeo, integrações e capacidade
 
 ## 4. Equipe & Acessos
 
+Estado da primeira camada: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_rbac.py`, ADR-0048 e testes associados.
+
 A área Business deve ter acesso individual por funcionário:
 - convite e conta próprios;
 - RBAC/perfis;
@@ -158,7 +161,7 @@ expansão.
 ## 10. Próximos blocos obrigatórios
 
 PENDENTE / APROVADO:
-- Equipe & Acessos / RBAC completo;
+- binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
 - Gestor de Capacidade & Escala;
 - política de backup e recuperação testável;
 - budget governor de R$200;
@@ -177,7 +180,7 @@ PENDENTE / APROVADO:
 | D-2026-09-30-DATA-INTEGRITY-FIRST | APROVADO / PENDENTE | Integridade e recuperação antes de potência |
 | D-2026-09-30-B2B-SERVICE-FIRST | APROVADO / PENDENTE | Monetização inicial por serviço B2B com AION |
 | D-2026-09-30-DROPSHIPPING-OUT | DESCARTADO | Dropshipping fora das prioridades atuais |
-| D-2026-09-30-TEAM-RBAC | APROVADO / PENDENTE | Equipe & Acessos individualizados |
+| D-2026-09-30-TEAM-RBAC | IMPLEMENTADO / EM VALIDAÇÃO | Equipe & Acessos individualizados |
 | D-2026-09-30-CAPACITY-SCALE-MANAGER | APROVADO / PENDENTE | Gestor de Capacidade & Escala |
 | D-2026-09-30-AION-INDEPENDENT-CHATGPT | APROVADO / PENDENTE | AION funciona sem depender do ChatGPT |
 | D-2026-09-30-CHATGPT-OPTIONAL-ARCHITECT | APROVADO / PENDENTE | ChatGPT como apoio externo opcional |
