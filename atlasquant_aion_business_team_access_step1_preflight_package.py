@@ -419,6 +419,29 @@ def build_step1_preflight_package(
         "ledger": ledger,
         "preflight": preflight,
         "step1_packet_digest": _digest(payload) if ready else "",
+        "materialization_digest": materialized["materialization_digest"]
+        if ready else "",
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower() if ready else "",
+        "ledger_digest": _clean(
+            ledger.get("ledger_digest"), 80
+        ).lower() if ready else "",
+        "preflight_digest": _clean(
+            preflight.get("preflight_digest"), 80
+        ).lower() if ready else "",
+        "operator_session_id": materialized["operator_session_id"]
+        if ready else "",
+        "baseline_evidence_digest": observed_baseline if ready else "",
+        "observation_observed_at": _clean(
+            observed.get("observed_at"), 100
+        ) if ready else "",
+        "observation_observed_by": observed_by if ready else "",
+        "evaluated_at": (
+            evaluated_time.isoformat()
+            if ready and evaluated_time is not None
+            else ""
+        ),
         "target_step_order": 1 if ready else None,
         "target_step_id": LIFECYCLE_STEP_IDS[0] if ready else "",
         "required_step_decision_token": _clean(
@@ -437,6 +460,142 @@ def build_step1_preflight_package(
     }
 
 
+
+
+def verify_step1_preflight_package(
+    packet: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    row = _mapping(packet)
+    materialization_digest = _clean(
+        row.get("materialization_digest"), 80
+    ).lower()
+    authorization_package_digest = _clean(
+        row.get("authorization_package_digest"), 80
+    ).lower()
+    ledger_digest = _clean(row.get("ledger_digest"), 80).lower()
+    preflight_digest = _clean(row.get("preflight_digest"), 80).lower()
+    session_id = _clean(row.get("operator_session_id"), 64).lower()
+    baseline_digest = _clean(
+        row.get("baseline_evidence_digest"), 80
+    ).lower()
+    observation_at = _clean(
+        row.get("observation_observed_at"), 100
+    )
+    observation_by = _clean(
+        row.get("observation_observed_by"), 120
+    )
+    evaluated_at = _parse_time(row.get("evaluated_at"))
+    packet_digest = _clean(
+        row.get("step1_packet_digest"), 80
+    ).lower()
+
+    payload = {
+        "materialization_digest": materialization_digest,
+        "authorization_package_digest": authorization_package_digest,
+        "ledger_digest": ledger_digest,
+        "preflight_digest": preflight_digest,
+        "operator_session_id": session_id,
+        "baseline_evidence_digest": baseline_digest,
+        "observation_observed_at": observation_at,
+        "observation_observed_by": observation_by,
+        "evaluated_at": (
+            evaluated_at.isoformat() if evaluated_at is not None else ""
+        ),
+        "target_step_order": 1,
+        "target_step_id": LIFECYCLE_STEP_IDS[0],
+    }
+
+    gates = {
+        "schema_valid": row.get("schema") == SCHEMA,
+        "state_ready": row.get("state")
+        == "READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET",
+        "materialization_digest_valid": bool(
+            _DIGEST64.fullmatch(materialization_digest)
+        ),
+        "authorization_package_digest_valid": bool(
+            _DIGEST64.fullmatch(authorization_package_digest)
+        ),
+        "ledger_digest_valid": bool(_DIGEST64.fullmatch(ledger_digest)),
+        "preflight_digest_valid": bool(
+            _DIGEST64.fullmatch(preflight_digest)
+        ),
+        "operator_session_valid": bool(_SESSION32.fullmatch(session_id)),
+        "baseline_digest_valid": bool(
+            _DIGEST64.fullmatch(baseline_digest)
+        ),
+        "observation_timestamp_present": bool(
+            _parse_time(observation_at) is not None
+        ),
+        "observer_present": bool(observation_by),
+        "evaluated_at_valid": evaluated_at is not None,
+        "target_is_step1": bool(
+            row.get("target_step_order") == 1
+            and row.get("target_step_id") == LIFECYCLE_STEP_IDS[0]
+        ),
+        "decision_token_present": bool(
+            _clean(row.get("required_step_decision_token"), 240)
+            == (
+                f"AUTHORIZE_SANDBOX_LIFECYCLE_STEP_1_"
+                f"{LIFECYCLE_STEP_IDS[0]}"
+            )
+        ),
+        "packet_digest_valid": bool(
+            _DIGEST64.fullmatch(packet_digest)
+        ),
+        "packet_digest_integrity": bool(
+            _DIGEST64.fullmatch(packet_digest)
+            and packet_digest == _digest(payload)
+        ),
+        "manual_decision_not_recorded": row.get(
+            "manual_decision_recorded"
+        ) is False,
+        "step_not_authorized": row.get(
+            "step_execution_authorized"
+        ) is False,
+        "automatic_execution_not_authorized": row.get(
+            "automatic_execution_authorized"
+        ) is False,
+        "automatic_ledger_append_off": row.get(
+            "automatic_ledger_append"
+        ) is False,
+        "executor_disabled": row.get("executor_enabled") is False,
+        "production_not_authorized": row.get(
+            "production_authorized"
+        ) is False,
+        "deploy_not_authorized": row.get("deploy_authorized") is False,
+        "runtime_not_authorized": row.get("runtime_authorized") is False,
+        "non_executing": row.get("executes_action") is False,
+    }
+    blockers = [name for name, passed in gates.items() if not passed]
+    match = not blockers
+    return {
+        "schema": (
+            "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_"
+            "STEP1_PREFLIGHT_PACKAGE_BINDING_V1"
+        ),
+        "version": VERSION,
+        "state": (
+            "STEP1_PREFLIGHT_PACKAGE_BINDING_MATCH"
+            if match
+            else "STEP1_PREFLIGHT_PACKAGE_BINDING_MISMATCH"
+        ),
+        "binding_match": match,
+        "gates": gates,
+        "blockers": blockers,
+        "step1_packet_digest": packet_digest if match else "",
+        "evaluated_at": (
+            evaluated_at.isoformat()
+            if match and evaluated_at is not None
+            else ""
+        ),
+        "manual_decision_recorded": False,
+        "step_execution_authorized": False,
+        "automatic_execution_authorized": False,
+        "executor_enabled": False,
+        "production_authorized": False,
+        "executes_action": False,
+    }
+
 __all__ = [
     "SCHEMA",
     "OBSERVATION_SCHEMA",
@@ -445,4 +604,5 @@ __all__ = [
     "step1_preflight_package_policy",
     "readiness_observation_template",
     "build_step1_preflight_package",
+    "verify_step1_preflight_package",
 ]
