@@ -88,6 +88,14 @@ pedir explicitamente no futuro.
 Regra de crescimento: primeiro validar serviço e formar caixa; depois usar
 receita para ampliar infraestrutura, IA, voz, vídeo, integrações e capacidade.
 
+Estado da produto inicial: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_b2b_revenue_offer.py`, ADR-0053 e testes associados.
+
+A oferta prioritária é **AION Atendimento & Automação Comercial**, com
+implantação + mensalidade recorrente. O AION calcula margem e piso sustentável
+a partir de custos informados/validados e da margem mínima definida pelo
+administrador; preço de mercado não é inventado automaticamente.
+
 ## 4. Equipe & Acessos
 
 Estado da primeira camada: **IMPLEMENTADO / EM VALIDAÇÃO** em
@@ -202,8 +210,8 @@ PENDENTE / APROVADO:
 - binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
 - política de backup e recuperação testável;
 - binding do Budget Governor/FinOps com custos reais de providers, alertas e ledger financeiro persistente;
-- oferta comercial B2B pronta para vender;
-- pipeline proposta → onboarding → entrega → saúde → renovação;
+- primeiro preço comercial real + segmento piloto + revisão jurídica/comercial da oferta B2B;
+- binding do pipeline comercial com CRM/contatos/contrato/cobrança reais após aprovação;
 - validação operacional do bootstrap do Checkpoint Mestre em ambientes empacotados/deployados;
 - validação do roteador dos oito papéis em runtime/deploy empacotado;
 - PDF atualizado da aba Negócios para visão do administrador.
@@ -215,7 +223,7 @@ PENDENTE / APROVADO:
 | D-2026-09-30-PROACTIVE-GAPS | APROVADO / PENDENTE | Identificar proativamente lacunas necessárias |
 | D-2026-09-30-COST-CAP-200 | IMPLEMENTADO / EM VALIDAÇÃO | Teto inicial de planejamento de R$200/mês |
 | D-2026-09-30-DATA-INTEGRITY-FIRST | APROVADO / PENDENTE | Integridade e recuperação antes de potência |
-| D-2026-09-30-B2B-SERVICE-FIRST | APROVADO / PENDENTE | Monetização inicial por serviço B2B com AION |
+| D-2026-09-30-B2B-SERVICE-FIRST | IMPLEMENTADO / EM VALIDAÇÃO | Monetização inicial por serviço B2B com AION |
 | D-2026-09-30-DROPSHIPPING-OUT | DESCARTADO | Dropshipping fora das prioridades atuais |
 | D-2026-09-30-TEAM-RBAC | IMPLEMENTADO / EM VALIDAÇÃO | Equipe & Acessos individualizados |
 | D-2026-09-30-CAPACITY-SCALE-MANAGER | IMPLEMENTADO / EM VALIDAÇÃO | Gestor de Capacidade & Escala |
@@ -228,3 +236,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TRADER-INITIAL-CAP-30 | IMPLEMENTADO / EM VALIDAÇÃO | Limite inicial de 30% do capital total para Trader |
 | D-2026-09-30-TRADE-TARGET-NOT-GUARANTEE | IMPLEMENTADO / EM VALIDAÇÃO | Meta de Trade não é promessa de retorno |
 | D-2026-09-30-CORE-CHECKPOINT-BOOTSTRAP | IMPLEMENTADO / EM VALIDAÇÃO | Core carrega o Checkpoint Mestre validado no bootstrap |
+| D-2026-09-30-COMMERCIAL-PIPELINE-END-TO-END | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline B2B sequencial até saúde e renovação |
