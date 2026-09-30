@@ -30,3 +30,6 @@ runtime OFF e decisão de deploy separada.
 
 Sem merge, rollback, deploy, piloto, cliente real, publicação, cobrança ou
 runtime.
+## Correção de validação
+
+O primeiro CI detectou um erro apenas no fixture de teste das 19 etapas: a massa de teste gerava 18 seeds e não 19 receipts. O fixture foi corrigido para produzir 19 digests hexadecimais únicos de 64 caracteres. A lógica do ledger não precisou ser alterada. A matriz completa deve ser reexecutada sobre o novo HEAD antes de considerar este bloco verde.
