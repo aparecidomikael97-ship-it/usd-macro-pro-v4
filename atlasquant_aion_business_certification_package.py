@@ -340,15 +340,21 @@ def build_business_specialist_evidence(
 
 def business_attestation_verifier(
     ci_attestation: Mapping[str, Any] | None,
+    *,
+    trusted_ci_verifier=None,
 ):
-    """Create a verifier bound to caller-supplied CI evidence, not payload claims."""
+    """Bind specialist proof to independently verified CI evidence.
+
+    A structurally valid attestation is still self-declared until a trusted
+    verifier outside this payload confirms provenance and evidence.
+    """
     attestation = normalize_ci_attestation(ci_attestation)
 
     def verify(envelope: Mapping[str, Any]) -> dict[str, Any]:
         claimed = _clean(envelope.get("claimed_fingerprint"), 128).lower()
         calculated = _clean(envelope.get("fingerprint"), 128).lower()
         refs = _refs(envelope.get("refs"))
-        valid = bool(
+        structurally_bound = bool(
             attestation["valid"]
             and claimed
             and calculated
@@ -360,6 +366,43 @@ def business_attestation_verifier(
             and _clean(envelope.get("version"), 80) == VERSION
             and _clean(envelope.get("provenance"), 240) == PROVENANCE
         )
+        trusted: Mapping[str, Any] = {}
+        verifier_error = False
+        if structurally_bound and callable(trusted_ci_verifier):
+            try:
+                raw = trusted_ci_verifier({
+                    "schema": ATTESTATION_SCHEMA,
+                    "specialist": "BUSINESS",
+                    "version": VERSION,
+                    "suite": SUITE,
+                    "provenance": PROVENANCE,
+                    "evidence_id": EVIDENCE_ID,
+                    "sha": attestation["sha"],
+                    "refs": list(refs),
+                    "fingerprint": calculated,
+                })
+            except Exception:
+                raw = {}
+                verifier_error = True
+            if isinstance(raw, Mapping):
+                trusted = raw
+            else:
+                verifier_error = True
+        trusted_refs = _refs(trusted.get("bound_refs"))
+        trusted_ok = bool(
+            not verifier_error
+            and trusted.get("state") == "VERIFIED"
+            and _exact_true(trusted.get("provenance_verified"))
+            and _exact_true(trusted.get("evidence_verified"))
+            and _clean(trusted.get("specialist"), 40).upper() == "BUSINESS"
+            and _clean(trusted.get("version"), 80) == VERSION
+            and _clean(trusted.get("suite"), 180) == SUITE
+            and _clean(trusted.get("evidence_id"), 80) == EVIDENCE_ID
+            and _clean(trusted.get("sha"), 80).lower() == attestation["sha"]
+            and trusted_refs == refs
+            and _clean(trusted.get("fingerprint"), 128).lower() == calculated
+        )
+        valid = structurally_bound and trusted_ok
         body = envelope.get("body") if isinstance(envelope.get("body"), Mapping) else {}
         tests = body.get("tests") if isinstance(body.get("tests"), Mapping) else {}
         return {
@@ -403,6 +446,7 @@ def assess_business_certification_package(
     product_evidence: Mapping[str, Any] | None,
     ci_attestation: Mapping[str, Any] | None,
     human_review_approved: Any = False,
+    trusted_ci_verifier=None,
 ) -> dict[str, Any]:
     """Assess BUSINESS while preserving product, technical and human gates."""
     product = business_package_readiness(product_evidence)
@@ -412,9 +456,12 @@ def assess_business_certification_package(
     # Bind the supplied attestation to the exact evidence fingerprint. A caller
     # cannot gain TESTED/CERTIFIED by passing a generic green CI result.
     if attestation["fingerprint"] != evidence["tests"]["fingerprint"]:
-        verifier = business_attestation_verifier(None)
+        verifier = business_attestation_verifier(None, trusted_ci_verifier=trusted_ci_verifier)
     else:
-        verifier = business_attestation_verifier(ci_attestation)
+        verifier = business_attestation_verifier(
+            ci_attestation,
+            trusted_ci_verifier=trusted_ci_verifier,
+        )
 
     technical = assess_specialist_certification(
         "BUSINESS",
