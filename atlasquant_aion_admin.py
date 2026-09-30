@@ -148,6 +148,17 @@ from atlasquant_aion_business_demo import (
     business_demo_html,
     business_demo_snapshot,
 )
+from atlasquant_aion_business_training import (
+    delivery_walkthrough as business_delivery_walkthrough,
+    diagnostic_brief as business_diagnostic_brief,
+    objection_answer as business_objection_answer,
+    objection_catalog as business_objection_catalog,
+    package_fit as business_package_fit,
+    scenario_catalog as business_scenario_catalog,
+    simulated_sales_conversation as business_simulated_sales_conversation,
+    training_scorecard as business_training_scorecard,
+    training_session as business_training_session,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -5138,6 +5149,150 @@ def _render_studio(
         st.info("Nenhum projeto de conteúdo registrado no Studio.")
 
 
+
+def _render_business_guided_training() -> None:
+    """Session-only training lab. Uses fictional fixtures and executes nothing."""
+    st.markdown("#### 🎓 Treinamento Guiado AION Business")
+    st.caption(
+        "Ambiente de prática com empresas fictícias. Nenhum dado real, contato, cobrança, "
+        "publicação ou runtime é usado aqui."
+    )
+    catalog = business_scenario_catalog()
+    labels = {row["label"]: row["id"] for row in catalog}
+    selected_label = st.selectbox(
+        "Empresa fictícia para treinar",
+        list(labels),
+        key="aion_business_training_scenario",
+    )
+    scenario_id = labels[selected_label]
+    session = business_training_session(scenario_id, step=1)
+    scenario = session["scenario"]
+
+    st.info(
+        f"**{scenario['company']} · {scenario['segment']}**\n\n{scenario['situation']}"
+    )
+
+    stages = (
+        "1 · Diagnóstico",
+        "2 · Radar & Pacote",
+        "3 · Entrega",
+        "4 · Objeções",
+        "5 · Venda simulada",
+        "6 · Minha preparação",
+    )
+    selected_stage = st.selectbox(
+        "Etapa do treinamento",
+        stages,
+        key="aion_business_training_stage",
+        help="Carrega uma etapa por vez para manter a navegação leve no celular.",
+    )
+
+    if selected_stage == stages[0]:
+        brief = business_diagnostic_brief(scenario_id)
+        st.markdown("**Como explicar o problema antes da tecnologia**")
+        st.write(brief["summary"])
+        st.markdown("**Gargalos do exercício**")
+        for gap in brief["priority_gaps"]:
+            st.markdown(f"- {gap}")
+        st.markdown("**Perguntas que precisam ser feitas numa empresa real**")
+        for question in brief["questions_to_confirm"]:
+            st.markdown(f"- {question}")
+        st.caption("Estado deste exercício: FICTIONAL_FIXTURE. Nada aqui é dado de cliente.")
+
+    elif selected_stage == stages[1]:
+        fit = business_package_fit(scenario_id)
+        fixture = scenario["fixture"]
+        r1,r2,r3,r4 = st.columns(4)
+        r1.metric("Leads abertos", fixture["leads_open"])
+        r2.metric("Resposta média", f"{fixture['avg_response_hours']:.1f}h")
+        r3.metric("Orçamentos parados", fixture["abandoned_quotes"])
+        r4.metric("Clientes retornando", f"{fixture['returning_customers_pct']:.0f}%")
+        st.caption("Dados fictícios usados apenas para aprender a ler o Radar.")
+        st.success(f"**Pacote de treino:** {fit['package_label']}")
+        for component in fit["components"]:
+            st.markdown(f"- {component}")
+        st.warning(
+            "Em empresa real o pacote e o preço só são fechados depois do diagnóstico. "
+            "Este encaixe é didático e não promete resultado."
+        )
+
+    elif selected_stage == stages[2]:
+        delivery = business_delivery_walkthrough(scenario_id)
+        st.markdown("**O que o cliente recebe**")
+        for item in delivery["what_client_receives"]:
+            st.markdown(f"- {item}")
+        st.markdown("**O que o cliente deve enxergar no painel**")
+        for item in delivery["what_client_sees"]:
+            st.markdown(f"- {item}")
+        st.markdown("**O que entra na manutenção mensal**")
+        for item in delivery["maintenance_covers"]:
+            st.markdown(f"- {item}")
+        st.info(
+            "Modelo comercial didático: implantação + manutenção mensal. "
+            "Preço não está definido automaticamente."
+        )
+
+    elif selected_stage == stages[3]:
+        objections = business_objection_catalog()
+        qmap = {row["question"]: row["id"] for row in objections}
+        question = st.selectbox(
+            "Escolha uma pergunta comum do cliente",
+            list(qmap),
+            key="aion_business_training_objection",
+        )
+        answer = business_objection_answer(qmap[question])
+        st.markdown("**Resposta segura para praticar**")
+        st.write(answer["answer"])
+        st.caption(
+            "Regra: se surgir uma dúvida que não sabemos responder, não inventar. "
+            "Registrar, conferir o escopo/evidência e responder depois."
+        )
+
+    elif selected_stage == stages[4]:
+        conversation = business_simulated_sales_conversation(scenario_id)
+        st.markdown("**Simulação de conversa**")
+        for row in conversation:
+            who = "Você / ADMIN" if row["speaker"] == "ADMIN" else "Cliente fictício"
+            st.markdown(f"**{who}:** {row['text']}")
+        st.caption(
+            "Treino somente. Nenhuma mensagem é enviada e nenhuma proposta comercial é criada."
+        )
+
+    else:
+        st.markdown("**Checklist antes de você divulgar ou conversar com cliente real**")
+        checks = {}
+        labels_checks = (
+            ("explained_problem_before_technology", "Consigo explicar o problema antes de falar de IA."),
+            ("separated_fact_from_assumption", "Separo fato confirmado de hipótese."),
+            ("explained_package_scope", "Sei explicar o que entra e o que não entra no pacote."),
+            ("explained_installation_and_maintenance", "Sei explicar implantação + manutenção mensal."),
+            ("avoided_financial_guarantee", "Sei explicar que não existe garantia de venda/lucro."),
+            ("explained_client_portal", "Consigo mostrar o Portal/Radar em linguagem simples."),
+            ("asked_for_next_step", "Sei conduzir para diagnóstico/proposta como próximo passo."),
+        )
+        for key, label in labels_checks:
+            checks[key] = st.checkbox(
+                label,
+                key=f"aion_business_training_check_{key}",
+            )
+        score = business_training_scorecard(**checks)
+        st.progress(int(round(score["progress_pct"])))
+        st.write(
+            f"Preparação neste checklist: **{score['completed']}/{score['total']} "
+            f"({score['progress_pct']:.0f}%)**"
+        )
+        if score["training_complete"]:
+            st.success(
+                "Checklist concluído nesta sessão. Continue praticando com outros cenários antes "
+                "de transformar o treino em atendimento real."
+            )
+        else:
+            st.info("Complete os itens restantes e pratique novamente.")
+        st.caption(
+            "Concluir o checklist não autoriza venda automática, runtime ou ação externa."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -5146,13 +5301,14 @@ def _render_business(
     st.markdown("### 💼 AION Negócios")
     demo_snapshot = business_demo_snapshot()
     st.markdown(business_demo_html(), unsafe_allow_html=True)
-    with st.expander("🎓 Treinamento do administrador · como explicar e vender com segurança", expanded=False):
+    with st.expander("🎓 Treinamento do administrador · visão geral", expanded=False):
         st.caption(
             "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "
             "vender somente o que estiver validado."
         )
         for index, instruction in enumerate(demo_snapshot["training_steps"], start=1):
             st.markdown(f"**{index}.** {instruction}")
+    _render_business_guided_training()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
