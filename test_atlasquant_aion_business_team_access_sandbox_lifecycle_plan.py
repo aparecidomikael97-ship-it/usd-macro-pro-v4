@@ -76,6 +76,19 @@ class TeamAccessSandboxLifecyclePlanTests(unittest.TestCase):
         self.assertFalse(plan["production_authorized"])
         self.assertFalse(plan["executes_action"])
 
+    def test_legacy_call_without_acceptance_fails_closed(self):
+        plan = build_lifecycle_test_plan(
+            _baseline(),
+            test_username="sandbox.operador.demo",
+            tenant_ids=["tenant-a"],
+            factor_type="PASSKEY",
+            requested_by="admin.demo",
+        )
+        self.assertEqual(
+            plan["state"], "TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_BLOCKED"
+        )
+        self.assertIn("baseline_acceptance_binding_match", plan["blockers"])
+
     def test_valid_baseline_without_explicit_acceptance_blocks(self):
         plan = build_lifecycle_test_plan(
             _baseline(),
