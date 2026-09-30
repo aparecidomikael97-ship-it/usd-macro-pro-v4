@@ -1301,3 +1301,22 @@ acceptance-record digest and plan digest. It stops at
 the lifecycle authorization record or execute any step.
 
 ADR-0074 records this boundary.
+
+
+## BUSINESS team access materialized lifecycle authorization
+
+`atlasquant_aion_business_team_access_lifecycle_authorization_package.py`
+binds the explicit lifecycle authorization record to the exact lifecycle
+materialization packet.
+
+The package recalculates materialization integrity and adds an
+`authorization_package_digest` covering materialization, plan, baseline,
+baseline acceptance, operator session and the human authorization record.
+
+The evidence ledger and Step Gate require the materialized authorization
+binding. Receipts preserve both the legacy authorization record digest and the
+new authorization package/materialization digests.
+
+The layer remains non-executing and does not authorize production.
+
+ADR-0075 records this boundary.

@@ -1,9 +1,14 @@
 import ast
+import hashlib
+import json
 import unittest
 from pathlib import Path
 
 from atlasquant_aion_business_team_access_sandbox_lifecycle_authorization import (
     SCHEMA as AUTH_SCHEMA,
+)
+from atlasquant_aion_business_team_access_lifecycle_authorization_package import (
+    SCHEMA as PACKAGE_SCHEMA,
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger import (
     GENESIS_DIGEST,
@@ -16,6 +21,16 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
     LIFECYCLE_STEP_IDS,
     SCHEMA as PLAN_SCHEMA,
 )
+
+def _digest(value):
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _plan():
@@ -34,19 +49,39 @@ def _plan():
         "state": "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION",
         "plan_digest": "a" * 64,
         "baseline_evidence_digest": "b" * 64,
+        "baseline_acceptance_record_digest": "e" * 64,
         "steps": steps,
     }
 
 
 def _auth():
+    package_payload = {
+        "materialization_digest": "d" * 64,
+        "plan_digest": "a" * 64,
+        "baseline_evidence_digest": "b" * 64,
+        "baseline_acceptance_record_digest": "e" * 64,
+        "operator_session_id": "f" * 32,
+        "authorization_record_digest": "c" * 64,
+        "approved_by": "admin.demo",
+        "approved_at": "2026-09-30T21:40:00+00:00",
+    }
     return {
         "schema": AUTH_SCHEMA,
         "state": "EXPLICIT_SANDBOX_LIFECYCLE_AUTHORIZATION_RECORD_VERIFIED",
         "authorization_record_verified": True,
         "sandbox_lifecycle_manual_execution_authorized": True,
+        "automatic_execution_authorized": False,
         "plan_digest": "a" * 64,
         "baseline_evidence_digest": "b" * 64,
         "record_digest": "c" * 64,
+        "approved_by": "admin.demo",
+        "approved_at": "2026-09-30T21:40:00+00:00",
+        "authorization_package_schema": PACKAGE_SCHEMA,
+        "materialization_binding_verified": True,
+        "materialization_digest": "d" * 64,
+        "baseline_acceptance_record_digest": "e" * 64,
+        "operator_session_id": "f" * 32,
+        "authorization_package_digest": _digest(package_payload),
         "executor_enabled": False,
         "production_authorized": False,
         "executes_action": False,
@@ -104,6 +139,17 @@ class TeamAccessSandboxLifecycleEvidenceLedgerTests(unittest.TestCase):
         self.assertEqual(ledger["next_expected_step_order"], 2)
         self.assertEqual(ledger["chain_head_digest"], first["receipt_digest"])
         self.assertFalse(ledger["automatic_next_step_authorized"])
+
+    def test_legacy_authorization_without_materialization_package_blocks(self):
+        auth = _auth()
+        auth.pop("authorization_package_digest")
+        auth.pop("materialization_digest")
+        auth.pop("materialization_binding_verified")
+        ledger = build_lifecycle_evidence_ledger(_plan(), auth, [])
+        self.assertEqual(
+            ledger["state"], "SANDBOX_LIFECYCLE_EVIDENCE_LEDGER_BLOCKED"
+        )
+        self.assertIn("authorization_binding", ledger["blockers"])
 
     def test_wrong_order_or_chain_blocks(self):
         first = _receipt(1, GENESIS_DIGEST, "d")

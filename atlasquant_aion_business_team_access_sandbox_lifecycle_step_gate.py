@@ -18,7 +18,9 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_authorization import (
     SCHEMA as AUTH_SCHEMA,
-    verify_authorization_binding,
+)
+from atlasquant_aion_business_team_access_lifecycle_authorization_package import (
+    verify_materialized_authorization_binding,
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger import (
     SCHEMA as LEDGER_SCHEMA,
@@ -57,6 +59,8 @@ def _ledger_ready_for_next(
     plan_digest: str,
     baseline_digest: str,
     authorization_record_digest: str,
+    authorization_package_digest: str,
+    materialization_digest: str,
 ) -> bool:
     return bool(
         ledger.get("schema") == LEDGER_SCHEMA
@@ -75,6 +79,10 @@ def _ledger_ready_for_next(
         == baseline_digest
         and _clean(ledger.get("authorization_record_digest"), 80).lower()
         == authorization_record_digest
+        and _clean(ledger.get("authorization_package_digest"), 80).lower()
+        == authorization_package_digest
+        and _clean(ledger.get("materialization_digest"), 80).lower()
+        == materialization_digest
         and ledger.get("automatic_next_step_authorized") is False
         and ledger.get("executor_enabled") is False
         and ledger.get("production_authorized") is False
@@ -140,8 +148,14 @@ def build_step_execution_preflight(
     authorization_record_digest = _clean(
         auth.get("record_digest"), 80
     ).lower()
+    authorization_package_digest = _clean(
+        auth.get("authorization_package_digest"), 80
+    ).lower()
+    materialization_digest = _clean(
+        auth.get("materialization_digest"), 80
+    ).lower()
 
-    auth_binding = verify_authorization_binding(plan_row, auth)
+    auth_binding = verify_materialized_authorization_binding(plan_row, auth)
     plan_steps = list(plan_row.get("steps") or [])
     target_row = (
         dict(plan_steps[order - 1])
@@ -173,6 +187,8 @@ def build_step_execution_preflight(
             plan_digest=plan_digest,
             baseline_digest=baseline_digest,
             authorization_record_digest=authorization_record_digest,
+            authorization_package_digest=authorization_package_digest,
+            materialization_digest=materialization_digest,
         ),
         "target_is_next_step": bool(
             order is not None
@@ -208,6 +224,8 @@ def build_step_execution_preflight(
         "authorization_record_digest": _clean(
             auth.get("record_digest"), 80
         ).lower(),
+        "authorization_package_digest": authorization_package_digest,
+        "materialization_digest": materialization_digest,
         "ledger_digest": _clean(ledger_row.get("ledger_digest"), 80).lower(),
         "chain_head_digest": _clean(
             ledger_row.get("chain_head_digest"), 80
@@ -270,6 +288,12 @@ def review_post_step_receipt(
     authorization_record_digest = _clean(
         auth.get("record_digest"), 80
     ).lower()
+    authorization_package_digest = _clean(
+        auth.get("authorization_package_digest"), 80
+    ).lower()
+    materialization_digest = _clean(
+        auth.get("materialization_digest"), 80
+    ).lower()
 
     recomputed = build_evidence_receipt(
         plan_row,
@@ -291,6 +315,8 @@ def review_post_step_receipt(
             plan_digest=plan_digest,
             baseline_digest=baseline_digest,
             authorization_record_digest=authorization_record_digest,
+            authorization_package_digest=authorization_package_digest,
+            materialization_digest=materialization_digest,
         ),
         "receipt_schema_valid": row.get("schema") == RECEIPT_SCHEMA,
         "receipt_state_ready": row.get("state")
