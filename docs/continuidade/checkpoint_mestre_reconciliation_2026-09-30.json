@@ -342,9 +342,26 @@
         "docs/aion/AION_BUSINESS_FIRST_PILOT_PRICING_REVIEW_V1.md",
         "docs/adr/ADR-0054-business-first-pilot-pricing-review.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-BACKUP-RECOVERY-POLICY",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_backup_recovery_policy.py",
+        "test_atlasquant_aion_backup_recovery_policy.py",
+        ".github/workflows/atlasquant-source-backup.yml",
+        "test_atlasquant_source_backup_workflow.py",
+        "docs/aion/AION_BACKUP_RECOVERY_POLICY_V1.md",
+        "docs/adr/ADR-0055-backup-recovery-policy.md"
+      ]
     }
   ],
   "pending": [
+    "BACKUP_NONPROD_RESTORE_DRILL",
+    "BACKUP_RPO_RTO_ADMIN_TARGETS",
+    "BACKUP_SECONDARY_COPY_CONFIGURATION",
     "FIRST_PILOT_LEGAL_COMMERCIAL_REVIEW",
     "FIRST_PILOT_REAL_SEGMENT_CANDIDATE_AND_PRICING",
     "COMMERCIAL_PIPELINE_LIVE_BINDING",
@@ -354,7 +371,6 @@
     "FINOPS_LIVE_PROVIDER_COST_BINDING",
     "CAPACITY_SCALE_LIVE_METRICS_BINDING",
     "TEAM_RBAC_PRODUCTION_BINDING",
-    "BACKUP_RECOVERY_TESTABLE_POLICY",
     "BUSINESS_UPDATED_PDF"
   ],
   "ecosystem_priority": {
@@ -392,5 +408,18 @@
     "runtime_authorized": false,
     "merge_authorized": false,
     "deploy_authorized": false
+  },
+  "backup_recovery": {
+    "status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "source_archive_sha256_verified": true,
+    "source_archive_extract_tested": true,
+    "critical_files_checked": true,
+    "runtime_checkpoint_separate": true,
+    "secondary_copy_required": true,
+    "secondary_copy_configured": false,
+    "rpo_target_hours": null,
+    "rto_target_hours": null,
+    "automatic_restore": false,
+    "production_restore_authorized": false
   }
 }
