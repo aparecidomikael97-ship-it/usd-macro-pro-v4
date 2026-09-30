@@ -294,11 +294,26 @@ def record_expansion_authorization(
         and row.get("automatic_expansion_allowed") is False
         and row.get("executes_action") is False
     )
+    current_rank = _scope_rank(current_scope)
+    next_rank = _scope_rank(next_scope)
     scope_ok = bool(
         current_scope in ALLOWED_SCOPES
         and next_scope in {"pilot", "bounded_production"}
         and 1 <= len(next_tenants) <= MAX_BOUNDED_TENANTS
         and set(current_tenants).issubset(set(next_tenants))
+        and next_rank in {current_rank, current_rank + 1}
+        and (
+            next_rank == current_rank + 1
+            or len(next_tenants) > len(current_tenants)
+        )
+        and not (
+            current_scope == "sandbox"
+            and next_scope != "pilot"
+        )
+        and not (
+            current_scope == "bounded_production"
+            and next_scope != "bounded_production"
+        )
     )
     token_ok = token == REQUIRED_EXPANSION_DECISION_TOKEN
     acknowledgements_ok = bool(
