@@ -116,6 +116,10 @@ class TeamAccessPhysicalSandboxTests(unittest.TestCase):
         self.assertNotIn("${KEYCLOAK_IMAGE", compose)
         self.assertIn("/var/lib/postgresql", compose)
         self.assertNotIn("/var/lib/postgresql/data", compose)
+        self.assertIn("./registry/init:/docker-entrypoint-initdb.d:ro", compose)
+        schema = Path("deploy/sandbox/team-access/registry/init/001_registry_schema.sql").read_text(encoding="utf-8")
+        self.assertIn("registry_revisions", schema)
+        self.assertIn("team_memberships", schema)
         self.assertNotIn("password=admin", compose.lower())
         self.assertIn("CHANGE_ME_", example)
 
