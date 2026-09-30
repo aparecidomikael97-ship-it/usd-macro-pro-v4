@@ -396,3 +396,18 @@ verification and keeps commercial pricing at `A DEFINIR APÓS ESCOPO`.
 The AION Business workspace renders one result stage at a time to preserve the
 mobile navigation contract. No generated proposal can be sent, signed, charged
 or used to activate runtime. ADR-0018 records this boundary.
+
+
+## BUSINESS client portal demo
+
+`atlasquant_aion_business_client_portal_demo.py` turns the diagnostic/proposal
+demo state into the future client-facing shell: overview, Radar, action plan,
+results, support and history.
+
+The portal is intentionally simple. Technical routing, security gates,
+fingerprints and runtime controls remain internal. The Results section begins in
+`NO_REAL_RESULTS` and cannot fabricate metrics before trusted post-implementation
+evidence exists.
+
+The AION Business workspace renders one portal section at a time to keep mobile
+navigation stable. ADR-0019 records this presentation and truth boundary.
