@@ -340,3 +340,16 @@ entire causal chain before considering a lifecycle-ledger append:
 The validator builds only an in-memory ledger preview. A valid preview must show
 Step 1 completed and Step 2 as next expected. It never appends the persisted
 ledger and never authorizes Step 2 automatically.
+
+
+## Step 1 ledger append decision contract
+
+After a valid provider-receipt review, build the append decision request:
+
+    python validate_team_access_step1_ledger_append.py <step1-preflight.json> <receipt-review.json> --output "%LOCALAPPDATA%\AtlasQuant\team-access-sandbox\operator\step1-ledger-append-request.json"
+
+The request emits the exact append token bound to the receipt-review digest,
+current GENESIS ledger digest and target 1/10 ledger-preview digest.
+
+A decision record can be validated separately with `--decision-record`.
+Neither mode writes the lifecycle ledger. Step 2 remains a separate gate.

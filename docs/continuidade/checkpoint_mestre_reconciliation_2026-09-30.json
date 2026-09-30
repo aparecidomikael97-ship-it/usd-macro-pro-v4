@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT_PLUS_STEP1_EXECUTION_ENVELOPE_PLUS_STEP1_PROVIDER_APPLY_PLAN_PLUS_STEP1_GUARDED_PROVIDER_RUNNER_PLUS_STEP1_PROVIDER_RECEIPT_LEDGER_REVIEW",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT_PLUS_STEP1_EXECUTION_ENVELOPE_PLUS_STEP1_PROVIDER_APPLY_PLAN_PLUS_STEP1_GUARDED_PROVIDER_RUNNER_PLUS_STEP1_PROVIDER_RECEIPT_LEDGER_REVIEW_PLUS_STEP1_LEDGER_APPEND_CONTRACT",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -237,7 +237,12 @@
     "step1_provider_receipt_review_expected_next_step_order": 2,
     "step1_provider_receipt_review_real_validated": false,
     "step1_real_ledger_append_performed": false,
-    "step2_real_execution_authorized": false
+    "step2_real_execution_authorized": false,
+    "step1_ledger_append_contract_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "step1_ledger_append_exact_token_required": true,
+    "step1_ledger_append_source_genesis_required": true,
+    "step1_ledger_append_target_preview_required": true,
+    "step1_ledger_append_real_decision_recorded": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -352,7 +357,8 @@
       466,
       467,
       468,
-      469
+      469,
+      470
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -392,7 +398,8 @@
     "team_access_step1_execution_envelope_pr": 466,
     "team_access_step1_provider_apply_plan_pr": 467,
     "team_access_step1_guarded_provider_runner_pr": 468,
-    "team_access_step1_provider_receipt_ledger_review_pr": 469
+    "team_access_step1_provider_receipt_ledger_review_pr": 469,
+    "team_access_step1_ledger_append_contract_pr": 470
   },
   "decisions": [
     {
@@ -903,9 +910,23 @@
         "validate_team_access_step1_provider_receipt.py",
         "docs/adr/ADR-0081-business-team-access-step1-provider-receipt-ledger-review.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-STEP1-LEDGER-APPEND-CONTRACT",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_step1_ledger_append_contract.py",
+        "test_atlasquant_aion_business_team_access_step1_ledger_append_contract.py",
+        "validate_team_access_step1_ledger_append.py",
+        "docs/adr/ADR-0082-business-team-access-step1-ledger-append-contract.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_REAL_STEP1_LEDGER_APPEND",
+    "TEAM_ACCESS_REAL_STEP1_LEDGER_PERSISTENT_WRITER",
     "TEAM_ACCESS_REAL_STEP2_PREFLIGHT",
     "TEAM_ACCESS_REAL_STEP1_LEDGER_APPEND_DECISION",
     "TEAM_ACCESS_REAL_STEP1_CANONICAL_RECEIPT",
