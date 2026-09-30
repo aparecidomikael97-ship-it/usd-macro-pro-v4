@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -126,7 +126,15 @@
     "sandbox_lifecycle_ledger_status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "sandbox_lifecycle_ledger_model": "APPEND_ONLY_HASH_CHAIN",
     "sandbox_lifecycle_completed_steps": 0,
-    "sandbox_lifecycle_ledger_complete": false
+    "sandbox_lifecycle_ledger_complete": false,
+    "sandbox_lifecycle_step_gate_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "sandbox_lifecycle_one_step_at_a_time": true,
+    "sandbox_lifecycle_step_fresh_baseline_required": true,
+    "sandbox_lifecycle_step_health_required": true,
+    "sandbox_lifecycle_step_cleanup_required": true,
+    "sandbox_lifecycle_step_explicit_decision_required": true,
+    "sandbox_lifecycle_step_automatic_execution": false,
+    "sandbox_lifecycle_step_automatic_ledger_append": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -620,9 +628,23 @@
         "deploy/sandbox/team-access/lifecycle-evidence-receipt.template.json",
         "docs/adr/ADR-0069-business-team-access-sandbox-lifecycle-evidence-ledger.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-STEP-GATE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate.py",
+        "test_atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate.py",
+        "docs/aion/AION_BUSINESS_TEAM_ACCESS_SANDBOX_LIFECYCLE_STEP_GATE_V1.md",
+        "docs/adr/ADR-0070-business-team-access-sandbox-lifecycle-step-gate.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_SANDBOX_STEP_1_RECEIPT_REVIEW",
+    "TEAM_ACCESS_SANDBOX_STEP_1_EXPLICIT_MANUAL_DECISION",
     "TEAM_ACCESS_SANDBOX_LIFECYCLE_STEP_1_MANUAL_EXECUTION",
     "TEAM_ACCESS_SANDBOX_LIFECYCLE_EXPLICIT_AUTHORIZATION_RECORD",
     "TEAM_ACCESS_SANDBOX_LIFECYCLE_EXPLICIT_ADMIN_DECISION",
