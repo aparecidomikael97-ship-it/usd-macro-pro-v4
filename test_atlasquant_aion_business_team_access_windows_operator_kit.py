@@ -28,7 +28,8 @@ def _report():
         "secrets_included": False,
         "container_started": False,
         "production_targeted": False,
-        "executes_mutation": False,
+        "external_side_effects_executed": False,
+        "local_report_written": True,
     }
 
 
@@ -96,9 +97,20 @@ class TeamAccessWindowsOperatorKitTests(unittest.TestCase):
         self.assertIn("-ApplyStart -CollectBaseline", operator)
         self.assertNotIn("Start-TeamAccessSandbox.ps1 -Apply\n", operator)
 
-    def test_operator_reports_are_gitignored(self):
-        ignore = Path(".gitignore").read_text(encoding="utf-8")
-        self.assertIn("**/.atlasquant_sandbox_operator/", ignore)
+    def test_operator_defaults_keep_sensitive_artifacts_outside_repo(self):
+        prepare = Path(
+            "deploy/sandbox/team-access/Prepare-TeamAccessSandboxEnv.ps1"
+        ).read_text(encoding="utf-8")
+        readiness = Path(
+            "deploy/sandbox/team-access/Get-TeamAccessSandboxReadiness.ps1"
+        ).read_text(encoding="utf-8")
+        operator = Path(
+            "deploy/sandbox/team-access/Invoke-TeamAccessSandboxOperator.ps1"
+        ).read_text(encoding="utf-8")
+        self.assertIn("$env:LOCALAPPDATA", prepare)
+        self.assertIn("$env:LOCALAPPDATA", readiness)
+        self.assertIn("$env:LOCALAPPDATA", operator)
+        self.assertIn("team-access-sandbox", prepare)
 
     def test_module_has_no_network_process_or_executor_imports(self):
         source = Path(
