@@ -71,6 +71,10 @@ def _number(value: Any, *, maximum: float | None = None) -> float | None:
     return n
 
 
+def _mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
 def _seq(value: Any, limit: int) -> list[Any]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         return []
@@ -215,7 +219,7 @@ def evaluate_opportunity(
         0.07 * opp["implementation_complexity"]
         + 0.05 * opp["support_load"]
     )
-    evidence_bonus = min(12.0, len(supported) * 4.0)
+    evidence_bonus = min(15.0, len(supported) * 5.0)
     score = max(0.0, min(100.0, positive - friction + evidence_bonus))
 
     if supported:
