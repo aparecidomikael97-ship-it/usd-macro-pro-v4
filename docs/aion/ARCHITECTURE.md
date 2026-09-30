@@ -507,3 +507,16 @@ external writes or production rollback. Audit records document actions and
 approvals but never grant authority.
 
 ADR-0026 records this privacy/audit boundary.
+
+
+## BUSINESS master readiness panel
+
+`atlasquant_aion_business_master_readiness.py` aggregates Business into three
+authority layers: DEMO, PILOT and LIVE.
+
+DEMO gates describe product readiness only. Pilot gates require separate
+operational review. Live gates require separate runtime/provider/credential
+evidence. No layer automatically grants the next layer and even complete Live
+gates remain review-only in this module.
+
+ADR-0027 records this authority separation.
