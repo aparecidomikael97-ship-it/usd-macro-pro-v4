@@ -62,6 +62,12 @@ testes associados. FinOps, suporte, infraestrutura e incidentes entram somente
 como evidência read-only atestada e recente antes de alimentar o Capacity & Scale
 Manager existente.
 
+Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
+em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
+testes associados. Custo mensal passa a vir do ledger FinOps verificado e
+capacidade passa a vir do Capacity Manager real; preço e venda continuam
+decisões administrativas separadas.
+
 ## 2.1 Prioridade entre Negócios, Trader e Investimentos
 
 Direção aprovada:
@@ -324,3 +330,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-FINOPS-PERSISTENCE-RECONCILIATION | IMPLEMENTADO / EM VALIDAÇÃO | Versões do ledger são encadeadas e faturas reconciliadas sem pagamento |
 | D-2026-09-30-REVENUE-OPPORTUNITY-ENGINE | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades de receita passam por gates econômicos antes do ranking |
 | D-2026-09-30-CAPACITY-LIVE-METRICS | IMPLEMENTADO / EM VALIDAÇÃO | Capacity Manager recebe FinOps, suporte, infra e incidentes atestados |
+| D-2026-09-30-REVENUE-LIVE-ECONOMICS | IMPLEMENTADO / EM VALIDAÇÃO | Oportunidades usam custo FinOps e capacidade real antes do ranking |
