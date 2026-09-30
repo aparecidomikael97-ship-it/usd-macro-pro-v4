@@ -259,6 +259,9 @@ def lifecycle_ledger_template() -> dict[str, Any]:
         "schema": SCHEMA,
         "version": VERSION,
         "state": "PLAN_AND_AUTHORIZATION_REQUIRED",
+        "plan_digest": "",
+        "baseline_evidence_digest": "",
+        "authorization_record_digest": "",
         "step_ids": list(LIFECYCLE_STEP_IDS),
         "total_steps": len(LIFECYCLE_STEP_IDS),
         "completed_count": 0,
@@ -424,6 +427,19 @@ def build_lifecycle_evidence_ledger(
         "schema": SCHEMA,
         "version": VERSION,
         "state": state,
+        "plan_digest": _clean(plan_row.get("plan_digest"), 80).lower()
+        if not blockers
+        else "",
+        "baseline_evidence_digest": _clean(
+            plan_row.get("baseline_evidence_digest"), 80
+        ).lower()
+        if not blockers
+        else "",
+        "authorization_record_digest": _clean(
+            auth.get("record_digest"), 80
+        ).lower()
+        if not blockers
+        else "",
         "entries": normalized,
         "completed_count": completed_count,
         "total_steps": len(LIFECYCLE_STEP_IDS),
