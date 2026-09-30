@@ -908,6 +908,17 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_master_readiness_separates_demo_pilot_and_live_authority(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_master_readiness()", src)
+        self.assertIn("Painel Mestre Business", src)
+        self.assertIn("Camada DEMO consolidada", src)
+        self.assertIn("PILOT: revisão humana ainda necessária", src)
+        self.assertIn("LIVE: RUNTIME OFF", src)
+        self.assertIn("Ver gates do piloto que ainda faltam", src)
+        self.assertIn("_render_business_master_readiness()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_privacy_audit_demo_is_default_deny_and_never_executes_data_requests(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_privacy_audit_demo()", src)
