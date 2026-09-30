@@ -244,6 +244,14 @@ from atlasquant_aion_business_pilot_governance import (
     pilot_posture as business_pilot_posture,
     pilot_review_packet as business_bounded_pilot_review_packet,
 )
+from atlasquant_aion_business_stack_consolidation_v2 import (
+    administrative_options as business_stack_admin_options,
+    consolidation_preview as business_stack_consolidation_preview,
+    frozen_green_evidence as business_stack_frozen_green_evidence,
+    release_bundle_manifest as business_stack_release_bundle,
+    rollback_integration_plan as business_stack_rollback_plan,
+    validate_stack as business_stack_validate,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7123,6 +7131,100 @@ def _render_business_pilot_governance_demo() -> None:
         )
 
 
+
+def _render_business_stack_consolidation_v2() -> None:
+    """Frozen administrative view of the #394–#412 stack; never merges."""
+    evidence = business_stack_frozen_green_evidence()
+    validation = business_stack_validate(evidence)
+    preview = business_stack_consolidation_preview(validation)
+    bundle = business_stack_release_bundle(validation)
+    rollback = business_stack_rollback_plan(validation)
+    options = business_stack_admin_options(validation)
+
+    st.markdown("#### 🧱 Consolidação da Stack Business · V2")
+    st.caption(
+        "Snapshot congelado da sequência #394–#412. Serve para revisão administrativa; "
+        "não executa merge, deploy nem runtime."
+    )
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("PRs na stack", int(validation.get("pr_count") or 0))
+    c2.metric("Validadas", int(validation.get("passed_count") or 0))
+    c3.metric("Bloqueadas", int(validation.get("blocked_count") or 0))
+    c4.metric("Merge autorizado", "NÃO")
+
+    view = st.selectbox(
+        "Visão da consolidação",
+        (
+            "1 · Estado geral",
+            "2 · Ordem técnica",
+            "3 · Bundle congelado",
+            "4 · Rollback de integração",
+            "5 · Decisão administrativa",
+        ),
+        key="aion_business_stack_consolidation_v2_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Estado geral":
+        st.write(f"Estado: **{validation.get('state')}**")
+        st.progress(int(round((float(validation.get("passed_count") or 0) / max(1, int(validation.get("pr_count") or 1))) * 100)))
+        st.success(
+            "Snapshot tecnicamente coerente para revisão administrativa."
+            if validation.get("state") == "READY_FOR_ADMIN_REVIEW"
+            else
+            "Existem bloqueios na stack."
+        )
+        st.warning(
+            "CI verde não autoriza merge. Merge não autoriza deploy. Deploy não autoriza runtime."
+        )
+        with st.expander("Ver PRs congeladas no snapshot", expanded=False):
+            for row in list(validation.get("rows") or []):
+                icon = "✅" if row.get("passed") else "⛔"
+                st.markdown(f"- {icon} **#{row.get('pr')}** · {row.get('title')}")
+
+    elif view == "2 · Ordem técnica":
+        st.write(f"Estratégia: **{preview.get('strategy') or 'BLOCKED'}**")
+        for row in list(preview.get("sequence") or []):
+            st.markdown(
+                f"{row.get('order')}. **#{row.get('pr')}** · {row.get('title')}  \\n"
+                f"   SHA: `{row.get('head_sha')}`"
+            )
+        st.caption(
+            "A ordem é somente preview técnico. Nenhuma PR é mergeada por esta tela."
+        )
+
+    elif view == "3 · Bundle congelado":
+        st.write(f"Estado: **{bundle.get('state')}**")
+        digest = str(bundle.get("bundle_digest") or "")
+        st.code(digest if digest else "BUNDLE BLOQUEADO", language=None)
+        st.caption(
+            "O digest congela a combinação esperada de SHAs/checks para revisão. "
+            "Antes de qualquer merge real, GitHub deve ser verificado novamente ao vivo."
+        )
+
+    elif view == "4 · Rollback de integração":
+        st.write(f"Estado: **{rollback.get('state')}**")
+        for item in list(rollback.get("steps") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O plano não executa rollback. Ele define o procedimento para parar na primeira regressão "
+            "e preservar o SHA anterior da main."
+        )
+
+    else:
+        st.markdown("**Opções disponíveis**")
+        for item in options:
+            if isinstance(item, Mapping):
+                st.markdown(f"- **{item.get('label')}**")
+        st.info(
+            "A próxima ação que altera repositório continua dependendo de autorização administrativa "
+            "explícita. Até lá, todas as PRs permanecem Draft."
+        )
+        st.caption(
+            "Runtime BUSINESS OFF · sem deploy · sem publicação · sem cobrança · sem piloto."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -7133,6 +7235,7 @@ def _render_business(
     st.markdown(business_demo_html(), unsafe_allow_html=True)
     _render_business_master_readiness()
     _render_business_pilot_governance_demo()
+    _render_business_stack_consolidation_v2()
     with st.expander("🎓 Treinamento do administrador · visão geral", expanded=False):
         st.caption(
             "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "

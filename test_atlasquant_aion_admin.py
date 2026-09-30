@@ -908,6 +908,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_stack_consolidation_v2_is_review_only_and_keeps_merge_separate(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_stack_consolidation_v2()", src)
+        self.assertIn("Consolidação da Stack Business · V2", src)
+        self.assertIn("Snapshot congelado da sequência #394–#412", src)
+        self.assertIn("CI verde não autoriza merge", src)
+        self.assertIn("Bundle congelado", src)
+        self.assertIn("Rollback de integração", src)
+        self.assertIn("todas as PRs permanecem Draft", src)
+        self.assertIn("_render_business_stack_consolidation_v2()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
