@@ -96,7 +96,8 @@ def validate_windows_operator_readiness(
         "secrets_absent": row.get("secrets_included") is False,
         "container_not_started_by_readiness": row.get("container_started") is False,
         "production_not_targeted": row.get("production_targeted") is False,
-        "readiness_non_mutating": row.get("executes_mutation") is False,
+        "external_side_effects_absent": row.get("external_side_effects_executed") is False,
+        "local_report_declared": row.get("local_report_written") is True,
     }
     blockers = [name for name, passed in gates.items() if not passed]
     ready = not blockers
