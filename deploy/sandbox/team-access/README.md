@@ -232,3 +232,22 @@ Validate it locally from the repository root:
 The resulting package still does not execute a lifecycle step. Ledger and Step
 Gate reject an authorization package if its materialization binding or package
 digest is not intact.
+
+
+## Step 1 preflight packet
+
+After a real materialization and Authorization Package exist, collect a fresh
+read-only observation:
+
+    .\Get-TeamAccessStep1ReadinessObservation.ps1 -ObservedBy <admin>
+
+The helper performs only Docker status, OIDC GET and registry schema SELECT
+checks. It does not start containers and does not execute a lifecycle mutation.
+
+Then build the Step 1 packet from the repository root:
+
+    python build_team_access_step1_preflight_package.py <materialization.json> <authorization-package.json> "%LOCALAPPDATA%\AtlasQuant\team-access-sandbox\operator\step1-readiness-observation.json" --output "%LOCALAPPDATA%\AtlasQuant\team-access-sandbox\operator\step1-preflight-package.json"
+
+The observation expires after 900 seconds. The output may reach
+READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET, but the decision is
+still not recorded and Step 1 is not executed.
