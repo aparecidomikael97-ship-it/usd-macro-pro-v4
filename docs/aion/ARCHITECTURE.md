@@ -1172,3 +1172,18 @@ MFA enrollment, registry writes and session revocation remain separate manual
 sandbox tests.
 
 ADR-0066 records this boundary.
+
+
+## BUSINESS team access sandbox lifecycle plan
+
+`atlasquant_aion_business_team_access_sandbox_lifecycle_plan.py` converts a
+validated local baseline into a ten-step, non-executing lifecycle test plan.
+
+The plan is bound to the baseline digest, requires a sandbox-scoped username,
+explicit tenant scope and a strong factor. It exposes a dedicated future
+decision token but does not record that decision or execute any mutation.
+
+The maximum automatic state is
+`READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION`.
+
+ADR-0067 records this boundary.
