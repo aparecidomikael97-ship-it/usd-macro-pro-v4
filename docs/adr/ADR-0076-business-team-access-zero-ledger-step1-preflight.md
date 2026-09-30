@@ -37,7 +37,8 @@ O pacote:
 5. exige Step 1 como next expected;
 6. exige observação read-only com no máximo 900 segundos;
 7. chama o Step Gate somente quando todos os gates anteriores passam;
-8. produz um packet digest para revisão.
+8. produz um packet digest para revisão;
+9. permite recalcular esse digest antes de qualquer decisão futura.
 
 ## Observação Windows
 
