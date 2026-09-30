@@ -494,3 +494,16 @@ required and prohibited-in-demo. The Hub never stores raw secrets and cannot
 perform OAuth, send, publish, charge, refund or grant write authority.
 
 ADR-0025 records this secret-free readiness boundary.
+
+
+## BUSINESS privacy and audit governance
+
+`atlasquant_aion_business_privacy_audit.py` defines purpose limitation,
+retention, consent evidence, default-deny role access, data-subject request
+review, audit events, configuration versioning and rollback preparation.
+
+The module contains no real personal data and cannot execute export, deletion,
+external writes or production rollback. Audit records document actions and
+approvals but never grant authority.
+
+ADR-0026 records this privacy/audit boundary.
