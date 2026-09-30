@@ -295,6 +295,9 @@ from atlasquant_aion_business_post_activation_expansion_boundary import (
     REQUIRED_EXPANSION_DECISION_TOKEN as BUSINESS_EXPANSION_DECISION_TOKEN,
     post_activation_verification_requirements as business_post_activation_boundary_requirements,
 )
+from atlasquant_aion_business_expansion_readiness import (
+    expansion_authorization_requirements as business_expansion_authorization_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7215,6 +7218,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "15 · Verificação de deploy & fronteira de runtime",
             "16 · Prontidão para ativação controlada",
             "17 · Pós-ativação & fronteira de expansão",
+            "18 · Prontidão para expansão controlada",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7475,7 +7479,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Mensagem genérica como 'vamos lá' não autoriza runtime."
         )
 
-    else:
+    elif view == "17 · Pós-ativação & fronteira de expansão":
         boundary = business_post_activation_boundary_requirements()
         st.write(f"Estado: **{boundary.get('state')}**")
         st.markdown("**Checks obrigatórios para verificar uma futura ativação:**")
@@ -7493,6 +7497,25 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Ativação verificada congela o escopo. Expansão automática, cobrança e ações com clientes "
             "continuam bloqueadas e exigem decisões separadas."
+        )
+
+    else:
+        expansion = business_expansion_authorization_requirements()
+        st.write(f"Estado: **{expansion.get('state')}**")
+        st.markdown("**Token explícito para uma futura decisão de expansão:**")
+        st.code(str(expansion.get("required_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(expansion.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A expansão só pode ser gradual: sandbox → pilot → bounded_production, "
+            "ou aumento explícito de tenants dentro do estágio atual. "
+            "Saltos, downgrades e remoção silenciosa de tenants são bloqueados."
+        )
+        st.caption(
+            "Máximo de 10 tenants nesta versão. Privacidade, suporte, finanças, integrações, "
+            "capacidade, monitoramento e rollback precisam ser revalidados. "
+            "Autorização continua separada da execução."
         )
 
 
