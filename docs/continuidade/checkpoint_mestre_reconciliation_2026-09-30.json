@@ -438,6 +438,7 @@
     }
   ],
   "pending": [
+    "GLOBAL_WORKER_SCHEDULED_PULSE_STALE",
     "REVENUE_OPPORTUNITY_WEIGHT_CALIBRATION_AFTER_CLIENT_HISTORY",
     "REVENUE_OPPORTUNITY_REAL_CAPACITY_BINDING",
     "REVENUE_OPPORTUNITY_REAL_COST_BINDING",
@@ -528,5 +529,18 @@
     "employment_exit_recommended": false,
     "trade_dependency_blocks_transition_review": true,
     "real_financial_data_connected": false
+  },
+  "global_worker_operational_blocker": {
+    "status": "BLOCKED",
+    "blocker": "SCHEDULED_PULSE_NOT_HEALTHY",
+    "observed_at": "2026-09-30T17:55:06Z",
+    "latest_successful_pulse_at": "2026-09-29T10:22:38Z",
+    "max_age_seconds": 5400,
+    "code_failure_identified": false,
+    "feature_flag_modified": false,
+    "worker_armed": false,
+    "runtime_modified": false,
+    "gate_weakening_authorized": false,
+    "activation_authorized": false
   }
 }
