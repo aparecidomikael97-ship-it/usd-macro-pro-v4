@@ -334,6 +334,10 @@ from atlasquant_aion_business_b2b_revenue_offer import (
 from atlasquant_aion_business_first_pilot_pricing_review import (
     first_pilot_policy as business_first_pilot_policy,
 )
+from atlasquant_aion_backup_recovery_policy import (
+    backup_recovery_policy as aion_backup_recovery_policy,
+    audit_repository_backup_readiness as aion_audit_repository_backup_readiness,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7265,6 +7269,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "26 · AION · Roteador dos 8 papéis",
             "27 · Oferta B2B & Receita",
             "28 · Primeiro Piloto & Preco",
+            "29 · Backup & Recovery",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7743,7 +7748,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "dropshipping fora da prioridade e Trade não é necessário para bancar o ecossistema."
         )
 
-    else:
+    elif view == "28 · Primeiro Piloto & Preco":
         pilot = business_first_pilot_policy()
         st.write(f"Estado: **{pilot.get('state')}**")
         st.metric("Clientes no primeiro piloto", int(pilot.get("max_clients") or 0))
@@ -7765,6 +7770,23 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Contato, proposta enviada, contrato, cobrança, admissão do cliente e runtime "
             "permanecem bloqueados até gates separados."
+        )
+
+    else:
+        policy = aion_backup_recovery_policy()
+        readiness = aion_audit_repository_backup_readiness()
+        st.write(f"Política: **{policy.get('state')}**")
+        st.write(f"Controles do repositório: **{readiness.get('state')}**")
+        st.markdown("**Camadas obrigatórias:**")
+        for item in list(policy.get("required_backup_layers") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Restore automático permanece proibido. RPO/RTO ainda precisam ser definidos "
+            "como metas administrativas, e a cópia secundária deve ser separada da referência primária."
+        )
+        st.caption(
+            "O backup de código valida SHA256, testa o ZIP e confere arquivos críticos. "
+            "O checkpoint de runtime continua versionado separadamente."
         )
 
 
