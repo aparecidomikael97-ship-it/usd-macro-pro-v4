@@ -111,7 +111,7 @@ ligada a:
 - refs;
 - fingerprint exato do corpo da prova.
 
-Um CI verde genérico ou fingerprint divergente não produz `TESTED`.
+Um CI verde genérico ou fingerprint divergente não produz `TESTED`. Além disso, a atestação estrutural não verifica a si mesma: um verificador independente e confiável precisa confirmar proveniência, SHA, refs e fingerprint. Sem esse verificador, o estado técnico permanece `CANDIDATE`.
 
 ## Revisão humana
 
