@@ -6,7 +6,9 @@
 
 ## Contexto
 
-ADR-0066 permite validar o baseline físico do sandbox. O passo seguinte envolve
+ADR-0066 permite validar o baseline físico do sandbox. ADR-0073 acrescenta a
+exigência de aceitação humana explícita do baseline antes da construção do
+plano. O passo seguinte envolve
 mutações intencionais, ainda que somente no sandbox: criar conta de teste,
 enrolar MFA, gravar uma revisão do registry, desabilitar a conta e revogar
 sessões. Essas ações não devem nascer de uma mensagem genérica nem ser
@@ -78,3 +80,9 @@ Nenhum.
 ## Superseded by
 
 Nenhum.
+
+
+## Entrada endurecida por ADR-0073
+
+O builder do lifecycle exige baseline acceptance binding válido. Baseline
+técnico isolado não é mais suficiente para produzir um plano.
