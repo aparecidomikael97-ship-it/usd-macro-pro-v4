@@ -5172,16 +5172,22 @@ def _render_business_guided_training() -> None:
         f"**{scenario['company']} · {scenario['segment']}**\n\n{scenario['situation']}"
     )
 
-    tabs = st.tabs([
+    stages = (
         "1 · Diagnóstico",
         "2 · Radar & Pacote",
         "3 · Entrega",
         "4 · Objeções",
         "5 · Venda simulada",
         "6 · Minha preparação",
-    ])
+    )
+    selected_stage = st.selectbox(
+        "Etapa do treinamento",
+        stages,
+        key="aion_business_training_stage",
+        help="Carrega uma etapa por vez para manter a navegação leve no celular.",
+    )
 
-    with tabs[0]:
+    if selected_stage == stages[0]:
         brief = business_diagnostic_brief(scenario_id)
         st.markdown("**Como explicar o problema antes da tecnologia**")
         st.write(brief["summary"])
@@ -5193,7 +5199,7 @@ def _render_business_guided_training() -> None:
             st.markdown(f"- {question}")
         st.caption("Estado deste exercício: FICTIONAL_FIXTURE. Nada aqui é dado de cliente.")
 
-    with tabs[1]:
+    elif selected_stage == stages[1]:
         fit = business_package_fit(scenario_id)
         fixture = scenario["fixture"]
         r1,r2,r3,r4 = st.columns(4)
@@ -5210,7 +5216,7 @@ def _render_business_guided_training() -> None:
             "Este encaixe é didático e não promete resultado."
         )
 
-    with tabs[2]:
+    elif selected_stage == stages[2]:
         delivery = business_delivery_walkthrough(scenario_id)
         st.markdown("**O que o cliente recebe**")
         for item in delivery["what_client_receives"]:
@@ -5226,7 +5232,7 @@ def _render_business_guided_training() -> None:
             "Preço não está definido automaticamente."
         )
 
-    with tabs[3]:
+    elif selected_stage == stages[3]:
         objections = business_objection_catalog()
         qmap = {row["question"]: row["id"] for row in objections}
         question = st.selectbox(
@@ -5242,7 +5248,7 @@ def _render_business_guided_training() -> None:
             "Registrar, conferir o escopo/evidência e responder depois."
         )
 
-    with tabs[4]:
+    elif selected_stage == stages[4]:
         conversation = business_simulated_sales_conversation(scenario_id)
         st.markdown("**Simulação de conversa**")
         for row in conversation:
@@ -5252,7 +5258,7 @@ def _render_business_guided_training() -> None:
             "Treino somente. Nenhuma mensagem é enviada e nenhuma proposta comercial é criada."
         )
 
-    with tabs[5]:
+    else:
         st.markdown("**Checklist antes de você divulgar ou conversar com cliente real**")
         checks = {}
         labels_checks = (
@@ -5295,7 +5301,7 @@ def _render_business(
     st.markdown("### 💼 AION Negócios")
     demo_snapshot = business_demo_snapshot()
     st.markdown(business_demo_html(), unsafe_allow_html=True)
-    with st.expander("🎓 Trilha do administrador · visão geral", expanded=False):
+    with st.expander("🎓 Treinamento do administrador · visão geral", expanded=False):
         st.caption(
             "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "
             "vender somente o que estiver validado."
