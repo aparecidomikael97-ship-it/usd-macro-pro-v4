@@ -1,0 +1,205 @@
+{
+  "schema": "ATLASQUANT_AION_CHECKPOINT_MASTER_INCREMENTAL_V1",
+  "gate_id": "CHECKPOINT_MESTRE_INCREMENTAL_2026_09_30",
+  "date": "2026-09-30",
+  "parent": {
+    "narrative": "docs/continuidade/CHECKPOINT_MESTRE_RECONCILIACAO_2026-09-29.md",
+    "manifest": "docs/continuidade/checkpoint_mestre_reconciliation_2026-09-29.json"
+  },
+  "rules": {
+    "preserves_history": true,
+    "latest_overrides_on_direct_conflict": true,
+    "checkpoint_is_official_continuity_source": true,
+    "parallel_conflicting_memory_store_forbidden": true,
+    "green_ci_is_merge_authorization": false,
+    "merge_is_deploy_authorization": false,
+    "deploy_is_runtime_authorization": false
+  },
+  "economics": {
+    "initial_monthly_budget_cap_brl": 200,
+    "hard_runtime_enforcement_status": "PENDING",
+    "priorities": [
+      "data_integrity",
+      "backup",
+      "versioning",
+      "audit",
+      "rollback",
+      "economy_mode",
+      "cheap_or_local_models_first",
+      "paid_api_only_when_valuable"
+    ],
+    "scale_from_customer_revenue": true
+  },
+  "monetization": {
+    "priority_offer": "B2B Atendimento & Automação Comercial com AION",
+    "recurring_revenue_first": true,
+    "dropshipping_priority": false,
+    "dropshipping_state": "DESCARTADO_ATUALMENTE",
+    "expansion_funded_by_revenue": true
+  },
+  "team_access": {
+    "status": "APROVADO / PENDENTE",
+    "individual_accounts": true,
+    "invitation_flow": true,
+    "rbac": true,
+    "tenant_scope": true,
+    "strong_auth_2fa_target": true,
+    "suspend_revoke": true,
+    "audit_trail": true,
+    "aion_must_obey_same_permissions": true,
+    "shared_admin_login_forbidden": true
+  },
+  "capacity_scale": {
+    "status": "APROVADO / PENDENTE",
+    "manager_required": true,
+    "measured_admission": true,
+    "protect_margin": true,
+    "protect_support": true,
+    "protect_stability": true
+  },
+  "external_ai_relationship": {
+    "aion_must_run_without_chatgpt_subscription": true,
+    "chatgpt_role": "OPTIONAL_EXTERNAL_ARCHITECT_REVIEW",
+    "administrator_final_authority": true
+  },
+  "multiagent": {
+    "topology": "ONE_AION_EIGHT_LOGICAL_ROLES",
+    "independent_expensive_models_required": false,
+    "share_models_and_infrastructure": true,
+    "on_demand_activation": true,
+    "roles": [
+      {
+        "id": "orchestrator",
+        "name": "AION Núcleo / Orquestrador"
+      },
+      {
+        "id": "architect",
+        "name": "Arquiteto / Estrategista"
+      },
+      {
+        "id": "guardian",
+        "name": "Guardião / Auditor"
+      },
+      {
+        "id": "executor",
+        "name": "Executor / Operador"
+      },
+      {
+        "id": "memory",
+        "name": "Memória / Conhecimento"
+      },
+      {
+        "id": "finops",
+        "name": "FinOps"
+      },
+      {
+        "id": "reliability",
+        "name": "Observabilidade / Confiabilidade"
+      },
+      {
+        "id": "customer_success",
+        "name": "Sucesso do Cliente / Comercial"
+      }
+    ]
+  },
+  "business_stack": {
+    "draft_prs": [
+      427,
+      428,
+      429,
+      430,
+      431,
+      433,
+      434
+    ],
+    "current_runtime_authorized": false,
+    "merge_authorized_by_this_checkpoint": false,
+    "deploy_authorized_by_this_checkpoint": false,
+    "billing_authorized_by_this_checkpoint": false,
+    "quota_application_authorized_by_this_checkpoint": false
+  },
+  "decisions": [
+    {
+      "id": "D-2026-09-30-PROACTIVE-GAPS",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-COST-CAP-200",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-DATA-INTEGRITY-FIRST",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-B2B-SERVICE-FIRST",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-DROPSHIPPING-OUT",
+      "state": "DESCARTADO",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-TEAM-RBAC",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-CAPACITY-SCALE-MANAGER",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-AION-INDEPENDENT-CHATGPT",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-CHATGPT-OPTIONAL-ARCHITECT",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-EIGHT-LOGICAL-ROLES",
+      "state": "APROVADO / PENDENTE",
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-CHECKPOINT-LATEST-POINTER",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "docs/continuidade/checkpoint_mestre_latest.json",
+        "atlasquant_aion_checkpoint_latest.py",
+        "test_atlasquant_aion_checkpoint_latest.py"
+      ]
+    }
+  ],
+  "pending": [
+    "TEAM_RBAC_FULL",
+    "CAPACITY_SCALE_MANAGER",
+    "BACKUP_RECOVERY_TESTABLE_POLICY",
+    "BUDGET_GOVERNOR_200_BRL",
+    "B2B_OFFER_READY_TO_SELL",
+    "COMMERCIAL_PIPELINE_END_TO_END",
+    "AION_CHECKPOINT_BOOTSTRAP_INTEGRATION",
+    "EIGHT_ROLE_MULTIAGENT_ROUTER",
+    "BUSINESS_UPDATED_PDF"
+  ]
+}

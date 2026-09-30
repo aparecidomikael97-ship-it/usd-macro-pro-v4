@@ -3,6 +3,22 @@
 This block connects AION Core Intelligence memory to the existing AtlasQuant
 Checkpoint Mestre without creating a second remote persistence system.
 
+## Latest reconciliation pointer
+
+The repository now keeps
+`docs/continuidade/checkpoint_mestre_latest.json` as the canonical pointer to
+the newest incremental Checkpoint Mestre reconciliation. The pointer preserves
+the previous reconciliation and never authorizes merge, deploy or runtime by
+itself.
+
+The read-only validator `atlasquant_aion_checkpoint_latest.py` verifies the
+pointer, its parent binding, the R$200 initial planning cap, the revenue-first
+Business direction, AION independence from a ChatGPT subscription, the eight
+logical agent roles and the fail-closed operational flags.
+
+This pointer is discovery metadata for the official Checkpoint Mestre chain. It
+does not create a second memory store.
+
 ## Persistence model
 
 Core memory is staged under the existing `aion_core_intelligence_v1`
