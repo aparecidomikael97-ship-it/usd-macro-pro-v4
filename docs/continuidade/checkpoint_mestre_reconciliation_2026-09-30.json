@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -161,7 +161,12 @@
     "sandbox_baseline_acceptance_required_for_lifecycle_plan": true,
     "sandbox_baseline_acceptance_recorded": false,
     "sandbox_baseline_automatic_acceptance": false,
-    "sandbox_lifecycle_plan_direct_baseline_bypass_blocked": true
+    "sandbox_lifecycle_plan_direct_baseline_bypass_blocked": true,
+    "sandbox_lifecycle_materialization_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "sandbox_lifecycle_materialization_revalidates_raw_baseline": true,
+    "sandbox_lifecycle_materialization_requires_acceptance": true,
+    "sandbox_lifecycle_materialization_real_plan_created": false,
+    "sandbox_lifecycle_materialization_automatic_authorization": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -713,9 +718,23 @@
         "validate_team_access_baseline_acceptance.py",
         "docs/adr/ADR-0073-business-team-access-sandbox-baseline-acceptance.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-MATERIALIZATION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_sandbox_lifecycle_materialization.py",
+        "test_atlasquant_aion_business_team_access_sandbox_lifecycle_materialization.py",
+        "materialize_team_access_lifecycle_plan.py",
+        "docs/adr/ADR-0074-business-team-access-sandbox-lifecycle-plan-materialization.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_SANDBOX_REAL_LIFECYCLE_PLAN_REVIEW",
+    "TEAM_ACCESS_SANDBOX_REAL_LIFECYCLE_PLAN_MATERIALIZATION",
     "TEAM_ACCESS_SANDBOX_REAL_LIFECYCLE_PLAN_BUILD",
     "TEAM_ACCESS_SANDBOX_REAL_BASELINE_ACCEPTANCE_RECORD",
     "TEAM_ACCESS_WINDOWS_OPERATOR_BASELINE_ACCEPTANCE_DECISION",
