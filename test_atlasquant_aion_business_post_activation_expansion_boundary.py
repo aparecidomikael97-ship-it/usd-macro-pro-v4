@@ -132,6 +132,16 @@ class BusinessPostActivationExpansionBoundaryTests(unittest.TestCase):
         self.assertFalse(packet["billing_authorized"])
         self.assertFalse(packet["executes_action"])
 
+    def test_forged_unbounded_verification_cannot_open_expansion_boundary(self):
+        row = dict(_verified())
+        row["activated_scope"] = "pilot"
+        row["activated_tenant_ids"] = [f"tenant-{i}" for i in range(11)]
+        packet = expansion_boundary_packet(row)
+        self.assertEqual(packet["state"], "NOT_READY")
+        self.assertEqual(packet["required_decision_token"], "")
+        self.assertFalse(packet["scope_expansion_authorized"])
+        self.assertFalse(packet["executes_action"])
+
     def test_unverified_receipt_cannot_open_expansion_boundary(self):
         bad = dict(_verified())
         bad["state"] = "POST_ACTIVATION_VERIFICATION_BLOCKED"
