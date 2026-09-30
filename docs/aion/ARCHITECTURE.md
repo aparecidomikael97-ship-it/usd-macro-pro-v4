@@ -601,3 +601,23 @@ keeps `merge_execution_authorized=false`. Physical merge execution is a
 separate boundary and is not implemented by this module.
 
 ADR-0032 records this explicit anti-ambiguity authorization contract.
+
+## BUSINESS consolidation execution preflight V1
+
+`atlasquant_aion_business_consolidation_execution_preflight.py` is the final
+read-only barrier before any physical merge can even be reviewed. It combines
+the ready dry-run, exact decision request, explicit authorization record, live
+revalidation, stack sequence position, observed/expected main SHA, BUSINESS
+runtime OFF and absence of deploy authority.
+
+Completed PRs must form an exact prefix of #394–#412 and the requested target
+must be the next PR. Any skipped/reordered PR, SHA drift, stale authorization,
+runtime posture change or deploy authority blocks the preflight.
+
+The maximum state is `MERGE_EXECUTION_REVIEW_REQUIRED`; the module keeps
+`merge_execution_authorized=false` and performs no GitHub action. After any
+future separately executed merge, full CI, UI/mobile validation when applicable,
+runtime posture recheck and rollback-SHA preservation are mandatory before the
+next preflight.
+
+ADR-0033 records this sequential fail-closed execution boundary.
