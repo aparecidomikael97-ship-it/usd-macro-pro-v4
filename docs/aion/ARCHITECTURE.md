@@ -533,3 +533,17 @@ Passing every gate can only produce `HUMAN_PILOT_APPROVAL_REQUIRED`. It never
 records pilot approval, activates runtime or enables external actions.
 
 ADR-0028 records this bounded first-pilot boundary.
+
+
+## BUSINESS full stack consolidation V2
+
+`atlasquant_aion_business_stack_consolidation_v2.py` freezes the complete
+AION Core + BUSINESS Draft stack from #394 through #412 and validates branch,
+SHA, draft/open posture, mergeability and required CI evidence.
+
+The module produces a review-only bundle digest, ordered consolidation preview
+and integration rollback plan. It has no GitHub/network execution path and
+cannot authorize merge, deploy, pilot or runtime.
+
+ADR-0029 records this administrative separation of technical readiness from
+merge authority.
