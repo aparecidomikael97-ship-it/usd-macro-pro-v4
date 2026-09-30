@@ -382,6 +382,9 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_authorization import
 from atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger import (
     lifecycle_ledger_template as business_team_sandbox_lifecycle_ledger_template,
 )
+from atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate import (
+    step_gate_policy as business_team_sandbox_step_gate_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7328,6 +7331,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "41 · Equipe & Acessos · Lifecycle Sandbox",
             "42 · Equipe & Acessos · Autorizacao Lifecycle",
             "43 · Equipe & Acessos · Ledger Lifecycle",
+            "44 · Equipe & Acessos · Step Gate",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8091,7 +8095,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Produção, deploy e runtime continuam não autorizados."
         )
 
-    else:
+    elif view == "43 · Equipe & Acessos · Ledger Lifecycle":
         ledger = business_team_sandbox_lifecycle_ledger_template()
         st.write(f"Estado: **{ledger.get('state')}**")
         st.metric("Etapas do lifecycle", int(ledger.get("total_steps") or 0))
@@ -8109,6 +8113,29 @@ def _render_business_stack_consolidation_v2() -> None:
             "Mesmo uma cadeia completa para em "
             "SANDBOX_LIFECYCLE_EVIDENCE_COMPLETE_REVIEW_REQUIRED. "
             "Nenhum próximo passo é executado automaticamente."
+        )
+
+    else:
+        gate = business_team_sandbox_step_gate_policy()
+        st.write(f"Estado: **{gate.get('state')}**")
+        st.markdown("**Antes de cada step são exigidos:**")
+        for item in (
+            "ledger na posição exata",
+            "baseline sem drift",
+            "sandbox saudável",
+            "OIDC e registry verificados",
+            "secrets somente locais",
+            "nenhum target de produção",
+            "cleanup pronto",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O gate libera apenas revisão para uma decisão explícita daquele step. "
+            "Ele não executa a mutação e não faz append automático no ledger."
+        )
+        st.caption(
+            "Pré-step: READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_DECISION · "
+            "Pós-step: READY_FOR_MANUAL_LEDGER_APPEND_REVIEW."
         )
 
 

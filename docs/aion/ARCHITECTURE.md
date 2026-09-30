@@ -1217,3 +1217,20 @@ Even a complete ten-step ledger stops at
 `SANDBOX_LIFECYCLE_EVIDENCE_COMPLETE_REVIEW_REQUIRED`.
 
 ADR-0069 records this boundary.
+
+
+## BUSINESS team access sandbox lifecycle step gate
+
+`atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate.py`
+requires a fresh one-step preflight before any manual sandbox lifecycle action.
+
+The target must equal the ledger's next expected step and the baseline digest
+must remain unchanged. Sandbox health, OIDC, registry schema, local-secret
+posture, production-target absence and cleanup readiness are required.
+
+The maximum pre-step state is
+`READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_DECISION`. Post-step receipt review
+stops at `READY_FOR_MANUAL_LEDGER_APPEND_REVIEW`. Neither state executes or
+appends anything.
+
+ADR-0070 records this boundary.
