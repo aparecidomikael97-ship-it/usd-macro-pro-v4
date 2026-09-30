@@ -908,6 +908,18 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_stack_consolidation_is_review_only_and_never_merges(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_stack_consolidation()", src)
+        self.assertIn("Consolidação da Stack Business · Revisão Administrativa", src)
+        self.assertIn("Snapshot congelado de 30/09/2026", src)
+        self.assertIn("READY_FOR_ADMIN_REVIEW ≠ merge autorizado", src)
+        self.assertIn("Ver ordem de consolidação", src)
+        self.assertIn("Ver opções administrativas", src)
+        self.assertIn("não executa merge, rebase ou deploy", src)
+        self.assertIn("_render_business_stack_consolidation()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_master_readiness_separates_demo_pilot_and_live_authority(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_master_readiness()", src)
