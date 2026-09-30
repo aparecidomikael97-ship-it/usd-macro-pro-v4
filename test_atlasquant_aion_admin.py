@@ -957,6 +957,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("stop-on-drift", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_execution_review_packet_is_read_only_dossier(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("10 · Pacote de revisão de execução", src)
+        self.assertIn("Seções obrigatórias do dossiê de revisão", src)
+        self.assertIn("O pacote só congela evidência para leitura humana", src)
+        self.assertIn("READY_FOR_HUMAN_EXECUTION_REVIEW", src)
+        self.assertIn("merge_execution_authorized=false", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
