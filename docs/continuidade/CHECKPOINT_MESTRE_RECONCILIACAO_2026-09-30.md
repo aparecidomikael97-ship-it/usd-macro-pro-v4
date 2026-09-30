@@ -126,6 +126,15 @@ PLAN ONLY por padrão; gravação do env exige `-Apply`, start exige
 `-ApplyStart` e baseline exige `-CollectBaseline` adicional. Nenhuma ação
 real no PC foi executada por esta camada no GitHub.
 
+Estado do Operator Baseline Handoff:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_windows_operator_handoff.py`, ADR-0072
+e testes associados. Readiness e baseline recebem o mesmo
+`operator_session_id` não sensível; sessões diferentes ou baseline anterior ao
+readiness bloqueiam. O máximo é
+`READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW`; baseline ainda
+não é aceito automaticamente e nenhum lifecycle plan real é criado.
+
 Estado do Operator Handoff readiness → baseline:
 **IMPLEMENTADO / EM VALIDAÇÃO** em
 `atlasquant_aion_business_team_access_windows_operator_handoff.py`, ADR-0072
