@@ -1320,3 +1320,22 @@ new authorization package/materialization digests.
 The layer remains non-executing and does not authorize production.
 
 ADR-0075 records this boundary.
+
+
+## BUSINESS team access zero-ledger Step 1 preflight
+
+`atlasquant_aion_business_team_access_step1_preflight_package.py` builds the
+first lifecycle decision packet only after materialization, authorization
+package, empty-ledger and fresh sandbox observations all match.
+
+The ledger must contain zero receipts, use the genesis chain head and point to
+Step 1. The observation may be at most 900 seconds old.
+
+If any prerequisite fails, the internal Step Gate is not evaluated and no
+decision token is exposed through the package.
+
+The maximum state is
+`READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET`. This does not
+record a decision or execute Step 1.
+
+ADR-0076 records this boundary.

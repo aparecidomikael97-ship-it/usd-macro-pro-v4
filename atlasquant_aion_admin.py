@@ -400,6 +400,9 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_materialization impo
 from atlasquant_aion_business_team_access_lifecycle_authorization_package import (
     authorization_package_requirements as business_team_lifecycle_authorization_package_requirements,
 )
+from atlasquant_aion_business_team_access_step1_preflight_package import (
+    step1_preflight_package_policy as business_team_step1_preflight_package_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7352,6 +7355,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "47 · Equipe & Acessos · Baseline Acceptance",
             "48 · Equipe & Acessos · Lifecycle Plan",
             "49 · Equipe & Acessos · Authorization Package",
+            "50 · Equipe & Acessos · Step 1 Preflight",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8237,7 +8241,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_REVIEW."
         )
 
-    else:
+    elif view == "49 · Equipe & Acessos · Authorization Package":
         package = business_team_lifecycle_authorization_package_requirements()
         st.write(f"Estado: **{package.get('state')}**")
         st.markdown("**Binding obrigatório da autorização:**")
@@ -8256,6 +8260,27 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Ledger e Step Gate rejeitam autorização sem esse binding materializado."
+        )
+
+    else:
+        packet = business_team_step1_preflight_package_policy()
+        st.write(f"Estado: **{packet.get('state')}**")
+        st.markdown("**Pré-requisitos do Step 1:**")
+        for item in (
+            "ledger vazio com chain GENESIS",
+            "Step 1 como next expected",
+            "observação read-only com até 900 segundos",
+            "baseline e operator session sem drift",
+            "health + OIDC + registry válidos",
+            "secrets locais + produção ausente + cleanup pronto",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "A tela mostra somente a policy. O pacote pode chegar até a decisão manual do Step 1, "
+            "mas não registra a decisão e não executa a criação da conta sandbox."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET."
         )
 
 
