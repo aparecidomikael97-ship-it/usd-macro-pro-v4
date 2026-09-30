@@ -48,4 +48,6 @@ O pacote exige:
 READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_1_DECISION_PACKET
 
 O token necessário para uma futura decisão explícita pode aparecer no pacote,
-mas a decisão não é registrada e o Step 1 não é executado.
+mas a decisão não é registrada e o Step 1 não é executado. O packet expõe
+somente os digests/timestamps necessários para `verify_step1_preflight_package`
+recalcular sua integridade antes do próximo gate.
