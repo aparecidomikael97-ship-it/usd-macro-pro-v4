@@ -23,6 +23,8 @@ Empilhado sobre a Draft PR #441.
 
 ## Estado
 
+Draft PR #442 — AION BUSINESS: first pilot selection and pricing review V1.
+
 IMPLEMENTADO / EM VALIDAÇÃO.
 
 Ainda pendente para piloto real:
