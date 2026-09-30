@@ -93,3 +93,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0062 | ACCEPTED | `docs/adr/ADR-0062-business-revenue-live-economics.md` |
 | ADR-0063 | ACCEPTED | `docs/adr/ADR-0063-business-team-access-production-binding.md` |
 | ADR-0064 | ACCEPTED | `docs/adr/ADR-0064-business-team-access-sandbox-e2e.md` |
+| ADR-0065 | ACCEPTED | `docs/adr/ADR-0065-business-team-access-physical-sandbox.md` |
