@@ -111,6 +111,13 @@ ADR-0069 e testes associados. O ledger aceita recibos sanitizados em cadeia
 SHA-256, exige ordem 1→10, recalcula a integridade de cada receipt e rejeita
 drift, duplicação ou quebra de cadeia. Nenhum step real foi executado.
 
+Estado do step gate do lifecycle sandbox:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate.py`,
+ADR-0070 e testes associados. Cada etapa exige preflight fresco, target igual ao
+next expected, baseline sem drift, saúde/OIDC/registry válidos, secrets locais,
+produção ausente e cleanup pronto. O gate não executa nem faz append automático.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -387,3 +394,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-PLAN | IMPLEMENTADO / EM VALIDAÇÃO | Lifecycle sandbox vira plano de dez etapas com decisão explícita separada |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-AUTHORIZATION | IMPLEMENTADO / EM VALIDAÇÃO | Registro formal futuro fica preso ao plano/baseline e não habilita executor |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Evidências por step ficam em ledger hash-chain sanitizado e sequencial |
+| D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-STEP-GATE | IMPLEMENTADO / EM VALIDAÇÃO | Cada step recebe preflight e pós-review próprios antes de qualquer avanço |
