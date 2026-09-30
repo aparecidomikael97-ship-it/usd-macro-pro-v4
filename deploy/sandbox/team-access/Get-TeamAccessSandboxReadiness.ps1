@@ -56,9 +56,11 @@ if (
 }
 
 $ready = -not ($checks.Values -contains $false)
+$operatorSessionId = [guid]::NewGuid().ToString("N").ToLowerInvariant()
 $payload = [ordered]@{
     schema = "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_WINDOWS_OPERATOR_READINESS_V1"
     version = "1"
+    operator_session_id = $operatorSessionId
     state = if ($ready) {
         "READY_FOR_ADMIN_TEAM_ACCESS_WINDOWS_SANDBOX_START_DECISION"
     }
