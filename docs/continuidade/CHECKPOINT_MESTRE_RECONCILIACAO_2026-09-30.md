@@ -166,6 +166,15 @@ materialization digest, plan digest, baseline/acceptance digests e operator
 session. Ledger e Step Gate rejeitam autorização sem package binding íntegro.
 Nenhum authorization package real foi criado.
 
+Estado do zero-ledger Step 1 preflight package:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_step1_preflight_package.py`, helper
+PowerShell read-only, ADR-0076 e testes associados. O ledger inicial precisa ter
+zero receipts, chain GENESIS e Step 1 como next expected. A observação de
+health/OIDC/registry/baseline expira após 900 segundos. Se qualquer pré-requisito
+falhar, o Step Gate interno não é avaliado. Nenhuma decisão de Step 1 foi
+registrada e nenhuma etapa foi executada.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -448,3 +457,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-BASELINE-ACCEPTANCE | IMPLEMENTADO / EM VALIDAÇÃO | Baseline técnico precisa de acceptance explícito antes de alimentar o lifecycle plan |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-MATERIALIZATION | IMPLEMENTADO / EM VALIDAÇÃO | Baseline aceito pode gerar pacote real de 10 steps para revisão, sem autorização automática |
 | D-2026-09-30-TEAM-ACCESS-MATERIALIZED-LIFECYCLE-AUTHORIZATION | IMPLEMENTADO / EM VALIDAÇÃO | Authorization record passa a ficar preso ao materialization digest e package digest antes do ledger/Step Gate |
+| D-2026-09-30-TEAM-ACCESS-ZERO-LEDGER-STEP1-PREFLIGHT | IMPLEMENTADO / EM VALIDAÇÃO | Empty ledger + observação fresca formam somente o pacote para decisão manual do Step 1 |
