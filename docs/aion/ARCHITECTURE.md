@@ -793,3 +793,19 @@ false at every cycle boundary.
 
 The module performs no expansion, runtime change, deploy, rollback or external
 action. ADR-0043 records this boundary.
+
+## BUSINESS expansion cycle audit ledger
+
+atlasquant_aion_business_expansion_cycle_audit_ledger.py keeps a pure
+administrative, tamper-evident history of verified expansion cycles. Each entry
+chains the prior entry digest with the expansion verification digest,
+authorization digest, previous scope/tenants and verified scope/tenants.
+
+The ledger must first bind to a verified expansion boundary as its genesis. An unbound ledger can remain an empty administrative template but cannot accept a cycle. This prevents a truncated history from being presented as the complete chain.
+
+The ledger revalidates sequence, anti-replay, transition rules, tenant
+preservation, continuity between cycles and the bounded tenant cap. Any drift or
+digest mismatch blocks the append.
+
+The ledger performs no expansion, runtime change, deploy, rollback, billing,
+publication or external action. ADR-0044 records this boundary.

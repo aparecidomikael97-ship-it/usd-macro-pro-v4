@@ -301,6 +301,10 @@ from atlasquant_aion_business_expansion_readiness import (
 from atlasquant_aion_business_post_expansion_cycle_freeze import (
     post_expansion_verification_requirements as business_post_expansion_verification_requirements,
 )
+from atlasquant_aion_business_expansion_cycle_audit_ledger import (
+    audit_expansion_cycle_ledger as business_audit_expansion_cycle_ledger,
+    expansion_cycle_ledger_template as business_expansion_cycle_ledger_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7223,6 +7227,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "17 · Pós-ativação & fronteira de expansão",
             "18 · Prontidão para expansão controlada",
             "19 · Pós-expansão & congelamento do ciclo",
+            "20 · Ledger auditável de ciclos de expansão",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7522,7 +7527,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Autorização continua separada da execução."
         )
 
-    else:
+    elif view == "19 · Pós-expansão & congelamento do ciclo":
         verification = business_post_expansion_verification_requirements()
         st.write(f"Estado: **{verification.get('state')}**")
         st.markdown("**Checks obrigatórios depois de uma futura expansão executada por caminho separado:**")
@@ -7538,6 +7543,30 @@ def _render_business_stack_consolidation_v2() -> None:
             "Depois da verificação, o novo escopo volta a ficar congelado. "
             "Uma nova expansão precisa recomeçar pelo boundary explícito; "
             "não existe crescimento automático, cobrança automática ou ação automática com clientes."
+        )
+
+    else:
+        ledger = business_expansion_cycle_ledger_template()
+        audit = business_audit_expansion_cycle_ledger(ledger)
+        st.write(f"Estado do ledger: **{ledger.get('state')}**")
+        st.write(f"Integridade: **{audit.get('state')}**")
+        st.markdown("**Proteções do histórico:**")
+        for item in (
+            "sequência estrita",
+            "digest encadeado",
+            "anti-replay",
+            "continuidade exata de escopo",
+            "continuidade exata de tenants",
+            "progressão e limite de tenants revalidados",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Somente receipts pós-expansão já verificados e congelados podem entrar no ledger. "
+            "História adulterada, duplicada ou descontínua bloqueia o append."
+        )
+        st.caption(
+            "O ledger é somente administrativo. Ele não expande tenants, não altera runtime, "
+            "não cobra, não publica e não executa ações com clientes."
         )
 
 
