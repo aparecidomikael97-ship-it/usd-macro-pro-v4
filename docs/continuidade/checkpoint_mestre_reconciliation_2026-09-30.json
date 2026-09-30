@@ -104,7 +104,9 @@
     "physical_sandbox_localhost_only": true,
     "physical_sandbox_plan_only_default": true,
     "physical_sandbox_manual_apply_required": true,
-    "physical_sandbox_secret_env_gitignored": true
+    "physical_sandbox_secret_env_gitignored": true,
+    "physical_sandbox_registry_schema": true,
+    "physical_sandbox_registry_schema_readonly_verifier": true
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -539,7 +541,8 @@
         "test_atlasquant_aion_business_team_access_physical_sandbox.py",
         "deploy/sandbox/team-access/compose.yml",
         "docs/aion/AION_BUSINESS_TEAM_ACCESS_PHYSICAL_SANDBOX_V1.md",
-        "docs/adr/ADR-0065-business-team-access-physical-sandbox.md"
+        "docs/adr/ADR-0065-business-team-access-physical-sandbox.md",
+        "deploy/sandbox/team-access/registry/init/001_registry_schema.sql"
       ]
     }
   ],
