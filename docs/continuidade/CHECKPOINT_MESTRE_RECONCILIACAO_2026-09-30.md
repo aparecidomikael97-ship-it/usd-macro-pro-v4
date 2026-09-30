@@ -46,6 +46,11 @@ uso caberá nele.
 Estado do Budget Governor / FinOps: **IMPLEMENTADO / EM VALIDAÇÃO** em
 `atlasquant_aion_finops_budget_governor.py`, ADR-0050 e testes associados.
 
+Estado do ledger de custos reais: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_finops_live_cost_ledger.py`, ADR-0058 e testes associados.
+Custos entram somente por fonte atestada read-only e formam uma hash-chain
+append-only verificável; persistência física e pagamento continuam separados.
+
 ## 2.1 Prioridade entre Negócios, Trader e Investimentos
 
 Direção aprovada:
@@ -252,7 +257,7 @@ PENDENTE / APROVADO:
 - binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
 - binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
 - definir RPO/RTO, cópia secundária real e executar restore drill não produtivo da política Backup & Recovery;
-- binding do Budget Governor/FinOps com custos reais de providers, alertas e ledger financeiro persistente;
+- configurar connectors reais de custo e persistência versionada do ledger FinOps;
 - segmento/candidato reais + custos reais + preço comercial real + revisão jurídica/comercial do primeiro piloto;
 - configuração física dos connectors read-only, OAuth/secret store e mapeamento de schema dos providers reais;
 - validação operacional do bootstrap do Checkpoint Mestre em ambientes empacotados/deployados;
@@ -284,3 +289,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-BACKUP-RECOVERY-POLICY | IMPLEMENTADO / EM VALIDAÇÃO | Backup em camadas, integridade e restore não automático |
 | D-2026-09-30-INDEPENDENCE-CLT-INDEX | IMPLEMENTADO / EM VALIDAÇÃO | Índice privado para revisão futura de independência do emprego |
 | D-2026-09-30-COMMERCIAL-LIVE-READ-BINDING | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline comercial consome somente dados reais atestados em leitura |
+| D-2026-09-30-FINOPS-LIVE-COST-LEDGER | IMPLEMENTADO / EM VALIDAÇÃO | Custos reais entram read-only e formam ledger hash-chained |
