@@ -28,6 +28,9 @@ Draft PR #448 — AION BUSINESS: Revenue Opportunity Engine V1.
 
 IMPLEMENTADO / EM VALIDAÇÃO.
 
+Validação final do HEAD reexecutada após reconciliação da stack. CI verde continua
+sendo evidência técnica, sem autorizar venda, gasto, merge, deploy ou runtime.
+
 Ainda pendente:
 - alimentar oportunidades com custos reais do ledger;
 - ligar capacidade real;
