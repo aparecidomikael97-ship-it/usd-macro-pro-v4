@@ -29,6 +29,8 @@ from atlasquant_aion_business_team_access_step1_execution_envelope import (
     build_step1_execution_envelope,
     execution_observation_template,
     step1_execution_envelope_policy,
+    verify_step1_execution_envelope,
+    verify_step1_execution_envelope_source_binding,
 )
 from atlasquant_aion_business_team_access_step1_preflight_package import (
     SCHEMA as PACKET_SCHEMA,
@@ -305,6 +307,80 @@ class TeamAccessStep1ExecutionEnvelopeTests(unittest.TestCase):
         self.assertFalse(result["automatic_execution_authorized"])
         self.assertFalse(result["executor_enabled"])
         self.assertFalse(result["production_authorized"])
+
+    def test_ready_envelope_has_recomputable_integrity(self):
+        materialization = _materialization()
+        packet = _packet(materialization)
+        decision = _decision(packet)
+        result = build_step1_execution_envelope(
+            materialization,
+            packet,
+            decision,
+            _observation(),
+            prepared_at="2026-09-30T21:54:00+00:00",
+        )
+        binding = verify_step1_execution_envelope(result)
+        self.assertTrue(binding["binding_match"])
+        self.assertEqual(
+            binding["state"], "STEP1_EXECUTION_ENVELOPE_BINDING_MATCH"
+        )
+        source = verify_step1_execution_envelope_source_binding(
+            materialization,
+            packet,
+            decision,
+            result,
+        )
+        self.assertTrue(source["binding_match"])
+
+    def test_tampered_observation_breaks_envelope_integrity(self):
+        materialization = _materialization()
+        packet = _packet(materialization)
+        decision = _decision(packet)
+        result = build_step1_execution_envelope(
+            materialization,
+            packet,
+            decision,
+            _observation(),
+            prepared_at="2026-09-30T21:54:00+00:00",
+        )
+        result["execution_observation"][
+            "target_account_absent_verified"
+        ] = False
+        binding = verify_step1_execution_envelope(result)
+        self.assertFalse(binding["binding_match"])
+        self.assertIn("observation_digest_integrity", binding["blockers"])
+
+    def test_tampered_envelope_digest_or_source_breaks_binding(self):
+        materialization = _materialization()
+        packet = _packet(materialization)
+        decision = _decision(packet)
+        result = build_step1_execution_envelope(
+            materialization,
+            packet,
+            decision,
+            _observation(),
+            prepared_at="2026-09-30T21:54:00+00:00",
+        )
+        result["execution_envelope_digest"] = "1" * 64
+        binding = verify_step1_execution_envelope(result)
+        self.assertFalse(binding["binding_match"])
+
+        result = build_step1_execution_envelope(
+            materialization,
+            packet,
+            decision,
+            _observation(),
+            prepared_at="2026-09-30T21:54:00+00:00",
+        )
+        changed = _materialization()
+        changed["materialization_digest"] = "2" * 64
+        source = verify_step1_execution_envelope_source_binding(
+            changed,
+            packet,
+            decision,
+            result,
+        )
+        self.assertFalse(source["binding_match"])
 
     def test_observation_must_be_after_decision(self):
         materialization = _materialization()
