@@ -443,6 +443,16 @@ def validate_provider_receipt_and_preview_ledger(
         "blockers": blockers,
         "provider_evidence_digest": provider_evidence_digest
         if ready else "",
+        "materialization_digest": materialization_digest if ready else "",
+        "plan_digest": materialized_plan_digest if ready else "",
+        "authorization_package_digest": _clean(
+            auth.get("authorization_package_digest"), 80
+        ).lower() if ready else "",
+        "apply_plan_digest": receipt_apply_digest if ready else "",
+        "runner_preflight_digest": receipt_runner_digest if ready else "",
+        "execution_envelope_digest": receipt_envelope_digest if ready else "",
+        "operator_session_id": receipt_session if ready else "",
+        "provider_user_id": provider_user_id if ready else "",
         "canonical_lifecycle_receipt": canonical_receipt
         if ready else {},
         "ledger_preview": ledger_preview if ready else {},
@@ -461,6 +471,165 @@ def validate_provider_receipt_and_preview_ledger(
     }
 
 
+
+
+def verify_provider_receipt_review(
+    review: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    row = _mapping(review)
+    canonical = _mapping(row.get("canonical_lifecycle_receipt"))
+    ledger = _mapping(row.get("ledger_preview"))
+
+    provider_evidence_digest = _clean(
+        row.get("provider_evidence_digest"), 80
+    ).lower()
+    materialization_digest = _clean(
+        row.get("materialization_digest"), 80
+    ).lower()
+    plan_digest = _clean(row.get("plan_digest"), 80).lower()
+    authorization_package_digest = _clean(
+        row.get("authorization_package_digest"), 80
+    ).lower()
+    apply_plan_digest = _clean(
+        row.get("apply_plan_digest"), 80
+    ).lower()
+    runner_preflight_digest = _clean(
+        row.get("runner_preflight_digest"), 80
+    ).lower()
+    execution_envelope_digest = _clean(
+        row.get("execution_envelope_digest"), 80
+    ).lower()
+    operator_session_id = _clean(
+        row.get("operator_session_id"), 64
+    ).lower()
+    provider_user_id = _clean(
+        row.get("provider_user_id"), 160
+    )
+    canonical_receipt_digest = _clean(
+        canonical.get("receipt_digest"), 80
+    ).lower()
+    ledger_preview_digest = _clean(
+        ledger.get("ledger_digest"), 80
+    ).lower()
+    review_digest = _clean(
+        row.get("receipt_review_digest"), 80
+    ).lower()
+
+    payload = {
+        "provider_evidence_digest": provider_evidence_digest,
+        "materialization_digest": materialization_digest,
+        "plan_digest": plan_digest,
+        "authorization_package_digest": authorization_package_digest,
+        "canonical_receipt_digest": canonical_receipt_digest,
+        "ledger_preview_digest": ledger_preview_digest,
+        "apply_plan_digest": apply_plan_digest,
+        "runner_preflight_digest": runner_preflight_digest,
+        "execution_envelope_digest": execution_envelope_digest,
+        "operator_session_id": operator_session_id,
+        "provider_user_id": provider_user_id,
+    }
+
+    gates = {
+        "schema_valid": row.get("schema") == SCHEMA,
+        "state_ready": row.get("state")
+        == "READY_FOR_ADMIN_TEAM_ACCESS_STEP1_LEDGER_APPEND_REVIEW",
+        "provider_evidence_digest_valid": bool(
+            _DIGEST64.fullmatch(provider_evidence_digest)
+        ),
+        "materialization_digest_valid": bool(
+            _DIGEST64.fullmatch(materialization_digest)
+        ),
+        "plan_digest_valid": bool(_DIGEST64.fullmatch(plan_digest)),
+        "authorization_package_digest_valid": bool(
+            _DIGEST64.fullmatch(authorization_package_digest)
+        ),
+        "apply_plan_digest_valid": bool(
+            _DIGEST64.fullmatch(apply_plan_digest)
+        ),
+        "runner_preflight_digest_valid": bool(
+            _DIGEST64.fullmatch(runner_preflight_digest)
+        ),
+        "execution_envelope_digest_valid": bool(
+            _DIGEST64.fullmatch(execution_envelope_digest)
+        ),
+        "operator_session_valid": bool(
+            _SESSION32.fullmatch(operator_session_id)
+        ),
+        "provider_user_id_valid": bool(
+            _PROVIDER_ID.fullmatch(provider_user_id)
+        ),
+        "canonical_receipt_digest_valid": bool(
+            _DIGEST64.fullmatch(canonical_receipt_digest)
+        ),
+        "ledger_preview_digest_valid": bool(
+            _DIGEST64.fullmatch(ledger_preview_digest)
+        ),
+        "ledger_preview_exact": bool(
+            ledger.get("state")
+            == "READY_FOR_NEXT_SANDBOX_LIFECYCLE_STEP"
+            and ledger.get("completed_count") == 1
+            and ledger.get("next_expected_step_order") == 2
+            and ledger.get("next_expected_step_id")
+            == LIFECYCLE_STEP_IDS[1]
+            and ledger.get("automatic_next_step_authorized") is False
+            and ledger.get("executor_enabled") is False
+            and ledger.get("production_authorized") is False
+            and ledger.get("executes_action") is False
+        ),
+        "append_not_authorized": row.get(
+            "ledger_append_authorized"
+        ) is False,
+        "append_not_performed": row.get(
+            "ledger_append_performed"
+        ) is False,
+        "step2_not_authorized": row.get(
+            "step2_execution_authorized"
+        ) is False,
+        "automatic_append_off": row.get(
+            "automatic_ledger_append"
+        ) is False,
+        "production_not_authorized": row.get(
+            "production_authorized"
+        ) is False,
+        "review_digest_valid": bool(
+            _DIGEST64.fullmatch(review_digest)
+        ),
+        "review_digest_integrity": bool(
+            _DIGEST64.fullmatch(review_digest)
+            and review_digest == _digest(payload)
+        ),
+    }
+    blockers = [name for name, passed in gates.items() if not passed]
+    match = not blockers
+
+    return {
+        "schema": (
+            "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_"
+            "STEP1_PROVIDER_RECEIPT_REVIEW_BINDING_V1"
+        ),
+        "version": VERSION,
+        "state": (
+            "STEP1_PROVIDER_RECEIPT_REVIEW_BINDING_MATCH"
+            if match
+            else "STEP1_PROVIDER_RECEIPT_REVIEW_BINDING_MISMATCH"
+        ),
+        "binding_match": match,
+        "gates": gates,
+        "blockers": blockers,
+        "receipt_review_digest": review_digest if match else "",
+        "canonical_receipt_digest": (
+            canonical_receipt_digest if match else ""
+        ),
+        "ledger_preview_digest": (
+            ledger_preview_digest if match else ""
+        ),
+        "ledger_append_authorized": False,
+        "ledger_append_performed": False,
+        "step2_execution_authorized": False,
+        "production_authorized": False,
+        "executes_action": False,
+    }
+
 __all__ = [
     "SCHEMA",
     "PROVIDER_RECEIPT_SCHEMA",
@@ -468,4 +637,5 @@ __all__ = [
     "MAX_RUNNER_TO_EXECUTION_SECONDS",
     "provider_receipt_review_policy",
     "validate_provider_receipt_and_preview_ledger",
+    "verify_provider_receipt_review",
 ]
