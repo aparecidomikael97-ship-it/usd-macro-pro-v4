@@ -89,3 +89,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0058 | ACCEPTED | `docs/adr/ADR-0058-finops-live-cost-ledger.md` |
 | ADR-0059 | ACCEPTED | `docs/adr/ADR-0059-finops-ledger-persistence-reconciliation.md` |
 | ADR-0060 | ACCEPTED | `docs/adr/ADR-0060-business-revenue-opportunity-engine.md` |
+| ADR-0061 | ACCEPTED | `docs/adr/ADR-0061-business-capacity-live-metrics.md` |
