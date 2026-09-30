@@ -170,8 +170,7 @@ Explicitly start, verify, collect and validate the sanitized baseline:
 
     .\Invoke-TeamAccessSandboxOperator.ps1 -ApplyStart -CollectBaseline
 
-The readiness report is stored under
-.atlasquant_sandbox_operator and that directory is ignored by Git.
+The Operator Kit stores its default secret file, readiness report and baseline artifacts under `%LOCALAPPDATA%\\AtlasQuant\\team-access-sandbox`, outside the repository tree. Legacy repository-local evidence paths remain gitignored, but the recommended Windows flow does not use them.
 
 The operator kit never performs any lifecycle step. Account creation, MFA,
 registry writes, account disable and session revocation remain behind the
