@@ -110,6 +110,21 @@ class BusinessQuotaApplicationAuthorizationTests(unittest.TestCase):
         self.assertEqual(row["state"], "BLOCKED")
         self.assertFalse(row["quota_application_authorized"])
 
+    def test_forged_authorization_actor_blocks_preflight(self):
+        authorization = _authorization()
+        authorization["actor"] = "forged"
+        row = quota_application_preflight(
+            authorization,
+            change_window_ref="change://window-001",
+            monitoring_plan_ref="monitor://quota-001",
+            rollback_plan_ref="rollback://quota-001",
+            dry_run_verified=True,
+            support_ready=True,
+            incident_response_ready=True,
+        )
+        self.assertEqual(row["state"], "QUOTA_APPLICATION_PREFLIGHT_BLOCKED")
+        self.assertIn("authorization_record_valid", row["blockers"])
+
     def test_complete_preflight_reaches_execution_review_only(self):
         row = _preflight()
         self.assertEqual(row["state"], "QUOTA_APPLICATION_EXECUTION_REVIEW_REQUIRED")
@@ -153,6 +168,13 @@ class BusinessQuotaApplicationAuthorizationTests(unittest.TestCase):
         self.assertFalse(packet["automatic_quota_changes_allowed"])
         self.assertFalse(packet["automatic_expansion_allowed"])
         self.assertFalse(packet["executes_action"])
+
+    def test_forged_change_window_after_preflight_is_rejected(self):
+        row = _preflight()
+        row["change_window_ref"] = "change://forged"
+        packet = quota_application_execution_review_packet(row)
+        self.assertEqual(packet["state"], "NOT_READY")
+        self.assertFalse(packet["quota_application_execution_authorized"])
 
     def test_forged_preflight_cannot_reach_execution_review(self):
         row = _preflight()
