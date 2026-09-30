@@ -276,6 +276,17 @@ def validate_ledger_append_decision(
     expected_token = _clean(
         req.get("required_decision_token"), 300
     )
+    expected_request_payload = {
+        "receipt_review_digest": receipt_review_digest,
+        "canonical_receipt_digest": canonical_receipt_digest,
+        "source_ledger_digest": source_ledger_digest,
+        "target_ledger_digest": target_ledger_digest,
+        "expected_decider": expected_decider,
+        "required_decision_token": expected_token,
+    }
+    request_digest = _clean(
+        req.get("decision_request_digest"), 80
+    ).lower()
 
     acknowledgements = _mapping(raw.get("acknowledgements"))
     decided_by = _clean(raw.get("decided_by"), 120)
@@ -286,8 +297,18 @@ def validate_ledger_append_decision(
         "request_state_ready": req.get("state")
         == "READY_FOR_EXPLICIT_STEP1_LEDGER_APPEND_DECISION",
         "decision_request_digest_valid": bool(
-            _DIGEST64.fullmatch(
-                _clean(req.get("decision_request_digest"), 80).lower()
+            _DIGEST64.fullmatch(request_digest)
+        ),
+        "decision_request_digest_integrity": bool(
+            _DIGEST64.fullmatch(request_digest)
+            and request_digest == _digest(expected_request_payload)
+        ),
+        "required_token_recomputed": bool(
+            expected_token
+            and expected_token == _decision_token(
+                receipt_review_digest,
+                source_ledger_digest,
+                target_ledger_digest,
             )
         ),
         "decision_token_exact": _clean(
