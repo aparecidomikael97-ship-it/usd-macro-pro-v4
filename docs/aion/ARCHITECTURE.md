@@ -876,3 +876,17 @@ approval gates.
 
 ADR-0048 records this boundary.
 
+## BUSINESS Capacity & Scale Manager
+
+atlasquant_aion_business_capacity_scale_manager.py turns the Business capacity
+plan into a read-only customer-admission ceiling. It validates the exact quota
+review digest and combines tenant costs, shared platform cost, the currently
+approved budget cap, support capacity, infrastructure headroom, tenant health
+and projected margin.
+
+The initial planning cap is R$200/month. The manager may report a
+`safe_additional_tenants` value, but it never accepts a customer or increases
+budget automatically. Customer admission remains a separate explicit decision.
+
+ADR-0049 records this boundary.
+
