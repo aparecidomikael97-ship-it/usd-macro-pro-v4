@@ -1393,3 +1393,21 @@ The maximum state is
 call the provider or create the user.
 
 ADR-0079 records this boundary.
+
+
+## BUSINESS team access Step 1 guarded provider runner
+
+`atlasquant_aion_business_team_access_step1_provider_runner.py` defines a
+read-only runner preflight and
+`deploy/sandbox/team-access/Invoke-TeamAccessStep1Provider.ps1` provides the
+local Windows runner.
+
+The runner is PLAN ONLY by default. Physical apply requires both `-Apply` and
+an exact token derived from the Step 1 apply-plan digest. The execution envelope
+must remain fresh, the provider is restricted to localhost Keycloak sandbox,
+and an exact username lookup is required before and after the POST.
+
+The access token is ephemeral and never written to the receipt. The sanitized
+receipt remains pending separate lifecycle-ledger review.
+
+ADR-0080 records this boundary.
