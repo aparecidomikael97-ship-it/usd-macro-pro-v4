@@ -91,10 +91,17 @@ class Registry:
             if spec.dependency
             else "LOCAL_DATA_ONLY_IMPLEMENTATION"
         )
+        runtime_available = not (spec.future or missing)
+        profile_registered = spec.name in {"BUSINESS_FUTURE", "TRADER_FUTURE", "INVESTMENTS_FUTURE"}
         return {"name": name, "state": "UNAVAILABLE" if spec.future or missing else "AVAILABLE",
-                "available": not (spec.future or missing), "reason": reason,
+                "available": runtime_available, "reason": reason,
                 "dependencies": [spec.dependency] if spec.dependency else [],
                 "domain": spec.domain.value if spec.domain else "CURRENT_CONTEXT",
+                "domain_recognized": spec.domain is not None,
+                "specialist_profile_registered": profile_registered,
+                "runtime_capability_available": runtime_available,
+                "specialist_certified": False,
+                "certification_state": "NOT_CERTIFIED" if profile_registered else "NOT_APPLICABLE",
                 "legacy_capability_id": spec.legacy_id,
                 "description": spec.description, "mode": "DATA_ONLY",
                 "external_integration_active": False, "execution_authorized": False}

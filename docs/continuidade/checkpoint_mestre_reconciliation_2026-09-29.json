@@ -382,47 +382,50 @@
     {
       "id": "D-SPECIALISTS-NOT-INDEPENDENT-AIS",
       "title": "Especialistas de domínio, não IAs independentes",
-      "state": "APROVADO / PENDENTE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
       "domain": "aion-core",
       "date": "2026-09-29",
-      "summary": "Trader usa AION Trader Expert; Negócios usa AION Business Expert; Investimentos usa AION Investment Expert; AION/AI usa o AION completo.",
+      "summary": "Trader usa AION Trader Expert; Negócios usa AION Business Expert; Investimentos usa AION Investment Expert; AION/AI usa o AION completo. O roteador local seleciona esses perfis sem criar IAs independentes.",
       "evidence": [
         "docs/aion/ARCHITECTURE.md",
+        "docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md",
         "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
       ],
       "supersedes": [],
       "superseded_by": null,
-      "implemented": false,
+      "implemented": true,
       "validated": false
     },
     {
       "id": "D-FOUR-CLOSURES",
       "title": "Quatro fechamentos obrigatórios do AION",
-      "state": "APROVADO / PENDENTE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
       "domain": "aion-core",
       "date": "2026-09-29",
-      "summary": "Specialist Router, permissões por domínio, memória e evidência isoladas por domínio, e AION Specialist Certification Gate. Nenhum especialista está concluído sem certificação.",
+      "summary": "Specialist Router, permissões por domínio, memória e evidência isoladas por domínio, e AION Specialist Certification Gate. O contrato existe; nenhum especialista está concluído sem certificação.",
       "evidence": [
-        "docs/adr/ADR-0010-quatro-fechamentos-do-aion.md"
+        "docs/adr/ADR-0010-quatro-fechamentos-do-aion.md",
+        "docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md"
       ],
       "supersedes": [],
       "superseded_by": null,
-      "implemented": false,
+      "implemented": true,
       "validated": false
     },
     {
       "id": "D-SPECIALIST-CERTIFICATION-REQUIRED",
       "title": "Certificação obrigatória de especialista",
-      "state": "APROVADO / PENDENTE",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
       "domain": "aion-core",
       "date": "2026-09-29",
-      "summary": "A Specialist Certification Gate é requisito de conclusão. O contrato Skill/Plugin Certification V1 é artefato distinto e não certifica os especialistas de domínio.",
+      "summary": "A Specialist Certification Gate é requisito de conclusão. O contrato existe e não declara especialista certificado. O contrato Skill/Plugin Certification V1 é artefato distinto e não certifica os especialistas de domínio.",
       "evidence": [
-        "docs/aion/AION_SKILL_PLUGIN_CERTIFICATION_V1.md"
+        "docs/aion/AION_SKILL_PLUGIN_CERTIFICATION_V1.md",
+        "docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md"
       ],
       "supersedes": [],
       "superseded_by": null,
-      "implemented": false,
+      "implemented": true,
       "validated": false
     },
     {
@@ -980,7 +983,7 @@
       "id": "G-SPECIALIST-CERTIFICATION-STATUS",
       "topic": "Status de certificação dos especialistas atuais",
       "state": "UNVERIFIED",
-      "reason": "Nenhum especialista foi declarado certificado. Skill/Plugin Certification não substitui a Specialist Certification Gate."
+      "reason": "O gate de certificação de especialista existe como contrato. Nenhum especialista foi declarado certificado. Skill/Plugin Certification não substitui esse gate."
     },
     {
       "id": "G-NINETY-PERCENT-MEASUREMENT",

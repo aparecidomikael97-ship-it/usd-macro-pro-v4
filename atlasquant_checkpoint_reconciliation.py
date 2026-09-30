@@ -267,6 +267,7 @@ def validate_repository(root: Path | None = None) -> dict[str, Any]:
         PRESERVED_CHECKPOINT,
         "docs/aion/ADDING_CAPABILITIES.md",
         "docs/aion/AION_SKILL_PLUGIN_CERTIFICATION_V1.md",
+        "docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md",
         "docs/continuidade/AION_ENTITLEMENTS_2026-09-24.md",
         "atlasquant_aion_specialist_session.py",
         "test_atlasquant_aion_specialist_session.py",

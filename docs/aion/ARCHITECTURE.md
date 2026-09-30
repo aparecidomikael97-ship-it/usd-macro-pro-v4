@@ -216,6 +216,34 @@ conflicts e `answers_user_question`. O Guardian continua dono de `real_trade`.
 - publicação, cobrança, merge, deploy, secrets e trading real permanecem fora
   da autonomia do AION.
 
+## Specialist Router e certificação de domínio
+
+O AION continua sendo um núcleo. Trader, Business e Investments selecionam,
+respectivamente, AION Trader Expert, AION Business Expert e AION Investment
+Expert. `AION/CORE` seleciona o AION completo. O contrato está em
+`atlasquant_aion_specialist_router.py`. Esse roteador não executa ferramenta
+e não transforma `BUSINESS_FUTURE`, `TRADER_FUTURE` ou `INVESTMENTS_FUTURE`
+em capability disponível.
+
+Domínio desconhecido permanece `UNKNOWN` / `DENIED_SAFE`. Domínio ambíguo pede
+clarificação. Especialista ausente fica `DEGRADED_SAFE`, sem fallback silencioso.
+Um perfil pode estar registrado e `NOT_CERTIFIED`. Até a certificação, a
+autoridade de runtime não aumenta. O Core coordena e não herda trade, pagamento,
+publicação ou deploy.
+
+Memória com domínio não atravessa outro domínio sozinha. Leitura cruzada exige
+o perfil `AION_CORE` e o domínio de origem em `explicit_domains`, e não promove
+`UNKNOWN`, `STALE`, `CONFLICT` ou `INCOMPLETE`. Pai sem roles, tools ou scopes
+não concede a metadata do perfil. A certificação desses especialistas é
+`ATLASQUANT_AION_SPECIALIST_CERTIFICATION_V1`, descrita em
+`docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md`. Ela é distinta da certificação
+de skill/plugin. `CERTIFIED` exige prova verificada, fingerprint do corpo e
+`human_review_approved` com o booleano `True`. Certificar não ativa o especialista.
+
+ADR-0001, ADR-0005 e ADR-0010 continuam sendo as decisões. Este bloco fecha o
+contrato que ADR-0010 deixou pendente de implementação; não substitui esses
+registros.
+
 ## Architecture Decision Records
 
 Decisões estruturais do Núcleo ficam em `docs/adr/`. O índice é

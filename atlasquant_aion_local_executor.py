@@ -201,6 +201,9 @@ def _memory_recall(arguments: Mapping[str, Any], runtime: Mapping[str, Any]) -> 
     layered = recall(
         layers,
         persona=arguments.get("persona") or runtime.get("persona") or "",
+        domain=arguments.get("domain") or runtime.get("domain") or "",
+        accessor_profile=arguments.get("accessor_profile") or runtime.get("accessor_profile") or "",
+        explicit_domains=_rows(arguments.get("explicit_domains") or runtime.get("explicit_domains")),
         tags=_rows(arguments.get("tags")),
         include_expired=bool(arguments.get("include_expired", False)),
         include_superseded=bool(arguments.get("include_superseded", False)),

@@ -22,7 +22,7 @@ Nenhum especialista está concluído sem Specialist Router, permissões por dom�
 
 ## Consequências
 
-A decisão está aceita e a implementação está pendente. Nenhum especialista atual é declarado certificado.
+A decisão está aceita. O contrato do Specialist Router, das permissões por domínio, da memória/evidência isoladas e da Specialist Certification Gate está implementado e em validação. Nenhum especialista atual é declarado certificado, e o runtime futuro permanece desligado.
 
 ## Componentes afetados
 

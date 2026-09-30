@@ -21,6 +21,7 @@ LAYERS = (
 )
 STATUSES = ("ACTIVE", "SUPERSEDED", "EXPIRED", "REJECTED")
 TRUTH_STATES = ("CONFIRMED", "INFERENCE", "HYPOTHESIS", "UNKNOWN")
+MEMORY_DOMAINS = ("TRADER", "BUSINESS", "INVESTMENTS", "CORE")
 MAX_ENTRIES = 2000
 
 
@@ -46,6 +47,7 @@ def default_memory_layers() -> dict[str, Any]:
         "digest": _digest(entries),
         "recovery": {"state": "CLEAN", "rejected": 0},
         "automatic_cross_persona_access": False,
+        "automatic_cross_domain_access": False,
     }
 
 
@@ -73,13 +75,23 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
         if tag and tag not in tags:
             tags.append(tag)
     created_at = _clean(item.get("created_at"), 80) or _now()
-    memory_key = _clean(item.get("memory_key"), 180) or _digest({
-        "layer": layer, "category": category, "persona": _clean(item.get("persona"), 80), "tags": tags,
-    }, 20)
-    fingerprint = _digest({
+    domain = _clean(item.get("domain"), 40).upper()
+    if domain and domain not in MEMORY_DOMAINS:
+        domain = "UNKNOWN"
+    persona_raw = _clean(item.get("persona"), 80)
+    persona = persona_raw.lower()
+    version = _clean(item.get("version") or "1", 80)
+    key_payload = {"layer": layer, "category": category, "persona": persona_raw, "tags": tags}
+    if domain:
+        key_payload["domain"] = domain
+    memory_key = _clean(item.get("memory_key"), 180) or _digest(key_payload, 20)
+    fingerprint_payload = {
         "layer": layer, "content": content, "origin": origin, "category": category,
-        "persona": _clean(item.get("persona"), 80).lower(), "version": _clean(item.get("version"), 80),
-    })
+        "persona": persona, "version": version,
+    }
+    if domain:
+        fingerprint_payload["domain"] = domain
+    fingerprint = _digest(fingerprint_payload)
     return {
         "memory_id": _clean(item.get("memory_id"), 80) or "MEM-" + fingerprint.upper(),
         "memory_key": memory_key,
@@ -90,12 +102,13 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
         "confidence": round(confidence, 2),
         "valid_until": _clean(item.get("valid_until"), 80),
         "category": category,
-        "version": _clean(item.get("version") or "1", 80),
+        "version": version,
         "tags": tags,
         "status": status,
         "superseded_by": _clean(item.get("superseded_by"), 80),
         "truth_state": truth,
-        "persona": _clean(item.get("persona"), 80).lower(),
+        "persona": persona,
+        "domain": domain,
         "source_refs": [_clean(x, 300) for x in list(item.get("source_refs") or [])[:30] if _clean(x, 300)],
         "fingerprint": fingerprint,
     }
@@ -129,6 +142,7 @@ def normalize_memory_layers(raw: Mapping[str, Any] | None) -> dict[str, Any]:
         "digest": _digest(entries),
         "recovery": {"state": "CLEAN" if not rejected else "RECOVERED_PARTIAL", "rejected": rejected},
         "automatic_cross_persona_access": False,
+        "automatic_cross_domain_access": False,
     }
 
 
@@ -145,6 +159,7 @@ def remember(
     version: Any = "1",
     tags: Sequence[Any] | None = None,
     persona: Any = "",
+    domain: Any = "",
     source_refs: Sequence[Any] | None = None,
     memory_key: Any = "",
 ) -> dict[str, Any]:
@@ -152,7 +167,7 @@ def remember(
     candidate = normalize_memory_entry({
         "layer": layer, "content": content, "origin": origin, "category": category,
         "confidence": confidence, "truth_state": truth_state, "valid_until": valid_until,
-        "version": version, "tags": list(tags or []), "persona": persona,
+        "version": version, "tags": list(tags or []), "persona": persona, "domain": domain,
         "source_refs": list(source_refs or []), "memory_key": memory_key,
     })
     entries = deepcopy(state["entries"])
@@ -186,6 +201,9 @@ def recall(
     *,
     layers: Sequence[str] | None = None,
     persona: Any = "",
+    domain: Any = "",
+    accessor_profile: Any = "",
+    explicit_domains: Sequence[Any] | None = None,
     tags: Sequence[Any] | None = None,
     include_superseded: bool = False,
     include_expired: bool = False,
@@ -195,6 +213,14 @@ def recall(
     state = normalize_memory_layers(memory)
     selected_layers = {str(x).lower() for x in list(layers or LAYERS)}
     requested_persona = _clean(persona, 80).lower()
+    requested_domain = _clean(domain, 40).upper()
+    accessor = _clean(accessor_profile, 40).upper().replace(" ", "_")
+    explicit: list[str] = []
+    if accessor == "AION_CORE":
+        for raw_domain in list(explicit_domains or []):
+            token = _clean(raw_domain, 40).upper()
+            if token in MEMORY_DOMAINS and token not in explicit:
+                explicit.append(token)
     requested_tags = {_clean(x, 80).lower() for x in list(tags or []) if _clean(x, 80)}
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
@@ -210,6 +236,15 @@ def recall(
         # Persona-scoped memories are invisible without the exact persona.
         if row["persona"] and row["persona"] != requested_persona:
             continue
+        row_domain = _clean(row.get("domain"), 40).upper()
+        cross_domain = False
+        if row_domain:
+            if requested_domain and row_domain == requested_domain:
+                cross_domain = False
+            elif accessor == "AION_CORE" and row_domain in explicit:
+                cross_domain = True
+            else:
+                continue
         if requested_tags and not requested_tags.intersection(row["tags"]):
             continue
         deadline = _valid_until(row.get("valid_until"))
@@ -217,6 +252,11 @@ def recall(
         if expired and not include_expired:
             continue
         item = dict(row)
+        item["automatic_cross_domain_access"] = False
+        item["used_as_current_fact"] = False
+        item["promoted"] = False
+        if cross_domain:
+            item["explicit_cross_domain"] = True
         if expired:
             item["status"] = "EXPIRED"
             if item.get("truth_state") == "CONFIRMED":
@@ -238,6 +278,7 @@ def memory_layer_summary(memory: Mapping[str, Any] | None) -> dict[str, Any]:
         "by_layer": {layer: sum(row["layer"] == layer for row in entries) for layer in LAYERS},
         "digest": state["digest"],
         "automatic_cross_persona_access": False,
+        "automatic_cross_domain_access": False,
     }
 
 
