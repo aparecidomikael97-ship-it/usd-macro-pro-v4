@@ -290,3 +290,21 @@ Build the envelope:
 
 The envelope expires quickly and does not generate or execute a provider
 command. Physical Step 1 execution remains a separate boundary.
+
+
+## Step 1 provider apply plan
+
+After the short-lived Step 1 execution envelope is valid, freeze the provider
+operation without executing it:
+
+    python build_team_access_step1_apply_plan.py <execution-envelope.json> --output "%LOCALAPPDATA%\AtlasQuant\team-access-sandbox\operator\step1-apply-plan.json"
+
+The output contains the structured Keycloak sandbox operation only. It contains
+no Authorization header, access token, password, credentials, PowerShell
+command or cURL command.
+
+The maximum state is:
+
+    READY_FOR_ADMIN_TEAM_ACCESS_STEP1_PROVIDER_APPLY_PLAN_REVIEW
+
+No account is created by this command.
