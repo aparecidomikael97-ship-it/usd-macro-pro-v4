@@ -920,6 +920,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_render_business_stack_consolidation_v2()", src)
         self.assertNotIn("st.tabs(", src)
 
+    def test_business_full_stack_dry_run_requires_live_revalidation(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("6 · Dry-run fail-closed", src)
+        self.assertIn("Snapshot congelado não é evidência GitHub ao vivo", src)
+        self.assertIn("READY_FOR_EXPLICIT_ADMIN_DECISION", src)
+        self.assertIn("Merge, deploy, piloto e runtime continuam sem autorização", src)
+        self.assertIn("business_live_revalidation_snapshot_v2", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_pilot_governance_demo()", src)
