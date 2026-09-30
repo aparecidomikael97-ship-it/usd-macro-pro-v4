@@ -166,6 +166,12 @@ from atlasquant_aion_business_proposal_simulator import (
     proposal_text as business_proposal_text,
     recommend_package as business_recommend_package,
 )
+from atlasquant_aion_business_client_portal_demo import (
+    SECTIONS as BUSINESS_CLIENT_PORTAL_SECTIONS,
+    build_client_portal_demo as business_build_client_portal_demo,
+    portal_attention_summary as business_portal_attention_summary,
+    portal_section as business_portal_section,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -5538,6 +5544,121 @@ def _render_business_diagnostic_proposal_simulator() -> None:
         )
 
 
+
+def _render_business_client_portal_demo() -> None:
+    """Render the future client-facing experience from session-only demo data."""
+    st.markdown("#### 🖥️ Portal Executivo do Cliente · Demo")
+    st.caption(
+        "Esta é a visão que o cliente deverá receber: simples, objetiva e sem complexidade técnica. "
+        "Usa somente o último exercício fictício do simulador."
+    )
+    result = st.session_state.get("aion_business_simulator_result")
+    if not isinstance(result, Mapping):
+        st.info(
+            "Primeiro gere um exercício no **Simulador de Diagnóstico + Proposta**. "
+            "Depois o mesmo diagnóstico aparece aqui na visão do cliente."
+        )
+        return
+
+    diagnostic = result.get("diagnostic") if isinstance(result.get("diagnostic"), Mapping) else {}
+    fit = result.get("fit") if isinstance(result.get("fit"), Mapping) else {}
+    radar = result.get("radar") if isinstance(result.get("radar"), Mapping) else {}
+    proposal = result.get("proposal") if isinstance(result.get("proposal"), Mapping) else {}
+    portal = business_build_client_portal_demo(diagnostic, radar, fit, proposal)
+    attention = business_portal_attention_summary(portal)
+
+    st.markdown(f"### {portal.get('company') or 'Empresa Demo'}")
+    st.caption(
+        f"{portal.get('segment') or 'Segmento Demo'} · DEMO ONLY · RUNTIME OFF · "
+        "SEM AÇÃO EXTERNA"
+    )
+    st.write(str(portal.get("headline") or ""))
+    st.markdown(f"**{portal.get('tagline') or ''}**")
+
+    section = st.selectbox(
+        "Área do Portal",
+        list(BUSINESS_CLIENT_PORTAL_SECTIONS),
+        key="aion_business_client_portal_section",
+        help="O cliente navega por uma área de cada vez, inclusive no celular.",
+    )
+    selected = business_portal_section(portal, section)
+    payload = selected.get("payload")
+
+    if section == "VISÃO GERAL":
+        overview = payload if isinstance(payload, Mapping) else {}
+        package = overview.get("package") if isinstance(overview.get("package"), Mapping) else {}
+        st.info(str(attention.get("headline") or ""))
+        a1,a2,a3 = st.columns(3)
+        a1.metric("Prioridades", int(attention.get("pending_actions") or 0))
+        a2.metric("Críticas", int(attention.get("critical_count") or 0))
+        a3.metric("Importantes", int(attention.get("high_count") or 0))
+        st.markdown(f"**Pacote do exercício:** {package.get('label') or 'A DEFINIR'}")
+        st.caption("Preço e escopo final continuam pendentes de validação real.")
+
+    elif section == "RADAR":
+        row = payload if isinstance(payload, Mapping) else {}
+        cards = row.get("cards") if isinstance(row.get("cards"), list) else []
+        cols = st.columns(4)
+        for index, card in enumerate(cards[:4]):
+            if isinstance(card, Mapping):
+                cols[index].metric(
+                    str(card.get("label") or ""),
+                    f"{int(card.get('health_score') or 0)}/100",
+                    str(card.get("state") or ""),
+                )
+        st.caption("Fonte: DEMO_USER_INPUT. Nenhum dado real de empresa foi conectado.")
+
+    elif section == "PLANO DE AÇÃO":
+        items = payload if isinstance(payload, list) else []
+        if not items:
+            st.success("Nenhuma ação básica apareceu no exercício.")
+        for item in items:
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"**{item.get('severity')} · {item.get('title')}**  \n"
+                    f"{item.get('recommendation')}  \n"
+                    f"_Estado: {item.get('status')}_"
+                )
+
+    elif section == "RESULTADOS":
+        row = payload if isinstance(payload, Mapping) else {}
+        st.info(str(row.get("message") or ""))
+        st.metric("Resultados reais disponíveis", 0)
+        st.caption(
+            "O AION não preenche números de resultado sem fonte confiável e período de medição."
+        )
+
+    elif section == "SUPORTE":
+        row = payload if isinstance(payload, Mapping) else {}
+        s1,s2,s3 = st.columns(3)
+        s1.metric("Chamados abertos", int(row.get("open_tickets") or 0))
+        s2.metric("Incidentes críticos", int(row.get("critical_incidents") or 0))
+        s3.metric("SLA", str(row.get("sla_state") or "A DEFINIR"))
+        st.write(f"Canal de suporte: **{row.get('contact_channel') or 'A DEFINIR'}**")
+        st.caption("Valores demonstrativos; SLA real é definido no contrato/escopo.")
+
+    else:
+        items = payload if isinstance(payload, list) else []
+        st.markdown("**Histórico visível ao cliente**")
+        for item in items:
+            if isinstance(item, Mapping):
+                st.markdown(
+                    f"- **{item.get('label') or item.get('event')}** · "
+                    f"{item.get('timestamp') or 'DEMO'}"
+                )
+
+    with st.expander("O que fica escondido do cliente", expanded=False):
+        st.write(
+            "Filas, roteamento de especialistas, validações, auditoria, segurança, fingerprints, "
+            "gates de runtime e outras camadas técnicas ficam por dentro do AION. "
+            "O cliente recebe contexto, prioridade, resultado verificável e próximo passo."
+        )
+    st.caption(
+        "Portal de demonstração. Sem cliente real conectado, sem cobrança, sem publicação, "
+        "sem mensagem automática e com runtime OFF."
+    )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -5555,6 +5676,7 @@ def _render_business(
             st.markdown(f"**{index}.** {instruction}")
     _render_business_guided_training()
     _render_business_diagnostic_proposal_simulator()
+    _render_business_client_portal_demo()
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
