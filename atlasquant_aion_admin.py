@@ -317,6 +317,10 @@ from atlasquant_aion_business_team_access_rbac import (
 from atlasquant_aion_business_capacity_scale_manager import (
     capacity_scale_policy as business_capacity_scale_policy,
 )
+from atlasquant_aion_finops_budget_governor import (
+    finops_policy as business_finops_policy,
+    revenue_routing_policy as business_revenue_routing_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7244,6 +7248,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "22 · Autorização de aplicação de quotas",
             "23 · Equipe & Acessos / RBAC",
             "24 · Gestor de Capacidade & Escala",
+            "25 · FinOps & Tesouraria",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7632,7 +7637,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "continuam bloqueados por gates separados."
         )
 
-    else:
+    elif view == "24 · Gestor de Capacidade & Escala":
         scale = business_capacity_scale_policy()
         st.write(f"Estado: **{scale.get('state')}**")
         st.metric("Teto inicial planejado", f"R$ {float(scale.get('initial_budget_cap_brl') or 0):.0f}/mês")
@@ -7654,6 +7659,30 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Nenhum cliente é aceito automaticamente e o orçamento não pode ser aumentado por esta camada."
+        )
+
+    else:
+        finops = business_finops_policy()
+        treasury = business_revenue_routing_policy()
+        st.write(f"Estado: **{finops.get('state')}**")
+        st.metric(
+            "Teto mensal inicial",
+            f"R$ {float(finops.get('initial_monthly_ecosystem_cap_brl') or 0):.0f}",
+        )
+        st.metric(
+            "Limite inicial de alocação ao Trader",
+            f"{float(finops.get('initial_max_trader_allocation_pct') or 0):.0f}%",
+        )
+        st.markdown("**Direção de caixa:**")
+        st.markdown("- Negócios: principal fonte de financiamento do ecossistema.")
+        st.markdown("- Trader: lucro líquido retido no próprio bucket Trader.")
+        st.markdown("- Investimentos: construção e preservação patrimonial.")
+        st.warning(
+            "Metas de retorno do Trader são planejamento, não promessa nem retorno esperado. "
+            "Backtest, risco e histórico real continuam obrigatórios."
+        )
+        st.caption(
+            "Nenhum gasto, transferência, trade ou aumento de orçamento é executado por esta camada."
         )
 
 
