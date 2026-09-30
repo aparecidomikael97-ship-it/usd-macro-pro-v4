@@ -14,6 +14,7 @@ import json
 import re
 
 VERIFICATION_SCHEMA = "ATLASQUANT_AION_BUSINESS_POST_EXPANSION_CYCLE_FREEZE_V1"
+BOUNDARY_SCHEMA = "ATLASQUANT_AION_BUSINESS_SCOPE_EXPANSION_BOUNDARY_PACKET_V1"
 SCHEMA = "ATLASQUANT_AION_BUSINESS_EXPANSION_CYCLE_AUDIT_LEDGER_V1"
 VERSION = "1"
 
@@ -103,11 +104,42 @@ def _valid_transition(
     )
 
 
-def expansion_cycle_ledger_template() -> dict[str, Any]:
+def expansion_cycle_ledger_template(
+    genesis_boundary: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    boundary = _mapping(genesis_boundary)
+    genesis_digest = _clean(
+        boundary.get("activation_verification_digest"), 128
+    ).lower()
+    genesis_scope = _clean(boundary.get("current_scope"), 80).lower()
+    genesis_tenants = _tenant_ids(boundary.get("current_tenant_ids"))
+
+    genesis_bound = bool(
+        boundary.get("schema") == BOUNDARY_SCHEMA
+        and boundary.get("state") == "EXPLICIT_EXPANSION_DECISION_REQUIRED"
+        and _DIGEST64.fullmatch(genesis_digest)
+        and _valid_scope_tenants(genesis_scope, genesis_tenants)
+        and boundary.get("generic_confirmation_is_authorization") is False
+        and boundary.get("automatic_expansion_allowed") is False
+        and boundary.get("scope_expansion_authorized") is False
+        and boundary.get("expansion_execution_authorized") is False
+        and boundary.get("client_actions_authorized") is False
+        and boundary.get("billing_authorized") is False
+        and boundary.get("executes_action") is False
+    )
+
     return {
         "schema": SCHEMA,
         "version": VERSION,
-        "state": "EXPANSION_CYCLE_AUDIT_LEDGER_EMPTY",
+        "state": (
+            "EXPANSION_CYCLE_AUDIT_LEDGER_EMPTY"
+            if genesis_bound
+            else "EXPANSION_CYCLE_LEDGER_GENESIS_REQUIRED"
+        ),
+        "genesis_bound": genesis_bound,
+        "genesis_verification_digest": genesis_digest if genesis_bound else "",
+        "genesis_scope": genesis_scope if genesis_bound else "",
+        "genesis_tenant_ids": genesis_tenants if genesis_bound else [],
         "entry_count": 0,
         "entries": [],
         "ledger_digest": "",
@@ -130,6 +162,19 @@ def audit_expansion_cycle_ledger(
         entries = []
 
     blockers: list[str] = []
+    genesis_bound = row.get("genesis_bound") is True
+    genesis_digest = _clean(row.get("genesis_verification_digest"), 128).lower()
+    genesis_scope = _clean(row.get("genesis_scope"), 80).lower()
+    genesis_tenants = _tenant_ids(row.get("genesis_tenant_ids"))
+
+    if genesis_bound:
+        if not _DIGEST64.fullmatch(genesis_digest):
+            blockers.append("genesis_digest_invalid")
+        if not _valid_scope_tenants(genesis_scope, genesis_tenants):
+            blockers.append("genesis_scope_invalid")
+    elif entries:
+        blockers.append("genesis_required_for_entries")
+
     if row.get("schema") != SCHEMA:
         blockers.append("schema_invalid")
     if row.get("version") != VERSION:
@@ -184,7 +229,12 @@ def audit_expansion_cycle_ledger(
         ):
             blockers.append(f"entry_{index}_transition_invalid")
 
-        if index > 1:
+        if index == 1 and genesis_bound:
+            if previous_scope != genesis_scope:
+                blockers.append("entry_1_genesis_scope_mismatch")
+            if sorted(previous_tenants) != sorted(genesis_tenants):
+                blockers.append("entry_1_genesis_tenant_mismatch")
+        elif index > 1:
             if previous_scope != previous_verified_scope:
                 blockers.append(f"entry_{index}_scope_continuity_broken")
             if sorted(previous_tenants) != sorted(previous_verified_tenants):
@@ -215,9 +265,13 @@ def audit_expansion_cycle_ledger(
         blockers.append("ledger_digest_mismatch")
 
     expected_state = (
-        "EXPANSION_CYCLE_AUDIT_LEDGER_EMPTY"
-        if not entries
-        else "EXPANSION_CYCLE_AUDIT_LEDGER_VERIFIED"
+        "EXPANSION_CYCLE_AUDIT_LEDGER_VERIFIED"
+        if entries
+        else (
+            "EXPANSION_CYCLE_AUDIT_LEDGER_EMPTY"
+            if genesis_bound
+            else "EXPANSION_CYCLE_LEDGER_GENESIS_REQUIRED"
+        )
     )
     if row.get("state") != expected_state:
         blockers.append("state_mismatch")
@@ -228,6 +282,10 @@ def audit_expansion_cycle_ledger(
         "state": "LEDGER_INTEGRITY_VERIFIED" if not blockers else "LEDGER_INTEGRITY_BLOCKED",
         "integrity_verified": not blockers,
         "entry_count": len(entries),
+        "genesis_bound": genesis_bound,
+        "genesis_verification_digest": genesis_digest if genesis_bound and not blockers else "",
+        "genesis_scope": genesis_scope if genesis_bound and not blockers else "",
+        "genesis_tenant_ids": genesis_tenants if genesis_bound and not blockers else [],
         "ledger_digest": expected_ledger_digest if not blockers else "",
         "last_verified_scope": previous_verified_scope if entries and not blockers else "",
         "last_verified_tenant_ids": (
@@ -257,6 +315,21 @@ def append_verified_expansion_cycle(
             "version": VERSION,
             "state": "EXPANSION_CYCLE_APPEND_BLOCKED",
             "blockers": ["ledger_integrity_invalid"],
+            "ledger": current,
+            "automatic_expansion_allowed": False,
+            "scope_expansion_authorized": False,
+            "expansion_execution_authorized": False,
+            "client_actions_authorized": False,
+            "billing_authorized": False,
+            "executes_action": False,
+        }
+
+    if current.get("genesis_bound") is not True:
+        return {
+            "schema": SCHEMA,
+            "version": VERSION,
+            "state": "EXPANSION_CYCLE_APPEND_BLOCKED",
+            "blockers": ["genesis_boundary_required"],
             "ledger": current,
             "automatic_expansion_allowed": False,
             "scope_expansion_authorized": False,
@@ -333,6 +406,13 @@ def append_verified_expansion_cycle(
             blockers.append("scope_continuity_broken")
         if sorted(previous_tenants) != sorted(last_tenants):
             blockers.append("tenant_continuity_broken")
+    else:
+        genesis_scope = _clean(current.get("genesis_scope"), 80).lower()
+        genesis_tenants = _tenant_ids(current.get("genesis_tenant_ids"))
+        if previous_scope != genesis_scope:
+            blockers.append("genesis_scope_mismatch")
+        if sorted(previous_tenants) != sorted(genesis_tenants):
+            blockers.append("genesis_tenant_mismatch")
 
     if blockers:
         return {
@@ -369,6 +449,10 @@ def append_verified_expansion_cycle(
         "schema": SCHEMA,
         "version": VERSION,
         "state": "EXPANSION_CYCLE_AUDIT_LEDGER_VERIFIED",
+        "genesis_bound": True,
+        "genesis_verification_digest": current.get("genesis_verification_digest"),
+        "genesis_scope": current.get("genesis_scope"),
+        "genesis_tenant_ids": list(current.get("genesis_tenant_ids") or []),
         "entry_count": len(entries),
         "entries": entries,
         "ledger_digest": entry["entry_digest"],
@@ -415,6 +499,7 @@ __all__ = [
     "SCHEMA",
     "VERSION",
     "VERIFICATION_SCHEMA",
+    "BOUNDARY_SCHEMA",
     "ALLOWED_SCOPES",
     "MAX_BOUNDED_TENANTS",
     "MAX_LEDGER_ENTRIES",
