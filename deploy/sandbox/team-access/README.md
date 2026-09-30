@@ -193,3 +193,24 @@ The maximum result is:
     READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW
 
 That result still does not accept the baseline or authorize lifecycle steps.
+
+
+## Explicit baseline acceptance
+
+A valid readiness-to-baseline handoff still does not mean the baseline has been
+accepted for lifecycle planning.
+
+Start from:
+
+    baseline-acceptance-record.template.json
+
+The exact decision token is:
+
+    ACCEPT_TEAM_ACCESS_SANDBOX_BASELINE
+
+Validate the filled record with:
+
+    python validate_team_access_baseline_acceptance.py <handoff.json> <baseline-acceptance-record.json>
+
+A verified record only authorizes the accepted baseline as lifecycle-plan input.
+It does not create a plan and does not authorize any lifecycle step.

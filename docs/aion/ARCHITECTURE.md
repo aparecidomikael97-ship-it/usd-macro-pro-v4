@@ -1272,3 +1272,18 @@ The maximum state is
 accept the baseline, create a lifecycle plan or authorize any mutation.
 
 ADR-0072 records this boundary.
+
+
+## BUSINESS team access sandbox baseline acceptance
+
+`atlasquant_aion_business_team_access_sandbox_baseline_acceptance.py` separates
+technical baseline validity from explicit human acceptance.
+
+The record binds the exact handoff, baseline, readiness and operator-session
+digests. A verified record only authorizes that baseline as lifecycle-plan
+input. It does not create the plan or authorize lifecycle execution.
+
+The lifecycle plan builder fails closed without a matching baseline acceptance
+record.
+
+ADR-0073 records this boundary.

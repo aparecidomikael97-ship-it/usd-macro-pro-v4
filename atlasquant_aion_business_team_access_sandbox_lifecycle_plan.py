@@ -15,6 +15,9 @@ from atlasquant_access_control import normalize_username
 from atlasquant_aion_business_team_access_sandbox_evidence import (
     SCHEMA as EVIDENCE_SCHEMA,
 )
+from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import (
+    verify_baseline_acceptance_binding,
+)
 
 SCHEMA = "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_SANDBOX_LIFECYCLE_PLAN_V1"
 VERSION = "1"
@@ -79,6 +82,7 @@ def lifecycle_plan_policy() -> dict[str, Any]:
         "required_decision_token": REQUIRED_DECISION_TOKEN,
         "required_acknowledgements": list(REQUIRED_ACKNOWLEDGEMENTS),
         "allowed_factors": list(ALLOWED_FACTORS),
+        "baseline_acceptance_required": True,
         "sandbox_only": True,
         "automatic_apply": False,
         "production_targets_allowed": False,
@@ -89,12 +93,17 @@ def lifecycle_plan_policy() -> dict[str, Any]:
 def build_lifecycle_test_plan(
     baseline_review: Mapping[str, Any] | None,
     *,
+    baseline_acceptance: Mapping[str, Any] | None = None,
     test_username: Any,
     tenant_ids: Sequence[Any] | None,
     factor_type: Any,
     requested_by: Any,
 ) -> dict[str, Any]:
     baseline = _mapping(baseline_review)
+    acceptance_binding = verify_baseline_acceptance_binding(
+        baseline_review,
+        baseline_acceptance,
+    )
     username = normalize_username(test_username)
     requester = normalize_username(requested_by)
     tenants = sorted(
@@ -113,6 +122,13 @@ def build_lifecycle_test_plan(
         == "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW",
         "baseline_digest_valid": bool(_DIGEST64.fullmatch(baseline_digest)),
         "baseline_non_executing": baseline.get("executes_action") is False,
+        "baseline_acceptance_binding_match": (
+            acceptance_binding.get("binding_match") is True
+            and acceptance_binding.get("lifecycle_plan_input_authorized") is True
+            and acceptance_binding.get("lifecycle_execution_authorized") is False
+            and acceptance_binding.get("production_authorized") is False
+            and acceptance_binding.get("executes_action") is False
+        ),
         "test_username_present": bool(username),
         "test_username_sandbox_scoped": username.startswith("sandbox."),
         "tenant_scope_present": bool(tenants),
@@ -228,6 +244,9 @@ def build_lifecycle_test_plan(
 
     payload = {
         "baseline_evidence_digest": baseline_digest,
+        "baseline_acceptance_record_digest": _clean(
+            _mapping(baseline_acceptance).get("acceptance_record_digest"), 80
+        ).lower(),
         "test_username": username,
         "tenant_ids": tenants,
         "factor_type": factor,
@@ -249,6 +268,9 @@ def build_lifecycle_test_plan(
         "tenant_ids": tenants if ready else [],
         "factor_type": factor if ready else "",
         "baseline_evidence_digest": baseline_digest if ready else "",
+        "baseline_acceptance_record_digest": _clean(
+            _mapping(baseline_acceptance).get("acceptance_record_digest"), 80
+        ).lower() if ready else "",
         "requested_by": requester if ready else "",
         "steps": steps,
         "plan_digest": _digest(payload) if ready else "",
