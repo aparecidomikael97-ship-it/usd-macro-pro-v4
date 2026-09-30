@@ -89,6 +89,14 @@ associados. A coleta é read-only, sanitizada e local; observa serviços, OIDC,
 schema do registry e hashes dos artefatos sem incluir secrets. O máximo é
 `READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW`.
 
+Estado do plano de lifecycle do sandbox de Equipe & Acessos:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_sandbox_lifecycle_plan.py`, ADR-0067 e
+testes associados. O plano define dez etapas manuais, exige baseline válido,
+username sandbox, tenant explícito e MFA forte. O máximo é
+`READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION`; nenhuma
+mutação é executada ou autorizada automaticamente.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -362,3 +370,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-E2E | IMPLEMENTADO / EM VALIDAÇÃO | Keycloak + OIDC, PostgreSQL e revogação via adapter formam o sandbox E2E |
 | D-2026-09-30-TEAM-ACCESS-PHYSICAL-SANDBOX | IMPLEMENTADO / EM VALIDAÇÃO | Sandbox local reproduzível, localhost-only e com partida manual explícita |
 | D-2026-09-30-TEAM-ACCESS-SANDBOX-EVIDENCE | IMPLEMENTADO / EM VALIDAÇÃO | Baseline local sanitizado prepara revisão antes do lifecycle manual |
+| D-2026-09-30-TEAM-ACCESS-SANDBOX-LIFECYCLE-PLAN | IMPLEMENTADO / EM VALIDAÇÃO | Lifecycle sandbox vira plano de dez etapas com decisão explícita separada |

@@ -373,6 +373,9 @@ from atlasquant_aion_business_team_access_physical_sandbox import (
 from atlasquant_aion_business_team_access_sandbox_evidence import (
     sandbox_evidence_policy as business_team_sandbox_evidence_policy,
 )
+from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
+    lifecycle_plan_policy as business_team_sandbox_lifecycle_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7316,6 +7319,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "38 · Equipe & Acessos · Sandbox E2E",
             "39 · Equipe & Acessos · Sandbox Fisico",
             "40 · Equipe & Acessos · Evidencias Sandbox",
+            "41 · Equipe & Acessos · Lifecycle Sandbox",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8018,7 +8022,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "antes de gerar qualquer evidência E2E."
         )
 
-    else:
+    elif view == "40 · Equipe & Acessos · Evidencias Sandbox":
         evidence = business_team_sandbox_evidence_policy()
         st.write(f"Estado: **{evidence.get('state')}**")
         st.markdown("**Baseline observado:**")
@@ -8037,6 +8041,29 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "O máximo é READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_TEST_REVIEW. "
             "Conta, MFA, registry write e revogação continuam em teste manual separado."
+        )
+
+    else:
+        lifecycle = business_team_sandbox_lifecycle_policy()
+        st.write(f"Estado: **{lifecycle.get('state')}**")
+        st.markdown("**Ciclo manual controlado:**")
+        for item in (
+            "criar conta individual sandbox",
+            "enrolar e validar MFA forte",
+            "gravar revisão + conferir read-back",
+            "desabilitar conta + revogar sessões",
+            "marcar membership inativo + conferir read-back",
+            "montar pacote E2E final",
+        ):
+            st.markdown(f"- {item}")
+        st.markdown("**Token formal para uma futura decisão:**")
+        st.code(str(lifecycle.get("required_decision_token") or ""), language=None)
+        st.warning(
+            "Esta visão só define o plano. Ela não registra a decisão e não executa nenhuma etapa."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION. "
+            "Produção continua fora deste fluxo."
         )
 
 
