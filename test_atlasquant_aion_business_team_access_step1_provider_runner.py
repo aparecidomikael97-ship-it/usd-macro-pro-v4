@@ -102,6 +102,7 @@ class TeamAccessStep1ProviderRunnerTests(unittest.TestCase):
         self.assertTrue(all(result["gates"].values()))
         token = result["required_physical_apply_token"]
         self.assertEqual(token, required_physical_apply_token(plan))
+        self.assertTrue(result["runner_preflight_digest"])
         self.assertTrue(
             token.startswith(
                 "APPLY_SANDBOX_STEP1_"
@@ -183,6 +184,36 @@ class TeamAccessStep1ProviderRunnerTests(unittest.TestCase):
         self.assertIn("sandbox_only", result["blockers"])
         self.assertIn("production_not_targeted", result["blockers"])
         self.assertIn("secrets_local", result["blockers"])
+
+    def test_windows_runner_is_plan_only_by_default_and_guarded(self):
+        script = Path(
+            "deploy/sandbox/team-access/Invoke-TeamAccessStep1Provider.ps1"
+        ).read_text(encoding="utf-8")
+        plan_guard = script.index("if (-not $Apply)")
+        token_request = script.index("$tokenResponse = Invoke-RestMethod")
+        provider_post = script.index("$response = Invoke-WebRequest")
+        self.assertLess(plan_guard, token_request)
+        self.assertLess(token_request, provider_post)
+        self.assertIn(
+            "READY_FOR_EXPLICIT_MANUAL_STEP1_PROVIDER_APPLY", script
+        )
+        self.assertIn("AuthorizationToken is required with -Apply.", script)
+        self.assertIn("exact=true", script)
+        self.assertGreaterEqual(script.count("Invoke-RestMethod"), 3)
+        self.assertIn('ledger_append_authorized = $false', script)
+        self.assertIn('access_token_included = $false', script)
+        self.assertIn('authorization_token_included = $false', script)
+        self.assertIn('$accessToken = $null', script)
+        self.assertNotIn("docker compose up", script)
+        self.assertNotIn("0.0.0.0", script)
+
+    def test_runner_cli_does_not_perform_provider_io(self):
+        source = Path(
+            "validate_team_access_step1_provider_runner.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("requests", source)
+        self.assertNotIn("Invoke-RestMethod", source)
+        self.assertNotIn("Invoke-WebRequest", source)
 
     def test_module_has_no_network_process_or_executor_imports(self):
         source = Path(
