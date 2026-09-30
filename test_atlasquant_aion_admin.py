@@ -908,6 +908,20 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_pilot_governance_keeps_first_pilot_bounded_and_unapproved(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_pilot_governance_demo()", src)
+        self.assertIn("Governança do Primeiro Piloto · Readiness", src)
+        self.assertIn("1 cliente, 1 fluxo", src)
+        self.assertIn("Gate pendente bloqueia o piloto", src)
+        self.assertIn("Critérios de sucesso", src)
+        self.assertIn("Condições de parada", src)
+        self.assertIn("Piloto autorizado", src)
+        self.assertIn("HUMAN_PILOT_APPROVAL_REQUIRED", src)
+        self.assertIn("o runtime permanece OFF", src)
+        self.assertIn("_render_business_pilot_governance_demo()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_master_readiness_separates_demo_pilot_and_live_authority(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_master_readiness()", src)

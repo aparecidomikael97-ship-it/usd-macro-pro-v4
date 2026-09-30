@@ -55,3 +55,5 @@ Cada registro usa o identificador `ADR-NNNN` e as seções: Título, Data, Statu
 | ADR-0027 | ACCEPTED | `docs/adr/ADR-0027-business-demo-pilot-live-authority.md` |
 
 Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu estado de produto está na reconciliação `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.
+
+| ADR-0028 | ACCEPTED | `docs/adr/ADR-0028-business-bounded-first-pilot.md` |

@@ -520,3 +520,16 @@ evidence. No layer automatically grants the next layer and even complete Live
 gates remain review-only in this module.
 
 ADR-0027 records this authority separation.
+
+
+## BUSINESS bounded pilot governance
+
+`atlasquant_aion_business_pilot_governance.py` defines a readiness-only
+first-pilot charter with one client, one workflow, few channels, short duration,
+human operators, support ownership, mandatory gates, measurable success criteria
+and explicit stop conditions.
+
+Passing every gate can only produce `HUMAN_PILOT_APPROVAL_REQUIRED`. It never
+records pilot approval, activates runtime or enables external actions.
+
+ADR-0028 records this bounded first-pilot boundary.
