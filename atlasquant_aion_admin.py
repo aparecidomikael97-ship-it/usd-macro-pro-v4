@@ -282,6 +282,10 @@ from atlasquant_aion_business_release_boundary_handoff import (
     deploy_decision_request as business_deploy_decision_request,
     release_handoff_template as business_release_handoff_template,
 )
+from atlasquant_aion_business_deploy_verification_runtime_boundary import (
+    deploy_authorization_requirements as business_deploy_authorization_requirements,
+    deployment_verification_template as business_deployment_verification_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7199,6 +7203,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "12 · Ledger sequencial",
             "13 · Revisão final da consolidação",
             "14 · Handoff para decisão de deploy",
+            "15 · Verificação de deploy & fronteira de runtime",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7394,7 +7399,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Mesmo o acknowledgement técnico não autoriza deploy, produção, piloto ou runtime."
         )
 
-    else:
+    elif view == "14 · Handoff para decisão de deploy":
         handoff = business_release_handoff_template()
         request = business_deploy_decision_request(handoff)
         st.write(f"Estado: **{handoff.get('state')}**")
@@ -7413,6 +7418,26 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Esta tela só prepara o handoff. Nenhum deploy é autorizado ou executado; "
             "runtime, piloto e ações com cliente real permanecem OFF."
+        )
+
+    else:
+        deploy = business_deploy_authorization_requirements()
+        verification = business_deployment_verification_template()
+        st.write(f"Estado de autorização: **{deploy.get('state')}**")
+        st.markdown("**Token explícito reservado para deploy-only:**")
+        st.code(str(deploy.get("required_decision_token") or ""), language=None)
+        st.markdown("**Checks obrigatórios depois de um deploy futuro:**")
+        for item in list(verification.get("required_health_checks") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Mesmo um deploy autorizado e executado precisa ser verificado com SHA, ambiente, "
+            "saúde, monitoramento e runtime ainda OFF antes de qualquer discussão de ativação."
+        )
+        st.markdown("**Próxima fronteira futura:**")
+        st.code("AUTHORIZE_BUSINESS_RUNTIME_ACTIVATION", language=None)
+        st.caption(
+            "Esta visão não registra autorização, não executa deploy e não ativa runtime. "
+            "Mensagem genérica como 'vamos lá' continua sem autoridade operacional."
         )
 
 
