@@ -347,6 +347,9 @@ from atlasquant_aion_business_commercial_live_data_binding import (
 from atlasquant_aion_finops_live_cost_ledger import (
     live_cost_policy as aion_live_cost_policy,
 )
+from atlasquant_aion_finops_ledger_persistence_reconciliation import (
+    persistence_policy as aion_finops_persistence_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7282,6 +7285,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "30 · Indice de Independencia CLT",
             "31 · Pipeline Comercial · Dados Reais",
             "32 · FinOps · Custos Reais & Ledger",
+            "33 · FinOps · Persistencia & Reconciliacao",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7839,7 +7843,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "não envia mensagem, não cobra e não inicia onboarding por esta camada."
         )
 
-    else:
+    elif view == "32 · FinOps · Custos Reais & Ledger":
         finops_live = aion_live_cost_policy()
         st.write(f"Estado: **{finops_live.get('state')}**")
         st.metric("Teto mensal inicial", f"R$ {float(finops_live.get('monthly_cap_brl') or 0):.0f}")
@@ -7854,6 +7858,20 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "O AION pode calcular orçamento e custo por tenant a partir do ledger verificado, "
             "mas não muda preço, não paga fatura e não movimenta dinheiro."
+        )
+
+    else:
+        persistence = aion_finops_persistence_policy()
+        st.write(f"Estado: **{persistence.get('state')}**")
+        st.markdown("**Modelo:** manifesto imutável versionado + chain de digests.")
+        st.markdown("**Reconciliação:** fatura atestada x entradas verificadas do ledger.")
+        st.warning(
+            "Esta camada prepara e verifica versões, mas não grava storage, "
+            "não paga fatura e não altera assinatura de provider."
+        )
+        st.caption(
+            "Buraco de versão, replay, quebra de digest ou divergência de valor "
+            "bloqueiam a revisão administrativa."
         )
 
 
