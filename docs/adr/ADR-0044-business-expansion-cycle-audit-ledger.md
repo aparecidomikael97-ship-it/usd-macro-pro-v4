@@ -29,6 +29,8 @@ Cada entrada registra:
 6. escopo e tenants verificados;
 7. digest próprio da entrada.
 
+O ledger começa vinculado a um boundary de gênese já verificado. Sem essa âncora, o estado é `EXPANSION_CYCLE_LEDGER_GENESIS_REQUIRED` e nenhum ciclo pode ser anexado. Isso impede truncar o começo do histórico e apresentar uma sequência parcial como completa.
+
 O ledger revalida:
 
 - integridade da cadeia;
