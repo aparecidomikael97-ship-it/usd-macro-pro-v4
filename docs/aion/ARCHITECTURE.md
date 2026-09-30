@@ -520,3 +520,17 @@ evidence. No layer automatically grants the next layer and even complete Live
 gates remain review-only in this module.
 
 ADR-0027 records this authority separation.
+
+
+## BUSINESS Draft PR stack consolidation
+
+`atlasquant_aion_business_stack_consolidation.py` freezes the Business Draft
+PR chain #398–#411 and verifies branch continuity, expected SHAs, draft/open
+state, mergeability and required CI checks from a dated snapshot.
+
+The maximum automatic state is `READY_FOR_ADMIN_REVIEW`. The module never
+grants merge, deploy or runtime authority and contains no GitHub/network action.
+Any future merge requires live revalidation followed by explicit administrative
+authorization.
+
+ADR-0028 records this separation between technical readiness and merge authority.
