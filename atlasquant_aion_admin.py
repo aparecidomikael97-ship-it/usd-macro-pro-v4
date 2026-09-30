@@ -252,6 +252,10 @@ from atlasquant_aion_business_stack_consolidation_v2 import (
     rollback_integration_plan as business_stack_rollback_plan,
     validate_stack as business_stack_validate,
 )
+from atlasquant_aion_business_consolidation_dry_run_v2 import (
+    build_consolidation_runbook as business_build_consolidation_dry_run_v2,
+    live_revalidation_snapshot as business_live_revalidation_snapshot_v2,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7160,6 +7164,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "3 · Bundle congelado",
             "4 · Rollback de integração",
             "5 · Decisão administrativa",
+            "6 · Dry-run fail-closed",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7211,7 +7216,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "e preservar o SHA anterior da main."
         )
 
-    else:
+    elif view == "5 · Decisão administrativa":
         st.markdown("**Opções disponíveis**")
         for item in options:
             if isinstance(item, Mapping):
@@ -7222,6 +7227,21 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Runtime BUSINESS OFF · sem deploy · sem publicação · sem cobrança · sem piloto."
+        )
+
+    else:
+        live = business_live_revalidation_snapshot_v2({})
+        dry_run = business_build_consolidation_dry_run_v2(validation, live)
+        st.write(f"Estado: **{dry_run.get('state')}**")
+        st.warning(
+            "Snapshot congelado não é evidência GitHub ao vivo. Antes de qualquer decisão futura, "
+            "todos os gates abaixo precisam ser revalidados externamente."
+        )
+        for gate in list(live.get("missing") or []):
+            st.markdown(f"- {gate}")
+        st.caption(
+            "Mesmo com revalidação completa, o máximo é READY_FOR_EXPLICIT_ADMIN_DECISION. "
+            "Merge, deploy, piloto e runtime continuam sem autorização."
         )
 
 
