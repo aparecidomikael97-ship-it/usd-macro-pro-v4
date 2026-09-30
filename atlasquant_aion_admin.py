@@ -235,6 +235,15 @@ from atlasquant_aion_business_master_readiness import (
     pilot_review_packet as business_pilot_review_packet,
     status_rows as business_master_status_rows,
 )
+from atlasquant_aion_business_pilot_governance import (
+    STOP_REASONS as BUSINESS_PILOT_STOP_REASONS,
+    build_pilot_charter as business_build_pilot_charter,
+    define_stop_conditions as business_define_pilot_stop_conditions,
+    define_success_criteria as business_define_pilot_success_criteria,
+    pilot_gate_review as business_pilot_gate_review,
+    pilot_posture as business_pilot_posture,
+    pilot_review_packet as business_bounded_pilot_review_packet,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6986,6 +6995,134 @@ def _render_business_master_readiness() -> None:
             st.caption("Mesmo elegível, o packet não autoriza piloto automaticamente.")
 
 
+
+def _render_business_pilot_governance_demo() -> None:
+    """Bounded first-pilot planning; never authorizes or activates a real pilot."""
+    st.markdown("#### 🧪 Governança do Primeiro Piloto · Readiness")
+    st.caption(
+        "Define como seria o primeiro piloto real sem liberar nada: 1 cliente, 1 fluxo, poucos canais, "
+        "prazo curto, operador humano e critérios claros de parada."
+    )
+
+    evidence = business_default_demo_evidence()
+    master = business_master_readiness_snapshot(evidence)
+    charter = business_build_pilot_charter(
+        client_reference="CLIENTE_REAL_A_DEFINIR",
+        segment="Clínica",
+        package_label="Atendimento & Conversão",
+        workflow_name="Atendimento inicial + follow-up controlado",
+        channels=["WhatsApp Business"],
+        duration_days=14,
+        human_operators=["Mikael"],
+        support_owner="Mikael",
+        daily_external_action_cap=0,
+        allow_external_messages=False,
+        allow_publication=False,
+        allow_payments=False,
+    )
+    success = business_define_pilot_success_criteria(
+        metric_names=["tempo_resposta", "leads_qualificados", "proximos_passos"],
+        minimum_sample_size=30,
+        review_cadence_days=7,
+    )
+    stop = business_define_pilot_stop_conditions(
+        reasons=list(BUSINESS_PILOT_STOP_REASONS),
+        immediate_stop_on_unexpected_external_action=True,
+    )
+
+    gates = {
+        "business_specialist_certified": evidence.get("business_certified") is True,
+        "master_readiness_demo_complete": master.get("demo", {}).get("complete") is True,
+        "scope_confirmed": evidence.get("package_scope_reviewed") is True,
+        "privacy_profile_ready": evidence.get("privacy_profile_reviewed") is True,
+        "sla_defined": evidence.get("support_sla_reviewed") is True,
+        "margin_reviewed": evidence.get("client_finance_reviewed") is True,
+        "capacity_reviewed": evidence.get("capacity_reviewed") is True,
+        "integration_readiness_reviewed": evidence.get("integration_scope_reviewed") is True,
+        "rollback_ready": evidence.get("rollback_plan_reviewed") is True,
+        "human_operator_assigned": evidence.get("human_operator_assigned") is True,
+        "support_owner_assigned": evidence.get("human_operator_assigned") is True,
+    }
+    review = business_pilot_gate_review(charter, gates, success, stop)
+    packet = business_bounded_pilot_review_packet(
+        charter,
+        review,
+        requested_by="Mikael",
+    )
+    posture = business_pilot_posture(charter, review, packet)
+
+    view = st.selectbox(
+        "Visão do piloto",
+        (
+            "1 · Limites",
+            "2 · Gates obrigatórios",
+            "3 · Critérios de sucesso",
+            "4 · Condições de parada",
+            "5 · Estado de autorização",
+        ),
+        key="aion_business_pilot_governance_view",
+        help="Uma visão por vez para manter a experiência leve no celular.",
+    )
+
+    if view == "1 · Limites":
+        row = charter.get("charter") if isinstance(charter.get("charter"), Mapping) else {}
+        p1,p2,p3,p4 = st.columns(4)
+        p1.metric("Clientes", int(row.get("client_count") or 0))
+        p2.metric("Fluxos", int(row.get("workflow_count") or 0))
+        p3.metric("Canais", len(list(row.get("channels") or [])))
+        p4.metric("Prazo", f"{int(row.get('duration_days') or 0)} dias")
+        st.markdown(f"**Pacote:** {row.get('package_label') or 'A DEFINIR'}")
+        st.markdown(f"**Fluxo:** {row.get('workflow_name') or 'A DEFINIR'}")
+        st.caption(
+            "Nesta V1, mensagens externas, publicação, pagamentos e runtime continuam OFF. "
+            "O charter é somente planejamento."
+        )
+
+    elif view == "2 · Gates obrigatórios":
+        st.write(f"Estado: **{review.get('state')}**")
+        gate_rows = review.get("gates") if isinstance(review.get("gates"), Mapping) else {}
+        for name,passed in gate_rows.items():
+            icon = "✅" if passed else "⛔"
+            st.markdown(f"- {icon} **{name}**")
+        st.caption(
+            "Gate pendente bloqueia o piloto. DEMO completo, sozinho, não autoriza cliente real."
+        )
+
+    elif view == "3 · Critérios de sucesso":
+        st.markdown("**Métricas do exercício**")
+        for metric in list(success.get("metrics") or []):
+            st.markdown(f"- {metric}")
+        st.write(f"Amostra mínima: **{success.get('minimum_sample_size')}**")
+        st.write(f"Revisão a cada: **{success.get('review_cadence_days')} dias**")
+        st.caption(
+            "Critério de sucesso não inclui garantia de lucro ou venda. Resultado precisa de amostra e fonte."
+        )
+
+    elif view == "4 · Condições de parada":
+        st.markdown("**Parar e escalar para humano se ocorrer:**")
+        for reason in list(stop.get("reasons") or []):
+            st.markdown(f"- {reason}")
+        st.warning(
+            "A V1 ainda não possui desligamento automático de runtime porque runtime continua OFF. "
+            "O objetivo é definir o procedimento antes de qualquer piloto."
+        )
+
+    else:
+        a1,a2,a3 = st.columns(3)
+        a1.metric("Charter", str(charter.get("state") or "UNKNOWN"))
+        a2.metric("Gates", str(review.get("state") or "UNKNOWN"))
+        a3.metric("Piloto autorizado", "NÃO")
+        st.write(f"Postura: **{posture.get('state')}**")
+        if review.get("failed_gates"):
+            st.markdown("**Ainda falta revisar:**")
+            for gate in list(review.get("failed_gates") or []):
+                st.markdown(f"- {gate}")
+        st.caption(
+            "Mesmo quando todos os gates passarem, o máximo será HUMAN_PILOT_APPROVAL_REQUIRED. "
+            "Nenhuma aprovação real foi registrada e o runtime permanece OFF."
+        )
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6995,6 +7132,7 @@ def _render_business(
     demo_snapshot = business_demo_snapshot()
     st.markdown(business_demo_html(), unsafe_allow_html=True)
     _render_business_master_readiness()
+    _render_business_pilot_governance_demo()
     with st.expander("🎓 Treinamento do administrador · visão geral", expanded=False):
         st.caption(
             "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "
