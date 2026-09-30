@@ -144,6 +144,10 @@ from atlasquant_aion_business import (
     trend_assessment,
     upsert_product,
 )
+from atlasquant_aion_business_demo import (
+    business_demo_html,
+    business_demo_snapshot,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -5140,6 +5144,15 @@ def _render_business(
     flags: Mapping[str, bool],
 ) -> None:
     st.markdown("### 💼 AION Negócios")
+    demo_snapshot = business_demo_snapshot()
+    st.markdown(business_demo_html(), unsafe_allow_html=True)
+    with st.expander("🎓 Treinamento do administrador · como explicar e vender com segurança", expanded=False):
+        st.caption(
+            "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "
+            "vender somente o que estiver validado."
+        )
+        for index, instruction in enumerate(demo_snapshot["training_steps"], start=1):
+            st.markdown(f"**{index}.** {instruction}")
     _render_persona_capabilities("business", {
         "catalog": True,
         "suppliers": True,
@@ -5152,14 +5165,16 @@ def _render_business(
         "reports": True,
     })
     st.write(
-        "Área separada do trading para pesquisa de produtos, tendências, fornecedores, margem, "
-        "estoque, anúncios e acompanhamento de receita."
+        "Central AION para soluções empresariais: Atrair → Atender → Converter → Reter. "
+        "O foco principal agora é diagnóstico, implantação, pacotes recorrentes, Radar do Negócio, "
+        "Portal do Cliente, resultados, suporte e expansão por módulos."
     )
     _context_voice(
         "Negócios",
         (
-            "Bem-vindo ao AION Negócios. Aqui pesquisamos candidatos de produto, registramos evidências "
-            "e calculamos margem. Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada."
+            "Bem-vindo ao AION Negócios. Aqui organizamos diagnóstico, atendimento, conversão, retenção, "
+            "pacotes e resultados de forma simples para o cliente. O que é complexo fica por dentro do AION. "
+            "Nenhuma automação externa é executada sem os gates e aprovações definidos."
         ),
         key="aion_business_voice",
     )
@@ -5300,6 +5315,12 @@ def _render_business(
             "Nenhuma campanha, gasto, comissão ou publicação é executada."
         )
 
+    st.markdown("#### Compatibilidade legada · Marketplace / pesquisa de produto")
+    st.caption(
+        "Este bloco histórico permanece temporariamente para compatibilidade e auditoria. "
+        "Dropshipping, afiliados, Shopee, Mercado Livre, TikTok Shop e e-commerce genérico "
+        "não são mais o foco principal da nova aba Negócios."
+    )
     st.markdown("#### Candidato de produto")
     with st.form("aion_business_new_product", clear_on_submit=True):
         name=st.text_input("Produto")
