@@ -82,6 +82,25 @@ class BusinessPostExpansionCycleFreezeTests(unittest.TestCase):
         self.assertIn("observed_scope_matches_proposed_scope", row["blockers"])
         self.assertIn("observed_tenants_match_proposed_tenants", row["blockers"])
 
+    def test_forged_scope_skip_execution_review_is_rejected(self):
+        packet = dict(_execution_review())
+        packet["current_scope"] = "sandbox"
+        packet["current_tenant_ids"] = []
+        packet["proposed_scope"] = "bounded_production"
+        packet["proposed_tenant_ids"] = ["tenant-001"]
+        row = verify_expansion_receipt(
+            packet,
+            observed_scope="bounded_production",
+            observed_tenant_ids=["tenant-001"],
+            health_checks={name: "success" for name in REQUIRED_POST_EXPANSION_CHECKS},
+            expansion_evidence_ref="expansion://forged-skip",
+            runtime_matches_authorized_expansion=True,
+        )
+        self.assertEqual(row["state"], "POST_EXPANSION_VERIFICATION_BLOCKED")
+        self.assertIn("proposed_scope_bounded", row["blockers"])
+        self.assertFalse(row["scope_expansion_verified"])
+        self.assertFalse(row["executes_action"])
+
     def test_failed_checks_or_runtime_mismatch_blocks(self):
         checks = {name: "success" for name in REQUIRED_POST_EXPANSION_CHECKS}
         checks["capacity_guardrail"] = "failure"
