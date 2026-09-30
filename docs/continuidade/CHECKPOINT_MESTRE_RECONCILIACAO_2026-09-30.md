@@ -83,6 +83,9 @@ Login administrativo de Mikael não deve ser compartilhado com funcionários.
 
 ## 5. Capacidade & Escala
 
+Estado da primeira camada: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_capacity_scale_manager.py`, ADR-0049 e testes associados.
+
 O Business precisa de um **Gestor de Capacidade & Escala** ligado a:
 - Central Financeira;
 - quotas por tenant;
@@ -162,7 +165,7 @@ expansão.
 
 PENDENTE / APROVADO:
 - binding de produção do Equipe & Acessos: provisionamento real, MFA/2FA, persistência do registry e revogação física;
-- Gestor de Capacidade & Escala;
+- binding do Gestor de Capacidade & Escala com métricas reais, custos de providers, incidentes e onboarding;
 - política de backup e recuperação testável;
 - budget governor de R$200;
 - oferta comercial B2B pronta para vender;
@@ -181,7 +184,7 @@ PENDENTE / APROVADO:
 | D-2026-09-30-B2B-SERVICE-FIRST | APROVADO / PENDENTE | Monetização inicial por serviço B2B com AION |
 | D-2026-09-30-DROPSHIPPING-OUT | DESCARTADO | Dropshipping fora das prioridades atuais |
 | D-2026-09-30-TEAM-RBAC | IMPLEMENTADO / EM VALIDAÇÃO | Equipe & Acessos individualizados |
-| D-2026-09-30-CAPACITY-SCALE-MANAGER | APROVADO / PENDENTE | Gestor de Capacidade & Escala |
+| D-2026-09-30-CAPACITY-SCALE-MANAGER | IMPLEMENTADO / EM VALIDAÇÃO | Gestor de Capacidade & Escala |
 | D-2026-09-30-AION-INDEPENDENT-CHATGPT | APROVADO / PENDENTE | AION funciona sem depender do ChatGPT |
 | D-2026-09-30-CHATGPT-OPTIONAL-ARCHITECT | APROVADO / PENDENTE | ChatGPT como apoio externo opcional |
 | D-2026-09-30-EIGHT-LOGICAL-ROLES | APROVADO / PENDENTE | Oito papéis lógicos internos do AION |

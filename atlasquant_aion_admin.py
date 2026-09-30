@@ -314,6 +314,9 @@ from atlasquant_aion_business_quota_application_authorization import (
 from atlasquant_aion_business_team_access_rbac import (
     TEAM_PROFILES as business_team_access_profiles,
 )
+from atlasquant_aion_business_capacity_scale_manager import (
+    capacity_scale_policy as business_capacity_scale_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7240,6 +7243,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "21 · Capacidade & quotas por tenant",
             "22 · Autorização de aplicação de quotas",
             "23 · Equipe & Acessos / RBAC",
+            "24 · Gestor de Capacidade & Escala",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7613,7 +7617,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Billing, expansão, runtime e ações com clientes permanecem separados."
         )
 
-    else:
+    elif view == "23 · Equipe & Acessos / RBAC":
         st.write("Estado: **TEAM_ACCESS_RBAC_IMPLEMENTED_IN_VALIDATION**")
         st.markdown("**Perfis Business previstos:**")
         for profile in business_team_access_profiles:
@@ -7626,6 +7630,30 @@ def _render_business_stack_consolidation_v2() -> None:
             "O AION obedece à mesma decisão de permissão da interface. "
             "Cross-tenant, elevação automática, billing, deploy, runtime e outras ações críticas "
             "continuam bloqueados por gates separados."
+        )
+
+    else:
+        scale = business_capacity_scale_policy()
+        st.write(f"Estado: **{scale.get('state')}**")
+        st.metric("Teto inicial planejado", f"R$ {float(scale.get('initial_budget_cap_brl') or 0):.0f}/mês")
+        st.metric("Máximo de tenants nesta fase", int(scale.get("max_bounded_tenants") or 0))
+        st.markdown("**O gestor considera antes de recomendar crescimento:**")
+        for item in (
+            "custo atual dos tenants + custo compartilhado da plataforma",
+            "orçamento mensal aprovado",
+            "horas de suporte disponíveis",
+            "headroom de infraestrutura",
+            "utilização e incidentes dos clientes atuais",
+            "custo e receita estimados do próximo cliente",
+            "margem mínima definida",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O resultado informa somente quantos novos clientes cabem com segurança. "
+            "Admissão continua dependendo de decisão explícita."
+        )
+        st.caption(
+            "Nenhum cliente é aceito automaticamente e o orçamento não pode ser aumentado por esta camada."
         )
 
 
