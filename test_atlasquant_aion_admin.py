@@ -915,7 +915,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Gerar diagnóstico e rascunho", src)
         self.assertIn("RASCUNHO INTERNO · NÃO ENVIADO · NÃO ASSINADO · SEM COBRANÇA", src)
         self.assertIn("Preço de implantação e mensalidade continuam A DEFINIR", src)
-        self.assertIn("não envia proposta, não assina contrato", src)
+        self.assertIn("Não envia proposta, não assina contrato", src)
         self.assertIn("Resultado para visualizar", src)
         self.assertNotIn("tabs = st.tabs(", src)
 
