@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -136,7 +136,16 @@
     "sandbox_lifecycle_step_automatic_execution": false,
     "sandbox_lifecycle_step_automatic_ledger_append": false,
     "sandbox_lifecycle_step_exact_ledger_binding": true,
-    "sandbox_lifecycle_step_receipt_integrity_recalculated": true
+    "sandbox_lifecycle_step_receipt_integrity_recalculated": true,
+    "windows_operator_kit_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "windows_operator_plan_only_default": true,
+    "windows_operator_secret_apply_required": true,
+    "windows_operator_start_apply_required": true,
+    "windows_operator_baseline_switch_separate": true,
+    "windows_operator_secret_values_printed": false,
+    "windows_operator_real_secret_file_created": false,
+    "windows_operator_real_sandbox_started": false,
+    "windows_operator_real_baseline_collected": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -644,9 +653,27 @@
         "docs/aion/AION_BUSINESS_TEAM_ACCESS_SANDBOX_LIFECYCLE_STEP_GATE_V1.md",
         "docs/adr/ADR-0070-business-team-access-sandbox-lifecycle-step-gate.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-WINDOWS-OPERATOR-KIT",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_windows_operator_kit.py",
+        "test_atlasquant_aion_business_team_access_windows_operator_kit.py",
+        "deploy/sandbox/team-access/Prepare-TeamAccessSandboxEnv.ps1",
+        "deploy/sandbox/team-access/Get-TeamAccessSandboxReadiness.ps1",
+        "deploy/sandbox/team-access/Invoke-TeamAccessSandboxOperator.ps1",
+        "docs/adr/ADR-0071-business-team-access-windows-operator-kit.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_WINDOWS_OPERATOR_REAL_BASELINE_COLLECTION",
+    "TEAM_ACCESS_WINDOWS_OPERATOR_REAL_SANDBOX_START",
+    "TEAM_ACCESS_WINDOWS_OPERATOR_LOCAL_SECRET_BOOTSTRAP",
+    "TEAM_ACCESS_WINDOWS_OPERATOR_PLAN_ONLY_RUN",
     "TEAM_ACCESS_SANDBOX_STEP_1_RECEIPT_REVIEW",
     "TEAM_ACCESS_SANDBOX_STEP_1_EXPLICIT_MANUAL_DECISION",
     "TEAM_ACCESS_SANDBOX_LIFECYCLE_STEP_1_MANUAL_EXECUTION",
