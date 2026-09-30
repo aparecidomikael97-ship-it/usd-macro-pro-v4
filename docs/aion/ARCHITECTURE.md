@@ -984,3 +984,17 @@ this layer; recovery drills are limited to local/sandbox/staging planning.
 
 ADR-0055 records this boundary.
 
+## AION Independence CLT Index
+
+`atlasquant_aion_independence_index.py` provides a private-input planning
+index for evaluating whether the ecosystem has enough non-Trade income
+consistency, reserve, recurring revenue and client diversification to justify a
+human transition review.
+
+Personal financial values are runtime inputs and are not hardcoded in the
+repository by this module. The score is not a probability and the module never
+recommends leaving employment. Essential expenses depending on Trade blocks the
+transition-review gate.
+
+ADR-0056 records this boundary.
+
