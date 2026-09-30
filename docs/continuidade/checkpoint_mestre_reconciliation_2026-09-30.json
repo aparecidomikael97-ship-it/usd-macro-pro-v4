@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -97,7 +97,14 @@
     "sandbox_reference_selection_scope": "SANDBOX_VALIDATION_ONLY",
     "sandbox_physical_environment_configured": false,
     "sandbox_real_e2e_executed": false,
-    "production_provider_activation_authorized": false
+    "production_provider_activation_authorized": false,
+    "physical_sandbox_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "physical_sandbox_keycloak_image": "quay.io/keycloak/keycloak:26.7.5",
+    "physical_sandbox_postgres_image": "postgres:18.6",
+    "physical_sandbox_localhost_only": true,
+    "physical_sandbox_plan_only_default": true,
+    "physical_sandbox_manual_apply_required": true,
+    "physical_sandbox_secret_env_gitignored": true
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -196,7 +203,8 @@
       449,
       450,
       451,
-      452
+      452,
+      453
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -220,7 +228,8 @@
     "capacity_live_metrics_pr": 449,
     "revenue_live_economics_pr": 450,
     "team_access_production_binding_pr": 451,
-    "team_access_sandbox_e2e_pr": 452
+    "team_access_sandbox_e2e_pr": 452,
+    "team_access_physical_sandbox_pr": 453
   },
   "decisions": [
     {
@@ -519,9 +528,23 @@
         "docs/aion/AION_BUSINESS_TEAM_ACCESS_SANDBOX_E2E_V1.md",
         "docs/adr/ADR-0064-business-team-access-sandbox-e2e.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-PHYSICAL-SANDBOX",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_physical_sandbox.py",
+        "test_atlasquant_aion_business_team_access_physical_sandbox.py",
+        "deploy/sandbox/team-access/compose.yml",
+        "docs/aion/AION_BUSINESS_TEAM_ACCESS_PHYSICAL_SANDBOX_V1.md",
+        "docs/adr/ADR-0065-business-team-access-physical-sandbox.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_PHYSICAL_SANDBOX_MANUAL_START_AND_HEALTHCHECK",
     "TEAM_ACCESS_PRODUCTION_PROVIDER_APPROVAL",
     "TEAM_ACCESS_SANDBOX_SECRET_STORE_AND_CONNECTOR_CONFIGURATION",
     "TEAM_ACCESS_PHYSICAL_SANDBOX_E2E_EXECUTION",
