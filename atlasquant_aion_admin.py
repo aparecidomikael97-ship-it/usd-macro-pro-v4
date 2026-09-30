@@ -265,6 +265,9 @@ from atlasquant_aion_business_consolidation_authorization_record import (
 from atlasquant_aion_business_consolidation_execution_preflight import (
     execution_preflight_template as business_consolidation_execution_preflight_template,
 )
+from atlasquant_aion_business_consolidation_execution_review_packet import (
+    review_packet_template as business_execution_review_packet_template,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7177,6 +7180,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "7 · Pedido de decisão vinculado",
             "8 · Contrato de autorização explícita",
             "9 · Preflight de execução",
+            "10 · Pacote de revisão de execução",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -7287,7 +7291,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Deploy, piloto e runtime continuam fronteiras separadas."
         )
 
-    else:
+    elif view == "9 · Preflight de execução":
         preflight = business_consolidation_execution_preflight_template()
         st.write(f"Estado: **{preflight.get('state')}**")
         st.markdown("**Gates da última barreira antes de qualquer merge físico:**")
@@ -7302,6 +7306,20 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Ordem sequencial obrigatória · stop-on-drift · BUSINESS runtime OFF · deploy separado."
+        )
+
+    else:
+        packet = business_execution_review_packet_template()
+        st.write(f"Estado: **{packet.get('state')}**")
+        st.markdown("**Seções obrigatórias do dossiê de revisão:**")
+        for item in list(packet.get("sections") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "O pacote só congela evidência para leitura humana. Ele não cria autorização."
+        )
+        st.caption(
+            "Estado máximo: READY_FOR_HUMAN_EXECUTION_REVIEW · "
+            "merge_execution_authorized=false · runtime OFF."
         )
 
 
