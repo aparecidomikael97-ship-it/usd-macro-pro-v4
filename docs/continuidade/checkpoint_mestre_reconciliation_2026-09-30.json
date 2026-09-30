@@ -404,11 +404,25 @@
         "docs/aion/AION_FINOPS_LIVE_COST_LEDGER_V1.md",
         "docs/adr/ADR-0058-finops-live-cost-ledger.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-FINOPS-PERSISTENCE-RECONCILIATION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_finops_ledger_persistence_reconciliation.py",
+        "test_atlasquant_aion_finops_ledger_persistence_reconciliation.py",
+        "docs/aion/AION_FINOPS_LEDGER_PERSISTENCE_RECONCILIATION_V1.md",
+        "docs/adr/ADR-0059-finops-ledger-persistence-reconciliation.md"
+      ]
     }
   ],
   "pending": [
+    "FINOPS_PROVIDER_INVOICE_READ_CONNECTOR",
+    "FINOPS_STORAGE_READBACK_VERIFICATION",
+    "FINOPS_PHYSICAL_STORAGE_WRITER_REVIEW",
     "FINOPS_REAL_INVOICE_RECONCILIATION",
-    "FINOPS_LEDGER_VERSIONED_PERSISTENCE_BINDING",
     "FINOPS_PROVIDER_READ_CONNECTOR_CONFIGURATION",
     "COMMERCIAL_LIVE_PROVIDER_SCHEMA_MAPPING",
     "COMMERCIAL_LIVE_READ_OAUTH_SECRET_STORE",
@@ -455,7 +469,11 @@
     "ledger_contract_status": "IMPLEMENTADO / EM VALIDAÇÃO",
     "ledger_model": "APPEND_ONLY_HASH_CHAIN",
     "provider_connectors_configured": false,
-    "automatic_payment": false
+    "automatic_payment": false,
+    "version_manifest_chain_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "invoice_reconciliation_contract_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "physical_storage_writer_configured": false,
+    "invoice_payment_authorized": false
   },
   "checkpoint_bootstrap": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
