@@ -1,10 +1,15 @@
 param(
     [string]$EnvFile = "$PSScriptRoot\sandbox.env.local",
-    [string]$OutputDir = "$PSScriptRoot\.atlasquant_sandbox_evidence"
+    [string]$OutputDir = "$PSScriptRoot\.atlasquant_sandbox_evidence",
+    [string]$OperatorSessionId = ""
 )
 
 $ErrorActionPreference = "Stop"
 $ComposeFile = "$PSScriptRoot\compose.yml"
+
+if ($OperatorSessionId -and $OperatorSessionId -notmatch "^[0-9a-f]{32}$") {
+    throw "Invalid OperatorSessionId."
+}
 $RealmFile = "$PSScriptRoot\realm\atlasquant-sandbox-realm.json"
 $RegistrySchemaFile = "$PSScriptRoot\registry\init\001_registry_schema.sql"
 
@@ -61,6 +66,7 @@ if ($LASTEXITCODE -ne 0) {
 $payload = [ordered]@{
     schema = "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_SANDBOX_EVIDENCE_V1"
     version = "1"
+    operator_session_id = $OperatorSessionId
     environment = "SANDBOX"
     production_environment = $false
     captured_at = (Get-Date).ToUniversalTime().ToString("o")
