@@ -705,3 +705,17 @@ BUSINESS runtime must remain OFF and runtime authority must stay separate.
 
 The highest automatic state is `READY_FOR_SEPARATE_DEPLOY_DECISION`. No deploy
 is authorized or executed. ADR-0038 records this boundary.
+
+
+## BUSINESS deploy verification and runtime boundary
+
+`atlasquant_aion_business_deploy_verification_runtime_boundary.py` defines a
+deploy-only authorization record, a non-executing preflight, post-deploy receipt
+verification and a separate runtime-decision packet.
+
+A verified deploy must match the authorized SHA and environment, keep BUSINESS
+runtime OFF, and pass application health, UI/mobile, observability and rollback
+checks. Only then can the state become
+`DEPLOY_VERIFIED_RUNTIME_DECISION_SEPARATE`.
+
+No function deploys or activates runtime. ADR-0039 records this boundary.
