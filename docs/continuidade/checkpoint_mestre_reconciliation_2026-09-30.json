@@ -78,7 +78,7 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT_PLUS_STEP1_EXECUTION_ENVELOPE",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_PLUS_SANDBOX_E2E_PLUS_PHYSICAL_SANDBOX_PLUS_BASELINE_EVIDENCE_PLUS_LIFECYCLE_PLAN_PLUS_AUTHORIZATION_CONTRACT_PLUS_EVIDENCE_LEDGER_PLUS_STEP_GATE_PLUS_WINDOWS_OPERATOR_KIT_PLUS_OPERATOR_HANDOFF_PLUS_BASELINE_ACCEPTANCE_PLUS_LIFECYCLE_MATERIALIZATION_PLUS_MATERIALIZED_AUTHORIZATION_PACKAGE_PLUS_ZERO_LEDGER_STEP1_PREFLIGHT_PLUS_EXPLICIT_STEP1_DECISION_CONTRACT_PLUS_STEP1_EXECUTION_ENVELOPE_PLUS_STEP1_PROVIDER_APPLY_PLAN",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
@@ -208,7 +208,14 @@
     "step1_execution_observation_digest_recalculated": true,
     "step1_execution_envelope_digest_recalculated": true,
     "step1_execution_envelope_source_binding_required": true,
-    "step1_execution_temporal_binding_recalculated": true
+    "step1_execution_temporal_binding_recalculated": true,
+    "step1_provider_apply_plan_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "step1_provider_apply_plan_non_executable": true,
+    "step1_provider_apply_plan_expected_http_status": 201,
+    "step1_provider_apply_plan_provider": "KEYCLOAK",
+    "step1_provider_apply_plan_realm": "atlasquant-sandbox",
+    "step1_provider_apply_plan_path": "/admin/realms/atlasquant-sandbox/users",
+    "step1_provider_apply_plan_real_created": false
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -831,9 +838,23 @@
         "build_team_access_step1_execution_envelope.py",
         "docs/adr/ADR-0078-business-team-access-step1-manual-execution-envelope.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-STEP1-PROVIDER-APPLY-PLAN",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_step1_apply_plan.py",
+        "test_atlasquant_aion_business_team_access_step1_apply_plan.py",
+        "build_team_access_step1_apply_plan.py",
+        "docs/adr/ADR-0079-business-team-access-step1-provider-apply-plan.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_STEP1_PROVIDER_COMMAND_RUNNER_REVIEW",
+    "TEAM_ACCESS_REAL_STEP1_PROVIDER_APPLY_PLAN",
     "TEAM_ACCESS_STEP1_POST_EXECUTION_RECEIPT",
     "TEAM_ACCESS_STEP1_PHYSICAL_MANUAL_APPLY",
     "TEAM_ACCESS_REAL_STEP1_EXECUTION_ENVELOPE",
