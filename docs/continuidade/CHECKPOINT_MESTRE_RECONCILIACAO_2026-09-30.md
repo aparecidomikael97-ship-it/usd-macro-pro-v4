@@ -67,6 +67,24 @@ Política financeira inicial:
   garantia ou retorno esperado;
 - nenhuma movimentação de capital é automática.
 
+## 2.2 Índice de Independência CLT
+
+Estado: **IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_independence_index.py`, ADR-0056 e testes associados.
+
+O índice usa somente entradas privadas de runtime e não grava renda pessoal no
+repositório. Ele acompanha:
+- renda não-Trade do ecossistema ao longo de vários meses;
+- faixa de segurança definida administrativamente;
+- reserva financeira;
+- receita recorrente;
+- concentração de clientes;
+- dependência do Trade para despesas essenciais.
+
+O score é planejamento, não probabilidade. Mesmo em
+`TRANSITION_REVIEW_ZONE`, a decisão permanece humana e
+`employment_exit_recommended=false`.
+
 ## 3. Monetização Business
 
 A prioridade de geração de caixa passa a ser **serviço B2B de Atendimento &
@@ -259,3 +277,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-COMMERCIAL-PIPELINE-END-TO-END | IMPLEMENTADO / EM VALIDAÇÃO | Pipeline B2B sequencial até saúde e renovação |
 | D-2026-09-30-FIRST-PILOT-PRICING-REVIEW | IMPLEMENTADO / EM VALIDAÇÃO | Primeiro piloto exige fit, preço sustentável e Pilot Governance |
 | D-2026-09-30-BACKUP-RECOVERY-POLICY | IMPLEMENTADO / EM VALIDAÇÃO | Backup em camadas, integridade e restore não automático |
+| D-2026-09-30-INDEPENDENCE-CLT-INDEX | IMPLEMENTADO / EM VALIDAÇÃO | Índice privado para revisão futura de independência do emprego |

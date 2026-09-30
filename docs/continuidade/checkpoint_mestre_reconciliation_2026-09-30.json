@@ -152,7 +152,8 @@
       440,
       441,
       442,
-      443
+      443,
+      444
     ],
     "current_runtime_authorized": false,
     "merge_authorized_by_this_checkpoint": false,
@@ -167,7 +168,8 @@
     "eight_role_router_pr": 440,
     "b2b_revenue_offer_pr": 441,
     "first_pilot_pricing_review_pr": 442,
-    "backup_recovery_policy_pr": 443
+    "backup_recovery_policy_pr": 443,
+    "independence_index_pr": 444
   },
   "decisions": [
     {
@@ -358,9 +360,23 @@
         "docs/aion/AION_BACKUP_RECOVERY_POLICY_V1.md",
         "docs/adr/ADR-0055-backup-recovery-policy.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-INDEPENDENCE-CLT-INDEX",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_independence_index.py",
+        "test_atlasquant_aion_independence_index.py",
+        "docs/aion/AION_INDEPENDENCE_INDEX_V1.md",
+        "docs/adr/ADR-0056-independence-clt-index.md"
+      ]
     }
   ],
   "pending": [
+    "INDEPENDENCE_INDEX_OPTIONAL_SECURE_DATA_BINDING",
+    "INDEPENDENCE_INDEX_PRIVATE_INPUT_UI",
     "BACKUP_NONPROD_RESTORE_DRILL",
     "BACKUP_RPO_RTO_ADMIN_TARGETS",
     "BACKUP_SECONDARY_COPY_CONFIGURATION",
@@ -423,5 +439,14 @@
     "rto_target_hours": null,
     "automatic_restore": false,
     "production_restore_authorized": false
+  },
+  "independence_index": {
+    "status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "private_runtime_inputs": true,
+    "personal_income_hardcoded": false,
+    "score_is_probability": false,
+    "employment_exit_recommended": false,
+    "trade_dependency_blocks_transition_review": true,
+    "real_financial_data_connected": false
   }
 }
