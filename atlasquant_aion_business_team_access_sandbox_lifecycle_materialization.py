@@ -17,10 +17,14 @@ from atlasquant_aion_business_team_access_sandbox_evidence import (
     validate_baseline_evidence,
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_plan import (
+    LIFECYCLE_STEP_IDS,
+    REQUIRED_ACKNOWLEDGEMENTS,
+    REQUIRED_DECISION_TOKEN,
     build_lifecycle_test_plan,
 )
 from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import (
     SCHEMA as ACCEPTANCE_SCHEMA,
+    verify_baseline_acceptance_binding,
 )
 
 SCHEMA = "ATLASQUANT_AION_BUSINESS_TEAM_ACCESS_SANDBOX_LIFECYCLE_MATERIALIZATION_V1"
@@ -75,6 +79,10 @@ def materialize_lifecycle_plan(
     raw = _mapping(raw_baseline_evidence)
     acceptance = _mapping(baseline_acceptance)
     baseline_review = validate_baseline_evidence(raw)
+    acceptance_binding = verify_baseline_acceptance_binding(
+        baseline_review,
+        acceptance,
+    )
 
     plan = build_lifecycle_test_plan(
         baseline_review,
@@ -95,6 +103,21 @@ def materialize_lifecycle_plan(
         acceptance.get("acceptance_record_digest"), 80
     ).lower()
     plan_digest = _clean(plan.get("plan_digest"), 80).lower()
+    steps = list(plan.get("steps") or [])
+    plan_payload = {
+        "baseline_evidence_digest": _clean(
+            plan.get("baseline_evidence_digest"), 80
+        ).lower(),
+        "baseline_acceptance_record_digest": _clean(
+            plan.get("baseline_acceptance_record_digest"), 80
+        ).lower(),
+        "test_username": plan.get("test_username"),
+        "tenant_ids": plan.get("tenant_ids"),
+        "factor_type": plan.get("factor_type"),
+        "requested_by": plan.get("requested_by"),
+        "steps": steps,
+    }
+    recomputed_plan_digest = _digest(plan_payload)
 
     gates = {
         "baseline_revalidated": baseline_review.get("state")
@@ -103,9 +126,31 @@ def materialize_lifecycle_plan(
         "operator_session_valid": bool(_SESSION32.fullmatch(session_id)),
         "acceptance_schema_valid": acceptance.get("schema") == ACCEPTANCE_SCHEMA,
         "acceptance_digest_valid": bool(_DIGEST64.fullmatch(acceptance_digest)),
+        "acceptance_binding_match": bool(
+            acceptance_binding.get("binding_match") is True
+            and acceptance_binding.get("lifecycle_plan_input_authorized") is True
+            and acceptance_binding.get("lifecycle_execution_authorized") is False
+            and acceptance_binding.get("production_authorized") is False
+            and acceptance_binding.get("executes_action") is False
+        ),
         "plan_ready": plan.get("state")
         == "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION",
         "plan_digest_valid": bool(_DIGEST64.fullmatch(plan_digest)),
+        "plan_digest_integrity": bool(
+            _DIGEST64.fullmatch(plan_digest)
+            and plan_digest == recomputed_plan_digest
+        ),
+        "plan_steps_exact": bool(
+            len(steps) == len(LIFECYCLE_STEP_IDS)
+            and [item.get("id") for item in steps] == list(LIFECYCLE_STEP_IDS)
+            and [item.get("order") for item in steps]
+            == list(range(1, len(LIFECYCLE_STEP_IDS) + 1))
+        ),
+        "plan_decision_contract_exact": bool(
+            plan.get("required_decision_token") == REQUIRED_DECISION_TOKEN
+            and plan.get("required_acknowledgements")
+            == list(REQUIRED_ACKNOWLEDGEMENTS)
+        ),
         "plan_non_authorizing": bool(
             plan.get("decision_recorded") is False
             and plan.get("account_creation_authorized") is False
