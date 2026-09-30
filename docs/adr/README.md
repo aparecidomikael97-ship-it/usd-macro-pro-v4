@@ -107,3 +107,5 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0075 | ACCEPTED | `docs/adr/ADR-0075-business-team-access-materialized-lifecycle-authorization.md` |
 
 | ADR-0076 | ACCEPTED | `docs/adr/ADR-0076-business-team-access-zero-ledger-step1-preflight.md` |
+
+| ADR-0077 | ACCEPTED | `docs/adr/ADR-0077-business-team-access-explicit-step1-decision.md` |
