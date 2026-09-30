@@ -78,11 +78,17 @@
     "audit_trail": true,
     "aion_must_obey_same_permissions": true,
     "shared_admin_login_forbidden": true,
-    "current_layer": "RBAC_CONTRACT_AND_DECISION",
+    "current_layer": "RBAC_PLUS_PRODUCTION_EVIDENCE_BINDING",
     "production_provisioning": false,
     "real_mfa_2fa": false,
     "persisted_registry": false,
-    "physical_session_revocation": false
+    "physical_session_revocation": false,
+    "production_binding_status": "IMPLEMENTADO / EM VALIDAÇÃO",
+    "production_evidence_contract": true,
+    "individual_account_attestation": true,
+    "strong_auth_attestation": true,
+    "registry_readback_attestation": true,
+    "revocation_verification_attestation": true
   },
   "capacity_scale": {
     "status": "IMPLEMENTADO / EM VALIDAÇÃO",
@@ -476,9 +482,25 @@
         "docs/aion/AION_BUSINESS_REVENUE_LIVE_ECONOMICS_V1.md",
         "docs/adr/ADR-0062-business-revenue-live-economics.md"
       ]
+    },
+    {
+      "id": "D-2026-09-30-TEAM-ACCESS-PRODUCTION-BINDING",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "implemented": true,
+      "validated": false,
+      "evidence": [
+        "atlasquant_aion_business_team_access_production_binding.py",
+        "test_atlasquant_aion_business_team_access_production_binding.py",
+        "docs/aion/AION_BUSINESS_TEAM_ACCESS_PRODUCTION_BINDING_V1.md",
+        "docs/adr/ADR-0063-business-team-access-production-binding.md"
+      ]
     }
   ],
   "pending": [
+    "TEAM_ACCESS_SANDBOX_E2E_VALIDATION",
+    "TEAM_ACCESS_SESSION_REVOCATION_CONNECTOR",
+    "TEAM_ACCESS_REGISTRY_STORAGE_BINDING",
+    "TEAM_ACCESS_IDENTITY_PROVIDER_SELECTION",
     "REVENUE_LIVE_ECONOMICS_FIRST_PILOT_VALIDATION",
     "REVENUE_LIVE_ECONOMICS_REAL_ALLOCATION_CALIBRATION",
     "CAPACITY_FIRST_PILOT_REAL_METRICS_VALIDATION",
@@ -502,7 +524,6 @@
     "FIRST_PILOT_REAL_SEGMENT_CANDIDATE_AND_PRICING",
     "EIGHT_ROLE_ROUTER_RUNTIME_VALIDATION",
     "AION_CHECKPOINT_BOOTSTRAP_DEPLOY_VALIDATION",
-    "TEAM_RBAC_PRODUCTION_BINDING",
     "BUSINESS_UPDATED_PDF"
   ],
   "ecosystem_priority": {
