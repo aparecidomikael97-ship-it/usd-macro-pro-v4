@@ -908,6 +908,19 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
+    def test_business_client_portal_demo_is_simple_and_read_only(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("def _render_business_client_portal_demo()", src)
+        self.assertIn("Portal Executivo do Cliente · Demo", src)
+        self.assertIn("Área do Portal", src)
+        self.assertIn("VISÃO GERAL", src)
+        self.assertIn("RESULTADOS", src)
+        self.assertIn("SUPORTE", src)
+        self.assertIn("O que fica escondido do cliente", src)
+        self.assertIn("sem cobrança, sem publicação", src)
+        self.assertIn("_render_business_client_portal_demo()", src)
+        self.assertNotIn("st.tabs(", src)
+
     def test_business_diagnostic_proposal_simulator_is_draft_only_and_mobile_stable(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_business_diagnostic_proposal_simulator()", src)
