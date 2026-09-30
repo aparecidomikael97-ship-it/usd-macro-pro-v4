@@ -51,7 +51,13 @@ def _digest(value: Any) -> str:
     return sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _ledger_ready_for_next(ledger: Mapping[str, Any]) -> bool:
+def _ledger_ready_for_next(
+    ledger: Mapping[str, Any],
+    *,
+    plan_digest: str,
+    baseline_digest: str,
+    authorization_record_digest: str,
+) -> bool:
     return bool(
         ledger.get("schema") == LEDGER_SCHEMA
         and ledger.get("state")
@@ -64,6 +70,11 @@ def _ledger_ready_for_next(ledger: Mapping[str, Any]) -> bool:
         and _DIGEST64.fullmatch(
             _clean(ledger.get("chain_head_digest"), 80).lower()
         )
+        and _clean(ledger.get("plan_digest"), 80).lower() == plan_digest
+        and _clean(ledger.get("baseline_evidence_digest"), 80).lower()
+        == baseline_digest
+        and _clean(ledger.get("authorization_record_digest"), 80).lower()
+        == authorization_record_digest
         and ledger.get("automatic_next_step_authorized") is False
         and ledger.get("executor_enabled") is False
         and ledger.get("production_authorized") is False
@@ -126,6 +137,9 @@ def build_step_execution_preflight(
     ).lower()
     requester = normalize_username(requested_by)
     approved_by = normalize_username(auth.get("approved_by"))
+    authorization_record_digest = _clean(
+        auth.get("record_digest"), 80
+    ).lower()
 
     auth_binding = verify_authorization_binding(plan_row, auth)
     plan_steps = list(plan_row.get("steps") or [])
@@ -154,7 +168,12 @@ def build_step_execution_preflight(
             and auth.get("executor_enabled") is False
             and auth.get("production_authorized") is False
         ),
-        "ledger_ready_for_next": _ledger_ready_for_next(ledger_row),
+        "ledger_ready_for_next": _ledger_ready_for_next(
+            ledger_row,
+            plan_digest=plan_digest,
+            baseline_digest=baseline_digest,
+            authorization_record_digest=authorization_record_digest,
+        ),
         "target_is_next_step": bool(
             order is not None
             and order == expected_order
@@ -244,6 +263,13 @@ def review_post_step_receipt(
         ledger.get("next_expected_step_id"), 120
     ).upper()
     chain_head = _clean(ledger.get("chain_head_digest"), 80).lower()
+    plan_digest = _clean(plan_row.get("plan_digest"), 80).lower()
+    baseline_digest = _clean(
+        plan_row.get("baseline_evidence_digest"), 80
+    ).lower()
+    authorization_record_digest = _clean(
+        auth.get("record_digest"), 80
+    ).lower()
 
     recomputed = build_evidence_receipt(
         plan_row,
@@ -260,7 +286,12 @@ def review_post_step_receipt(
     )
 
     gates = {
-        "ledger_ready_for_next": _ledger_ready_for_next(ledger),
+        "ledger_ready_for_next": _ledger_ready_for_next(
+            ledger,
+            plan_digest=plan_digest,
+            baseline_digest=baseline_digest,
+            authorization_record_digest=authorization_record_digest,
+        ),
         "receipt_schema_valid": row.get("schema") == RECEIPT_SCHEMA,
         "receipt_state_ready": row.get("state")
         == "SANDBOX_LIFECYCLE_STEP_EVIDENCE_RECEIPT_READY",
