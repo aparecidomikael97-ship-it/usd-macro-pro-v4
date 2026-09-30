@@ -582,3 +582,22 @@ does not record authorization and cannot merge, deploy, authorize a pilot or
 activate runtime.
 
 ADR-0031 records this anti-replay and anti-ambiguity boundary.
+
+## BUSINESS explicit consolidation authorization record V1
+
+`atlasquant_aion_business_consolidation_authorization_record.py` defines the
+only accepted shape for a future explicit authorization record. Generic language
+such as "ok", "vamos lá" or "pode seguir" is never interpreted as consolidation
+authority.
+
+The record must carry the exact decision token
+`AUTHORIZE_STACK_CONSOLIDATION_394_412`, the exact request digest, matching
+reviewer and scope, an approval timestamp, and explicit acknowledgements that
+deploy, pilot and runtime remain separate and that CI/stop-on-drift remain
+mandatory.
+
+A valid record reaches `EXPLICIT_AUTHORIZATION_RECORD_VERIFIED`, but still
+keeps `merge_execution_authorized=false`. Physical merge execution is a
+separate boundary and is not implemented by this module.
+
+ADR-0032 records this explicit anti-ambiguity authorization contract.
