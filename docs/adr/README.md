@@ -77,3 +77,4 @@ Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu e
 | ADR-0046 | ACCEPTED | `docs/adr/ADR-0046-business-quota-application-authorization.md` |
 | ADR-0047 | ACCEPTED | `docs/adr/ADR-0047-aion-eight-logical-roles.md` |
 | ADR-0048 | ACCEPTED | `docs/adr/ADR-0048-business-team-access-rbac.md` |
+| ADR-0049 | ACCEPTED | `docs/adr/ADR-0049-business-capacity-scale-manager.md` |
