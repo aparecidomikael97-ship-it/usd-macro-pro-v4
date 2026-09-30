@@ -97,6 +97,17 @@ class TeamAccessSandboxEvidenceTests(unittest.TestCase):
             "TEAM_ACCESS_SANDBOX_LIFECYCLE_EVIDENCE_TEMPLATE_BLOCKED",
         )
 
+    def test_local_evidence_directory_is_gitignored_and_collector_is_sanitized(self):
+        ignore = Path(".gitignore").read_text(encoding="utf-8")
+        collector = Path(
+            "deploy/sandbox/team-access/Collect-TeamAccessSandboxEvidence.ps1"
+        ).read_text(encoding="utf-8")
+        self.assertIn("**/.atlasquant_sandbox_evidence/", ignore)
+        self.assertIn("secrets_included = $false", collector)
+        self.assertNotIn("KC_DB_PASSWORD", collector)
+        self.assertNotIn("KC_BOOTSTRAP_ADMIN_PASSWORD", collector)
+        self.assertNotIn("REGISTRY_DB_PASSWORD", collector)
+
     def test_module_has_no_network_process_or_docker_imports(self):
         source = Path(
             "atlasquant_aion_business_team_access_sandbox_evidence.py"
