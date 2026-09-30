@@ -8,6 +8,7 @@ Isolated non-production environment for the Business Team & Access E2E flow.
 - OpenID Connect
 - PostgreSQL 18.6 for Keycloak persistence
 - PostgreSQL 18.6 for the AtlasQuant team registry
+- versioned registry schema: registry_revisions + team_memberships
 - Keycloak Admin REST is the future revocation adapter boundary
 
 This directory is not a production deployment bundle.
@@ -45,6 +46,7 @@ Explicit sandbox start:
 Read-only verification:
 
     .\Test-TeamAccessSandbox.ps1
+    .\Test-TeamAccessRegistry.ps1
 
 Stop and preserve data:
 
@@ -76,3 +78,7 @@ atlasquant_aion_business_team_access_sandbox_e2e.py.
 
 Never reuse this start-dev bundle for production. Production remains a separate
 architecture and approval gate.
+
+## Registry initialization note
+
+The PostgreSQL official image runs init scripts only when the registry volume is empty. If the local sandbox volume already existed before the schema was added, destroy only the sandbox data with the guarded cleanup command and recreate it. Never do this against production data.
