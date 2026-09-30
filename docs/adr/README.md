@@ -40,5 +40,6 @@ Cada registro usa o identificador `ADR-NNNN` e as seções: Título, Data, Statu
 | ADR-0010 | ACCEPTED | `docs/adr/ADR-0010-quatro-fechamentos-do-aion.md` |\n| ADR-0011 | ACCEPTED | `docs/adr/ADR-0011-core-validation-business-readiness.md` |\n| ADR-0012 | ACCEPTED | `docs/adr/ADR-0012-business-primary-scope-certification.md` |
 | ADR-0013 | ACCEPTED | `docs/adr/ADR-0013-business-external-attestation-review.md` |
 | ADR-0014 | ACCEPTED | `docs/adr/ADR-0014-business-runtime-readiness.md` |
+| ADR-0015 | ACCEPTED | `docs/adr/ADR-0015-business-sandbox-harness.md` |
 
 Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu estado de produto está na reconciliação `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.
