@@ -1,9 +1,14 @@
 import ast
+import hashlib
+import json
 import unittest
 from pathlib import Path
 
 from atlasquant_aion_business_team_access_sandbox_lifecycle_authorization import (
     SCHEMA as AUTH_SCHEMA,
+)
+from atlasquant_aion_business_team_access_lifecycle_authorization_package import (
+    SCHEMA as PACKAGE_SCHEMA,
 )
 from atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger import (
     GENESIS_DIGEST,
@@ -19,6 +24,16 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate import (
     review_post_step_receipt,
     step_gate_policy,
 )
+
+def _digest(value):
+    raw = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _plan():
@@ -37,6 +52,7 @@ def _plan():
         "state": "READY_FOR_ADMIN_TEAM_ACCESS_SANDBOX_LIFECYCLE_EXECUTION_DECISION",
         "plan_digest": "a" * 64,
         "baseline_evidence_digest": "b" * 64,
+        "baseline_acceptance_record_digest": "e" * 64,
         "requested_by": "admin.demo",
         "steps": steps,
         "executes_action": False,
@@ -44,6 +60,16 @@ def _plan():
 
 
 def _auth():
+    package_payload = {
+        "materialization_digest": "d" * 64,
+        "plan_digest": "a" * 64,
+        "baseline_evidence_digest": "b" * 64,
+        "baseline_acceptance_record_digest": "e" * 64,
+        "operator_session_id": "f" * 32,
+        "authorization_record_digest": "c" * 64,
+        "approved_by": "admin.demo",
+        "approved_at": "2026-09-30T21:40:00+00:00",
+    }
     return {
         "schema": AUTH_SCHEMA,
         "state": "EXPLICIT_SANDBOX_LIFECYCLE_AUTHORIZATION_RECORD_VERIFIED",
@@ -54,6 +80,13 @@ def _auth():
         "baseline_evidence_digest": "b" * 64,
         "record_digest": "c" * 64,
         "approved_by": "admin.demo",
+        "approved_at": "2026-09-30T21:40:00+00:00",
+        "authorization_package_schema": PACKAGE_SCHEMA,
+        "materialization_binding_verified": True,
+        "materialization_digest": "d" * 64,
+        "baseline_acceptance_record_digest": "e" * 64,
+        "operator_session_id": "f" * 32,
+        "authorization_package_digest": _digest(package_payload),
         "executor_enabled": False,
         "production_authorized": False,
         "executes_action": False,
