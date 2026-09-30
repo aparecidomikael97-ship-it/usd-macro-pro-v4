@@ -1132,3 +1132,24 @@ Production activation, secrets, registry writes, session revocation, deploy and
 runtime remain outside this layer.
 
 ADR-0064 records this boundary.
+
+
+## BUSINESS team access physical sandbox
+
+`atlasquant_aion_business_team_access_physical_sandbox.py` and
+`deploy/sandbox/team-access/` define the isolated physical validation
+environment after the sandbox E2E contract.
+
+The stack pins Keycloak 26.7.5 and PostgreSQL 18.6, separates Keycloak
+persistence from the AtlasQuant registry database, binds host ports only to
+127.0.0.1 and keeps real secrets in a gitignored local env file.
+
+The PowerShell launcher is plan-only by default. Starting or stopping containers
+requires explicit `-Apply`; deleting sandbox volumes requires a second
+confirmation switch.
+
+The maximum automatic application state is
+`READY_FOR_ADMIN_TEAM_ACCESS_PHYSICAL_SANDBOX_START_REVIEW`. The Python layer
+never invokes Docker or external providers.
+
+ADR-0065 records this boundary.
