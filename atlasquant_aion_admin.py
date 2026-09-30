@@ -229,6 +229,12 @@ from atlasquant_aion_business_privacy_audit import (
     role_access_matrix as business_privacy_role_access_matrix,
     rollback_plan as business_privacy_rollback_plan,
 )
+from atlasquant_aion_business_master_readiness import (
+    default_demo_evidence as business_default_demo_evidence,
+    master_readiness_snapshot as business_master_readiness_snapshot,
+    pilot_review_packet as business_pilot_review_packet,
+    status_rows as business_master_status_rows,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -6934,6 +6940,52 @@ def _render_business_privacy_audit_demo() -> None:
         )
 
 
+
+def _render_business_master_readiness() -> None:
+    """Compact at-a-glance Business status that never grants operational authority."""
+    evidence = business_default_demo_evidence()
+    snapshot = business_master_readiness_snapshot(evidence)
+    rows = business_master_status_rows(snapshot)
+
+    st.markdown("#### 🧭 Painel Mestre Business")
+    st.caption(
+        "Leitura rápida: o que está pronto em DEMO, o que ainda falta para revisar um piloto e "
+        "por que o runtime continua desligado."
+    )
+    cols = st.columns(3)
+    for index,row in enumerate(rows):
+        cols[index].metric(
+            str(row.get("layer") or ""),
+            f"{float(row.get('progress_pct') or 0):.0f}%",
+            str(row.get("state") or "UNKNOWN"),
+        )
+    st.progress(int(round(float(snapshot.get("demo", {}).get("progress_pct") or 0))))
+    st.success(
+        "Camada DEMO consolidada. Isso não significa piloto autorizado nem operação real."
+        if snapshot.get("demo", {}).get("complete")
+        else
+        "Ainda existem gates de DEMO pendentes."
+    )
+    st.warning(
+        "PILOT: revisão humana ainda necessária · LIVE: RUNTIME OFF · "
+        "sem contato real, cobrança, publicação ou ação externa."
+    )
+
+    with st.expander("Ver gates do piloto que ainda faltam", expanded=False):
+        missing = list(snapshot.get("pilot", {}).get("missing") or [])
+        if missing:
+            for gate in missing:
+                st.markdown(f"- {gate}")
+        else:
+            packet = business_pilot_review_packet(
+                snapshot,
+                requested_by="Mikael",
+                pilot_scope="Piloto Business controlado",
+            )
+            st.write(f"Estado: **{packet.get('state')}**")
+            st.caption("Mesmo elegível, o packet não autoriza piloto automaticamente.")
+
+
 def _render_business(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -6942,6 +6994,7 @@ def _render_business(
     st.markdown("### 💼 AION Negócios")
     demo_snapshot = business_demo_snapshot()
     st.markdown(business_demo_html(), unsafe_allow_html=True)
+    _render_business_master_readiness()
     with st.expander("🎓 Treinamento do administrador · visão geral", expanded=False):
         st.caption(
             "Treinamento interno antes de divulgação. Entender primeiro, demonstrar depois e "
