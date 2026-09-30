@@ -391,6 +391,9 @@ from atlasquant_aion_business_team_access_windows_operator_kit import (
 from atlasquant_aion_business_team_access_windows_operator_handoff import (
     operator_handoff_policy as business_team_windows_operator_handoff_policy,
 )
+from atlasquant_aion_business_team_access_sandbox_baseline_acceptance import (
+    baseline_acceptance_requirements as business_team_baseline_acceptance_requirements,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7340,6 +7343,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "44 · Equipe & Acessos · Step Gate",
             "45 · Equipe & Acessos · Windows Operator",
             "46 · Equipe & Acessos · Operator Handoff",
+            "47 · Equipe & Acessos · Baseline Acceptance",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8167,7 +8171,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Lifecycle e produção continuam separados."
         )
 
-    else:
+    elif view == "46 · Equipe & Acessos · Operator Handoff":
         handoff = business_team_windows_operator_handoff_policy()
         st.write(f"Estado: **{handoff.get('state')}**")
         st.markdown("**Binding obrigatório do handoff:**")
@@ -8186,6 +8190,23 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Estado máximo: READY_FOR_ADMIN_TEAM_ACCESS_REAL_BASELINE_ACCEPTANCE_REVIEW."
+        )
+
+    else:
+        acceptance = business_team_baseline_acceptance_requirements()
+        st.write(f"Estado: **{acceptance.get('state')}**")
+        st.markdown("**Token explícito obrigatório:**")
+        st.code(str(acceptance.get("required_decision_token") or ""), language=None)
+        st.markdown("**Acknowledgements obrigatórios:**")
+        for item in list(acceptance.get("required_acknowledgements") or []):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Baseline técnico verde não significa baseline aceito. "
+            "Sem acceptance explícito e vinculado aos digests exatos, o lifecycle plan fica bloqueado."
+        )
+        st.caption(
+            "Acceptance permite apenas usar o baseline como input do plano. "
+            "Não cria plano automaticamente e não autoriza lifecycle/produção."
         )
 
 
