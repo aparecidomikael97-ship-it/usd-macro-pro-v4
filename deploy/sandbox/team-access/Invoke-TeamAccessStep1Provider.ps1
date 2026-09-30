@@ -123,6 +123,11 @@ if ($preflight.state -ne "READY_FOR_EXPLICIT_MANUAL_STEP1_PROVIDER_APPLY") {
 }
 if (-not $AuthorizationToken) { throw "AuthorizationToken is required with -Apply." }
 
+$receiptFile = Join-Path $OutputResolved "step1-provider-execution-receipt.json"
+if (Test-Path -LiteralPath $receiptFile) {
+    throw "A prior Step 1 execution receipt already exists. Refusing a new provider apply."
+}
+
 $probe = Join-Path $OutputResolved ".step1-runner-write-probe.tmp"
 "probe" | Set-Content -LiteralPath $probe -Encoding UTF8
 Remove-Item -LiteralPath $probe -Force
@@ -183,6 +188,23 @@ try {
         throw "Created user readback is not enabled."
     }
 
+    $attrs = $created[0].attributes
+    if (-not $attrs) { throw "Created user readback has no sandbox attributes." }
+    if (@($attrs.atlasquant_sandbox_only) -notcontains "true") {
+        throw "Created user readback sandbox-only attribute mismatch."
+    }
+    if (@($attrs.atlasquant_operator_session_id) -notcontains ([string]$plan.operator_session_id)) {
+        throw "Created user readback operator session attribute mismatch."
+    }
+    if (@($attrs.atlasquant_lifecycle_step) -notcontains "1") {
+        throw "Created user readback lifecycle step attribute mismatch."
+    }
+    $expectedTenants = @($plan.tenant_ids | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+    $actualTenants = @($attrs.atlasquant_tenants | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+    if (($expectedTenants -join "|") -ne ($actualTenants -join "|")) {
+        throw "Created user readback tenant scope mismatch."
+    }
+
     $providerUserId = [string]$created[0].id
     if (-not $providerUserId) { throw "Created user readback did not expose a provider user id." }
 
@@ -212,7 +234,6 @@ try {
         production_targeted = $false
     }
 
-    $receiptFile = Join-Path $OutputResolved "step1-provider-execution-receipt.json"
     $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptFile -Encoding UTF8
 
     Write-Host "Sandbox Step 1 provider apply completed."
