@@ -5319,7 +5319,8 @@ def _render_business(
     st.caption(
         "Este bloco histórico permanece temporariamente para compatibilidade e auditoria. "
         "Dropshipping, afiliados, Shopee, Mercado Livre, TikTok Shop e e-commerce genérico "
-        "não são mais o foco principal da nova aba Negócios."
+        "não são mais o foco principal da nova aba Negócios. "
+        "Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada."
     )
     st.markdown("#### Candidato de produto")
     with st.form("aion_business_new_product", clear_on_submit=True):
