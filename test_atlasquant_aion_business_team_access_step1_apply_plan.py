@@ -14,6 +14,7 @@ from atlasquant_aion_business_team_access_step1_apply_plan import (
     build_step1_apply_plan,
     step1_apply_plan_policy,
     verify_step1_apply_plan,
+    verify_step1_apply_plan_source_binding,
 )
 from atlasquant_aion_business_team_access_step1_execution_envelope import (
     SCHEMA as ENVELOPE_SCHEMA,
@@ -115,6 +116,32 @@ class TeamAccessStep1ApplyPlanTests(unittest.TestCase):
         self.assertEqual(
             binding["state"], "STEP1_PROVIDER_APPLY_PLAN_BINDING_MATCH"
         )
+
+    @patch(
+        "atlasquant_aion_business_team_access_step1_apply_plan."
+        "verify_step1_execution_envelope",
+        return_value={"binding_match": True},
+    )
+    def test_apply_plan_source_binding_matches_exact_envelope(
+        self, _verify
+    ):
+        envelope = _envelope()
+        result = build_step1_apply_plan(envelope)
+        binding = verify_step1_apply_plan_source_binding(
+            envelope, result
+        )
+        self.assertTrue(binding["binding_match"])
+        self.assertEqual(
+            binding["state"],
+            "STEP1_PROVIDER_APPLY_PLAN_SOURCE_BINDING_MATCH",
+        )
+
+        changed = _envelope()
+        changed["target_username"] = "sandbox.outro.demo"
+        binding = verify_step1_apply_plan_source_binding(
+            changed, result
+        )
+        self.assertFalse(binding["binding_match"])
 
     @patch(
         "atlasquant_aion_business_team_access_step1_apply_plan."
