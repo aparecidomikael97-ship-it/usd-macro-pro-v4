@@ -385,6 +385,9 @@ from atlasquant_aion_business_team_access_sandbox_lifecycle_evidence_ledger impo
 from atlasquant_aion_business_team_access_sandbox_lifecycle_step_gate import (
     step_gate_policy as business_team_sandbox_step_gate_policy,
 )
+from atlasquant_aion_business_team_access_windows_operator_kit import (
+    windows_operator_policy as business_team_windows_operator_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7332,6 +7335,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "42 · Equipe & Acessos · Autorizacao Lifecycle",
             "43 · Equipe & Acessos · Ledger Lifecycle",
             "44 · Equipe & Acessos · Step Gate",
+            "45 · Equipe & Acessos · Windows Operator",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8115,7 +8119,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Nenhum próximo passo é executado automaticamente."
         )
 
-    else:
+    elif view == "44 · Equipe & Acessos · Step Gate":
         gate = business_team_sandbox_step_gate_policy()
         st.write(f"Estado: **{gate.get('state')}**")
         st.markdown("**Antes de cada step são exigidos:**")
@@ -8136,6 +8140,27 @@ def _render_business_stack_consolidation_v2() -> None:
         st.caption(
             "Pré-step: READY_FOR_EXPLICIT_MANUAL_SANDBOX_STEP_DECISION · "
             "Pós-step: READY_FOR_MANUAL_LEDGER_APPEND_REVIEW."
+        )
+
+    else:
+        operator = business_team_windows_operator_policy()
+        st.write(f"Estado: **{operator.get('state')}**")
+        st.markdown("**Fluxo Windows protegido:**")
+        for item in (
+            "gerar secrets locais sem exibir valores",
+            "validar Docker/Compose em modo read-only",
+            "revisar o plano sem iniciar containers",
+            "usar -ApplyStart somente para start local explícito",
+            "usar -CollectBaseline separadamente",
+        ):
+            st.markdown(f"- {item}")
+        st.warning(
+            "Esta tela só mostra a policy. Ela não acessa seu PC, não cria secrets e não inicia Docker."
+        )
+        st.caption(
+            "Estado máximo do readiness local: "
+            "READY_FOR_ADMIN_TEAM_ACCESS_WINDOWS_SANDBOX_START_DECISION. "
+            "Lifecycle e produção continuam separados."
         )
 
 

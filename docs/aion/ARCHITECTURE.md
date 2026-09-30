@@ -1234,3 +1234,25 @@ stops at `READY_FOR_MANUAL_LEDGER_APPEND_REVIEW`. Neither state executes or
 appends anything.
 
 ADR-0070 records this boundary.
+
+
+## BUSINESS team access Windows operator kit
+
+`atlasquant_aion_business_team_access_windows_operator_kit.py` and the guarded
+PowerShell scripts under `deploy/sandbox/team-access/` define the local Windows
+operator boundary for the physical Team Access sandbox.
+
+Secret preparation and sandbox start are plan-only by default. Writing
+`sandbox.env.local` requires `-Apply`; starting containers requires
+`-ApplyStart`; collecting a baseline additionally requires
+`-CollectBaseline`.
+
+The readiness report contains only boolean checks and timestamp metadata. Secret
+values are never included and local operator reports remain outside version
+control.
+
+The maximum automatic state is
+`READY_FOR_ADMIN_TEAM_ACCESS_WINDOWS_SANDBOX_START_DECISION`. The lifecycle
+executor remains outside this kit.
+
+ADR-0071 records this boundary.
