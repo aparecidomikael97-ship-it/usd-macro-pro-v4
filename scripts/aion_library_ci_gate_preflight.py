@@ -33,6 +33,7 @@ EXPECTED_FLAGS = {
     "AION_LIB_BROWSER_PG_E2E": "1",
     "AION_LIB_FULL_CHAIN_TEST": "1",
     "AION_LIB_JOINT_E2E": "1",
+    "AION_LIB_TEST_PG_DSN": "postgresql://library_sandbox:synthetic_ci_only_not_for_production@localhost:5432/aion_library_sandbox",
 }
 
 
@@ -111,6 +112,10 @@ def inspect_workflow(source: str) -> list[str]:
             )
             if not expected_line.search(env_text):
                 errors.append("missing strict job-level synthetic environment flag: " + key)
+        services = _block(job, "services", 4)
+        postgres = _block(services, "postgres", 6)
+        if not any(line.strip() == "image: postgres:16" for line in postgres):
+            errors.append("PostgreSQL service must use postgres:16")
     except ValueError as exc:
         errors.append(str(exc))
     for label, marker in {
