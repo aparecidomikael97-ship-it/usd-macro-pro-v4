@@ -58,6 +58,30 @@ def _ci_only_shell(st, *, gate):
             chain.append(type(cursor).__name__)
             cursor = cursor.__cause__
         print("AION_CI_READ_EXCEPTION_TYPES=" + ",".join(chain), flush=True)
+        # Fixed finite stage codes, never raw tracebacks, SQL, user identity,
+        # passwords, token values, document IDs, file paths or error messages.
+        allowed = {
+            "read_from_real_app_session", "read_selected", "read_preview",
+            "_preflight", "_principal", "host_access", "roles_for",
+            "_lookup_roles", "_identity", "inspect", "verify",
+            "identity_envelope", "_new_handle", "_verify_handle",
+        }
+        trace_chain = []
+        cursor = exc
+        for _ in range(7):
+            if cursor is None:
+                break
+            locations = []
+            tb = cursor.__traceback__
+            while tb is not None:
+                name = tb.tb_frame.f_code.co_name
+                if name in allowed:
+                    locations.append(name)
+                tb = tb.tb_next
+            trace_chain.append(">".join(locations[-8:]) if locations else "UNKNOWN")
+            cursor = cursor.__cause__
+        print("AION_CI_DENIAL_STAGES=" + "|".join(trace_chain), flush=True)
+
         # Uniform browser response, regardless of internal cause.
         st.caption("Consulta sintética indisponível")
     return True
