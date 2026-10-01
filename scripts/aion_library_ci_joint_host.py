@@ -39,7 +39,7 @@ def initialize_fixture():
     from aion_core.library_foundation import LibraryCatalog
     from aion_core.library_authorization import AttestationVerifier
     from atlasquant_aion_library_acl_postgres import MIGRATION_POSTGRESQL as ACL_DDL
-    from test_aion_core_library_atomic_store import IK, AK, RK, sign
+    from test_aion_core_library_atomic_store import IK, AK, RK
 
     with psycopg.connect(OWNER_DSN, autocommit=True) as db:
         with db.cursor() as c:
@@ -66,7 +66,6 @@ def initialize_fixture():
                       "VALUES (%s,%s,%s,%s)",
                       ("admin.ci", SCOPE[0], SCOPE[1], "LIBRARY_ADMIN"))
 
-    now = int(time.time())
     verifier = AttestationVerifier(
         identity_issuers={"authz": IK, "browser-host": HOST_KEY},
         approval_issuers={"human": AK},
@@ -93,30 +92,34 @@ def initialize_fixture():
     )
     store.import_reviewed(trusted_entry=entry)
 
+    return entry, store
+
+
+def approve_fixture(entry, store):
+    """Mint time-limited synthetic assertions only at the CI approval step.
+
+    Full-app browser navigation can be slower than a 100s fixture proof TTL;
+    we do not extend TTL or retry a failed approval with replacement tokens.
+    """
+    require_synthetic(writer=True)
+    from test_aion_core_library_atomic_store import IK, AK, RK, sign
+    now = int(time.time())
     common = dict(
         tenant_id=entry.tenant_id, domain_id=entry.domain_id,
         document_id=entry.document_id, version=entry.version,
         sha256=entry.sha256, license_kind=entry.license_kind,
         usage_scope=entry.usage_scope,
     )
-    proofs = (
-        sign("identity", dict(
-            issuer="authz", subject="reviewer", tenant_id=entry.tenant_id,
-            domain_id=entry.domain_id, roles=["LIBRARY_REVIEWER"],
-            action="APPROVE_INDEX"), IK, now=now),
-        sign("approval", dict(
-            common, issuer="human", reviewer="reviewer",
-            action="APPROVE_INDEX", approval_id="BROWSER-CI-APR-1"), AK, now=now),
-        sign("rights", dict(
-            common, issuer="license", rights_holder=entry.rights_holder,
-            rights_action="INDEX", grant_id="BROWSER-CI-GRANT-1"), RK, now=now),
-    )
-    return entry, store, proofs
-
-
-def approve_fixture(entry, store, proofs):
-    require_synthetic(writer=True)
-    identity, approval, rights = proofs
+    identity = sign("identity", dict(
+        issuer="authz", subject="reviewer", tenant_id=entry.tenant_id,
+        domain_id=entry.domain_id, roles=["LIBRARY_REVIEWER"],
+        action="APPROVE_INDEX"), IK, now=now)
+    approval = sign("approval", dict(
+        common, issuer="human", reviewer="reviewer",
+        action="APPROVE_INDEX", approval_id="BROWSER-CI-APR-1"), AK, now=now)
+    rights = sign("rights", dict(
+        common, issuer="license", rights_holder=entry.rights_holder,
+        rights_action="INDEX", grant_id="BROWSER-CI-GRANT-1"), RK, now=now)
     return store.approve(
         tenant_id=SCOPE[0], domain_id=SCOPE[1], entry_id=entry.entry_id,
         identity_envelope=identity, approval_envelope=approval,
