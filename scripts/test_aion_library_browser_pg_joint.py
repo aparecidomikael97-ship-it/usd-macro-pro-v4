@@ -215,7 +215,7 @@ def main():
     if os.getenv("AION_LIB_TEST_PG_DSN") != OWNER_DSN:
         raise RuntimeError("CI PostgreSQL must use the exact ephemeral DSN")
 
-    entry, writer, approvals = initialize_fixture()
+    entry, writer = initialize_fixture()
     assert_read_only_roles()
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
@@ -237,7 +237,7 @@ def main():
                         desktop_page = page
 
                 # Writer is held by the CI runner, never app/browser.
-                approve_fixture(entry, writer, approvals)
+                approve_fixture(entry, writer)
                 rerender_library(desktop_page)
                 assert_state(desktop_page, "APPROVED_FOR_INDEXING")
                 actual.assert_no_document_controls(desktop_page)
