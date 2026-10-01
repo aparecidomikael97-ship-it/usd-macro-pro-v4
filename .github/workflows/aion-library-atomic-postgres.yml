@@ -27,7 +27,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd 'pg_isready -U library_sandbox -d aion_library_sandbox'
+          --health-cmd pg_isready
           --health-interval 3s
           --health-timeout 3s
           --health-retries 12
