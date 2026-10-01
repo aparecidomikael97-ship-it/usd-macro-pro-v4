@@ -202,10 +202,41 @@ def assert_state(page, expected):
 
 
 def rerender_library(page):
-    area = actual.enter_aion(page)
-    combo = area.get_by_role("combobox")
-    combo.click()
-    page.get_by_role("option", name="🧠 Central").click(timeout=30_000)
+    """Force a genuine Streamlit navigation cycle without touching session state.
+
+    An external runner-only PG approval/revocation cannot trigger the client's
+    own Streamlit rerun. UI navigation does. Streamlit may detach the menu
+    during a render, so reacquire the selector with a bounded retry.
+    """
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+    central = page.get_by_role("option", name="🧠 Central", exact=True)
+    for attempt in range(4):
+        area = actual.enter_aion(page)
+        combo = area.get_by_role("combobox")
+        if "🧠 Central" in combo.inner_text():
+            break
+        combo.click(timeout=15_000)
+        try:
+            central.wait_for(state="visible", timeout=4_000)
+            central.click(timeout=6_000)
+            # If React re-rendered immediately, only the actual selected
+            # value (never synthetic session injection) counts as success.
+            area = actual.enter_aion(page)
+            area.get_by_role("combobox").filter(
+                has_text="🧠 Central"
+            ).wait_for(state="visible", timeout=20_000)
+            break
+        except PlaywrightTimeout:
+            area = actual.enter_aion(page)
+            if "🧠 Central" in area.get_by_role("combobox").inner_text():
+                break
+            page.keyboard.press("Escape")
+            if attempt < 3:
+                page.wait_for_timeout(600)
+    else:
+        raise AssertionError("real Streamlit Central navigation remained unstable")
+
     area = actual.enter_aion(page)
     choose_library_checked(page, area)
 
