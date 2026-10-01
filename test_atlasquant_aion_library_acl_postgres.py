@@ -407,4 +407,236 @@ class PrincipalBoundSandboxTests(unittest.TestCase):
         self.assertNotIn("INSERT ", _SELECT)
         self.assertNotIn("UPDATE ", _SELECT)
 
+
+class PersistentPrincipalRegistrySandboxTests(unittest.TestCase):
+    """Offline persistent-registry contract; never mints durable identities."""
+
+    def setUp(self):
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            PostgresPrincipalRegistry, VerifiedHostAccount,
+        )
+        self.Verified = VerifiedHostAccount
+        self.account = VerifiedHostAccount(
+            username="reader.1", issuer="trusted.local",
+            subject="principal-old-0001", account_generation="a" * 32,
+            credential_fingerprint="c" * 24, active=True,
+        )
+        self.rows = [("reader.1", "c" * 24, True, None)]
+        self.fail_at = None
+        self.on_fetch = lambda: None
+        self.connections = []
+        owner = self
+
+        class RegistryCursor:
+            closed = False
+            def __init__(self):
+                self.calls = []
+
+            def execute(self, sql, params=None):
+                self.calls.append((sql, params))
+                if owner.fail_at == "sql":
+                    raise RuntimeError("SECRET-REGISTRY-CONNECTION")
+
+            def fetchmany(self, limit):
+                owner.on_fetch()
+                if owner.fail_at == "fetch":
+                    raise RuntimeError("SECRET-REGISTRY-CONNECTION")
+                return owner.rows[:limit]
+
+            def close(self):
+                self.closed = True
+
+        class RegistryDB:
+            autocommit = False
+            def __init__(self):
+                self.cur = RegistryCursor()
+                self.closed = False
+                self.rolled = False
+
+            def cursor(self):
+                return self.cur
+
+            def rollback(self):
+                self.rolled = True
+
+            def close(self):
+                self.closed = True
+
+        def connect():
+            instance = RegistryDB()
+            owner.connections.append(instance)
+            return instance
+
+        self.connect = connect
+        self.registry = PostgresPrincipalRegistry(
+            connect=self.connect, verified_host_account=lambda: self.account,
+        )
+
+    def read(self):
+        return self.registry.current_principal()
+
+    def test_registry_reads_exact_persistent_principal_not_username_lookup(self):
+        identity = self.read()
+        self.assertEqual(
+            (identity.username, identity.issuer, identity.subject,
+             identity.account_generation, identity.active),
+            ("reader.1", "trusted.local", "principal-old-0001", "a" * 32, True),
+        )
+        conn = self.connections[-1]
+        self.assertIn("READ COMMITTED, READ ONLY", conn.cur.calls[0][0])
+        self.assertEqual(
+            conn.cur.calls[1][1],
+            ("trusted.local", "principal-old-0001", "a" * 32),
+        )
+        self.assertTrue(conn.closed and conn.rolled and conn.cur.closed)
+
+    def test_registry_missing_or_duplicate_row_denied(self):
+        for rows in ([], self.rows * 2):
+            with self.subTest(rows=rows):
+                self.rows = rows
+                with self.assertRaises(AuthorizationDenied):
+                    self.read()
+        self.assertTrue(all(c.closed and c.rolled for c in self.connections))
+
+    def test_registry_inactive_retired_and_malformed_row_denied(self):
+        for row in (
+            ("reader.1", "c" * 24, False, 2000000000),
+            ("reader.1", "c" * 24, True, 2000000000),
+            ("reader.1", "c" * 24, False, None),
+            ("reader.2", "c" * 24, True, None),
+            ("reader.1", "d" * 24, True, None),
+            ("reader.1", "c" * 24, 1, None),
+            ("reader.1", "not-fingerprint", True, None),
+            ("reader.1", "c" * 24, True),
+        ):
+            with self.subTest(row=row):
+                self.rows = [row]
+                with self.assertRaises(AuthorizationDenied):
+                    self.read()
+
+    def test_invalid_untrusted_identity_denied_before_sql(self):
+        for invalid in (
+            None,
+            {"username": "reader.1"},
+            self.Verified("reader.1", "trusted.local", "principal-old-0001",
+                          "a" * 32, "bad", True),
+            self.Verified("reader.1", "trusted.local", "principal-old-0001",
+                          "a" * 32, "c" * 24, False),
+            self.Verified("Reader.1", "trusted.local", "principal-old-0001",
+                          "a" * 32, "c" * 24, True),
+            self.Verified("reader.1", "trusted.local", "principal-old-0001",
+                          "a" * 32, "c" * 24, 1),
+        ):
+            with self.subTest(identity=repr(invalid)):
+                self.account = invalid
+                with self.assertRaises(AuthorizationDenied):
+                    self.read()
+        self.assertEqual(self.connections, [])
+
+    def test_registry_rejects_identity_switch_mid_query(self):
+        self.on_fetch = lambda: setattr(
+            self, "account", self.Verified(
+                "reader.1", "trusted.local", "principal-new-0002",
+                "b" * 32, "d" * 24, True,
+            )
+        )
+        with self.assertRaises(AuthorizationDenied):
+            self.read()
+        self.assertTrue(self.connections[-1].closed)
+
+    def test_registry_rotation_requires_fresh_privileged_binding_not_regrant(self):
+        old = self.read()
+        self.account = self.Verified(
+            "reader.1", "trusted.local", "principal-old-0001",
+            "a" * 32, "d" * 24, True,
+        )
+        with self.assertRaises(AuthorizationDenied):
+            self.read()
+        # In a real deployment only a separately audited privileged identity
+        # control plane would update the registry binding atomically.
+        self.rows = [("reader.1", "d" * 24, True, None)]
+        rotated = self.read()
+        self.assertEqual(rotated, old)
+
+    def test_recreation_cannot_reuse_retired_identity_or_old_binding(self):
+        old = self.read()
+        self.account = self.Verified(
+            "reader.1", "trusted.local", "principal-new-0002",
+            "b" * 32, "d" * 24, True,
+        )
+        # Simulate the DB response for an old account: changed ID/generation
+        # cannot be authenticated solely via username or old password binding.
+        with self.assertRaises(AuthorizationDenied):
+            self.read()
+        # On the new principal's explicit row the lookup is distinct.
+        self.rows = [("reader.1", "d" * 24, True, None)]
+        fresh = self.read()
+        self.assertNotEqual(
+            (fresh.subject, fresh.account_generation),
+            (old.subject, old.account_generation),
+        )
+
+    def test_registry_failure_is_fail_closed_and_never_leaks_db_errors(self):
+        self.fail_at = "fetch"
+        with self.assertRaises(AuthorizationDenied) as cm:
+            self.read()
+        self.assertNotIn("SECRET-REGISTRY", str(cm.exception))
+        self.assertTrue(self.connections[-1].closed)
+
+    def test_registry_configuration_and_autocommit_denied(self):
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            PostgresPrincipalRegistry,
+        )
+        with self.assertRaises(AuthorizationDenied):
+            PostgresPrincipalRegistry(
+                connect=None, verified_host_account=lambda: self.account,
+            )
+        db = self.connect()
+        db.autocommit = True
+        self.registry = PostgresPrincipalRegistry(
+            connect=lambda: db, verified_host_account=lambda: self.account,
+        )
+        with self.assertRaises(AuthorizationDenied):
+            self.read()
+        self.assertTrue(db.closed)
+
+    def test_registry_to_acl_v2_adapter_revalidates_identity(self):
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        registry = self.registry
+        grants = {
+            ("trusted.local", "principal-old-0001", "a" * 32,
+             "reader.1", "T-A", "LIBRARY"): (("LIBRARY_READER", True, None),)
+        }
+
+        def acl_connect():
+            scope = ACLFakeDB()
+            def fetchmany(limit):
+                params = scope.cur.calls[1][1]
+                return grants.get(params, ())[:limit]
+            scope.cur.fetchmany = fetchmany
+            return scope
+
+        acl = PrincipalBoundPostgresMembership(
+            connect=acl_connect, current_principal=registry.current_principal,
+        )
+        self.assertEqual(acl.roles_for("reader.1", "T-A", "LIBRARY"),
+                         ("LIBRARY_READER",))
+        self.account = self.Verified(
+            "reader.1", "trusted.local", "principal-new-0002",
+            "b" * 32, "d" * 24, True,
+        )
+        # Registry denies B until independently persisted and bound.
+        with self.assertRaises(AuthorizationDenied):
+            acl.roles_for("reader.1", "T-A", "LIBRARY")
+        self.rows = [("reader.1", "d" * 24, True, None)]
+        self.assertEqual(acl.roles_for("reader.1", "T-A", "LIBRARY"), ())
+        grants[("trusted.local", "principal-new-0002", "b" * 32,
+                "reader.1", "T-A", "LIBRARY")] = (
+                    ("LIBRARY_READER", True, None),
+                )
+        self.assertEqual(acl.roles_for("reader.1", "T-A", "LIBRARY"),
+                         ("LIBRARY_READER",))
+
 if __name__=='__main__':unittest.main()
