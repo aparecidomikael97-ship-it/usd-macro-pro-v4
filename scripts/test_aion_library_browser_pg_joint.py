@@ -85,6 +85,28 @@ def start_actual_app(entry_id, *, shell_enabled):
         raise
 
 
+def choose_library_checked(page, area):
+    combo = area.get_by_role("combobox")
+    combo.click()
+    try:
+        page.get_by_role("option", name="📚 Biblioteca").wait_for(
+            state="visible", timeout=12_000)
+        page.get_by_role("option", name="📚 Biblioteca").click(timeout=20_000)
+        page.get_by_text("Nenhum PDF pode ser enviado, consultado ou aprovado",
+                         exact=False).wait_for(timeout=120_000)
+    except Exception:
+        # Only display static workspace labels and allowlisted policy reason.
+        labels = page.get_by_role("option").all_inner_texts()
+        print("CI_WORKSPACE_OPTIONS=" + repr(labels[:12]), flush=True)
+        logfile = OUT / "private-local-only.log"
+        if logfile.exists():
+            lines = [line.strip() for line in logfile.read_text(
+                encoding="utf-8", errors="replace").splitlines()
+                if "AION_CI_GATE_REASON=" in line]
+            print("CI_GATE_DIAG=" + repr(lines[-4:]), flush=True)
+        raise
+
+
 def browser_case(browser, *, username, width, height, mobile, expected):
     context = browser.new_context(
         viewport={"width": width, "height": height},
@@ -97,7 +119,7 @@ def browser_case(browser, *, username, width, height, mobile, expected):
         actual.login(page, username)
         if username == actual.CI_ADMIN and expected != "FLAG_OFF":
             area = actual.enter_aion(page)
-            actual.choose_library(page, area)
+            choose_library_checked(page, area)
             actual.assert_no_document_controls(page)
             assert_state(page, expected)
         elif username == actual.CI_ADMIN:
@@ -140,7 +162,7 @@ def rerender_library(page):
     combo.click()
     page.get_by_role("option", name="🧠 Central").click(timeout=30_000)
     area = actual.enter_aion(page)
-    actual.choose_library(page, area)
+    choose_library_checked(page, area)
 
 
 def main():
