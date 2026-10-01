@@ -1,27 +1,7 @@
 {
   "version": "V1",
-  "updated_at": "2026-10-01T22:22:47.096847+00:00",
+  "updated_at": "2026-10-01T22:49:25.732110+00:00",
   "samples": [
-    {
-      "schema_version": "atlasquant.quota-shadow.v1",
-      "timestamp": "2026-09-21T21:51:29.439562+00:00",
-      "market_open": true,
-      "actual_http_calls": 0,
-      "requested_internal_calls": 0,
-      "provider_blocked": false,
-      "block_type": "",
-      "app_headless_ok": true,
-      "scanner_fresh": 7,
-      "market_map_fresh": 7,
-      "budget_used": 175.0,
-      "budget_remaining": 305.0,
-      "adaptive_estimated_daily_calls": 309,
-      "adaptive_usable_cap": 400,
-      "adaptive_within_usable_cap": true,
-      "adaptive_active_pairs": 3,
-      "adaptive_background_pairs": 25,
-      "sample_id": "6722b70ae46f9e6a67ffd53ae6b9ec56bbf6fc6610b5ed1ece2bd0931aad113c"
-    },
     {
       "schema_version": "atlasquant.quota-shadow.v1",
       "timestamp": "2026-09-21T22:21:52.485721+00:00",
@@ -10001,6 +9981,26 @@
       "adaptive_active_pairs": 3,
       "adaptive_background_pairs": 25,
       "sample_id": "e6d049dc43603c43d6cf81510426f7dca3b8bb57b9a5f1d63065ff8729b595cc"
+    },
+    {
+      "schema_version": "atlasquant.quota-shadow.v1",
+      "timestamp": "2026-10-01T22:49:25.732110+00:00",
+      "market_open": true,
+      "actual_http_calls": 0,
+      "requested_internal_calls": 0,
+      "provider_blocked": true,
+      "block_type": "CONTROLE_INDISPONIVEL",
+      "app_headless_ok": true,
+      "scanner_fresh": 7,
+      "market_map_fresh": 7,
+      "budget_used": 166.0,
+      "budget_remaining": 314.0,
+      "adaptive_estimated_daily_calls": 309,
+      "adaptive_usable_cap": 400,
+      "adaptive_within_usable_cap": true,
+      "adaptive_active_pairs": 3,
+      "adaptive_background_pairs": 25,
+      "sample_id": "bfe9aafef1c4986601265112c7b46dfbfa83b82aa17bcd199ac22a5cfab7a255"
     }
   ],
   "summary": {
@@ -10011,8 +10011,8 @@
     "market_open_runs": 401,
     "min_market_runs": 20,
     "minimum_met": true,
-    "provider_blocked_runs": 192,
-    "provider_block_rate_pct": 47.88,
+    "provider_blocked_runs": 193,
+    "provider_block_rate_pct": 48.13,
     "headless_failed_runs": 0,
     "avg_actual_http_calls_per_market_run": 3.57,
     "max_actual_http_calls_per_market_run": 14,
