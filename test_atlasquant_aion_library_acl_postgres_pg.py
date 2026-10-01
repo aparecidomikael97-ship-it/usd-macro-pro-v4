@@ -549,7 +549,6 @@ class PersistentRegistryPostgreSQLTests(unittest.TestCase):
             self.enroll(self.account_b)
         self.retire(self.account_a)
         self.enroll(self.account_b)
-        self.assertEqual(self.registry.current_principal, self.registry.current_principal)
         self.account = self.account_b
         self.assertEqual(self.registry.current_principal().subject,
                          self.account_b.subject)
