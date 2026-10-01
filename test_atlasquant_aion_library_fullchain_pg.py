@@ -19,6 +19,7 @@ from test_aion_core_library_atomic_store import IK, AK, RK, NOW, make_proofs
 
 EXPECTED = ('postgresql://library_sandbox:synthetic_ci_only_not_for_production'
             '@localhost:5432/aion_library_sandbox')
+HOST_IDENTITY_KEY = b'j' * 32  # Separate synthetic host identity from trusted approval-import verifier.
 ENABLED = (os.getenv('CI') == 'true' and
            os.getenv('AION_LIB_FULL_CHAIN_TEST') == '1' and
            os.getenv('AION_LIB_TEST_PG_DSN') == EXPECTED)
@@ -75,7 +76,7 @@ class AtlasQuantFullChainPostgresTests(unittest.TestCase):
         }
         self.login('reader.1')
         self.verifier=AttestationVerifier(
-            identity_issuers={'fullchain-id':IK, 'authz':IK},
+            identity_issuers={'fullchain-id':HOST_IDENTITY_KEY, 'authz':IK},
             approval_issuers={'human':AK},
             rights_issuers={'license':RK}, clock=lambda:NOW)
         self.writer=AtomicLibraryStore(
@@ -134,7 +135,7 @@ class AtlasQuantFullChainPostgresTests(unittest.TestCase):
             acl_connect=lambda:self.psycopg.connect(READ_DSN),
             document_connect=lambda:self.psycopg.connect(READ_DSN),
             trusted_issuer='atlasquant.local',token_audience='library',
-            attestation_issuer='fullchain-id',identity_key=IK,
+            attestation_issuer='fullchain-id',identity_key=HOST_IDENTITY_KEY,
             verifier=self.verifier,checkpoint_key=b'c'*32,clock=lambda:NOW)
         args.update(kwargs)
         return SandboxLibraryServerReadAssembly(**args)
