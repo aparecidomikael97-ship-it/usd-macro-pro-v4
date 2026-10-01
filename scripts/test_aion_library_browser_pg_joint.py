@@ -202,40 +202,40 @@ def assert_state(page, expected):
 
 
 def rerender_library(page):
-    """Force a genuine Streamlit navigation cycle without touching session state.
+    """Genuine keyboard-only workspace navigation; same authenticated browser.
 
-    An external runner-only PG approval/revocation cannot trigger the client's
-    own Streamlit rerun. UI navigation does. Streamlit may detach the menu
-    during a render, so reacquire the selector with a bounded retry.
+    Streamlit's React-Aria menu options have repeatedly detached during
+    Playwright's element-stability check. Moving by keyboard uses the real
+    visible combobox without DOM poking, session injections or page.reload().
     """
     from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-    central = page.get_by_role("option", name="🧠 Central", exact=True)
+    selected = False
     for attempt in range(4):
         area = actual.enter_aion(page)
         combo = area.get_by_role("combobox")
         if "🧠 Central" in combo.inner_text():
+            selected = True
             break
-        combo.click(timeout=15_000)
+        # Only native React-Aria keyboard selection. Home selects the first
+        # fixed workspace (Central); Enter commits this actual UI change.
+        combo.click(timeout=12_000)
+        combo.press("Home", timeout=7_000)
+        combo.press("Enter", timeout=7_000)
         try:
-            central.wait_for(state="visible", timeout=4_000)
-            central.click(timeout=6_000)
-            # If React re-rendered immediately, only the actual selected
-            # value (never synthetic session injection) counts as success.
             area = actual.enter_aion(page)
             area.get_by_role("combobox").filter(
                 has_text="🧠 Central"
-            ).wait_for(state="visible", timeout=20_000)
+            ).wait_for(state="visible", timeout=6_000)
+            selected = True
             break
         except PlaywrightTimeout:
-            area = actual.enter_aion(page)
-            if "🧠 Central" in area.get_by_role("combobox").inner_text():
-                break
             page.keyboard.press("Escape")
             if attempt < 3:
-                page.wait_for_timeout(600)
-    else:
-        raise AssertionError("real Streamlit Central navigation remained unstable")
+                page.wait_for_timeout(650)
+
+    if not selected:
+        raise AssertionError("actual Streamlit keyboard navigation did not select Central")
 
     area = actual.enter_aion(page)
     choose_library_checked(page, area)
