@@ -16,6 +16,7 @@ on:
       - review/aion-library-restore-drill-v1-20261001
       - review/aion-library-native-login-bridge-v1-20261001
       - review/aion-library-native-login-pg-preview-v1-20261001
+      - review/aion-library-admin-shell-sandbox-v1-20261001
     paths:
       - "aion_core/**"
       - "atlasquant_aion_library_host_access.py"
@@ -24,6 +25,8 @@ on:
       - "atlasquant_aion_library_workspace_shell.py"
       - "atlasquant_aion_admin.py"
       - "test_atlasquant_aion_library_workspace_shell.py"
+      - "atlasquant_aion_library_acl_postgres.py"
+      - "test_atlasquant_aion_library_acl_postgres*.py"
       - "test_atlasquant_aion_library_postgres_preview*.py"
       - "test_aion_core_*.py"
       - ".github/workflows/aion-library-foundation.yml"
@@ -44,7 +47,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile Python sources
-        run: python -m compileall -q aion_core test_aion_core_*.py atlasquant_aion_library_host_access.py test_atlasquant_aion_library_host_access.py atlasquant_aion_library_postgres_preview.py test_atlasquant_aion_library_postgres_preview*.py atlasquant_aion_library_workspace_shell.py test_atlasquant_aion_library_workspace_shell.py atlasquant_aion_admin.py
+        run: python -m compileall -q aion_core test_aion_core_*.py atlasquant_aion_library_host_access.py test_atlasquant_aion_library_host_access.py atlasquant_aion_library_postgres_preview.py test_atlasquant_aion_library_postgres_preview*.py atlasquant_aion_library_workspace_shell.py test_atlasquant_aion_library_workspace_shell.py atlasquant_aion_library_acl_postgres.py test_atlasquant_aion_library_acl_postgres*.py atlasquant_aion_admin.py
       - name: Run AION Core, login-to-PostgreSQL and protected admin Library shell contracts
         run: |
           python -m unittest -q \
@@ -68,4 +71,6 @@ jobs:
             test_atlasquant_aion_library_host_access \
             test_atlasquant_aion_library_postgres_preview \
             test_atlasquant_aion_library_postgres_preview_pg \
-            test_atlasquant_aion_library_workspace_shell
+            test_atlasquant_aion_library_workspace_shell \
+            test_atlasquant_aion_library_acl_postgres \
+            test_atlasquant_aion_library_acl_postgres_pg
