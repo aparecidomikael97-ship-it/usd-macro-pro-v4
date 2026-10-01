@@ -639,4 +639,157 @@ class PersistentPrincipalRegistrySandboxTests(unittest.TestCase):
         self.assertEqual(acl.roles_for("reader.1", "T-A", "LIBRARY"),
                          ("LIBRARY_READER",))
 
+
+class ExternalRetirementFenceSandboxTests(unittest.TestCase):
+    """Offline independent authority port; intentionally no production source."""
+
+    def setUp(self):
+        from atlasquant_aion_library_principal_acl_sandbox import CurrentPrincipal
+        from atlasquant_aion_library_external_retirement_fence_sandbox import (
+            ExternalAuthorityHead, ExternalRetirementFence,
+        )
+        self.Principal = CurrentPrincipal
+        self.Head = ExternalAuthorityHead
+        self.Fence = ExternalRetirementFence
+        self.a = CurrentPrincipal(
+            "reader.1", "trusted.local", "principal-old-0001", "a" * 32, True,
+        )
+        self.b = CurrentPrincipal(
+            "reader.1", "trusted.local", "principal-new-0002", "b" * 32, True,
+        )
+        self.registry = self.a
+        self.head = self.head_for(self.a, revision=7)
+        self.floor = 7
+        self.calls = {"registry": 0, "head": 0, "floor": 0}
+        self.on_registry = lambda: None
+        self.on_head = lambda: None
+        self.on_floor = lambda: None
+        self.reader = self.make_fence()
+
+    def head_for(self, p, *, revision, active=True):
+        return self.Head(
+            p.issuer, p.username, p.subject, p.account_generation,
+            active, revision,
+        )
+
+    def registry_current(self):
+        self.calls["registry"] += 1
+        self.on_registry()
+        return self.registry
+
+    def current_external(self, issuer, username):
+        self.assertEqual((issuer, username), ("trusted.local", "reader.1"))
+        self.calls["head"] += 1
+        self.on_head()
+        return self.head
+
+    def external_floor(self, issuer, username):
+        self.assertEqual((issuer, username), ("trusted.local", "reader.1"))
+        self.calls["floor"] += 1
+        self.on_floor()
+        return self.floor
+
+    def make_fence(self):
+        return self.Fence(
+            registry_principal=self.registry_current,
+            current_authority=self.current_external,
+            minimum_revision=self.external_floor,
+        )
+
+    def test_current_external_head_and_independent_floor_allow_same_identity(self):
+        self.assertEqual(self.reader.current_principal(), self.a)
+        self.assertEqual(self.calls, {"registry": 2, "head": 2, "floor": 2})
+
+    def test_external_retirement_denies_even_if_old_db_still_says_active(self):
+        self.head = self.head_for(self.a, revision=8, active=False)
+        self.floor = 8
+        with self.assertRaises(AuthorizationDenied):
+            self.reader.current_principal()
+
+    def test_restored_old_account_denied_after_external_replacement(self):
+        self.head = self.head_for(self.b, revision=8)
+        self.floor = 8
+        # Simulate stale/restored registry reporting A despite current B.
+        with self.assertRaises(AuthorizationDenied):
+            self.reader.current_principal()
+        self.registry = self.b
+        self.assertEqual(self.reader.current_principal(), self.b)
+
+    def test_stale_external_head_lower_than_independent_floor_denied(self):
+        # A previously signed/archived head MUST NOT override the external
+        # durable monotonic floor. Both callbacks are independently trusted.
+        self.floor = 8
+        with self.assertRaises(AuthorizationDenied):
+            self.reader.current_principal()
+
+    def test_unavailable_authority_or_floor_denied_not_username_fallback(self):
+        def failed():
+            raise RuntimeError("EXTERNAL-RETIREMENT-SECRET")
+        for change in ("current_authority", "minimum_revision"):
+            with self.subTest(callback=change):
+                kwargs = dict(
+                    registry_principal=self.registry_current,
+                    current_authority=self.current_external,
+                    minimum_revision=self.external_floor,
+                )
+                kwargs[change] = lambda *args: failed()
+                fence = self.Fence(**kwargs)
+                with self.assertRaises(AuthorizationDenied) as err:
+                    fence.current_principal()
+                self.assertNotIn("EXTERNAL-RETIREMENT-SECRET", str(err.exception))
+
+    def test_head_change_during_registry_resolution_denied(self):
+        self.on_registry = lambda: setattr(
+            self, "head", self.head_for(self.b, revision=8),
+        ) if self.calls["registry"] == 2 else None
+        with self.assertRaises(AuthorizationDenied):
+            self.reader.current_principal()
+
+    def test_external_minimum_advances_during_resolution_denied(self):
+        self.on_floor = lambda: setattr(self, "floor", 8) \
+            if self.calls["floor"] == 2 else None
+        with self.assertRaises(AuthorizationDenied):
+            self.reader.current_principal()
+
+    def test_registry_identity_switch_during_resolution_denied(self):
+        self.on_registry = lambda: setattr(self, "registry", self.b) \
+            if self.calls["registry"] == 2 else None
+        with self.assertRaises(AuthorizationDenied):
+            self.reader.current_principal()
+
+    def test_malformed_external_heads_and_floor_fail_closed(self):
+        cases = (
+            (None, 7),
+            (dict(username="reader.1"), 7),
+            (self.Head("wrong.local", "reader.1", self.a.subject,
+                       self.a.account_generation, True, 7), 7),
+            (self.Head("trusted.local", "reader.1", self.a.subject,
+                       self.a.account_generation, 1, 7), 7),
+            (self.head_for(self.a, revision=0), 0),
+            (self.head_for(self.a, revision=True), 7),
+            (self.head, True),
+            (self.head, -1),
+            (self.head, 8),
+        )
+        for head, floor in cases:
+            with self.subTest(head=head, floor=floor):
+                self.head, self.floor = head, floor
+                with self.assertRaises(AuthorizationDenied):
+                    self.reader.current_principal()
+
+    def test_inactive_registry_and_untrusted_configuration_denied(self):
+        with self.assertRaises(AuthorizationDenied):
+            self.Fence(
+                registry_principal=None,
+                current_authority=self.current_external,
+                minimum_revision=self.external_floor,
+            )
+        self.registry = self.Principal(
+            self.a.username, self.a.issuer, self.a.subject,
+            self.a.account_generation, False,
+        )
+        with self.assertRaises(AuthorizationDenied):
+            self.reader.current_principal()
+        self.assertEqual(self.calls["head"], 0)
+
 if __name__=='__main__':unittest.main()
