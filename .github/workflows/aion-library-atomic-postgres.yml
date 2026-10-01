@@ -1,0 +1,49 @@
+name: AION Library atomic PostgreSQL sandbox
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - review/aion-library-shared-approval-port-v1-20261001
+    paths:
+      - 'aion_core/**'
+      - 'test_aion_core_library_atomic_*.py'
+      - '.github/workflows/aion-library-atomic-postgres.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-postgresql-transaction-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: library_sandbox
+          POSTGRES_PASSWORD: synthetic_ci_only_not_for_production
+          POSTGRES_DB: aion_library_sandbox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd 'pg_isready -U library_sandbox -d aion_library_sandbox'
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      AION_LIB_TEST_PG_DSN: postgresql://library_sandbox:synthetic_ci_only_not_for_production@localhost:5432/aion_library_sandbox
+      PYTHONWARNINGS: error::ResourceWarning
+    steps:
+      - name: Checkout candidate PR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned PostgreSQL integration driver in sandbox
+        run: python -m pip install 'psycopg[binary]==3.2.10'
+      - name: Compile offline contracts
+        run: python -m compileall -q aion_core test_aion_core_library_atomic_*.py
+      - name: Real ephemeral PostgreSQL transactions and concurrency
+        run: python -m unittest -v test_aion_core_library_atomic_pg
