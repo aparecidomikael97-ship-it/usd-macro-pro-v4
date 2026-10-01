@@ -421,6 +421,9 @@ from atlasquant_aion_business_team_access_step1_provider_receipt_review import (
 from atlasquant_aion_business_team_access_step1_ledger_append_contract import (
     ledger_append_contract_policy as business_team_step1_ledger_append_contract_policy,
 )
+from atlasquant_aion_business_team_access_step1_ledger_persistent_writer import (
+    ledger_writer_policy as business_team_step1_ledger_writer_policy,
+)
 from atlasquant_aion_promotions import (
     BENEFIT_TYPES as PROMO_BENEFIT_TYPES,
     activation_preflight,
@@ -7380,6 +7383,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "54 · Equipe & Acessos · Step 1 Provider Runner",
             "55 · Equipe & Acessos · Step 1 Receipt Review",
             "56 · Equipe & Acessos · Step 1 Ledger Append",
+            "57 · Equipe & Acessos · Ledger Persistence Preflight",
         ),
         key="aion_business_stack_consolidation_v2_view",
         help="Uma visão por vez para manter a experiência leve no celular.",
@@ -8413,7 +8417,7 @@ def _render_business_stack_consolidation_v2() -> None:
             "Step 2 continua não autorizado."
         )
 
-    else:
+    elif view == "56 · Equipe & Acessos · Step 1 Ledger Append":
         append = business_team_step1_ledger_append_contract_policy()
         st.write(f"Estado: **{append.get('state')}**")
         st.markdown("**Contrato de append do Step 1:**")
@@ -8431,6 +8435,43 @@ def _render_business_stack_consolidation_v2() -> None:
         )
         st.caption(
             "Mensagens genéricas não autorizam append · Step 2 continua OFF."
+        )
+
+    elif view == "57 · Equipe & Acessos · Ledger Persistence Preflight":
+        writer = business_team_step1_ledger_writer_policy()
+        st.error(str(writer.get("banner") or "PERSISTENCE NOT AUTHORIZED"))
+        st.warning(
+            "PERSISTENCE NOT AUTHORIZED. Este preflight não grava o ledger e não contém botão de aplicar."
+        )
+        st.write(f"Estado: **{writer.get('state')}**")
+        st.write(f"Modo: **{writer.get('mode')}**")
+        st.caption(
+            f"Estado máximo do preflight: {writer.get('maximum_preflight_state')}. "
+            "Esse estado não autoriza persistência."
+        )
+
+        def _shown(value):
+            text = str(value or "").strip()
+            return text if text else "NÃO EVIDENCIADO"
+
+        current_count = writer.get("current_receipt_count")
+        st.markdown("**Plano verificável, sem ledger carregado:**")
+        for label, value in (
+            ("source ledger digest", _shown(writer.get("source_ledger_digest"))),
+            ("canonical receipt digest", _shown(writer.get("canonical_receipt_digest"))),
+            ("decision digest", _shown(writer.get("ledger_append_decision_digest"))),
+            ("target digest", _shown(writer.get("target_ledger_digest"))),
+            ("receipt count atual", "NÃO EVIDENCIADO" if current_count is None else str(current_count)),
+            ("receipt count esperado", str(writer.get("expected_receipt_count"))),
+            ("atomic-write status", str(writer.get("atomic_write_status"))),
+            ("rollback readiness", str(writer.get("rollback_readiness"))),
+            ("lock status", str(writer.get("lock_status"))),
+            ("next expected lifecycle step", str(writer.get("next_expected_lifecycle_step"))),
+        ):
+            st.markdown(f"- {label}: `{value}`")
+        st.caption(
+            "next_step_authorized=false · step2_execution_authorized=false · "
+            "apply_command_available=false · produção/deploy/runtime OFF."
         )
 
 

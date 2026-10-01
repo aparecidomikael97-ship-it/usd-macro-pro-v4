@@ -1446,3 +1446,22 @@ The maximum state is
 modified and Step 2 remains unauthorized.
 
 ADR-0082 records this boundary.
+
+## BUSINESS team access Step 1 persistent ledger writer
+
+`atlasquant_aion_business_team_access_step1_ledger_persistent_writer.py`
+turns the verified append decision into a plan-only persistence preflight.
+
+The default mode is `PLAN_ONLY`. A ready plan must match the append decision
+digest, the GENESIS source digest, the target preview digest, the canonical
+receipt digest and the receipt-review digest. The source file must still be
+GENESIS, must stay unchanged after preflight, and must live inside an explicit
+sandbox directory that is not a symlink.
+
+The maximum state is
+`READY_FOR_EXPLICIT_STEP1_LEDGER_PERSISTENCE_AUTHORIZATION`. That state does
+not authorize a write. Physical apply is refused. A future Windows Hello or
+FIDO2 proof is only an interface here and is not verified. Step 2 stays
+unauthorized.
+
+ADR-0083 records this boundary.

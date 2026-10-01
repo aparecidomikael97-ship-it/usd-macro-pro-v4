@@ -32,6 +32,6 @@ Step 2 continua não autorizado.
 
 ## Próximo gate
 
-Writer local atômico, PLAN ONLY por padrão, preso ao append decision digest e
-ao source ledger digest atual. Mesmo depois do append, Step 2 terá preflight e
+O writer local PLAN ONLY foi aberto na camada seguinte (ADR-0083). Ele ainda
+não grava. Mesmo depois de uma persistência futura, Step 2 terá preflight e
 decisão próprios.
