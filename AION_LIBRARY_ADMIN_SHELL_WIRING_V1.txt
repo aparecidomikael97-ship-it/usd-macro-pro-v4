@@ -1,0 +1,11 @@
+Incremental wiring map (actual 500KB administrator file and workflow modifications remain tracked in the Draft PR, not included in this backup ZIP):
+
+- Existing import: from atlasquant_access_panel import configured_users
+  becomes: from atlasquant_access_panel import configured_users, session_time_status
+- Import WORKSPACE_LABEL, library_shell_gate, library_workspace_choices, render_library_shell from atlasquant_aion_library_workspace_shell.
+- Immediately after obtaining configured_account_rows, construct library_gate(access=access_map, users=configured_account_rows, environment=_secret("ATLASQUANT_ENV"), preview_flag=_secret("AION_LIBRARY_SHELL_PREVIEW"), now=datetime.now(timezone.utc).timestamp(), session_time_check=session_time_status).
+- Keep AION_WORKSPACES exactly unchanged; create workspace_choices=library_workspace_choices(standard=AION_WORKSPACES, gate=library_gate), use for jump membership and st.selectbox options.
+- Before st.selectbox, if not library_gate['visible'] and session_state workspace is the Library label, set the selection to "🧠 Central".
+- In existing render dispatch add `elif selected_workspace == LIBRARY_WORKSPACE_LABEL: render_library_shell(st, gate=library_gate)`.
+- Update isolated CI to include compileall of admin and shell/test and add test_atlasquant_aion_library_workspace_shell; update Quality test list for the new module.
+- No new route, no upload, no database connection, no feature flag change.
