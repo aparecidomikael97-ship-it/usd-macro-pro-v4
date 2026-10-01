@@ -712,4 +712,375 @@ class PersistentRegistryPostgreSQLTests(unittest.TestCase):
         with self.assertRaises(AuthorizationDenied):
             reader.roles_for("reader.1", "T-A", "LIBRARY")
 
+
+# These tests run only with the EXACT ephemeral CI DB and RESTORE_DRILL=1.
+# This is a REAL pg_dump/pg_restore of the sandbox identity/ACL TABLES,
+# leaving a separate logical witness DB intact on the SAME CI PG SERVER.
+# The external revision floor remains simulated in process, NOT offsite.
+@unittest.skipUnless(
+    ENABLED and os.getenv("AION_LIB_RESTORE_DRILL") == "1",
+    "strict ephemeral PG real identity+ACL restore configuration required",
+)
+class IdentityAclRestoreWitnessPostgreSQLTests(unittest.TestCase):
+    SOURCE = "aion_library_identity_source_ci"
+    TARGET = "aion_library_identity_restore_ci"
+    WITNESS = "aion_library_retirement_witness_ci"
+    DATA_READER = "aion_identity_ci_reader"
+    WITNESS_READER = "aion_witness_ci_reader"
+
+    @classmethod
+    def admin_dsn(cls, database):
+        return EXPECTED.rsplit("/", 1)[0] + "/" + database
+
+    @classmethod
+    def data_reader_dsn(cls, database):
+        return (
+            "postgresql://aion_identity_ci_reader:synthetic_identity_reader_only"
+            "@localhost:5432/" + database
+        )
+
+    @classmethod
+    def witness_reader_dsn(cls):
+        return (
+            "postgresql://aion_witness_ci_reader:synthetic_witness_reader_only"
+            "@localhost:5432/" + cls.WITNESS
+        )
+
+    @classmethod
+    def setUpClass(cls):
+        import shutil
+        import subprocess
+        import hashlib
+        import psycopg
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            MIGRATION_PRINCIPAL_REGISTRY,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            MIGRATION_PRINCIPAL_ACL_V2,
+        )
+        from atlasquant_aion_library_witness_pg_sandbox import (
+            MIGRATION_WITNESS_PG,
+        )
+        if shutil.which("docker") is None:
+            raise RuntimeError("ephemeral PG Docker restore tool missing; no skip")
+        cls.pg = psycopg
+        cls.subprocess = subprocess
+        cls.hashlib = hashlib
+        # Fixed, distinct synthetic DB names only. Never take arbitrary DSNs.
+        with psycopg.connect(EXPECTED, autocommit=True) as db:
+            for name in (cls.SOURCE, cls.TARGET, cls.WITNESS):
+                db.execute("DROP DATABASE IF EXISTS " + name + " WITH (FORCE)")
+                db.execute("CREATE DATABASE " + name)
+            with db.cursor() as cur:
+                for role, password in (
+                    (cls.DATA_READER, "synthetic_identity_reader_only"),
+                    (cls.WITNESS_READER, "synthetic_witness_reader_only"),
+                ):
+                    cur.execute("SELECT 1 FROM pg_roles WHERE rolname=%s", (role,))
+                    if cur.fetchone() is None:
+                        # Both names/passwords are hard-coded synthetic CI only.
+                        cur.execute(
+                            "CREATE ROLE " + role + " LOGIN PASSWORD '" + password + "'"
+                        )
+                    for name in (cls.SOURCE, cls.TARGET, cls.WITNESS):
+                        cur.execute("GRANT CONNECT ON DATABASE " + name
+                                    + " TO " + role)
+        with psycopg.connect(cls.admin_dsn(cls.SOURCE), autocommit=True) as db:
+            db.execute(MIGRATION_PRINCIPAL_REGISTRY)
+            db.execute(MIGRATION_PRINCIPAL_ACL_V2)
+            db.execute("GRANT USAGE ON SCHEMA public TO " + cls.DATA_READER)
+            db.execute(
+                "GRANT SELECT ON aion_library_principal_registry_sandbox,"
+                "aion_library_tenant_acl_principal_v2 TO " + cls.DATA_READER
+            )
+        with psycopg.connect(cls.admin_dsn(cls.WITNESS), autocommit=True) as db:
+            db.execute(MIGRATION_WITNESS_PG)
+            db.execute("GRANT USAGE ON SCHEMA public TO " + cls.WITNESS_READER)
+            db.execute(
+                "GRANT SELECT ON aion_library_witness_history_sandbox TO "
+                + cls.WITNESS_READER
+            )
+
+    @classmethod
+    def tearDownClass(cls):
+        with cls.pg.connect(EXPECTED, autocommit=True) as db:
+            for name in (cls.SOURCE, cls.TARGET, cls.WITNESS):
+                db.execute("DROP DATABASE IF EXISTS " + name + " WITH (FORCE)")
+
+    def setUp(self):
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            VerifiedHostAccount,
+        )
+        self.a = VerifiedHostAccount(
+            "reader.1", "trusted.local", "principal-old-0001",
+            "a" * 32, "c" * 24, True,
+        )
+        self.b = VerifiedHostAccount(
+            "reader.1", "trusted.local", "principal-new-0002",
+            "b" * 32, "d" * 24, True,
+        )
+        self.account = self.a
+        self.floor = 7  # Simulated separate trusted floor, NOT durable/offsite.
+        with self.pg.connect(self.admin_dsn(self.SOURCE), autocommit=True) as db:
+            db.execute("TRUNCATE TABLE aion_library_principal_registry_sandbox,"
+                       "aion_library_tenant_acl_principal_v2")
+        with self.pg.connect(self.admin_dsn(self.WITNESS), autocommit=True) as db:
+            db.execute("TRUNCATE TABLE aion_library_witness_history_sandbox")
+        with self.pg.connect(EXPECTED, autocommit=True) as db:
+            db.execute("DROP DATABASE IF EXISTS " + self.TARGET + " WITH (FORCE)")
+            db.execute("CREATE DATABASE " + self.TARGET)
+
+    def enroll(self, identity, database=None):
+        database = database or self.SOURCE
+        with self.pg.connect(self.admin_dsn(database)) as db:
+            db.execute(
+                """INSERT INTO aion_library_principal_registry_sandbox
+                (principal_issuer,principal_subject,account_generation,
+                 username,credential_binding) VALUES (%s,%s,%s,%s,%s)""",
+                (identity.issuer, identity.subject, identity.account_generation,
+                 identity.username, identity.credential_fingerprint),
+            )
+
+    def grant(self, identity, database=None):
+        database = database or self.SOURCE
+        with self.pg.connect(self.admin_dsn(database)) as db:
+            db.execute(
+                """INSERT INTO aion_library_tenant_acl_principal_v2
+                (principal_issuer,principal_subject,account_generation,
+                 username,tenant_id,domain_id,library_role)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                (identity.issuer, identity.subject, identity.account_generation,
+                 identity.username, "T-A", "LIBRARY", "LIBRARY_READER"),
+            )
+
+    def retire(self, identity, database=None):
+        database = database or self.SOURCE
+        with self.pg.connect(self.admin_dsn(database)) as db:
+            db.execute(
+                """UPDATE aion_library_principal_registry_sandbox
+                SET active=FALSE, retired_at_unix=2000000000
+                WHERE principal_issuer=%s AND principal_subject=%s
+                  AND account_generation=%s""",
+                (identity.issuer, identity.subject, identity.account_generation),
+            )
+
+    def append_witness(self, identity, *, revision, active=True):
+        # Privileged TEST FIXTURE. No mutation path exists in runtime reader.
+        with self.pg.connect(self.admin_dsn(self.WITNESS)) as db:
+            db.execute(
+                """INSERT INTO aion_library_witness_history_sandbox
+                (principal_issuer,username,principal_subject,
+                 account_generation,active,revision)
+                VALUES (%s,%s,%s,%s,%s,%s)""",
+                (identity.issuer, identity.username, identity.subject,
+                 identity.account_generation, active, revision),
+            )
+
+    def roles(self, database, *, witness_available=True):
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            PostgresPrincipalRegistry,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        from atlasquant_aion_library_witness_pg_sandbox import (
+            SeparateDatabaseWitnessReader,
+        )
+        from atlasquant_aion_library_external_retirement_fence_sandbox import (
+            ExternalRetirementFence,
+        )
+        reader_connect = lambda: self.pg.connect(self.data_reader_dsn(database))
+        registry = PostgresPrincipalRegistry(
+            connect=reader_connect, verified_host_account=lambda: self.account,
+        )
+        if witness_available:
+            witness = SeparateDatabaseWitnessReader(
+                connect=lambda: self.pg.connect(self.witness_reader_dsn()),
+            )
+            current_authority = witness.current_head
+        else:
+            current_authority = lambda issuer, name: (_ for _ in ()).throw(
+                ConnectionError("SYNTHETIC-WITNESS-OFFLINE")
+            )
+        fence = ExternalRetirementFence(
+            registry_principal=registry.current_principal,
+            current_authority=current_authority,
+            minimum_revision=lambda issuer, name: self.floor,
+        )
+        return PrincipalBoundPostgresMembership(
+            connect=reader_connect, current_principal=fence.current_principal,
+        ).roles_for("reader.1", "T-A", "LIBRARY")
+
+    @classmethod
+    def docker_tool(cls, tool, database, *, archive=None):
+        # Strict CI-only allowlist; host and credentials are synthetic literals.
+        if (
+            tool not in ("pg_dump", "pg_restore")
+            or database not in (cls.SOURCE, cls.TARGET)
+            or (tool == "pg_dump" and database != cls.SOURCE)
+            or (tool == "pg_restore" and database != cls.TARGET)
+        ):
+            raise RuntimeError("synthetic restore command not allowed")
+        command = ["docker", "run", "--rm", "--network", "host"]
+        if archive is not None:
+            command += ["-i"]
+        command += [
+            "-e", "PGPASSWORD=synthetic_ci_only_not_for_production",
+            "postgres:16", tool, "-h", "localhost", "-U",
+            "library_sandbox", "-d", database,
+        ]
+        if tool == "pg_dump":
+            command += [
+                "-Fc",
+                "--table=public.aion_library_principal_registry_sandbox",
+                "--table=public.aion_library_tenant_acl_principal_v2",
+            ]
+        else:
+            command += ["--no-owner", "--no-privileges", "--exit-on-error"]
+        proc = cls.subprocess.run(
+            command, input=archive, stdout=cls.subprocess.PIPE,
+            stderr=cls.subprocess.PIPE, timeout=100, check=False,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError("synthetic identity+ACL dump/restore failed")
+        return proc.stdout
+
+    def snapshot(self):
+        blob = self.docker_tool("pg_dump", self.SOURCE)
+        return blob, self.hashlib.sha256(blob).hexdigest()
+
+    def restore(self, blob, digest):
+        from aion_core.library_authorization import AuthorizationDenied
+        import hmac
+        # Refuse accidental archive corruption before invoking pg_restore.
+        # In-memory digest is a synthetic fixture, NOT signed external custody.
+        if not hmac.compare_digest(
+            self.hashlib.sha256(blob).hexdigest(), digest
+        ):
+            raise AuthorizationDenied("synthetic archive integrity failed")
+        self.docker_tool("pg_restore", self.TARGET, archive=blob)
+        # Since --no-privileges prevents restoring insecure source grants,
+        # an independent synthetic administrator grants SELECT on the target.
+        with self.pg.connect(self.admin_dsn(self.TARGET), autocommit=True) as db:
+            db.execute("GRANT USAGE ON SCHEMA public TO " + self.DATA_READER)
+            db.execute(
+                "GRANT SELECT ON aion_library_principal_registry_sandbox,"
+                "aion_library_tenant_acl_principal_v2 TO " + self.DATA_READER
+            )
+
+    def test_real_pg_dump_restore_replays_old_registry_acl_but_witness_vetoes(self):
+        from aion_core.library_authorization import AuthorizationDenied
+        self.enroll(self.a)
+        self.grant(self.a)
+        self.append_witness(self.a, revision=7)
+        self.assertEqual(self.roles(self.SOURCE), ("LIBRARY_READER",))
+        blob, digest = self.snapshot()
+        self.retire(self.a)
+        self.account = self.b
+        self.enroll(self.b)
+        self.grant(self.b)
+        self.append_witness(self.b, revision=8)
+        self.floor = 8
+        self.assertEqual(self.roles(self.SOURCE), ("LIBRARY_READER",))
+        self.restore(blob, digest)
+        # Assert genuine old snapshot: A + old grant exist in restored DB.
+        with self.pg.connect(self.admin_dsn(self.TARGET)) as db:
+            rows = db.execute(
+                "SELECT principal_subject,active "
+                "FROM aion_library_principal_registry_sandbox"
+            ).fetchall()
+            self.assertEqual(rows, [("principal-old-0001", True)])
+            roles = db.execute(
+                "SELECT principal_subject FROM aion_library_tenant_acl_principal_v2"
+            ).fetchall()
+            self.assertEqual(roles, [("principal-old-0001",)])
+        # Old A host (or spoofed old session) cannot win against current B
+        # witness even though both old registry and ACL were really restored.
+        self.account = self.a
+        with self.assertRaises(AuthorizationDenied):
+            self.roles(self.TARGET)
+        # New B is also denied until its registry and ACL are reconciled.
+        self.account = self.b
+        with self.assertRaises(AuthorizationDenied):
+            self.roles(self.TARGET)
+        self.retire(self.a, database=self.TARGET)
+        self.enroll(self.b, database=self.TARGET)
+        self.assertEqual(self.roles(self.TARGET), ())
+        self.grant(self.b, database=self.TARGET)
+        self.assertEqual(self.roles(self.TARGET), ("LIBRARY_READER",))
+
+    def test_real_pg_dump_restore_external_witness_revoked_a_denies_old_grant(self):
+        from aion_core.library_authorization import AuthorizationDenied
+        self.enroll(self.a)
+        self.grant(self.a)
+        self.append_witness(self.a, revision=7)
+        blob, digest = self.snapshot()
+        self.retire(self.a)
+        self.append_witness(self.a, revision=8, active=False)
+        self.floor = 8
+        self.restore(blob, digest)
+        self.account = self.a
+        with self.assertRaises(AuthorizationDenied):
+            self.roles(self.TARGET)
+
+    def test_real_pg_dump_restore_rejects_witness_rollback_below_separate_floor(self):
+        from aion_core.library_authorization import AuthorizationDenied
+        self.enroll(self.a)
+        self.grant(self.a)
+        self.append_witness(self.a, revision=7)
+        blob, digest = self.snapshot()
+        self.append_witness(self.b, revision=8)
+        self.floor = 8
+        self.restore(blob, digest)
+        # Privileged malicious/failed CI-only witness rollback simulation.
+        # Witness and floor live in different logical test sources.
+        with self.pg.connect(self.admin_dsn(self.WITNESS)) as db:
+            db.execute(
+                "DELETE FROM aion_library_witness_history_sandbox "
+                "WHERE revision=8"
+            )
+        with self.assertRaises(AuthorizationDenied):
+            self.roles(self.TARGET)
+
+    def test_real_pg_dump_restore_witness_outage_denies_no_fallback(self):
+        from aion_core.library_authorization import AuthorizationDenied
+        self.enroll(self.a)
+        self.grant(self.a)
+        self.append_witness(self.a, revision=7)
+        blob, digest = self.snapshot()
+        self.restore(blob, digest)
+        with self.assertRaises(AuthorizationDenied):
+            self.roles(self.TARGET, witness_available=False)
+
+    def test_real_pg_dump_restore_tampered_archive_denied_before_restore(self):
+        from aion_core.library_authorization import AuthorizationDenied
+        self.enroll(self.a)
+        self.grant(self.a)
+        blob, digest = self.snapshot()
+        tampered = blob[:-1] + bytes((blob[-1] ^ 1,))
+        with self.assertRaises(AuthorizationDenied):
+            self.restore(tampered, digest)
+        with self.pg.connect(self.admin_dsn(self.TARGET)) as db:
+            self.assertIsNone(db.execute(
+                "SELECT to_regclass('public.aion_library_principal_registry_sandbox')"
+            ).fetchone()[0])
+
+    def test_real_pg_separate_witness_sql_reader_cannot_change_history(self):
+        self.append_witness(self.a, revision=7)
+        with self.pg.connect(self.witness_reader_dsn()) as db:
+            with self.assertRaises(self.pg.errors.InsufficientPrivilege):
+                db.execute(
+                    "DELETE FROM aion_library_witness_history_sandbox"
+                )
+        with self.pg.connect(self.witness_reader_dsn()) as db:
+            with self.assertRaises(self.pg.errors.InsufficientPrivilege):
+                db.execute(
+                    """INSERT INTO aion_library_witness_history_sandbox
+                    (principal_issuer,username,principal_subject,
+                     account_generation,active,revision)
+                    VALUES ('trusted.local','reader.1','principal-new-0002',
+                            %s,TRUE,9)""",
+                    ("b" * 32,),
+                )
+
 if __name__=='__main__':unittest.main()
