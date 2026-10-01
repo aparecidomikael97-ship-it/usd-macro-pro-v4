@@ -103,8 +103,9 @@ def login(page, username: str):
 
 
 def enter_aion(page):
-    # The app's existing authenticated ?aion=1 route is the only entry used.
-    page.goto(URL, wait_until="domcontentloaded", timeout=90_000)
+    # Preserve the authenticated Streamlit websocket. A fresh page.goto() after
+    # login can RESET Streamlit session_state, including its local login!
+    # The initial login page already used ?aion=1, consumed on its rerun.
     page.locator('[data-testid="stSelectbox"]').filter(has_text="Área AION").first.wait_for(
         state="visible", timeout=160_000)
     return page.locator('[data-testid="stSelectbox"]').filter(has_text="Área AION").first
