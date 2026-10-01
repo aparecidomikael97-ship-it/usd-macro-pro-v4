@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - integration/aion-core-nightshift-v1-20261001
+      - drael/aion-library-foundation-v1
     paths:
       - "aion_core/**"
       - "test_aion_core_*.py"
@@ -37,4 +38,5 @@ jobs:
             test_aion_core_provenance \
             test_aion_core_security_audit \
             test_aion_core_trust_engine \
-            test_aion_core_library_foundation
+            test_aion_core_library_foundation \
+            test_aion_core_library_guard_contract

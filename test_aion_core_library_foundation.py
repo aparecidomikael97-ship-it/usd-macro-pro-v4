@@ -31,8 +31,8 @@ class LibraryFoundationTests(unittest.TestCase):
     def test_legal_transition_chain(self):
         cat = LibraryCatalog()
         e = reg(cat)
-        e2 = cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="analyst")
-        e3 = cat.transition(entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="mikael")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="analyst")
+        e3 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="mikael")
         self.assertEqual(e3.state, "APPROVED_FOR_INDEXING")
         self.assertEqual(len(e3.audit_trail), 3)
         self.assertTrue(verify_entry_integrity(e3)["integrity_ok"])
@@ -41,42 +41,42 @@ class LibraryFoundationTests(unittest.TestCase):
         cat = LibraryCatalog()
         e = reg(cat)
         with self.assertRaises(LibraryFoundationError):
-            cat.transition(entry_id=e.entry_id, to_state="APPROVED_FOR_INDEXING", actor="x")  # skips review
+            cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="APPROVED_FOR_INDEXING", actor="x")  # skips review
 
     def test_terminal_revoked_no_outgoing(self):
         cat = LibraryCatalog()
         e = reg(cat)
-        e2 = cat.transition(entry_id=e.entry_id, to_state="REVOKED", actor="mikael")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="REVOKED", actor="mikael")
         with self.assertRaises(LibraryFoundationError):
-            cat.transition(entry_id=e2.entry_id, to_state="METADATA_REVIEW", actor="x")
+            cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="METADATA_REVIEW", actor="x")
 
     def test_approval_requires_license(self):
         cat = LibraryCatalog()
         e = reg(cat, license_kind="")
-        e2 = cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
         with self.assertRaises(LibraryFoundationError):
-            cat.transition(entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="h")
+            cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="h")
 
     def test_approval_requires_human(self):
         cat = LibraryCatalog()
         e = reg(cat, human_approved_by="")
-        e2 = cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
         with self.assertRaises(LibraryFoundationError):
-            cat.transition(entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="h")
+            cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="h")
 
     def test_approval_requires_origin(self):
         cat = LibraryCatalog()
         e = reg(cat, source_reference="")
-        e2 = cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
         with self.assertRaises(LibraryFoundationError):
-            cat.transition(entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="h")
+            cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="h")
 
     def test_forged_approval_actor_rejected(self):
         cat = LibraryCatalog()
         e = reg(cat)
-        e2 = cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
         with self.assertRaises(LibraryFoundationError):
-            cat.transition(entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="a b c!")
+            cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="a b c!")
 
     # --- dedup / versions ---------------------------------------------------------
     def test_dedup_same_bytes_flagged_not_merged(self):
@@ -105,9 +105,9 @@ class LibraryFoundationTests(unittest.TestCase):
     def test_origin_requires_source_type_and_reference(self):
         cat = LibraryCatalog()
         e = reg(cat, source_type="")
-        cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
+        cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
         with self.assertRaises(LibraryFoundationError):
-            cat.transition(entry_id=e.entry_id, to_state="APPROVED_FOR_INDEXING", actor="mikael")
+            cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="APPROVED_FOR_INDEXING", actor="mikael")
 
     def test_extra_fields_fail_closed_even_for_named_fields(self):
         cat = LibraryCatalog()
@@ -196,9 +196,9 @@ class LibraryFoundationTests(unittest.TestCase):
     def test_revoked_not_indexable(self):
         cat = LibraryCatalog()
         e = reg(cat)
-        e2 = cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
-        e3 = cat.transition(entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="h")
-        e4 = cat.transition(entry_id=e3.entry_id, to_state="REVOKED", actor="h")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="a")
+        e3 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="APPROVED_FOR_INDEXING", actor="mikael")
+        e4 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e3.entry_id, to_state="REVOKED", actor="h")
         self.assertEqual(cat.indexable(tenant_id="T-A", domain_id="TRADER"), [])
         self.assertEqual(e4.retention_policy, "AUDIT_RETAIN")  # content retained per policy
 
@@ -211,8 +211,8 @@ class LibraryFoundationTests(unittest.TestCase):
     def test_audit_trail_invariants(self):
         cat = LibraryCatalog()
         e = reg(cat)
-        e2 = cat.transition(entry_id=e.entry_id, to_state="QUARANTINED", actor="a", note="suspeito")
-        e3 = cat.transition(entry_id=e2.entry_id, to_state="REVOKED", actor="b")
+        e2 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="QUARANTINED", actor="a", note="suspeito")
+        e3 = cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e2.entry_id, to_state="REVOKED", actor="b")
         checks = verify_entry_integrity(e3)
         self.assertTrue(checks["audit_chain_unbroken"])
         self.assertTrue(checks["audit_ends_at_current_state"])
@@ -230,7 +230,7 @@ class LibraryFoundationTests(unittest.TestCase):
         cat = LibraryCatalog()
         e = reg(cat)
         before = cat.snapshot()["digest"]
-        cat.transition(entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="reviewer")
+        cat.transition(tenant_id="T-A", domain_id="TRADER", entry_id=e.entry_id, to_state="METADATA_REVIEW", actor="reviewer")
         self.assertNotEqual(cat.snapshot()["digest"], before)
 
     def test_snapshot_digest_deterministic_and_order_free(self):

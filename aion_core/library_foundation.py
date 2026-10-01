@@ -144,6 +144,9 @@ class LibraryCatalog:
             raise LibraryFoundationError("extra_fields are not supported; use named parameters")
         tenant_id = _require_nonempty(tenant_id, "tenant_id", 64)
         domain_id = _require_nonempty(domain_id, "domain_id", 64)
+        for scope_name, scope_value in (("tenant_id", tenant_id), ("domain_id", domain_id)):
+            if not re.fullmatch(r"[A-Za-z0-9_.:-]+", scope_value):
+                raise LibraryFoundationError(f"{scope_name} has invalid characters")
         document_id = _require_nonempty(document_id, "document_id", 128)
         if not re.fullmatch(r"[A-Za-z0-9_.:-]+", document_id):
             raise LibraryFoundationError("document_id has invalid characters")
@@ -212,8 +215,11 @@ class LibraryCatalog:
         return entry
 
     # -- transitions ------------------------------------------------------------
-    def transition(self, *, entry_id: str, to_state: str, actor: str, note: str = "") -> CatalogEntry:
-        entry = self._find(entry_id)
+    def transition(self, *, tenant_id: str, domain_id: str, entry_id: str,
+                   to_state: str, actor: str, note: str = "") -> CatalogEntry:
+        # Caller scope is mandatory, but authentication/authorization MUST also be
+        # enforced by a trusted external integration before calling this method.
+        entry = self._find(entry_id, tenant_id=tenant_id, domain_id=domain_id)
         if to_state not in STATES:
             raise LibraryFoundationError(f"unknown state: {to_state}")
         if to_state == entry.state:
@@ -221,10 +227,14 @@ class LibraryCatalog:
         if to_state not in TRANSITIONS[entry.state]:
             raise LibraryFoundationError(f"illegal transition {entry.state} -> {to_state}")
         if to_state == "APPROVED_FOR_INDEXING":
-            if not entry.license_kind or entry.license_kind == "UNKNOWN":
-                raise LibraryFoundationError("cannot approve without registered license/rights")
+            if not entry.license_kind or entry.license_kind in ("UNKNOWN", "ALL_RIGHTS_RESERVED"):
+                # A declared all-rights-reserved notice is not a verifiable grant.
+                # Future verified rights grants need a separate, authenticated gate.
+                raise LibraryFoundationError("cannot approve without licensed usage rights")
             if not entry.human_approved_by:
                 raise LibraryFoundationError("cannot approve without explicit human approval")
+            if actor != entry.human_approved_by:
+                raise LibraryFoundationError("approval actor does not match declared human reviewer")
             if not entry.source_type or not entry.source_reference:
                 raise LibraryFoundationError("cannot approve with incomplete origin")
         actor = _require_nonempty(actor, "actor", 64)
@@ -241,9 +251,12 @@ class LibraryCatalog:
     def get(self, *, tenant_id: str, domain_id: str, document_id: str, version: int) -> CatalogEntry | None:
         return self._entries.get((tenant_id, domain_id, document_id, version))
 
-    def find_by_entry_id(self, entry_id: str) -> CatalogEntry | None:
+    def find_by_entry_id(self, *, tenant_id: str, domain_id: str,
+                         entry_id: str) -> CatalogEntry | None:
+        # Scope filters prevent accidental cross-tenant lookups in shared catalogs.
+        # Scope values supplied by the caller are NOT authentication claims.
         for e in self._entries.values():
-            if e.entry_id == entry_id:
+            if (e.tenant_id, e.domain_id, e.entry_id) == (tenant_id, domain_id, entry_id):
                 return e
         return None
 
@@ -272,8 +285,8 @@ class LibraryCatalog:
                 self._entries.values(), key=lambda x: x.entry_id)]}),
         }
 
-    def _find(self, entry_id: str) -> CatalogEntry:
-        entry = self.find_by_entry_id(entry_id)
+    def _find(self, entry_id: str, *, tenant_id: str, domain_id: str) -> CatalogEntry:
+        entry = self.find_by_entry_id(tenant_id=tenant_id, domain_id=domain_id, entry_id=entry_id)
         if entry is None:
             raise LibraryFoundationError(f"unknown entry_id: {entry_id}")
         return entry
