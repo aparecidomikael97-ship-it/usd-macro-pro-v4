@@ -164,8 +164,11 @@ def assert_state(page, expected):
     main = page.locator('[data-testid="stMain"]')
     if expected in ("METADATA_REVIEW", "APPROVED_FOR_INDEXING"):
         try:
-            page.get_by_text("Estado sintético: " + expected,
-                             exact=False).wait_for(timeout=30_000)
+            # Streamlit may briefly retain several identically labeled
+            # text spans across rerenders. Require at least one visible
+            # matching state AND recheck the bounded main-panel contents.
+            main.get_by_text("Estado sintético: " + expected,
+                             exact=True).first.wait_for(timeout=30_000)
         except Exception:
             body = main.inner_text()
             print("CI_READ_STATE_DIAG=" + repr({
@@ -184,13 +187,15 @@ def assert_state(page, expected):
                             full_page=False)
             raise
         body = main.inner_text()
+        assert "Estado sintético: " + expected in body
         assert "Integridade sintética: CONFIRMADA" in body
         assert "Versão sintética: 1" in body
         assert "DOC-1" not in body and "synthetic-publisher" not in body
         assert "a" * 64 not in body
         assert "Consulta sintética indisponível" not in body
     elif expected == "DENIED":
-        page.get_by_text("Consulta sintética indisponível", exact=False).wait_for(timeout=90_000)
+        main.get_by_text("Consulta sintética indisponível",
+                         exact=True).first.wait_for(timeout=90_000)
         assert "Estado sintético:" not in main.inner_text()
     else:
         raise AssertionError("unknown expected synthetic state")
