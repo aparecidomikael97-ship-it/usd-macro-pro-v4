@@ -33,7 +33,11 @@ from atlasquant_aion_background_executor import (
 from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest, safe_text, utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
-from atlasquant_aion_core_voice_automation import CheckpointAutomationAdapter
+from atlasquant_aion_core_voice_automation import (
+    SCHEDULER_NAMESPACE,
+    CheckpointAutomationAdapter,
+)
+from atlasquant_aion_loop_governor import govern_agent_plan
 from atlasquant_aion_global_worker_arming import validate_global_worker_arming_approval
 from atlasquant_aion_memory import (
     MAX_RUNTIME_BYTES,
@@ -65,6 +69,9 @@ MAX_LEASE_SECONDS = 1800
 DEFAULT_MAX_JOBS = 5
 MAX_JOBS = 20
 SERVICE_PRINCIPAL = "aion-global-worker"
+PLAN_DEPTH = 2
+PLAN_FANOUT = 8
+PLAN_NODES = 16
 
 
 def global_worker_feature_enabled(value: Any | None = None) -> bool:
@@ -172,6 +179,219 @@ def _global_work_intent(
         **payload,
         "digest": digest(payload),
         "executes_action": False,
+    }
+
+
+def _claim_text(row: Mapping[str, Any], key: str) -> tuple[str, bool]:
+    """Return a string claim. Non-strings are invalid and are not coerced."""
+    if key not in row:
+        return "", False
+    value = row.get(key)
+    if value in (None, ""):
+        return "", False
+    if type(value) is not str:
+        return "", True
+    text = " ".join(value.replace("\x00", "").split())
+    if not text:
+        return "", False
+    if len(text) > 80:
+        return "", True
+    return text, False
+
+
+def _raw_schedule_index(checkpoint: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    raw = checkpoint.get(SCHEDULER_NAMESPACE) if isinstance(checkpoint, Mapping) else None
+    rows = raw.get("schedules") if isinstance(raw, Mapping) else None
+    if not isinstance(rows, list):
+        return {}
+    found: dict[str, Mapping[str, Any]] = {}
+    for row in rows[:200]:
+        if not isinstance(row, Mapping):
+            continue
+        schedule_id = row.get("schedule_id")
+        if type(schedule_id) is not str:
+            continue
+        text = schedule_id.strip()
+        if text and text not in found:
+            found[text] = row
+    return found
+
+
+def govern_global_worker_plan(
+    nodes: list[Mapping[str, Any]] | tuple[Mapping[str, Any], ...] | None,
+    *,
+    trusted_context: Mapping[str, Any] | None,
+    max_depth: Any = PLAN_DEPTH,
+    max_fanout: Any = PLAN_FANOUT,
+    max_nodes: Any = PLAN_NODES,
+    call_limit: Any = DEFAULT_MAX_JOBS,
+    calls_used: Any = 0,
+    token_limit: Any = 100000,
+    tokens_used: Any = 0,
+    wall_seconds_limit: Any = 300,
+    wall_seconds_used: Any = 0,
+    memory_mb_limit: Any = 1024,
+    memory_mb_used: Any = 0,
+) -> dict[str, Any]:
+    """Run the existing loop governor. Defaults stay at or below its ceilings."""
+    decision = govern_agent_plan(
+        nodes,
+        trusted_context=trusted_context,
+        max_depth=max_depth,
+        max_fanout=max_fanout,
+        max_nodes=max_nodes,
+        call_limit=call_limit,
+        calls_used=calls_used,
+        token_limit=token_limit,
+        tokens_used=tokens_used,
+        wall_seconds_limit=wall_seconds_limit,
+        wall_seconds_used=wall_seconds_used,
+        memory_mb_limit=memory_mb_limit,
+        memory_mb_used=memory_mb_used,
+    )
+    report = dict(decision)
+    report["grants_permission"] = False
+    report["executes_action"] = False
+    report["starts_worker"] = False
+    report["arms_worker"] = False
+    report["authorizes_action"] = False
+    return report
+
+
+def evaluate_global_worker_loop(
+    context,
+    checkpoint: Mapping[str, Any],
+    *,
+    max_jobs: int,
+    now: datetime,
+) -> dict[str, Any]:
+    """Build a deterministic plan from trusted scope and due schedules."""
+    jobs = _exact_int(
+        max_jobs,
+        minimum=1,
+        maximum=MAX_JOBS,
+        name="global worker governor max jobs",
+    )
+    current = utc(now)
+    scheduler = CheckpointAutomationAdapter(context, checkpoint).snapshot(current)
+    due_count = 0
+
+    def _due_rows():
+        nonlocal due_count
+        for row in scheduler.get("schedules") or ():
+            if isinstance(row, Mapping) and row.get("due") is True:
+                due_count += 1
+                yield row
+
+    selected = nsmallest(
+        jobs,
+        _due_rows(),
+        key=lambda row: (
+            str(row.get("due_at") or ""),
+            str(row.get("schedule_id") or ""),
+        ),
+    )
+    if not selected:
+        return {
+            "state": "NOT_REQUIRED",
+            "blockers": [],
+            "due_count": 0,
+            "selected_count": 0,
+            "grants_permission": False,
+            "executes_action": False,
+            "starts_worker": False,
+            "arms_worker": False,
+            "authorizes_action": False,
+        }
+
+    raw_rows = _raw_schedule_index(checkpoint)
+    pre_blockers: list[str] = []
+    nodes: list[dict[str, Any]] = [{
+        "node_id": "global-batch",
+        "parent_id": "",
+        "tenant_id": context.tenant_id,
+        "workspace_id": context.workspace_id,
+        "capability": "GLOBAL_WORKER",
+        "schedule_id": "",
+        "occurrence_key": "",
+        "guardian_risk": "READ",
+        "impact": "LOW",
+        "uncertainty_pct": 0,
+        "reversible": False,
+        "external_side_effects": False,
+        "resource_context": {"max_jobs": jobs, "calls_used": 0},
+    }]
+    for index, row in enumerate(selected):
+        schedule_id = str(row.get("schedule_id") or "").strip()
+        if not schedule_id or len(schedule_id) > 80:
+            pre_blockers.append("NODE_ID_INVALID")
+            schedule_id = "blocked-" + str(index)
+        raw = raw_rows.get(str(row.get("schedule_id") or "").strip(), {})
+        claimed_tenant, tenant_invalid = _claim_text(raw, "tenant_id")
+        claimed_workspace, workspace_invalid = _claim_text(raw, "workspace_id")
+        if tenant_invalid or workspace_invalid:
+            pre_blockers.append("CLAIM_TYPE_INVALID")
+        capability = str(row.get("capability") or "").strip().upper()
+        due_at = str(row.get("due_at") or "")
+        nodes.append({
+            "node_id": schedule_id,
+            "parent_id": "global-batch",
+            "tenant_id": claimed_tenant or context.tenant_id,
+            "workspace_id": claimed_workspace or context.workspace_id,
+            "capability": capability,
+            "schedule_id": str(row.get("schedule_id") or ""),
+            "occurrence_key": _occurrence_key(context, row, due_at),
+            "guardian_risk": "DRAFT" if capability in {"VOICE", "CONTENT"} else "READ",
+            "impact": "LOW",
+            "uncertainty_pct": 0,
+            "reversible": False,
+            "external_side_effects": False,
+            "resource_context": {"max_jobs": jobs, "calls_used": 0},
+        })
+    decision = govern_global_worker_plan(
+        nodes,
+        trusted_context={
+            "tenant_id": context.tenant_id,
+            "workspace_id": context.workspace_id,
+        },
+        max_depth=PLAN_DEPTH,
+        max_fanout=PLAN_FANOUT,
+        max_nodes=PLAN_NODES,
+        call_limit=jobs,
+        calls_used=0,
+        token_limit=100000,
+        tokens_used=0,
+        wall_seconds_limit=300,
+        wall_seconds_used=0,
+        memory_mb_limit=1024,
+        memory_mb_used=0,
+    )
+    if pre_blockers:
+        decision["blockers"] = list(dict.fromkeys([
+            *pre_blockers,
+            *list(decision.get("blockers") or []),
+        ]))
+        decision["state"] = "BLOCK"
+    decision["due_count"] = due_count
+    decision["selected_count"] = len(selected)
+    return decision
+
+
+def _loop_evidence(
+    decision: Mapping[str, Any],
+    batch: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    receipts = []
+    if isinstance(batch, Mapping):
+        receipts = [
+            item for item in islice(batch.get("action_receipts") or (), 20)
+            if isinstance(item, Mapping)
+        ]
+    return {
+        "loop_governor": dict(decision),
+        "action_receipts": receipts,
+        "action_receipts_are_authority": False,
+        "action_receipt_external_persisted": False,
     }
 
 
@@ -1395,6 +1615,45 @@ def run_global_worker_once(
             "real_trading_enabled": False,
         }
 
+    try:
+        loop_governor = evaluate_global_worker_loop(
+            delegated_context,
+            checkpoint,
+            max_jobs=state["max_jobs"],
+            now=current,
+        )
+    except Exception:
+        loop_governor = {
+            "state": "BLOCK",
+            "blockers": ["GOVERNOR_EXCEPTION"],
+            "grants_permission": False,
+            "executes_action": False,
+            "starts_worker": False,
+            "arms_worker": False,
+            "authorizes_action": False,
+        }
+    if loop_governor.get("state") == "BLOCK":
+        return {
+            "schema": SCHEMA,
+            "status": "LOOP_GOVERNOR_BLOCKED",
+            "processed": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "blocked": 0,
+            "network_called": True,
+            "executor_called": False,
+            "automatic_runtime_checkpoint_persistence": False,
+            "automatic_retry_allowed": False,
+            "reconciliation_required": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+            "provider_called": False,
+            "payment_executed": False,
+            "publication_executed": False,
+            "deploy_executed": False,
+            **_loop_evidence(loop_governor),
+        }
+
     work_intent = _global_work_intent(
         delegated_context,
         checkpoint,
@@ -1414,7 +1673,9 @@ def run_global_worker_once(
             "processed": 0,
             "lease": lease,
             "network_called": True,
+            "executor_called": False,
             "external_action_executed": False,
+            **_loop_evidence(loop_governor),
         }
     claim_checkpoint = attach_global_worker_state(checkpoint, claimed)
     claim_write = _persist_runtime_checkpoint_cas(
@@ -1434,7 +1695,9 @@ def run_global_worker_once(
             "checkpoint_write": claim_write,
             "reconciliation_required": bool(claim_write.get("reconciliation_required")),
             "automatic_retry_allowed": False,
+            "executor_called": False,
             "external_action_executed": False,
+            **_loop_evidence(loop_governor),
         }
 
     claimed_checkpoint = ensure_operating_checkpoint(claim_write.get("checkpoint"))
@@ -1451,7 +1714,9 @@ def run_global_worker_once(
             "status": "FENCE_VERIFICATION_FAILED",
             "processed": 0,
             "network_called": True,
+            "executor_called": False,
             "external_action_executed": False,
+            **_loop_evidence(loop_governor),
         }
 
     authorization_digest = digest({
@@ -1501,8 +1766,10 @@ def run_global_worker_once(
             "network_called": True,
             "automatic_runtime_checkpoint_persistence": False,
             "automatic_retry_allowed": False,
+            "executor_called": True,
             "external_action_executed": False,
             "real_trading_enabled": False,
+            **_loop_evidence(loop_governor, batch),
         }
     final_checkpoint = attach_global_worker_state(
         result_checkpoint,
@@ -1529,8 +1796,10 @@ def run_global_worker_once(
             "checkpoint_write": final_write,
             "reconciliation_required": bool(final_write.get("reconciliation_required")),
             "automatic_retry_allowed": False,
+            "executor_called": True,
             "external_action_executed": False,
             "real_trading_enabled": False,
+            **_loop_evidence(loop_governor, batch),
         }
 
     return {
@@ -1559,6 +1828,8 @@ def run_global_worker_once(
         "deploy_executed": False,
         "merge_executed": False,
         "real_trading_enabled": False,
+        "executor_called": True,
+        **_loop_evidence(loop_governor, batch),
     }
 
 
@@ -1582,6 +1853,7 @@ def _cli() -> int:
         "FENCE_VERIFICATION_FAILED",
         "FENCE_RELEASE_FAILED",
         "INFLIGHT_RECONCILIATION_REQUIRED",
+        "LOOP_GOVERNOR_BLOCKED",
     } or status.startswith("FINAL_ERROR") else 0
 
 
@@ -1604,5 +1876,7 @@ __all__ = [
     "stage_pause_global_worker",
     "stage_kill_global_worker",
     "global_worker_snapshot",
+    "govern_global_worker_plan",
+    "evaluate_global_worker_loop",
     "run_global_worker_once",
 ]

@@ -244,6 +244,23 @@ ADR-0001, ADR-0005 e ADR-0010 continuam sendo as decisões. Este bloco fecha o
 contrato que ADR-0010 deixou pendente de implementação; não substitui esses
 registros.
 
+## Global Worker safety bridge
+
+O Global Durable Worker continua desligado por padrão. Antes de chamar o
+executor, `run_global_worker_once` monta um plano e o passa por
+`govern_agent_plan`. Tenant e workspace confiáveis saem só do contexto
+autenticado da delegação. Um claim livre divergente, um tipo inválido, um
+ciclo ou um estouro de fan-out/nós bloqueia o tick: o executor não corre, o
+lease não é reivindicado e nenhum receipt falso é criado.
+
+O child receipt do executor continua sendo o registro da execução. O Action
+Receipt produzido por `seal_executor_receipt_envelope` é só o envelope de
+evidência, devolvido na resposta, com `external_persisted=false`. Ele não
+arma o worker, não aprova tarefa e não libera produção, trading ou pagamento.
+Os tetos do governor não foram aumentados. Multi-instância real e operação
+24/7 não estão confirmados. O contrato está em
+`docs/aion/CORE_GLOBAL_WORKER_SAFETY_BRIDGE_V1.md`.
+
 ## Architecture Decision Records
 
 Decisões estruturais do Núcleo ficam em `docs/adr/`. O índice é
