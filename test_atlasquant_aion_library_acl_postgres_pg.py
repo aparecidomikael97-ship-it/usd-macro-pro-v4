@@ -200,13 +200,15 @@ class PrincipalBoundPostgreSQLTests(unittest.TestCase):
                 )
                 if cur.fetchone()[0] is None:
                     cur.execute(MIGRATION_PRINCIPAL_ACL_V2)
-                cur.execute("""DO $ BEGIN
-                  IF NOT EXISTS (SELECT 1 FROM pg_roles
-                    WHERE rolname = 'aion_acl_ci_principal_reader') THEN
-                    CREATE ROLE aion_acl_ci_principal_reader LOGIN
-                      PASSWORD 'synthetic_principal_reader_only';
-                  END IF;
-                END $""")
+                cur.execute(
+                    "SELECT 1 FROM pg_roles WHERE rolname=%s",
+                    ("aion_acl_ci_principal_reader",),
+                )
+                if cur.fetchone() is None:
+                    cur.execute(
+                        "CREATE ROLE aion_acl_ci_principal_reader LOGIN "
+                        "PASSWORD 'synthetic_principal_reader_only'"
+                    )
                 cur.execute(
                     "GRANT CONNECT ON DATABASE aion_library_sandbox "
                     "TO aion_acl_ci_principal_reader"
