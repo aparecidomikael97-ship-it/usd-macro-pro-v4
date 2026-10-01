@@ -84,6 +84,10 @@ def _ci_only_shell(st, *, gate):
 
         # Uniform browser response, regardless of internal cause.
         st.caption("Consulta sintética indisponível")
+    # CI-only widget: clicking it causes the ordinary authenticated Streamlit
+    # rerun. Never accepts document/scope/role args and is never in runtime.
+    st.button("Revalidar metadados sintéticos (CI)",
+              key="aion_ci_library_read_recheck")
     return True
 
 
