@@ -47,9 +47,18 @@ def _ci_only_shell(st, *, gate):
         st.text("Estado sintético: " + result.state)
         st.text("Versão sintética: " + str(result.version))
         st.text("Integridade sintética: " + ("CONFIRMADA" if result.integrity_checked else "NEGADA"))
-    except Exception:
-        # Identical response for revoked, wrong tenant, changed selector,
-        # tampered audit and backend unavailability; no secrets in the client.
+    except Exception as exc:
+        # CI-only diagnostic prints exception CLASS NAMES only, never messages,
+        # IDs, SQL, paths, session fields, tokens or document metadata.
+        chain = []
+        cursor = exc
+        for _ in range(7):
+            if cursor is None:
+                break
+            chain.append(type(cursor).__name__)
+            cursor = cursor.__cause__
+        print("AION_CI_READ_EXCEPTION_TYPES=" + ",".join(chain), flush=True)
+        # Uniform browser response, regardless of internal cause.
         st.caption("Consulta sintética indisponível")
     return True
 
