@@ -7,6 +7,7 @@ on:
       - main
       - integration/aion-core-nightshift-v1-20261001
       - drael/aion-library-foundation-v1
+      - review/aion-library-scope-rights-guards-v1-20261001
     paths:
       - "aion_core/**"
       - "test_aion_core_*.py"
@@ -29,7 +30,7 @@ jobs:
           python-version: "3.12"
       - name: Compile Python sources
         run: python -m compileall -q aion_core test_aion_core_*.py
-      - name: Run original six suites and new Library Foundation suite
+      - name: Run AION Core, Library and authorization suites
         run: |
           python -m unittest -q \
             test_aion_core_domain_registry \
@@ -39,4 +40,5 @@ jobs:
             test_aion_core_security_audit \
             test_aion_core_trust_engine \
             test_aion_core_library_foundation \
-            test_aion_core_library_guard_contract
+            test_aion_core_library_guard_contract \
+            test_aion_core_library_authorization
