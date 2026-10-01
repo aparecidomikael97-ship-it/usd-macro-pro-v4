@@ -9,6 +9,7 @@ on:
       - review/aion-library-recovery-preflight-v1-20261001
       - review/aion-library-native-login-bridge-v1-20261001
       - review/aion-library-admin-shell-sandbox-v1-20261001
+      - review/aion-library-server-composition-v1-20261001
     paths:
       - 'aion_core/**'
       - 'test_aion_core_library_*.py'
@@ -17,6 +18,8 @@ on:
       - 'test_atlasquant_aion_library_postgres_preview_pg.py'
       - 'atlasquant_aion_library_acl_postgres.py'
       - 'test_atlasquant_aion_library_acl_postgres_pg.py'
+      - 'atlasquant_aion_library_server_selection.py'
+      - 'test_atlasquant_aion_library_server_selection_pg.py'
       - '.github/workflows/aion-library-atomic-postgres.yml'
 
 permissions:
@@ -54,12 +57,14 @@ jobs:
       - name: Install pinned PostgreSQL integration driver in sandbox
         run: python -m pip install 'psycopg[binary]==3.2.10'
       - name: Compile offline contracts
-        run: python -m compileall -q aion_core test_aion_core_library_*.py atlasquant_aion_library_host_access.py atlasquant_aion_library_postgres_preview.py test_atlasquant_aion_library_postgres_preview_pg.py atlasquant_aion_library_acl_postgres.py test_atlasquant_aion_library_acl_postgres_pg.py
+        run: python -m compileall -q aion_core test_aion_core_library_*.py atlasquant_aion_library_host_access.py atlasquant_aion_library_postgres_preview.py test_atlasquant_aion_library_postgres_preview_pg.py atlasquant_aion_library_acl_postgres.py test_atlasquant_aion_library_acl_postgres_pg.py atlasquant_aion_library_server_selection.py test_atlasquant_aion_library_server_selection_pg.py atlasquant_aion_library_server_assembly.py
       - name: Real PostgreSQL atomic transactions and recovery preflight
         run: python -m unittest -v test_aion_core_library_atomic_pg test_aion_core_library_recovery_pg
       - name: Native login to authoritative PostgreSQL preview integration
         run: python -m unittest -v test_atlasquant_aion_library_postgres_preview_pg
       - name: Persisted PostgreSQL tenant membership and revoked ACLs
         run: python -m unittest -v test_atlasquant_aion_library_acl_postgres_pg
+      - name: End-to-end synthetic login + ACL + audit + trusted selection on PostgreSQL
+        run: AION_LIB_JOINT_E2E=1 python -m unittest -v test_atlasquant_aion_library_server_selection_pg
       - name: Synthetic pg_dump and pg_restore recovery drill (dedicated database)
         run: python -m unittest -v test_aion_core_library_restore_drill_pg
