@@ -564,4 +564,152 @@ class PersistentRegistryPostgreSQLTests(unittest.TestCase):
         with self.assertRaises(AuthorizationDenied):
             self.registry.current_principal()
 
+
+    def external_acl(self, shared):
+        """The witness/floor are synthetic independent authority ports.
+
+        SQL is real PostgreSQL, but this fixture is NOT a real offsite witness.
+        """
+        from atlasquant_aion_library_external_retirement_fence_sandbox import (
+            ExternalRetirementFence,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        fence = ExternalRetirementFence(
+            registry_principal=self.registry.current_principal,
+            current_authority=lambda issuer, username: shared["head"],
+            minimum_revision=lambda issuer, username: shared["floor"],
+        )
+        return PrincipalBoundPostgresMembership(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            current_principal=fence.current_principal,
+        )
+
+    def external_head(self, account, *, revision=7, active=True):
+        from atlasquant_aion_library_external_retirement_fence_sandbox import (
+            ExternalAuthorityHead,
+        )
+        return ExternalAuthorityHead(
+            account.issuer, account.username, account.subject,
+            account.account_generation, active, revision,
+        )
+
+    def test_real_pg_external_retirement_denies_old_active_registry_and_acl(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        shared = {"head": self.external_head(self.account_a),
+                  "floor": 7}
+        reader = self.external_acl(shared)
+        self.assertEqual(reader.roles_for("reader.1", "T-A", "LIBRARY"),
+                         ("LIBRARY_READER",))
+        # External retirement is newer than this PostgreSQL snapshot. The
+        # registry/ACL still say A is active but the independent port vetoes.
+        shared["head"] = self.external_head(self.account_a,
+                                            revision=8, active=False)
+        shared["floor"] = 8
+        with self.assertRaises(AuthorizationDenied):
+            reader.roles_for("reader.1", "T-A", "LIBRARY")
+
+    def test_real_pg_simulated_old_snapshot_replay_stays_denied(self):
+        # Not pg_restore: deliberately rewind only the ephemeral DB fixture.
+        # Issue #501 still requires a real offsite witness + pg_dump/pg_restore.
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        shared = {"head": self.external_head(self.account_a),
+                  "floor": 7}
+        reader = self.external_acl(shared)
+        self.assertEqual(reader.roles_for("reader.1", "T-A", "LIBRARY"),
+                         ("LIBRARY_READER",))
+        self.retire(self.account_a)
+        self.account = self.account_b
+        self.enroll(self.account_b)
+        shared["head"] = self.external_head(self.account_b, revision=8)
+        shared["floor"] = 8
+        self.assertEqual(reader.roles_for("reader.1", "T-A", "LIBRARY"), ())
+        # Simulate PostgreSQL being reverted to the exact pre-retirement
+        # identity while leaving the old ACL row in place.
+        with self.pg.connect(EXPECTED, autocommit=True) as db:
+            db.execute("TRUNCATE TABLE aion_library_principal_registry_sandbox")
+        self.enroll(self.account_a)
+        self.account = self.account_a
+        with self.assertRaises(AuthorizationDenied):
+            reader.roles_for("reader.1", "T-A", "LIBRARY")
+        # Switching to a current B session still cannot access old ACL.
+        self.account = self.account_b
+        with self.assertRaises(AuthorizationDenied):
+            reader.roles_for("reader.1", "T-A", "LIBRARY")
+        # Only privileged fixture reconciliation + separate B grant restores.
+        self.retire(self.account_a)
+        self.enroll(self.account_b)
+        self.assertEqual(reader.roles_for("reader.1", "T-A", "LIBRARY"), ())
+        self.grant(self.account_b)
+        self.assertEqual(reader.roles_for("reader.1", "T-A", "LIBRARY"),
+                         ("LIBRARY_READER",))
+
+    def test_real_pg_historical_authority_head_below_external_floor_denied(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        shared = {"head": self.external_head(self.account_a, revision=7),
+                  "floor": 8}
+        with self.assertRaises(AuthorizationDenied):
+            self.external_acl(shared).roles_for("reader.1", "T-A", "LIBRARY")
+
+    def test_real_pg_missing_external_authority_denied_without_fallback(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        from atlasquant_aion_library_external_retirement_fence_sandbox import (
+            ExternalRetirementFence,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        fence = ExternalRetirementFence(
+            registry_principal=self.registry.current_principal,
+            current_authority=lambda issuer, name: (
+                (_ for _ in ()).throw(ConnectionError("EXTERNAL-SECRET"))
+            ),
+            minimum_revision=lambda issuer, name: 7,
+        )
+        reader = PrincipalBoundPostgresMembership(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            current_principal=fence.current_principal,
+        )
+        with self.assertRaises(AuthorizationDenied) as cm:
+            reader.roles_for("reader.1", "T-A", "LIBRARY")
+        self.assertNotIn("EXTERNAL-SECRET", str(cm.exception))
+
+    def test_real_pg_external_retirement_during_acl_read_denied(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        from atlasquant_aion_library_external_retirement_fence_sandbox import (
+            ExternalRetirementFence,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        shared = {"head": self.external_head(self.account_a), "floor": 7}
+        calls = {"n": 0}
+        def latest(issuer, username):
+            calls["n"] += 1
+            # The first two checks surround the registry read. The third
+            # happens after the ACL SQL query and must veto the old role.
+            if calls["n"] == 3:
+                shared["head"] = self.external_head(
+                    self.account_a, revision=8, active=False,
+                )
+                shared["floor"] = 8
+            return shared["head"]
+        fence = ExternalRetirementFence(
+            registry_principal=self.registry.current_principal,
+            current_authority=latest,
+            minimum_revision=lambda issuer, username: shared["floor"],
+        )
+        reader = PrincipalBoundPostgresMembership(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            current_principal=fence.current_principal,
+        )
+        with self.assertRaises(AuthorizationDenied):
+            reader.roles_for("reader.1", "T-A", "LIBRARY")
+
 if __name__=='__main__':unittest.main()
