@@ -20,6 +20,7 @@ on:
       - review/aion-library-real-app-e2e-v1-20261001
       - review/aion-library-server-composition-v1-20261001
       - review/aion-library-fullchain-pg-selection-v1-20261001
+      - review/aion-library-joint-reconciliation-v1-20261001
     paths:
       - "aion_core/**"
       - "atlasquant_aion_library_host_access.py"
@@ -39,6 +40,9 @@ on:
       - "test_atlasquant_aion_library_server_selection*.py"
       - "test_atlasquant_aion_library_postgres_preview*.py"
       - "test_aion_core_*.py"
+      - "scripts/aion_library_ci_*.py"
+      - "scripts/test_aion_library_browser_pg_joint.py"
+      - ".github/workflows/aion-library-browser-pg-joint.yml"
       - ".github/workflows/aion-library-foundation.yml"
       - ".github/workflows/quality-tests.yml"
 
