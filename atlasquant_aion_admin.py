@@ -160,7 +160,13 @@ from atlasquant_aion_entitlements import (
     new_entitlement_request,
     upsert_entitlement,
 )
-from atlasquant_access_panel import configured_users
+from atlasquant_access_panel import configured_users, session_time_status
+from atlasquant_aion_library_workspace_shell import (
+    WORKSPACE_LABEL as LIBRARY_WORKSPACE_LABEL,
+    library_shell_gate,
+    library_workspace_choices,
+    render_library_shell,
+)
 from atlasquant_entitlement_account_audit import (
     audit_account_entitlements,
     audit_requires_review,
@@ -10946,6 +10952,17 @@ def render_aion_admin_console(
             "error_type": type(exc).__name__,
         })
 
+    # Library shell: opt-in SANDBOX ONLY, information-only, no document route.
+    # Both the host environment and preview flag come from trusted server config.
+    library_gate = library_shell_gate(
+        access=access_map,
+        users=configured_account_rows,
+        environment=_secret("ATLASQUANT_ENV"),
+        preview_flag=_secret("AION_LIBRARY_SHELL_PREVIEW"),
+        now=datetime.now(timezone.utc).timestamp(),
+        session_time_check=session_time_status,
+    )
+
     try:
         account_entitlement_audit = audit_account_entitlements(
             configured_account_rows,
@@ -11269,13 +11286,17 @@ def render_aion_admin_console(
             "Nenhuma ação externa, permissão ou trading real foi habilitado pelo fallback."
         )
 
+    workspace_choices = library_workspace_choices(standard=AION_WORKSPACES, gate=library_gate)
     jump_request = st.session_state.pop(_AION_WORKSPACE_JUMP_KEY, None)
-    if jump_request in AION_WORKSPACES:
+    if jump_request in workspace_choices:
         st.session_state["aion_admin_workspace"] = jump_request
+    # A flag/session change must never leave a stale gated workspace selected.
+    if not library_gate['visible'] and st.session_state.get("aion_admin_workspace") == LIBRARY_WORKSPACE_LABEL:
+        st.session_state["aion_admin_workspace"] = "🧠 Central"
 
     selected_workspace = st.selectbox(
         "Área AION",
-        AION_WORKSPACES,
+        workspace_choices,
         key="aion_admin_workspace",
         help=(
             "Carrega uma área administrativa por vez. Isso reduz a carga da interface "
@@ -11318,6 +11339,8 @@ def render_aion_admin_console(
                 checkpoint,
                 flags,
             )
+        elif selected_workspace == LIBRARY_WORKSPACE_LABEL:
+            render_library_shell(st, gate=library_gate)
     except Exception as exc:
         workspace_error_type = type(exc).__name__
         st.error(
