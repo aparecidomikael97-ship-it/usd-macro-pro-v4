@@ -56,6 +56,7 @@ def child_env(entry_id, *, shell_enabled):
 
 def start_actual_app(entry_id, *, shell_enabled):
     OUT.mkdir(exist_ok=True)
+    actual.OUT.mkdir(exist_ok=True)
     logfile = (OUT / "private-local-only.log").open("w", encoding="utf-8")
     cmd = [
         sys.executable, "-m", "streamlit", "run",
