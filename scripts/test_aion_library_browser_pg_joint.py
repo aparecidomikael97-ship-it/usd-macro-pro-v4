@@ -201,44 +201,18 @@ def assert_state(page, expected):
         raise AssertionError("unknown expected synthetic state")
 
 
-def rerender_library(page):
-    """Genuine keyboard-only workspace navigation; same authenticated browser.
+def refresh_library_via_ci_button(page):
+    """Authenticated real-app Streamlit rerun via test-only visible control.
 
-    Streamlit's React-Aria menu options have repeatedly detached during
-    Playwright's element-stability check. Moving by keyboard uses the real
-    visible combobox without DOM poking, session injections or page.reload().
+    The button exists solely inside CI's in-memory wrapper after genuine login
+    and original Library shell gate. It cannot select a scope, override ACL,
+    grant access, or call runner-only approval/revocation.
     """
-    from playwright.sync_api import TimeoutError as PlaywrightTimeout
-
-    selected = False
-    for attempt in range(4):
-        area = actual.enter_aion(page)
-        combo = area.get_by_role("combobox")
-        if "🧠 Central" in combo.inner_text():
-            selected = True
-            break
-        # Only native React-Aria keyboard selection. Home selects the first
-        # fixed workspace (Central); Enter commits this actual UI change.
-        combo.click(timeout=12_000)
-        combo.press("Home", timeout=7_000)
-        combo.press("Enter", timeout=7_000)
-        try:
-            area = actual.enter_aion(page)
-            area.get_by_role("combobox").filter(
-                has_text="🧠 Central"
-            ).wait_for(state="visible", timeout=6_000)
-            selected = True
-            break
-        except PlaywrightTimeout:
-            page.keyboard.press("Escape")
-            if attempt < 3:
-                page.wait_for_timeout(650)
-
-    if not selected:
-        raise AssertionError("actual Streamlit keyboard navigation did not select Central")
-
-    area = actual.enter_aion(page)
-    choose_library_checked(page, area)
+    button = page.get_by_role(
+        "button", name="Revalidar metadados sintéticos (CI)", exact=True)
+    button.wait_for(state="visible", timeout=45_000)
+    button.click(timeout=30_000)
+    # The caller MUST assert the *new* state after re-render (or fail closed).
 
 
 def main():
@@ -269,7 +243,7 @@ def main():
 
                 # Writer is held by the CI runner, never app/browser.
                 approve_fixture(entry, writer)
-                rerender_library(desktop_page)
+                refresh_library_via_ci_button(desktop_page)
                 assert_state(desktop_page, "APPROVED_FOR_INDEXING")
                 actual.assert_no_document_controls(desktop_page)
                 actual.record_layout(desktop_page, "pg-admin-after-approval", 1440)
@@ -277,7 +251,7 @@ def main():
 
                 # PostgreSQL committed revocation must deny the NEXT browser-driven read.
                 revoke_admin()
-                rerender_library(desktop_page)
+                refresh_library_via_ci_button(desktop_page)
                 assert_state(desktop_page, "DENIED")
                 actual.record_layout(desktop_page, "pg-admin-after-revocation", 1440)
                 print("PASS browser-driven read denied after persistent ACL revocation", flush=True)
