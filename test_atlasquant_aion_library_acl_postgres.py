@@ -792,4 +792,136 @@ class ExternalRetirementFenceSandboxTests(unittest.TestCase):
             self.reader.current_principal()
         self.assertEqual(self.calls["head"], 0)
 
+
+class SeparateDatabaseWitnessSandboxTests(unittest.TestCase):
+    """Offline SELECT-only witness adapter: the floor is deliberately separate."""
+
+    def setUp(self):
+        from atlasquant_aion_library_witness_pg_sandbox import (
+            SeparateDatabaseWitnessReader,
+        )
+        self.rows = [
+            ("principal-new-0002", "b" * 32, True, 8),
+            ("principal-old-0001", "a" * 32, False, 7),
+        ]
+        self.connections = []
+        self.fail_at = None
+        fixture = self
+
+        class Cursor:
+            def __init__(self):
+                self.calls = []
+                self.closed = False
+
+            def execute(self, query, params=None):
+                self.calls.append((query, params))
+                if fixture.fail_at == "execute":
+                    raise RuntimeError("SYNTHETIC-WITNESS-SECRET")
+
+            def fetchmany(self, amount):
+                if fixture.fail_at == "fetch":
+                    raise RuntimeError("SYNTHETIC-WITNESS-SECRET")
+                return fixture.rows[:amount]
+
+            def close(self):
+                self.closed = True
+
+        class DB:
+            autocommit = False
+            def __init__(self):
+                self.cur = Cursor()
+                self.rolled = False
+                self.closed = False
+
+            def cursor(self):
+                return self.cur
+
+            def rollback(self):
+                self.rolled = True
+
+            def close(self):
+                self.closed = True
+
+        def connect():
+            db = DB()
+            fixture.connections.append(db)
+            return db
+
+        self.connect = connect
+        self.reader = SeparateDatabaseWitnessReader(connect=connect)
+
+    def test_witness_fetches_latest_head_by_exact_issuer_username(self):
+        current = self.reader.current_head("trusted.local", "reader.1")
+        self.assertEqual(
+            (current.subject, current.account_generation,
+             current.active, current.revision),
+            ("principal-new-0002", "b" * 32, True, 8),
+        )
+        db = self.connections[-1]
+        self.assertIn("READ COMMITTED, READ ONLY", db.cur.calls[0][0])
+        self.assertEqual(db.cur.calls[1][1], ("trusted.local", "reader.1"))
+        self.assertTrue(db.rolled and db.closed and db.cur.closed)
+
+    def test_witness_missing_out_of_order_or_corrupt_history_denied(self):
+        for rows in (
+            [],
+            self.rows[::-1],
+            [self.rows[0], self.rows[0]],
+            [("principal-new-0002", "b" * 32, 1, 8)],
+            [("principal-new-0002", "bad", True, 8)],
+            [("principal-new-0002", "b" * 32, True, True)],
+            [("principal-new-0002", "b" * 32, True, 0)],
+            [("principal-new-0002", "b" * 32, True)],
+        ):
+            with self.subTest(rows=rows):
+                self.rows = rows
+                with self.assertRaises(AuthorizationDenied):
+                    self.reader.current_head("trusted.local", "reader.1")
+        self.assertTrue(all(x.closed and x.rolled for x in self.connections))
+
+    def test_witness_rejects_invalid_scope_before_opening_database(self):
+        for issuer, name in (
+            ("", "reader.1"), ("Bad Issuer", "reader.1"),
+            ("trusted.local", ""), ("trusted.local", "Reader.1"),
+            ("trusted.local", "reader;drop"), (None, "reader.1"),
+        ):
+            with self.subTest(issuer=issuer, name=name):
+                with self.assertRaises(AuthorizationDenied):
+                    self.reader.current_head(issuer, name)
+        self.assertEqual(self.connections, [])
+
+    def test_witness_db_failure_never_leaks_details(self):
+        for stage in ("execute", "fetch"):
+            with self.subTest(stage=stage):
+                self.fail_at = stage
+                with self.assertRaises(AuthorizationDenied) as err:
+                    self.reader.current_head("trusted.local", "reader.1")
+                self.assertNotIn("SYNTHETIC-WITNESS-SECRET", str(err.exception))
+                self.assertTrue(self.connections[-1].closed)
+
+    def test_witness_autocommit_and_missing_factory_fail_closed(self):
+        from atlasquant_aion_library_witness_pg_sandbox import (
+            SeparateDatabaseWitnessReader,
+        )
+        with self.assertRaises(AuthorizationDenied):
+            SeparateDatabaseWitnessReader(connect=None)
+        db = self.connect()
+        db.autocommit = True
+        adapter = SeparateDatabaseWitnessReader(connect=lambda: db)
+        with self.assertRaises(AuthorizationDenied):
+            adapter.current_head("trusted.local", "reader.1")
+        self.assertTrue(db.closed)
+
+    def test_witness_ddl_only_documents_logical_separation_not_offsite(self):
+        from atlasquant_aion_library_witness_pg_sandbox import (
+            MIGRATION_WITNESS_PG, _SELECT,
+        )
+        self.assertIn("CREATE TABLE aion_library_witness_history_sandbox",
+                      MIGRATION_WITNESS_PG)
+        self.assertIn("PRIMARY KEY(principal_issuer, username, revision)",
+                      MIGRATION_WITNESS_PG)
+        self.assertIn("ORDER BY revision DESC LIMIT 2", _SELECT)
+        self.assertNotIn("UPDATE ", _SELECT)
+        self.assertNotIn("INSERT ", _SELECT)
+
 if __name__=='__main__':unittest.main()
