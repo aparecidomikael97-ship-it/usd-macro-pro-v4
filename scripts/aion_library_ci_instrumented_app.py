@@ -21,8 +21,19 @@ require_synthetic()
 
 import atlasquant_aion_admin
 
-_original_shell = atlasquant_aion_admin.render_library_shell
-_original_gate = atlasquant_aion_admin.library_shell_gate
+# Streamlit reruns this entrypoint on every actual browser interaction.
+# Preserve original library functions on the CI-only imported module, rather
+# than accidentally wrapping a previous rerun's wrappers recursively.
+_ORIGINAL_SHELL_ATTR = "_aion_ci_browser_pg_original_shell"
+_ORIGINAL_GATE_ATTR = "_aion_ci_browser_pg_original_gate"
+if not hasattr(atlasquant_aion_admin, _ORIGINAL_SHELL_ATTR):
+    setattr(atlasquant_aion_admin, _ORIGINAL_SHELL_ATTR,
+            atlasquant_aion_admin.render_library_shell)
+if not hasattr(atlasquant_aion_admin, _ORIGINAL_GATE_ATTR):
+    setattr(atlasquant_aion_admin, _ORIGINAL_GATE_ATTR,
+            atlasquant_aion_admin.library_shell_gate)
+_original_shell = getattr(atlasquant_aion_admin, _ORIGINAL_SHELL_ATTR)
+_original_gate = getattr(atlasquant_aion_admin, _ORIGINAL_GATE_ATTR)
 
 
 def _ci_gate_diagnostics(**kwargs):
