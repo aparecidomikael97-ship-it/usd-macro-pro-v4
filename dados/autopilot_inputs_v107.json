@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-01T19:48:14.641297+00:00",
+  "generated_at": "2026-10-01T20:23:33.324359+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -19,7 +19,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 14.6,
+      "Dif. macro": 14.7,
       "Índice ranking": 89.9
     },
     {
@@ -28,7 +28,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 27.2,
+      "Dif. macro": 27.3,
       "Índice ranking": 89.9
     },
     {
@@ -37,7 +37,7 @@
       "Score final": 90.0,
       "Qualidade": 84.0,
       "Confluência": "ALTA",
-      "Dif. macro": 31.5,
+      "Dif. macro": 31.6,
       "Índice ranking": 87.2
     },
     {
@@ -46,7 +46,7 @@
       "Score final": 84.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": -17.8,
+      "Dif. macro": -17.9,
       "Índice ranking": 87.1
     },
     {
@@ -55,8 +55,17 @@
       "Score final": 91.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -18.0,
+      "Dif. macro": -18.1,
       "Índice ranking": 82.5
+    },
+    {
+      "Par": "GBP/USD",
+      "Direção": "🔴 VENDA GBP/USD",
+      "Score final": 78.0,
+      "Qualidade": 70.0,
+      "Confluência": "MODERADA",
+      "Dif. macro": -14.9,
+      "Índice ranking": 75.2
     },
     {
       "Par": "AUD/USD",
@@ -64,21 +73,12 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -15.0,
+      "Dif. macro": -14.4,
       "Índice ranking": 69.4
-    },
-    {
-      "Par": "GBP/USD",
-      "Direção": "🔴 VENDA GBP/USD",
-      "Score final": 68.0,
-      "Qualidade": 70.0,
-      "Confluência": "MODERADA",
-      "Dif. macro": -14.8,
-      "Índice ranking": 69.1
     }
   ],
   "macro_context": {
-    "usd_score": 61.12579073333333,
+    "usd_score": 61.223710733333334,
     "usd_quality": 90.0,
     "fed_tone": "Restritivo",
     "fed_strength": 0.37083333333333335,
@@ -101,7 +101,7 @@
       },
       "Treasury 2Y": {
         "direcao": 1,
-        "delta": 0.13999999999999968,
+        "delta": 0.12399999999999967,
         "texto": "Subindo"
       },
       "Broad USD": {
@@ -123,7 +123,7 @@
   },
   "fast_boot": {
     "macro_eua": {
-      "Juros do Fed": 3.63,
+      "Juros do Fed": 3.75,
       "IPC anual": 3.35302,
       "IPC Núcleo anual": 2.44616,
       "PCE anual": 3.41903,
@@ -131,16 +131,16 @@
       "Payroll variação mensal (mil)": 162.0,
       "Desemprego": 4.1,
       "PIB": 2.2,
-      "Treasury 2 anos": 4.89,
-      "Treasury 10 anos": 5.26,
+      "Treasury 2 anos": 4.88,
+      "Treasury 10 anos": 5.29,
       "Índice amplo do dólar": 120.33,
       "_auditoria": [
         {
           "Indicador": "Juros do Fed",
-          "Valor": 3.63,
-          "Última observação": "01/08/2026",
-          "Idade (dias)": 61,
-          "Status": "🟡 Atenção",
+          "Valor": 3.75,
+          "Última observação": "01/09/2026",
+          "Idade (dias)": 30,
+          "Status": "🟢 Atual",
           "Fonte": "FRED · FEDFUNDS"
         },
         {
@@ -201,17 +201,17 @@
         },
         {
           "Indicador": "Treasury 2 anos",
-          "Valor": 4.89,
-          "Última observação": "29/09/2026",
-          "Idade (dias)": 2,
+          "Valor": 4.88,
+          "Última observação": "30/09/2026",
+          "Idade (dias)": 1,
           "Status": "🟢 Atual",
           "Fonte": "FRED · DGS2"
         },
         {
           "Indicador": "Treasury 10 anos",
-          "Valor": 5.26,
-          "Última observação": "29/09/2026",
-          "Idade (dias)": 2,
+          "Valor": 5.29,
+          "Última observação": "30/09/2026",
+          "Idade (dias)": 1,
           "Status": "🟢 Atual",
           "Fonte": "FRED · DGS10"
         },
@@ -226,9 +226,9 @@
       ],
       "_metadados": {
         "Juros do Fed": {
-          "valor": 3.63,
-          "data": "01/08/2026",
-          "idade_dias": 61,
+          "valor": 3.75,
+          "data": "01/09/2026",
+          "idade_dias": 30,
           "serie": "FEDFUNDS"
         },
         "IPC anual": {
@@ -274,15 +274,15 @@
           "serie": "A191RL1Q225SBEA"
         },
         "Treasury 2 anos": {
-          "valor": 4.89,
-          "data": "29/09/2026",
-          "idade_dias": 2,
+          "valor": 4.88,
+          "data": "30/09/2026",
+          "idade_dias": 1,
           "serie": "DGS2"
         },
         "Treasury 10 anos": {
-          "valor": 5.26,
-          "data": "29/09/2026",
-          "idade_dias": 2,
+          "valor": 5.29,
+          "data": "30/09/2026",
+          "idade_dias": 1,
           "serie": "DGS10"
         },
         "Índice amplo do dólar": {
@@ -300,8 +300,8 @@
       "titulos": [
         "Markets Brace For Two More Fed Rate Hikes In 2026 - Forbes",
         "J.P. Morgan sees Fed rate hikes going out with a bang this year - Yahoo Finance",
-        "Fed's Barr says more rate hikes likely to be needed to curb inflation - reuters.com",
-        "Goldman Sachs pushes Fed rate hike forecast to December - reuters.com",
+        "Fed's Barr says more rate hikes likely to be needed to curb inflation - Reuters",
+        "Goldman Sachs pushes Fed rate hike forecast to December - Reuters",
         "Minneapolis Federal Reserve President Neel Kashkari sees one more rate hike this year - CNBC",
         "Cooler inflation could buy the Fed, Trump time on another rate hike - Politico",
         "Week Ahead for FX, Bonds: U.S. Jobs Data in Focus as Another Fed Rate Hike Looks Possible - WSJ",
@@ -309,7 +309,7 @@
         "News | Will the Bank of Canada follow the Federal Reserve and raise rates? Inflation will decide. - CoStar",
         "Federal Reserve Monetary Policy Impact on Markets - Funds Society",
         "Gold holds steady as firm dollar, yields counter easing Fed rate hike bets - CNBC",
-        "Wall St Week Ahead Jobs report, inflation data to test US rate path, economic strength - reuters.com"
+        "Wall St Week Ahead Jobs report, inflation data to test US rate path, economic strength - Reuters"
       ],
       "analisadas": [
         {
@@ -333,9 +333,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Fed's Barr says more rate hikes likely to be needed to curb inflation - reuters.com",
+          "titulo": "Fed's Barr says more rate hikes likely to be needed to curb inflation - Reuters",
           "corpo": "Fed's Barr says more rate hikes likely to be needed to curb inflation",
-          "fonte": "reuters.com",
+          "fonte": "Reuters",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.75,
@@ -343,9 +343,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Goldman Sachs pushes Fed rate hike forecast to December - reuters.com",
+          "titulo": "Goldman Sachs pushes Fed rate hike forecast to December - Reuters",
           "corpo": "Goldman Sachs pushes Fed rate hike forecast to December",
-          "fonte": "reuters.com",
+          "fonte": "Reuters",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.55,
@@ -423,9 +423,9 @@
           "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
         },
         {
-          "titulo": "Wall St Week Ahead Jobs report, inflation data to test US rate path, economic strength - reuters.com",
+          "titulo": "Wall St Week Ahead Jobs report, inflation data to test US rate path, economic strength - Reuters",
           "corpo": "Wall St Week Ahead Jobs report, inflation data to test US rate path, economic strength",
-          "fonte": "reuters.com",
+          "fonte": "Reuters",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.0,
@@ -436,10 +436,10 @@
     },
     "dados_moedas": {
       "USD": {
-        "juros": 3.63,
+        "juros": 3.75,
         "inflacao": 3.35302,
         "pib": 2.19157,
-        "sentimento": 51.851851851851855,
+        "sentimento": 53.84615384615385,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -481,7 +481,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 53.333333333333336,
+        "sentimento": 60.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -537,25 +537,25 @@
       },
       {
         "Código": "USD",
-        "juros": 3.6,
+        "juros": 3.8,
         "inflacao": 3.4,
         "pib": 2.2,
-        "sentimento": 51.9,
+        "sentimento": 53.8,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
-        "juros_reais": 0.3,
-        "n_juros": 66.128,
+        "juros_reais": 0.4,
+        "n_juros": 66.536,
         "n_inflacao": 62.67743,
         "n_pib": 73.09578815534078,
-        "n_sentimento": 51.85185185185186,
+        "n_sentimento": 53.84615384615385,
         "n_emprego": 55.400000000000006,
         "n_atividade": 52.0,
-        "Pontuação_Macro": 60.5,
+        "Pontuação_Macro": 60.6,
         "Influência_Fed": 18.5,
-        "Pontuação_Final": 61.1,
+        "Pontuação_Final": 61.2,
         "strength_attribution": {
           "factors": {
-            "Juros / Treasury": 15.870719999999999,
+            "Juros / Treasury": 15.96864,
             "Inflação": 11.2819374,
             "PIB": 0.0,
             "Emprego": 9.972000000000001,
@@ -567,9 +567,44 @@
             "Índice amplo USD": 4.0527999999999995,
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 61.12579073333333
+          "unrounded_final": 61.223710733333334
         },
         "Posição": 2
+      },
+      {
+        "Código": "AUD",
+        "juros": 4.5,
+        "inflacao": 2.7,
+        "pib": 2.1,
+        "sentimento": 60.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Australiano",
+        "juros_reais": 1.8,
+        "n_juros": 28.98896661469615,
+        "n_inflacao": 49.66887417218545,
+        "n_pib": 70.40481809880697,
+        "n_sentimento": 60.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 49.8,
+        "Influência_Fed": -3.0,
+        "Pontuação_Final": 46.8,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 5.79779332293923,
+            "Inflação": 7.450331125827817,
+            "PIB": 10.560722714821045,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 6.0
+          },
+          "fed": -3.0037500000000006,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 46.80509716358809
+        },
+        "Posição": 3
       },
       {
         "Código": "CHF",
@@ -604,7 +639,7 @@
           },
           "unrounded_final": 46.51261956666713
         },
-        "Posição": 3
+        "Posição": 4
       },
       {
         "Código": "GBP",
@@ -638,41 +673,6 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 46.334139983135785
-        },
-        "Posição": 4
-      },
-      {
-        "Código": "AUD",
-        "juros": 4.5,
-        "inflacao": 2.7,
-        "pib": 2.1,
-        "sentimento": 53.3,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Australiano",
-        "juros_reais": 1.8,
-        "n_juros": 28.98896661469615,
-        "n_inflacao": 49.66887417218545,
-        "n_pib": 70.40481809880697,
-        "n_sentimento": 53.333333333333336,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 49.1,
-        "Influência_Fed": -3.0,
-        "Pontuação_Final": 46.1,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 5.79779332293923,
-            "Inflação": 7.450331125827817,
-            "PIB": 10.560722714821045,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 5.333333333333334
-          },
-          "fed": -3.0037500000000006,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 46.13843049692142
         },
         "Posição": 5
       },
@@ -818,12 +818,12 @@
       }
     ],
     "usd_detalhado": {
-      "score": 61.12579073333333,
+      "score": 61.223710733333334,
       "componentes": {
         "Inflação": 62.67743,
         "Emprego": 55.400000000000006,
         "Atividade": 52.0,
-        "Juros / Treasury 2Y": 66.128,
+        "Juros / Treasury 2Y": 66.536,
         "Federal Reserve": 68.54166666666667,
         "Índice amplo USD": 50.66
       },
