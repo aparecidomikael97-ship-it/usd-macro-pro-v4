@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-01T06:29:53.352333+00:00",
+  "generated_at": "2026-10-01T06:55:45.338543+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -64,7 +64,7 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -19.8,
+      "Dif. macro": -20.4,
       "Índice ranking": 69.4
     },
     {
@@ -439,7 +439,7 @@
         "juros": 3.63,
         "inflacao": 3.35302,
         "pib": 2.19157,
-        "sentimento": 54.166666666666664,
+        "sentimento": 52.0,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -481,7 +481,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 50.0,
+        "sentimento": 46.15384615384615,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -540,14 +540,14 @@
         "juros": 3.6,
         "inflacao": 3.4,
         "pib": 2.2,
-        "sentimento": 54.2,
+        "sentimento": 52.0,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.3,
         "n_juros": 66.128,
         "n_inflacao": 62.67743,
         "n_pib": 73.09578815534078,
-        "n_sentimento": 31.25,
+        "n_sentimento": 28.000000000000004,
         "n_emprego": 55.400000000000006,
         "n_atividade": 52.0,
         "Pontuação_Macro": 60.5,
@@ -642,41 +642,6 @@
         "Posição": 4
       },
       {
-        "Código": "AUD",
-        "juros": 4.5,
-        "inflacao": 2.7,
-        "pib": 2.1,
-        "sentimento": 50.0,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Australiano",
-        "juros_reais": 1.8,
-        "n_juros": 28.98896661469615,
-        "n_inflacao": 49.66887417218545,
-        "n_pib": 70.40481809880697,
-        "n_sentimento": 25.0,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 46.3,
-        "Influência_Fed": -3.9,
-        "Pontuação_Final": 42.4,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 5.79779332293923,
-            "Inflação": 7.450331125827817,
-            "PIB": 10.560722714821045,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 2.5
-          },
-          "fed": -3.9042000000000003,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 42.40464716358809
-        },
-        "Posição": 5
-      },
-      {
         "Código": "EUR",
         "juros": 2.5,
         "inflacao": 3.2,
@@ -708,6 +673,41 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 42.31714101052951
+        },
+        "Posição": 5
+      },
+      {
+        "Código": "AUD",
+        "juros": 4.5,
+        "inflacao": 2.7,
+        "pib": 2.1,
+        "sentimento": 46.2,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Australiano",
+        "juros_reais": 1.8,
+        "n_juros": 28.98896661469615,
+        "n_inflacao": 49.66887417218545,
+        "n_pib": 70.40481809880697,
+        "n_sentimento": 19.23076923076923,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 45.7,
+        "Influência_Fed": -3.9,
+        "Pontuação_Final": 41.8,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 5.79779332293923,
+            "Inflação": 7.450331125827817,
+            "PIB": 10.560722714821045,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 1.9230769230769231
+          },
+          "fed": -3.9042000000000003,
+          "other": {
+            "Limite da escala 0–100": -7.105427357601002e-15
+          },
+          "unrounded_final": 41.82772408666501
         },
         "Posição": 6
       },
