@@ -186,6 +186,18 @@ class ExistingAtlasQuantLibraryHostTests(unittest.TestCase):
         self.session['last_seen']=self.now-1
         self.denies()
 
+    def test_real_access_panel_subsecond_timestamp_matches_integer_host_clock(self):
+        # Live panel updates last_seen as time.time() float, then the Library
+        # host mints an integer-second proof during that same Streamlit render.
+        self.session["authenticated_at"] = self.now - 30.25
+        self.session["last_seen"] = self.now + 0.25
+        envelope = self.issue()
+        self.assertEqual(envelope["payload"]["subject"], "mikael")
+
+    def test_session_one_second_or_more_in_future_is_denied(self):
+        self.session["last_seen"] = self.now + 1
+        self.denies()
+
     def test_future_session_denied(self):
         self.session['last_seen']=self.now+10
         self.denies()
