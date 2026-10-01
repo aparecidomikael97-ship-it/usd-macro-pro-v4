@@ -17,6 +17,9 @@ from urllib.request import urlopen
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
+# GitHub runs this file from scripts/; import the actual repo-root auth module.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 PORT = 8594
 URL = f"http://127.0.0.1:{PORT}/?aion=1"
 CI_ADMIN = "admin.ci"
