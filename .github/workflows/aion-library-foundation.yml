@@ -9,6 +9,7 @@ on:
       - drael/aion-library-foundation-v1
       - review/aion-library-scope-rights-guards-v1-20261001
       - review/aion-library-verifiable-authorization-v1-20261001
+      - review/aion-library-trusted-identity-ledger-v1-20261001
     paths:
       - "aion_core/**"
       - "test_aion_core_*.py"
@@ -31,7 +32,7 @@ jobs:
           python-version: "3.12"
       - name: Compile Python sources
         run: python -m compileall -q aion_core test_aion_core_*.py
-      - name: Run AION Core, Library and durable security contracts
+      - name: Run AION Core, Library and shared approval port tests
         run: |
           python -m unittest -q \
             test_aion_core_domain_registry \
@@ -43,4 +44,5 @@ jobs:
             test_aion_core_library_foundation \
             test_aion_core_library_guard_contract \
             test_aion_core_library_authorization \
-            test_aion_core_library_security_runtime
+            test_aion_core_library_security_runtime \
+            test_aion_core_library_shared_approval_port
