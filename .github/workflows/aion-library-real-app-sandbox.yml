@@ -1,0 +1,47 @@
+name: AION Biblioteca — actual app synthetic login mobile and desktop
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - review/aion-library-persistent-acl-browser-v1-20261001
+    paths:
+      - 'scripts/test_aion_library_actual_app_browser.py'
+      - 'atlasquant_aion_library_workspace_shell.py'
+      - 'atlasquant_aion_admin.py'
+      - '.github/workflows/aion-library-real-app-sandbox.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  full-app-synthetic-navigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    env:
+      CI: 'true'
+      ATLASQUANT_REAL_APP_SYNTHETIC: '1'
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: 'false'
+    steps:
+      - name: Checkout proposed draft branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned sandbox browser dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'playwright==1.63.0'
+          python -m playwright install --with-deps chromium
+      - name: Actual AtlasQuant offline app and synthetic local login
+        run: python scripts/test_aion_library_actual_app_browser.py
+      - name: Upload synthetic UI smoke screenshots and sanitised local logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aion-library-synthetic-real-app-e2e
+          path: |
+            aion-library-real-app-smoke/*.png
+          retention-days: 7
