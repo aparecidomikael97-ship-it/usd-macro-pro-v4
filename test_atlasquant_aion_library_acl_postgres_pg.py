@@ -328,4 +328,241 @@ class PrincipalBoundPostgreSQLTests(unittest.TestCase):
         with self.assertRaises(AuthorizationDenied):
             reader.roles_for("reader.1", "T-A", "LIBRARY")
 
+
+@unittest.skipUnless(ENABLED, "strict ephemeral PostgreSQL registry integration required")
+class PersistentRegistryPostgreSQLTests(unittest.TestCase):
+    """Opt-in actual PostgreSQL registry + principal ACL, synthetic roles only."""
+
+    @classmethod
+    def setUpClass(cls):
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            MIGRATION_PRINCIPAL_REGISTRY,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            MIGRATION_PRINCIPAL_ACL_V2,
+        )
+        import psycopg
+        cls.pg = psycopg
+        cls.reader_dsn = (
+            "postgresql://aion_principal_registry_ci_reader:synthetic_registry_only"
+            "@localhost:5432/aion_library_sandbox"
+        )
+        with cls.pg.connect(EXPECTED, autocommit=True) as db:
+            for table, ddl in (
+                ("aion_library_principal_registry_sandbox",
+                 MIGRATION_PRINCIPAL_REGISTRY),
+                ("aion_library_tenant_acl_principal_v2",
+                 MIGRATION_PRINCIPAL_ACL_V2),
+            ):
+                with db.cursor() as cur:
+                    cur.execute("SELECT to_regclass(%s)", ("public." + table,))
+                    if cur.fetchone()[0] is None:
+                        cur.execute(ddl)
+            with db.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM pg_roles WHERE rolname=%s",
+                    ("aion_principal_registry_ci_reader",),
+                )
+                if cur.fetchone() is None:
+                    cur.execute(
+                        "CREATE ROLE aion_principal_registry_ci_reader LOGIN "
+                        "PASSWORD 'synthetic_registry_only'"
+                    )
+                cur.execute(
+                    "GRANT CONNECT ON DATABASE aion_library_sandbox "
+                    "TO aion_principal_registry_ci_reader"
+                )
+                cur.execute(
+                    "GRANT USAGE ON SCHEMA public TO aion_principal_registry_ci_reader"
+                )
+                cur.execute(
+                    "GRANT SELECT ON aion_library_principal_registry_sandbox,"
+                    "aion_library_tenant_acl_principal_v2 "
+                    "TO aion_principal_registry_ci_reader"
+                )
+
+    def setUp(self):
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            PostgresPrincipalRegistry, VerifiedHostAccount,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        self.Verified = VerifiedHostAccount
+        self.account_a = VerifiedHostAccount(
+            "reader.1", "trusted.local", "principal-old-0001",
+            "a" * 32, "c" * 24, True,
+        )
+        self.account_b = VerifiedHostAccount(
+            "reader.1", "trusted.local", "principal-new-0002",
+            "b" * 32, "d" * 24, True,
+        )
+        self.account = self.account_a
+        self.on_verify = lambda: None
+        with self.pg.connect(EXPECTED, autocommit=True) as db:
+            db.execute(
+                "TRUNCATE TABLE aion_library_principal_registry_sandbox,"
+                " aion_library_tenant_acl_principal_v2"
+            )
+        self.make_ports()
+
+    def make_ports(self):
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            PostgresPrincipalRegistry,
+        )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        self.registry = PostgresPrincipalRegistry(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            verified_host_account=self.get_verified,
+        )
+        self.acl = PrincipalBoundPostgresMembership(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            current_principal=self.registry.current_principal,
+        )
+
+    def get_verified(self):
+        self.on_verify()
+        return self.account
+
+    def enroll(self, identity):
+        with self.pg.connect(EXPECTED) as db:
+            db.execute(
+                """INSERT INTO aion_library_principal_registry_sandbox
+                   (principal_issuer,principal_subject,account_generation,
+                    username,credential_binding)
+                   VALUES (%s,%s,%s,%s,%s)""",
+                (identity.issuer, identity.subject, identity.account_generation,
+                 identity.username, identity.credential_fingerprint),
+            )
+
+    def grant(self, identity):
+        with self.pg.connect(EXPECTED) as db:
+            db.execute(
+                """INSERT INTO aion_library_tenant_acl_principal_v2
+                   (principal_issuer,principal_subject,account_generation,
+                    username,tenant_id,domain_id,library_role)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                (identity.issuer, identity.subject, identity.account_generation,
+                 identity.username, "T-A", "LIBRARY", "LIBRARY_READER"),
+            )
+
+    def retire(self, identity):
+        with self.pg.connect(EXPECTED) as db:
+            db.execute(
+                """UPDATE aion_library_principal_registry_sandbox
+                   SET active=FALSE, retired_at_unix=2000000000
+                   WHERE principal_issuer=%s AND principal_subject=%s
+                     AND account_generation=%s""",
+                (identity.issuer, identity.subject, identity.account_generation),
+            )
+
+    def roles(self):
+        return self.acl.roles_for("reader.1", "T-A", "LIBRARY")
+
+    def test_real_pg_registry_same_username_recreated_requires_explicit_regrant(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        self.assertEqual(self.roles(), ("LIBRARY_READER",))
+        self.retire(self.account_a)
+        self.account = self.account_b
+        # Previous V2 ACL row still exists but is NOT transferable to B.
+        with self.assertRaises(AuthorizationDenied):
+            self.roles()
+        self.enroll(self.account_b)
+        self.assertEqual(self.roles(), ())
+        self.grant(self.account_b)
+        self.assertEqual(self.roles(), ("LIBRARY_READER",))
+        self.assertEqual(self.acl.roles_for("reader.1", "T-B", "LIBRARY"), ())
+
+    def test_real_pg_registry_retired_principal_denied_even_if_old_acl_is_active(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        self.assertEqual(self.roles(), ("LIBRARY_READER",))
+        self.retire(self.account_a)
+        with self.assertRaises(AuthorizationDenied):
+            self.roles()
+
+    def test_real_pg_registry_password_rotation_requires_authoritative_rebinding(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        self.assertEqual(self.roles(), ("LIBRARY_READER",))
+        new_credential = self.Verified(
+            "reader.1", "trusted.local", "principal-old-0001",
+            "a" * 32, "f" * 24, True,
+        )
+        self.account = new_credential
+        with self.assertRaises(AuthorizationDenied):
+            self.roles()
+        # Privileged test fixture updates only credential binding, not
+        # the stable subject/generation or ACL.
+        with self.pg.connect(EXPECTED) as db:
+            db.execute(
+                """UPDATE aion_library_principal_registry_sandbox
+                   SET credential_binding=%s
+                   WHERE principal_issuer=%s AND principal_subject=%s
+                     AND account_generation=%s""",
+                ("f" * 24, "trusted.local", "principal-old-0001", "a" * 32),
+            )
+        self.assertEqual(self.roles(), ("LIBRARY_READER",))
+
+    def test_real_pg_registry_retirement_visible_to_independent_worker(self):
+        self.enroll(self.account_a)
+        self.grant(self.account_a)
+        self.assertEqual(self.roles(), ("LIBRARY_READER",))
+        from atlasquant_aion_library_principal_registry_sandbox import (
+            PostgresPrincipalRegistry,
+        )
+        second = PostgresPrincipalRegistry(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            verified_host_account=self.get_verified,
+        )
+        self.assertEqual(second.current_principal().username, "reader.1")
+        self.retire(self.account_a)
+        for worker in (self.registry, second):
+            with self.assertRaises(AuthorizationDenied):
+                worker.current_principal()
+
+    def test_real_pg_registry_read_role_cannot_update_or_provision(self):
+        self.enroll(self.account_a)
+        with self.pg.connect(self.reader_dsn) as db:
+            with self.assertRaises(self.pg.errors.InsufficientPrivilege):
+                db.execute(
+                    """UPDATE aion_library_principal_registry_sandbox
+                       SET active=FALSE WHERE username='reader.1'"""
+                )
+        with self.pg.connect(self.reader_dsn) as db:
+            with self.assertRaises(self.pg.errors.InsufficientPrivilege):
+                db.execute(
+                    """INSERT INTO aion_library_principal_registry_sandbox
+                       (principal_issuer,principal_subject,account_generation,
+                        username,credential_binding)
+                       VALUES ('trusted.local','principal-other-0003',%s,
+                               'reader.2',%s)""",
+                    ("d" * 32, "f" * 24),
+                )
+
+    def test_real_pg_registry_enforces_one_active_generation_per_issuer_username(self):
+        self.enroll(self.account_a)
+        with self.assertRaises(self.pg.errors.UniqueViolation):
+            self.enroll(self.account_b)
+        self.retire(self.account_a)
+        self.enroll(self.account_b)
+        self.assertEqual(self.registry.current_principal, self.registry.current_principal)
+        self.account = self.account_b
+        self.assertEqual(self.registry.current_principal().subject,
+                         self.account_b.subject)
+
+    def test_real_pg_registry_switch_during_live_read_is_denied(self):
+        self.enroll(self.account_a)
+        calls = {"n": 0}
+        def switch():
+            calls["n"] += 1
+            if calls["n"] == 2:
+                self.account = self.account_b
+        self.on_verify = switch
+        with self.assertRaises(AuthorizationDenied):
+            self.registry.current_principal()
+
 if __name__=='__main__':unittest.main()
