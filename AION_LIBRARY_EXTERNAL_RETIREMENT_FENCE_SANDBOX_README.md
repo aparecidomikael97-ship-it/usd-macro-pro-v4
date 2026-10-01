@@ -1,0 +1,24 @@
+# AION Biblioteca — Bloqueio externo de identidades aposentadas (Sandbox)
+
+**Somente contrato de teste, módulo não montado no app.** Complementa [#507](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/507), [#502](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/502) e o ensaio de recuperação [#501](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/501). Não gera identidade, não aposenta contas, não escreve no banco e não executa migrations. A `main`, login/ACL V1 e as Drafts ancestrais não são modificados.
+
+## Contrato de fronteira
+
+`ExternalRetirementFence` exige três interfaces internas controladas pelo host: (1) `registry_principal`, identidade fresca de login verificado e registry SQL já testados; (2) `current_authority(issuer,username)`, estado **ATUAL** de emissor externo independente e não restaurável junto com o banco protegido; (3) `minimum_revision(issuer,username)`, limite monotônico **independente** que não pode retroceder quando o banco sofre restauração. O testemunho inclui emissor, username, subject, geração, status ativo e número inteiro de revisão. O limite monotônico impede aceitar um testemunho histórico cuja revisão seja inferior ao limite confiável.
+
+O método `current_principal` lê o registro, exige correspondência exata de identidade + estado externo, reconsulta o registro e as fontes externas, exige estabilidade da revisão, e devolve `CurrentPrincipal` somente se houver consenso. Para validar também a revogação DURANTE a consulta de ACL, injetar `fence.current_principal` no adapter já existente `PrincipalBoundPostgresMembership`, que revalida o callback antes e depois da leitura SQL de ACL. Falha de callback, identidade trocada, estado aposentado ou revisão antiga resultam em `AuthorizationDenied` sem fallback para username V1.
+
+## Evidência limitada dos testes
+
+- Regressões offline adicionadas em `test_atlasquant_aion_library_acl_postgres.py` cobrem witness ativo, aposentadoria, substituição de A→B mesmo username, limite monotônico mais recente do que witness antigo, callback indisponível, alteração entre consultas e entradas malformadas.
+- Testes de PostgreSQL efêmero adicionais em `test_atlasquant_aion_library_acl_postgres_pg.py` verificam consulta/ACL reais mesmo quando o witness veta A, simulação explícita de **reversão do banco** para linha antiga com ACL antiga presente, negação até reenrolar B e conceder permissão de modo explícito, witness antigo abaixo do limite, indisponibilidade externa e aposentadoria entre leitura de registry e ACL. A simulação NÃO é `pg_restore` nem dispõe de witness externo real; o testemunho e o limite são valores mantidos em memória nos testes, separados logicamente da tabela SQL.
+- A revisão deve exigir a execução dos novos testes PostgreSQL com `CI=true` e DSN estritamente sintética, não interpretando os skips em Foundation/Quality como prova de banco real.
+
+## Limites de segurança que NÃO foram implementados
+
+1. Não existe serviço independente, assinaturas de evidência, custódia de chaves ou armazenamento append-only imutável neste patch. O host deve comprovar autenticação, frescor e consistência multi-worker das DUAS interfaces externas. Se ambos os callbacks devolverem um registro antigo falso, este módulo não tem como perceber; uma assinatura de histórico sozinha NÃO é suficiente.
+2. O login V1 ainda não emite identidade permanente atestada; o callback de registry permanece simulado. Nunca aceitar o witness vindo de browser, sessão não verificada, rede sem autenticação ou do próprio snapshot restaurável.
+3. Falha depois da última revalidação ainda precisa de análise de consistência e ponto de autorização final no futuro serviço produtivo. Não tratar as consultas repetidas como bloqueio matemático de todas as corridas.
+4. Uma autoridade privilegiada separada deverá emitir IDs/gerações imprevisíveis, registrar aposentadoria irreversível e provisão/concessão auditadas; o plano de testes deve contemplar reativações indevidas, replay em outra instância e backup antes/depois da exclusão. O operador deve decidir semântica de disponibilidade quando a autoridade externa estiver fora do ar: aqui o contrato é **sempre negar**.
+
+**Pendências para liberar produção:** [#507](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/507) (plano privilegiado e testemunha externa realmente persistente), [#501](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/501) (ensaios reais `pg_dump/pg_restore` conjunto com revogações externas e RPO/RTO), [#499](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/499) (gates PostgreSQL e navegador automáticos na main), #325 e #477 (proteção administrativa, direitos/licenças, auditoria independente, LGPD, DR real). **Não mergear, migrar, publicar, implantar ou conectar contas/documentos reais por aprovação de testes desta Draft.**
