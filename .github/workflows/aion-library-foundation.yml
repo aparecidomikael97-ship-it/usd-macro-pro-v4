@@ -11,6 +11,7 @@ on:
       - review/aion-library-verifiable-authorization-v1-20261001
       - review/aion-library-trusted-identity-ledger-v1-20261001
       - review/aion-library-shared-approval-port-v1-20261001
+      - review/aion-library-atomic-document-audit-v1-20261001
     paths:
       - "aion_core/**"
       - "test_aion_core_*.py"
@@ -33,7 +34,7 @@ jobs:
           python-version: "3.12"
       - name: Compile Python sources
         run: python -m compileall -q aion_core test_aion_core_*.py
-      - name: Run AION Core, Library and atomic persistence tests
+      - name: Run AION Core, Library and recovery integrity preflight
         run: |
           python -m unittest -q \
             test_aion_core_domain_registry \
@@ -48,4 +49,6 @@ jobs:
             test_aion_core_library_security_runtime \
             test_aion_core_library_shared_approval_port \
             test_aion_core_library_atomic_store \
-            test_aion_core_library_atomic_pg
+            test_aion_core_library_atomic_pg \
+            test_aion_core_library_recovery_gate \
+            test_aion_core_library_recovery_pg
