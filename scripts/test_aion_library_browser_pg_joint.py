@@ -154,7 +154,7 @@ def assert_state(page, expected):
             }), flush=True)
             logfile = OUT / "private-local-only.log"
             if logfile.exists():
-                allowed = ("AION_CI_GATE_REASON=", "AION_CI_READ_EXCEPTION_TYPES=")
+                allowed = ("AION_CI_GATE_REASON=", "AION_CI_READ_EXCEPTION_TYPES=", "AION_CI_DENIAL_STAGES=")
                 diagnostic = [line.strip() for line in logfile.read_text(
                     encoding="utf-8", errors="replace").splitlines()
                     if any(marker in line for marker in allowed)]
