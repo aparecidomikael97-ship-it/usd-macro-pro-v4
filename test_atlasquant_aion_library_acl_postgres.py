@@ -354,6 +354,45 @@ class PrincipalBoundSandboxTests(unittest.TestCase):
                 with self.assertRaises(AuthorizationDenied):
                     self.read()
 
+    def test_existing_host_with_v2_provider_denies_recreated_real_login(self):
+        from atlasquant_access_control import AccessUser, authenticate, hash_password
+        from atlasquant_aion_library_host_access import AtlasQuantLibraryHostAccess
+        now = 2_000_000_000
+        old_pass, new_pass = "SyntheticV2OldPassword#A", "SyntheticV2NewPassword#B"
+        old_hash = hash_password(old_pass, salt=b"z" * 16, iterations=200_000)
+        new_hash = hash_password(new_pass, salt=b"y" * 16, iterations=200_000)
+        users = {"reader.1": AccessUser("reader.1", "USER", old_hash)}
+        old = authenticate("reader.1", old_pass, users)
+        self.assertIsNotNone(old)
+        access = {"allowed": True, "mode": "AUTHENTICATED", "role": "USER",
+                  "session": dict(old, authenticated_at=now-10, last_seen=now-1)}
+        host = AtlasQuantLibraryHostAccess(
+            access_provider=lambda: access,
+            users_provider=lambda: users,
+            membership_provider=self.adapter.roles_for,
+            trusted_issuer="atlasquant.local", token_audience="library",
+            attestation_issuer="atlasquant-library", signing_key=b"k" * 32,
+            clock=lambda: now,
+        )
+        self.grant()
+        self.assertEqual(host._lookup_roles("reader.1", "T-A", "LIBRARY"),
+                         ("LIBRARY_READER",))
+        # Deprovision old account; re-create the SAME username, with a
+        # different credential and a separate immutable account generation.
+        users["reader.1"] = AccessUser("reader.1", "USER", new_hash)
+        fresh = authenticate("reader.1", new_pass, users)
+        self.assertIsNotNone(fresh)
+        access["session"] = dict(fresh, authenticated_at=now-1, last_seen=now)
+        self.identity = self.Principal(
+            "reader.1", self.issuer, self.subject_b, self.generation_b, True
+        )
+        with self.assertRaises(AuthorizationDenied):
+            host._lookup_roles("reader.1", "T-A", "LIBRARY")
+        self.grant(key=self.key(subject=self.subject_b,
+                                generation=self.generation_b))
+        self.assertEqual(host._lookup_roles("reader.1", "T-A", "LIBRARY"),
+                         ("LIBRARY_READER",))
+
     def test_v2_schema_is_separate_and_select_only_no_legacy_auto_migration(self):
         from atlasquant_aion_library_principal_acl_sandbox import (
             MIGRATION_PRINCIPAL_ACL_V2, _SELECT,
