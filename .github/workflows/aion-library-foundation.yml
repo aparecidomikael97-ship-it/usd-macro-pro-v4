@@ -13,8 +13,11 @@ on:
       - review/aion-library-shared-approval-port-v1-20261001
       - review/aion-library-atomic-document-audit-v1-20261001
       - review/aion-library-recovery-preflight-v1-20261001
+      - review/aion-library-restore-drill-v1-20261001
     paths:
       - "aion_core/**"
+      - "atlasquant_aion_library_host_access.py"
+      - "test_atlasquant_aion_library_host_access.py"
       - "test_aion_core_*.py"
       - ".github/workflows/aion-library-foundation.yml"
       - ".github/workflows/quality-tests.yml"
@@ -34,8 +37,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile Python sources
-        run: python -m compileall -q aion_core test_aion_core_*.py
-      - name: Run AION Core, Library integrity and backup custody contracts
+        run: python -m compileall -q aion_core test_aion_core_*.py atlasquant_aion_library_host_access.py test_atlasquant_aion_library_host_access.py
+      - name: Run AION Core, Library and existing login integration contracts
         run: |
           python -m unittest -q \
             test_aion_core_domain_registry \
@@ -54,4 +57,5 @@ jobs:
             test_aion_core_library_recovery_gate \
             test_aion_core_library_recovery_pg \
             test_aion_core_library_backup_evidence \
-            test_aion_core_library_restore_drill_pg
+            test_aion_core_library_restore_drill_pg \
+            test_atlasquant_aion_library_host_access
