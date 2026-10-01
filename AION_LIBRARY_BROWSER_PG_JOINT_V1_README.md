@@ -27,10 +27,12 @@ by inherited backend code on each request.
 - Android 390: ordinary USER login gets no admin Library area.
 - Desktop 1440: genuine ADMIN login and review metadata.
 - Runner-only approval writes a fictitious signed decision. The **same desktop
-  authenticated browser session** navigates away and back; PostgreSQL returns
-  APPROVED_FOR_INDEXING metadata.
+  authenticated browser session** clicks a strictly CI-only revalidation button
+  (ordinary Streamlit rerun; no new login or navigation bypass); PostgreSQL
+  must return APPROVED_FOR_INDEXING metadata.
 - Runner revokes that ADMIN's PostgreSQL membership. The same browser session
-  navigates back: the test overlay now returns a uniform denial with no metadata.
+  clicks the test-only revalidation button again; the test overlay must now
+  return a uniform denial with no metadata. No button exists in production.
 - Separate app restart with feature flag OFF proves the Library option is hidden.
 - Reader roles independently fail an SQL UPDATE check.
 - The same workflow job also executes the existing 10 full-chain and 8 server
