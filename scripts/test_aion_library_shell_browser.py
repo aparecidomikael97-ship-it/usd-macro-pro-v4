@@ -50,8 +50,16 @@ def browser_case(browser,scenario,width,height,mobile):
         response=page.goto(f'http://127.0.0.1:{PORT}',wait_until='domcontentloaded',timeout=35_000)
         assert response and response.status==200, (scenario,width,'HTTP response')
         page.get_by_text('Ensaio visual isolado',exact=False).wait_for(timeout=30_000)
-        body=page.locator('[data-testid="stMain"]').inner_text(timeout=20_000)
         visible=scenario=='allowed'
+        # Streamlit streams deltas: the caption and title can appear before
+        # metrics and warnings. Wait for the last semantic element instead of
+        # asserting against a partially rendered page.
+        if visible:
+            page.locator('[data-testid="stMetric"]').first.wait_for(timeout=30_000)
+            page.get_by_text('Nenhum PDF pode ser enviado',exact=False).wait_for(timeout=30_000)
+        else:
+            page.get_by_text('Biblioteca indisponível neste cenário de acesso.',exact=False).wait_for(timeout=30_000)
+        body=page.locator('[data-testid="stMain"]').inner_text(timeout=20_000)
         assert ('📚 Biblioteca AION' in body)==visible,(scenario,width,'visibility')
         if visible:
             assert 'Ingestão e indexação' in body,(scenario,width,'status')
