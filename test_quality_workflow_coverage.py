@@ -212,6 +212,18 @@ class AionLibraryMainGatePreflightTests(unittest.TestCase):
                                          "ATLASQUANT_ENV: 'PRODUCTION'")
         self.assertTrue(any("ATLASQUANT_ENV" in error for error in inspect_workflow(altered)))
 
+    def test_gate_denies_remote_pg_dsn_even_if_localhost_mentioned_elsewhere(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        local = "postgresql://library_sandbox:synthetic_ci_only_not_for_production@localhost:5432/aion_library_sandbox"
+        altered = self._sample().replace(local, "postgresql://nonlocal-host.example/production")
+        # The run marker still mentions localhost, so validate JOB env specifically.
+        self.assertTrue(any("AION_LIB_TEST_PG_DSN" in e for e in inspect_workflow(altered)))
+
+    def test_gate_denies_non_postgresql_service_image(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("image: postgres:16", "image: redis:7")
+        self.assertTrue(any("PostgreSQL service" in e for e in inspect_workflow(altered)))
+
     def test_gate_denies_write_permissions(self):
         from scripts.aion_library_ci_gate_preflight import inspect_workflow
         altered = self._sample().replace("contents: read", "contents: write")
