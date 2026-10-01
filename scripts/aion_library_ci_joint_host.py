@@ -18,7 +18,7 @@ DOC_DSN = ("postgresql://aion_browser_doc_reader:synthetic_browser_doc"
 HOST_KEY = b"j" * 32  # Fictitious CI fixtures, never deployed or used with real data.
 CHECKPOINT_KEY = b"c" * 32
 SCOPE = ("T-A", "TRADER")
-ENTRY_RE = re.compile(r"[A-Za-z0-9_.:-]{1,28}\\Z")
+ENTRY_RE = re.compile(r"[A-Za-z0-9_.:-]{1,28}\Z")
 
 
 def require_synthetic(*, writer=False):
