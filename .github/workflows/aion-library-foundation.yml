@@ -19,6 +19,7 @@ on:
       - review/aion-library-admin-shell-sandbox-v1-20261001
       - review/aion-library-real-app-e2e-v1-20261001
       - review/aion-library-server-composition-v1-20261001
+      - review/aion-library-fullchain-pg-selection-v1-20261001
     paths:
       - "aion_core/**"
       - "atlasquant_aion_library_host_access.py"
@@ -34,6 +35,8 @@ on:
       - "atlasquant_aion_library_internal_entry.py"
       - "test_atlasquant_aion_library_internal_entry.py"
       - "test_atlasquant_aion_library_fullchain_pg.py"
+      - "atlasquant_aion_library_server_selection.py"
+      - "test_atlasquant_aion_library_server_selection*.py"
       - "test_atlasquant_aion_library_postgres_preview*.py"
       - "test_aion_core_*.py"
       - ".github/workflows/aion-library-foundation.yml"
@@ -54,7 +57,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile Python sources
-        run: python -m compileall -q aion_core test_aion_core_*.py atlasquant_aion_library_host_access.py test_atlasquant_aion_library_host_access.py atlasquant_aion_library_postgres_preview.py test_atlasquant_aion_library_postgres_preview*.py atlasquant_aion_library_workspace_shell.py test_atlasquant_aion_library_workspace_shell.py atlasquant_aion_library_acl_postgres.py test_atlasquant_aion_library_acl_postgres*.py atlasquant_aion_admin.py atlasquant_aion_library_server_assembly.py test_atlasquant_aion_library_server_assembly.py atlasquant_aion_library_internal_entry.py test_atlasquant_aion_library_internal_entry.py test_atlasquant_aion_library_fullchain_pg.py
+        run: python -m compileall -q aion_core test_aion_core_*.py atlasquant_aion_library_host_access.py test_atlasquant_aion_library_host_access.py atlasquant_aion_library_postgres_preview.py test_atlasquant_aion_library_postgres_preview*.py atlasquant_aion_library_workspace_shell.py test_atlasquant_aion_library_workspace_shell.py atlasquant_aion_library_acl_postgres.py test_atlasquant_aion_library_acl_postgres*.py atlasquant_aion_admin.py atlasquant_aion_library_server_assembly.py test_atlasquant_aion_library_server_assembly.py atlasquant_aion_library_internal_entry.py test_atlasquant_aion_library_internal_entry.py test_atlasquant_aion_library_fullchain_pg.py atlasquant_aion_library_server_selection.py test_atlasquant_aion_library_server_selection*.py
       - name: Run AION Library sandbox stack including host composition security contracts
         run: |
           python -m unittest -q \
@@ -83,4 +86,7 @@ jobs:
             test_atlasquant_aion_library_acl_postgres_pg \
             test_atlasquant_aion_library_server_assembly \
             test_atlasquant_aion_library_internal_entry \
-            test_atlasquant_aion_library_fullchain_pg
+            test_atlasquant_aion_library_fullchain_pg \
+            test_atlasquant_aion_library_server_selection \
+            test_atlasquant_aion_library_server_selection_pg \
+            test_quality_workflow_coverage
