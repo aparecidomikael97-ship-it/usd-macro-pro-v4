@@ -3,7 +3,7 @@ name: Quality tests
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, review/aion-library-fullchain-pg-selection-v1-20261001]
   push:
     branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final, atlasquant-render-fast-home, atlasquant-mobile-dom-stability, atlasquant-natural-deep-voice]
     paths:
@@ -404,6 +404,8 @@ jobs:
             test_atlasquant_aion_library_server_assembly.py \
             test_atlasquant_aion_library_internal_entry.py \
             test_atlasquant_aion_library_fullchain_pg.py \
+            test_atlasquant_aion_library_server_selection.py \
+            test_atlasquant_aion_library_server_selection_pg.py \
             test_quality_workflow_coverage.py \
             test_streamlit_width_compat.py \
             tests/test_atlasquant_budget_28_planning.py \
