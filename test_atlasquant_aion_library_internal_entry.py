@@ -16,6 +16,7 @@ class HostSelectionTests(unittest.TestCase):
         self.assembly = object.__new__(SandboxLibraryServerReadAssembly)
         self.output = LibraryPanelPreview("ENTRY-1", 2, "APPROVED_FOR_INDEXING", True)
         self.called = []
+        self.on_read = None
         self.reader = patch.object(SandboxLibraryServerReadAssembly, 'read_preview',
                                    autospec=True, side_effect=self.read)
         self.reader.start()
@@ -28,6 +29,8 @@ class HostSelectionTests(unittest.TestCase):
 
     def read(self, _assembly, **kwargs):
         self.called.append(kwargs)
+        if self.on_read is not None:
+            self.on_read()
         return self.output
 
     def test_minimal_status_no_entry_id_or_hash(self):
@@ -61,18 +64,12 @@ class HostSelectionTests(unittest.TestCase):
                 with self.assertRaises(AuthorizationDenied):self.svc.preview_for_host(selection='study')
 
     def test_server_retargets_during_read_fails_closed(self):
-        def flip(_,**kw):
-            self.target['study']=('TENANT-2','LIBRARY','ENTRY-2')
-            return self.output
-        with patch.object(SandboxLibraryServerReadAssembly,'read_preview',autospec=True,side_effect=flip):
-            with self.assertRaises(AuthorizationDenied):self.svc.preview_for_host(selection='study')
+        self.on_read = lambda: self.target.__setitem__('study',('TENANT-2','LIBRARY','ENTRY-2'))
+        with self.assertRaises(AuthorizationDenied):self.svc.preview_for_host(selection='study')
 
     def test_server_removes_selection_during_read_fails_closed(self):
-        def remove(_,**kw):
-            self.target.clear()
-            return self.output
-        with patch.object(SandboxLibraryServerReadAssembly,'read_preview',autospec=True,side_effect=remove):
-            with self.assertRaises(AuthorizationDenied):self.svc.preview_for_host(selection='study')
+        self.on_read = self.target.clear
+        with self.assertRaises(AuthorizationDenied):self.svc.preview_for_host(selection='study')
 
     def test_mismatched_or_unverified_result_denied(self):
         for result in (LibraryPanelPreview('ENTRY-2',1,'APPROVED_FOR_INDEXING',True),
