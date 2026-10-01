@@ -86,25 +86,46 @@ def start_actual_app(entry_id, *, shell_enabled):
 
 
 def choose_library_checked(page, area):
-    combo = area.get_by_role("combobox")
-    combo.click()
-    try:
-        page.get_by_role("option", name="📚 Biblioteca").wait_for(
-            state="visible", timeout=12_000)
-        page.get_by_role("option", name="📚 Biblioteca").click(timeout=20_000)
-        page.get_by_text("Nenhum PDF pode ser enviado, consultado ou aprovado",
-                         exact=False).wait_for(timeout=120_000)
-    except Exception:
-        # Only display static workspace labels and allowlisted policy reason.
-        labels = page.get_by_role("option").all_inner_texts()
-        print("CI_WORKSPACE_OPTIONS=" + repr(labels[:12]), flush=True)
-        logfile = OUT / "private-local-only.log"
-        if logfile.exists():
-            lines = [line.strip() for line in logfile.read_text(
-                encoding="utf-8", errors="replace").splitlines()
-                if "AION_CI_GATE_REASON=" in line]
-            print("CI_GATE_DIAG=" + repr(lines[-4:]), flush=True)
-        raise
+    # Streamlit can rerender the selectbox just as Playwright opens the
+    # dropdown. Reacquire the REAL element and retry only the UI gesture;
+    # never inject session state or select a Library scope from the browser.
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+    option = page.get_by_role("option", name="📚 Biblioteca", exact=True)
+    for attempt in range(3):
+        area = actual.enter_aion(page)
+        combo = area.get_by_role("combobox")
+        combo.click(timeout=15_000)
+        try:
+            option.wait_for(state="visible", timeout=5_000)
+            option.click(timeout=15_000)
+            page.get_by_text(
+                "Nenhum PDF pode ser enviado, consultado ou aprovado",
+                exact=False,
+            ).wait_for(timeout=120_000)
+            return
+        except PlaywrightTimeout:
+            # A vanished option can mean a Streamlit rerender closed the
+            # dropdown. Retrying does not grant any new permission.
+            if page.get_by_text(
+                "Nenhum PDF pode ser enviado, consultado ou aprovado",
+                exact=False,
+            ).count():
+                return
+            page.keyboard.press("Escape")
+            if attempt < 2:
+                page.wait_for_timeout(650)
+
+    # Fail closed after bounded retries, with only static policy telemetry.
+    labels = page.get_by_role("option").all_inner_texts()
+    print("CI_WORKSPACE_OPTIONS=" + repr(labels[:12]), flush=True)
+    logfile = OUT / "private-local-only.log"
+    if logfile.exists():
+        lines = [line.strip() for line in logfile.read_text(
+            encoding="utf-8", errors="replace").splitlines()
+            if "AION_CI_GATE_REASON=" in line]
+        print("CI_GATE_DIAG=" + repr(lines[-4:]), flush=True)
+    raise AssertionError("real Streamlit Library option not stable after bounded retries")
 
 
 def browser_case(browser, *, username, width, height, mobile, expected):
