@@ -100,12 +100,19 @@ def inspect_workflow(source: str) -> list[str]:
         errors.append(str(exc))
     if re.search(r"(?m)^\s*contents:\s*write\s*$", clean):
         errors.append("write permissions are forbidden")
-    for key, expected in EXPECTED_FLAGS.items():
-        expected_line = re.compile(
-            r"(?m)^    " + re.escape(key) + r":\s*['\"]?" + re.escape(expected) + r"['\"]?\s*$"
-        )
-        if not expected_line.search(clean):
-            errors.append("missing strict synthetic environment flag: " + key)
+    try:
+        jobs = _block(lines, "jobs", 0)
+        job = _block(jobs, "actual-app-browser-pg-synthetic", 2)
+        job_env = _block(job, "env", 4)
+        env_text = "\n".join(job_env)
+        for key, expected in EXPECTED_FLAGS.items():
+            expected_line = re.compile(
+                r"(?m)^      " + re.escape(key) + r":\s*['\"]?" + re.escape(expected) + r"['\"]?\s*$"
+            )
+            if not expected_line.search(env_text):
+                errors.append("missing strict job-level synthetic environment flag: " + key)
+    except ValueError as exc:
+        errors.append(str(exc))
     for label, marker in {
         "PostgreSQL 16 ephemeral service": "image: postgres:16",
         "local synthetic database": "localhost:5432/aion_library_sandbox",
