@@ -22,6 +22,18 @@ require_synthetic()
 import atlasquant_aion_admin
 
 _original_shell = atlasquant_aion_admin.render_library_shell
+_original_gate = atlasquant_aion_admin.library_shell_gate
+
+
+def _ci_gate_diagnostics(**kwargs):
+    result = _original_gate(**kwargs)
+    # Only constant policy reason/boolean; never session, username or DB details.
+    print("AION_CI_GATE_REASON=" + str(result.get("reason")) +
+          " VISIBLE=" + str(result.get("visible") is True), flush=True)
+    return result
+
+
+atlasquant_aion_admin.library_shell_gate = _ci_gate_diagnostics
 
 
 def _ci_only_shell(st, *, gate):
