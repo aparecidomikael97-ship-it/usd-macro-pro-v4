@@ -1,3 +1,4 @@
+import json
 import unittest
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -12,16 +13,24 @@ from atlasquant_aion_core_intelligence.context import Domain
 from atlasquant_aion_core_intelligence.evidence import digest
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_core_voice_automation import stage_schedule
+from atlasquant_aion_action_receipt import canonical_fingerprint
+from atlasquant_aion_action_receipt_bridge import seal_executor_receipt_envelope
+from atlasquant_aion_core_voice_automation import SCHEDULER_NAMESPACE, _bundle_digest
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
+    PLAN_DEPTH,
+    PLAN_FANOUT,
+    PLAN_NODES,
     SERVICE_PRINCIPAL,
     _claim_state,
     _persist_runtime_checkpoint_cas,
     _release_state,
     _runtime_id,
     attach_global_worker_state,
+    evaluate_global_worker_loop,
     global_worker_integrity,
     global_worker_snapshot,
+    govern_global_worker_plan,
     load_global_worker_state,
     run_global_worker_once,
     stage_arm_global_worker,
@@ -903,6 +912,239 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
             "real_trade(",
         ):
             self.assertNotIn(banned, source)
+
+
+def _plan_node(node_id, parent_id, *, tenant="tenant:alpha", workspace="workspace:alpha"):
+    return {
+        "node_id": node_id,
+        "parent_id": parent_id,
+        "tenant_id": tenant,
+        "workspace_id": workspace,
+        "capability": "ADMINISTRATION",
+        "schedule_id": node_id,
+        "occurrence_key": "occ-" + node_id,
+        "guardian_risk": "READ",
+        "impact": "LOW",
+        "uncertainty_pct": 0,
+        "reversible": False,
+        "external_side_effects": False,
+        "resource_context": {"max_jobs": 1, "calls_used": 0},
+    }
+
+
+class GlobalWorkerSafetyBridgeTests(AionGlobalDurableWorkerTests):
+    def trusted(self):
+        return {"tenant_id": "tenant:alpha", "workspace_id": "workspace:alpha"}
+
+    def valid_nodes(self):
+        return [
+            _plan_node("global-batch", ""),
+            _plan_node("job-1", "global-batch"),
+        ]
+
+    def test_valid_plan_passes_without_granting_authority(self):
+        decision = govern_global_worker_plan(
+            self.valid_nodes(),
+            trusted_context=self.trusted(),
+        )
+        self.assertEqual(decision["state"], "WITHIN_LIMITS")
+        self.assertFalse(decision["grants_permission"])
+        self.assertFalse(decision["executes_action"])
+        self.assertFalse(decision["starts_worker"])
+        self.assertFalse(decision["arms_worker"])
+        self.assertFalse(decision["authorizes_action"])
+        self.assertLessEqual(PLAN_DEPTH, 4)
+        self.assertLessEqual(PLAN_FANOUT, 8)
+        self.assertLessEqual(PLAN_NODES, 32)
+
+    def test_tenant_and_workspace_mismatch_block_the_plan(self):
+        tenant = govern_global_worker_plan(
+            [
+                _plan_node("global-batch", ""),
+                _plan_node("job-1", "global-batch", tenant="tenant:other"),
+            ],
+            trusted_context=self.trusted(),
+        )
+        workspace = govern_global_worker_plan(
+            [
+                _plan_node("global-batch", ""),
+                _plan_node("job-1", "global-batch", workspace="workspace:other"),
+            ],
+            trusted_context=self.trusted(),
+        )
+        self.assertEqual(tenant["state"], "BLOCK")
+        self.assertIn("SCOPE_MISMATCH", tenant["blockers"])
+        self.assertEqual(workspace["state"], "BLOCK")
+        self.assertIn("SCOPE_MISMATCH", workspace["blockers"])
+
+    def test_cycle_fanout_and_node_count_block_without_raising_ceilings(self):
+        cycle = govern_global_worker_plan(
+            [
+                _plan_node("left", "right"),
+                _plan_node("right", "left"),
+            ],
+            trusted_context=self.trusted(),
+        )
+        wide = [
+            _plan_node("global-batch", ""),
+            *[_plan_node("job-" + str(index), "global-batch") for index in range(9)],
+        ]
+        fanout = govern_global_worker_plan(wide, trusted_context=self.trusted())
+        crowded = [
+            _plan_node("global-batch", ""),
+            *[_plan_node("job-" + str(index), "global-batch") for index in range(16)],
+        ]
+        nodes = govern_global_worker_plan(crowded, trusted_context=self.trusted())
+        self.assertIn("CYCLE", cycle["blockers"])
+        self.assertEqual(cycle["state"], "BLOCK")
+        self.assertIn("FANOUT_LIMIT", fanout["blockers"])
+        self.assertEqual(fanout["state"], "BLOCK")
+        self.assertIn("NODE_LIMIT", nodes["blockers"])
+        self.assertEqual(nodes["state"], "BLOCK")
+
+    def test_invalid_limit_types_fail_closed(self):
+        for value in (True, "8", 1.5, 0):
+            decision = govern_global_worker_plan(
+                self.valid_nodes(),
+                trusted_context=self.trusted(),
+                max_fanout=value,
+            )
+            self.assertEqual(decision["state"], "BLOCK")
+            self.assertIn("LIMIT_INVALID", decision["blockers"])
+            self.assertFalse(decision["authorizes_action"])
+
+    def _claim_checkpoint(self, **claims):
+        checkpoint = deepcopy(self.armed_checkpoint())
+        bundle = checkpoint[SCHEDULER_NAMESPACE]
+        bundle["schedules"][0].update(claims)
+        bundle["digest"] = _bundle_digest(bundle)
+        return checkpoint
+
+    def test_scope_mismatch_blocks_before_executor_and_creates_no_receipt(self):
+        cases = (
+            {"tenant_id": "tenant:other"},
+            {"workspace_id": "workspace:other"},
+            {"tenant_id": 1},
+            {"tenant_id": True},
+            {"workspace_id": "true"},
+        )
+        for claims in cases:
+            checkpoint = self._claim_checkpoint(**claims)
+            with patch(
+                "atlasquant_aion_global_worker.load_runtime_checkpoint",
+                return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "sha-0"},
+            ), patch(
+                "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            ) as persist, patch(
+                "atlasquant_aion_global_worker._execute_due_local_work_authorized",
+            ) as executor:
+                result = run_global_worker_once(
+                    config=_config(),
+                    runtime_id="gha-governor",
+                    feature_enabled=True,
+                    now=TICK,
+                )
+            executor.assert_not_called()
+            persist.assert_not_called()
+            self.assertEqual(result["status"], "LOOP_GOVERNOR_BLOCKED")
+            self.assertEqual(result["processed"], 0)
+            self.assertEqual(result["action_receipts"], [])
+            self.assertFalse(result["action_receipts_are_authority"])
+            self.assertFalse(result["executor_called"])
+            self.assertFalse(result["action_receipt_external_persisted"])
+            self.assertTrue(result["loop_governor"]["blockers"])
+
+    def test_due_work_is_governed_before_a_non_authoritative_receipt(self):
+        checkpoint = self.armed_checkpoint()
+        preview = evaluate_global_worker_loop(
+            self.context,
+            checkpoint,
+            max_jobs=5,
+            now=TICK,
+        )
+        self.assertEqual(preview["state"], "WITHIN_LIMITS")
+        captures = []
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "sha-0"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
+            side_effect=self.fake_persist(captures),
+        ):
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-receipt",
+                feature_enabled=True,
+                now=TICK,
+            )
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual(result["loop_governor"]["state"], "WITHIN_LIMITS")
+        self.assertFalse(result["loop_governor"]["grants_permission"])
+        self.assertEqual(len(result["action_receipts"]), 1)
+        self.assertFalse(result["action_receipts_are_authority"])
+        self.assertFalse(result["action_receipt_external_persisted"])
+        final = captures[-1]["checkpoint"]
+        receipts, _ = load_executor_receipts(self.context, final)
+        child = receipts[0]
+        before = deepcopy(child)
+        envelope = result["action_receipts"][0]
+        self.assertEqual(child, before)
+        self.assertEqual(envelope["child_receipt_id"], child["receipt_id"])
+        self.assertEqual(envelope["child_fingerprint"], canonical_fingerprint(child))
+        self.assertEqual(envelope["authorization"], "NONE")
+        self.assertFalse(envelope["external_persisted"])
+        self.assertFalse(envelope["executes_action"])
+        self.assertNotEqual(child.get("schema"), envelope.get("schema"))
+        sealed_again = seal_executor_receipt_envelope(child, context=self.context)
+        self.assertEqual(child, before)
+        self.assertEqual(sealed_again["child_fingerprint"], canonical_fingerprint(child))
+        missing = dict(child)
+        missing["receipt_id"] = ""
+        with self.assertRaises(ValueError):
+            seal_executor_receipt_envelope(missing, context=self.context)
+        tampered = dict(child)
+        tampered["reason"] = "changed-after-seal"
+        self.assertNotEqual(canonical_fingerprint(tampered), canonical_fingerprint(child))
+        secret = dict(child)
+        secret["reason"] = "token=super-secret-value"
+        redacted = seal_executor_receipt_envelope(secret, context=self.context)
+        blob = json.dumps(redacted, sort_keys=True)
+        self.assertNotIn("super-secret-value", blob)
+        self.assertIn("[REDACTED]", blob)
+        self.assertNotIn("super-secret-value", json.dumps(envelope))
+
+    def test_disarmed_worker_and_false_flag_cannot_execute(self):
+        paused = stage_pause_global_worker(
+            self.access,
+            self.armed_checkpoint(),
+            confirmation=True,
+        )["checkpoint"]
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": paused, "sha": "sha-0"},
+        ), patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized",
+        ) as executor:
+            paused_result = run_global_worker_once(
+                config=_config(),
+                runtime_id="gha-paused",
+                feature_enabled=True,
+                now=TICK,
+            )
+        executor.assert_not_called()
+        self.assertEqual(paused_result["status"], "PAUSED")
+        self.assertEqual(paused_result["processed"], 0)
+        for flag in (False, "true", "TRUE", 1, "yes"):
+            with patch("atlasquant_aion_global_worker.load_runtime_checkpoint") as load:
+                disabled = run_global_worker_once(
+                    config=_config(),
+                    runtime_id="gha-off",
+                    feature_enabled=flag,
+                    now=TICK,
+                )
+            load.assert_not_called()
+            self.assertEqual(disabled["status"], "FEATURE_DISABLED")
+            self.assertFalse(disabled["network_called"])
 
 
 if __name__ == "__main__":
