@@ -12,6 +12,7 @@ on:
       - review/aion-library-trusted-identity-ledger-v1-20261001
       - review/aion-library-shared-approval-port-v1-20261001
       - review/aion-library-atomic-document-audit-v1-20261001
+      - review/aion-library-recovery-preflight-v1-20261001
     paths:
       - "aion_core/**"
       - "test_aion_core_*.py"
@@ -34,7 +35,7 @@ jobs:
           python-version: "3.12"
       - name: Compile Python sources
         run: python -m compileall -q aion_core test_aion_core_*.py
-      - name: Run AION Core, Library and recovery integrity preflight
+      - name: Run AION Core, Library integrity and backup custody contracts
         run: |
           python -m unittest -q \
             test_aion_core_domain_registry \
@@ -51,4 +52,6 @@ jobs:
             test_aion_core_library_atomic_store \
             test_aion_core_library_atomic_pg \
             test_aion_core_library_recovery_gate \
-            test_aion_core_library_recovery_pg
+            test_aion_core_library_recovery_pg \
+            test_aion_core_library_backup_evidence \
+            test_aion_core_library_restore_drill_pg
