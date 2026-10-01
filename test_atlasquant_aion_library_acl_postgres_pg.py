@@ -177,4 +177,153 @@ class PostgreSQLMembershipTests(unittest.TestCase):
         with self.assertRaises(AuthorizationDenied):
             host._lookup_roles('reader.1','T-A','LIBRARY')
 
+
+@unittest.skipUnless(ENABLED, "strict ephemeral PostgreSQL V2 principal drill required")
+class PrincipalBoundPostgreSQLTests(unittest.TestCase):
+    """Real PG sandbox: no V1 migration, no auth registry or production data."""
+
+    @classmethod
+    def setUpClass(cls):
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            MIGRATION_PRINCIPAL_ACL_V2,
+        )
+        import psycopg
+        cls.pg = psycopg
+        cls.reader_dsn = (
+            "postgresql://aion_acl_ci_principal_reader:synthetic_principal_reader_only"
+            "@localhost:5432/aion_library_sandbox"
+        )
+        with cls.pg.connect(EXPECTED, autocommit=True) as db:
+            with db.cursor() as cur:
+                cur.execute(
+                    "SELECT to_regclass('public.aion_library_tenant_acl_principal_v2')"
+                )
+                if cur.fetchone()[0] is None:
+                    cur.execute(MIGRATION_PRINCIPAL_ACL_V2)
+                cur.execute("""DO $ BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles
+                    WHERE rolname = 'aion_acl_ci_principal_reader') THEN
+                    CREATE ROLE aion_acl_ci_principal_reader LOGIN
+                      PASSWORD 'synthetic_principal_reader_only';
+                  END IF;
+                END $""")
+                cur.execute(
+                    "GRANT CONNECT ON DATABASE aion_library_sandbox "
+                    "TO aion_acl_ci_principal_reader"
+                )
+                cur.execute(
+                    "GRANT USAGE ON SCHEMA public TO aion_acl_ci_principal_reader"
+                )
+                cur.execute(
+                    "GRANT SELECT ON aion_library_tenant_acl_principal_v2 "
+                    "TO aion_acl_ci_principal_reader"
+                )
+
+    def setUp(self):
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            CurrentPrincipal, PrincipalBoundPostgresMembership,
+        )
+        self.Principal = CurrentPrincipal
+        self.subject_a = "principal-old-0001"
+        self.subject_b = "principal-new-0002"
+        self.identity = CurrentPrincipal(
+            "reader.1", "trusted.local", self.subject_a, "a" * 32, True
+        )
+        with self.pg.connect(EXPECTED, autocommit=True) as db:
+            db.execute("TRUNCATE TABLE aion_library_tenant_acl_principal_v2")
+        self.reader = PrincipalBoundPostgresMembership(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            current_principal=lambda: self.identity,
+        )
+
+    def grant(self, *, subject="principal-old-0001", generation="a" * 32,
+              tenant="T-A", domain="LIBRARY", role="LIBRARY_READER"):
+        with self.pg.connect(EXPECTED) as db:
+            db.execute(
+                """INSERT INTO aion_library_tenant_acl_principal_v2
+                 (principal_issuer,principal_subject,account_generation,
+                  username,tenant_id,domain_id,library_role)
+                 VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                ("trusted.local", subject, generation, "reader.1",
+                 tenant, domain, role),
+            )
+
+    def read(self, *, tenant="T-A", domain="LIBRARY"):
+        return self.reader.roles_for("reader.1", tenant, domain)
+
+    def test_real_pg_recreated_username_does_not_inherit_old_acl(self):
+        self.grant()
+        self.assertEqual(self.read(), ("LIBRARY_READER",))
+        self.identity = self.Principal(
+            "reader.1", "trusted.local", self.subject_b, "b" * 32, True
+        )
+        self.assertEqual(self.read(), ())
+        self.assertEqual(self.read(tenant="T-B"), ())
+
+    def test_real_pg_same_subject_new_generation_does_not_inherit(self):
+        self.grant()
+        self.identity = self.Principal(
+            "reader.1", "trusted.local", self.subject_a, "b" * 32, True
+        )
+        self.assertEqual(self.read(), ())
+
+    def test_real_pg_explicit_new_grant_is_tenant_domain_scoped(self):
+        self.grant()
+        self.identity = self.Principal(
+            "reader.1", "trusted.local", self.subject_b, "b" * 32, True
+        )
+        self.assertEqual(self.read(), ())
+        self.grant(subject=self.subject_b, generation="b" * 32)
+        self.assertEqual(self.read(), ("LIBRARY_READER",))
+        self.assertEqual(self.read(tenant="T-B"), ())
+        self.assertEqual(self.read(domain="NEGOCIOS"), ())
+
+    def test_real_pg_revocation_visible_to_second_worker(self):
+        self.grant()
+        self.assertEqual(self.read(), ("LIBRARY_READER",))
+        with self.pg.connect(EXPECTED) as db:
+            db.execute(
+                """UPDATE aion_library_tenant_acl_principal_v2
+                   SET active=FALSE, revoked_at_unix=2000000000
+                   WHERE username='reader.1' AND tenant_id='T-A'"""
+            )
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        second = PrincipalBoundPostgresMembership(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            current_principal=lambda: self.identity,
+        )
+        self.assertEqual(second.roles_for("reader.1", "T-A", "LIBRARY"), ())
+        self.assertEqual(self.read(), ())
+
+    def test_real_pg_principal_reader_cannot_update_acl(self):
+        self.grant()
+        with self.pg.connect(self.reader_dsn) as db:
+            with self.assertRaises(self.pg.errors.InsufficientPrivilege):
+                db.execute(
+                    """UPDATE aion_library_tenant_acl_principal_v2
+                       SET active=FALSE WHERE username='reader.1'"""
+                )
+
+    def test_real_pg_registry_replacement_during_read_is_denied(self):
+        self.grant()
+        from atlasquant_aion_library_principal_acl_sandbox import (
+            PrincipalBoundPostgresMembership,
+        )
+        counter = {"calls": 0}
+        def current():
+            counter["calls"] += 1
+            if counter["calls"] == 2:
+                self.identity = self.Principal(
+                    "reader.1", "trusted.local", self.subject_b, "b" * 32, True
+                )
+            return self.identity
+        reader = PrincipalBoundPostgresMembership(
+            connect=lambda: self.pg.connect(self.reader_dsn),
+            current_principal=current,
+        )
+        with self.assertRaises(AuthorizationDenied):
+            reader.roles_for("reader.1", "T-A", "LIBRARY")
+
 if __name__=='__main__':unittest.main()
