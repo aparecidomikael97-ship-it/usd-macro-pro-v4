@@ -142,7 +142,26 @@ def browser_case(browser, *, username, width, height, mobile, expected):
 def assert_state(page, expected):
     main = page.locator('[data-testid="stMain"]')
     if expected in ("METADATA_REVIEW", "APPROVED_FOR_INDEXING"):
-        page.get_by_text("Estado sintético: " + expected, exact=False).wait_for(timeout=120_000)
+        try:
+            page.get_by_text("Estado sintético: " + expected,
+                             exact=False).wait_for(timeout=30_000)
+        except Exception:
+            body = main.inner_text()
+            print("CI_READ_STATE_DIAG=" + repr({
+                "generic_denial_visible": "Consulta sintética indisponível" in body,
+                "static_shell_visible": "Nenhum PDF pode ser enviado" in body,
+                "streamlit_exception_count": page.locator('[data-testid="stException"]').count(),
+            }), flush=True)
+            logfile = OUT / "private-local-only.log"
+            if logfile.exists():
+                allowed = ("AION_CI_GATE_REASON=", "AION_CI_READ_EXCEPTION_TYPES=")
+                diagnostic = [line.strip() for line in logfile.read_text(
+                    encoding="utf-8", errors="replace").splitlines()
+                    if any(marker in line for marker in allowed)]
+                print("CI_HOST_DIAG=" + repr(diagnostic[-8:]), flush=True)
+            page.screenshot(path=str(actual.OUT / "pg-synthetic-diagnostic.png"),
+                            full_page=False)
+            raise
         body = main.inner_text()
         assert "Integridade sintética: CONFIRMADA" in body
         assert "Versão sintética: 1" in body
