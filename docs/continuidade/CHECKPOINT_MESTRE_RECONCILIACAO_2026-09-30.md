@@ -226,6 +226,15 @@ ledger preview 1/10. Mensagens genéricas não autorizam; token e acknowledgemen
 precisam ser exatos. Mesmo uma decisão verificada não escreve o ledger e não
 autoriza Step 2.
 
+Estado do Step 1 persistent lifecycle ledger writer:
+**IMPLEMENTADO / EM VALIDAÇÃO** em
+`atlasquant_aion_business_team_access_step1_ledger_persistent_writer.py`,
+ADR-0083 e testes associados. O padrão é PLAN ONLY. O preflight pode chegar a
+`READY_FOR_EXPLICIT_STEP1_LEDGER_PERSISTENCE_AUTHORIZATION`, e esse estado não
+autoriza gravar. Nenhuma persistência física foi executada. Step 2, executor,
+produção, deploy e runtime externo permanecem OFF. A prova forte futura
+(Windows Hello/FIDO2) fica só como interface e não é verificada nesta versão.
+
 Estado do binding de oportunidades com economia real: **IMPLEMENTADO / EM VALIDAÇÃO**
 em `atlasquant_aion_business_revenue_live_economics_binding.py`, ADR-0062 e
 testes associados. Custo mensal passa a vir do ledger FinOps verificado e
@@ -515,3 +524,4 @@ PENDENTE / APROVADO:
 | D-2026-09-30-TEAM-ACCESS-STEP1-GUARDED-PROVIDER-RUNNER | IMPLEMENTADO / EM VALIDAÇÃO | Runner físico fica PLAN ONLY por padrão e exige -Apply + token exato + freshness + readback antes de qualquer ledger append |
 | D-2026-09-30-TEAM-ACCESS-STEP1-PROVIDER-RECEIPT-LEDGER-REVIEW | IMPLEMENTADO / EM VALIDAÇÃO | Receipt físico vira receipt canônico e preview 1/10 antes de qualquer append real ou Step 2 |
 | D-2026-09-30-TEAM-ACCESS-STEP1-LEDGER-APPEND-CONTRACT | IMPLEMENTADO / EM VALIDAÇÃO | Append do receipt canônico exige token exato e digests source/target congelados; writer e Step 2 seguem separados |
+| D-2026-10-01-TEAM-ACCESS-STEP1-LEDGER-PERSISTENT-WRITER | IMPLEMENTADO / EM VALIDAÇÃO | Writer do Step 1 fica PLAN ONLY; preflight pronto não autoriza persistência física |

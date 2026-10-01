@@ -353,3 +353,16 @@ current GENESIS ledger digest and target 1/10 ledger-preview digest.
 
 A decision record can be validated separately with `--decision-record`.
 Neither mode writes the lifecycle ledger. Step 2 remains a separate gate.
+
+## Step 1 ledger persistence preflight
+
+The persistent writer is plan-only. It does not apply:
+
+    python validate_team_access_step1_ledger_writer_preflight.py --allowed-root <sandbox-dir> --ledger <genesis-ledger.json> --step1-preflight <step1-preflight.json> --receipt-review <receipt-review.json> --decision-record <decision.json> --output <writer-plan.json>
+
+The command prints `PLAN ONLY — NO LEDGER WRITE PERFORMED`. `--apply` is refused
+and does not write the ledger. A ready plan may reach
+`READY_FOR_EXPLICIT_STEP1_LEDGER_PERSISTENCE_AUTHORIZATION`; that state is not
+write authorization. The allowed ledger path must sit inside an explicit sandbox
+directory. Symlinks and paths outside that directory fail closed. No secret is
+stored. Production, deploy and external runtime stay off.

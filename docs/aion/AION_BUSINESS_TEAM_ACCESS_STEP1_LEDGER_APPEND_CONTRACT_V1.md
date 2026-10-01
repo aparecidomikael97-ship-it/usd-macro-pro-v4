@@ -33,8 +33,9 @@ Estado máximo:
 
 ## Fronteira
 
-Nenhuma chamada deste módulo ou CLI grava o ledger. O writer persistente será
-uma camada separada e deverá comparar o ledger atual com source_ledger_digest
-antes de qualquer gravação atômica.
+Nenhuma chamada deste módulo ou CLI grava o ledger. O writer persistente está
+em `atlasquant_aion_business_team_access_step1_ledger_persistent_writer.py` e
+permanece PLAN ONLY. Ele compara o ledger atual com `source_ledger_digest`
+antes de qualquer gravação futura e não executa essa gravação.
 
 Step 2 permanece sem autorização.

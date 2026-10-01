@@ -56,3 +56,21 @@ baseline real
 
 Qualquer drift, salto de etapa, hash inválido, duplicação ou binding divergente
 bloqueia a cadeia e interrompe o avanço.
+
+## Writer persistente do Step 1
+
+Depois do contrato de append (ADR-0082), o writer de ADR-0083 só produz um
+preflight PLAN ONLY. O estado máximo é
+`READY_FOR_EXPLICIT_STEP1_LEDGER_PERSISTENCE_AUTHORIZATION` e não autoriza
+gravação.
+
+Segurança desta camada:
+
+- diretório sandbox explícito;
+- rejeição de symlink e path traversal;
+- lock local sem escrever o ledger;
+- digest de bytes para invalidar plano se o arquivo mudar;
+- backup/rollback descrito e não executado;
+- nenhum segredo persistido;
+- prova Windows Hello/FIDO2 apenas como interface futura, sem verificação;
+- Step 2, executor, produção, deploy e runtime externo permanecem OFF.
