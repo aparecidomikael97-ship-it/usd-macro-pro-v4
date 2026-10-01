@@ -122,7 +122,11 @@ class AtlasQuantLibraryHostAccess:
         issued, last = session.get("authenticated_at"), session.get("last_seen")
         if (type(issued) not in (int, float) or type(last) not in (int, float) or
                 not math.isfinite(issued) or not math.isfinite(last) or
-                not 0 < issued <= last <= now or
+                # The real AtlasQuant access panel stores float timestamps,
+                # while signed Library envelopes use integer Unix seconds.
+                # A fresh last_seen in the current clock second is permitted;
+                # anything a full second ahead or beyond remains denied.
+                not 0 < issued <= last < now + 1 or
                 now - issued > MAX_SESSION_AGE or now - last > MAX_SESSION_IDLE):
             raise AuthorizationDenied("local login idle or expired")
         fingerprint = session.get("credential_fingerprint")
