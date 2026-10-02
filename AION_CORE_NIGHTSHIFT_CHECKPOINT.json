@@ -26,7 +26,8 @@
     "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL",
     "POST_515_LOCAL_RELEASE_CANDIDATE_V2_AUDIT",
     "POST516_LIBRARY_CANONICAL_CROSS_SOURCE_V1",
-    "LIBRARY_CHECKPOINT_DURABILITY_AND_REVIEW_HISTORY_LOCAL"
+    "LIBRARY_CHECKPOINT_DURABILITY_AND_REVIEW_HISTORY_LOCAL",
+    "HISTORICAL_REQUIREMENTS_RECONCILIATION_2026_10_02_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -48,7 +49,9 @@
     "atlasquant_aion_library_preview.py",
     "atlasquant_aion_tenant_persistence_review.py",
     "atlasquant_aion_library_cross_source.py",
-    "atlasquant_aion_library_checkpoint.py"
+    "atlasquant_aion_library_checkpoint.py",
+    "atlasquant_aion_historical_commitments.py",
+    "atlasquant_aion_internal_roles.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
@@ -83,7 +86,19 @@
     "test_atlasquant_aion_library_cross_source.py",
     "atlasquant_aion_memory.py",
     "test_atlasquant_aion_memory.py",
-    "test_atlasquant_aion_library_checkpoint.py"
+    "test_atlasquant_aion_library_checkpoint.py",
+    "atlasquant_aion_core_checkpoint_bridge.py",
+    "test_atlasquant_aion_historical_commitments.py",
+    "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+    "docs/continuidade/aion_historical_commitments_2026-10-02.json",
+    "atlasquant_aion_historical_commitments.py",
+    "atlasquant_aion_internal_roles.py",
+    "test_atlasquant_aion_internal_roles.py",
+    "scripts/reconcile_historical_commitments_20261002.py",
+    "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-17.md",
+    "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-28.md",
+    "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-30.md",
+    "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md"
   ],
   "production_baseline": {
     "sha": "a38ad022c5dc1e97cd934f115cf2c58731bbb5ed",
@@ -157,7 +172,13 @@
     "aion_full_regression_library_durability": "2216 passed / 0 failed / 1 skipped",
     "contract_audit_library_durability": "17 checks / 0 failures",
     "developer_adversarial_library_durability": "348 cases / 0 gaps / 0 critical / 0 high",
-    "library_checkpoint_compile": "PASS"
+    "library_checkpoint_compile": "PASS",
+    "historical_commitments_focused": "109 passed / 0 failed",
+    "historical_commitments_full_aion": "2223 passed / 0 failed / 1 skipped / 729 subtests",
+    "historical_reconciliation_contract_audit": "17 checks / 0 failures",
+    "historical_reconciliation_adversarial_audit": "348 cases / 0 gaps / 334 blocked-by-design / 14 pass",
+    "historical_reconciliation_idempotency": "108 commitments / 0 uncovered days on two consecutive runs",
+    "fresh_origin_main_compare_historical": "0 behind / 2 ahead before historical finalization commit"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -216,7 +237,7 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "POST516_LOCAL_RELEASE_CANDIDATE_V3_AUDIT",
+  "next_wave": "POST516_HISTORICAL_RECONCILIATION_FINAL_AUDIT",
   "known_blockers": [
     "Library checkpoint changes are local only and have not run remote CI.",
     "Saving a staged Library review to runtime still requires the existing explicit guarded Checkpoint save flow; no auto-save exists.",
@@ -354,7 +375,7 @@
     "tenant_evidence_source": "NOT_INJECTED_REVIEW_ARTIFACT",
     "tenant_evidence_auto_loaded": false
   },
-  "critical_path_status": "POST516_LIBRARY_CANONICAL_AND_CHECKPOINT_DURABILITY_LOCAL_VALIDATED",
+  "critical_path_status": "POST516_LIBRARY_AND_HISTORICAL_REQUIREMENTS_LOCAL_VALIDATED",
   "core_wiring_audit": {
     "state": "LOCAL_VALIDATED",
     "recovery_traceability_gate_production_consumers": 1,
@@ -519,5 +540,76 @@
     "working_checkpoint_dirty_on_stage": true,
     "runtime_save_automatic": false,
     "explicit_guarded_checkpoint_save_required": true
+  },
+  "historical_requirements_reconciliation": {
+    "state": "LOCAL_VALIDATED",
+    "period_start": "2026-09-15",
+    "period_end": "2026-10-02",
+    "commitment_count": 108,
+    "approved_pending_count": 75,
+    "implemented_in_validation_count": 25,
+    "manifest": "docs/continuidade/aion_historical_commitments_2026-10-02.json",
+    "narrative": "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+    "checkpoint_snapshot_wired": true,
+    "legacy_reconciliation_preserved": true,
+    "pending_is_not_implementation": true,
+    "execution_authority": false,
+    "automatic_activation": false,
+    "production_changed": false,
+    "merge_authorized": false,
+    "deploy_authorized": false,
+    "real_trading_enabled": false,
+    "admin_read_only_surface_wired": true,
+    "daily_historical_sweep": {
+      "enabled": true,
+      "fixed_start": "2026-09-15",
+      "rolling_end": "CURRENT_DAY",
+      "day_by_day_required": true,
+      "close_only_with_evidence": true,
+      "preserve_superseded_history": true,
+      "mandatory_domains": [
+        "AION_CORE",
+        "INTERFACE_UX",
+        "AION_BUSINESS",
+        "LIBRARY",
+        "SECURITY_GOVERNANCE",
+        "MEMORY_CHECKPOINT",
+        "TRADER_RADAR_LAB",
+        "INVESTMENTS",
+        "INTEGRATIONS_VOICE_STUDIO_DIGITAL"
+      ],
+      "priority_order": [
+        "AION_CORE",
+        "INTERFACE_UX",
+        "AION_BUSINESS"
+      ],
+      "priority_policy": {
+        "phase_1_until_core_and_interface_closed": {
+          "primary": [
+            "AION_CORE",
+            "INTERFACE_UX"
+          ],
+          "parallel_secondary": [
+            "AION_BUSINESS"
+          ]
+        },
+        "phase_2_after_core_and_interface_closed": {
+          "AION_BUSINESS_PERCENT": 60,
+          "TRADER_PERCENT": 20,
+          "INVESTMENTS_PERCENT": 20
+        }
+      },
+      "later_phase_items_must_remain_tracked": true,
+      "target_operational_window": "2026-12_to_2027-01",
+      "target_is_planning_goal_not_release_authority": true
+    },
+    "external_dependency_count": 3,
+    "unverified_count": 1,
+    "superseded_count": 2,
+    "discarded_count": 2,
+    "daily_coverage_count": 18,
+    "uncovered_days": [],
+    "coverage_complete_for_period": true,
+    "historical_days_auto_closed": false
   }
 }

@@ -3204,6 +3204,68 @@ def _render_central(
             "a cópia de trabalho; persistência externa continua dependendo de "
             "“Salvar Checkpoint Mestre no runtime” e do Guardian."
         )
+        roles = core_memory.get("internal_roles")
+        if isinstance(roles, Mapping):
+            role_rows = [
+                row for row in list(roles.get("roles") or [])
+                if isinstance(row, Mapping)
+            ]
+            if role_rows:
+                with st.expander("🧩 8 papéis internos do AION", expanded=False):
+                    st.caption(
+                        "Responsabilidades internas do mesmo AION Core. "
+                        "Não são oito IAs independentes e não ganham autoridade externa."
+                    )
+                    st.dataframe(
+                        [
+                            {
+                                "Papel": str(row.get("label") or ""),
+                                "Responsabilidade": str(row.get("purpose") or ""),
+                            }
+                            for row in role_rows
+                        ],
+                        hide_index=True,
+                        width="stretch",
+                    )
+
+        historical = core_memory.get("historical_commitments")
+        if isinstance(historical, Mapping):
+            historical_rows = [
+                row for row in list(historical.get("commitments") or [])
+                if isinstance(row, Mapping)
+            ]
+            approved_pending_count = sum(
+                1 for row in historical_rows
+                if str(row.get("state") or "") == "APROVADO / PENDENTE"
+            )
+            hc1, hc2, hc3 = st.columns(3)
+            hc1.metric("Compromissos históricos", int(historical.get("count") or 0))
+            hc2.metric("Aprovados pendentes", approved_pending_count)
+            period = historical.get("period") if isinstance(historical.get("period"), Mapping) else {}
+            hc3.metric(
+                "Período reconciliado",
+                f"{str(period.get('start') or '?')} → {str(period.get('end') or '?')}",
+            )
+            st.caption(
+                "Registro histórico somente leitura: aprovação não equivale a implementação e "
+                "não concede autoridade de execução, merge, deploy, gasto, publicação ou trading real."
+            )
+            if historical_rows:
+                with st.expander("📚 Compromissos históricos reconciliados", expanded=False):
+                    st.dataframe(
+                        [
+                            {
+                                "Data": str(row.get("source_date") or ""),
+                                "Área": str(row.get("domain") or ""),
+                                "Estado": str(row.get("state") or ""),
+                                "Compromisso": str(row.get("title") or ""),
+                            }
+                            for row in historical_rows
+                        ],
+                        hide_index=True,
+                        width="stretch",
+                    )
+
         approved_rows = [
             row for row in list(core_memory.get("approved_decisions") or [])
             if isinstance(row, Mapping)

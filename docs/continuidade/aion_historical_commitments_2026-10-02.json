@@ -1,0 +1,1853 @@
+{
+  "schema": "ATLASQUANT_AION_HISTORICAL_COMMITMENTS_V1",
+  "period": {
+    "start": "2026-09-15",
+    "end": "2026-10-02"
+  },
+  "precedence": "Complementa, sem apagar, os checkpoints e reconciliações anteriores. Aprovação histórica não significa implementação; implementação não significa validação.",
+  "recovered_at": "2026-10-02",
+  "sources": [
+    {
+      "path": "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+      "kind": "historical-user-approved-reconciliation"
+    },
+    {
+      "path": "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md",
+      "kind": "versioned-checkpoint"
+    },
+    {
+      "path": "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md",
+      "kind": "versioned-checkpoint"
+    },
+    {
+      "path": "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md",
+      "kind": "preserved-checkpoint"
+    }
+  ],
+  "commitments": [
+    {
+      "id": "D-2026-09-23-RADAR-28FX-TOP10",
+      "title": "Radar oficial 28 pares + TOP 10",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-23",
+      "summary": "Monitorar os 28 pares formados por USD/EUR/GBP/JPY/CHF/CAD/AUD/NZD, destacar TOP 10 Forex e manter índices e cripto separados; dado ausente ou stale não pode fabricar oportunidade.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-LAB-EVIDENCE-ARCHIVE",
+      "title": "Laboratório e arquivo permanente de backtests",
+      "state": "APROVADO / PENDENTE",
+      "domain": "laboratory",
+      "source_date": "2026-09-23",
+      "summary": "Backtest/Paper/Real separados; M15/M30/H1/H4/D1/W1; Day Trade/Intraday/Swing/Position; registrar versões, fontes, custos, R, MAE/MFE, IS/OOS, walk-forward, meses bons e ruins sem inventar métricas.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-PPR-DEFINITION-BLOCKER",
+      "title": "PPR permanece bloqueado sem definição objetiva",
+      "state": "APROVADO / PENDENTE",
+      "domain": "laboratory",
+      "source_date": "2026-09-23",
+      "summary": "PPR não pode entrar em ranking, backtest ou promoção até existir definição operacional objetiva e testável. Na ausência disso, o estado correto é SEM EVIDÊNCIA/BLOQUEADO.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-AION-VOICE-WAKEWORD-OFFLINE",
+      "title": "AION voz móvel, wake word e modo offline limitado",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-23",
+      "summary": "Voz PT-BR humanizada, briefing proativo, acionamento móvel/PC por wake word local e operação offline limitada; ações críticas continuam sujeitas a Guardian e aprovação.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-AION-CONNECTOR-HUB",
+      "title": "Hub de Conectores AION",
+      "state": "APROVADO / PENDENTE",
+      "domain": "integrations",
+      "source_date": "2026-09-23",
+      "summary": "Prioridade YouTube/Spotify e depois Calendar/Gmail/Drive; OAuth/permissões separados; escrita, envio, publicação, alteração ou exclusão exigem confirmação.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-STUDIO-PUBLISH-APPROVAL",
+      "title": "Studio cria e mede; publicação exige aprovação",
+      "state": "APROVADO / PENDENTE",
+      "domain": "studio",
+      "source_date": "2026-09-23",
+      "summary": "Instagram/TikTok/YouTube podem receber conteúdo criado/adaptado pelo AION, mas preview e aprovação explícita são obrigatórios; alteração posterior exige nova aprovação.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-24-CONTROLLED-EVOLUTION-DARWIN",
+      "title": "Evolução contínua controlada",
+      "state": "APROVADO / PENDENTE",
+      "domain": "learning",
+      "source_date": "2026-09-24",
+      "summary": "AION melhora por uso, feedback, backtests e avaliação Champion/Challenger, preservando segurança, versionamento, rollback e proibição de promoção automática sem evidência.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-CYBER-IMMUNE-SYSTEM",
+      "title": "AION Cyber Immune System",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-25",
+      "summary": "Camada obrigatória de defesa adaptativa sem desativar antivírus/EDR e sem autoelevação de privilégios.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-DIGITAL-TWIN-PREEXEC-PROOF",
+      "title": "Gêmeo Digital + Prova de Segurança pré-execução",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-25",
+      "summary": "Mudanças sensíveis devem poder ser simuladas no Gêmeo Digital e passar por prova de segurança antes de execução real; aprovação não substitui o gate técnico.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-PORTABLE-CORE-EVERYWHERE",
+      "title": "AION Portable Core / AION Everywhere",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-25",
+      "summary": "Core independente do AtlasQuant, acessível por API/MCP, com permissões separadas, workspaces isolados, sandbox e operação multi-dispositivo.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-AION-VAULT-OFFICIAL-ACCESS",
+      "title": "AION Vault + acesso oficial site/app/PWA",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-25",
+      "summary": "Um acesso oficial central por site/app/PWA, com AION Vault separado para credenciais, backups, checkpoints e configurações sensíveis; custo zero primeiro.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-COST-ZERO-PRIVACY-EGRESS",
+      "title": "Custo zero, privacidade e egress sob aprovação",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-09-25",
+      "summary": "Local/open-source/cache primeiro; sem contratar, cobrar, fazer upgrade, telemetria ou saída de dados sem necessidade, preço/alternativa e autorização explícita; internet bloqueada por padrão quando aplicável.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-26-TREASURY-GROWTH-ENGINE",
+      "title": "Treasury & Growth Engine",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-26",
+      "summary": "Unificar Vendas + Caixa + Renda Fixa, separar receita/custos/impostos-reservas/lucro líquido e comparar reinvestimentos por evidência; nenhuma movimentação financeira sem aprovação.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-AION-CENTRAL-INDEPENDENT",
+      "title": "Central AION independente do Trader",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "AION deve ter central própria fora do Trader, acessar o ecossistema por permissões e poder ser comercializado separadamente; especialistas compartilham o mesmo Core.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-BUSINESS-CLIENT-PORTAL-TENANT",
+      "title": "Portal do Cliente isolado por tenant/workspace",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-30",
+      "summary": "Cada empresa cliente acessa apenas o próprio workspace/tenant, nunca a administração global nem dados de outra empresa; painel/CRM/automações dependem do pacote e permissões.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-BUSINESS-RBAC-LGPD-FINOPS",
+      "title": "AION Negócios profissional: RBAC, LGPD, FinOps e SLA",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-30",
+      "summary": "Negócios é frente prioritária de geração de caixa e deve incluir Central Financeira/FinOps, Equipe & Acessos/RBAC, integrações, capacidade/escala, suporte/SLA, auditoria, LGPD, saúde do cliente e Demo/Sandbox.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-CLT-INDEPENDENCE-INDEX",
+      "title": "Índice de Independência CLT",
+      "state": "APROVADO / PENDENTE",
+      "domain": "finance",
+      "source_date": "2026-09-30",
+      "summary": "Checkpoint deve acompanhar transição do emprego CLT com referência inicial de R$ 7.500–9.000 de lucro líquido/receita pessoal sustentável por vários meses, reserva financeira e sem depender de Trade para despesas.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-FUTURE-BIOMETRIC-CRITICAL-DECISION",
+      "title": "Biometria local futura para decisões críticas",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-30",
+      "summary": "Requisito adiado: quando implementado, usar preferencialmente Windows Hello/FIDO2 para destravar assinatura criptográfica vinculada ao digest exato da decisão, seguida de confirmação explícita; nunca autorização passiva por câmera.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-LIBRARY-OFFICIAL-KNOWLEDGE-FLOW",
+      "title": "Fluxo oficial da Biblioteca AION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "library",
+      "source_date": "2026-09-30",
+      "summary": "Camada local já implementa ingestão/preview de PDF, proveniência, classificação, revisão cruzada determinística, estados VALIDATED/CONFLICTING/STALE/QUARANTINED/REJECTED e histórico no Checkpoint. Consulta externa online e promoção automática continuam fora desta implementação.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "atlasquant_aion_library_cross_source.py",
+        "atlasquant_aion_library_checkpoint.py",
+        "atlasquant_aion_library_preview.py"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-30-AION-NO-BANK-GOV-AUTHORITY",
+      "title": "AION sem autoridade sobre bancos e apps governamentais",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-30",
+      "summary": "AION pode orientar e organizar fluxos, mas não deve acessar contas bancárias ou aplicativos governamentais; qualquer ação financeira sensível permanece fora da autoridade autônoma.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-FORTRESS-LAYER",
+      "title": "Camada Fortaleza + Diferencial Oficial",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-25",
+      "summary": "Policy Engine determin?stico externo ao modelo, logs imut?veis/audit?veis, sandbox r?gido, segrega??o decis?o-execu??o-auditoria, supply-chain de c?digo e corte de emerg?ncia independente.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-SOVEREIGNTY-KERNEL",
+      "title": "N?cleo de Soberania",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-25",
+      "summary": "Camada soberana integrada a Vault/Guardian/Policy Engine para preservar controle humano, limites de autoridade e independ?ncia operacional do Core.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-AUTONOMY-BUDGET",
+      "title": "Or?amento de Autonomia",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-09-25",
+      "summary": "Toda autonomia deve operar dentro de or?amento expl?cito de a??es, custo, loops, escopo e tempo; exceder or?amento bloqueia em fail-closed.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-FALSIFICATION-ENGINE",
+      "title": "Motor de Falsifica??o",
+      "state": "APROVADO / PENDENTE",
+      "domain": "truth",
+      "source_date": "2026-09-25",
+      "summary": "Hip?teses e decis?es relevantes devem procurar evid?ncia contr?ria, conflitos e condi??es de invalida??o antes de promo??o ou execu??o.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-PRIME-SHADOW-SENTINEL",
+      "title": "AION Prime + Shadow + Sentinel com qu?rum",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "Decis?es cr?ticas devem poder passar por pap?is Prime/Shadow/Sentinel com independ?ncia de revis?o e qu?rum, sem transformar m?ltiplos agentes em autoridade aut?noma.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-ZERO-TRUST-CONTEXT-FIREWALL",
+      "title": "Identity/Zero Trust + Context Firewall",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-29",
+      "summary": "Identidades e ferramentas operam sob Zero Trust; contexto entre agentes/providers deve atravessar firewall estruturado contra prompt injection, confus?o de autoridade e vazamento de segredos.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-MEMORY-QUARANTINE-KNOWLEDGE-VAULT",
+      "title": "Memory Quarantine + Knowledge Vault",
+      "state": "APROVADO / PENDENTE",
+      "domain": "memory",
+      "source_date": "2026-09-29",
+      "summary": "Mem?ria duvidosa/conflitante fica em quarentena; conhecimento promovido preserva fonte, data, confian?a, proveni?ncia, vers?o e possibilidade de reavalia??o.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-PROTOCOL-FIREWALL-ACTION-RECEIPT",
+      "title": "Protocol Firewall + Action Receipt/Flight Recorder",
+      "state": "APROVADO / PENDENTE",
+      "domain": "audit",
+      "source_date": "2026-09-29",
+      "summary": "Chamadas entre agentes/ferramentas devem respeitar contratos de protocolo e a??es de impacto devem gerar recibos audit?veis/flight recorder ligados ? decis?o e evid?ncia.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-BLAST-RADIUS-BUDGET-LOOP-GOVERNOR",
+      "title": "Blast Radius + Budget/Loop Governor",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-09-29",
+      "summary": "Limitar raio de impacto, n?mero de itera??es, custo, tempo e recursos por tarefa; loops ou expans?o de escopo devem ser bloqueados ou reenviados ? revis?o humana.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-SUPPLY-CHAIN-SECURITY",
+      "title": "Supply-chain security do AION",
+      "state": "APROVADO / PENDENTE",
+      "domain": "security",
+      "source_date": "2026-09-29",
+      "summary": "Depend?ncias, builds e artefatos devem evoluir para SBOM, pinagem/verifica??o, secret scanning, proveni?ncia e gates de seguran?a; nada disso autoriza merge autom?tico.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-CHAOS-DR-RPO-RTO",
+      "title": "Chaos/DR com RPO/RTO e recovery fail-closed",
+      "state": "APROVADO / PENDENTE",
+      "domain": "recovery",
+      "source_date": "2026-09-29",
+      "summary": "Testes de falha, recupera??o e continuidade devem ter RPO/RTO definidos, evid?ncia de restore e comportamento fail-closed quando a recupera??o n?o puder ser provada.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-MODEL-REGISTRY-CANARY",
+      "title": "Model Registry + promo??o can?rio",
+      "state": "APROVADO / PENDENTE",
+      "domain": "models",
+      "source_date": "2026-09-29",
+      "summary": "Modelos/vers?es devem ter registry, avalia??o adversarial e calibra??o; promo??o por can?rio/evid?ncia e rollback, sem troca silenciosa do n?cleo.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-EXECUTABLE-CONSTITUTION-HUMAN-CONTROL",
+      "title": "Constitui??o execut?vel + Human Control Center",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-09-29",
+      "summary": "Restri??es cr?ticas devem existir como pol?ticas verific?veis, com centro humano para aprova??es, bloqueios, auditoria, kill switch e explica??o do porqu? de cada veto.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-GITHUB-MAIN-PROTECTION",
+      "title": "Prote??o administrativa da main",
+      "state": "APROVADO / PENDENTE",
+      "domain": "developer",
+      "source_date": "2026-09-29",
+      "summary": "Main deve ter prote??o/ruleset e checks obrigat?rios adequados; CODEOWNERS, an?lise de depend?ncias/c?digo e gates de supply-chain entram como hardening administrativo sujeito a valida??o humana.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-PROFESSIONAL-FINANCIAL-SHEETS",
+      "title": "Planilhas financeiras profissionais e did?ticas",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-25",
+      "summary": "Receitas, gastos, custos, reservas, resultado e relat?rios devem ficar organizados em vis?o financeira profissional, did?tica e audit?vel, sem movimenta??o autom?tica de dinheiro.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-27-PREMIUM-UX-VISUAL-AUDIT",
+      "title": "Auditoria visual premium desktop/mobile",
+      "state": "APROVADO / PENDENTE",
+      "domain": "interface",
+      "source_date": "2026-09-27",
+      "summary": "Segunda auditoria visual deve cobrir tipografia, hierarquia, densidade, profundidade, microintera??es, gr?ficos, hover/focus/selected, screenshots desktop/mobile, WCAG, performance e zero overflow.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-NOTIFICATION-CENTER",
+      "title": "Central de Notifica??es e oportunidades",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-23",
+      "summary": "AION deve centralizar alertas relevantes de sistema, mercado e oportunidades, com prioridade e contexto; notifica??o n?o autoriza ordem, publica??o ou a??o externa.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-OPENING-TRADE-WIN-WDO-CORRELATES",
+      "title": "Pesquisa de abertura WIN/WDO com correlatos",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-23",
+      "summary": "Laborat?rio deve testar leitura de abertura de WIN/WDO usando petr?leo Brent, min?rio de ferro, VIX com rela??o inversa no score, EWZ e correlatos adicionais para WDO, sempre por evid?ncia/backtest e sem regra fixa n?o validada.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-STUDENT-CONSISTENCY-RANKING",
+      "title": "Ranking de alunos por consist?ncia comprovada",
+      "state": "APROVADO / PENDENTE",
+      "domain": "education",
+      "source_date": "2026-09-23",
+      "summary": "Ranking de alunos deve usar resultados audit?veis, consist?ncia, risco e per?odo adequado; lucro isolado ou m?tricas inventadas n?o podem promover posi??o.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-23-MACRO-DAY-WEEK-VOICE",
+      "title": "Macro do dia e da semana em texto e voz",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-23",
+      "summary": "AtlasQuant/AION deve resumir macro do dia e da semana, vi?s e justificativas em texto e voz PT-BR, declarando fonte, atualidade e aus?ncia de confirma??o quando necess?rio.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-24-BUSINESS-MARKETPLACE-IN-ECOSYSTEM",
+      "title": "Marketplace/Vendas passa a integrar AION Neg?cios",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-24",
+      "summary": "Decis?o posterior traz Mercado Livre/TikTok Shop e automa??o comercial para a ?rea Neg?cios/Vendas separada do Trade, sob aprova??o para publica??o, gasto, compra ou contrata??o.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "supersedes": [
+        "D-2026-09-22-OUTSIDE-MERCADO-LIVRE"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-24-DIGITAL-INCOME-AREA",
+      "title": "?rea Digital/Renda Digital separada",
+      "state": "APROVADO / PENDENTE",
+      "domain": "digital",
+      "source_date": "2026-09-24",
+      "summary": "Criar n?cleo separado para fontes de renda digital, afiliados, dropshipping, conte?do/clipagem e experimentos online, sem misturar contexto de trading e sem gasto/publica??o autom?tica.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-24-REALTIME-EVENT-ALERTS",
+      "title": "Alertas de not?cias e eventos relevantes 24h",
+      "state": "APROVADO / PENDENTE",
+      "domain": "market-intelligence",
+      "source_date": "2026-09-24",
+      "summary": "Quando online, AION deve detectar eventos/not?cias relevantes e avaliar impacto em moedas/?ndices com fonte e timestamp; offline ou sem confirma??o deve declarar indisponibilidade e n?o inventar impacto.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-24-VIDEO-EXPLANATIONS-ON-DEMAND",
+      "title": "Explica??es em v?deo sob demanda",
+      "state": "APROVADO / PENDENTE",
+      "domain": "education",
+      "source_date": "2026-09-24",
+      "summary": "Para d?vidas de macro, ICT/SMC e uso do sistema, AION deve poder gerar explica??o curta em texto/voz/v?deo; cria??o n?o implica publica??o externa autom?tica.",
+      "evidence": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-AION-SINGLE-NUCLEUS",
+      "title": "AION é um núcleo central único",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "Um AION central com especialistas, contexto, memória, ferramentas e permissões separadas por domínio. Não são quatro IAs independentes.",
+      "evidence": [
+        "docs/aion/ARCHITECTURE.md",
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-ADMIN-DOORS-FOUR",
+      "title": "Quatro portas ADMIN do ecossistema",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "Portas ADMIN: Trader, Negócios, Investimentos e AION/AI (núcleo completo). Refina as quatro áreas de 27/09 sem transformá-las em IAs separadas.",
+      "evidence": [
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-SPECIALISTS-NOT-INDEPENDENT-AIS",
+      "title": "Especialistas de domínio, não IAs independentes",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "Trader usa AION Trader Expert; Negócios usa AION Business Expert; Investimentos usa AION Investment Expert; AION/AI usa o AION completo. O roteador local seleciona esses perfis sem criar IAs independentes.",
+      "evidence": [
+        "docs/aion/ARCHITECTURE.md",
+        "docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md",
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-FOUR-CLOSURES",
+      "title": "Quatro fechamentos obrigatórios do AION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "Specialist Router, permissões por domínio, memória e evidência isoladas por domínio, e AION Specialist Certification Gate. O contrato existe; nenhum especialista está concluído sem certificação.",
+      "evidence": [
+        "docs/adr/ADR-0010-quatro-fechamentos-do-aion.md",
+        "docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-SPECIALIST-CERTIFICATION-REQUIRED",
+      "title": "Certificação obrigatória de especialista",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "A Specialist Certification Gate é requisito de conclusão. O contrato existe e não declara especialista certificado. O contrato Skill/Plugin Certification V1 é artefato distinto e não certifica os especialistas de domínio.",
+      "evidence": [
+        "docs/aion/AION_SKILL_PLUGIN_CERTIFICATION_V1.md",
+        "docs/aion/AION_SPECIALIST_CERTIFICATION_V1.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-BUSINESS-FIVE-FRONTS",
+      "title": "Cinco frentes atuais de Negócios",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "Base atual, não limite permanente: automação B2B e agentes de IA; micro-SaaS próprio com AION; serviços de IA para clientes internacionais; captação e Revenue Operations com IA; produtos digitais próprios.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-BUSINESS-OPERATIONAL-GUIDELINE",
+      "title": "Diretriz operacional de Negócios sem promessa fixa de 90%",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "AION pode assumir a maior parte do trabalho digital/operacional, perto de 90% só onde for tecnicamente seguro, maduro, validado e permitido. 90% não é promessa fixa. Mikael administra o AION; o AION administra grande parte da operação.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-HUMAN-APPROVAL-HIGH-IMPACT",
+      "title": "Aprovação humana explícita para ações de alto impacto",
+      "state": "APROVADO / PENDENTE",
+      "domain": "safety",
+      "source_date": "2026-09-29",
+      "summary": "Gastos, pagamentos, contratos, compromissos comerciais, publicação relevante, contatos externos sensíveis, contratação, mudanças críticas de produção, movimentação financeira e trading real continuam exigindo aprovação humana explícita. Trading real e o gate de release têm evidência de código separada; o conjunto comercial completo não está implementado.",
+      "evidence": [
+        "docs/continuidade/REGISTRO_ORIGINAL_2026-09-15.md",
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md",
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md",
+        "docs/aion/ARCHITECTURE.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-COMMERCIAL-AION-REQUIREMENTS",
+      "title": "Requisitos futuros do AION Comercial",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "CRM com memória do cliente, pesquisa de preços, motor de precificação, pacotes Essencial/Profissional/Premium, mensagens humanizadas, proposta, contrato, pós-venda, Guardião Comercial, painel executivo e modo internacional. Não implementado neste bloco.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-COMMERCIAL-FLOW",
+      "title": "Fluxo oficial comercial",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "Lead, diagnóstico, pesquisa, precificação, proposta, negociação, contrato, aprovação do Mikael, fechamento, execução, pós-venda, lucro líquido e aprendizado.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-REVENUE-IS-NOT-PROFIT",
+      "title": "Faturamento não é lucro",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "Faturamento e lucro líquido permanecem conceitos separados. Nenhum número comercial foi inventado.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-OPPORTUNITY-SCOUT",
+      "title": "Trend Radar / Opportunity Scout",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "O portfólio de Negócios é dinâmico. As cinco frentes são a base atual. Pesquisa diária de tendências é capacidade futura, com detecção precoce como meta conceitual.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-OPPORTUNITY-FLOW",
+      "title": "Fluxo de oportunidade",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "DETECTADA, PESQUISADA, EVIDÊNCIA AUMENTANDO, CANDIDATA A TESTE, TESTE PEQUENO, RESULTADO, APROVADA ou DESCARTADA. Avaliar demanda, tração, concorrência, maturidade, custo, margem, compatibilidade e risco de moda.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-NO-VIRAL-OR-TOP20-PROOF",
+      "title": "Viralização não é prova e não há promessa de top 20",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "Viralização não prova oportunidade. A meta conceitual é detecção precoce, sem prometer literalmente estar no top 20 do mundo.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-ADR-ARCHITECTURE-RECORDS",
+      "title": "Architecture Decision Records no fechamento do Núcleo",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "ADR no Núcleo/Developer significa Architecture Decision Records. O registry versionado em Git entra agora. Registro substituído não é apagado. ADR financeiro e ADR de recibo de depósito americano não são arquivos deste registry.",
+      "evidence": [
+        "docs/adr/README.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-ADR-AVERAGE-DAILY-RANGE",
+      "title": "Average Daily Range no Trader Expert",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-29",
+      "summary": "Uso futuro de range médio diário, consumo percentual, extremos e sessões, com janelas como 5/10/20 dias avaliadas por backtest. Não gera compra ou venda sozinho. Não é Architecture Decision Record.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-ADR-DEPOSITARY-RECEIPTS",
+      "title": "American Depositary Receipts no Investment Expert",
+      "state": "APROVADO / PENDENTE",
+      "domain": "investments",
+      "source_date": "2026-09-29",
+      "summary": "Análise futura de empresa, ticker, país, ação original, moeda, proporção, mercado, liquidez, dividendos, custos quando confirmados, risco cambial e diferença contra a ação local. Sem inventar tributação ou regra regulatória.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-ATR-SEPARATE-FROM-ADR",
+      "title": "ATR separado de qualquer significado de ADR",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-29",
+      "summary": "Average True Range fica no AION Trader Expert como contexto de volatilidade, stops, alvos, comparação e regime. Não substitui ICT/SMC, macro ou risco. Uso operacional passa por laboratório, backtest/OOS/walk-forward, shadow, paper e validação humana.",
+      "evidence": [],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-ECOSYSTEM-ROBUSTNESS",
+      "title": "Robustez do ecossistema no roadmap",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "Observabilidade central, health por especialista, feature flags, rollback, contratos de dados, trilha de auditoria, fallback de provider e degradação para UNKNOWN. O contrato parcial de observabilidade do Core não valida o roadmap inteiro.",
+      "evidence": [
+        "docs/aion/ARCHITECTURE.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-PRIORITY-ORDER-2026-09-29",
+      "title": "Ordem de prioridade de 29/09/2026",
+      "state": "APROVADO / PENDENTE",
+      "domain": "continuity",
+      "source_date": "2026-09-29",
+      "summary": "1 fechar AION; 2 fechar Núcleo; 3 Specialist Certification; 4 estabilizar interface; 5 consolidar Checkpoint Mestre; 6 expansões de Negócios, Investimentos e Trader. Architecture Decision Records entram já no fechamento do Núcleo.",
+      "evidence": [
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "implemented": false,
+      "validated": false,
+      "supersedes": [
+        "D-2026-09-22-IMMEDIATE-PRIORITY",
+        "D-2026-09-27-PRIORITY-ORDER"
+      ]
+    },
+    {
+      "id": "D-CHECKPOINT-MASTER-NO-PARALLEL-STORE",
+      "title": "Checkpoint Mestre é a persistência oficial",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "memory",
+      "source_date": "2026-09-29",
+      "summary": "Memória do Core entra no Checkpoint Mestre. Não há store remoto paralelo automático. Persistência externa continua no fluxo explícito de salvar o Checkpoint Mestre.",
+      "evidence": [
+        "docs/aion/CORE_CHECKPOINT_MEMORY.md",
+        "docs/aion/ARCHITECTURE.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-TRUTH-INCOMPLETE-NOT-CONFIRMED",
+      "title": "UNKNOWN, STALE ou evidência incompleta não vira fato CONFIRMED",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "truth",
+      "source_date": "2026-09-29",
+      "summary": "Verdade confirmada exige evidência suficiente. Dado stale, conflito ou normalização incompleta não promove fato atual.",
+      "evidence": [
+        "docs/aion/ARCHITECTURE.md",
+        "docs/aion/ADDING_CAPABILITIES.md",
+        "atlasquant_aion_specialist_session.py",
+        "test_atlasquant_aion_specialist_session.py"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-ADMIN-USER-SEPARATION",
+      "title": "Separação ADMIN x USER",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "access",
+      "source_date": "2026-09-27",
+      "summary": "USER comercial fica restrito ao domínio Trade. Investimentos, Negócios e AION Core não são portas de USER. Ocultar menu não substitui autorização.",
+      "evidence": [
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md",
+        "docs/aion/ARCHITECTURE.md",
+        "docs/continuidade/AION_ENTITLEMENTS_2026-09-24.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-SPECIALISTS-SHARE-CORE",
+      "title": "Especialistas compartilham o Core sem permissão independente",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-09-29",
+      "summary": "Especialistas atuais compartilham infraestrutura e não recebem permissões próprias nem autoridade fora do Guardian.",
+      "evidence": [
+        "docs/aion/ARCHITECTURE.md",
+        "docs/aion/ADDING_CAPABILITIES.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-DOD-HUMAN-RELEASE-REVIEW",
+      "title": "Definition of Done termina em HUMAN_RELEASE_REVIEW",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "developer",
+      "source_date": "2026-09-29",
+      "summary": "O workflow de desenvolvimento não termina em merge ou deploy automático.",
+      "evidence": [
+        "docs/aion/ARCHITECTURE.md",
+        "atlasquant_aion_developer_engine.py",
+        "test_atlasquant_aion_developer_engine.py"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-REAL-TRADING-FAIL-CLOSED",
+      "title": "Trading real permanece fail-closed",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "safety",
+      "source_date": "2026-09-29",
+      "summary": "REAL_TRADING_ENABLED permanece falso nesta versão. Aprovação, papel ou flag não liberam ordem real.",
+      "evidence": [
+        "docs/aion/ARCHITECTURE.md",
+        "atlasquant_aion_capabilities.py",
+        "test_atlasquant_aion_capabilities.py"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-RELEASE-DEPLOY-MERGE-GATE",
+      "title": "Release, deploy e merge exigem gate apropriado",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "safety",
+      "source_date": "2026-09-15",
+      "summary": "Merge, promoção e deploy não são automáticos. Guard de release e revisão humana permanecem no caminho.",
+      "evidence": [
+        "docs/continuidade/REGISTRO_ORIGINAL_2026-09-15.md",
+        "docs/aion/ARCHITECTURE.md",
+        "atlasquant_release_guard.py"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-22-DOCUMENT-PRESERVED",
+      "title": "Checkpoint Mestre de 22/09/2026 permanece",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "continuity",
+      "source_date": "2026-09-29",
+      "summary": "O documento de 22/09 não é apagado. A reconciliação de 29/09 o complementa e declara precedência temporal quando houver conflito.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-22-IMMEDIATE-PRIORITY",
+      "title": "Prioridade técnica imediata de 22/09/2026",
+      "state": "SUBSTITUÍDO",
+      "domain": "continuity",
+      "source_date": "2026-09-22",
+      "summary": "A lista imediata de 22/09, começando pelo erro do Radar, fica preservada e foi substituída pela ordem de 29/09.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-27-PRIORITY-ORDER",
+      "title": "Ordem AION, sistema e monetização de 27/09/2026",
+      "state": "SUBSTITUÍDO",
+      "domain": "continuity",
+      "source_date": "2026-09-27",
+      "summary": "A ordem de 27/09 permanece no histórico. A ordem de 29/09 é mais específica e inclui certificação, interface, consolidação do checkpoint e ADR no fechamento do Núcleo. Monetização continua depois do AION.",
+      "evidence": [
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-22-OUTSIDE-MERCADO-LIVRE",
+      "title": "Plano pessoal de marketplace fora do AtlasQuant",
+      "state": "DESCARTADO",
+      "domain": "product",
+      "source_date": "2026-09-22",
+      "summary": "Renda extra via Mercado Livre ou TikTok Shop foi explicitamente deixada fora do Checkpoint do produto.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-18-ELLIOTT-OUT-OF-ENGINE",
+      "title": "Elliott fora do motor",
+      "state": "DESCARTADO",
+      "domain": "trader",
+      "source_date": "2026-09-18",
+      "summary": "Elliott não entra no motor por subjetividade. Wyckoff permanece referência conceitual futura, sem prioridade.",
+      "evidence": [
+        "docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-FAIL-CLOSED-MARKET-READING",
+      "title": "Leitura de mercado fail-closed",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "trader",
+      "source_date": "2026-09-15",
+      "summary": "Macro direciona, ICT/SMC localiza, risco veta. Dado ausente, antigo, conflitante ou incompleto não fabrica entrada. NÃO OPERAR e AGUARDAR são resultados válidos.",
+      "evidence": [
+        "docs/continuidade/REGISTRO_ORIGINAL_2026-09-15.md",
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-SCORE-IS-NOT-PROFIT-PROBABILITY",
+      "title": "Score interno não é probabilidade de lucro",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "trader",
+      "source_date": "2026-09-15",
+      "summary": "Score, convicção ou ranking não podem ser apresentados como probabilidade de lucro sem calibração explícita e validada. Esta reconciliação não declara essa calibração.",
+      "evidence": [
+        "docs/continuidade/REGISTRO_ORIGINAL_2026-09-15.md",
+        "docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md",
+        "docs/aion/ARCHITECTURE.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-PROMOTION-LADDER",
+      "title": "Escada oficial de promoção",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-22",
+      "summary": "Laboratório/testes, backtest/OOS/walk-forward, shadow, paper/forward, admin, validação prática do proprietário, revisão humana e só então público. Nenhuma etapa é pulada por resultado aparente.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-27-UX-DIRECTION",
+      "title": "Direção visual e navegação de 27/09/2026",
+      "state": "APROVADO / PENDENTE",
+      "domain": "interface",
+      "source_date": "2026-09-27",
+      "summary": "Identidade própria, grafite institucional, atalhos lado a lado e rejeição de estética genérica. Não foi revalidada como interface concluída nesta reconciliação.",
+      "evidence": [
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-25-NEXTGEN-REQUIREMENTS",
+      "title": "Requisitos NextGen aprovados em 25/09/2026",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-09-25",
+      "summary": "Computer Operator em sandbox, Tool Hub, durable tasks, evaluation lab, model router, knowledge graph, vault e demais requisitos do checkpoint NextGen estão aprovados. O próprio documento avisa que isso não significa feature já ativa.",
+      "evidence": [
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-CHECKPOINT-STATE-VOCABULARY",
+      "title": "Vocabulário oficial de estado do Checkpoint",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "continuity",
+      "source_date": "2026-09-22",
+      "summary": "Estados oficiais: APROVADO / PENDENTE, IMPLEMENTADO / EM VALIDAÇÃO, VALIDADO, DEPENDÊNCIA EXTERNA, SUBSTITUÍDO e DESCARTADO. Lacuna não comprovada usa UNVERIFIED ou NEEDS HUMAN RECONCILIATION.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-PRODUCTION-DEPLOY-PROOF",
+      "title": "Prova de deploy de produção",
+      "state": "DEPENDÊNCIA EXTERNA",
+      "domain": "release",
+      "source_date": "2026-09-22",
+      "summary": "Deploy controlado depende de integração, hook e credencial válidos. Health 200 não prova o build. O SHA realmente servido em produção permanece fora deste registro.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-PRODUCT-STILL-PRIVATE-PHASE",
+      "title": "Fase comercial pública",
+      "state": "UNVERIFIED",
+      "domain": "product",
+      "source_date": "2026-09-19",
+      "summary": "Em 19/09 o produto foi registrado como privado, sem venda pública. Esta reconciliação não comprovou o estado comercial atual e não o promove a lançado nem a ainda privado.",
+      "evidence": [
+        "docs/product/PRODUCT_DECISIONS_2026-09-19.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-18-ACADEMY-AFTER-UI-STABLE",
+      "title": "Academia obrigat?ria ap?s estabiliza??o da interface",
+      "state": "APROVADO / PENDENTE",
+      "domain": "education",
+      "source_date": "2026-09-18",
+      "summary": "Academy permanece entrega obrigat?ria com texto, exemplos e v?deos curtos ap?s estabiliza??o das telas; n?o promete lucro.",
+      "evidence": [
+        "docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-18-COT-FINAL-PHASE",
+      "title": "COT e posicionamento institucional em fase final",
+      "state": "APROVADO / PENDENTE",
+      "domain": "market-intelligence",
+      "source_date": "2026-09-18",
+      "summary": "CFTC COT, COT Index normalizado e compara??o base/cotada ficam preservados como fase posterior; dados n?o podem ser inventados.",
+      "evidence": [
+        "docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-18-BACKTEST-FORWARD-TRADINGVIEW",
+      "title": "Backtest, forward-test e TradingView preservados",
+      "state": "APROVADO / PENDENTE",
+      "domain": "laboratory",
+      "source_date": "2026-09-18",
+      "summary": "Backtest/forward e integra??o/uso de TradingView permanecem no roadmap com evid?ncia audit?vel antes de promo??o operacional.",
+      "evidence": [
+        "docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-18-AUTOEXEC-LATER-PHASE",
+      "title": "Automa??o de execu??o somente em fase posterior",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-18",
+      "summary": "Automa??o de execu??o n?o entra antes de valida??o, risco, Guardian e aprova??o humana; trading real continua fail-closed.",
+      "evidence": [
+        "docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-20-OPERATE-INVEST-BOTH",
+      "title": "Ecossistema Operar / Investir / Os dois",
+      "state": "APROVADO / PENDENTE",
+      "domain": "investments",
+      "source_date": "2026-09-20",
+      "summary": "Preservar tr?s caminhos de entrada Operar, Investir ou Os dois, com horizontes e risco separados e sem recomenda??o autom?tica.",
+      "evidence": [
+        "docs/product/INVESTMENT_ECOSYSTEM_FOUNDATION_2026-09-20.md",
+        "docs/product/PRODUCT_DECISIONS_2026-09-19.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-20-EVENT-POSITION-MANAGER",
+      "title": "Gestor de posi??o por evento",
+      "state": "APROVADO / PENDENTE",
+      "domain": "trader",
+      "source_date": "2026-09-20",
+      "summary": "Acompanhar posi??es antes/depois de eventos macro relevantes sem confundir evento com autoriza??o de ordem.",
+      "evidence": [
+        "docs/product/ADMIN_EVENT_FOUNDATION_2026-09-20.md",
+        "docs/product/INVESTMENT_ECOSYSTEM_FOUNDATION_2026-09-20.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-21-FIXED-NEURAL-VOICE",
+      "title": "Voz neural oficial fixa e fallback fail-closed",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "voice",
+      "source_date": "2026-09-21",
+      "summary": "Voz oficial via TTS neural, sem escolher silenciosamente voz gen?rica do dispositivo; aus?ncia de provider deve degradar sem inventar identidade de voz.",
+      "evidence": [
+        "docs/product/FIXED_NEURAL_VOICE_2026-09-21.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-22-RADAR-MAIN-NAVIGATION",
+      "title": "Radar como porta de entrada e navega??o-base",
+      "state": "APROVADO / PENDENTE",
+      "domain": "interface",
+      "source_date": "2026-09-22",
+      "summary": "Preservar Radar como entrada principal e a navega??o-base Radar, Painel Mestre, Agenda, Academia, Di?rio e Perfil enquanto a interface evolui.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-22-AGENDA-DIARY-PERFORMANCE",
+      "title": "Agenda e Di?rio/Performance",
+      "state": "APROVADO / PENDENTE",
+      "domain": "interface",
+      "source_date": "2026-09-22",
+      "summary": "Agenda macro e Di?rio/Performance permanecem requisitos do produto, com fonte/frescor e m?tricas audit?veis.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-22-COMMUNITY-WHATSAPP",
+      "title": "Comunidade e WhatsApp",
+      "state": "APROVADO / PENDENTE",
+      "domain": "community",
+      "source_date": "2026-09-22",
+      "summary": "Comunidade interna e integra??o/atalho de WhatsApp permanecem no roadmap, sem publica??o ou envio autom?tico sem aprova??o.",
+      "evidence": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-AION-EIGHT-INTERNAL-ROLES",
+      "title": "Oito pap?is internos do AION",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-10-02",
+      "summary": "Os oito pap?is internos s?o Orquestrador, Arquiteto/Estrategista, Guardi?o/Auditor, Executor/Operador, Mem?ria/Conhecimento, FinOps/Controle de Custos, Observabilidade/Confiabilidade e Sucesso do Cliente/Comercial. S?o responsabilidades do mesmo AION Core, n?o oito IAs independentes.",
+      "evidence": [
+        "atlasquant_aion_internal_roles.py",
+        "test_atlasquant_aion_internal_roles.py"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-DAILY-HISTORICAL-SWEEP",
+      "title": "Varredura hist?rica di?ria desde 15/09",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "memory",
+      "source_date": "2026-10-02",
+      "summary": "Todo dia deve reconciliar 15/09 at? a data atual, dia por dia, preservar pend?ncias e s? fechar item/dia com evid?ncia. Nada aprovado pode sumir por mudan?a de prioridade.",
+      "evidence": [
+        "atlasquant_aion_historical_commitments.py",
+        "AION_CORE_NIGHTSHIFT_CHECKPOINT.json"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS",
+      "title": "Prioridade atual: N?cleo, Interface e Neg?cios em paralelo",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-10-02",
+      "summary": "At? fechar N?cleo e Interface, essas duas frentes s?o prim?rias; Neg?cios avan?a em paralelo. Trader e Investimentos permanecem rastreados para a fase correta.",
+      "evidence": [
+        "AION_CORE_NIGHTSHIFT_CHECKPOINT.json"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-PHASE2-60-20-20",
+      "title": "Distribui??o p?s-fechamento: 60/20/20",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-10-02",
+      "summary": "Depois de N?cleo e Interface comprovadamente fechados, distribuir foco em 60% Neg?cios, 20% Trader/Radar/Laborat?rio e 20% Investimentos, sem apagar backlog das demais ?reas.",
+      "evidence": [
+        "AION_CORE_NIGHTSHIFT_CHECKPOINT.json"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-DECEMBER-90-PLANNING-TARGET",
+      "title": "Meta de planejamento superior a 90% at? o fim de dezembro",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-10-02",
+      "summary": "Meta de planejamento: chegar ao fim de dezembro com o ecossistema praticamente pronto, acima de 90% segundo crit?rios verific?veis. N?o ? promessa de release, lucro ou autoriza??o de produ??o.",
+      "evidence": [
+        "AION_CORE_NIGHTSHIFT_CHECKPOINT.json"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-17-AUTOPILOT-PAPER-V116",
+      "title": "Autopilot e Paper Trading V11.6 com fricção e auditoria",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "trader",
+      "source_date": "2026-09-17",
+      "summary": "Preservar V11.1–V11.6: quota saver, Paper Trading checklist-gated, auditoria, derivação M15/H1/H4 e custos spread/slippage; sem ordem real.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-17.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-17-TWELVE-DATA-PROD-SMOKE-BLOCK",
+      "title": "Twelve Data e smoke de produção como bloqueios externos",
+      "state": "DEPENDÊNCIA EXTERNA",
+      "domain": "data-runtime",
+      "source_date": "2026-09-17",
+      "summary": "Limite da Twelve Data e instabilidade/smoke de produção impedem tratar o runtime daquele dia como validação irrestrita.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-17.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-17-PRIVATE-WINDOWS-BACKUP-FLOW",
+      "title": "Fluxo privado Windows com backup antes de desenvolvimento",
+      "state": "APROVADO / PENDENTE",
+      "domain": "distribution",
+      "source_date": "2026-09-17",
+      "summary": "Manter estável → backup → desenvolvimento → testes → nova versão, preservando fonte, dados, pacote estável e histórico.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-17.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-28-FOREX28-RADAR-LAB-FOUNDATION",
+      "title": "Radar Forex 28 pares e Laboratório com evidência real",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "trader",
+      "source_date": "2026-09-28",
+      "summary": "Preservar Radar 28 pares/TOP 10 e Laboratório/Replay com evidência real e no-lookahead.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-28.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-28-AION-ADMIN-REPLAY-HEALTH-GOVERNANCE",
+      "title": "Admin Copilot, Replay, Health, Freshness e release governado",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-09-28",
+      "summary": "Preservar Admin Copilot/onboarding, Replay point-in-time, Data Confidence/Freshness, System Health, Cost Center e release em estágios com gates fail-closed.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-28.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-28-BUSINESS-TOPLEVEL-INTERFACE",
+      "title": "AION Business e navegação premium como áreas integradas",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "interface",
+      "source_date": "2026-09-28",
+      "summary": "Preservar Negócios como área de alto nível e os reparos de navegação/Painel Mestre/Radar sem criar autoridade autônoma.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-28.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-01-NIGHTSHIFT-V1-RECOVERY",
+      "title": "AION Core Nightshift V1 recuperado e integrado",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "aion-core",
+      "source_date": "2026-10-01",
+      "summary": "Preservar recuperação Nightshift, bridge de runtime e cobertura de testes como base do endurecimento posterior do Core.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-01-LIBRARY-FOUNDATION-INDEX-PDF",
+      "title": "Biblioteca AION: Foundation, Index e PDF Ingestion",
+      "state": "IMPLEMENTADO / EM VALIDAÇÃO",
+      "domain": "library",
+      "source_date": "2026-10-01",
+      "summary": "Preservar Foundation, Index e PDF local com proveniência, quarentena, revisão explícita e isolamento tenant/workspace; sem OCR ou promoção automática.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md"
+      ],
+      "implemented": true,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-01-LIBRARY-IDENTITY-ACL-DR-BLOCKERS",
+      "title": "Identidade durável, ACL e DR continuam bloqueios reais",
+      "state": "DEPENDÊNCIA EXTERNA",
+      "domain": "security",
+      "source_date": "2026-10-01",
+      "summary": "Sandboxes PostgreSQL/browser não substituem identidade durável, revogação autoritativa, witness externo, tombstone e DR independente.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md"
+      ],
+      "implemented": false,
+      "validated": false
+    }
+  ],
+  "execution_authority": false,
+  "automatic_activation": false,
+  "production_change": false,
+  "merge_authorized": false,
+  "deploy_authorized": false,
+  "real_trading_enabled": false,
+  "inherited_registries": [
+    {
+      "path": "docs/continuidade/checkpoint_mestre_reconciliation_2026-09-29.json",
+      "kind": "structured-precedence-registry",
+      "period": {
+        "start": "2026-09-15",
+        "end": "2026-09-29"
+      },
+      "decision_count": 40,
+      "gap_count": 8,
+      "precedence": "preserve; newer explicit decisions may supersede but never erase history"
+    }
+  ],
+  "inherited_gaps": [
+    {
+      "id": "G-PRIVATE-CONVERSATIONS",
+      "topic": "Decisões de conversa privada ausentes dos documentos",
+      "state": "NEEDS HUMAN RECONCILIATION",
+      "reason": "Conversas que não estão no repositório não foram reconstruídas."
+    },
+    {
+      "id": "G-PRODUCTION-DEPLOYED-SHA",
+      "topic": "SHA implantado em produção",
+      "state": "UNVERIFIED",
+      "reason": "Não houve leitura do ambiente de produção nem chamada de deploy."
+    },
+    {
+      "id": "G-NEXTGEN-MODULE-COMPLETENESS",
+      "topic": "Quais módulos NextGen já estão implementados de ponta a ponta",
+      "state": "UNVERIFIED",
+      "reason": "O checkpoint de 25/09 aprova requisitos e recusa tratá-los como features ativas. A completude módulo a módulo não foi auditada aqui."
+    },
+    {
+      "id": "G-ADR-TAX-AND-REGULATION",
+      "topic": "Tributação e regra regulatória de American Depositary Receipts",
+      "state": "UNVERIFIED",
+      "reason": "Nenhuma regra fiscal ou regulatória foi inventada."
+    },
+    {
+      "id": "G-SPECIALIST-CERTIFICATION-STATUS",
+      "topic": "Status de certificação dos especialistas atuais",
+      "state": "UNVERIFIED",
+      "reason": "O gate de certificação de especialista existe como contrato. Nenhum especialista foi declarado certificado. Skill/Plugin Certification não substitui esse gate."
+    },
+    {
+      "id": "G-NINETY-PERCENT-MEASUREMENT",
+      "topic": "Medição da cobertura operacional próxima de 90%",
+      "state": "UNVERIFIED",
+      "reason": "A diretriz não é promessa e não há medição comprovada."
+    },
+    {
+      "id": "G-DEV-BRANCH-POLICY",
+      "topic": "Se atlasquant-dev continua sendo a única branch de desenvolvimento",
+      "state": "NEEDS HUMAN RECONCILIATION",
+      "reason": "O handoff de 15/09 mandava desenvolver em atlasquant-dev. Documentos posteriores não fecham essa política de branch."
+    },
+    {
+      "id": "G-WYCKOFF-PRIORITY",
+      "topic": "Prioridade de Wyckoff",
+      "state": "UNVERIFIED",
+      "reason": "O backlog de 18/09 deixa Wyckoff como referência conceitual futura, sem decisão de implementação."
+    }
+  ],
+  "daily_coverage": [
+    {
+      "date": "2026-09-15",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/REGISTRO_ORIGINAL_2026-09-15.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-FAIL-CLOSED-MARKET-READING",
+        "D-RELEASE-DEPLOY-MERGE-GATE",
+        "D-SCORE-IS-NOT-PROFIT-PROBABILITY"
+      ]
+    },
+    {
+      "date": "2026-09-16",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/AUDITORIA_RUNTIME_2026-09-16.json"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": []
+    },
+    {
+      "date": "2026-09-17",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-17.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-17-AUTOPILOT-PAPER-V116",
+        "D-2026-09-17-PRIVATE-WINDOWS-BACKUP-FLOW",
+        "D-2026-09-17-TWELVE-DATA-PROD-SMOKE-BLOCK"
+      ]
+    },
+    {
+      "date": "2026-09-18",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-18-ACADEMY-AFTER-UI-STABLE",
+        "D-2026-09-18-AUTOEXEC-LATER-PHASE",
+        "D-2026-09-18-BACKTEST-FORWARD-TRADINGVIEW",
+        "D-2026-09-18-COT-FINAL-PHASE",
+        "D-2026-09-18-ELLIOTT-OUT-OF-ENGINE"
+      ]
+    },
+    {
+      "date": "2026-09-19",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/product/PRODUCT_DECISIONS_2026-09-19.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-PRODUCT-STILL-PRIVATE-PHASE"
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/product/ADMIN_EVENT_FOUNDATION_2026-09-20.md",
+        "docs/product/GUIDED_ADVANCED_SESSION_RADAR_2026-09-20.md",
+        "docs/product/INVESTMENT_ECOSYSTEM_FOUNDATION_2026-09-20.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-20-EVENT-POSITION-MANAGER",
+        "D-2026-09-20-OPERATE-INVEST-BOTH"
+      ]
+    },
+    {
+      "date": "2026-09-21",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/product/FIXED_NEURAL_VOICE_2026-09-21.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-21-FIXED-NEURAL-VOICE"
+      ]
+    },
+    {
+      "date": "2026-09-22",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-22-AGENDA-DIARY-PERFORMANCE",
+        "D-2026-09-22-COMMUNITY-WHATSAPP",
+        "D-2026-09-22-IMMEDIATE-PRIORITY",
+        "D-2026-09-22-OUTSIDE-MERCADO-LIVRE",
+        "D-2026-09-22-RADAR-MAIN-NAVIGATION",
+        "D-CHECKPOINT-STATE-VOCABULARY",
+        "D-PRODUCTION-DEPLOY-PROOF",
+        "D-PROMOTION-LADDER"
+      ]
+    },
+    {
+      "date": "2026-09-23",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/AION_FOUNDATION_2026-09-23.md",
+        "docs/continuidade/AION_OPERATING_MEMORY_2026-09-23.md",
+        "docs/continuidade/AION_STUDIO_BUSINESS_2026-09-23.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-23-AION-CONNECTOR-HUB",
+        "D-2026-09-23-AION-VOICE-WAKEWORD-OFFLINE",
+        "D-2026-09-23-LAB-EVIDENCE-ARCHIVE",
+        "D-2026-09-23-MACRO-DAY-WEEK-VOICE",
+        "D-2026-09-23-NOTIFICATION-CENTER",
+        "D-2026-09-23-OPENING-TRADE-WIN-WDO-CORRELATES",
+        "D-2026-09-23-PPR-DEFINITION-BLOCKER",
+        "D-2026-09-23-RADAR-28FX-TOP10",
+        "D-2026-09-23-STUDENT-CONSISTENCY-RANKING",
+        "D-2026-09-23-STUDIO-PUBLISH-APPROVAL"
+      ]
+    },
+    {
+      "date": "2026-09-24",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/AION_CONTROLLED_LEARNING_2026-09-24.md",
+        "docs/continuidade/AION_MASTER_STATUS_BOARD_2026-09-24.md",
+        "docs/continuidade/AION_TENANT_ISOLATION_2026-09-24.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-24-BUSINESS-MARKETPLACE-IN-ECOSYSTEM",
+        "D-2026-09-24-CONTROLLED-EVOLUTION-DARWIN",
+        "D-2026-09-24-DIGITAL-INCOME-AREA",
+        "D-2026-09-24-REALTIME-EVENT-ALERTS",
+        "D-2026-09-24-VIDEO-EXPLANATIONS-ON-DEMAND"
+      ]
+    },
+    {
+      "date": "2026-09-25",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/AION_CHECKPOINT_NEXTGEN_APPROVED_2026-09-25.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-25-AION-VAULT-OFFICIAL-ACCESS",
+        "D-2026-09-25-AUTONOMY-BUDGET",
+        "D-2026-09-25-COST-ZERO-PRIVACY-EGRESS",
+        "D-2026-09-25-CYBER-IMMUNE-SYSTEM",
+        "D-2026-09-25-DIGITAL-TWIN-PREEXEC-PROOF",
+        "D-2026-09-25-FALSIFICATION-ENGINE",
+        "D-2026-09-25-FORTRESS-LAYER",
+        "D-2026-09-25-NEXTGEN-REQUIREMENTS",
+        "D-2026-09-25-PORTABLE-CORE-EVERYWHERE",
+        "D-2026-09-25-PROFESSIONAL-FINANCIAL-SHEETS",
+        "D-2026-09-25-SOVEREIGNTY-KERNEL"
+      ]
+    },
+    {
+      "date": "2026-09-26",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/product/PREMIUM_INTERFACE_2026-09-26.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-26-TREASURY-GROWTH-ENGINE"
+      ]
+    },
+    {
+      "date": "2026-09-27",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md",
+        "docs/continuidade/ENDURECIMENTO_FIM_DE_SEMANA_2026-09-27.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-27-PREMIUM-UX-VISUAL-AUDIT",
+        "D-2026-09-27-PRIORITY-ORDER",
+        "D-2026-09-27-UX-DIRECTION",
+        "D-ADMIN-USER-SEPARATION"
+      ]
+    },
+    {
+      "date": "2026-09-28",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-28.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-28-AION-ADMIN-REPLAY-HEALTH-GOVERNANCE",
+        "D-2026-09-28-BUSINESS-TOPLEVEL-INTERFACE",
+        "D-2026-09-28-FOREX28-RADAR-LAB-FOUNDATION"
+      ]
+    },
+    {
+      "date": "2026-09-29",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/CHECKPOINT_MESTRE_RECONCILIACAO_2026-09-29.md",
+        "docs/continuidade/checkpoint_mestre_reconciliation_2026-09-29.json"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-22-DOCUMENT-PRESERVED",
+        "D-2026-09-29-AION-CENTRAL-INDEPENDENT",
+        "D-2026-09-29-BLAST-RADIUS-BUDGET-LOOP-GOVERNOR",
+        "D-2026-09-29-CHAOS-DR-RPO-RTO",
+        "D-2026-09-29-EXECUTABLE-CONSTITUTION-HUMAN-CONTROL",
+        "D-2026-09-29-GITHUB-MAIN-PROTECTION",
+        "D-2026-09-29-MEMORY-QUARANTINE-KNOWLEDGE-VAULT",
+        "D-2026-09-29-MODEL-REGISTRY-CANARY",
+        "D-2026-09-29-PRIME-SHADOW-SENTINEL",
+        "D-2026-09-29-PROTOCOL-FIREWALL-ACTION-RECEIPT",
+        "D-2026-09-29-SUPPLY-CHAIN-SECURITY",
+        "D-2026-09-29-ZERO-TRUST-CONTEXT-FIREWALL",
+        "D-ADMIN-DOORS-FOUR",
+        "D-ADR-ARCHITECTURE-RECORDS",
+        "D-ADR-AVERAGE-DAILY-RANGE",
+        "D-ADR-DEPOSITARY-RECEIPTS",
+        "D-AION-SINGLE-NUCLEUS",
+        "D-ATR-SEPARATE-FROM-ADR",
+        "D-BUSINESS-FIVE-FRONTS",
+        "D-BUSINESS-OPERATIONAL-GUIDELINE",
+        "D-CHECKPOINT-MASTER-NO-PARALLEL-STORE",
+        "D-COMMERCIAL-AION-REQUIREMENTS",
+        "D-COMMERCIAL-FLOW",
+        "D-DOD-HUMAN-RELEASE-REVIEW",
+        "D-ECOSYSTEM-ROBUSTNESS",
+        "D-FOUR-CLOSURES",
+        "D-HUMAN-APPROVAL-HIGH-IMPACT",
+        "D-NO-VIRAL-OR-TOP20-PROOF",
+        "D-OPPORTUNITY-FLOW",
+        "D-OPPORTUNITY-SCOUT",
+        "D-PRIORITY-ORDER-2026-09-29",
+        "D-REAL-TRADING-FAIL-CLOSED",
+        "D-REVENUE-IS-NOT-PROFIT",
+        "D-SPECIALIST-CERTIFICATION-REQUIRED",
+        "D-SPECIALISTS-NOT-INDEPENDENT-AIS",
+        "D-SPECIALISTS-SHARE-CORE",
+        "D-TRUTH-INCOMPLETE-NOT-CONFIRMED"
+      ]
+    },
+    {
+      "date": "2026-09-30",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-09-30.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-09-30-AION-NO-BANK-GOV-AUTHORITY",
+        "D-2026-09-30-BUSINESS-CLIENT-PORTAL-TENANT",
+        "D-2026-09-30-BUSINESS-RBAC-LGPD-FINOPS",
+        "D-2026-09-30-CLT-INDEPENDENCE-INDEX",
+        "D-2026-09-30-FUTURE-BIOMETRIC-CRITICAL-DECISION",
+        "D-2026-09-30-LIBRARY-OFFICIAL-KNOWLEDGE-FLOW"
+      ]
+    },
+    {
+      "date": "2026-10-01",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-10-01-LIBRARY-FOUNDATION-INDEX-PDF",
+        "D-2026-10-01-LIBRARY-IDENTITY-ACL-DR-BLOCKERS",
+        "D-2026-10-01-NIGHTSHIFT-V1-RECOVERY"
+      ]
+    },
+    {
+      "date": "2026-10-02",
+      "state": "COVERED_WITH_EVIDENCE",
+      "source_paths": [
+        "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
+        "docs/continuidade/aion_historical_commitments_2026-10-02.json"
+      ],
+      "closed": false,
+      "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
+      "commitment_ids": [
+        "D-2026-10-02-AION-EIGHT-INTERNAL-ROLES",
+        "D-2026-10-02-DAILY-HISTORICAL-SWEEP",
+        "D-2026-10-02-DECEMBER-90-PLANNING-TARGET",
+        "D-2026-10-02-PHASE2-60-20-20",
+        "D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS"
+      ]
+    }
+  ],
+  "reconciliation_status": {
+    "as_of": "2026-10-02",
+    "coverage_complete_for_period": true,
+    "historical_days_auto_closed": false,
+    "rule": "Coverage evidence does not close commitments; terminal state still requires explicit evidence."
+  }
+}

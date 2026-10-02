@@ -29,6 +29,8 @@ from atlasquant_aion_core_intelligence.store import (
 )
 from atlasquant_aion_observability import new_event
 from atlasquant_aion_core_runtime_bridge import authenticated_context
+from atlasquant_aion_historical_commitments import historical_commitments_snapshot
+from atlasquant_aion_internal_roles import internal_roles_snapshot
 
 
 SCHEMA = "ATLASQUANT_AION_CORE_CHECKPOINT_BRIDGE_V1"
@@ -507,6 +509,8 @@ def checkpoint_memory_snapshot(
     current = utc(now or datetime.now(timezone.utc))
     context = authenticated_context(access, Domain.ADMIN)
     store, state = load_checkpoint_store(context, legacy_checkpoint)
+    historical = historical_commitments_snapshot()
+    internal_roles = internal_roles_snapshot()
     if state["state"] == "CONTEXT_ISOLATED":
         return {
             "schema": SCHEMA,
@@ -514,6 +518,8 @@ def checkpoint_memory_snapshot(
             "records": [],
             "approved_decisions": [],
             "version": 0,
+            "historical_commitments": historical,
+            "internal_roles": internal_roles,
             "external_persisted": False,
         }
     rows = store.read(context, current)
@@ -527,6 +533,8 @@ def checkpoint_memory_snapshot(
             and row.get("origin") == Origin.USER_APPROVED.value
         ],
         "version": store.revision(context),
+        "historical_commitments": historical,
+        "internal_roles": internal_roles,
         "storage": store.storage_kind,
         "external_persistence": store.remote_persistence,
         "external_persisted": False,

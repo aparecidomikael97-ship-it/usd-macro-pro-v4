@@ -759,6 +759,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_set_working_checkpoint(updated, dirty=True)",src)
         self.assertIn("Salve o Checkpoint Mestre para persistir",src)
 
+    def test_admin_shows_historical_commitments_as_read_only_checkpoint_data(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Compromissos históricos reconciliados", src)
+        self.assertIn("Aprovados pendentes", src)
+        self.assertIn("aprovação não equivale a implementação", src)
+        self.assertIn("não concede autoridade de execução", src)
+        self.assertIn("8 papéis internos do AION", src)
+        self.assertIn("Não são oito IAs independentes", src)
+
     def test_admin_mobile_contrast_is_stronger_and_single_column_at_small_width(self):
         self.assertIn(".aion-pulse-grid",AION_ADMIN_CSS)
         self.assertIn("@media(max-width:430px)",AION_ADMIN_CSS)

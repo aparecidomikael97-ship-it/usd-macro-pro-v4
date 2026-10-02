@@ -254,6 +254,11 @@ class CheckpointCoreStoreTests(unittest.TestCase):
         self.assertEqual(len(snap["records"]), 2)
         self.assertEqual(len(snap["approved_decisions"]), 1)
         self.assertEqual(snap["approved_decisions"][0]["text"], "Decisão A.")
+        self.assertGreaterEqual(snap["historical_commitments"]["count"], 108)
+        self.assertFalse(snap["historical_commitments"]["execution_authority"])
+        self.assertEqual(snap["internal_roles"]["count"], 8)
+        self.assertTrue(snap["internal_roles"]["single_shared_aion_core"])
+        self.assertFalse(snap["internal_roles"]["execution_authority"])
 
     def test_admin_ui_keeps_memory_stage_and_external_save_separate(self):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
