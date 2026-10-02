@@ -377,8 +377,9 @@ def radar_freshness_html(freshness:Mapping[str,Any]|None)->str:
         age_text=f"{float(age):.0f} min"
     source=" ".join(str(item.get("source") or "").split())[:100] or "origem não informada"
     refresh_text=refresh or "estado de atualização não informado"
+    state_attr=escape(state or "UNKNOWN")
     return (
-        f'<section class="aq-radar-freshness" data-tone="{tone}" data-freshness-state="{escape(state or "UNKNOWN")}" '
+        f'<section class="aq-radar-freshness" data-tone="{tone}" data-freshness-state="{state_attr}" '
         'role="status" aria-label="Frescor e atualização do Radar">'
         f'<div><small>Estado</small><strong>{escape(status)}</strong></div>'
         f'<div><small>Última evidência</small><strong>{escape(generated)}</strong></div>'
