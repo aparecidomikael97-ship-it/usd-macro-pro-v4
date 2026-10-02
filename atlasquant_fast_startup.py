@@ -308,7 +308,11 @@ def _render_beginner_chrome(app_version:str, environment:str, access:Mapping[str
             render_atlasquant_header,
         )
         apply_atlasquant_theme()
-        render_atlasquant_header(app_version or "AtlasQuant", environment or "LOCAL")
+        render_atlasquant_header(
+            app_version or "AtlasQuant",
+            environment or "LOCAL",
+            build_id=str(st.session_state.get("atlasquant_visible_build") or ""),
+        )
         render_account_identity(dict(access) if isinstance(access,Mapping) else None)
         st.markdown(experience_mode_overview_html("Iniciante"), unsafe_allow_html=True)
         st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
