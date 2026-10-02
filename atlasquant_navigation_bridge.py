@@ -272,6 +272,10 @@ def consume_navigation_request(
             session_state["atlasquant_advanced_area"] = page
         else:
             session_state["atlasquant_beginner_area_full"] = page
+            # The authenticated fast-start shell owns a separate radio key.
+            # Keep it synchronized so Central -> Investimentos reaches the
+            # existing fast 💰 Investir surface instead of falling back to Radar.
+            session_state["aq_beginner_page"] = page
         session_state["atlasquant_stable_nav_fallback"] = page
         return dict(raw)
     return consume_revalidation_request(
