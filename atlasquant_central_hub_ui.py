@@ -67,6 +67,15 @@ AION_MODULE_WORKSPACES = {
 }
 AION_MODULE_JUMP_KEY = "aion_admin_workspace_jump"
 
+_LEGACY_AION_MODULE_ALIASES = {
+    "administracao": "orchestrator",
+    "memoria": "memory",
+    "desenvolvedor": "architect",
+    "automacao": "executor",
+    "seguranca": "guardian",
+    "observabilidade": "observability",
+}
+
 
 def _canonical_aion_modules() -> tuple[dict[str, Any], ...]:
     snapshot = internal_roles_snapshot()
@@ -439,8 +448,14 @@ def aion_home_claims(system_context: Mapping[str, Any] | None) -> dict[str, dict
     supplied = system_context.get("home_claims")
     if isinstance(supplied, Mapping):
         for spec in _AION_MODULES:
-            claims[spec["id"]] = normalize_home_claim(supplied.get(spec["id"]))
-    if claims["observabilidade"]["truth_state"] == "CONFIRMED":
+            direct = supplied.get(spec["id"])
+            if direct is None:
+                for legacy_id, canonical_id in _LEGACY_AION_MODULE_ALIASES.items():
+                    if canonical_id == spec["id"] and legacy_id in supplied:
+                        direct = supplied.get(legacy_id)
+                        break
+            claims[spec["id"]] = normalize_home_claim(direct)
+    if claims["observability"]["truth_state"] == "CONFIRMED":
         return claims
     observations = system_context.get("source_observations")
     if not isinstance(observations, (list, tuple)):
@@ -454,7 +469,7 @@ def aion_home_claims(system_context: Mapping[str, Any] | None) -> dict[str, dict
             "summary": row.get("summary") or row.get("detail"),
         })
         if claim["truth_state"] == "CONFIRMED":
-            claims["observabilidade"] = claim
+            claims["observability"] = claim
             break
     return claims
 
@@ -532,6 +547,7 @@ def consume_aion_module_jump(session_state, access: Mapping[str, Any] | None, mo
     if not _admin(access):
         return ""
     module = str(module_id or "").strip()
+    module = _LEGACY_AION_MODULE_ALIASES.get(module, module)
     workspace = AION_MODULE_WORKSPACES.get(module, "")
     if not workspace:
         return ""
