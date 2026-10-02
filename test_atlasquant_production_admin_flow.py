@@ -119,7 +119,8 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self._assert_clean(at)
         door = self._html(at)
         self.assertIn("CENTRAL PRINCIPAL", door)
-        self.assertIn("Escolha um setor", door)
+        self.assertIn("Central AtlasQuant", door)
+        self.assertIn("Escolha o ambiente que você quer abrir.", door)
         self.assertIn('data-root="central_root"', door)
         for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
             self.assertIn(label, door)
