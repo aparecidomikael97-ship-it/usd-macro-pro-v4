@@ -19,7 +19,8 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING_LOCAL",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING_LOCAL",
     "TENANT_EVIDENCE_DIGEST_BINDING_LOCAL",
-    "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP_LOCAL"
+    "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP_LOCAL",
+    "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -88,7 +89,12 @@
     "windows_symlink_environment_error": "CLOSED - full AION suite green",
     "tenant_evidence_binding_bundle": "51 passed / 0 failed",
     "tenant_real_evidence_bundle": "57 passed / 0 failed",
-    "aion_full_regression_after_evidence_bundle": "2173 passed / 0 failed / 1 skipped"
+    "aion_full_regression_after_evidence_bundle": "2173 passed / 0 failed / 1 skipped",
+    "final_local_contract_audit": "17 checks / 0 failures",
+    "final_developer_adversarial_audit": "348 cases / 0 gaps / 334 blocked-by-design / 14 pass",
+    "finalization_audit": "internal_release_preparation_complete=true",
+    "git_fsck": "PASS / exit code 0 / dangling objects only",
+    "fresh_origin_main_compare": "0 behind / 9 ahead"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -145,12 +151,12 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP",
+  "next_wave": "REMOTE_CI_BRANCH_PUBLICATION_PENDING_EXPLICIT_AUTHORIZATION",
   "known_blockers": [
-    "Production tenant persistence remains intentionally disabled and requires explicit administrative authorization after review",
-    "The current integration branch has not yet been pushed or validated by remote CI",
-    "Drael local key/config is absent; main development flow must not wait for it",
-    "All current advances remain local until an explicitly authorized remote publication step"
+    "The local release candidate branch has not been pushed; remote CI has not run for these commits",
+    "Production tenant persistence remains intentionally disabled and requires explicit administrative authorization after evidence review",
+    "Merge and deploy remain prohibited without explicit authorization",
+    "Drael local key/config is absent; main development flow must not wait for it"
   ],
   "hourly_night_shift_enabled": true,
   "protected_ledger_unchanged": true,
@@ -241,5 +247,32 @@
     "evidence_is_authority": false,
     "production_persistence_activated": false,
     "automatic_activation": false
+  },
+  "local_release_candidate": {
+    "state": "READY_FOR_REMOTE_CI_LOCAL_ONLY",
+    "branch": "integration/aion-library-document-intelligence-v1-20261001",
+    "base_sha": "27b605c3088a955934a60a8544245ab41894029b",
+    "component_head_sha": "5bec4637bbd8d20d9a90d3427336a6a2df37eb10",
+    "component_commits": 9,
+    "changed_files": 21,
+    "insertions": 3248,
+    "deletions": 35,
+    "behind_origin_main": 0,
+    "ahead_origin_main": 9,
+    "full_aion_tests": 2173,
+    "full_aion_failures": 0,
+    "full_aion_skipped": 1,
+    "contract_checks": 17,
+    "contract_failures": 0,
+    "adversarial_cases": 348,
+    "adversarial_gaps": 0,
+    "internal_release_preparation_complete": true,
+    "tenant_evidence_gate": "READY_FOR_ADMIN_REVIEW",
+    "production_persistence_activated": false,
+    "real_trading_enabled": false,
+    "automatic_merge": false,
+    "automatic_deploy": false,
+    "branch_pushed": false,
+    "remote_ci_run": false
   }
 }
