@@ -115,7 +115,10 @@ class CheckpointCoreStoreTests(unittest.TestCase):
         self.assertEqual(result["status"], "COMPLETED")
         self.assertEqual(result["route"]["capability"], "MEMORY")
         self.assertEqual(len(result["payload"]["approved_decisions"]), 1)
-        self.assertEqual(result["persistence"]["state"], "STAGED_CHECKPOINT")
+        self.assertEqual(
+            result["persistence"]["state"],
+            "STAGED_CHECKPOINT_AND_LOCAL_DURABLE_AVAILABLE",
+        )
         self.assertEqual(
             result["persistence"]["remote_persistence"],
             "REQUIRES_EXPLICIT_CHECKPOINT_SAVE",

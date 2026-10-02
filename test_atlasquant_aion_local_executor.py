@@ -12,7 +12,7 @@ from atlasquant_aion_local_executor import (
     local_allowlist,
     sanitize_local_arguments,
 )
-from atlasquant_aion_memory import default_checkpoint
+from atlasquant_aion_memory import checkpoint_integrity_report, default_checkpoint
 from atlasquant_aion_memory_layers import default_memory_layers, remember
 from atlasquant_aion_portable import default_portable_core, new_connector
 from atlasquant_aion_tool_hub import default_tool_hub
@@ -294,6 +294,21 @@ class ExecutionTests(unittest.TestCase):
         self.assertIsNone(out["result"])
         self.assertFalse(out["security"]["network_called"])
         self.assertFalse(out["external_action_executed"])
+
+    def test_checkpoint_inspect_preserves_integrity_through_runtime_sanitizer(self):
+        checkpoint = default_checkpoint()
+        direct = checkpoint_integrity_report(checkpoint)
+        inspected = _call(
+            "aion.checkpoint.inspect",
+            runtime_context={"checkpoint": checkpoint},
+            request_id="checkpoint-integrity-regression",
+        )
+        self.assertEqual(direct["state"], "CONFIRMED")
+        self.assertEqual(inspected["state"], "SUCCESS")
+        self.assertEqual(inspected["result"]["integrity"]["state"], "CONFIRMED")
+        self.assertEqual(inspected["result"]["integrity"]["mismatches"], [])
+        self.assertFalse(inspected["external_action_executed"])
+        self.assertFalse(inspected["security"]["network_called"])
 
     def test_real_checkpoint_events_feed_observability_and_secretary(self):
         checkpoint = default_checkpoint()
