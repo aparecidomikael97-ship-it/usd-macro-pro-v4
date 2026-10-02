@@ -86,7 +86,9 @@ def validate_runtime_rows(
             freshness_class="STATIC" if row.get("time_sensitive") is False else "REALTIME",
             published_at=_clean(row.get("observed_at") or row.get("timestamp") or current, 80),
             confidence=1.0 if truth == "CONFIRMED" else 0.5,
-            supports_claim=True,
+            supports_claim=row.get("supports_claim") is not False,
+            contradicts_claim=row.get("contradicts_claim") is True,
+            human_validated=row.get("human_validated") is True,
             provenance_id=validated.provenance_id,
             tenant_id=tenant_id,
             domain_id=domain_id,
@@ -122,6 +124,19 @@ def validate_runtime_rows(
         "rejected_rows": rejected_rows,
         "provenance_failures": provenance_failures,
         "assessments": [a.as_dict() for a in assessments],
+        "evidence_manifest": [
+            {
+                "evidence_id": item.evidence_id,
+                "claim_id": item.claim_id,
+                "provenance_id": item.provenance_id,
+                "source_fingerprint": item.source_fingerprint,
+                "supports_claim": item.supports_claim,
+                "contradicts_claim": item.contradicts_claim,
+                "tenant_id": item.tenant_id,
+                "domain_id": item.domain_id,
+            }
+            for item in evidence
+        ],
         "memory_policy_probe": memory_access,
         "memory_auto_write": False,
         "external_persisted": False,

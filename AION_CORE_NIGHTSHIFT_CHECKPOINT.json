@@ -14,7 +14,8 @@
     "LIBRARY_DOCUMENT_INTELLIGENCE_V1_LOCAL",
     "EXECUTOR_TOOL_HUB_PERMISSIONING_AUDIT",
     "TENANT_PERSISTENCE_GATE_V1_LOCAL",
-    "TENANT_DURABLE_STORE_IDENTITY_ACL_E2E_V1_LOCAL"
+    "TENANT_DURABLE_STORE_IDENTITY_ACL_E2E_V1_LOCAL",
+    "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION_V1_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -27,14 +28,19 @@
     "atlasquant_aion_library_pdf_ingestion.py",
     "atlasquant_aion_library_document_intelligence.py",
     "atlasquant_aion_tenant_persistence_gate.py",
-    "atlasquant_aion_tenant_durable_store.py"
+    "atlasquant_aion_tenant_durable_store.py",
+    "atlasquant_aion_core_consolidation_gate.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
     "test_atlasquant_aion_library_document_intelligence.py",
     "test_atlasquant_aion_tenant_persistence_gate.py",
     "atlasquant_aion_tenant_persistence_gate.py",
-    "test_atlasquant_aion_tenant_durable_store.py"
+    "test_atlasquant_aion_tenant_durable_store.py",
+    "atlasquant_aion_core_nightshift_bridge.py",
+    "atlasquant_aion_core_runtime_bridge.py",
+    "test_atlasquant_aion_core_consolidation_gate.py",
+    "test_atlasquant_aion_core_nightshift_bridge.py"
   ],
   "production_baseline": {
     "sha": "27b605c3088a955934a60a8544245ab41894029b",
@@ -58,7 +64,10 @@
     "git_diff_check": "PASS",
     "tenant_durable_store_e2e": "10 passed / 0 failed",
     "tenant_persistence_bundle": "36 passed / 0 failed",
-    "tenant_core_executor_regression": "120 passed / 0 failed"
+    "tenant_core_executor_regression": "120 passed / 0 failed",
+    "core_consolidation_focused": "85 passed / 0 failed",
+    "core_tenant_executor_regression": "283 passed / 0 failed",
+    "core_consolidation_compile": "PASS"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -114,9 +123,9 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION",
+  "next_wave": "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
   "known_blockers": [
-    "Formal tenant/workspace evidence digests still need to be generated and bound to the validated local run before admin review",
+    "Formal tenant/workspace evidence digests still need to be generated and bound before persistence admin review",
     "Production tenant persistence remains intentionally disabled and requires explicit authorization after evidence review",
     "Full adversarial suite on this Windows host still needs symlink privilege or Linux CI for one environment-only test",
     "Drael local key/config is absent; main development flow must not wait for it",
@@ -139,5 +148,19 @@
     "acl_tamper_rejected": true,
     "network_io": false,
     "production_persistence_activated": false
+  },
+  "core_consolidation": {
+    "state": "LOCAL_VALIDATED",
+    "nightshift_runtime_veto": true,
+    "provenance_manifest": true,
+    "trust_conflict_detection": true,
+    "stale_realtime_detection": true,
+    "memory_candidate_generation": true,
+    "memory_auto_write": false,
+    "memory_auto_promotion": false,
+    "checkpoint_auto_stage": false,
+    "execution_authority": false,
+    "deterministic_replay_with_bound_clock": true,
+    "external_persistence": false
   }
 }

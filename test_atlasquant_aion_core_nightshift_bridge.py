@@ -66,6 +66,55 @@ class NightshiftRuntimeBridgeTests(unittest.TestCase):
         self.assertFalse(result["execution_authorized"])
         self.assertFalse(result["external_action_executed"])
 
+    def test_runtime_exposes_consolidation_without_auto_writes(self):
+        result = handle_runtime_intent(
+            _access(),
+            "qual e o estado do sistema",
+            system_context={"core_evidence": [{
+                "claim": "build",
+                "truth_state": "CONFIRMED",
+                "source": "runtime",
+                "source_ref": "runtime-build:abc123",
+                "time_sensitive": False,
+            }]},
+            now=NOW,
+        )
+        self.assertEqual(result["core_consolidation"]["status"], "CONSOLIDATED")
+        self.assertFalse(result["core_consolidation"]["memory_auto_write"])
+        self.assertFalse(result["core_consolidation"]["memory_auto_promotion"])
+        self.assertFalse(result["core_consolidation"]["checkpoint_auto_stage"])
+
+    def test_runtime_conflicting_sources_trigger_consolidation_veto(self):
+        result = handle_runtime_intent(
+            _access(),
+            "qual e o estado do sistema",
+            system_context={"core_evidence": [
+                {
+                    "claim": "build",
+                    "truth_state": "CONFIRMED",
+                    "source": "runtime-a",
+                    "source_ref": "runtime-build:a",
+                    "supports_claim": True,
+                    "time_sensitive": False,
+                },
+                {
+                    "claim": "build",
+                    "truth_state": "CONFIRMED",
+                    "source": "runtime-b",
+                    "source_ref": "runtime-build:b",
+                    "supports_claim": False,
+                    "contradicts_claim": True,
+                    "time_sensitive": False,
+                },
+            ]},
+            now=NOW,
+        )
+        self.assertEqual(result["core_consolidation"]["status"], "BLOCKED")
+        self.assertTrue(result["evidence"]["core_consolidation_veto"])
+        self.assertTrue(result["evidence"]["nightshift_veto"])
+        self.assertEqual(result["truth_state"], "UNKNOWN")
+        self.assertFalse(result["execution_authorized"])
+
     def test_unmapped_domain_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "NIGHTSHIFT_DOMAIN_UNMAPPED"):
             validate_runtime_rows(
