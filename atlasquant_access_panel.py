@@ -372,7 +372,7 @@ def render_access_gate()->dict[str,Any]:
         with st.form("atlasquant_login_form",clear_on_submit=False):
             username=st.text_input("Usuário",autocomplete="username")
             password=st.text_input("Senha",type="password",autocomplete="current-password")
-            submit=st.form_submit_button("Entrar",type="primary",use_container_width=True)
+            submit=st.form_submit_button("Entrar",type="primary",width="stretch")
     if submit:
         authenticated=authenticate(username,password,users)
         if authenticated is None:
