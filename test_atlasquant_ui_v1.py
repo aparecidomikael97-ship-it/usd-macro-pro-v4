@@ -185,14 +185,20 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
-    def test_main_workspace_surfaces_focus_strip_before_stable_navigation(self):
+    def test_main_workspace_surfaces_focus_strip_only_on_radar_home(self):
         app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
-        self.assertIn("operation_focus_html",app)
-        focus=app.index("operation_focus_html(")
+        active=app.index('_aq_catalog_active_page = str(')
+        radar=app.index('_aq_radar_home = _aq_catalog_active_page == "🎯 Radar"',active)
+        guard=app.index("if _aq_radar_home and operation_focus_html is not None:",radar)
+        focus=app.index("operation_focus_html(",guard)
         nav=app.index("render_stable_navigation(",focus)
+        self.assertLess(active,radar)
+        self.assertLess(radar,guard)
+        self.assertLess(guard,focus)
         self.assertLess(focus,nav)
-        self.assertIn('decision="Radar pronto para leitura"',app)
-        self.assertIn('safety="Safety Core monitorado"',app)
+        self.assertIn('decision="Radar em foco"',app[guard:nav])
+        self.assertIn('safety="Safety Core monitorado"',app[guard:nav])
+        self.assertNotIn('Radar pronto para leitura',app)
 
 
     def test_mobile_navigation_is_compact_sticky_and_labeled(self):
