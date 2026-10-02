@@ -23,9 +23,15 @@ import requests
 import streamlit as st
 
 try:
-    from atlasquant_ui_v1 import experience_compass_html
+    from atlasquant_ui_v1 import (
+        experience_compass_html,
+        experience_mode_overview_html,
+        mobile_navigation_hint_html,
+    )
 except Exception:
     experience_compass_html = None
+    experience_mode_overview_html = None
+    mobile_navigation_hint_html = None
 
 SCHEMA="ATLASQUANT_HOME_SNAPSHOT_V1"
 HOME_SNAPSHOT_PATH="dados/atlasquant_home_snapshot_v1.json"
@@ -302,8 +308,6 @@ def _render_beginner_chrome(app_version:str, environment:str, access:Mapping[str
     try:
         from atlasquant_ui_v1 import (
             apply_atlasquant_theme,
-            experience_mode_overview_html,
-            mobile_navigation_hint_html,
             render_account_identity,
             render_atlasquant_header,
         )
@@ -314,8 +318,6 @@ def _render_beginner_chrome(app_version:str, environment:str, access:Mapping[str
             build_id=str(st.session_state.get("atlasquant_visible_build") or ""),
         )
         render_account_identity(dict(access) if isinstance(access,Mapping) else None)
-        st.markdown(experience_mode_overview_html("Iniciante"), unsafe_allow_html=True)
-        st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
     except Exception:
         st.markdown("## 🧭 AtlasQuant")
 
@@ -447,6 +449,11 @@ def render_beginner_shell(
         render_premium_catalog is not None
         and _aq_fast_active_page=="🎯 Radar"
     )
+    if _aq_fast_catalog_home:
+        if experience_mode_overview_html is not None:
+            st.markdown(experience_mode_overview_html("Iniciante"), unsafe_allow_html=True)
+        if mobile_navigation_hint_html is not None:
+            st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
     if render_premium_catalog is not None:
         render_premium_catalog(
             mode="Iniciante",
