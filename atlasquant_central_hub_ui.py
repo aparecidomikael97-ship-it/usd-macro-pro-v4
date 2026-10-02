@@ -24,7 +24,7 @@ from atlasquant_navigation_bridge import (
 from atlasquant_ui_v1 import hero_html, section_title_html, state_badge_html
 from atlasquant_aion_internal_roles import internal_roles_snapshot
 
-_AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
+_AREA_ORDER = ("trader", "negocios", "investimentos", "aion")
 CENTRAL_ROOT = "central_root"
 CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
 LOGIN_GREETING_KEY = "aion_login_greeting_shown"
@@ -32,8 +32,8 @@ _ROOT_TOKENS = {"central", "central root", "ecosystem root", "central principal"
 
 _AREAS = {
     "aion": {
-        "label": "AION IA",
-        "sentence": "Inteligência do ecossistema, ainda em construção.",
+        "label": "AION",
+        "sentence": "Núcleo inteligente transversal do ecossistema, com módulos evoluindo sob controle e auditoria.",
         "private": True,
     },
     "negocios": {
@@ -47,8 +47,8 @@ _AREAS = {
         "private": False,
     },
     "investimentos": {
-        "label": "Renda Fixa / Investimentos",
-        "sentence": "Central de investimentos já existente, com comparação e leitura sem execução financeira automática.",
+        "label": "Investimentos",
+        "sentence": "Central de investimentos para comparação e leitura, sem execução financeira automática.",
         "private": True,
     },
 }
@@ -134,10 +134,20 @@ _CENTRAL_CSS = """
 .aq-aion-presence-state{margin:.25rem 0 .4rem;color:var(--aq-text);font-size:.78rem;font-weight:800;letter-spacing:.08em}
 .aq-aion-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#8fd0c4;margin-right:6px}
 .aq-aion-presence-line{margin:.15rem 0;color:var(--aq-text);font-size:.92rem;line-height:1.4}
-.aq-central-root h2{margin:.2rem 0 .8rem;color:var(--aq-text);font-size:1.35rem}
+.aq-central-root{position:relative;overflow:hidden;border:1px solid rgba(113,139,255,.22);border-radius:26px;padding:22px;background:radial-gradient(circle at 82% 10%,rgba(142,109,255,.12),transparent 28%),linear-gradient(145deg,rgba(10,18,38,.94),rgba(5,11,25,.94));box-shadow:0 24px 70px rgba(0,0,0,.3)}
+.aq-central-root:before{content:"";position:absolute;width:260px;height:260px;right:-120px;top:-150px;border-radius:50%;border:1px solid rgba(84,215,255,.16);box-shadow:0 0 70px rgba(84,215,255,.08);pointer-events:none}
+.aq-central-root>*{position:relative;z-index:1}
+.aq-central-root h2{margin:.2rem 0 .25rem;color:var(--aq-text);font-size:clamp(1.45rem,2.6vw,2rem);letter-spacing:-.02em}
+.aq-central-root-copy{margin:0 0 1rem;color:var(--aq-muted);font-size:.84rem}
 .aq-central-choices{display:grid;grid-template-columns:1fr;gap:12px}
-.aq-central-choice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-decoration:none;color:var(--aq-text);border:1px solid var(--aq-line);border-radius:18px;padding:14px;background:linear-gradient(180deg,rgba(16,24,46,.92),rgba(7,17,31,.9))}
-.aq-central-choice small{color:var(--aq-muted);font-size:.75rem;line-height:1.35}
+.aq-central-choice{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;min-height:168px;text-decoration:none;color:var(--aq-text);border:1px solid var(--aq-line);border-radius:20px;padding:16px;background:linear-gradient(180deg,rgba(18,28,52,.94),rgba(7,17,31,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.aq-central-choice[data-central-area="trader"]{border-color:rgba(84,215,255,.28)}
+.aq-central-choice[data-central-area="negocios"]{border-color:rgba(242,193,78,.28)}
+.aq-central-choice[data-central-area="investimentos"]{border-color:rgba(66,211,146,.24)}
+.aq-central-choice[data-central-area="aion"]{border-color:rgba(180,140,255,.34)}
+.aq-central-choice-index{position:absolute;right:14px;top:10px;color:rgba(203,214,255,.28);font-size:1.35rem;font-weight:900;letter-spacing:.06em}
+.aq-central-choice strong{font-size:1.05rem;letter-spacing:-.01em}
+.aq-central-choice small{color:var(--aq-muted);font-size:.75rem;line-height:1.45;max-width:31rem}
 .aq-central-route{display:inline-flex;align-items:center;gap:5px;margin-top:3px;border:1px solid rgba(79,163,255,.34);border-radius:999px;padding:4px 8px;color:#dbeaff;font-size:.62rem;font-weight:850;letter-spacing:.06em;background:rgba(79,163,255,.08)}
 .aq-central-route:before{content:"";width:6px;height:6px;border-radius:50%;background:#8fd0c4}
 .aq-central-back{color:var(--aq-aion,#b48cff);font-weight:800;text-decoration:none}
@@ -145,6 +155,8 @@ _CENTRAL_CSS = """
 .aq-aion-home .aq-hero{margin-bottom:8px}
 @media (max-width:760px){
   .aq-central-layout{grid-template-columns:1fr;gap:10px}
+  .aq-central-root{padding:16px;border-radius:22px}
+  .aq-central-choice{min-height:150px}
   .aq-central-rail-fold{padding:8px}
   .aq-central-rail-fold>summary{display:flex;align-items:center;min-height:36px}
   .aq-central-link{padding:8px 10px}
@@ -755,11 +767,12 @@ def central_selector_html(
     if not model["admin"]:
         return ""
     choices = []
-    for area in model["areas"]:
+    for index, area in enumerate(model["areas"], start=1):
         area_id = area["id"]
         spec = _AREAS[area_id]
         choices.append(
             f'<article class="aq-central-choice" data-central-area="{area_id}">'
+            f'<span class="aq-central-choice-index">{index:02d}</span>'
             f"{_ART[area_id]()}"
             f"<strong>{escape(spec['label'])}</strong>"
             f"<small>{escape(spec['sentence'])}</small>"
@@ -776,7 +789,8 @@ def central_selector_html(
         + presence
         + '<p class="aq-aion-motto">Poderoso por dentro. Simples por fora.</p>'
         + '<p class="aq-central-kicker">CENTRAL PRINCIPAL</p>'
-        "<h2>Escolha um setor</h2>"
+        "<h2>Central AtlasQuant</h2>"
+        '<p class="aq-central-root-copy">Escolha o ambiente que você quer abrir.</p>'
         '<div class="aq-central-choices">'
         + "".join(choices)
         + "</div></section>"
