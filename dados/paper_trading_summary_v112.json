@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-10-02T01:49:52.855533+00:00",
+    "ran_at": "2026-10-02T02:23:52.811237+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -38,7 +38,9 @@
         "soft_blocks": [
           "Risco de evento elevado",
           "ADR14 em 242%: evitar perseguir preço",
-          "ICT incompleto (49/100)"
+          "ICT incompleto (52/100)",
+          "Fluxo institucional incompleto (70/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
@@ -47,13 +49,13 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
-          "H1 está contra o viés",
           "ADR14 muito esticado (120%)"
         ],
         "soft_blocks": [
           "Risco de evento elevado",
           "ADR14 em 120%: evitar perseguir preço",
-          "ICT incompleto (40/100)",
+          "ICT incompleto (54/100)",
+          "Fluxo institucional incompleto (64/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -61,31 +63,30 @@
       "USD/JPY": {
         "side": "BUY",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
           "ADR14 em 113%: evitar perseguir preço",
-          "ICT incompleto (51/100)",
-          "Fluxo institucional incompleto (67/100)"
+          "ICT incompleto (45/100)",
+          "Fluxo institucional incompleto (53/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
       "NZD/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "🔴 BLOQUEADO",
-        "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (79 min)"
-        ],
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "ADR14 em 102%: evitar perseguir preço",
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (60/100)"
+          "ADR14 em 111%: evitar perseguir preço",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (48/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
@@ -94,16 +95,15 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (79 min)",
           "ADR14 muito esticado (285%)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
           "ADR14 em 285%: evitar perseguir preço",
-          "ICT incompleto (58/100)",
-          "Fluxo institucional incompleto (58/100)"
+          "ICT incompleto (40/100)",
+          "Fluxo institucional incompleto (52/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
@@ -112,15 +112,15 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (79 min)",
           "ADR14 muito esticado (158%)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
           "ADR14 em 158%: evitar perseguir preço",
-          "ICT incompleto (40/100)"
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (55/100)",
+          "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
@@ -129,8 +129,6 @@
         "passed": false,
         "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [
-          "Dados técnicos insuficientes (0/100)",
-          "Técnica desatualizada (79 min)",
           "ADR14 muito esticado (138%)"
         ],
         "soft_blocks": [
