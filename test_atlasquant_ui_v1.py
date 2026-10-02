@@ -202,6 +202,19 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("min-height:34px",ATLASQUANT_CSS)
 
 
+    def test_home_uses_premium_catalog_with_compact_stable_navigation_fallback(self):
+        from pathlib import Path
+        ui=Path("atlasquant_ui_v1.py").read_text(encoding="utf-8")
+        app=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        nav=ui[ui.index("def render_stable_navigation"):ui.index("def navigation_groups")]
+        self.assertIn("compact: bool = False",nav)
+        self.assertIn('st.expander("Navegação alternativa", expanded=False)',nav)
+        self.assertIn("return _render_selector()",nav)
+        self.assertIn("_aq_catalog_home = bool(",app)
+        self.assertIn('_aq_catalog_active_page == "🎯 Radar"',app)
+        call=app[app.index("render_stable_navigation("):app.index("else:",app.index("render_stable_navigation("))]
+        self.assertIn("compact=_aq_catalog_home",call)
+
     def test_mobile_navigation_guidance_precedes_stable_selector(self):
         app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("mobile_navigation_hint_html",app)

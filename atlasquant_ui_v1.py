@@ -862,12 +862,14 @@ def render_stable_navigation(
     items: tuple[str, ...] | list[str],
     *,
     mode: object = "Avançado",
+    compact: bool = False,
 ) -> str:
-    """Render one stable selector while keeping advanced areas discoverable.
+    """Render the stable selector, optionally as a compact fallback.
 
-    Beginner mode keeps every destination visible. Advanced-only destinations
-    are marked with a lock and the caller must intercept them before rendering
-    any advanced workspace.
+    Beginner mode keeps every destination discoverable. Advanced-only
+    destinations are marked with a lock and the caller must intercept them
+    before rendering any advanced workspace. Compact mode changes presentation
+    only; it keeps the same session-state key and navigation authority.
     """
     options=[str(x) for x in list(items or []) if str(x).strip()]
     if not options:
@@ -887,24 +889,32 @@ def render_stable_navigation(
     current=str(st.session_state.get(key,options[0]) or options[0])
     if current not in options:
         current=options[0]
-    selected=st.selectbox(
-        label,
-        options,
-        index=options.index(current),
-        key=key,
-        format_func=_format_option,
-        help=(
-            "Escolha a área do AtlasQuant. No modo Iniciante, áreas com cadeado "
-            "abrem apenas uma prévia; no Avançado, os workspaces completos são renderizados, "
-            "reduzindo carga e instabilidade de DOM no celular."
-        ),
-    )
-    group=navigation_group_for(selected)
-    if is_page_locked_for_mode(selected, normalized):
-        st.caption(f"Modo {normalized} · {group} · prévia do recurso Avançado.")
-    else:
-        st.caption(f"Modo {normalized} · {group} · navegação estável para celular e desktop.")
-    return str(selected)
+
+    def _render_selector() -> str:
+        selected=st.selectbox(
+            label,
+            options,
+            index=options.index(current),
+            key=key,
+            format_func=_format_option,
+            help=(
+                "Escolha a área do AtlasQuant. No modo Iniciante, áreas com cadeado "
+                "abrem apenas uma prévia; no Avançado, os workspaces completos são renderizados, "
+                "reduzindo carga e instabilidade de DOM no celular."
+            ),
+        )
+        group=navigation_group_for(selected)
+        if is_page_locked_for_mode(selected, normalized):
+            st.caption(f"Modo {normalized} · {group} · prévia do recurso Avançado.")
+        else:
+            st.caption(f"Modo {normalized} · {group} · navegação estável para celular e desktop.")
+        return str(selected)
+
+    if bool(compact):
+        with st.expander("Navegação alternativa", expanded=False):
+            st.caption("Use o seletor clássico se preferir. A autoridade de navegação permanece a mesma.")
+            return _render_selector()
+    return _render_selector()
 
 
 def navigation_groups() -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -949,7 +959,7 @@ def operation_focus_html(
 
 def mobile_navigation_hint_html() -> str:
     """Small mobile-only affordance; presentation only."""
-    return '<div class="aq-mobile-hint">Use o seletor de área para navegar sem sobrecarregar a tela.</div><div class="aq-section-divider"></div>'
+    return '<div class="aq-mobile-hint">Na home, use os cartões; o seletor clássico continua disponível em Navegação alternativa.</div><div class="aq-section-divider"></div>'
 
 
 def hero_html(app_version: str, environment: str = "LOCAL", build_id: str = "") -> str:

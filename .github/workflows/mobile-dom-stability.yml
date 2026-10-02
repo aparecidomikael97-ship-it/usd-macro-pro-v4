@@ -219,10 +219,28 @@ jobs:
                   page.wait_for_timeout(800)
               return False
 
+          def _classic_nav(page):
+              nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+              visible=False
+              try:
+                  visible=nav.count()>=1 and nav.is_visible()
+              except Exception:
+                  visible=False
+              if nav.count()>=1 and not visible:
+                  toggle=page.get_by_text("Navegação alternativa",exact=True)
+                  if toggle.count():
+                      try:
+                          toggle.first.click()
+                          page.wait_for_timeout(300)
+                      except Exception:
+                          pass
+                  nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+              return nav
+
           def select_area(page,label):
               last_selected=""
               for attempt in range(1,4):
-                  nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                  nav=_classic_nav(page)
                   if nav.count()<1:
                       page.wait_for_timeout(500)
                       continue
@@ -240,7 +258,7 @@ jobs:
                       page.wait_for_timeout(180)
                       combo.press("Enter")
                       page.wait_for_timeout(900)
-                      nav=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área avançada").first
+                      nav=_classic_nav(page)
                       combo=nav.get_by_role("combobox")
                       last_selected=combo.input_value(timeout=20_000).strip()
                       if last_selected==label:
@@ -297,7 +315,9 @@ jobs:
                   errors.append("controle Avançado não encontrado após retry")
               else:
                   advanced.first.click()
-                  if not wait_text(page,"Área avançada",timeout=150_000):
+                  page.wait_for_timeout(900)
+                  _classic_nav(page)
+                  if not wait_text(page,"Área avançada",timeout=30_000):
                       errors.append("seletor Área avançada não apareceu")
                   assert_clean(page,"advanced-enter",page_errors)
 
@@ -371,7 +391,9 @@ jobs:
                       advanced=page.get_by_text("Avançado",exact=True)
                   if advanced.count():
                       advanced.first.click()
-                      wait_text(page,"Área avançada",timeout=120_000)
+                      page.wait_for_timeout(900)
+                      _classic_nav(page)
+                      wait_text(page,"Área avançada",timeout=30_000)
                       assert_clean(page,f"cycle-{cycle}-advanced",page_errors)
 
               viewport=page.evaluate("window.innerWidth")

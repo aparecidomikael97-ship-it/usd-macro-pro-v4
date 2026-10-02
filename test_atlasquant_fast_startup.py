@@ -171,6 +171,17 @@ class FastStartupTests(unittest.TestCase):
         self.assertLess(pages,compass)
         self.assertLess(compass,radar)
 
+    def test_fast_home_keeps_classic_area_selector_as_compact_fallback_only(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        self.assertIn("_aq_fast_catalog_home=bool(",src)
+        self.assertIn('_aq_fast_active_page=="🎯 Radar"',src)
+        self.assertIn('with st.expander("Navegação alternativa",expanded=False):',src)
+        self.assertIn('page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")',src)
+        compact=src.index('with st.expander("Navegação alternativa",expanded=False):')
+        normal=src.index('else:\n        page=st.radio("Área"',compact)
+        self.assertLess(compact,normal)
+
     def test_fast_shell_reuses_visible_build_from_authenticated_runtime(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
