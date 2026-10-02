@@ -201,7 +201,7 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertIn("AION IA", surface)
         self.assertEqual(surface.count('class="aq-aion-module"'), 8)
 
-    def test_trader_central_leaves_aion_and_shells_stay_shells(self):
+    def test_trader_central_leaves_aion_and_investments_opens_real_page(self):
         pages = list(navigation_labels())
         pages.append("🧠 AION")
         self.assertEqual(pages[0], "🎯 Radar")
@@ -241,10 +241,20 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertEqual(business_request["workspace"], "💼 Negócios")
         self.assertEqual(business_request["state"], "BUSINESS_WORKSPACE_REQUESTED")
         self.assertEqual(parked["aion_admin_workspace_jump"], "💼 Negócios")
-        self.assertIsNone(request_central_destination(parked, admin, "Renda Fixa"))
-        self.assertEqual(parked["atlasquant_advanced_area"], "🧠 AION")
+
+        investments_state = {
+            "atlasquant_experience_mode": "Avançado",
+            "atlasquant_advanced_area": "🧠 AION",
+        }
+        investments_request=request_central_destination(investments_state, admin, "Renda Fixa")
+        self.assertEqual(investments_request["page"], "💰 Investir")
+        self.assertEqual(investments_request["state"], "INVESTMENTS_PAGE_REQUESTED")
+        consumed=consume_navigation_request(investments_state, available_pages=pages)
+        self.assertEqual(consumed["page"], "💰 Investir")
+        self.assertEqual(investments_state["atlasquant_advanced_area"], "💰 Investir")
+        self.assertEqual(investments_state["atlasquant_stable_nav_fallback"], "💰 Investir")
         self.assertFalse(resolve_central_area(admin, "negocios")["shell"])
-        self.assertTrue(resolve_central_area(admin, "investimentos")["shell"])
+        self.assertFalse(resolve_central_area(admin, "investimentos")["shell"])
         self.assertFalse(resolve_central_area(admin, "trader")["shell"])
 
         src = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
