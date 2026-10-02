@@ -23,7 +23,8 @@
     "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP",
     "CORE_EXECUTOR_TENANT_RECOVERY_E2E_V2_LOCAL",
     "CORE_FINAL_CAPABILITY_WIRING_AND_ORPHAN_AUDIT",
-    "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL"
+    "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL",
+    "POST_515_LOCAL_RELEASE_CANDIDATE_V2_AUDIT"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -128,7 +129,10 @@
     "tenant_review_wiring_guard": "93 passed / 0 failed",
     "aion_full_regression_tenant_review": "2198 passed / 0 failed / 1 skipped",
     "contract_audit_tenant_review": "17 checks / 0 failures",
-    "developer_adversarial_tenant_review": "348 cases / 0 gaps / 0 critical / 0 high"
+    "developer_adversarial_tenant_review": "348 cases / 0 gaps / 0 critical / 0 high",
+    "finalization_audit_v2": "internal_release_preparation_complete=true",
+    "git_fsck_v2": "PASS / exit code 0 / dangling objects only",
+    "fresh_origin_main_compare_v2": "0 behind / 3 ahead before checkpoint finalization commit"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -187,11 +191,11 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "POST_515_LOCAL_RELEASE_CANDIDATE_V2_AUDIT",
+  "next_wave": "REMOTE_CI_BRANCH_PUBLICATION_PENDING_EXPLICIT_AUTHORIZATION_V2",
   "known_blockers": [
-    "Production tenant persistence remains disabled and requires a separate explicit administrative authorization; the review surface has no activation control.",
-    "The Core runtime does not auto-load the tenant evidence artifact; only the explicit admin review surface revalidates it.",
-    "Current post-515 branch is local only; no push, PR, merge or deploy is authorized.",
+    "The post-515 local release candidate has not been pushed; remote CI has not run for this V2 branch.",
+    "Production tenant persistence remains disabled and requires a separate explicit administrative authorization; no activation control exists in the review surface.",
+    "Merge and deploy remain prohibited without explicit authorization.",
     "Drael local key/config is absent; main development flow must not wait for it."
   ],
   "hourly_night_shift_enabled": true,
@@ -380,5 +384,36 @@
     "external_action_executed": false,
     "network_called": false,
     "activation_button_present": false
+  },
+  "local_release_candidate_v2": {
+    "state": "READY_FOR_REMOTE_CI_LOCAL_ONLY",
+    "branch": "integration/aion-core-e2e-consolidation-v1-20261002",
+    "base_sha": "a44e31795519aa31b32fe2df2b8eb172cff504d1",
+    "audited_component_head_sha": "76946d292ca505098656a221e9ce94bf8699334c",
+    "component_commits": 3,
+    "changed_files": 17,
+    "insertions": 1727,
+    "deletions": 90,
+    "behind_origin_main": 0,
+    "ahead_origin_main": 3,
+    "full_aion_tests": 2198,
+    "full_aion_failures": 0,
+    "full_aion_skipped": 1,
+    "contract_checks": 17,
+    "contract_failures": 0,
+    "adversarial_cases": 348,
+    "adversarial_gaps": 0,
+    "internal_release_preparation_complete": true,
+    "recovery_review_wired": true,
+    "library_preview_wired": true,
+    "tenant_persistence_admin_review_wired": true,
+    "tenant_persistence_activation_authorized": false,
+    "production_persistence_activated": false,
+    "real_trading_enabled": false,
+    "automatic_merge": false,
+    "automatic_deploy": false,
+    "branch_pushed": false,
+    "remote_ci_run": false,
+    "checkpoint_finalization_commit_follows_audit": true
   }
 }
