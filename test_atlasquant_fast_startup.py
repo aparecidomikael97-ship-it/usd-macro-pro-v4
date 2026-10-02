@@ -171,6 +171,14 @@ class FastStartupTests(unittest.TestCase):
         self.assertLess(pages,compass)
         self.assertLess(compass,radar)
 
+    def test_fast_shell_reuses_visible_build_from_authenticated_runtime(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        chrome=src[src.index("def _render_beginner_chrome"):src.index("def render_beginner_shell")]
+        self.assertIn('build_id=str(st.session_state.get("atlasquant_visible_build") or "")',chrome)
+        self.assertNotIn("RENDER_GIT_COMMIT",chrome)
+        self.assertNotIn("GIT_COMMIT",chrome)
+
     def test_fast_beginner_radar_passes_validated_freshness_metadata(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")

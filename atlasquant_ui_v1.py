@@ -952,9 +952,14 @@ def mobile_navigation_hint_html() -> str:
     return '<div class="aq-mobile-hint">Use o seletor de área para navegar sem sobrecarregar a tela.</div><div class="aq-section-divider"></div>'
 
 
-def hero_html(app_version: str, environment: str = "LOCAL") -> str:
+def hero_html(app_version: str, environment: str = "LOCAL", build_id: str = "") -> str:
     version = escape(str(app_version))
     env = escape(str(environment).upper())
+    build = "".join(ch for ch in str(build_id or "") if ch.isalnum())[:12]
+    build_badge = (
+        f'<span class="aq-badge aq-build" title="Identificador visual do build em execução">Build {escape(build)}</span>'
+        if build else ""
+    )
     return f"""
 <div class="aq-hero">
   <div class="aq-kicker">Market Intelligence Platform</div>
@@ -965,6 +970,7 @@ def hero_html(app_version: str, environment: str = "LOCAL") -> str:
   <div class="aq-badges">
     <span class="aq-badge aq-dev">{env}</span>
     <span class="aq-badge">Engine base {version}</span>
+    {build_badge}
     <span class="aq-badge">Safety Core monitorado</span>
     <span class="aq-badge">Fail-closed por desenho</span>
     <span class="aq-badge">Auditável</span>
@@ -1081,5 +1087,5 @@ def apply_atlasquant_theme() -> None:
     st.markdown(ATLASQUANT_CSS, unsafe_allow_html=True)
 
 
-def render_atlasquant_header(app_version: str, environment: str = "LOCAL") -> None:
-    st.markdown(hero_html(app_version, environment), unsafe_allow_html=True)
+def render_atlasquant_header(app_version: str, environment: str = "LOCAL", build_id: str = "") -> None:
+    st.markdown(hero_html(app_version, environment, build_id), unsafe_allow_html=True)
