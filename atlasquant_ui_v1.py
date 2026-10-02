@@ -796,13 +796,9 @@ def render_experience_mode_switch() -> str:
     )
     mode=normalize_experience_mode(mode)
     st.session_state["atlasquant_view_mode"]="Básico" if mode=="Iniciante" else "Pro"
-    # Primary navigation no longer relies on hiding mounted tab buttons.
-    # Avoid injecting mode-dependent tab CSS on every rerun; this keeps the
-    # mobile DOM stable while nested tabs elsewhere retain the global theme.
-    if mode=="Iniciante":
-        st.caption("Modo Iniciante · áreas essenciais abertas e recursos Avançados visíveis em prévia bloqueada.")
-    else:
-        st.caption("Modo Avançado · todas as áreas e diagnósticos disponíveis.")
+    # O controle já identifica o modo selecionado. O contexto adicional aparece
+    # no overview da home ou na legenda do seletor estável fora dela.
+    # Evita repetir a mesma orientação imediatamente abaixo do radio.
     return mode
 
 
