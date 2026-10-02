@@ -349,7 +349,6 @@ def render_beginner_shell(
                 "automatic_execution":False,
             }
         _render_beginner_chrome(app_version, environment, access)
-        st.markdown("## 🧭 AtlasQuant")
         st.warning("Radar temporariamente aguardando dados válidos.")
         st.caption("O snapshot não passou na validação de frescor/segurança. Nenhuma oportunidade é exibida até a próxima atualização válida.")
         if st.button("↻ Tentar atualizar",key="aq_fast_invalid_refresh",width="stretch"):
@@ -423,14 +422,6 @@ def render_beginner_shell(
         render_top_voice_access(st.session_state, pages=_dock_pages, fast=True)
     except Exception:
         pass
-    st.markdown(
-        """<div style="border:1px solid rgba(137,170,210,.18);border-radius:16px;padding:13px 16px;
-        background:linear-gradient(120deg,rgba(17,43,72,.96),rgba(8,25,43,.94));margin:2px 0 10px">
-        <strong style="font-size:1.15rem;color:#f5f8fc">🧭 AtlasQuant</strong><br>
-        <span style="color:#e7eef8;font-size:.82rem;font-weight:700">Modo Iniciante · carregamento rápido por snapshot validado</span>
-        </div>""",
-        unsafe_allow_html=True,
-    )
     c1,c2=st.columns([4,1])
     with c1:
         input_age=check.get("input_age_minutes")
