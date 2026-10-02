@@ -16,6 +16,7 @@ from atlasquant_premium_shell import (
     request_premium_card,
     loading_state_html,
     master_command_html,
+    master_surface_state_html,
     metric_card_html,
     premium_module_card_html,
     premium_panel_html,
@@ -105,6 +106,28 @@ class PremiumShellTests(unittest.TestCase):
             self.assertIn(label, html)
         self.assertIn("NÃO OPERAR", html)
         self.assertIn("EUR/USD", html)
+
+    def test_master_surface_state_is_explicit_fail_closed_and_escaped(self):
+        ready = master_surface_state_html("READY", "Matriz pronta", build_id="abc12345deadbeef")
+        self.assertIn('data-master-state="READY"', ready)
+        self.assertIn("PRONTO PARA LEITURA", ready)
+        self.assertIn("Build abc12345dead", ready)
+        self.assertNotIn("abc12345deadbeef", ready)
+
+        waiting = master_surface_state_html("WAITING", "<script>aguarde</script>")
+        self.assertIn("AGUARDANDO MATRIZ", waiting)
+        self.assertNotIn("<script>", waiting)
+        self.assertIn("&lt;script&gt;", waiting)
+
+        snapshot = master_surface_state_html("SNAPSHOT", "continuidade")
+        self.assertIn("CONTINUIDADE POR SNAPSHOT", snapshot)
+
+        unavailable = master_surface_state_html("UNAVAILABLE", "sem módulo")
+        self.assertIn("INDISPONÍVEL", unavailable)
+
+        unknown = master_surface_state_html("qualquer", "x")
+        self.assertIn("ESTADO NÃO COMPROVADO", unknown)
+        self.assertIn('data-master-state="QUALQUER"', unknown)
 
     def test_master_panel_explains_the_separate_universe(self):
         html = master_command_html(operational_count=7)

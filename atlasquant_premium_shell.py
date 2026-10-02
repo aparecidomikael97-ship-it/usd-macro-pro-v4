@@ -498,6 +498,30 @@ def radar_live_html() -> str:
     )
 
 
+def master_surface_state_html(state: object, detail: object, *, build_id: object = "") -> str:
+    """Visible state of the Master Panel surface; never grants execution authority."""
+    code = str(state or "").strip().upper()
+    labels = {
+        "READY": ("PRONTO PARA LEITURA", "good"),
+        "SNAPSHOT": ("CONTINUIDADE POR SNAPSHOT", "warn"),
+        "WAITING": ("AGUARDANDO MATRIZ", "warn"),
+        "UNAVAILABLE": ("INDISPONÍVEL", "danger"),
+    }
+    label, tone = labels.get(code, ("ESTADO NÃO COMPROVADO", "danger"))
+    build = "".join(ch for ch in str(build_id or "") if ch.isalnum())[:12]
+    build_note = f" · Build {escape(build)}" if build else ""
+    return (
+        '<section class="aq-panel aq-master-state" role="status" data-master-state="'
+        + escape(code or "UNKNOWN")
+        + '"><h3>Painel Mestre · '
+        + status_badge_html(label, tone)
+        + "</h3><p>"
+        + escape(str(detail or "Sem detalhe disponível."))
+        + build_note
+        + "</p></section>"
+    )
+
+
 def master_command_html(*, operational_count: int) -> str:
     count = max(0, int(operational_count))
     sections = (

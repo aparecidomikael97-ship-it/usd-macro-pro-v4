@@ -197,6 +197,12 @@ class MasterPanelTests(unittest.TestCase):
         self.assertIn('"Gate": ctx.get("readiness_grade"',src)
         self.assertIn('"Índice Integrado": round',src)
 
+    def test_master_panel_static_header_does_not_claim_live_safety_active(self):
+        from pathlib import Path
+        src=Path("master_panel_v102.py").read_text(encoding="utf-8")
+        self.assertIn('"SAFETY CORE": "MONITORADO"',src)
+        self.assertNotIn('"SAFETY CORE": "ATIVO"',src)
+
     def test_master_panel_ui_explicitly_says_macro_bias_is_not_entry(self):
         from pathlib import Path
         src=Path("master_panel_v102.py").read_text(encoding="utf-8")

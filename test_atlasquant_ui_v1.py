@@ -269,6 +269,21 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("return default",fn)
         self.assertIn("r.raise_for_status()",fn)
 
+    def test_master_panel_surface_states_are_wired_before_fail_closed_messages(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        self.assertIn("master_surface_state_html",src)
+        for state in ('"UNAVAILABLE"','"WAITING"','"SNAPSHOT"','"READY"'):
+            self.assertIn(state,src)
+        unavailable=src.index('master_surface_state_html(\n                    "UNAVAILABLE"')
+        unavailable_error=src.index("Painel Mestre indisponível neste carregamento.",unavailable)
+        waiting=src.index('master_surface_state_html(\n                            "WAITING"')
+        waiting_warning=src.index("Painel Mestre aguardando a Matriz dos 7 pares.",waiting)
+        self.assertLess(unavailable,unavailable_error)
+        self.assertLess(waiting,waiting_warning)
+        self.assertIn("autorizações operacionais permanecem bloqueadas",src)
+        self.assertIn("qualquer autorização continua dependente dos gates operacionais",src)
+
     def test_experience_compass_explains_current_area_without_execution(self):
         beginner=experience_compass_model("Iniciante","🎯 Radar")
         self.assertEqual(beginner["mode"],"Iniciante")
