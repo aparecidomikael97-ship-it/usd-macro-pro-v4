@@ -52,15 +52,22 @@ class PremiumShellTests(unittest.TestCase):
             if item.get("fast_page"):
                 self.assertIn(item["fast_page"], fast_pages, item["id"])
 
-    def test_cards_escape_text_and_announce_click_and_lock(self):
+    def test_cards_escape_text_and_do_not_fake_click_affordance(self):
         sample = dict(PREMIUM_MODULES[0])
         sample["title"] = "<script>x</script>"
-        html = premium_module_card_html(sample, locked=True, available=True)
-        self.assertNotIn("<script>", html)
-        self.assertIn("&lt;script&gt;", html)
-        self.assertIn("Navegação interna", html)
-        self.assertIn("Prévia no Iniciante", html)
-        self.assertIn("aq-premium-card", html)
+        locked = premium_module_card_html(sample, locked=True, available=True)
+        self.assertNotIn("<script>", locked)
+        self.assertIn("&lt;script&gt;", locked)
+        self.assertIn("Navegação interna", locked)
+        self.assertIn("Prévia no Iniciante", locked)
+        self.assertIn("Disponível no modo Avançado", locked)
+        self.assertIn("aq-premium-card", locked)
+
+        available = premium_module_card_html(PREMIUM_MODULES[0], locked=False, available=True)
+        self.assertIn("Acesso disponível", available)
+        self.assertNotIn("Abrir Radar", available)
+        self.assertNotIn("<a class=\"aq-premium-card\"", available)
+
         hero = section_hero_html("<b>", "Central", "texto")
         self.assertIn("&lt;b&gt;", hero)
 
@@ -185,7 +192,8 @@ class PremiumShellTests(unittest.TestCase):
         self.assertLess(essencial.index(">Radar<"), essencial.index(">Painel Mestre<"))
         self.assertLess(essencial.index(">Painel Mestre<"), essencial.index(">Macroeconomia<"))
         self.assertNotIn("?aq_card=", essencial)
-        self.assertIn("Abrir Radar", essencial)
+        self.assertIn("Acesso disponível", essencial)
+        self.assertNotIn("Abrir Radar", essencial)
         self.assertNotIn('<a class="aq-premium-card"', essencial)
         self.assertIn("deslize, role ou use as setas", html)
         fast_pages = ["🎯 Radar", "🎙️ Macro", "🎓 Aprender", "👤 Conta", "📱 Instalar", "💰 Investir", "🛟 Suporte"]
@@ -264,11 +272,20 @@ class PremiumShellTests(unittest.TestCase):
         self.assertIn(".aq-workspace-welcome", PREMIUM_CSS)
         self.assertIn("overflow:hidden", PREMIUM_CSS)
 
-    def test_catalog_renderer_uses_native_stateful_controls(self):
+    def test_catalog_renderer_uses_only_valid_native_stateful_launchers(self):
         shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
-        self.assertIn("def _render_premium_stateful_controls", shell)
-        self.assertIn("request_premium_card(", shell)
-        self.assertIn("st.rerun()", shell)
+        controls = shell[
+            shell.index("def _render_premium_stateful_controls"):
+            shell.index("def render_premium_catalog")
+        ]
+        self.assertIn("launchable = []", controls)
+        self.assertIn("if target:", controls)
+        self.assertIn("launchable.append((module, target))", controls)
+        self.assertIn('st.caption(f"Acessos seguros · {sector}")', controls)
+        self.assertIn('"Abrir · " + str(module["title"])', controls)
+        self.assertIn("request_premium_card(", controls)
+        self.assertIn("st.rerun()", controls)
+        self.assertNotIn("disabled=not bool(target)", controls)
         self.assertNotIn('href=f"?aq_card=', shell)
         self.assertNotIn('href="?aq_card=', shell)
 
