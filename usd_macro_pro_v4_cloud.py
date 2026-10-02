@@ -10702,11 +10702,24 @@ if _aq_active_index == 0:
 
         if render_home_radar is not None:
             try:
+                _aq_radar_freshness=dict(st.session_state.get("atlasquant_advanced_boot",{}) or {})
+                _aq_fresh_state=str(_aq_radar_freshness.get("state") or "").upper()
+                _aq_fresh_refresh=str(_aq_radar_freshness.get("refresh_status") or "")
+                if _aq_fresh_refresh.casefold().startswith("pacote anterior"):
+                    _aq_fresh_source="snapshot runtime preservado"
+                elif _aq_fresh_state=="LIVE_REFRESH":
+                    _aq_fresh_source="fontes AtlasQuant atualizadas"
+                elif _aq_fresh_state=="CACHED_SNAPSHOT":
+                    _aq_fresh_source="runtime snapshot"
+                else:
+                    _aq_fresh_source="fontes AtlasQuant"
+                _aq_radar_freshness["source"]=_aq_fresh_source
                 render_home_radar(
                     _aq_runtime_snapshot.get("packs", []),
                     experience_mode=_aq_experience_mode,
                     macro_context=_macro_v108,
                     ranking=ranking,
+                    freshness=_aq_radar_freshness,
                 )
                 mark_surface_ok(
                     st.session_state,
