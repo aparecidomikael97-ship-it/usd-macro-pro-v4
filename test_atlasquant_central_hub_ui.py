@@ -37,19 +37,19 @@ from atlasquant_central_hub_ui import (
 from atlasquant_navigation_bridge import consume_navigation_request
 from atlasquant_ui_v1 import navigation_labels
 from atlasquant_ui_v1 import ATLASQUANT_CSS
+from atlasquant_aion_internal_roles import internal_roles_snapshot
 
 
 _PRIVATE_LABELS = ("AION IA", "Negócios", "Renda Fixa")
 _AION_TITLES = (
-    "Administração",
-    "Memória / Checkpoint Mestre",
-    "Desenvolvedor",
-    "Pesquisa",
-    "Voz",
-    "Conteúdo",
-    "Automação",
-    "Segurança",
-    "Observabilidade",
+    "Orquestrador",
+    "Arquiteto / Estrategista",
+    "Guardião / Auditor",
+    "Executor / Operador",
+    "Memória / Conhecimento",
+    "FinOps / Controle de Custos",
+    "Observabilidade / Confiabilidade",
+    "Sucesso do Cliente / Comercial",
 )
 
 
@@ -113,14 +113,20 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertNotIn("PRONTO", html)
         self.assertIn("UNKNOWN", html)
         self.assertIn("EM CONSTRUÇÃO", html)
-        self.assertGreaterEqual(html.count('data-truth="UNKNOWN"'), 9)
+        self.assertGreaterEqual(html.count('data-truth="UNKNOWN"'), 8)
 
-    def test_aion_home_lists_nine_modules(self):
+    def test_aion_home_lists_eight_canonical_internal_roles(self):
         html = aion_home_html()
         for title in _AION_TITLES:
             self.assertIn(title, html)
-        self.assertEqual(html.count('class="aq-aion-module"'), 9)
-        self.assertIn("Depende de Memória / Checkpoint Mestre.", html)
+        self.assertEqual(html.count('class="aq-aion-module"'), 8)
+        snapshot = internal_roles_snapshot()
+        self.assertEqual(snapshot["count"], 8)
+        self.assertEqual(tuple(row["label"] for row in snapshot["roles"]), _AION_TITLES)
+        self.assertIn("8 núcleos especializados, 1 AION Core.", html)
+        self.assertIn("Não são oito IAs independentes", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
+        self.assertEqual(html.count("Núcleo interno · AION Core compartilhado"), 8)
         self.assertIn("aq-hero", html)
         self.assertIn("aq-section-title", html)
         self.assertIn("aq-state", html)
@@ -193,7 +199,7 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertEqual(model["default_area"], "trader")
         surface = central_surface_html(_access("ADMIN"), "aion")
         self.assertIn("AION IA", surface)
-        self.assertEqual(surface.count('class="aq-aion-module"'), 9)
+        self.assertEqual(surface.count('class="aq-aion-module"'), 8)
 
     def test_trader_central_leaves_aion_and_shells_stay_shells(self):
         pages = list(navigation_labels())
@@ -272,6 +278,7 @@ class CentralHubUiTests(unittest.TestCase):
         html = central_surface_html(admin)
         self.assertIn("CENTRAL PRINCIPAL", html)
         self.assertIn("Escolha um setor", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
         for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
             self.assertIn(label, html)
         self.assertNotIn("?central=", html)
