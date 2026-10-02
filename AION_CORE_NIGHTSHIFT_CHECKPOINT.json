@@ -13,7 +13,8 @@
     "LIBRARY_PDF_INGESTION_V1",
     "LIBRARY_DOCUMENT_INTELLIGENCE_V1_LOCAL",
     "EXECUTOR_TOOL_HUB_PERMISSIONING_AUDIT",
-    "TENANT_PERSISTENCE_GATE_V1_LOCAL"
+    "TENANT_PERSISTENCE_GATE_V1_LOCAL",
+    "TENANT_DURABLE_STORE_IDENTITY_ACL_E2E_V1_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -25,12 +26,15 @@
     "atlasquant_aion_library_index.py",
     "atlasquant_aion_library_pdf_ingestion.py",
     "atlasquant_aion_library_document_intelligence.py",
-    "atlasquant_aion_tenant_persistence_gate.py"
+    "atlasquant_aion_tenant_persistence_gate.py",
+    "atlasquant_aion_tenant_durable_store.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
     "test_atlasquant_aion_library_document_intelligence.py",
-    "test_atlasquant_aion_tenant_persistence_gate.py"
+    "test_atlasquant_aion_tenant_persistence_gate.py",
+    "atlasquant_aion_tenant_persistence_gate.py",
+    "test_atlasquant_aion_tenant_durable_store.py"
   ],
   "production_baseline": {
     "sha": "27b605c3088a955934a60a8544245ab41894029b",
@@ -51,7 +55,10 @@
     "aion_broad": "2118 tests / 1 environment error / 1 skipped",
     "aion_broad_environment_error": "WinError 1314 creating symlink in developer adversarial auditor; no functional regression identified",
     "pip_check": "PASS - no broken requirements",
-    "git_diff_check": "PASS"
+    "git_diff_check": "PASS",
+    "tenant_durable_store_e2e": "10 passed / 0 failed",
+    "tenant_persistence_bundle": "36 passed / 0 failed",
+    "tenant_core_executor_regression": "120 passed / 0 failed"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -69,13 +76,23 @@
     "local_contract_auditor": "PASS",
     "checks": 17,
     "failures": 0,
-    "safe_kinds": ["READ", "SEARCH", "DRAFT"],
-    "forbidden_kinds": ["WRITE", "PUBLISH", "PRODUCTION", "SECRETS", "FINANCIAL"],
+    "safe_kinds": [
+      "READ",
+      "SEARCH",
+      "DRAFT"
+    ],
+    "forbidden_kinds": [
+      "WRITE",
+      "PUBLISH",
+      "PRODUCTION",
+      "SECRETS",
+      "FINANCIAL"
+    ],
     "drael_key_required_for_aion_local_executor": false
   },
   "tenant_persistence_gate": {
-    "state": "BLOCKED_BY_DESIGN",
-    "durable_io_implemented": false,
+    "state": "LOCAL_CODE_READY_EVIDENCE_PENDING",
+    "durable_io_implemented": true,
     "tenant_persistence_enabled": false,
     "cross_tenant_access_allowed": false,
     "credential_bound_namespace": true,
@@ -97,15 +114,30 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "PERSISTENT_IDENTITY_ACL_TENANT_WORKSPACE",
+  "next_wave": "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION",
   "known_blockers": [
-    "Durable tenant persistence is not implemented yet; tenant store is plan-only",
-    "Tenant persistence remains disabled until durable store and ACL evidence exist",
-    "Required evidence still open: identity registry, ACL store, durable store, tenant E2E, backup/restore, revocation/replay",
-    "Full adversarial suite on this Windows host needs symlink privilege or Linux CI for one test",
+    "Formal tenant/workspace evidence digests still need to be generated and bound to the validated local run before admin review",
+    "Production tenant persistence remains intentionally disabled and requires explicit authorization after evidence review",
+    "Full adversarial suite on this Windows host still needs symlink privilege or Linux CI for one environment-only test",
     "Drael local key/config is absent; main development flow must not wait for it",
-    "Current giant-block changes are local only until a later authorized remote publication step"
+    "Current giant-block changes remain local only until a later authorized remote publication step"
   ],
   "hourly_night_shift_enabled": true,
-  "protected_ledger_unchanged": true
+  "protected_ledger_unchanged": true,
+  "tenant_durable_store": {
+    "state": "LOCAL_CODE_READY",
+    "filesystem_atomic_write": true,
+    "identity_registry": true,
+    "acl_store": true,
+    "tenant_workspace_isolation": true,
+    "sha256_integrity_envelope": true,
+    "optimistic_concurrency": true,
+    "explicit_write_approval_required": true,
+    "backup_restore": true,
+    "revocation_blocks_read": true,
+    "cross_tenant_transplant_rejected": true,
+    "acl_tamper_rejected": true,
+    "network_io": false,
+    "production_persistence_activated": false
+  }
 }

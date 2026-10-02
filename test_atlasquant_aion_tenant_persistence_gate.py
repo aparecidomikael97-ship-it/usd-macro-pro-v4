@@ -18,22 +18,24 @@ def _pass_evidence():
 
 
 class AionTenantPersistenceGateTests(unittest.TestCase):
-    def test_current_code_is_fail_closed_until_durable_io_exists(self):
+    def test_current_code_is_ready_locally_but_blocked_without_evidence(self):
         result = tenant_persistence_readiness()
         self.assertEqual(result["state"], "BLOCKED")
-        self.assertFalse(result["code_ready"])
-        self.assertIn("DURABLE_IO_NOT_IMPLEMENTED", result["blockers"])
-        self.assertIn("TENANT_PERSISTENCE_DISABLED", result["blockers"])
+        self.assertTrue(result["code_ready"])
+        self.assertTrue(result["local_durable_ready"])
+        self.assertNotIn("LOCAL_DURABLE_STORE_NOT_READY", result["blockers"])
+        self.assertIn("EVIDENCE_DURABLE_STORE_MISSING", result["blockers"])
         self.assertFalse(result["persistence_activation_authorized"])
         self.assertFalse(result["automatic_activation"])
 
-    def test_fake_green_evidence_cannot_bypass_code_policy(self):
+    def test_green_evidence_only_reaches_admin_review_never_activation(self):
         result = tenant_persistence_readiness(_pass_evidence())
         self.assertTrue(result["evidence_ready"])
-        self.assertFalse(result["code_ready"])
-        self.assertEqual(result["state"], "BLOCKED")
-        self.assertIn("DURABLE_IO_NOT_IMPLEMENTED", result["blockers"])
+        self.assertTrue(result["code_ready"])
+        self.assertEqual(result["state"], "READY_FOR_ADMIN_REVIEW")
         self.assertFalse(result["evidence_is_authority"])
+        self.assertFalse(result["persistence_activation_authorized"])
+        self.assertFalse(result["automatic_activation"])
 
     def test_missing_evidence_is_explicit(self):
         result = tenant_persistence_readiness({})
@@ -51,6 +53,13 @@ class AionTenantPersistenceGateTests(unittest.TestCase):
         result = tenant_persistence_readiness(evidence)
         self.assertIn("EVIDENCE_ACL_STORE_DIGEST_INVALID", result["blockers"])
         self.assertFalse(result["evidence"]["ACL_STORE"]["valid"])
+        self.assertFalse(result["evidence_ready"])
+
+    def test_wrong_evidence_scope_is_blocking(self):
+        evidence = _pass_evidence()
+        evidence["ACL_STORE"]["scope"] = "admin/global"
+        result = tenant_persistence_readiness(evidence)
+        self.assertIn("EVIDENCE_ACL_STORE_DIGEST_INVALID", result["blockers"])
         self.assertFalse(result["evidence_ready"])
 
     def test_failed_evidence_remains_blocking(self):

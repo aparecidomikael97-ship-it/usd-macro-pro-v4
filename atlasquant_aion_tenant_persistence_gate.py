@@ -10,6 +10,7 @@ import re
 
 from atlasquant_aion_tenant import tenant_policy_snapshot
 from atlasquant_aion_tenant_store import tenant_store_policy
+from atlasquant_aion_tenant_durable_store import durable_store_policy
 from atlasquant_aion_tenant_privacy import tenant_privacy_readiness
 
 SCHEMA = "ATLASQUANT_AION_TENANT_PERSISTENCE_GATE_V1"
@@ -29,7 +30,11 @@ def _evidence_state(raw: Any) -> dict[str, Any]:
     status = str(row.get("status") or "").strip().upper()
     digest = str(row.get("digest") or "").strip().lower()
     scope = str(row.get("scope") or "").strip().lower()
-    valid = status == "PASS" and bool(_DIGEST.fullmatch(digest))
+    valid = (
+        status == "PASS"
+        and bool(_DIGEST.fullmatch(digest))
+        and scope == "tenant/workspace"
+    )
     return {
         "status": status or "MISSING",
         "digest": digest if valid else "",
@@ -43,6 +48,7 @@ def tenant_persistence_readiness(
 ) -> dict[str, Any]:
     tenant = tenant_policy_snapshot()
     store = tenant_store_policy()
+    durable = durable_store_policy()
     privacy = tenant_privacy_readiness()
     supplied = dict(evidence or {})
     evidence_view = {
@@ -51,10 +57,18 @@ def tenant_persistence_readiness(
     }
     blockers: list[str] = []
 
-    if store.get("network_io_implemented") is not True:
-        blockers.append("DURABLE_IO_NOT_IMPLEMENTED")
-    if privacy.get("persistence_enabled") is not True:
-        blockers.append("TENANT_PERSISTENCE_DISABLED")
+    local_durable_ready = (
+        durable.get("local_durable_io_implemented") is True
+        and durable.get("identity_registry_implemented") is True
+        and durable.get("acl_store_implemented") is True
+        and durable.get("atomic_replace") is True
+        and durable.get("optimistic_concurrency") is True
+        and durable.get("backup_restore_implemented") is True
+        and durable.get("network_io_implemented") is False
+        and durable.get("production_persistence_activated") is False
+    )
+    if not local_durable_ready:
+        blockers.append("LOCAL_DURABLE_STORE_NOT_READY")
     if tenant.get("cross_tenant_access") is not False:
         blockers.append("CROSS_TENANT_POLICY_UNSAFE")
     if tenant.get("credential_bound_namespace") is not True:
@@ -63,6 +77,8 @@ def tenant_persistence_readiness(
         blockers.append("EXPLICIT_WRITE_APPROVAL_REQUIRED")
     if store.get("automatic_overwrite") is not False:
         blockers.append("AUTOMATIC_OVERWRITE_MUST_STAY_DISABLED")
+    if privacy.get("cross_tenant_audit_ready") is not True:
+        blockers.append("CROSS_TENANT_AUDIT_REQUIRED")
 
     for name, row in evidence_view.items():
         if row["status"] == "MISSING":
@@ -73,12 +89,12 @@ def tenant_persistence_readiness(
             blockers.append(f"EVIDENCE_{name}_DIGEST_INVALID")
 
     code_ready = (
-        store.get("network_io_implemented") is True
-        and privacy.get("persistence_enabled") is True
+        local_durable_ready
         and tenant.get("cross_tenant_access") is False
         and tenant.get("credential_bound_namespace") is True
         and store.get("explicit_write_approval_required") is True
         and store.get("automatic_overwrite") is False
+        and privacy.get("cross_tenant_audit_ready") is True
     )
     evidence_ready = all(row["valid"] for row in evidence_view.values())
     state = "READY_FOR_ADMIN_REVIEW" if code_ready and evidence_ready and not blockers else "BLOCKED"
@@ -90,6 +106,8 @@ def tenant_persistence_readiness(
         "evidence_ready": evidence_ready,
         "tenant_policy": tenant,
         "store_policy": store,
+        "durable_store_policy": durable,
+        "local_durable_ready": local_durable_ready,
         "privacy_readiness": {
             "persistence_enabled": privacy.get("persistence_enabled"),
             "cross_tenant_audit_ready": privacy.get("cross_tenant_audit_ready"),
