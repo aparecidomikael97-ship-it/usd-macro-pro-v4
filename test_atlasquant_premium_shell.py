@@ -289,6 +289,19 @@ class PremiumShellTests(unittest.TestCase):
         self.assertNotIn('href=f"?aq_card=', shell)
         self.assertNotIn('href="?aq_card=', shell)
 
+    def test_catalog_renderer_is_css_only_outside_radar_home(self):
+        shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
+        render = shell[shell.index("def render_premium_catalog"):]
+        start = render.index("if not catalog_is_home(active_page):")
+        stop = render.index("        return", start)
+        off_home = render[start:stop]
+        self.assertIn("st.markdown(PREMIUM_CSS, unsafe_allow_html=True)", off_home)
+        self.assertNotIn("premium_panel_html(", off_home)
+        self.assertNotIn("st.button(", off_home)
+        self.assertNotIn("Voltar à central", off_home)
+        self.assertIn("stable selector", off_home)
+        self.assertIn("Compass", off_home)
+
     def test_cockpit_header_escapes_copy_and_telemetry(self):
         html = cockpit_header_html("<Radar>", "x & y", telemetry={"ORDENS": "<BLOQUEADAS>"})
         self.assertIn("&lt;Radar&gt;", html)
