@@ -128,7 +128,8 @@ class AtlasQuantNavigationStabilityTests(unittest.TestCase):
     def test_master_panel_snapshot_fallback_keeps_operational_gate_closed(self):
         src=APP.read_text(encoding="utf-8")
         master=src.index("# ABA 1 — V10.2.2 PAINEL MESTRE DE OPORTUNIDADES")
-        block=src[master:master+11000]
+        master_end=src.index("# ABA 10 — V10.3 EXPERIÊNCIA",master)
+        block=src[master:master_end]
         self.assertIn('_aq_master_uses_runtime_fallback',block)
         self.assertIn('_scanner_state_master_v102 = {}',block)
         self.assertIn('None if _aq_master_uses_runtime_fallback',block)
