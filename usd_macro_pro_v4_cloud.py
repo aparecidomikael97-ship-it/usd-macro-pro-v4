@@ -4698,11 +4698,6 @@ if operation_focus_html is not None:
         ),
         unsafe_allow_html=True,
     )
-if navigation_groups_html is not None:
-    st.markdown(navigation_groups_html(), unsafe_allow_html=True)
-if mobile_navigation_hint_html is not None:
-    st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
-
 if consume_premium_navigation is not None:
     consume_premium_navigation(
         st.session_state,
@@ -4720,6 +4715,12 @@ _aq_catalog_home = bool(
     render_premium_catalog is not None
     and _aq_catalog_active_page == "🎯 Radar"
 )
+if _aq_catalog_home:
+    if mobile_navigation_hint_html is not None:
+        st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
+elif navigation_groups_html is not None:
+    st.markdown(navigation_groups_html(), unsafe_allow_html=True)
+
 if render_premium_catalog is not None:
     render_premium_catalog(
         mode=_aq_experience_mode,
