@@ -759,6 +759,15 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("_set_working_checkpoint(updated, dirty=True)",src)
         self.assertIn("Salve o Checkpoint Mestre para persistir",src)
 
+    def test_admin_shows_historical_commitments_as_read_only_checkpoint_data(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn("Compromissos históricos reconciliados", src)
+        self.assertIn("Aprovados pendentes", src)
+        self.assertIn("aprovação não equivale a implementação", src)
+        self.assertIn("não concede autoridade de execução", src)
+        self.assertIn("8 papéis internos do AION", src)
+        self.assertIn("Não são oito IAs independentes", src)
+
     def test_admin_mobile_contrast_is_stronger_and_single_column_at_small_width(self):
         self.assertIn(".aion-pulse-grid",AION_ADMIN_CSS)
         self.assertIn("@media(max-width:430px)",AION_ADMIN_CSS)
@@ -892,6 +901,26 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertLess(route,answer)
         self.assertIn('st.session_state["aion_last_route"] = route',src)
         self.assertIn("Roteamento:",src)
+
+    def test_library_workspace_uses_canonical_persona_capability_snapshot(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        start = src.index("def _render_library(")
+        end = src.index("def _render_promotions(", start)
+        block = src[start:end]
+        self.assertIn('_render_persona_capabilities(', block)
+        self.assertIn('"library"', block)
+        self.assertIn('"documents"', block)
+        self.assertIn('"quality"', block)
+        self.assertIn('"conflicts": {"truth_state": "CONFIRMED", "source": "library_cross_source"}', block)
+        self.assertIn('"ocr_plan"', block)
+        self.assertIn("stage_library_review_checkpoint(", block)
+        self.assertIn("_set_working_checkpoint(", block)
+        self.assertIn("pendente", block)
+        self.assertIn("do fluxo administrativo de Salvar Checkpoint", block)
+        self.assertNotIn("save_runtime_checkpoint(", block)
+        self.assertNotIn("real_trade", block)
+        self.assertNotIn("deploy_production", block)
+        self.assertNotIn("merge_main", block)
 
     def test_contextual_voice_exists_for_all_aion_workspaces(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")

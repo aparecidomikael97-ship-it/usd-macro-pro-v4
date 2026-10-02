@@ -41,12 +41,16 @@ class AionCoreWiringTests(unittest.TestCase):
         self.assertIn("prepare_ocr_handoff(", preview)
         self.assertIn("review_and_index_pdf(", preview)
         self.assertIn(
-            "from atlasquant_aion_library_preview import build_library_pdf_preview",
+            "from atlasquant_aion_library_preview import apply_library_review_decision, build_library_pdf_preview",
             admin,
         )
         self.assertIn('"📚 Biblioteca"', admin)
-        self.assertIn("_render_library(access_map)", admin)
+        self.assertIn("_render_library(access_map, checkpoint)", admin)
+        self.assertIn("stage_library_review_checkpoint(", admin)
         self.assertIn("build_library_pdf_preview(", admin)
+        self.assertIn("from atlasquant_aion_library_cross_source import compare_library_records", admin)
+        self.assertIn("compare_library_records(", admin)
+        self.assertIn("apply_library_review_decision(", admin)
 
     def test_tenant_evidence_bundle_remains_review_artifact_not_runtime_loader(self):
         runtime = self._text("atlasquant_aion_core_runtime_bridge.py")

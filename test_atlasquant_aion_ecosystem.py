@@ -27,11 +27,11 @@ ADMIN = {"role": "ADMIN", "session": {"username": "mikael", "role": "ADMIN"}}
 
 
 class EcosystemRegistryTests(unittest.TestCase):
-    def test_registry_contains_exactly_the_eight_official_areas(self):
+    def test_registry_contains_exactly_the_nine_official_areas(self):
         registry = ecosystem_registry()
         ids = [area["area_id"] for area in registry["areas"]]
         self.assertEqual(ids, list(OFFICIAL_AREA_IDS))
-        self.assertEqual(len(ids), 8)
+        self.assertEqual(len(ids), 9)
 
     def test_workspace_ids_are_unique(self):
         ids = [area["workspace_id"] for area in ecosystem_registry()["areas"]]
@@ -40,6 +40,29 @@ class EcosystemRegistryTests(unittest.TestCase):
     def test_persona_ids_are_unique(self):
         ids = [area["persona_id"] for area in ecosystem_registry()["areas"]]
         self.assertEqual(len(ids), len(set(ids)))
+
+    def test_library_links_workspace_persona_specialists_and_capabilities(self):
+        area = ecosystem_area("library")
+        self.assertIsNotNone(area)
+        self.assertEqual(area["workspace_id"], "library")
+        self.assertEqual(area["persona_id"], "library")
+        self.assertEqual(area["label"], "Biblioteca")
+        self.assertEqual(area["kind"], "KNOWLEDGE_LIBRARY")
+        self.assertTrue(area["admin_only"])
+        self.assertEqual(set(area["specialist_ids"]), {"research", "risk"})
+        self.assertEqual(
+            set(area["capability_ids"]),
+            {"research.synthesize", "risk.assess"},
+        )
+        persona = ecosystem_persona("library")
+        self.assertEqual(persona["title"], "AION Biblioteca")
+        self.assertEqual(persona["console_workspace"], "📚 Biblioteca")
+        self.assertEqual(
+            persona["allowed_actions"],
+            ("read", "summarize", "search", "draft"),
+        )
+        self.assertFalse(persona["external_action_authority"])
+        self.assertFalse(persona["real_trading_enabled"])
 
     def test_investments_links_workspace_persona_specialist_and_capability(self):
         area = ecosystem_area("investments")
@@ -62,6 +85,7 @@ class EcosystemRegistryTests(unittest.TestCase):
         self.assertEqual(DEFAULT_WORKSPACES, portable_workspaces())
         ids = [item["workspace_id"] for item in DEFAULT_WORKSPACES]
         self.assertEqual(ids[0], "central")
+        self.assertIn("library", ids)
         self.assertIn("investments", ids)
         self.assertIn("laboratory", ids)
         investments = next(item for item in DEFAULT_WORKSPACES if item["workspace_id"] == "investments")
@@ -74,7 +98,13 @@ class EcosystemRegistryTests(unittest.TestCase):
     def test_personas_are_derived_and_include_investments(self):
         self.assertEqual(AION_PERSONAS, persona_catalog())
         ids = [item["id"] for item in AION_PERSONAS]
+        self.assertIn("library", ids)
         self.assertIn("investments", ids)
+        self.assertEqual(PERSONA_CAPABILITIES["library"], (
+            "documents", "metadata", "provenance", "quality",
+            "classification", "conflicts", "review",
+            "temporary_index", "ocr_plan",
+        ))
         self.assertEqual(PERSONA_CAPABILITIES["investments"], (
             "products", "rates", "liquidity", "risk", "income", "comparison", "sources",
         ))
@@ -164,9 +194,9 @@ class EcosystemRegistryTests(unittest.TestCase):
         report = ecosystem_integrity_report()
         self.assertEqual(report["schema"], "ATLASQUANT_AION_ECOSYSTEM_V1")
         self.assertEqual(report["state"], "VALID", report["errors"])
-        self.assertEqual(report["areas"], 8)
-        self.assertEqual(report["workspaces"], 8)
-        self.assertEqual(report["personas"], 8)
+        self.assertEqual(report["areas"], 9)
+        self.assertEqual(report["workspaces"], 9)
+        self.assertEqual(report["personas"], 9)
         self.assertEqual(report["specialists"], 12)
         self.assertEqual(report["capabilities"], len(DEFAULT_CAPABILITIES))
         self.assertEqual(report["errors"], [])
@@ -212,7 +242,7 @@ class EcosystemIntegrityFailureTests(unittest.TestCase):
         self.assertEqual(report["state"], "INVALID")
         self.assertTrue(any(error.startswith("persona duplicada:") for error in report["errors"]))
 
-    def test_unknown_ninth_area_is_invalid(self):
+    def test_unknown_tenth_area_is_invalid(self):
         registry = ecosystem_registry()
         registry["areas"].append({
             "area_id": "archive",
@@ -227,7 +257,7 @@ class EcosystemIntegrityFailureTests(unittest.TestCase):
         })
         report = ecosystem_integrity_report(registry)
         self.assertEqual(report["state"], "INVALID")
-        self.assertEqual(report["areas"], 9)
+        self.assertEqual(report["areas"], 10)
         self.assertTrue(any(error == "área desconhecida: archive" for error in report["errors"]))
         self.assertTrue(any(error.startswith("contagem de áreas inválida:") for error in report["errors"]))
         self.assertIs(report["real_trading_enabled"], False)

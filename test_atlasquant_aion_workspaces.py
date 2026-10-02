@@ -29,7 +29,7 @@ class PersonaTests(unittest.TestCase):
         from atlasquant_aion_admin import AION_WORKSPACES
         self.assertEqual(
             [p["id"] for p in AION_PERSONAS],
-            ["trader", "admin", "developer", "video", "business", "laboratory", "investments", "central"],
+            ["trader", "library", "admin", "developer", "video", "business", "laboratory", "investments", "central"],
         )
         for item in AION_PERSONAS:
             if item["id"] == "investments":
@@ -37,6 +37,33 @@ class PersonaTests(unittest.TestCase):
             else:
                 self.assertIn(item["workspace"], AION_WORKSPACES)
             self.assertEqual(persona_for_workspace(item["workspace"])["id"], item["id"])
+
+    def test_library_persona_is_scoped_read_only_and_capability_bound(self):
+        item = persona_for_workspace("📚 Biblioteca")
+        self.assertIsNotNone(item)
+        self.assertEqual(item["id"], "library")
+        self.assertEqual(item["actions"], ("read", "summarize", "search", "draft"))
+        snapshot = capability_snapshot("library", {
+            "documents": {"truth_state": "CONFIRMED", "source": "library_preview"},
+            "quality": {"truth_state": "CONFIRMED", "source": "document_intelligence"},
+        })
+        self.assertEqual(snapshot["persona"], "library")
+        self.assertEqual(snapshot["connected"], 2)
+        self.assertFalse(snapshot["executes_action"])
+        self.assertFalse(snapshot["real_orders_enabled"])
+        states = {row["capability"]: row["state"] for row in snapshot["capabilities"]}
+        self.assertEqual(states["documents"], "CONNECTED")
+        self.assertEqual(states["quality"], "CONNECTED")
+        self.assertEqual(states["conflicts"], "UNAVAILABLE")
+
+        self.assertTrue(authorize_workspace_action("library", "read", ADMIN)["allowed"])
+        for action in NEVER_FROM_WORKSPACE:
+            denied = authorize_workspace_action(
+                "library", action, ADMIN, approved=True,
+                feature_flags={"production_deploy": True, "auto_merge": True, "real_broker_execution": True},
+            )
+            self.assertFalse(denied["allowed"])
+            self.assertFalse(denied["executes_action"])
 
     def test_context_keys_are_isolated_per_persona(self):
         a = workspace_context_key("trader", "last question")

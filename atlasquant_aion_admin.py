@@ -33,7 +33,8 @@ from atlasquant_aion_core import (
 )
 from atlasquant_aion_gateway import local_answer, provider_status
 from atlasquant_aion_command_orchestrator import orchestrate_local_command
-from atlasquant_aion_library_preview import build_library_pdf_preview
+from atlasquant_aion_library_cross_source import compare_library_records
+from atlasquant_aion_library_preview import apply_library_review_decision, build_library_pdf_preview
 from atlasquant_aion_workspaces import (
     AION_PERSONAS,
     admin_brief_lines,
@@ -55,6 +56,7 @@ from atlasquant_aion_memory import (
     runtime_configuration_status,
     save_runtime_checkpoint,
     search_canonical_memory,
+    stage_library_review_checkpoint,
     update_business_checkpoint,
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
@@ -606,6 +608,7 @@ _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
+_AION_LIBRARY_REVIEWED_RECORDS_KEY = "aion_library_reviewed_records_v1"
 _AION_ADMIN_ONBOARDING_PROGRESS_KEY = "aion_admin_onboarding_progress_v1"
 _AION_ADMIN_ONBOARDING_STARTED_KEY = "aion_admin_onboarding_started_v1"
 _AION_ADMIN_ONBOARDING_MODE_KEY = "aion_admin_onboarding_mode_v1"
@@ -1013,11 +1016,13 @@ def _workspace_overview_items(
     task_summary = queue_summary(tasks)
 
     studio = checkpoint.get("studio") if isinstance(checkpoint.get("studio"), Mapping) else {}
+    library = checkpoint.get("library") if isinstance(checkpoint.get("library"), Mapping) else {}
     business = checkpoint.get("business") if isinstance(checkpoint.get("business"), Mapping) else {}
     promotions = checkpoint.get("promotions") if isinstance(checkpoint.get("promotions"), Mapping) else {}
     entitlements = checkpoint.get("entitlements") if isinstance(checkpoint.get("entitlements"), Mapping) else {}
 
     projects = list(studio.get("projects", []) or [])
+    library_records = list(library.get("records", []) or [])
     products = list(business.get("products", []) or [])
     campaigns = list(promotions.get("campaigns", []) or [])
     records = list(entitlements.get("records", []) or [])
@@ -1033,9 +1038,9 @@ def _workspace_overview_items(
         },
         {
             "name": "📚 Biblioteca",
-            "state": "OFFLINE / REVISÃO",
+            "state": f"{len(library_records)} REVISADOS",
             "tone": "info",
-            "detail": "PDFs locais com proveniência, inspeção, classificação e índice temporário sob revisão humana.",
+            "detail": "PDFs locais com proveniência, revisão multiestado e histórico no Checkpoint Mestre; sem promoção automática.",
         },
         {
             "name": "🗂️ Secretaria",
@@ -3199,6 +3204,68 @@ def _render_central(
             "a cópia de trabalho; persistência externa continua dependendo de "
             "“Salvar Checkpoint Mestre no runtime” e do Guardian."
         )
+        roles = core_memory.get("internal_roles")
+        if isinstance(roles, Mapping):
+            role_rows = [
+                row for row in list(roles.get("roles") or [])
+                if isinstance(row, Mapping)
+            ]
+            if role_rows:
+                with st.expander("🧩 8 papéis internos do AION", expanded=False):
+                    st.caption(
+                        "Responsabilidades internas do mesmo AION Core. "
+                        "Não são oito IAs independentes e não ganham autoridade externa."
+                    )
+                    st.dataframe(
+                        [
+                            {
+                                "Papel": str(row.get("label") or ""),
+                                "Responsabilidade": str(row.get("purpose") or ""),
+                            }
+                            for row in role_rows
+                        ],
+                        hide_index=True,
+                        width="stretch",
+                    )
+
+        historical = core_memory.get("historical_commitments")
+        if isinstance(historical, Mapping):
+            historical_rows = [
+                row for row in list(historical.get("commitments") or [])
+                if isinstance(row, Mapping)
+            ]
+            approved_pending_count = sum(
+                1 for row in historical_rows
+                if str(row.get("state") or "") == "APROVADO / PENDENTE"
+            )
+            hc1, hc2, hc3 = st.columns(3)
+            hc1.metric("Compromissos históricos", int(historical.get("count") or 0))
+            hc2.metric("Aprovados pendentes", approved_pending_count)
+            period = historical.get("period") if isinstance(historical.get("period"), Mapping) else {}
+            hc3.metric(
+                "Período reconciliado",
+                f"{str(period.get('start') or '?')} → {str(period.get('end') or '?')}",
+            )
+            st.caption(
+                "Registro histórico somente leitura: aprovação não equivale a implementação e "
+                "não concede autoridade de execução, merge, deploy, gasto, publicação ou trading real."
+            )
+            if historical_rows:
+                with st.expander("📚 Compromissos históricos reconciliados", expanded=False):
+                    st.dataframe(
+                        [
+                            {
+                                "Data": str(row.get("source_date") or ""),
+                                "Área": str(row.get("domain") or ""),
+                                "Estado": str(row.get("state") or ""),
+                                "Compromisso": str(row.get("title") or ""),
+                            }
+                            for row in historical_rows
+                        ],
+                        hide_index=True,
+                        width="stretch",
+                    )
+
         approved_rows = [
             row for row in list(core_memory.get("approved_decisions") or [])
             if isinstance(row, Mapping)
@@ -10428,8 +10495,22 @@ def _render_development(
 
 
 
-def _render_library(access: Mapping[str, Any]) -> None:
+def _render_library(access: Mapping[str, Any], checkpoint: Mapping[str, Any]) -> None:
     st.markdown("### 📚 Biblioteca AION")
+    _render_persona_capabilities(
+        "library",
+        {
+            "documents": {"truth_state": "CONFIRMED", "source": "library_preview"},
+            "metadata": {"truth_state": "CONFIRMED", "source": "document_intelligence"},
+            "provenance": {"truth_state": "CONFIRMED", "source": "library_foundation"},
+            "quality": {"truth_state": "CONFIRMED", "source": "document_intelligence"},
+            "classification": {"truth_state": "CONFIRMED", "source": "pdf_ingestion"},
+            "conflicts": {"truth_state": "CONFIRMED", "source": "library_cross_source"},
+            "review": {"truth_state": "CONFIRMED", "source": "library_preview"},
+            "temporary_index": {"truth_state": "CONFIRMED", "source": "library_index"},
+            "ocr_plan": {"truth_state": "CONFIRMED", "source": "document_intelligence"},
+        },
+    )
     _context_voice(
         "Biblioteca",
         (
@@ -10456,6 +10537,12 @@ def _render_library(access: Mapping[str, Any]) -> None:
         value="",
         key="aion_library_pdf_title",
     )
+    document_version = st.text_input(
+        "Versão do documento",
+        value="1",
+        key="aion_library_document_version",
+        help="Usada apenas para proveniência e comparação entre versões.",
+    )
     rights_status = st.selectbox(
         "Direitos de uso",
         ("UNKNOWN", "OWNED", "LICENSED", "PUBLIC"),
@@ -10472,6 +10559,7 @@ def _render_library(access: Mapping[str, Any]) -> None:
         pdf_bytes=raw,
         filename=uploaded.name,
         title=title,
+        document_version=document_version,
         rights_status=rights_status,
         approve_review=False,
     )
@@ -10531,38 +10619,181 @@ def _render_library(access: Mapping[str, Any]) -> None:
         )
         return
 
+    library_state = (
+        checkpoint.get("library")
+        if isinstance(checkpoint.get("library"), Mapping)
+        else {}
+    )
+    checkpoint_records = [
+        dict(item)
+        for item in list(library_state.get("records", []) or [])
+        if isinstance(item, Mapping)
+    ]
+    session_records = [
+        dict(item)
+        for item in list(st.session_state.get(_AION_LIBRARY_REVIEWED_RECORDS_KEY, []) or [])
+        if isinstance(item, Mapping)
+    ]
+    reviewed_by_id: dict[str, dict[str, Any]] = {}
+    reviewed_order: list[str] = []
+    for item in checkpoint_records + session_records:
+        doc_id = str(item.get("document_id") or "").strip()
+        if not doc_id:
+            continue
+        if doc_id not in reviewed_by_id:
+            reviewed_order.append(doc_id)
+        reviewed_by_id[doc_id] = item
+    reviewed_records = [
+        reviewed_by_id[doc_id]
+        for doc_id in reviewed_order
+        if doc_id in reviewed_by_id
+    ][-100:]
+    staged_record = (
+        dict(staged.get("record") or {})
+        if isinstance(staged.get("record"), Mapping)
+        else {}
+    )
+    comparison = compare_library_records(staged_record, reviewed_records)
+    hints = list(comparison.get("hints") or [])
+    if hints:
+        with st.expander("Cruzamento com documentos já revisados nesta sessão", expanded=True):
+            st.caption(
+                "São apenas indícios determinísticos para revisão humana; "
+                "o AION não decide conflito nem verdade automaticamente."
+            )
+            st.dataframe(hints, width="stretch", hide_index=True)
+    elif reviewed_records:
+        st.caption(
+            f"Cruzamento local concluído com {int(comparison.get('compared_peers') or 0)} "
+            "documento(s); nenhum indício determinístico foi encontrado."
+        )
+
+    review_decision = st.selectbox(
+        "Decisão de revisão",
+        ("VALIDATED", "CONFLICTING", "STALE", "QUARANTINED", "REJECTED"),
+        key="aion_library_review_decision",
+        help=(
+            "CONFLICTING exige referência a outro documento. "
+            "Estados diferentes de VALIDATED exigem motivo de auditoria."
+        ),
+    )
+    peer_options: dict[str, str] = {}
+    for peer in reviewed_records:
+        peer_id = str(peer.get("document_id") or "").strip()
+        if not peer_id:
+            continue
+        label = f"{str(peer.get('title') or 'Documento')[:64]} · {peer_id[:14]}"
+        peer_options[label] = peer_id
+    selected_peer_labels = st.multiselect(
+        "Documentos relacionados / evidência cruzada",
+        options=list(peer_options),
+        key="aion_library_related_documents",
+        help="Obrigatório quando a decisão for CONFLICTING.",
+    )
+    related_document_ids = [
+        peer_options[label]
+        for label in selected_peer_labels
+        if label in peer_options
+    ]
+    review_reason = st.text_area(
+        "Motivo da revisão",
+        value="",
+        max_chars=500,
+        key="aion_library_review_reason",
+        help="Obrigatório para CONFLICTING, STALE, QUARANTINED e REJECTED.",
+    )
     confirm = st.checkbox(
-        "Revisei este PDF e autorizo montar somente um índice local temporário nesta sessão",
+        "Confirmo que revisei este PDF e que a decisão acima é humana e explícita",
         value=False,
         key="aion_library_review_confirm",
     )
     if st.button(
-        "✅ Validar e montar índice local temporário",
-        key="aion_library_review_index",
+        "✅ Aplicar revisão local",
+        key="aion_library_review_apply",
         disabled=not bool(confirm),
         width="stretch",
     ):
-        reviewed = build_library_pdf_preview(
+        reviewed = apply_library_review_decision(
             access,
-            pdf_bytes=raw,
-            filename=uploaded.name,
-            title=title,
-            rights_status=rights_status,
-            approve_review=True,
+            preview,
+            decision=review_decision,
+            reason=review_reason,
+            related_document_ids=related_document_ids,
+            build_temporary_index=True,
         )
-        if reviewed.get("status") == "REVIEW_INDEX_READY":
-            result = reviewed.get("review") if isinstance(reviewed.get("review"), Mapping) else {}
-            st.success(
-                f"Revisão concluída. {int(result.get('indexed_passages') or 0)} "
-                "passagem(ns) montada(s) no índice temporário."
+        if reviewed.get("status") in {"REVIEW_INDEX_READY", "REVIEW_STAGED"}:
+            reviewed_record = (
+                dict(reviewed.get("reviewed_record") or {})
+                if isinstance(reviewed.get("reviewed_record"), Mapping)
+                else {}
+            )
+            session = (
+                access.get("session")
+                if isinstance(access.get("session"), Mapping)
+                else access
+            )
+            reviewer_id = str(
+                (session or {}).get("username")
+                if isinstance(session, Mapping)
+                else ""
+            )
+            staged_checkpoint = stage_library_review_checkpoint(
+                checkpoint,
+                reviewed_record,
+                reviewer_id=reviewer_id,
+                related_document_ids=related_document_ids,
+                reason=review_reason,
+            )
+            if staged_checkpoint.get("status") != "STAGED":
+                blockers = ", ".join(
+                    str(x) for x in staged_checkpoint.get("blockers") or []
+                )
+                st.error(
+                    "A revisão foi calculada, mas não pôde ser preparada no "
+                    f"Checkpoint Mestre: {blockers or 'estado não confirmado'}."
+                )
+                return
+
+            _set_working_checkpoint(
+                staged_checkpoint["checkpoint"],
+                dirty=True,
+            )
+            checkpoint_library = (
+                staged_checkpoint.get("library")
+                if isinstance(staged_checkpoint.get("library"), Mapping)
+                else {}
+            )
+            st.session_state[_AION_LIBRARY_REVIEWED_RECORDS_KEY] = [
+                dict(row)
+                for row in list(checkpoint_library.get("records", []) or [])[-50:]
+                if isinstance(row, Mapping)
+            ]
+
+            state = str(reviewed_record.get("state") or review_decision)
+            if reviewed.get("status") == "REVIEW_INDEX_READY":
+                st.success(
+                    f"Revisão {state} concluída. "
+                    f"{int(reviewed.get('indexed_passages') or 0)} passagem(ns) "
+                    "montada(s) no índice temporário."
+                )
+            else:
+                st.info(
+                    f"Revisão {state} preservada para auditoria; este estado não "
+                    "é indexável."
+                )
+            st.warning(
+                "A revisão foi preparada no Checkpoint Mestre local e está pendente "
+                "do fluxo administrativo de Salvar Checkpoint. Nada foi salvo "
+                "automaticamente no runtime."
             )
             st.caption(
-                "O índice não foi persistido externamente, não promoveu memória e não autorizou ações."
+                "PDF bruto e passagens não entram no Checkpoint; nada foi promovido "
+                "à memória, OCR não foi executado e nenhuma ação ganhou autoridade."
             )
         else:
             blockers = ", ".join(str(x) for x in reviewed.get("blockers") or [])
             st.error(
-                "A revisão/indexação local não pôde ser concluída. "
+                "A revisão local não pôde ser concluída. "
                 f"{blockers or 'Estado não confirmado'}."
             )
 
@@ -11510,7 +11741,7 @@ def render_aion_admin_console(
                 specialist_snapshot=specialist_snapshot,
             )
         elif selected_workspace == "📚 Biblioteca":
-            _render_library(access_map)
+            _render_library(access_map, checkpoint)
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
         elif selected_workspace == "📈 Trading":
