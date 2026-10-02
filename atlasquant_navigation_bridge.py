@@ -176,6 +176,32 @@ def revalidation_result(
     return dict(raw) if isinstance(raw, Mapping) else None
 
 
+def request_investments_page(
+    session_state: MutableMapping[str, Any],
+) -> dict[str, Any]:
+    """Open the existing Investments page in the current authenticated session.
+
+    Navigation only. The current experience mode is preserved when possible;
+    no investment order, transfer, subscription or paid action is executed.
+    """
+    current_mode = str(session_state.get("atlasquant_experience_mode") or "").strip()
+    mode = "Avançado" if current_mode.casefold().startswith("avan") else "Iniciante"
+    request = {
+        "schema": SCHEMA,
+        "surface": "investments",
+        "page": "💰 Investir",
+        "mode": mode,
+        "label": "Renda Fixa / Investimentos",
+        "build_id": "",
+        "state": "INVESTMENTS_PAGE_REQUESTED",
+        "explicit_user_action": True,
+        "executes_action": False,
+        "real_orders_enabled": False,
+    }
+    session_state[_REQUEST_KEY] = request
+    return dict(request)
+
+
 def request_return_to_aion(
     session_state: MutableMapping[str, Any],
 ) -> dict[str, Any]:
@@ -230,6 +256,24 @@ def consume_navigation_request(
         session_state["atlasquant_advanced_area"] = "🧠 AION"
         session_state["atlasquant_stable_nav_fallback"] = "🧠 AION"
         return dict(raw)
+    if isinstance(raw, Mapping) and str(raw.get("surface") or "") == "investments":
+        session_state.pop(_REQUEST_KEY, None)
+        pages = [str(x) for x in list(available_pages or [])]
+        page = "💰 Investir"
+        if page not in pages:
+            return {
+                **dict(raw),
+                "state": "NAVIGATION_BLOCKED",
+                "reason": "TARGET_PAGE_UNAVAILABLE",
+            }
+        mode = "Avançado" if str(raw.get("mode") or "").casefold().startswith("avan") else "Iniciante"
+        session_state["atlasquant_experience_mode"] = mode
+        if mode == "Avançado":
+            session_state["atlasquant_advanced_area"] = page
+        else:
+            session_state["atlasquant_beginner_area_full"] = page
+        session_state["atlasquant_stable_nav_fallback"] = page
+        return dict(raw)
     return consume_revalidation_request(
         session_state,
         available_pages=available_pages,
@@ -246,5 +290,6 @@ __all__ = [
     "complete_surface_revalidation",
     "revalidation_result",
     "request_return_to_aion",
+    "request_investments_page",
     "request_business_workspace",
 ]
