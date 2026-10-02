@@ -214,6 +214,10 @@ class ProductionAdminFlowTests(unittest.TestCase):
 
         go("central")
         go("investimentos")
+        self.assertEqual(at.session_state["atlasquant_experience_mode"], "Avançado")
+        self.assertEqual(at.session_state["atlasquant_advanced_area"], "💰 Investir")
+        self.assertEqual(at.session_state["atlasquant_stable_nav_fallback"], "💰 Investir")
+        self.assertIn("Seja bem-vindo à área de Investimentos.", self._html(at))
         go("central")
         go("trader")
 
