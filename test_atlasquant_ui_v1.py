@@ -66,6 +66,18 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('ATLASQUANT', html)
 
 
+    def test_header_can_show_short_visual_build_without_claiming_deploy_truth(self):
+        html = hero_html("V11.0.6", "prod", "abc12345deadbeef")
+        self.assertIn("Build abc12345dead", html)
+        self.assertIn("Engine base V11.0.6", html)
+        self.assertIn("PROD", html)
+        self.assertNotIn("abc12345deadbeef", html)
+
+    def test_header_omits_visual_build_when_unavailable(self):
+        html = hero_html("V11.0.6", "prod")
+        self.assertNotIn("Build UNKNOWN", html)
+        self.assertNotIn('class="aq-badge aq-build"', html)
+
     def test_native_controls_follow_canvas_and_sidebar_contrast(self):
         css=ATLASQUANT_CSS
         self.assertIn('color: #334155 !important;',css)
@@ -161,10 +173,12 @@ class AtlasQuantUiTests(unittest.TestCase):
     def test_primary_app_header_is_at_execution_start_not_duplicated_before_tabs(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
-        self.assertEqual(src.count("render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)"),1)
+        self.assertEqual(src.count("render_atlasquant_header("),1)
+        self.assertIn("build_id=_ATLASQUANT_VISIBLE_BUILD",src)
+        self.assertIn('st.session_state["atlasquant_visible_build"]=_ATLASQUANT_VISIBLE_BUILD',src)
         self.assertNotIn('st.title("USD Macro Pro")',src)
         exec_pos=src.index("# EXECUÇÃO PRINCIPAL")
-        hero_pos=src.index("render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)")
+        hero_pos=src.index("render_atlasquant_header(")
         nav_pos=src.index("render_stable_navigation(")
         self.assertLess(exec_pos,hero_pos)
         self.assertLess(hero_pos,nav_pos)
