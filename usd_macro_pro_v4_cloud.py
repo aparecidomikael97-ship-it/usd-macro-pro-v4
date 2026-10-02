@@ -4688,16 +4688,6 @@ if experience_mode_overview_html is not None:
         experience_mode_overview_html(_aq_experience_mode),
         unsafe_allow_html=True,
     )
-if operation_focus_html is not None:
-    st.markdown(
-        operation_focus_html(
-            decision="Radar pronto para leitura",
-            market="G8 + 7 pares",
-            data="Frescor monitorado",
-            safety="Safety Core monitorado",
-        ),
-        unsafe_allow_html=True,
-    )
 if consume_premium_navigation is not None:
     consume_premium_navigation(
         st.session_state,
@@ -4711,10 +4701,21 @@ _aq_nav_key = (
     else "atlasquant_beginner_area_full"
 )
 _aq_catalog_active_page = str(st.session_state.get(_aq_nav_key) or "🎯 Radar")
+_aq_radar_home = _aq_catalog_active_page == "🎯 Radar"
 _aq_catalog_home = bool(
     render_premium_catalog is not None
-    and _aq_catalog_active_page == "🎯 Radar"
+    and _aq_radar_home
 )
+if _aq_radar_home and operation_focus_html is not None:
+    st.markdown(
+        operation_focus_html(
+            decision="Radar em foco",
+            market="G8 + 7 pares",
+            data="Frescor monitorado",
+            safety="Safety Core monitorado",
+        ),
+        unsafe_allow_html=True,
+    )
 if _aq_catalog_home:
     if mobile_navigation_hint_html is not None:
         st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
