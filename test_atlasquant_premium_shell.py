@@ -5,6 +5,7 @@ from atlasquant_ui_v1 import BEGINNER_OPEN_AREAS, NAVIGATION_LABELS
 from atlasquant_premium_shell import (
     PREMIUM_CSS,
     PREMIUM_MODULES,
+    WORKSPACE_WELCOME,
     catalog_is_home,
     cockpit_header_html,
     alert_card_html,
@@ -21,6 +22,7 @@ from atlasquant_premium_shell import (
     radar_live_html,
     section_hero_html,
     status_badge_html,
+    workspace_welcome_html,
 )
 
 
@@ -219,6 +221,26 @@ class PremiumShellTests(unittest.TestCase):
         self.assertNotIn("real_orders_enabled = True", shell)
         self.assertNotIn("automatic_execution = True", shell)
 
+    def test_workspace_welcome_covers_every_navigation_area_and_aion(self):
+        expected = set(NAVIGATION_LABELS) | {"🧠 AION"}
+        self.assertEqual(set(WORKSPACE_WELCOME), expected)
+        for page in sorted(expected):
+            with self.subTest(page=page):
+                html = workspace_welcome_html(page, mode="Avançado")
+                self.assertIn("Seja bem-vindo", html)
+                self.assertIn("Poderoso por dentro. Simples por fora.", html)
+                self.assertIn("modo Avançado", html)
+                self.assertIn('aria-label="Boas-vindas da área"', html)
+        self.assertEqual(workspace_welcome_html("mesa secreta"), "")
+
+    def test_workspace_welcome_escapes_dynamic_mode_and_keeps_mobile_safe_css(self):
+        html = workspace_welcome_html("🎯 Radar", mode="<script>x</script>")
+        self.assertNotIn("<script>", html)
+        self.assertIn("&lt;script&gt;", html)
+        self.assertIn("Seja bem-vindo ao Radar.", html)
+        self.assertIn(".aq-workspace-welcome", PREMIUM_CSS)
+        self.assertIn("overflow:hidden", PREMIUM_CSS)
+
     def test_catalog_renderer_uses_native_stateful_controls(self):
         shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
         self.assertIn("def _render_premium_stateful_controls", shell)
@@ -242,6 +264,11 @@ class PremiumShellTests(unittest.TestCase):
         self.assertLess(consume, catalog)
         self.assertLess(catalog, select)
         self.assertIn("navigation_groups_html()", cloud)
+        self.assertIn("workspace_welcome_html,", cloud)
+        self.assertIn("workspace_welcome_html(", cloud)
+        welcome_pos = cloud.index("workspace_welcome_html(")
+        locked_pos = cloud.index("_aq_locked_preview = bool(", welcome_pos)
+        self.assertLess(welcome_pos, locked_pos)
         fast = Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
         self.assertLess(fast.index("consume_premium_navigation("), fast.index('key="aq_beginner_page"'))
         home = Path("atlasquant_home_radar.py").read_text(encoding="utf-8")

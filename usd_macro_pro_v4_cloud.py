@@ -410,12 +410,14 @@ try:
         pull_premium_card_id,
         render_premium_catalog,
         request_premium_card,
+        workspace_welcome_html,
     )
 except Exception:
     consume_premium_navigation = None
     pull_premium_card_id = None
     render_premium_catalog = None
     request_premium_card = None
+    workspace_welcome_html = None
 
 try:
     from atlasquant_central_hub_ui import (
@@ -4728,6 +4730,14 @@ else:
         _aq_allowed_nav,
         key="atlasquant_stable_nav_fallback",
     )
+if workspace_welcome_html is not None:
+    _aq_welcome = workspace_welcome_html(
+        _aq_active_page,
+        mode=_aq_experience_mode,
+    )
+    if _aq_welcome:
+        st.markdown(_aq_welcome, unsafe_allow_html=True)
+
 _aq_locked_preview = bool(
     is_page_locked_for_mode is not None
     and is_page_locked_for_mode(_aq_active_page, _aq_experience_mode)

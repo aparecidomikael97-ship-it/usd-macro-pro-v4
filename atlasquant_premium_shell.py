@@ -33,6 +33,31 @@ TOKENS = {
     "info": "#8eb7e8",
 }
 
+WORKSPACE_WELCOME = {
+    "🎯 Radar": ("RADAR", "Seja bem-vindo ao Radar.", "Visão rápida do mercado, Top 10 e direção já calculada para você começar pelo que importa."),
+    "🧭 Painel mestre": ("COMANDO", "Seja bem-vindo ao Painel Mestre.", "Consolide leitura macro, técnica, risco e bloqueios no mesmo cockpit operacional."),
+    "💱 Moedas": ("FORÇA RELATIVA", "Seja bem-vindo à área de Moedas.", "Compare força, componentes do score e contexto relativo sem transformar leitura em ordem."),
+    "🇺🇸 EUA": ("MACRO EUA", "Seja bem-vindo à leitura dos EUA.", "Juros, inflação, emprego e surpresas econômicas organizados para leitura do USD."),
+    "🔀 Pares": ("CONFLUÊNCIA", "Seja bem-vindo à área de Pares.", "Cruze força, contexto e timing do par usando apenas dados já validados nesta execução."),
+    "🏦 Fed": ("POLÍTICA MONETÁRIA", "Seja bem-vindo à área do Fed.", "Acompanhe tom, juros e narrativa do banco central com separação entre fato, interpretação e risco."),
+    "🗂️ Histórico": ("EVIDÊNCIA", "Seja bem-vindo ao Histórico.", "Revise leituras anteriores, snapshots e rastreabilidade antes de comparar desempenho."),
+    "🧪 Backtest": ("LABORATÓRIO", "Seja bem-vindo ao Laboratório de Backtests.", "Teste operacionais, ativos e períodos sem confundir simulação com execução real."),
+    "⚡ Decisão": ("GUARDIÃO", "Seja bem-vindo à área de Decisão.", "Veja contexto, gates e motivos para operar ou não operar; autorização real continua separada."),
+    "🗺️ Market Map": ("INTERMERCADO", "Seja bem-vindo ao Market Map.", "Enxergue relações entre ativos e contexto intermercado sem inventar causalidade."),
+    "🎙️ Macro Briefing": ("BRIEFING", "Seja bem-vindo ao Macro Briefing.", "Receba a leitura resumida do cenário e dos eventos que merecem atenção agora."),
+    "🎓 Aprender": ("ACADEMIA", "Seja bem-vindo à Academia.", "Estude macro, ICT/SMC e funcionamento do AtlasQuant em uma trilha mais simples de acompanhar."),
+    "🧩 Produto": ("PRODUTO", "Seja bem-vindo à área de Produto.", "Consulte recursos e configurações do ecossistema sem alterar segurança ou produção por esta tela."),
+    "🛠️ Melhorias": ("EVOLUÇÃO", "Seja bem-vindo à área de Melhorias.", "Acompanhe validações, estabilidade e evolução técnica com evidência antes de promoção."),
+    "📰 Notícias": ("CONTEXTO", "Seja bem-vindo à área de Notícias.", "Organize fatos relevantes por moeda e impacto potencial sem transformar manchete em sinal."),
+    "🤖 Autopilot": ("AUTOMAÇÃO", "Seja bem-vindo ao Autopilot.", "Acompanhe monitoramento e runtime com trilha de auditoria; ações externas seguem protegidas."),
+    "👤 Conta": ("CONTA", "Seja bem-vindo à sua Conta.", "Gerencie sua experiência de acesso sem expor secrets, infraestrutura ou credenciais de servidor."),
+    "📱 Instalar": ("ACESSO", "Seja bem-vindo à área de Instalação.", "Encontre o caminho de acesso ao AtlasQuant de forma simples e compatível com seu dispositivo."),
+    "💼 Vendas": ("COMERCIAL", "Seja bem-vindo à área de Vendas.", "Acompanhe onboarding comercial e acesso sem misturar esta área com o cockpit B2B do AION Negócios."),
+    "💰 Investir": ("INVESTIMENTOS", "Seja bem-vindo à área de Investimentos.", "Compare alternativas e cenários com foco em evidência, liquidez e risco; movimentação financeira não é executada aqui."),
+    "🛟 Suporte": ("SUPORTE", "Seja bem-vindo ao Suporte.", "Use esta área para orientação e diagnóstico sem criar permissões ou atalhos administrativos."),
+    "🧠 AION": ("AION CORE", "Seja bem-vindo ao AION.", "Oito núcleos especializados trabalham dentro de um único AION Core para organizar, pesquisar, proteger e coordenar o ecossistema."),
+}
+
 PREMIUM_CSS = """
 <style>
 .stApp{
@@ -42,6 +67,12 @@ PREMIUM_CSS = """
     #07111f;
 }
 .aq-premium{max-width:100%;overflow-x:hidden;color:#f5f8fc}
+.aq-workspace-welcome{position:relative;overflow:hidden;border:1px solid rgba(143,208,196,.24);border-radius:16px;padding:13px 15px;margin:8px 0 14px;background:linear-gradient(135deg,rgba(16,38,61,.96),rgba(9,25,43,.95));box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.aq-workspace-welcome:after{content:"";position:absolute;right:-54px;top:-74px;width:150px;height:150px;border-radius:50%;border:1px solid rgba(215,181,109,.13);box-shadow:0 0 0 24px rgba(143,208,196,.025);pointer-events:none}
+.aq-workspace-welcome small{display:block;color:#8fd0c4;font-size:.64rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+.aq-workspace-welcome strong{display:block;color:#f5f8fc;font-size:1rem;line-height:1.3;margin-top:3px}
+.aq-workspace-welcome p{margin:5px 0 0;color:#d7e4f2;font-size:.8rem;line-height:1.42;max-width:86ch;font-weight:650}
+.aq-workspace-welcome .motto{color:#d7b56d;font-size:.7rem;font-weight:900;letter-spacing:.04em}
 .aq-premium-hero{position:relative;overflow:hidden;border:1px solid rgba(198,214,232,.22);border-radius:22px;padding:22px 22px 18px;margin:4px 0 16px;background:
   radial-gradient(circle at 100% 0%, rgba(215,181,109,.16), transparent 34%),
   linear-gradient(145deg, #12283f 0%, #0c1a2c 58%, #10261f 100%);
@@ -131,6 +162,25 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 }
 </style>
 """
+
+
+def workspace_welcome_html(page: object, *, mode: object = "") -> str:
+    """Compact area greeting. Presentation only; never grants access or executes actions."""
+    key = str(page or "").strip()
+    spec = WORKSPACE_WELCOME.get(key)
+    if spec is None:
+        return ""
+    kicker, title, detail = spec
+    mode_text = str(mode or "").strip()
+    mode_suffix = f" · modo {mode_text}" if mode_text else ""
+    return (
+        '<section class="aq-workspace-welcome" aria-label="Boas-vindas da área">'
+        f"<small>{escape(kicker + mode_suffix)}</small>"
+        f"<strong>{escape(title)}</strong>"
+        f"<p>{escape(detail)}</p>"
+        '<p class="motto">Poderoso por dentro. Simples por fora.</p>'
+        "</section>"
+    )
 
 
 def cockpit_header_html(
