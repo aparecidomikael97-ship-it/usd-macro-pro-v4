@@ -136,10 +136,21 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("_aq_active_index",src)
         self.assertNotIn("abas = st.tabs(_nav_items)",src)
         self.assertNotIn("with abas[",src)
-        self.assertIn("navigation_groups_html()",src)
+        self.assertNotIn("st.markdown(navigation_groups_html()",src)
         self.assertEqual(len(NAVIGATION_LABELS),21)
 
 
+
+    def test_offhome_navigation_relies_on_stable_selector_not_redundant_group_strip(self):
+        from pathlib import Path
+        ui=Path("atlasquant_ui_v1.py").read_text(encoding="utf-8")
+        app=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+
+        nav=ui[ui.index("def render_stable_navigation"):ui.index("def navigation_groups")]
+        self.assertIn("group=navigation_group_for(selected)",nav)
+        self.assertIn("navegação estável para celular e desktop",nav)
+        self.assertNotIn("st.markdown(navigation_groups_html()",app)
+        self.assertIn("render_stable_navigation(",app)
 
     def test_decision_strip_escapes_content_and_is_not_probability(self):
         html=decision_strip_html("<b>EUR/USD</b>","BUY","AGUARDAR","NORMAL",88)
