@@ -442,14 +442,24 @@ def render_beginner_shell(
             st.rerun()
 
     pages=_fast_pages
+    _aq_fast_active_page=str(st.session_state.get("aq_beginner_page") or "🎯 Radar")
+    _aq_fast_catalog_home=bool(
+        render_premium_catalog is not None
+        and _aq_fast_active_page=="🎯 Radar"
+    )
     if render_premium_catalog is not None:
         render_premium_catalog(
             mode="Iniciante",
             available_pages=pages,
             fast=True,
-            active_page=str(st.session_state.get("aq_beginner_page") or "🎯 Radar"),
+            active_page=_aq_fast_active_page,
         )
-    page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
+    if _aq_fast_catalog_home:
+        with st.expander("Navegação alternativa",expanded=False):
+            st.caption("Use o seletor clássico se preferir. Os cartões continuam sendo a navegação principal da home.")
+            page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
+    else:
+        page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
     if workspace_welcome_html is not None:
         _welcome = workspace_welcome_html(page, mode="Iniciante")
         if _welcome:
