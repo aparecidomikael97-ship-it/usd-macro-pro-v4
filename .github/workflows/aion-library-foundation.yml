@@ -1,0 +1,40 @@
+name: AION Library Foundation V1 — isolated tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - integration/aion-core-nightshift-v1-20261001
+    paths:
+      - "aion_core/**"
+      - "test_aion_core_*.py"
+      - ".github/workflows/aion-library-foundation.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-library-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout proposed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Compile Python sources
+        run: python -m compileall -q aion_core test_aion_core_*.py
+      - name: Run original six suites and new Library Foundation suite
+        run: |
+          python -m unittest -q \
+            test_aion_core_domain_registry \
+            test_aion_core_evidence_pack \
+            test_aion_core_memory_architecture \
+            test_aion_core_provenance \
+            test_aion_core_security_audit \
+            test_aion_core_trust_engine \
+            test_aion_core_library_foundation
