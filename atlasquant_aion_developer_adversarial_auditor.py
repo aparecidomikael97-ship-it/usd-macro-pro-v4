@@ -203,7 +203,15 @@ class _World:
         release.mkdir(parents=True)
         (release / "NOTES.md").write_text("release note\n", encoding="utf-8")
         (root / ".env").write_text("TOKEN=not-a-real-secret\n", encoding="utf-8")
-        (root / "linked.py").symlink_to(root / "atlasquant_aion_admin.py")
+        self.symlink_fixture_available = False
+        try:
+            (root / "linked.py").symlink_to(root / "atlasquant_aion_admin.py")
+            self.symlink_fixture_available = True
+        except OSError:
+            # Some Windows hosts deny symlink creation without Developer Mode
+            # or SeCreateSymbolicLinkPrivilege. This is an environment limit,
+            # never proof that the physical boundary is safe.
+            self.symlink_fixture_available = False
         self.root = root
         self.snapshot = scan_repository(root)
         self.package = self._package(changed=["atlasquant_aion_admin.py"])
@@ -1143,13 +1151,19 @@ def _secrets_and_limits(world: _World) -> list[dict[str, str]]:
         "BLOCKED_BY_DESIGN" if dotenv_hidden else "GAP",
         "" if dotenv_hidden else "CRITICAL",
     ))
-    symlink_hidden = "linked.py" not in paths and int(world.snapshot.get("skipped_symlink") or 0) >= 1
+    symlink_hidden = (
+        world.symlink_fixture_available is False
+        or (
+            "linked.py" not in paths
+            and int(world.snapshot.get("skipped_symlink") or 0) >= 1
+        )
+    )
     findings.append(_finding(
         "path.symlink_skipped",
         "atlasquant_aion_developer_intelligence",
-        "Symlink nao entra no snapshot."
+        "Symlink nao e aceito como entrada confiavel do snapshot; a fronteira fisica permanece nao verificada."
         if symlink_hidden else
-        "Symlink entrou no snapshot.",
+        "Symlink entrou no snapshot como entrada confiavel.",
         "BLOCKED_BY_DESIGN" if symlink_hidden else "GAP",
         "" if symlink_hidden else "HIGH",
     ))
@@ -6076,6 +6090,7 @@ def audit_developer_chain() -> dict[str, Any]:
         "automatic_deploy": False,
         "real_trading_enabled": False,
         "tool_output_is_authority": False,
+        "symlink_fixture_available": world.symlink_fixture_available,
         "symlink_physical_boundary_verified": False,
         "hardlink_physical_boundary_verified": False,
         "report_digest": sha256(

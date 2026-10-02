@@ -15,7 +15,8 @@
     "EXECUTOR_TOOL_HUB_PERMISSIONING_AUDIT",
     "TENANT_PERSISTENCE_GATE_V1_LOCAL",
     "TENANT_DURABLE_STORE_IDENTITY_ACL_E2E_V1_LOCAL",
-    "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION_V1_LOCAL"
+    "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION_V1_LOCAL",
+    "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -40,7 +41,8 @@
     "atlasquant_aion_core_nightshift_bridge.py",
     "atlasquant_aion_core_runtime_bridge.py",
     "test_atlasquant_aion_core_consolidation_gate.py",
-    "test_atlasquant_aion_core_nightshift_bridge.py"
+    "test_atlasquant_aion_core_nightshift_bridge.py",
+    "atlasquant_aion_developer_adversarial_auditor.py"
   ],
   "production_baseline": {
     "sha": "27b605c3088a955934a60a8544245ab41894029b",
@@ -67,7 +69,10 @@
     "tenant_core_executor_regression": "120 passed / 0 failed",
     "core_consolidation_focused": "85 passed / 0 failed",
     "core_tenant_executor_regression": "283 passed / 0 failed",
-    "core_consolidation_compile": "PASS"
+    "core_consolidation_compile": "PASS",
+    "developer_intelligence_regression": "209 passed / 0 failed / 1 skipped",
+    "developer_adversarial_auditor": "348 cases / 0 gaps / 334 blocked-by-design / 14 pass",
+    "windows_symlink_fixture": "UNAVAILABLE_FAIL_CLOSED"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -123,11 +128,11 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
+  "next_wave": "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING",
   "known_blockers": [
     "Formal tenant/workspace evidence digests still need to be generated and bound before persistence admin review",
     "Production tenant persistence remains intentionally disabled and requires explicit authorization after evidence review",
-    "Full adversarial suite on this Windows host still needs symlink privilege or Linux CI for one environment-only test",
+    "Symlink/hardlink physical boundary remains unverified; current Windows host cannot create the symlink fixture and the auditor now fails closed instead of erroring",
     "Drael local key/config is absent; main development flow must not wait for it",
     "Current giant-block changes remain local only until a later authorized remote publication step"
   ],
@@ -162,5 +167,21 @@
     "execution_authority": false,
     "deterministic_replay_with_bound_clock": true,
     "external_persistence": false
+  },
+  "developer_intelligence_hardening": {
+    "state": "LOCAL_VALIDATED",
+    "adversarial_cases": 348,
+    "gaps": 0,
+    "critical_gaps": 0,
+    "high_gaps": 0,
+    "medium_gaps": 0,
+    "low_gaps": 0,
+    "symlink_fixture_available_on_current_host": false,
+    "symlink_physical_boundary_verified": false,
+    "hardlink_physical_boundary_verified": false,
+    "host_capability_unavailable_is_not_treated_as_security_pass": true,
+    "automatic_commit": false,
+    "automatic_merge": false,
+    "automatic_deploy": false
   }
 }
