@@ -4710,23 +4710,29 @@ if consume_premium_navigation is not None:
         available_pages=_nav_items,
         fast=False,
     )
+_aq_nav_key = (
+    "atlasquant_advanced_area"
+    if str(_aq_experience_mode).casefold().startswith("avan")
+    else "atlasquant_beginner_area_full"
+)
+_aq_catalog_active_page = str(st.session_state.get(_aq_nav_key) or "🎯 Radar")
+_aq_catalog_home = bool(
+    render_premium_catalog is not None
+    and _aq_catalog_active_page == "🎯 Radar"
+)
 if render_premium_catalog is not None:
-    _aq_nav_key = (
-        "atlasquant_advanced_area"
-        if str(_aq_experience_mode).casefold().startswith("avan")
-        else "atlasquant_beginner_area_full"
-    )
     render_premium_catalog(
         mode=_aq_experience_mode,
         available_pages=_nav_items,
         fast=False,
-        active_page=str(st.session_state.get(_aq_nav_key) or "🎯 Radar"),
+        active_page=_aq_catalog_active_page,
     )
 
 if render_stable_navigation is not None:
     _aq_active_page = render_stable_navigation(
         _nav_items,
         mode=_aq_experience_mode,
+        compact=_aq_catalog_home,
     )
 else:
     _aq_allowed_nav = (
