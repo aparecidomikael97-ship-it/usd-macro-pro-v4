@@ -119,6 +119,20 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
         self.assertFalse(revoked["allowed"])
         self.assertEqual(revoked["reason"],"SESSION_REVOKED")
 
+    def test_login_reference_shell_preserves_premium_visual_contract(self):
+        src=Path("atlasquant_access_panel.py").read_text(encoding="utf-8")
+        self.assertIn("LOGIN_REFERENCE_CSS",src)
+        self.assertIn("aq-login-orb",src)
+        self.assertIn("backdrop-filter:blur",src)
+        self.assertIn("Poderoso por dentro. Simples por fora.",src)
+        self.assertIn("Trader",src)
+        self.assertIn("Negócios",src)
+        self.assertIn("Investimentos",src)
+        self.assertIn("AION",src)
+        self.assertIn("@media (max-width: 760px)",src)
+        self.assertIn('st.form("atlasquant_login_form"',src)
+        self.assertIn("authenticate(username,password,users)",src)
+
     def test_main_app_integrates_gate_and_fail_closed_stop(self):
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("from atlasquant_access_panel import render_access_gate",src)
