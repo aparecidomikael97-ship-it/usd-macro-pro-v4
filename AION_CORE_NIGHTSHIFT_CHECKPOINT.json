@@ -1,42 +1,77 @@
 {
-  "base_sha": "bdad9b49a58e754c4fe8c1c1c5429f7b44974aff",
-  "session": "retomada-04",
+  "base_sha": "27b605c3088a955934a60a8544245ab41894029b",
+  "session": "retomada-05-document-intelligence-v1",
+  "branch": "integration/aion-library-document-intelligence-v1-20261001",
   "completed_waves": [
     "A_DOMAIN_REGISTRY",
     "B_MEMORY_ARCHITECTURE",
     "C_PROVENANCE",
     "D_TRUST_ENGINE",
-    "E_EVIDENCE_PACK"
+    "E_EVIDENCE_PACK",
+    "LIBRARY_FOUNDATION_V1",
+    "LIBRARY_INDEX_V1",
+    "LIBRARY_PDF_INGESTION_V1",
+    "LIBRARY_DOCUMENT_INTELLIGENCE_V1_LOCAL"
   ],
   "implemented_files": [
-    "aion_core/__init__.py",
     "aion_core/domain_registry.py",
     "aion_core/memory_architecture.py",
     "aion_core/provenance.py",
     "aion_core/trust_engine.py",
-    "aion_core/evidence_pack.py"
+    "aion_core/evidence_pack.py",
+    "atlasquant_aion_library_foundation.py",
+    "atlasquant_aion_library_index.py",
+    "atlasquant_aion_library_pdf_ingestion.py",
+    "atlasquant_aion_library_document_intelligence.py"
   ],
-  "modified_files": [],
-  "tests_passed_individual": {
-    "test_aion_core_domain_registry.py": "14",
-    "test_aion_core_memory_architecture.py": "19",
-    "test_aion_core_provenance.py": "18",
-    "test_aion_core_trust_engine.py": "17",
-    "test_aion_core_evidence_pack.py": "15",
-    "test_aion_core_security_audit.py": "9"
+  "modified_files": [
+    ".github/workflows/quality-tests.yml",
+    "test_atlasquant_aion_library_document_intelligence.py"
+  ],
+  "production_baseline": {
+    "sha": "27b605c3088a955934a60a8544245ab41894029b",
+    "pr_514_merged": true,
+    "production_health": "PASS",
+    "source_backup_zip": "PASS",
+    "quality_tests": "PASS",
+    "production_build_identity": "PASS",
+    "pages_build_deployment": "PASS"
   },
-  "integrated_suite": "82 passed / 0 failed (6 suites, executado nesta sessao)",
-  "tests_failed": [],
-  "security_audit": {
-    "A_validation_explicit": "PASS",
-    "B_cross_domain_isolation": "PASS",
-    "C_trust_determinism_lineage": "PASS"
+  "validation": {
+    "document_intelligence": "9 passed / 0 failed",
+    "library_integrated": "80 passed / 0 failed",
+    "core_focused": "292 passed / 0 failed / 1 skipped",
+    "aion_broad": "2118 tests / 1 environment error / 1 skipped",
+    "aion_broad_environment_error": "WinError 1314 creating symlink in developer adversarial auditor; no functional regression identified",
+    "pip_check": "PASS - no broken requirements",
+    "git_diff_check": "PASS"
   },
-  "protected_ledger_unchanged": true,
-  "ledger_verification_evidence": "re-verificado nesta sessao (retomada-04) via SHA-256 contra ledger_baseline.json",
-  "next_wave": "LIBRARY_FOUNDATION",
+  "document_intelligence_contract": {
+    "rich_pdf_metadata": true,
+    "extraction_quality_score": true,
+    "scanned_pdf_likelihood": true,
+    "encrypted_pdf_fail_closed": true,
+    "ocr_plan_only": true,
+    "ocr_automatic_execution": false,
+    "provider_calls": false,
+    "model_calls": false,
+    "memory_auto_promotion": false,
+    "external_persistence": false
+  },
+  "six_day_critical_path": [
+    "EXECUTOR_TOOL_HUB_PERMISSIONING_FAIL_CLOSED",
+    "PERSISTENT_IDENTITY_ACL_TENANT_WORKSPACE",
+    "MINIMUM_REPRODUCIBLE_E2E",
+    "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION",
+    "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
+    "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
+  ],
+  "next_wave": "EXECUTOR_TOOL_HUB_PERMISSIONING_FAIL_CLOSED",
   "known_blockers": [
-    "sem git binario: commits locais pendentes; trabalho versionavel por patch/zip"
+    "Full adversarial suite on this Windows host needs symlink privilege or Linux CI for one test",
+    "Drael local key/config is absent; main development flow must not wait for it",
+    "Document Intelligence changes are local only until a later authorized remote publication step"
   ],
-  "timestamp_utc": "2026-10-01T08:16:53.184858+00:00"
+  "hourly_night_shift_enabled": true,
+  "protected_ledger_unchanged": true
 }
