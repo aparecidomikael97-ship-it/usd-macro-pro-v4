@@ -4719,9 +4719,8 @@ if _aq_radar_home and operation_focus_html is not None:
 if _aq_catalog_home:
     if mobile_navigation_hint_html is not None:
         st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
-elif navigation_groups_html is not None:
-    st.markdown(navigation_groups_html(), unsafe_allow_html=True)
-
+# Fora da home, o seletor estável já informa o grupo atual na própria legenda.
+# Evita uma segunda faixa horizontal de navegação antes do workspace.
 if render_premium_catalog is not None:
     render_premium_catalog(
         mode=_aq_experience_mode,
