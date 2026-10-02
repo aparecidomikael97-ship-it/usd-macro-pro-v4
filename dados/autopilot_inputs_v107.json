@@ -1,14 +1,14 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-02T21:49:25.704414+00:00",
+  "generated_at": "2026-10-02T22:21:39.922531+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
       "claim": "build",
-      "value": "a4861f11d53ed9a0",
+      "value": "320bfbe1d8bd29f1",
       "truth_state": "CONFIRMED",
       "source": "AtlasQuant runtime identity",
-      "source_ref": "runtime-build:a4861f11d53ed9a0",
+      "source_ref": "runtime-build:320bfbe1d8bd29f1",
       "time_sensitive": false
     }
   ],
@@ -55,7 +55,7 @@
       "Score final": 91.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -18.1,
+      "Dif. macro": -16.6,
       "Índice ranking": 82.5
     },
     {
@@ -73,7 +73,7 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -13.7,
+      "Dif. macro": -14.1,
       "Índice ranking": 69.4
     }
   ],
@@ -306,10 +306,10 @@
         "Goldman Sachs pushes Fed rate hike forecast to December - Reuters",
         "Minneapolis Federal Reserve President Neel Kashkari sees one more rate hike this year - CNBC",
         "Cooler inflation could buy the Fed, Trump time on another rate hike - Politico",
-        "Federal Reserve raises interest rates for the 1st time since 2023 - abcnews.com",
         "News | Will the Bank of Canada follow the Federal Reserve and raise rates? Inflation will decide. - CoStar",
         "Federal Reserve Monetary Policy Impact on Markets - Funds Society",
-        "Gold edges up as softer inflation data dents Fed rate-hike bets - Reuters"
+        "Gold edges up as softer inflation data dents Fed rate-hike bets - Reuters",
+        "Gold holds steady as firm dollar, yields counter easing Fed rate hike bets - CNBC"
       ],
       "analisadas": [
         {
@@ -393,16 +393,6 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Federal Reserve raises interest rates for the 1st time since 2023 - abcnews.com",
-          "corpo": "Federal Reserve raises interest rates for the 1st time since 2023",
-          "fonte": "abcnews.com",
-          "relevancia_pontos": 6,
-          "relevancia": "Alta",
-          "impacto": 0.0,
-          "direcao": "⚪ Neutro/indefinido",
-          "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
-        },
-        {
           "titulo": "News | Will the Bank of Canada follow the Federal Reserve and raise rates? Inflation will decide. - CoStar",
           "corpo": "News | Will the Bank of Canada follow the Federal Reserve and raise rates? Inflation will decide.",
           "fonte": "CoStar",
@@ -431,6 +421,16 @@
           "impacto": 0.0,
           "direcao": "⚪ Neutro/indefinido",
           "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
+        },
+        {
+          "titulo": "Gold holds steady as firm dollar, yields counter easing Fed rate hike bets - CNBC",
+          "corpo": "Gold holds steady as firm dollar, yields counter easing Fed rate hike bets",
+          "fonte": "CNBC",
+          "relevancia_pontos": 6,
+          "relevancia": "Alta",
+          "impacto": 0.0,
+          "direcao": "⚪ Neutro/indefinido",
+          "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
         }
       ]
     },
@@ -446,7 +446,7 @@
         "juros": 2.5,
         "inflacao": 3.22645,
         "pib": 1.6603,
-        "sentimento": 42.85714285714286,
+        "sentimento": 58.33333333333333,
         "fonte": "FRED + transformação anual"
       },
       "GBP": {
@@ -481,7 +481,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 58.33333333333333,
+        "sentimento": 54.54545454545455,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -611,19 +611,19 @@
         "juros": 4.5,
         "inflacao": 2.7,
         "pib": 2.1,
-        "sentimento": 58.3,
+        "sentimento": 54.5,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Dólar Australiano",
         "juros_reais": 1.8,
         "n_juros": 28.98896661469615,
         "n_inflacao": 49.66887417218545,
         "n_pib": 70.40481809880697,
-        "n_sentimento": 58.33333333333333,
+        "n_sentimento": 54.54545454545454,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 49.6,
+        "Pontuação_Macro": 49.3,
         "Influência_Fed": -3.5,
-        "Pontuação_Final": 46.1,
+        "Pontuação_Final": 45.7,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 5.79779332293923,
@@ -631,15 +631,50 @@
             "PIB": 10.560722714821045,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 5.833333333333333
+            "Sentimento": 5.454545454545454
           },
           "fed": -3.5478,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 46.094380496921424
+          "unrounded_final": 45.71559261813354
         },
         "Posição": 4
+      },
+      {
+        "Código": "EUR",
+        "juros": 2.5,
+        "inflacao": 3.2,
+        "pib": 1.7,
+        "sentimento": 58.3,
+        "fonte": "FRED + transformação anual",
+        "Moeda": "Euro",
+        "juros_reais": -0.7,
+        "n_juros": 5.657886869857563,
+        "n_inflacao": 67.10099337748345,
+        "n_pib": 46.58676419956989,
+        "n_sentimento": 58.33333333333333,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 44.0,
+        "Influência_Fed": -0.8,
+        "Pontuação_Final": 43.2,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 1.1315773739715127,
+            "Inflação": 10.065149006622518,
+            "PIB": 6.988014629935484,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 5.833333333333333
+          },
+          "fed": -0.7884000000000001,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 43.22967434386285
+        },
+        "Posição": 5
       },
       {
         "Código": "NZD",
@@ -674,7 +709,7 @@
           },
           "unrounded_final": 42.79688584020098
         },
-        "Posição": 5
+        "Posição": 6
       },
       {
         "Código": "CHF",
@@ -708,41 +743,6 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 41.754419566667124
-        },
-        "Posição": 6
-      },
-      {
-        "Código": "EUR",
-        "juros": 2.5,
-        "inflacao": 3.2,
-        "pib": 1.7,
-        "sentimento": 42.9,
-        "fonte": "FRED + transformação anual",
-        "Moeda": "Euro",
-        "juros_reais": -0.7,
-        "n_juros": 5.657886869857563,
-        "n_inflacao": 67.10099337748345,
-        "n_pib": 46.58676419956989,
-        "n_sentimento": 42.85714285714286,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 42.5,
-        "Influência_Fed": -0.8,
-        "Pontuação_Final": 41.7,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 1.1315773739715127,
-            "Inflação": 10.065149006622518,
-            "PIB": 6.988014629935484,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 4.2857142857142865
-          },
-          "fed": -0.7884000000000001,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 41.682055296243796
         },
         "Posição": 7
       },
