@@ -4761,7 +4761,7 @@ _aq_locked_preview = bool(
     is_page_locked_for_mode is not None
     and is_page_locked_for_mode(_aq_active_page, _aq_experience_mode)
 )
-if experience_compass_html is not None:
+if experience_compass_html is not None and _aq_active_page != "🎯 Radar":
     st.markdown(
         experience_compass_html(_aq_experience_mode, _aq_active_page),
         unsafe_allow_html=True,
