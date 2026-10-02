@@ -21,6 +21,7 @@ from atlasquant_navigation_bridge import (
     request_surface_revalidation,
 )
 from atlasquant_ui_v1 import hero_html, section_title_html, state_badge_html
+from atlasquant_aion_internal_roles import internal_roles_snapshot
 
 _AREA_ORDER = ("aion", "negocios", "trader", "investimentos")
 CENTRAL_ROOT = "central_root"
@@ -51,74 +52,55 @@ _AREAS = {
     },
 }
 
-# Seven home cards open an existing workspace. Pesquisa and Voz stay unlinkable.
+# AION Home presents the eight canonical internal roles inside one shared Core.
+# These are responsibilities, not eight autonomous AIs. Navigation only reuses
+# already existing workspaces and never grants execution authority.
 AION_MODULE_WORKSPACES = {
-    "administracao": "🧠 Central",
-    "memoria": "🧠 Central",
-    "desenvolvedor": "🛠️ Desenvolvimento",
-    "conteudo": "🎬 Studio",
-    "automacao": "🧠 Central",
-    "seguranca": "🧠 Central",
-    "observabilidade": "🧠 Central",
+    "orchestrator": "🧠 Central",
+    "architect": "🛠️ Desenvolvimento",
+    "guardian": "🧠 Central",
+    "executor": "🧠 Central",
+    "memory": "📚 Biblioteca",
+    "finops": "💼 Negócios",
+    "observability": "🗂️ Secretaria",
+    "customer_success": "💼 Negócios",
 }
 AION_MODULE_JUMP_KEY = "aion_admin_workspace_jump"
 
-_AION_MODULES = (
-    {
-        "id": "administracao",
-        "title": "Administração",
-        "sentence": "Sessão, papéis e portas do ecossistema.",
-        "dependency": "",
-    },
-    {
-        "id": "memoria",
-        "title": "Memória / Checkpoint Mestre",
-        "sentence": "Registro mestre do que a AION já consolidou.",
-        "dependency": "",
-    },
-    {
-        "id": "desenvolvedor",
-        "title": "Desenvolvedor",
-        "sentence": "Contratos e revisão antes de qualquer execução.",
-        "dependency": "Memória / Checkpoint Mestre",
-    },
-    {
-        "id": "pesquisa",
-        "title": "Pesquisa",
-        "sentence": "Leitura e hipóteses ainda sem publicação.",
-        "dependency": "",
-    },
-    {
-        "id": "voz",
-        "title": "Voz",
-        "sentence": "Canal de fala da AION, ainda sem operação.",
-        "dependency": "",
-    },
-    {
-        "id": "conteudo",
-        "title": "Conteúdo",
-        "sentence": "Peças e roteiros ainda não publicados.",
-        "dependency": "",
-    },
-    {
-        "id": "automacao",
-        "title": "Automação",
-        "sentence": "Rotinas futuras, sem disparo nesta camada.",
-        "dependency": "Desenvolvedor",
-    },
-    {
-        "id": "seguranca",
-        "title": "Segurança",
-        "sentence": "Limites e fail-closed desta central.",
-        "dependency": "Administração",
-    },
-    {
-        "id": "observabilidade",
-        "title": "Observabilidade",
-        "sentence": "Sinais de saúde ainda sem fonte ligada.",
-        "dependency": "Segurança",
-    },
-)
+_LEGACY_AION_MODULE_ALIASES = {
+    "administracao": "orchestrator",
+    "memoria": "memory",
+    "desenvolvedor": "architect",
+    "automacao": "executor",
+    "seguranca": "guardian",
+    "observabilidade": "observability",
+}
+
+
+def _canonical_aion_modules() -> tuple[dict[str, Any], ...]:
+    snapshot = internal_roles_snapshot()
+    modules: list[dict[str, Any]] = []
+    for row in snapshot.get("roles", ()):
+        if not isinstance(row, Mapping):
+            continue
+        role_id = str(row.get("role_id") or "").strip()
+        label = str(row.get("label") or "").strip()
+        purpose = str(row.get("purpose") or "").strip()
+        if not role_id or not label or not purpose:
+            continue
+        modules.append({
+            "id": role_id,
+            "title": label,
+            "sentence": purpose,
+            "dependency": "",
+            "shared_core": bool(row.get("shared_core", True)),
+            "independent_ai": bool(row.get("independent_ai", False)),
+            "external_action_authority": bool(row.get("external_action_authority", False)),
+        })
+    return tuple(modules)
+
+
+_AION_MODULES = _canonical_aion_modules()
 
 _CENTRAL_CSS = """
 <style>
@@ -141,6 +123,9 @@ _CENTRAL_CSS = """
 .aq-aion-module .aq-central-art{width:42px;height:42px}
 .aq-aion-home{border:1px solid var(--aq-aion,#b48cff);border-radius:18px;padding:12px 14px;background:linear-gradient(180deg,rgba(180,140,255,.18),rgba(7,17,31,.55));transition:border-color .2s ease}
 .aq-aion-priority{margin:0 0 8px;color:var(--aq-aion,#b48cff);font-size:.62rem;font-weight:800;letter-spacing:.14em}
+.aq-aion-core-note{margin:0 0 10px;color:var(--aq-text);font-size:.8rem;line-height:1.45;border-left:3px solid var(--aq-aion,#b48cff);padding:8px 10px;background:rgba(180,140,255,.08);border-radius:0 10px 10px 0}
+.aq-aion-shared{margin-top:8px!important;color:#d8c6ff!important;font-size:.68rem!important;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.aq-aion-motto{margin:8px 0 12px;color:var(--aq-warn);font-size:.78rem;font-weight:900;letter-spacing:.05em}
 .aq-aion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:12px}
 .aq-central-denied{margin:0;color:var(--aq-warn);font-size:.82rem;font-weight:750}
 .aq-aion-presence{border:1px solid var(--aq-aion,#b48cff);border-radius:18px;padding:12px 14px;margin:0 0 14px;background:linear-gradient(180deg,rgba(180,140,255,.18),rgba(7,17,31,.55))}
@@ -357,22 +342,21 @@ def _svg_investments() -> str:
 
 def _svg_module(module_id: str) -> str:
     paths = {
-        "administracao": "M8 24 H32 M20 12 V36 M12 16 H28 V32 H12 Z",
-        "memoria": "M10 14 H30 V34 H10 Z M14 18 H26 M14 23 H26 M14 28 H22",
-        "desenvolvedor": "M12 16 L8 24 L12 32 M28 16 L32 24 L28 32 M16 34 L24 14",
-        "pesquisa": "M16 16 A8 8 0 1 1 15.9 16 M22 28 L30 36",
-        "voz": "M20 12 V24 A6 6 0 0 0 26 24 V12 M14 22 A8 8 0 0 0 28 22 M20 30 V36",
-        "conteudo": "M12 12 H24 L30 18 V36 H12 Z M24 12 V18 H30",
-        "automacao": "M20 12 V18 M20 30 V36 M12 24 H18 M26 24 H32 M14 16 L18 20 M26 28 L30 32 M14 32 L18 28 M26 20 L30 16",
-        "seguranca": "M20 10 L30 14 V22 C30 28 20 34 20 34 C20 34 10 28 10 22 V14 Z",
-        "observabilidade": "M8 26 C14 16 26 16 32 26 C26 36 14 36 8 26 M20 26 A2 2 0 1 0 19.9 26",
+        "orchestrator": "M20 8 V14 M20 26 V32 M8 20 H14 M26 20 H32 M11 11 L15 15 M25 25 L29 29 M11 29 L15 25 M25 15 L29 11",
+        "architect": "M8 30 L20 10 L32 30 M13 24 H27 M16 30 V23 M24 30 V23",
+        "guardian": "M20 10 L30 14 V22 C30 28 20 34 20 34 C20 34 10 28 10 22 V14 Z M15 22 L19 26 L26 18",
+        "executor": "M10 12 H30 V32 H10 Z M15 21 L19 25 L26 17",
+        "memory": "M10 14 H30 V34 H10 Z M14 18 H26 M14 23 H26 M14 28 H22",
+        "finops": "M10 30 V20 H16 V30 M18 30 V12 H24 V30 M26 30 V17 H32 V30 M8 32 H34",
+        "observability": "M8 26 C14 16 26 16 32 26 C26 36 14 36 8 26 M20 26 A2 2 0 1 0 19.9 26",
+        "customer_success": "M12 14 A5 5 0 1 0 12.1 14 M28 14 A5 5 0 1 0 28.1 14 M7 32 C8 24 16 24 17 32 M23 32 C24 24 32 24 33 32 M18 20 L22 24",
     }
+    path = paths.get(module_id, paths["orchestrator"])
     return (
         '<svg class="aq-central-art" viewBox="0 0 40 40" aria-hidden="true">'
-        f'<path d="{paths[module_id]}" fill="none" stroke="#b48cff" stroke-width="1.6" '
+        f'<path d="{path}" fill="none" stroke="#b48cff" stroke-width="1.6" '
         'stroke-linecap="round" stroke-linejoin="round"/></svg>'
     )
-
 
 _ART = {
     "aion": _svg_aion,
@@ -464,8 +448,14 @@ def aion_home_claims(system_context: Mapping[str, Any] | None) -> dict[str, dict
     supplied = system_context.get("home_claims")
     if isinstance(supplied, Mapping):
         for spec in _AION_MODULES:
-            claims[spec["id"]] = normalize_home_claim(supplied.get(spec["id"]))
-    if claims["observabilidade"]["truth_state"] == "CONFIRMED":
+            direct = supplied.get(spec["id"])
+            if direct is None:
+                for legacy_id, canonical_id in _LEGACY_AION_MODULE_ALIASES.items():
+                    if canonical_id == spec["id"] and legacy_id in supplied:
+                        direct = supplied.get(legacy_id)
+                        break
+            claims[spec["id"]] = normalize_home_claim(direct)
+    if claims["observability"]["truth_state"] == "CONFIRMED":
         return claims
     observations = system_context.get("source_observations")
     if not isinstance(observations, (list, tuple)):
@@ -479,13 +469,13 @@ def aion_home_claims(system_context: Mapping[str, Any] | None) -> dict[str, dict
             "summary": row.get("summary") or row.get("detail"),
         })
         if claim["truth_state"] == "CONFIRMED":
-            claims["observabilidade"] = claim
+            claims["observability"] = claim
             break
     return claims
 
 
 def aion_home_html(claims: Mapping[str, Any] | None = None, **_ignored: Any) -> str:
-    """Nine read-only modules. Incomplete claims stay UNKNOWN."""
+    """Eight canonical internal roles. One shared AION Core; incomplete claims stay UNKNOWN."""
     del _ignored
     supplied = claims if isinstance(claims, Mapping) else {}
     modules = []
@@ -519,6 +509,7 @@ def aion_home_html(claims: Mapping[str, Any] | None = None, **_ignored: Any) -> 
             + "</h3><p>"
             + escape(spec["sentence"])
             + "</p>"
+            + '<p class="aq-aion-shared">Núcleo interno · AION Core compartilhado</p>'
             + summary
             + "<p>"
             + badge
@@ -532,7 +523,9 @@ def aion_home_html(claims: Mapping[str, Any] | None = None, **_ignored: Any) -> 
         '<section class="aq-aion-home" data-truth="UNKNOWN">'
         + '<p class="aq-aion-priority">PRIORIDADE ATUAL</p>'
         + hero_html("AION", "LOCAL")
-        + section_title_html("AION IA")
+        + section_title_html("AION IA · 8 NÚCLEOS INTERNOS")
+        + '<p class="aq-aion-core-note"><strong>8 núcleos especializados, 1 AION Core.</strong> Cada cartão representa uma responsabilidade interna coordenada pelo mesmo núcleo. Não são oito IAs independentes e nenhum núcleo recebe autoridade autônoma para merge, deploy, publicação, cobrança ou trade real.</p>'
+        + '<p class="aq-aion-motto">Poderoso por dentro. Simples por fora.</p>'
         + '<div class="aq-aion-grid">'
         + "".join(modules)
         + "</div></section>"
@@ -554,6 +547,7 @@ def consume_aion_module_jump(session_state, access: Mapping[str, Any] | None, mo
     if not _admin(access):
         return ""
     module = str(module_id or "").strip()
+    module = _LEGACY_AION_MODULE_ALIASES.get(module, module)
     workspace = AION_MODULE_WORKSPACES.get(module, "")
     if not workspace:
         return ""
@@ -769,6 +763,7 @@ def central_selector_html(
     return (
         '<section class="aq-central-root" data-root="central_root">'
         + presence
+        + '<p class="aq-aion-motto">Poderoso por dentro. Simples por fora.</p>'
         + '<p class="aq-central-kicker">CENTRAL PRINCIPAL</p>'
         "<h2>Escolha um setor</h2>"
         '<div class="aq-central-choices">'
@@ -830,7 +825,7 @@ def render_aion_home_viewer(
     if html:
         st.markdown(html, unsafe_allow_html=True)
         modules = [spec for spec in _AION_MODULES if spec["id"] in AION_MODULE_WORKSPACES]
-        st.caption("Módulos AION · navegação interna da mesma sessão")
+        st.caption("8 núcleos internos do AION · navegação na mesma sessão, sem autoridade autônoma")
         columns = st.columns(2)
         for index, spec in enumerate(modules):
             with columns[index % 2]:

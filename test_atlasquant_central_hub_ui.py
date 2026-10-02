@@ -37,19 +37,19 @@ from atlasquant_central_hub_ui import (
 from atlasquant_navigation_bridge import consume_navigation_request
 from atlasquant_ui_v1 import navigation_labels
 from atlasquant_ui_v1 import ATLASQUANT_CSS
+from atlasquant_aion_internal_roles import internal_roles_snapshot
 
 
 _PRIVATE_LABELS = ("AION IA", "Negócios", "Renda Fixa")
 _AION_TITLES = (
-    "Administração",
-    "Memória / Checkpoint Mestre",
-    "Desenvolvedor",
-    "Pesquisa",
-    "Voz",
-    "Conteúdo",
-    "Automação",
-    "Segurança",
-    "Observabilidade",
+    "Orquestrador",
+    "Arquiteto / Estrategista",
+    "Guardião / Auditor",
+    "Executor / Operador",
+    "Memória / Conhecimento",
+    "FinOps / Controle de Custos",
+    "Observabilidade / Confiabilidade",
+    "Sucesso do Cliente / Comercial",
 )
 
 
@@ -113,14 +113,20 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertNotIn("PRONTO", html)
         self.assertIn("UNKNOWN", html)
         self.assertIn("EM CONSTRUÇÃO", html)
-        self.assertGreaterEqual(html.count('data-truth="UNKNOWN"'), 9)
+        self.assertGreaterEqual(html.count('data-truth="UNKNOWN"'), 8)
 
-    def test_aion_home_lists_nine_modules(self):
+    def test_aion_home_lists_eight_canonical_internal_roles(self):
         html = aion_home_html()
         for title in _AION_TITLES:
             self.assertIn(title, html)
-        self.assertEqual(html.count('class="aq-aion-module"'), 9)
-        self.assertIn("Depende de Memória / Checkpoint Mestre.", html)
+        self.assertEqual(html.count('class="aq-aion-module"'), 8)
+        snapshot = internal_roles_snapshot()
+        self.assertEqual(snapshot["count"], 8)
+        self.assertEqual(tuple(row["label"] for row in snapshot["roles"]), _AION_TITLES)
+        self.assertIn("8 núcleos especializados, 1 AION Core.", html)
+        self.assertIn("Não são oito IAs independentes", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
+        self.assertEqual(html.count("Núcleo interno · AION Core compartilhado"), 8)
         self.assertIn("aq-hero", html)
         self.assertIn("aq-section-title", html)
         self.assertIn("aq-state", html)
@@ -193,7 +199,7 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertEqual(model["default_area"], "trader")
         surface = central_surface_html(_access("ADMIN"), "aion")
         self.assertIn("AION IA", surface)
-        self.assertEqual(surface.count('class="aq-aion-module"'), 9)
+        self.assertEqual(surface.count('class="aq-aion-module"'), 8)
 
     def test_trader_central_leaves_aion_and_shells_stay_shells(self):
         pages = list(navigation_labels())
@@ -272,6 +278,7 @@ class CentralHubUiTests(unittest.TestCase):
         html = central_surface_html(admin)
         self.assertIn("CENTRAL PRINCIPAL", html)
         self.assertIn("Escolha um setor", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
         for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
             self.assertIn(label, html)
         self.assertNotIn("?central=", html)
@@ -519,27 +526,27 @@ class AionHomeViewerTests(unittest.TestCase):
 
     def test_zero_claims_keep_every_module_unknown(self):
         html = aion_home_html()
-        self.assertEqual(html.count('class="aq-aion-module"'), 9)
+        self.assertEqual(html.count('class="aq-aion-module"'), 8)
         self.assertEqual(html.count('data-truth="CONFIRMED"'), 0)
-        self.assertGreaterEqual(html.count('data-truth="UNKNOWN"'), 9)
+        self.assertGreaterEqual(html.count('data-truth="UNKNOWN"'), 8)
         self.assertNotIn("CONFIRMADO", html)
         wrapped = aion_home_claims({"truth_state": "CONFIRMED", "source_build": "abc"})
         self.assertTrue(all(item["truth_state"] == "UNKNOWN" for item in wrapped.values()))
 
     def test_only_a_complete_claim_is_confirmed(self):
         html = aion_home_html(claims={
-            "observabilidade": {
+            "observability": {
                 "truth_state": "CONFIRMED",
                 "source": "source_mesh",
                 "summary": "Uma observação já confirmada nesta execução.",
             }
         })
         self.assertEqual(html.count('data-truth="CONFIRMED"'), 1)
-        card = self._article(html, "observabilidade")
+        card = self._article(html, "observability")
         self.assertIn("CONFIRMADO", card)
         self.assertIn("Uma observação já confirmada nesta execução.", card)
         self.assertIn("Fonte: source_mesh", card)
-        admin = self._article(html, "administracao")
+        admin = self._article(html, "orchestrator")
         self.assertIn('data-truth="UNKNOWN"', admin)
         self.assertIn("EM CONSTRUÇÃO", admin)
         self.assertNotIn("CONFIRMADO", admin)
@@ -554,8 +561,8 @@ class AionHomeViewerTests(unittest.TestCase):
         )
         for raw in cases:
             with self.subTest(raw=raw):
-                html = aion_home_html(claims={"memoria": raw})
-                card = self._article(html, "memoria")
+                html = aion_home_html(claims={"memory": raw})
+                card = self._article(html, "memory")
                 self.assertIn('data-truth="UNKNOWN"', card)
                 self.assertNotIn("CONFIRMADO", card)
                 self.assertNotIn("Fonte:", card)
@@ -567,33 +574,32 @@ class AionHomeViewerTests(unittest.TestCase):
         self.assertNotIn("AION IA", surface)
         self.assertNotIn("module=", surface)
         state = {}
-        self.assertEqual(consume_aion_module_jump(state, user, "administracao"), "")
+        self.assertEqual(consume_aion_module_jump(state, user, "orchestrator"), "")
         self.assertEqual(state, {})
 
-    def test_unknown_module_does_not_jump_and_research_and_voice_have_no_link(self):
+    def test_unknown_and_retired_legacy_modules_do_not_appear_or_jump(self):
         admin = _access("ADMIN")
         state = {}
-        self.assertEqual(consume_aion_module_jump(state, admin, "mesa secreta"), "")
-        self.assertEqual(consume_aion_module_jump(state, admin, "pesquisa"), "")
-        self.assertEqual(consume_aion_module_jump(state, admin, "voz"), "")
+        for module_id in ("mesa secreta", "pesquisa", "voz", "conteudo"):
+            self.assertEqual(consume_aion_module_jump(state, admin, module_id), "")
         self.assertNotIn(AION_MODULE_JUMP_KEY, state)
         self.assertNotIn("aion_admin_workspace", state)
         html = aion_home_html()
-        for module_id in ("pesquisa", "voz"):
-            article = self._article(html, module_id)
-            self.assertNotIn("href=", article)
-            self.assertNotIn("Abrir", article)
+        for module_id in ("pesquisa", "voz", "conteudo"):
+            self.assertNotIn(f'data-module="{module_id}"', html)
+        self.assertEqual(html.count('class="aq-aion-module"'), 8)
 
     def test_linked_modules_jump_only_through_the_existing_key(self):
         admin = _access("ADMIN")
         expected = {
-            "administracao": "🧠 Central",
-            "memoria": "🧠 Central",
-            "desenvolvedor": "🛠️ Desenvolvimento",
-            "conteudo": "🎬 Studio",
-            "automacao": "🧠 Central",
-            "seguranca": "🧠 Central",
-            "observabilidade": "🧠 Central",
+            "orchestrator": "🧠 Central",
+            "architect": "🛠️ Desenvolvimento",
+            "guardian": "🧠 Central",
+            "executor": "🧠 Central",
+            "memory": "📚 Biblioteca",
+            "finops": "💼 Negócios",
+            "observability": "🗂️ Secretaria",
+            "customer_success": "💼 Negócios",
         }
         html = aion_home_html()
         for module_id, workspace in expected.items():
@@ -606,6 +612,22 @@ class AionHomeViewerTests(unittest.TestCase):
                 self.assertNotIn("href=", article)
                 self.assertNotIn(f"module={module_id}", article)
                 self.assertIn("Abrir pelo controle de módulo abaixo.", article)
+
+        legacy_aliases = {
+            "administracao": "orchestrator",
+            "memoria": "memory",
+            "desenvolvedor": "architect",
+            "automacao": "executor",
+            "seguranca": "guardian",
+            "observabilidade": "observability",
+        }
+        for legacy_id, canonical_id in legacy_aliases.items():
+            state = {}
+            self.assertEqual(
+                consume_aion_module_jump(state, admin, legacy_id),
+                expected[canonical_id],
+            )
+            self.assertEqual(state[AION_MODULE_JUMP_KEY], expected[canonical_id])
 
         source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
         self.assertIn("aq_aion_module_stateful_", source)
@@ -625,10 +647,10 @@ class AionHomeViewerTests(unittest.TestCase):
             "publication_truth": {"truth_state": "CONFIRMED", "schema": "PUB", "next_action": "Revisar."},
         }
         claims = aion_home_claims(context)
-        self.assertEqual(claims["observabilidade"]["truth_state"], "CONFIRMED")
-        self.assertEqual(claims["observabilidade"]["source"], "FRED")
-        self.assertEqual(claims["administracao"]["truth_state"], "UNKNOWN")
-        self.assertEqual(claims["memoria"]["truth_state"], "UNKNOWN")
+        self.assertEqual(claims["observability"]["truth_state"], "CONFIRMED")
+        self.assertEqual(claims["observability"]["source"], "FRED")
+        self.assertEqual(claims["orchestrator"]["truth_state"], "UNKNOWN")
+        self.assertEqual(claims["memory"]["truth_state"], "UNKNOWN")
         html = aion_home_viewer_html(_access("ADMIN"), context)
         self.assertEqual(html.count('data-truth="CONFIRMED"'), 1)
         cloud = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
