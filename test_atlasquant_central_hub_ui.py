@@ -24,6 +24,8 @@ from atlasquant_central_hub_ui import (
     aion_home_html,
     aion_login_presence_html,
     assert_area_access,
+    central_card_html,
+    central_selector_html,
     central_surface_html,
     central_visibility_model,
     clear_login_greeting,
@@ -105,6 +107,26 @@ class CentralHubUiTests(unittest.TestCase):
                 assert_area_access(access, area)
         self.assertEqual(assert_area_access(access, "trader"), "trader")
         self.assertEqual(assert_area_access(_access("ADMIN"), "aion"), "aion")
+
+    def test_connected_central_routes_are_not_presented_as_feature_readiness(self):
+        for area in ("trader","negocios","investimentos"):
+            with self.subTest(area=area):
+                html=central_card_html(area)
+                self.assertIn('data-route-state="CONNECTED"',html)
+                self.assertIn("NAVEGAÇÃO CONECTADA",html)
+                self.assertIn('data-truth="UNKNOWN"',html)
+                self.assertNotIn("EM CONSTRUÇÃO",html)
+                self.assertNotIn("PRONTO",html)
+                self.assertNotIn("DISPONÍVEL",html)
+
+    def test_central_root_marks_access_route_without_claiming_inner_modules_ready(self):
+        html=central_selector_html(_access("ADMIN"))
+        self.assertEqual(html.count("ACESSO CONECTADO"),4)
+        self.assertIn("aq-central-route",html)
+        aion=aion_home_html()
+        self.assertIn("EM CONSTRUÇÃO",aion)
+        self.assertIn('data-truth="UNKNOWN"',aion)
+        self.assertNotIn("ACESSO CONECTADO",aion)
 
     def test_unknown_status_does_not_become_available(self):
         html = aion_home_html(statuses={"Administração": "DISPONÍVEL", "Voz": "PRONTO"})
