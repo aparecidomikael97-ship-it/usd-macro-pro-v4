@@ -17,6 +17,7 @@ from atlasquant_aion_clock import (
 )
 from atlasquant_navigation_bridge import (
     request_business_workspace,
+    request_investments_page,
     request_return_to_aion,
     request_surface_revalidation,
 )
@@ -47,7 +48,7 @@ _AREAS = {
     },
     "investimentos": {
         "label": "Renda Fixa / Investimentos",
-        "sentence": "Casca visual de proteção e patrimônio.",
+        "sentence": "Central de investimentos já existente, com comparação e leitura sem execução financeira automática.",
         "private": True,
     },
 }
@@ -222,7 +223,8 @@ def request_central_destination(session_state, access: Mapping[str, Any] | None,
 
     Trader opens the current Radar page. AION opens the existing AION page.
     Negócios opens the existing AION Business workspace in the same session.
-    Investimentos remains a shell. The central root only records the selector.
+    Investimentos opens the existing 💰 Investir page. The central root only
+    records the selector.
     """
     if _explicit_root(area):
         if not _admin(access):
@@ -239,6 +241,8 @@ def request_central_destination(session_state, access: Mapping[str, Any] | None,
         mode = str(session_state.get("atlasquant_experience_mode") or "")
         surface = "advanced_radar" if mode.casefold().startswith("avan") else "home_radar"
         return request_surface_revalidation(session_state, surface)
+    if area_id == "investimentos":
+        return request_investments_page(session_state)
     return None
 
 
@@ -260,7 +264,7 @@ def resolve_central_area(access: Mapping[str, Any] | None, requested: Any = None
     return {
         "area": area_id,
         "denied": False,
-        "shell": area_id in {"investimentos"},
+        "shell": False,
         "root": False,
     }
 
