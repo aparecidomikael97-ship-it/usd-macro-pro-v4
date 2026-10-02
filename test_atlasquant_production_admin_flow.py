@@ -220,6 +220,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         # current mode survives, while still opening the real Investir page.
         self.assertEqual(at.session_state["atlasquant_experience_mode"], "Iniciante")
         self.assertEqual(at.session_state["atlasquant_beginner_area_full"], "💰 Investir")
+        self.assertEqual(at.session_state["aq_beginner_page"], "💰 Investir")
         self.assertEqual(at.session_state["atlasquant_stable_nav_fallback"], "💰 Investir")
         self.assertIn("Seja bem-vindo à área de Investimentos.", self._html(at))
         go("central")
