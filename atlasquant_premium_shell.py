@@ -766,25 +766,13 @@ def render_premium_catalog(
     fast: bool = False,
     active_page: str = "",
 ) -> None:
-    """Visual home. Buttons only store a navigation target."""
+    """Render the catalog on Radar home; elsewhere keep only shared premium CSS."""
     pages = {str(item) for item in list(available_pages or [])}
     if not catalog_is_home(active_page):
+        # Off-home navigation already has the stable selector, contextual welcome
+        # and Compass. Keep the premium design tokens without adding a second
+        # generic navigation panel or a redundant "back home" action.
         st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
-        st.markdown(
-            premium_panel_html(
-                "Central do ecossistema",
-                "Você está fora da home. A área aberta continua sendo a mesma de antes.",
-            ),
-            unsafe_allow_html=True,
-        )
-        home_target = "🎯 Radar" if "🎯 Radar" in pages else ""
-        if home_target and st.button(
-            "Voltar à central",
-            key="aq_premium_back_home_fast" if fast else "aq_premium_back_home_full",
-            width="stretch",
-        ):
-            st.session_state[_PENDING_KEY] = home_target
-            st.rerun()
         return
     st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
     st.markdown(
