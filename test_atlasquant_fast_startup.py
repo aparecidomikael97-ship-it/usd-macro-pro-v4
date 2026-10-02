@@ -191,6 +191,17 @@ class FastStartupTests(unittest.TestCase):
         self.assertNotIn("RENDER_GIT_COMMIT",chrome)
         self.assertNotIn("GIT_COMMIT",chrome)
 
+    def test_fast_shell_uses_shared_header_as_single_branding_surface(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        shell=src[src.index("def render_beginner_shell"):]
+
+        self.assertNotIn('st.markdown("## 🧭 AtlasQuant")',shell)
+        self.assertNotIn("carregamento rápido por snapshot validado",shell)
+        self.assertIn("_render_beginner_chrome(app_version, environment, access)",shell)
+        self.assertIn('key="aq_fast_refresh"',shell)
+        self.assertIn('age_label=f"Runtime atualizado há {age:.0f} min"',shell)
+
     def test_fast_home_guidance_is_not_rendered_globally(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
