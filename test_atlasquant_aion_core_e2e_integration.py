@@ -225,6 +225,11 @@ class AionCoreE2EIntegrationTests(unittest.TestCase):
         self.assertEqual(contract["state"], "LOCAL_DURABLE_AVAILABLE")
         self.assertTrue(contract["tenant_code_ready"])
         self.assertFalse(contract["tenant_evidence_ready"])
+        self.assertEqual(
+            contract["tenant_evidence_source"],
+            "NOT_INJECTED_REVIEW_ARTIFACT",
+        )
+        self.assertFalse(contract["tenant_evidence_auto_loaded"])
         self.assertTrue(contract["explicit_write_approval_required"])
         self.assertFalse(contract["runtime_bridge_connected"])
         self.assertFalse(contract["memory_auto_write"])

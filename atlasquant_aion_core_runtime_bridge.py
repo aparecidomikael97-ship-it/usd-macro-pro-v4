@@ -272,6 +272,8 @@ def persistence_contract(connected: bool = False) -> dict[str, Any]:
         "tenant_gate_state": str(readiness.get("state") or "BLOCKED"),
         "tenant_code_ready": readiness.get("code_ready") is True,
         "tenant_evidence_ready": readiness.get("evidence_ready") is True,
+        "tenant_evidence_source": "NOT_INJECTED_REVIEW_ARTIFACT",
+        "tenant_evidence_auto_loaded": False,
         "production_persistence_activated": False,
         "automatic_activation": False,
     }

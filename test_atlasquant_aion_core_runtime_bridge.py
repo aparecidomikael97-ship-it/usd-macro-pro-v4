@@ -203,6 +203,11 @@ class AionCoreRuntimeBridgeTests(unittest.TestCase):
         self.assertTrue(contract["explicit_write_approval_required"])
         self.assertTrue(contract["tenant_code_ready"])
         self.assertFalse(contract["tenant_evidence_ready"])
+        self.assertEqual(
+            contract["tenant_evidence_source"],
+            "NOT_INJECTED_REVIEW_ARTIFACT",
+        )
+        self.assertFalse(contract["tenant_evidence_auto_loaded"])
         self.assertFalse(contract["runtime_bridge_connected"])
         self.assertFalse(contract["automatic_directory_creation"])
         self.assertFalse(contract["automatic_database_creation"])

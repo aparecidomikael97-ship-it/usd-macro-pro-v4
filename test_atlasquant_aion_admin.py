@@ -42,7 +42,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
 
     def test_admin_uses_stable_single_workspace_navigation(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertEqual(len(AION_WORKSPACES),9)
+        self.assertEqual(len(AION_WORKSPACES),10)
         self.assertIn('st.selectbox(',src)
         self.assertIn('"Área AION"',src)
         self.assertIn('key="aion_admin_workspace"',src)
@@ -847,7 +847,9 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Recuperação / Rollback do Checkpoint",src)
         self.assertIn("list_checkpoint_revisions(",src)
         self.assertIn("load_checkpoint_revision(",src)
-        self.assertIn("recovery_preflight(runtime_result, candidate)",src)
+        self.assertIn("build_recovery_review(",src)
+        self.assertIn('preview_review.get("state") != "READY_FOR_ADMIN_REVIEW"',src)
+        self.assertIn('preview_review.get("traceability_security")',src)
         self.assertIn('"restore_checkpoint"',src)
         self.assertIn("restore_checkpoint_revision(",src)
         self.assertIn("Confirmo que revisei esta versão",src)
@@ -879,9 +881,9 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
 
     def test_contextual_voice_exists_for_all_aion_workspaces(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertGreaterEqual(src.count("_context_voice("),9)
+        self.assertGreaterEqual(src.count("_context_voice("),10)
         for area in (
-            "Central","Secretaria","Trading","Studio",
+            "Central","Biblioteca","Secretaria","Trading","Studio",
             "Negócios","Laboratório","Desenvolvimento","Assinaturas","Promoções",
         ):
             self.assertIn(f'"{area}",', src)

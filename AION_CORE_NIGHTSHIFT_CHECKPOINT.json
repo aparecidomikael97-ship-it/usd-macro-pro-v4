@@ -21,7 +21,8 @@
     "TENANT_EVIDENCE_DIGEST_BINDING_LOCAL",
     "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP_LOCAL",
     "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP",
-    "CORE_EXECUTOR_TENANT_RECOVERY_E2E_V2_LOCAL"
+    "CORE_EXECUTOR_TENANT_RECOVERY_E2E_V2_LOCAL",
+    "CORE_FINAL_CAPABILITY_WIRING_AND_ORPHAN_AUDIT"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -38,7 +39,9 @@
     "atlasquant_aion_core_consolidation_gate.py",
     "atlasquant_aion_recovery_traceability_gate.py",
     "atlasquant_aion_tenant_evidence_binding.py",
-    "atlasquant_aion_tenant_evidence_bundle.py"
+    "atlasquant_aion_tenant_evidence_bundle.py",
+    "atlasquant_aion_recovery_review.py",
+    "atlasquant_aion_library_preview.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
@@ -59,7 +62,12 @@
     "test_atlasquant_aion_core_checkpoint_bridge.py",
     "test_atlasquant_aion_core_runtime_bridge.py",
     "test_atlasquant_aion_local_executor.py",
-    "test_atlasquant_aion_core_e2e_integration.py"
+    "test_atlasquant_aion_core_e2e_integration.py",
+    "atlasquant_aion_admin.py",
+    "test_atlasquant_aion_admin.py",
+    "test_atlasquant_aion_recovery_review.py",
+    "test_atlasquant_aion_library_preview.py",
+    "test_atlasquant_aion_core_wiring.py"
   ],
   "production_baseline": {
     "sha": "a44e31795519aa31b32fe2df2b8eb172cff504d1",
@@ -106,7 +114,13 @@
     "aion_full_regression_post_515": "2181 passed / 0 failed / 1 skipped",
     "contract_audit_post_515": "17 checks / 0 failures",
     "developer_adversarial_post_515": "348 cases / 0 gaps / 0 critical / 0 high",
-    "tenant_evidence_revalidation": "bundle valid / gate READY_FOR_ADMIN_REVIEW / activation false"
+    "tenant_evidence_revalidation": "bundle valid / gate READY_FOR_ADMIN_REVIEW / activation false",
+    "core_wiring_focused": "125 passed / 0 failed",
+    "library_admin_bundle": "137 passed / 0 failed",
+    "recovery_admin_bundle": "148 passed / 0 failed",
+    "aion_full_regression_wiring": "2193 passed / 0 failed / 1 skipped",
+    "contract_audit_wiring": "17 checks / 0 failures",
+    "developer_adversarial_wiring": "348 cases / 0 gaps / 0 critical / 0 high"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -165,9 +179,10 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "CORE_FINAL_CAPABILITY_WIRING_AND_ORPHAN_AUDIT",
+  "next_wave": "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL",
   "known_blockers": [
     "Production tenant persistence remains disabled and requires explicit administrative authorization despite READY_FOR_ADMIN_REVIEW evidence.",
+    "The tenant evidence bundle is intentionally a review artifact and is not auto-loaded by the Core runtime.",
     "Current post-515 branch is local only; no push, PR, merge or deploy is authorized for this new wave.",
     "Drael local key/config is absent; main development flow must not wait for it."
   ],
@@ -298,7 +313,48 @@
     "explicit_write_approval_required": true,
     "memory_auto_write": false,
     "automatic_activation": false,
+    "production_persistence_activated": false,
+    "tenant_evidence_source": "NOT_INJECTED_REVIEW_ARTIFACT",
+    "tenant_evidence_auto_loaded": false
+  },
+  "critical_path_status": "PR515_CORE_CRITICAL_PATH_CLOSED_AND_PRODUCTION_VALIDATED",
+  "core_wiring_audit": {
+    "state": "LOCAL_VALIDATED",
+    "recovery_traceability_gate_production_consumers": 1,
+    "recovery_review_admin_consumer": true,
+    "library_document_intelligence_production_consumers": 1,
+    "library_preview_admin_consumer": true,
+    "tenant_evidence_bundle_runtime_consumers": 0,
+    "tenant_evidence_bundle_classification": "INTENTIONAL_REVIEW_ARTIFACT",
+    "tenant_evidence_auto_loaded": false,
+    "orphan_critical_modules_remaining": 0,
+    "automatic_merge": false,
+    "automatic_deploy": false,
     "production_persistence_activated": false
   },
-  "critical_path_status": "PR515_CORE_CRITICAL_PATH_CLOSED_AND_PRODUCTION_VALIDATED"
+  "recovery_admin_review": {
+    "state": "READY_FOR_ADMIN_REVIEW_GATE_WIRED",
+    "checkpoint_local_inspection_required": true,
+    "traceability_safe_local_required": true,
+    "conditional_recovery_preflight_required": true,
+    "explicit_restore_confirmation_required": true,
+    "restore_authorized_by_review": false,
+    "automatic_restore": false,
+    "automatic_retry": false
+  },
+  "library_admin_preview": {
+    "state": "OFFLINE_PREVIEW_WIRED",
+    "workspace": "Biblioteca",
+    "pdf_upload_local": true,
+    "document_intelligence": true,
+    "provenance_staging": true,
+    "topic_classification": true,
+    "temporary_index_after_human_review": true,
+    "ocr_plan_only": true,
+    "ocr_automatic_execution": false,
+    "external_persistence": false,
+    "memory_auto_promotion": false,
+    "provider_calls": false,
+    "model_calls": false
+  }
 }
