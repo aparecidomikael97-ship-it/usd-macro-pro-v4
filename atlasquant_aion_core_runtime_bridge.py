@@ -19,7 +19,7 @@ from atlasquant_aion_core_voice_automation import (
     AtlasQuantVoiceAdapter,
     CheckpointAutomationAdapter,
 )
-from atlasquant_aion_core_nightshift_bridge import validate_runtime_rows
+from atlasquant_aion_core_consolidation_gate import consolidate_runtime_knowledge
 
 
 SCHEMA = "ATLASQUANT_AION_CORE_RUNTIME_BRIDGE_V1"
@@ -317,14 +317,20 @@ def handle_runtime_intent(
     runtime_rows = _runtime_rows(system_context)
     scoped, ingress = scoped_runtime_evidence(context, system_context)
     evidence_truth = assess(scoped.records, current)
-    nightshift = validate_runtime_rows(
+    consolidation = consolidate_runtime_knowledge(
         tenant_id=context.tenant_id,
         runtime_domain=context.domain,
         rows=runtime_rows,
         now=current,
     )
-    if nightshift.get("status") == "BLOCKED":
-        evidence_truth = {**evidence_truth, "status": "UNKNOWN", "nightshift_veto": True}
+    nightshift = consolidation["nightshift_validation"]
+    if consolidation.get("status") == "BLOCKED":
+        evidence_truth = {
+            **evidence_truth,
+            "status": "UNKNOWN",
+            "nightshift_veto": True,
+            "core_consolidation_veto": True,
+        }
     try:
         result = core.handle(
             intent,
@@ -353,6 +359,7 @@ def handle_runtime_intent(
         "evidence": evidence_truth,
         "evidence_ingress": ingress,
         "nightshift_validation": nightshift,
+        "core_consolidation": consolidation,
         "persistence": {
             **persistence_contract(isinstance(legacy_checkpoint, Mapping)),
             "checkpoint_state": str(checkpoint_state.get("state") or "UNKNOWN"),
