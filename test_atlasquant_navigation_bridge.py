@@ -139,6 +139,10 @@ class AtlasQuantNavigationBridgeTests(unittest.TestCase):
                 self.assertEqual(consumed["page"],"💰 Investir")
                 self.assertEqual(state["atlasquant_experience_mode"],initial_mode)
                 self.assertEqual(state[target_key],"💰 Investir")
+                if initial_mode == "Iniciante":
+                    self.assertEqual(state["aq_beginner_page"],"💰 Investir")
+                else:
+                    self.assertNotIn("aq_beginner_page",state)
                 self.assertEqual(state["atlasquant_stable_nav_fallback"],"💰 Investir")
 
     def test_investments_request_fails_closed_when_page_is_unavailable(self):
