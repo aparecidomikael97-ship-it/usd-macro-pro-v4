@@ -405,13 +405,16 @@ def premium_module_card_html(
         action = ""
     elif locked and not href:
         badge = status_badge_html("Prévia no Iniciante", "warn")
-        action = f"{title} · aguardar modo Avançado"
+        action = "Disponível no modo Avançado"
     elif locked:
         badge = status_badge_html("Prévia no Iniciante", "warn")
         action = f"Abrir {title}"
-    else:
+    elif href:
         badge = status_badge_html("Abrir área", "good")
         action = f"Abrir {title}"
+    else:
+        badge = status_badge_html("Acesso disponível", "good")
+        action = ""
     body = (
         f'<div class="aq-premium-art">{_svg(str(module.get("motif") or "radar"))}</div>'
         f'<p class="aq-premium-kicker">{escape(str(module.get("sector") or ""))}</p>'
@@ -722,27 +725,29 @@ def _render_premium_stateful_controls(
     available_pages: Sequence[str],
     fast: bool,
 ) -> None:
-    """Native controls keep authenticated navigation inside session_state."""
+    """Render only valid authenticated launch actions for the current session."""
     pages = [str(item) for item in list(available_pages or [])]
     for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
-        modules = [item for item in PREMIUM_MODULES if item["sector"] == sector]
-        if not modules:
-            continue
-        st.caption(f"{sector} · abrir módulo")
-        columns = st.columns(min(4, max(1, len(modules))))
-        for index, module in enumerate(modules):
+        launchable = []
+        for module in (item for item in PREMIUM_MODULES if item["sector"] == sector):
             target = allowed_premium_target(
                 module["id"],
                 mode=mode,
                 available_pages=pages,
                 fast=fast,
             )
+            if target:
+                launchable.append((module, target))
+        if not launchable:
+            continue
+        st.caption(f"Acessos seguros · {sector}")
+        columns = st.columns(min(4, len(launchable)))
+        for index, (module, _target) in enumerate(launchable):
             with columns[index % len(columns)]:
                 if st.button(
-                    str(module["title"]),
+                    "Abrir · " + str(module["title"]),
                     key=f"aq_premium_stateful_{'fast' if fast else 'full'}_{module['id']}",
                     width="stretch",
-                    disabled=not bool(target),
                 ):
                     request_premium_card(
                         st.session_state,
