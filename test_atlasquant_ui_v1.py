@@ -366,12 +366,18 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("aq-mode-strip",ATLASQUANT_CSS)
         self.assertIn("aq-mode-chip",ATLASQUANT_CSS)
 
-    def test_main_renders_experience_overview_before_workspace_selector(self):
+    def test_main_limits_experience_overview_to_radar_home(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
-        overview=src.index("experience_mode_overview_html(_aq_experience_mode)")
-        nav=src.index("render_stable_navigation(",overview)
-        self.assertLess(overview,nav)
+        radar=src.index('_aq_radar_home = _aq_catalog_active_page == "🎯 Radar"')
+        guard=src.index("if _aq_radar_home and experience_mode_overview_html is not None:",radar)
+        overview=src.index("experience_mode_overview_html(_aq_experience_mode)",guard)
+        focus=src.index("if _aq_radar_home and operation_focus_html is not None:",overview)
+        nav=src.index("render_stable_navigation(",focus)
+        self.assertLess(radar,guard)
+        self.assertLess(guard,overview)
+        self.assertLess(overview,focus)
+        self.assertLess(focus,nav)
 
     def test_beginner_mode_hides_advanced_tab_buttons_without_changing_indices(self):
         self.assertEqual(normalize_experience_mode("iniciante"),"Iniciante")

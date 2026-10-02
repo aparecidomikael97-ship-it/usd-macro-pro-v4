@@ -4683,11 +4683,6 @@ try:
     render_top_voice_access(st.session_state, pages=_nav_items, fast=False)
 except Exception:
     pass
-if experience_mode_overview_html is not None:
-    st.markdown(
-        experience_mode_overview_html(_aq_experience_mode),
-        unsafe_allow_html=True,
-    )
 if consume_premium_navigation is not None:
     consume_premium_navigation(
         st.session_state,
@@ -4706,6 +4701,11 @@ _aq_catalog_home = bool(
     render_premium_catalog is not None
     and _aq_radar_home
 )
+if _aq_radar_home and experience_mode_overview_html is not None:
+    st.markdown(
+        experience_mode_overview_html(_aq_experience_mode),
+        unsafe_allow_html=True,
+    )
 if _aq_radar_home and operation_focus_html is not None:
     st.markdown(
         operation_focus_html(
