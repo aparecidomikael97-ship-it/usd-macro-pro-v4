@@ -324,6 +324,8 @@ class AtlasQuantAionCoreIndependenceTests(unittest.TestCase):
             "PYTHONPATH": str(ROOT),
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONUNBUFFERED": "1",
+            "SystemRoot": os.environ.get("SystemRoot", ""),
+            "WINDIR": os.environ.get("WINDIR", ""),
         }
         result = subprocess.run(
             [sys.executable, "-c", blocker],
