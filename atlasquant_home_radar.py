@@ -326,12 +326,67 @@ HOME_CSS="""
 .aq-home-card{transition:border-color .2s ease, transform .2s ease}
 .aq-home-card:hover{border-color:rgba(215,181,109,.55)}
 .aq-radar-live{display:flex;align-items:center;gap:8px;margin-top:10px;color:#d7e4f2;font-size:.75rem;font-weight:800}
+.aq-radar-freshness{display:grid;grid-template-columns:1.15fr 1.6fr .75fr 1.5fr 1fr;gap:7px;margin:0 0 13px}
+.aq-radar-freshness>div{border:1px solid rgba(163,190,222,.26);border-radius:11px;padding:8px 10px;background:rgba(10,26,44,.72);min-width:0}
+.aq-radar-freshness small{display:block;color:#dce8f5;font-size:.61rem;font-weight:900;letter-spacing:.065em;text-transform:uppercase}
+.aq-radar-freshness strong{display:block;color:#ffffff;font-size:.74rem;line-height:1.3;margin-top:3px;overflow-wrap:anywhere}
+.aq-radar-freshness[data-tone="good"]>div:first-child{border-color:rgba(66,211,146,.48)}
+.aq-radar-freshness[data-tone="warn"]>div:first-child{border-color:rgba(242,193,78,.5)}
+.aq-radar-freshness[data-tone="bad"]>div:first-child{border-color:rgba(255,107,122,.52)}
 .aq-radar-dot{width:8px;height:8px;border-radius:50%;background:#8fd0c4;animation:aq-ping 2.8s ease-out infinite}
 @keyframes aq-ping{0%{box-shadow:0 0 0 0 rgba(143,208,196,.55)}100%{box-shadow:0 0 0 10px rgba(143,208,196,0)}}
-@media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:0}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}.aq-rank-board{grid-template-columns:1fr}.aq-home-card:hover{transform:none}}
+@media(max-width:760px){.aq-home-hero{padding:14px 15px}.aq-home-hero h2{font-size:1.3rem}.aq-home-card{min-height:0}.aq-home-grid{grid-template-columns:1fr}.aq-home-top{align-items:flex-start}.aq-rank-board{grid-template-columns:1fr}.aq-home-card:hover{transform:none}.aq-radar-freshness{grid-template-columns:1fr 1fr}.aq-radar-freshness>div:first-child{grid-column:1/-1}}
 @media (prefers-reduced-motion:reduce){.aq-radar-dot,.aq-home-card{animation:none !important}}
 </style>
 """
+
+
+def radar_freshness_html(freshness:Mapping[str,Any]|None)->str:
+    """One truthful freshness strip shared by Beginner and Advanced Radar."""
+    item=dict(freshness or {})
+    state=str(item.get("state") or "").strip().upper()
+    refresh=" ".join(str(item.get("refresh_status") or "").split())[:140]
+    retained=refresh.casefold().startswith("pacote anterior")
+    if retained:
+        status="PACOTE ANTERIOR MANTIDO"
+        tone="warn"
+    elif state=="LIVE_REFRESH":
+        status="ATUALIZAÇÃO AO VIVO CONCLUÍDA"
+        tone="good"
+    elif state in {"CACHED_SNAPSHOT","VALIDATED_SNAPSHOT"}:
+        status="SNAPSHOT VALIDADO"
+        tone="good"
+    elif state=="STALE_REJECTED":
+        status="SNAPSHOT REJEITADO · CAMINHO AO VIVO"
+        tone="warn"
+    elif state=="LIVE_REQUIRED":
+        status="CAMINHO AO VIVO · FRESCOR GLOBAL NÃO COMPROVADO"
+        tone="warn"
+    else:
+        status="FRESCOR NÃO COMPROVADO"
+        tone="bad"
+
+    generated=str(
+        item.get("runtime_generated_at")
+        or item.get("generated_at")
+        or ""
+    ).strip() or "horário não comprovado"
+    age=item.get("age_minutes")
+    age_text="N/D"
+    if isinstance(age,(int,float)) and math.isfinite(float(age)) and float(age)>=0:
+        age_text=f"{float(age):.0f} min"
+    source=" ".join(str(item.get("source") or "").split())[:100] or "origem não informada"
+    refresh_text=refresh or "estado de atualização não informado"
+    return (
+        f'<section class="aq-radar-freshness" data-tone="{tone}" data-freshness-state="{escape(state or "UNKNOWN")}" '
+        'role="status" aria-label="Frescor e atualização do Radar">'
+        f'<div><small>Estado</small><strong>{escape(status)}</strong></div>'
+        f'<div><small>Última evidência</small><strong>{escape(generated)}</strong></div>'
+        f'<div><small>Idade</small><strong>{escape(age_text)}</strong></div>'
+        f'<div><small>Atualização</small><strong>{escape(refresh_text)}</strong></div>'
+        f'<div><small>Origem</small><strong>{escape(source)}</strong></div>'
+        '</section>'
+    )
 
 
 def render_browser_voice(script:str, *, key:str)->None:
@@ -369,6 +424,7 @@ def render_home_radar(
     macro_context:Mapping[str,Any]|None=None,
     ranking:Any=None,
     separate_observations:Mapping[str,Any]|None=None,
+    freshness:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
     pack_rows=home_rows_from_packs(packs)
     board=compose_fx_board(pack_rows, ranking)
@@ -395,6 +451,7 @@ def render_home_radar(
         ),
         unsafe_allow_html=True,
     )
+    st.markdown(radar_freshness_html(freshness),unsafe_allow_html=True)
     if not rows:
         st.warning("Radar aguardando a Matriz dos pares e dados persistidos.")
         return {"schema":SCHEMA,"rows":0,"mode":mode,"real_orders_enabled":False}
@@ -602,5 +659,5 @@ def render_home_radar(
 
 __all__=[
     "SCHEMA","home_rows_from_packs","home_summary","voice_script_for_row",
-    "render_browser_voice","render_home_radar",
+    "render_browser_voice","radar_freshness_html","render_home_radar",
 ]
