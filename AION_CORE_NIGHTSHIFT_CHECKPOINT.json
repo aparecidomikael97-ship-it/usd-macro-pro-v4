@@ -1,6 +1,6 @@
 {
   "base_sha": "27b605c3088a955934a60a8544245ab41894029b",
-  "session": "retomada-05-document-intelligence-v1",
+  "session": "retomada-05-giant-block",
   "branch": "integration/aion-library-document-intelligence-v1-20261001",
   "completed_waves": [
     "A_DOMAIN_REGISTRY",
@@ -11,7 +11,9 @@
     "LIBRARY_FOUNDATION_V1",
     "LIBRARY_INDEX_V1",
     "LIBRARY_PDF_INGESTION_V1",
-    "LIBRARY_DOCUMENT_INTELLIGENCE_V1_LOCAL"
+    "LIBRARY_DOCUMENT_INTELLIGENCE_V1_LOCAL",
+    "EXECUTOR_TOOL_HUB_PERMISSIONING_AUDIT",
+    "TENANT_PERSISTENCE_GATE_V1_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -22,11 +24,13 @@
     "atlasquant_aion_library_foundation.py",
     "atlasquant_aion_library_index.py",
     "atlasquant_aion_library_pdf_ingestion.py",
-    "atlasquant_aion_library_document_intelligence.py"
+    "atlasquant_aion_library_document_intelligence.py",
+    "atlasquant_aion_tenant_persistence_gate.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
-    "test_atlasquant_aion_library_document_intelligence.py"
+    "test_atlasquant_aion_library_document_intelligence.py",
+    "test_atlasquant_aion_tenant_persistence_gate.py"
   ],
   "production_baseline": {
     "sha": "27b605c3088a955934a60a8544245ab41894029b",
@@ -41,6 +45,9 @@
     "document_intelligence": "9 passed / 0 failed",
     "library_integrated": "80 passed / 0 failed",
     "core_focused": "292 passed / 0 failed / 1 skipped",
+    "tenant_persistence_gate_bundle": "33 passed / 0 failed",
+    "checkpoint_reconciliation": "22 passed / 0 failed",
+    "local_contract_auditor": "PASS / 17 checks / 0 failures",
     "aion_broad": "2118 tests / 1 environment error / 1 skipped",
     "aion_broad_environment_error": "WinError 1314 creating symlink in developer adversarial auditor; no functional regression identified",
     "pip_check": "PASS - no broken requirements",
@@ -58,19 +65,46 @@
     "memory_auto_promotion": false,
     "external_persistence": false
   },
+  "executor_permissioning": {
+    "local_contract_auditor": "PASS",
+    "checks": 17,
+    "failures": 0,
+    "safe_kinds": ["READ", "SEARCH", "DRAFT"],
+    "forbidden_kinds": ["WRITE", "PUBLISH", "PRODUCTION", "SECRETS", "FINANCIAL"],
+    "drael_key_required_for_aion_local_executor": false
+  },
+  "tenant_persistence_gate": {
+    "state": "BLOCKED_BY_DESIGN",
+    "durable_io_implemented": false,
+    "tenant_persistence_enabled": false,
+    "cross_tenant_access_allowed": false,
+    "credential_bound_namespace": true,
+    "explicit_write_approval_required": true,
+    "required_evidence": [
+      "IDENTITY_REGISTRY",
+      "ACL_STORE",
+      "DURABLE_STORE",
+      "TENANT_E2E",
+      "BACKUP_RESTORE",
+      "REVOCATION_REPLAY"
+    ],
+    "fake_green_evidence_can_bypass_code_policy": false
+  },
   "six_day_critical_path": [
-    "EXECUTOR_TOOL_HUB_PERMISSIONING_FAIL_CLOSED",
     "PERSISTENT_IDENTITY_ACL_TENANT_WORKSPACE",
     "MINIMUM_REPRODUCIBLE_E2E",
     "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION",
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "EXECUTOR_TOOL_HUB_PERMISSIONING_FAIL_CLOSED",
+  "next_wave": "PERSISTENT_IDENTITY_ACL_TENANT_WORKSPACE",
   "known_blockers": [
+    "Durable tenant persistence is not implemented yet; tenant store is plan-only",
+    "Tenant persistence remains disabled until durable store and ACL evidence exist",
+    "Required evidence still open: identity registry, ACL store, durable store, tenant E2E, backup/restore, revocation/replay",
     "Full adversarial suite on this Windows host needs symlink privilege or Linux CI for one test",
     "Drael local key/config is absent; main development flow must not wait for it",
-    "Document Intelligence changes are local only until a later authorized remote publication step"
+    "Current giant-block changes are local only until a later authorized remote publication step"
   ],
   "hourly_night_shift_enabled": true,
   "protected_ledger_unchanged": true
