@@ -334,14 +334,18 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("color:#dce8f5",ATLASQUANT_CSS)
         self.assertIn("color:#d8e5f3",ATLASQUANT_CSS)
 
-    def test_full_app_renders_compass_after_navigation_selection(self):
+    def test_full_app_hides_compass_only_on_radar_home(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         nav=src.index("render_stable_navigation(")
-        compass=src.index("experience_compass_html(_aq_experience_mode, _aq_active_page)",nav)
+        guard=src.index('if experience_compass_html is not None and _aq_active_page != "🎯 Radar":',nav)
+        compass=src.index("experience_compass_html(_aq_experience_mode, _aq_active_page)",guard)
         preview=src.index("render_locked_advanced_preview(_aq_active_page)",compass)
-        self.assertLess(nav,compass)
+        self.assertLess(nav,guard)
+        self.assertLess(guard,compass)
         self.assertLess(compass,preview)
+        welcome=src.index("workspace_welcome_html(",nav)
+        self.assertLess(welcome,guard)
 
     def test_experience_overview_makes_beginner_and_advanced_scope_explicit(self):
         beginner=experience_mode_overview_html("Iniciante")

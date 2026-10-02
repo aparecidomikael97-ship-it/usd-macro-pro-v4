@@ -464,7 +464,7 @@ def render_beginner_shell(
         _welcome = workspace_welcome_html(page, mode="Iniciante")
         if _welcome:
             st.markdown(_welcome, unsafe_allow_html=True)
-    if experience_compass_html is not None:
+    if experience_compass_html is not None and page != "🎯 Radar":
         st.markdown(
             experience_compass_html("Iniciante", page),
             unsafe_allow_html=True,
