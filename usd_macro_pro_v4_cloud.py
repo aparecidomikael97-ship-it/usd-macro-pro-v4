@@ -417,6 +417,7 @@ try:
         render_premium_catalog,
         request_premium_card,
         workspace_welcome_html,
+        master_surface_state_html,
     )
 except Exception:
     consume_premium_navigation = None
@@ -424,6 +425,7 @@ except Exception:
     render_premium_catalog = None
     request_premium_card = None
     workspace_welcome_html = None
+    master_surface_state_html = None
 
 try:
     from atlasquant_central_hub_ui import (
@@ -9830,6 +9832,15 @@ if _aq_active_index == 9:
 # =========================================================
 if _aq_active_index == 1:
     if render_master_panel is None:
+        if master_surface_state_html is not None:
+            st.markdown(
+                master_surface_state_html(
+                    "UNAVAILABLE",
+                    "A superfície do Painel Mestre não foi carregada. O restante do AtlasQuant permanece disponível e nenhuma oportunidade será inventada.",
+                    build_id=_ATLASQUANT_VISIBLE_BUILD,
+                ),
+                unsafe_allow_html=True,
+            )
         mark_surface_error(
             st.session_state,
             "master_panel",
@@ -9843,8 +9854,8 @@ if _aq_active_index == 1:
             error_type="IMPORT_UNAVAILABLE",
         )
         st.error(
-            "O Painel Mestre V10.2 não pôde ser carregado. "
-            "Confirme que master_panel_v102.py está na raiz do repositório."
+            "Painel Mestre indisponível neste carregamento. "
+            "O restante do AtlasQuant continua funcionando em modo seguro."
         )
         if _MASTER_V102_IMPORT_ERROR:
             st.caption(f"Diagnóstico: {_MASTER_V102_IMPORT_ERROR}")
@@ -9852,6 +9863,15 @@ if _aq_active_index == 1:
         try:
             _matrix_master_v102 = globals().get("matriz_v61")
             if not isinstance(_matrix_master_v102,pd.DataFrame) or _matrix_master_v102.empty:
+                if master_surface_state_html is not None:
+                    st.markdown(
+                        master_surface_state_html(
+                            "WAITING",
+                            "A interface está carregada, mas a Matriz dos 7 pares ainda não está disponível. Oportunidades e autorização operacional permanecem bloqueadas.",
+                            build_id=_ATLASQUANT_VISIBLE_BUILD,
+                        ),
+                        unsafe_allow_html=True,
+                    )
                 mark_surface_error(
                     st.session_state,
                     "master_panel",
@@ -9884,6 +9904,21 @@ if _aq_active_index == 1:
                 _aq_master_uses_runtime_fallback = (
                     str(_aq_pair_matrix_result.get("source") or "") == "runtime_snapshot"
                 )
+                if master_surface_state_html is not None:
+                    _aq_master_state = "SNAPSHOT" if _aq_master_uses_runtime_fallback else "READY"
+                    _aq_master_detail = (
+                        "Painel carregado por snapshot runtime validado. Leitura disponível; autorizações operacionais permanecem bloqueadas até a Matriz ao vivo voltar."
+                        if _aq_master_uses_runtime_fallback
+                        else "Matriz dos 7 pares disponível. Painel pronto para leitura; qualquer autorização continua dependente dos gates operacionais e da validade temporal."
+                    )
+                    st.markdown(
+                        master_surface_state_html(
+                            _aq_master_state,
+                            _aq_master_detail,
+                            build_id=_ATLASQUANT_VISIBLE_BUILD,
+                        ),
+                        unsafe_allow_html=True,
+                    )
                 if _aq_master_uses_runtime_fallback:
                     # Snapshot mantém o painel visível, mas o gate operacional fica
                     # deliberadamente fechado até a Matriz ao vivo ser reconstruída.
