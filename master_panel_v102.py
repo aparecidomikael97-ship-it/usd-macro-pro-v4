@@ -662,7 +662,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
                 telemetry={
                     "UNIVERSO": _universe_n,
                     "MARKET MAP": "PERSISTIDO",
-                    "SAFETY CORE": "ATIVO",
+                    "SAFETY CORE": "MONITORADO",
                     "EXECUÇÃO": "BLOQUEADA",
                 },
             ),
