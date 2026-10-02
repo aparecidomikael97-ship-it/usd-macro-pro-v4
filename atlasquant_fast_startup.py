@@ -422,24 +422,34 @@ def render_beginner_shell(
         render_top_voice_access(st.session_state, pages=_dock_pages, fast=True)
     except Exception:
         pass
-    c1,c2=st.columns([4,1])
-    with c1:
-        input_age=check.get("input_age_minutes")
-        age_label=f"Runtime atualizado há {age:.0f} min"
-        if isinstance(input_age,(int,float)) and input_age>age+1:
-            age_label+=f" · base macro há {float(input_age):.0f} min"
-        st.caption(f"{age_label} · {environment or 'AtlasQuant'} · Engine {app_version}")
-    with c2:
-        if st.button("↻ Atualizar",key="aq_fast_refresh",width="stretch"):
-            load_home_snapshot.clear()
-            st.rerun()
-
     pages=_fast_pages
     _aq_fast_active_page=str(st.session_state.get("aq_beginner_page") or "🎯 Radar")
     _aq_fast_catalog_home=bool(
         render_premium_catalog is not None
         and _aq_fast_active_page=="🎯 Radar"
     )
+
+    input_age=check.get("input_age_minutes")
+    age_label=f"Runtime atualizado há {age:.0f} min"
+    if isinstance(input_age,(int,float)) and input_age>age+1:
+        age_label+=f" · base macro há {float(input_age):.0f} min"
+
+    if _aq_fast_catalog_home:
+        # O Radar já mostra estado, idade, atualização e origem na faixa de frescor.
+        # Mantém aqui somente a ação manual para evitar repetir telemetria no topo.
+        _spacer,_refresh=st.columns([4,1])
+        with _refresh:
+            if st.button("↻ Atualizar",key="aq_fast_refresh",width="stretch"):
+                load_home_snapshot.clear()
+                st.rerun()
+    else:
+        # Fora da home, os detalhes técnicos seguem disponíveis sob demanda sem
+        # ocupar permanentemente o topo de cada workspace.
+        with st.expander("Dados do snapshot",expanded=False):
+            st.caption(f"{age_label} · {environment or 'AtlasQuant'} · Engine {app_version}")
+            if st.button("↻ Atualizar",key="aq_fast_refresh",width="stretch"):
+                load_home_snapshot.clear()
+                st.rerun()
     if _aq_fast_catalog_home:
         if experience_mode_overview_html is not None:
             st.markdown(experience_mode_overview_html("Iniciante"), unsafe_allow_html=True)

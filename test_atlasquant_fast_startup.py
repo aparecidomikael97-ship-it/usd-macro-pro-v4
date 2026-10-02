@@ -202,6 +202,25 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn('key="aq_fast_refresh"',shell)
         self.assertIn('age_label=f"Runtime atualizado há {age:.0f} min"',shell)
 
+    def test_fast_snapshot_controls_are_contextual_not_global_telemetry(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        shell=src[src.index("def render_beginner_shell"):]
+
+        active=shell.index('_aq_fast_active_page=str(st.session_state.get("aq_beginner_page") or "🎯 Radar")')
+        home=shell.index("if _aq_fast_catalog_home:",active)
+        offhome=shell.index('with st.expander("Dados do snapshot",expanded=False):',home)
+        caption=shell.index('st.caption(f"{age_label}',offhome)
+        refresh=shell.index('key="aq_fast_refresh"',home)
+
+        self.assertLess(active,home)
+        self.assertLess(home,offhome)
+        self.assertLess(offhome,caption)
+        self.assertLess(home,refresh)
+        self.assertIn("O Radar já mostra estado, idade, atualização e origem",shell)
+        self.assertIn('st.expander("Dados do snapshot",expanded=False)',shell)
+        self.assertEqual(shell.count('key="aq_fast_refresh"'),2)
+
     def test_fast_home_guidance_is_not_rendered_globally(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
