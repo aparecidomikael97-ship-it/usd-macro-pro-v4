@@ -18,7 +18,8 @@
     "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION_V1_LOCAL",
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING_LOCAL",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING_LOCAL",
-    "TENANT_EVIDENCE_DIGEST_BINDING_LOCAL"
+    "TENANT_EVIDENCE_DIGEST_BINDING_LOCAL",
+    "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -34,7 +35,8 @@
     "atlasquant_aion_tenant_durable_store.py",
     "atlasquant_aion_core_consolidation_gate.py",
     "atlasquant_aion_recovery_traceability_gate.py",
-    "atlasquant_aion_tenant_evidence_binding.py"
+    "atlasquant_aion_tenant_evidence_binding.py",
+    "atlasquant_aion_tenant_evidence_bundle.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
@@ -48,7 +50,9 @@
     "test_atlasquant_aion_core_nightshift_bridge.py",
     "atlasquant_aion_developer_adversarial_auditor.py",
     "test_atlasquant_aion_recovery_traceability_gate.py",
-    "test_atlasquant_aion_tenant_evidence_binding.py"
+    "test_atlasquant_aion_tenant_evidence_binding.py",
+    "test_atlasquant_aion_tenant_evidence_bundle.py",
+    "docs/aion/evidence/tenant_persistence_local_evidence.json"
   ],
   "production_baseline": {
     "sha": "27b605c3088a955934a60a8544245ab41894029b",
@@ -82,7 +86,9 @@
     "recovery_traceability_bundle": "120 passed / 0 failed",
     "aion_full_regression": "2160 passed / 0 failed / 1 skipped",
     "windows_symlink_environment_error": "CLOSED - full AION suite green",
-    "tenant_evidence_binding_bundle": "51 passed / 0 failed"
+    "tenant_evidence_binding_bundle": "51 passed / 0 failed",
+    "tenant_real_evidence_bundle": "57 passed / 0 failed",
+    "aion_full_regression_after_evidence_bundle": "2173 passed / 0 failed / 1 skipped"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -139,12 +145,12 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP",
+  "next_wave": "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP",
   "known_blockers": [
-    "A real local tenant evidence bundle still needs to be generated from a bound test run before admin review",
-    "Production tenant persistence remains intentionally disabled and requires explicit authorization after evidence review",
+    "Production tenant persistence remains intentionally disabled and requires explicit administrative authorization after review",
+    "The current integration branch has not yet been pushed or validated by remote CI",
     "Drael local key/config is absent; main development flow must not wait for it",
-    "Current changes remain local only until a later authorized remote publication step"
+    "All current advances remain local until an explicitly authorized remote publication step"
   ],
   "hourly_night_shift_enabled": true,
   "protected_ledger_unchanged": true,
@@ -221,6 +227,19 @@
     "subject_tamper_detected": true,
     "result_tamper_detected": true,
     "evidence_is_authority": false,
+    "automatic_activation": false
+  },
+  "tenant_local_evidence_bundle": {
+    "state": "READY_FOR_ADMIN_REVIEW_LOCAL_ONLY",
+    "path": "docs/aion/evidence/tenant_persistence_local_evidence.json",
+    "source_head_sha": "e6e68ed6f8fe18167d25d60aa24f766f2a1f5062",
+    "test_count": 51,
+    "result_digest": "sha256:b2c17cb1c2d740c63695ab192279b9bbf45107df9eb0cce8144a41de2d3665dc",
+    "bundle_digest": "sha256:6b09c62546845fda74e491d090d4793acb7e9af5e9b44ce80fcd428865987b8a",
+    "current_sources_revalidated": true,
+    "gate_state": "READY_FOR_ADMIN_REVIEW",
+    "evidence_is_authority": false,
+    "production_persistence_activated": false,
     "automatic_activation": false
   }
 }
