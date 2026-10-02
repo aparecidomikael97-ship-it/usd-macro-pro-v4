@@ -3,7 +3,7 @@ from io import BytesIO
 
 from pypdf import PdfWriter
 
-from atlasquant_aion_library_preview import build_library_pdf_preview
+from atlasquant_aion_library_preview import apply_library_review_decision, build_library_pdf_preview
 
 
 def _pdf_with_text(text: str) -> bytes:
@@ -115,6 +115,68 @@ class AionLibraryPreviewTests(unittest.TestCase):
         )
         self.assertFalse(result["ocr_handoff"]["ocr_executed"])
         self.assertFalse(result["execution_authorized"])
+
+    def test_explicit_conflicting_review_requires_cross_source_evidence(self):
+        raw = _pdf_with_text(" ".join(["CPI inflation source conflict"] * 80))
+        preview = build_library_pdf_preview(
+            _admin(),
+            pdf_bytes=raw,
+            filename="conflict.pdf",
+            title="Macro Guide",
+            document_version="1",
+            rights_status="OWNED",
+        )
+        blocked = apply_library_review_decision(
+            _admin(),
+            preview,
+            decision="CONFLICTING",
+            reason="Fonte diverge de outro documento revisado.",
+        )
+        self.assertEqual(blocked["status"], "BLOCKED")
+        self.assertIn("CROSS_SOURCE_EVIDENCE_REQUIRED", blocked["blockers"])
+
+        reviewed = apply_library_review_decision(
+            _admin(),
+            preview,
+            decision="CONFLICTING",
+            reason="Fonte diverge de outro documento revisado.",
+            related_document_ids=["DOC-PEER-1"],
+        )
+        self.assertEqual(reviewed["status"], "REVIEW_INDEX_READY")
+        self.assertEqual(reviewed["decision"], "CONFLICTING")
+        self.assertEqual(reviewed["reviewed_record"]["state"], "CONFLICTING")
+        self.assertIn("DOC-PEER-1", reviewed["reviewed_record"]["evidence_refs"])
+        self.assertFalse(reviewed["memory_promoted"])
+        self.assertFalse(reviewed["execution_authorized"])
+        self.assertFalse(reviewed["external_action_executed"])
+
+    def test_nonvalidated_review_requires_reason_and_is_preserved_without_index_when_quarantined(self):
+        raw = _pdf_with_text(" ".join(["document review quarantine"] * 80))
+        preview = build_library_pdf_preview(
+            _admin(),
+            pdf_bytes=raw,
+            filename="review.pdf",
+            rights_status="OWNED",
+        )
+        blocked = apply_library_review_decision(
+            _admin(),
+            preview,
+            decision="QUARANTINED",
+        )
+        self.assertEqual(blocked["status"], "BLOCKED")
+        self.assertIn("REVIEW_REASON_REQUIRED", blocked["blockers"])
+
+        quarantined = apply_library_review_decision(
+            _admin(),
+            preview,
+            decision="QUARANTINED",
+            reason="Evidência insuficiente para validação.",
+        )
+        self.assertEqual(quarantined["status"], "REVIEW_STAGED")
+        self.assertEqual(quarantined["reviewed_record"]["state"], "QUARANTINED")
+        self.assertIsNone(quarantined["temporary_index"])
+        self.assertEqual(quarantined["indexed_passages"], 0)
+        self.assertFalse(quarantined["memory_promoted"])
 
     def test_untrusted_or_incomplete_admin_context_is_blocked(self):
         result = build_library_pdf_preview(

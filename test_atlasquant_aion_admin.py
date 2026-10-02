@@ -893,6 +893,21 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn('st.session_state["aion_last_route"] = route',src)
         self.assertIn("Roteamento:",src)
 
+    def test_library_workspace_uses_canonical_persona_capability_snapshot(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        start = src.index("def _render_library(")
+        end = src.index("def _render_promotions(", start)
+        block = src[start:end]
+        self.assertIn('_render_persona_capabilities(', block)
+        self.assertIn('"library"', block)
+        self.assertIn('"documents"', block)
+        self.assertIn('"quality"', block)
+        self.assertIn('"conflicts": {"truth_state": "CONFIRMED", "source": "library_cross_source"}', block)
+        self.assertIn('"ocr_plan"', block)
+        self.assertNotIn("real_trade", block)
+        self.assertNotIn("deploy_production", block)
+        self.assertNotIn("merge_main", block)
+
     def test_contextual_voice_exists_for_all_aion_workspaces(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertGreaterEqual(src.count("_context_voice("),10)

@@ -23,6 +23,7 @@ FORBIDDEN_ACTIONS = frozenset({
 
 OFFICIAL_AREA_IDS = (
     "central",
+    "library",
     "atlasquant",
     "administration",
     "development",
@@ -35,6 +36,7 @@ OFFICIAL_AREA_IDS = (
 # Historical portable order, then the areas that were missing from the shell.
 PORTABLE_WORKSPACE_ORDER = (
     "central",
+    "library",
     "atlasquant",
     "studio",
     "business",
@@ -47,6 +49,7 @@ PORTABLE_WORKSPACE_ORDER = (
 # Historical console persona order, then Investments and Central.
 PUBLIC_PERSONA_ORDER = (
     "trader",
+    "library",
     "admin",
     "developer",
     "video",
@@ -58,6 +61,7 @@ PUBLIC_PERSONA_ORDER = (
 
 REQUIRED_AREA_CAPABILITIES = {
     "central": ("central.conversation",),
+    "library": ("research.synthesize",),
     "atlasquant": ("market.explain", "macro.explain", "ict.explain"),
     "administration": ("admin.status",),
     "development": ("development.inspect", "development.sandbox"),
@@ -149,6 +153,26 @@ _AREAS: tuple[dict[str, Any], ...] = (
         persona_capability_keys=("conversation", "research", "risk"),
         allowed_actions=_READ_ONLY,
         console_workspace="🧠 Central",
+    ),
+    _area(
+        workspace_id="library",
+        persona_id="library",
+        label="Biblioteca",
+        title="AION Biblioteca",
+        kind="KNOWLEDGE_LIBRARY",
+        domain="library",
+        purpose="Inspecionar, classificar e revisar documentos locais com proveniência; nunca promove memória nem executa OCR automaticamente.",
+        state="READY",
+        admin_only=True,
+        specialist_ids=("research", "risk"),
+        capability_ids=("research.synthesize", "risk.assess"),
+        persona_capability_keys=(
+            "documents", "metadata", "provenance", "quality",
+            "classification", "conflicts", "review",
+            "temporary_index", "ocr_plan",
+        ),
+        allowed_actions=_READ_ONLY,
+        console_workspace="📚 Biblioteca",
     ),
     _area(
         workspace_id="atlasquant",

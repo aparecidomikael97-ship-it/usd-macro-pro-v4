@@ -33,7 +33,8 @@ from atlasquant_aion_core import (
 )
 from atlasquant_aion_gateway import local_answer, provider_status
 from atlasquant_aion_command_orchestrator import orchestrate_local_command
-from atlasquant_aion_library_preview import build_library_pdf_preview
+from atlasquant_aion_library_cross_source import compare_library_records
+from atlasquant_aion_library_preview import apply_library_review_decision, build_library_pdf_preview
 from atlasquant_aion_workspaces import (
     AION_PERSONAS,
     admin_brief_lines,
@@ -606,6 +607,7 @@ _WORKING_SOURCE_KEY = "aion_working_checkpoint_source_digest"
 _WORKING_DIRTY_KEY = "aion_working_checkpoint_dirty"
 _WORKING_CONFLICT_KEY = "aion_working_checkpoint_conflict"
 _AION_WORKSPACE_JUMP_KEY = "aion_admin_workspace_jump"
+_AION_LIBRARY_REVIEWED_RECORDS_KEY = "aion_library_reviewed_records_v1"
 _AION_ADMIN_ONBOARDING_PROGRESS_KEY = "aion_admin_onboarding_progress_v1"
 _AION_ADMIN_ONBOARDING_STARTED_KEY = "aion_admin_onboarding_started_v1"
 _AION_ADMIN_ONBOARDING_MODE_KEY = "aion_admin_onboarding_mode_v1"
@@ -10430,6 +10432,20 @@ def _render_development(
 
 def _render_library(access: Mapping[str, Any]) -> None:
     st.markdown("### 📚 Biblioteca AION")
+    _render_persona_capabilities(
+        "library",
+        {
+            "documents": {"truth_state": "CONFIRMED", "source": "library_preview"},
+            "metadata": {"truth_state": "CONFIRMED", "source": "document_intelligence"},
+            "provenance": {"truth_state": "CONFIRMED", "source": "library_foundation"},
+            "quality": {"truth_state": "CONFIRMED", "source": "document_intelligence"},
+            "classification": {"truth_state": "CONFIRMED", "source": "pdf_ingestion"},
+            "conflicts": {"truth_state": "CONFIRMED", "source": "library_cross_source"},
+            "review": {"truth_state": "CONFIRMED", "source": "library_preview"},
+            "temporary_index": {"truth_state": "CONFIRMED", "source": "library_index"},
+            "ocr_plan": {"truth_state": "CONFIRMED", "source": "document_intelligence"},
+        },
+    )
     _context_voice(
         "Biblioteca",
         (
@@ -10456,6 +10472,12 @@ def _render_library(access: Mapping[str, Any]) -> None:
         value="",
         key="aion_library_pdf_title",
     )
+    document_version = st.text_input(
+        "Versão do documento",
+        value="1",
+        key="aion_library_document_version",
+        help="Usada apenas para proveniência e comparação entre versões.",
+    )
     rights_status = st.selectbox(
         "Direitos de uso",
         ("UNKNOWN", "OWNED", "LICENSED", "PUBLIC"),
@@ -10472,6 +10494,7 @@ def _render_library(access: Mapping[str, Any]) -> None:
         pdf_bytes=raw,
         filename=uploaded.name,
         title=title,
+        document_version=document_version,
         rights_status=rights_status,
         approve_review=False,
     )
@@ -10531,38 +10554,119 @@ def _render_library(access: Mapping[str, Any]) -> None:
         )
         return
 
+    reviewed_records = [
+        dict(item)
+        for item in list(st.session_state.get(_AION_LIBRARY_REVIEWED_RECORDS_KEY, []) or [])
+        if isinstance(item, Mapping)
+    ]
+    staged_record = (
+        dict(staged.get("record") or {})
+        if isinstance(staged.get("record"), Mapping)
+        else {}
+    )
+    comparison = compare_library_records(staged_record, reviewed_records)
+    hints = list(comparison.get("hints") or [])
+    if hints:
+        with st.expander("Cruzamento com documentos já revisados nesta sessão", expanded=True):
+            st.caption(
+                "São apenas indícios determinísticos para revisão humana; "
+                "o AION não decide conflito nem verdade automaticamente."
+            )
+            st.dataframe(hints, width="stretch", hide_index=True)
+    elif reviewed_records:
+        st.caption(
+            f"Cruzamento local concluído com {int(comparison.get('compared_peers') or 0)} "
+            "documento(s); nenhum indício determinístico foi encontrado."
+        )
+
+    review_decision = st.selectbox(
+        "Decisão de revisão",
+        ("VALIDATED", "CONFLICTING", "STALE", "QUARANTINED", "REJECTED"),
+        key="aion_library_review_decision",
+        help=(
+            "CONFLICTING exige referência a outro documento. "
+            "Estados diferentes de VALIDATED exigem motivo de auditoria."
+        ),
+    )
+    peer_options: dict[str, str] = {}
+    for peer in reviewed_records:
+        peer_id = str(peer.get("document_id") or "").strip()
+        if not peer_id:
+            continue
+        label = f"{str(peer.get('title') or 'Documento')[:64]} · {peer_id[:14]}"
+        peer_options[label] = peer_id
+    selected_peer_labels = st.multiselect(
+        "Documentos relacionados / evidência cruzada",
+        options=list(peer_options),
+        key="aion_library_related_documents",
+        help="Obrigatório quando a decisão for CONFLICTING.",
+    )
+    related_document_ids = [
+        peer_options[label]
+        for label in selected_peer_labels
+        if label in peer_options
+    ]
+    review_reason = st.text_area(
+        "Motivo da revisão",
+        value="",
+        max_chars=500,
+        key="aion_library_review_reason",
+        help="Obrigatório para CONFLICTING, STALE, QUARANTINED e REJECTED.",
+    )
     confirm = st.checkbox(
-        "Revisei este PDF e autorizo montar somente um índice local temporário nesta sessão",
+        "Confirmo que revisei este PDF e que a decisão acima é humana e explícita",
         value=False,
         key="aion_library_review_confirm",
     )
     if st.button(
-        "✅ Validar e montar índice local temporário",
-        key="aion_library_review_index",
+        "✅ Aplicar revisão local",
+        key="aion_library_review_apply",
         disabled=not bool(confirm),
         width="stretch",
     ):
-        reviewed = build_library_pdf_preview(
+        reviewed = apply_library_review_decision(
             access,
-            pdf_bytes=raw,
-            filename=uploaded.name,
-            title=title,
-            rights_status=rights_status,
-            approve_review=True,
+            preview,
+            decision=review_decision,
+            reason=review_reason,
+            related_document_ids=related_document_ids,
+            build_temporary_index=True,
         )
-        if reviewed.get("status") == "REVIEW_INDEX_READY":
-            result = reviewed.get("review") if isinstance(reviewed.get("review"), Mapping) else {}
-            st.success(
-                f"Revisão concluída. {int(result.get('indexed_passages') or 0)} "
-                "passagem(ns) montada(s) no índice temporário."
+        if reviewed.get("status") in {"REVIEW_INDEX_READY", "REVIEW_STAGED"}:
+            reviewed_record = (
+                dict(reviewed.get("reviewed_record") or {})
+                if isinstance(reviewed.get("reviewed_record"), Mapping)
+                else {}
             )
+            doc_id = str(reviewed_record.get("document_id") or "")
+            updated_records = [
+                row for row in reviewed_records
+                if str(row.get("document_id") or "") != doc_id
+            ]
+            if reviewed_record:
+                updated_records.append(reviewed_record)
+            st.session_state[_AION_LIBRARY_REVIEWED_RECORDS_KEY] = updated_records[-50:]
+
+            state = str(reviewed_record.get("state") or review_decision)
+            if reviewed.get("status") == "REVIEW_INDEX_READY":
+                st.success(
+                    f"Revisão {state} concluída. "
+                    f"{int(reviewed.get('indexed_passages') or 0)} passagem(ns) "
+                    "montada(s) no índice temporário."
+                )
+            else:
+                st.info(
+                    f"Revisão {state} registrada somente na sessão. "
+                    "Este estado não é indexável e foi preservado para auditoria."
+                )
             st.caption(
-                "O índice não foi persistido externamente, não promoveu memória e não autorizou ações."
+                "Nada foi persistido externamente, nada foi promovido à memória, "
+                "OCR não foi executado e nenhuma ação ganhou autoridade."
             )
         else:
             blockers = ", ".join(str(x) for x in reviewed.get("blockers") or [])
             st.error(
-                "A revisão/indexação local não pôde ser concluída. "
+                "A revisão local não pôde ser concluída. "
                 f"{blockers or 'Estado não confirmado'}."
             )
 
