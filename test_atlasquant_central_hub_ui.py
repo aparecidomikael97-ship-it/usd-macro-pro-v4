@@ -341,6 +341,15 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertTrue(resolve_central_area(admin, "central")["root"])
         self.assertTrue(resolve_central_area(admin, "central_root")["root"])
 
+    def test_root_controls_do_not_render_a_disabled_self_button(self):
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        controls = source[source.index("def _render_central_navigation_controls"):source.index("def render_central_hub")]
+        self.assertIn("if current == CENTRAL_ROOT:", controls)
+        self.assertIn("targets = area_targets", controls)
+        self.assertIn('targets = [("central", "Central Principal")] + [', controls)
+        self.assertIn("if item[0] != current", controls)
+        self.assertNotIn("disabled=disabled", controls)
+
     def test_streamlit_edge_uses_stateful_controls_not_query_anchors(self):
         source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
         self.assertIn("def _render_central_navigation_controls", source)
@@ -704,9 +713,14 @@ class AionHomeViewerTests(unittest.TestCase):
 
     def test_central_controls_are_explicit_and_master_panel_stays_visible(self):
         hub = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
-        self.assertIn("#### Acessos da Central", hub)
+        self.assertIn("#### Escolha e abra um setor", hub)
+        self.assertIn("#### Trocar de setor", hub)
+        self.assertIn("Acesso protegido pela sessão autenticada atual.", hub)
+        self.assertIn("Navegue pelo ecossistema sem sair da sessão autenticada.", hub)
         self.assertIn('"Abrir " + label', hub)
+        self.assertIn('"← Central Principal"', hub)
         self.assertIn('key=f"aq_central_stateful_{area_id}"', hub)
+        self.assertNotIn("Os cartões acima são um mapa visual; a navegação real acontece aqui.", hub)
 
         admin = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn("def _render_master_status_summary", admin)

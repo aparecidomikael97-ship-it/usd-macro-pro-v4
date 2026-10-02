@@ -862,19 +862,23 @@ def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, re
 
     current = CENTRAL_ROOT if resolved.get("root") else str(resolved.get("area") or "")
     model = central_visibility_model(access)
-    targets = [("central", "Central Principal")] + [
+    area_targets = [
         (str(area["id"]), str(area["label"])) for area in model["areas"]
     ]
-    st.markdown("#### Acessos da Central")
-    st.caption(
-        "Use estes botões para abrir um setor na mesma sessão autenticada. "
-        "Os cartões acima são um mapa visual; a navegação real acontece aqui."
-    )
+    if current == CENTRAL_ROOT:
+        targets = area_targets
+        st.markdown("#### Escolha e abra um setor")
+        st.caption("Acesso protegido pela sessão autenticada atual.")
+    else:
+        targets = [("central", "Central Principal")] + [
+            item for item in area_targets if item[0] != current
+        ]
+        st.markdown("#### Trocar de setor")
+        st.caption("Navegue pelo ecossistema sem sair da sessão autenticada.")
     columns = st.columns(2)
     for index, (area_id, label) in enumerate(targets):
-        disabled = (current == CENTRAL_ROOT and area_id == "central") or current == area_id
         action_label = (
-            "Central Principal"
+            "← Central Principal"
             if area_id == "central"
             else "Abrir " + label
         )
@@ -883,7 +887,6 @@ def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, re
                 action_label,
                 key=f"aq_central_stateful_{area_id}",
                 width="stretch",
-                disabled=disabled,
             ):
                 request_central_destination(st.session_state, access, area_id)
                 st.rerun()
