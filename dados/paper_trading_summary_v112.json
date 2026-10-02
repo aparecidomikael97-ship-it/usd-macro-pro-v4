@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-10-02T08:49:57.885288+00:00",
+    "ran_at": "2026-10-02T09:27:29.978896+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -37,7 +37,7 @@
         "soft_blocks": [
           "Risco de evento elevado",
           "ICT incompleto (34/100)",
-          "Fluxo institucional incompleto (67/100)",
+          "Fluxo institucional incompleto (62/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -45,13 +45,25 @@
       "USD/CAD": {
         "side": "BUY",
         "passed": false,
-        "state": "🔴 BLOQUEADO",
-        "hard_blocks": [
-          "H1 está contra o viés"
-        ],
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "hard_blocks": [],
         "soft_blocks": [
           "Risco de evento elevado",
-          "ICT incompleto (52/100)",
+          "ICT incompleto (40/100)",
+          "M15 ainda não confirmou gatilho"
+        ],
+        "daily_gain_lock": false
+      },
+      "NZD/USD": {
+        "side": "SELL",
+        "passed": false,
+        "state": "⚪ EM OBSERVAÇÃO",
+        "hard_blocks": [],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "Risco de evento elevado",
+          "ICT incompleto (57/100)",
+          "Fluxo institucional incompleto (56/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -67,20 +79,7 @@
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
           "ICT incompleto (68/100)",
-          "M15 ainda não confirmou gatilho"
-        ],
-        "daily_gain_lock": false
-      },
-      "NZD/USD": {
-        "side": "SELL",
-        "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
-        "hard_blocks": [],
-        "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "Risco de evento elevado",
-          "ICT incompleto (57/100)",
-          "Fluxo institucional incompleto (57/100)",
+          "Fluxo institucional incompleto (62/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -88,27 +87,26 @@
       "EUR/USD": {
         "side": "SELL",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "ICT incompleto (43/100)",
-          "Fluxo institucional incompleto (60/100)",
+          "ICT incompleto (58/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
       "GBP/USD": {
-        "side": "SELL",
+        "side": "WAIT",
         "passed": false,
-        "state": "⚪ EM OBSERVAÇÃO",
+        "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "Risco de evento elevado",
-          "ICT incompleto (55/100)",
-          "Fluxo institucional incompleto (53/100)",
+          "ICT incompleto (0/100)",
+          "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -119,6 +117,7 @@
         "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [],
         "soft_blocks": [
+          "Gate ainda não liberou execução",
           "Risco de evento elevado",
           "ICT incompleto (0/100)",
           "Fluxo institucional incompleto (0/100)",
