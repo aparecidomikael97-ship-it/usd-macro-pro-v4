@@ -334,6 +334,12 @@ st.markdown(identity_marker_html(_ATLASQUANT_RUNTIME_IDENTITY), unsafe_allow_htm
 # It lets the production smoke prove that the executable app bundle matches the
 # checked-out code even when RENDER_GIT_COMMIT is unavailable.
 _ATLASQUANT_SOURCE_BUILD=short_source_fingerprint(Path(__file__).resolve().parent,16)
+_ATLASQUANT_VISIBLE_BUILD=(
+    _ATLASQUANT_DEPLOY_COMMIT[:8]
+    if _ATLASQUANT_DEPLOY_COMMIT
+    else str(_ATLASQUANT_SOURCE_BUILD or "")[:8]
+)
+st.session_state["atlasquant_visible_build"]=_ATLASQUANT_VISIBLE_BUILD
 st.markdown(
     (
         '<div id="atlasquant-source-build-marker" '
@@ -2474,7 +2480,11 @@ st.session_state["atlasquant_advanced_boot"] = {
 }
 
 if render_atlasquant_header is not None:
-    render_atlasquant_header(APP_VERSION, environment=ATLASQUANT_ENVIRONMENT)
+    render_atlasquant_header(
+        APP_VERSION,
+        environment=ATLASQUANT_ENVIRONMENT,
+        build_id=_ATLASQUANT_VISIBLE_BUILD,
+    )
     try:
         from atlasquant_ui_v1 import render_account_identity
         render_account_identity(_ATLASQUANT_ACCESS)
