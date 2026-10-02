@@ -4,6 +4,7 @@ from atlasquant_home_radar import (
     home_rows_from_packs,
     home_summary,
     radar_operational_model,
+    radar_freshness_html,
     voice_script_for_row,
     RADAR_VISIBLE_LIMIT,
 )
@@ -79,6 +80,40 @@ def _pack(
 
 
 class AtlasQuantHomeRadarTests(unittest.TestCase):
+    def test_radar_freshness_strip_is_truthful_for_validated_snapshot(self):
+        html=radar_freshness_html({
+            "state":"VALIDATED_SNAPSHOT",
+            "generated_at":"2026-10-02T18:40:00+00:00",
+            "age_minutes":17.4,
+            "refresh_status":"carregamento rápido concluído",
+            "source":"runtime snapshot · raw",
+        })
+        self.assertIn("SNAPSHOT VALIDADO",html)
+        self.assertIn("2026-10-02T18:40:00+00:00",html)
+        self.assertIn("17 min",html)
+        self.assertIn("carregamento rápido concluído",html)
+        self.assertIn("runtime snapshot · raw",html)
+        self.assertIn('aria-label="Frescor e atualização do Radar"',html)
+
+    def test_radar_freshness_retained_package_is_not_called_live(self):
+        html=radar_freshness_html({
+            "state":"LIVE_REFRESH",
+            "generated_at":"2026-10-02T18:40:00+00:00",
+            "refresh_status":"pacote anterior mantido; fonte sem detalhe",
+            "source":"snapshot runtime preservado",
+        })
+        self.assertIn("PACOTE ANTERIOR MANTIDO",html)
+        self.assertNotIn("ATUALIZAÇÃO AO VIVO CONCLUÍDA",html)
+        self.assertIn('data-tone="warn"',html)
+
+    def test_radar_freshness_unknown_fails_visibly_closed_and_escapes_source(self):
+        html=radar_freshness_html({"source":"<script>alert(1)</script>"})
+        self.assertIn("FRESCOR NÃO COMPROVADO",html)
+        self.assertIn("horário não comprovado",html)
+        self.assertIn("N/D",html)
+        self.assertNotIn("<script>",html)
+        self.assertIn("&lt;script&gt;",html)
+
     def test_valid_buy_remains_analysis_buy(self):
         rows=home_rows_from_packs([_pack()])
         self.assertEqual(rows[0]["bias"],"COMPRA")

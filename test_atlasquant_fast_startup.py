@@ -171,6 +171,28 @@ class FastStartupTests(unittest.TestCase):
         self.assertLess(pages,compass)
         self.assertLess(compass,radar)
 
+    def test_fast_beginner_radar_passes_validated_freshness_metadata(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        radar=src.index('if page=="🎯 Radar":')
+        block=src[radar:radar+2400]
+        self.assertIn('"state":"VALIDATED_SNAPSHOT"',block)
+        self.assertIn('"age_minutes":age',block)
+        self.assertIn('"refresh_status":"carregamento rápido concluído"',block)
+        self.assertIn('"source":"runtime snapshot"',block)
+        self.assertIn("freshness=_freshness",block)
+
+    def test_advanced_radar_passes_boot_freshness_without_touching_engine(self):
+        from pathlib import Path
+        src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+        radar=src.index("if render_home_radar is not None:")
+        block=src[radar:radar+2600]
+        self.assertIn("_aq_radar_freshness",block)
+        self.assertIn('"source"]=_aq_fresh_source',block)
+        self.assertIn("freshness=_aq_radar_freshness",block)
+        self.assertNotIn("real_orders_enabled=True",block)
+        self.assertNotIn("automatic_execution=True",block)
+
     def test_fast_beginner_compass_never_expands_trading_permissions(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")

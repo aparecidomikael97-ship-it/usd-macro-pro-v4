@@ -462,6 +462,14 @@ def render_beginner_shell(
         _macro=dict(_inputs.get("macro_context",{}) or {})
         _fast=dict(_inputs.get("fast_boot",{}) or {})
         _macro["fed"]=dict(_fast.get("fed",{}) or {})
+        _transport=str(_obs.get("source") or "").strip()
+        _freshness={
+            "state":"VALIDATED_SNAPSHOT",
+            "generated_at":str(snapshot.get("runtime_generated_at") or snapshot.get("generated_at") or ""),
+            "age_minutes":age,
+            "refresh_status":"carregamento rápido concluído",
+            "source":"runtime snapshot" + (f" · {_transport}" if _transport else ""),
+        }
         render_home_radar(
             list(snapshot.get("packs",[]) or []),
             experience_mode="Iniciante",
@@ -471,6 +479,7 @@ def render_beginner_shell(
                 "indices": list(_fast.get("indices",[]) or []),
                 "cryptos": list(_fast.get("cryptos",[]) or []),
             },
+            freshness=_freshness,
         )
     elif page=="🎙️ Macro":
         from atlasquant_macro_briefing_panel import render_macro_briefing_panel
