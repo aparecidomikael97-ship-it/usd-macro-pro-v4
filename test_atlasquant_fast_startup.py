@@ -191,6 +191,22 @@ class FastStartupTests(unittest.TestCase):
         self.assertNotIn("RENDER_GIT_COMMIT",chrome)
         self.assertNotIn("GIT_COMMIT",chrome)
 
+    def test_fast_home_guidance_is_not_rendered_globally(self):
+        from pathlib import Path
+        src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
+        chrome=src[src.index("def _render_beginner_chrome"):src.index("def render_beginner_shell")]
+        self.assertNotIn('experience_mode_overview_html("Iniciante")',chrome)
+        self.assertNotIn("mobile_navigation_hint_html()",chrome)
+        home=src.index("_aq_fast_catalog_home=bool(")
+        guard=src.index("if _aq_fast_catalog_home:",home)
+        overview=src.index('experience_mode_overview_html("Iniciante")',guard)
+        hint=src.index("mobile_navigation_hint_html()",overview)
+        catalog=src.index("render_premium_catalog(",hint)
+        self.assertLess(home,guard)
+        self.assertLess(guard,overview)
+        self.assertLess(overview,hint)
+        self.assertLess(hint,catalog)
+
     def test_fast_beginner_radar_passes_validated_freshness_metadata(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
