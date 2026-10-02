@@ -1,5 +1,6 @@
 import unittest
 
+from atlasquant_aion_tenant_evidence_binding import build_evidence_record
 from atlasquant_aion_tenant_persistence_gate import (
     REQUIRED_EVIDENCE,
     tenant_persistence_readiness,
@@ -8,11 +9,12 @@ from atlasquant_aion_tenant_persistence_gate import (
 
 def _pass_evidence():
     return {
-        name: {
-            "status": "PASS",
-            "digest": "sha256:" + ("a" * 64),
-            "scope": "tenant/workspace",
-        }
+        name: build_evidence_record(
+            name,
+            subject_digest="sha256:" + ("a" * 64),
+            result_digest="sha256:" + ("b" * 64),
+            test_count=10,
+        )
         for name in REQUIRED_EVIDENCE
     }
 
@@ -45,13 +47,9 @@ class AionTenantPersistenceGateTests(unittest.TestCase):
 
     def test_pass_without_bound_digest_is_not_valid_evidence(self):
         evidence = _pass_evidence()
-        evidence["ACL_STORE"] = {
-            "status": "PASS",
-            "digest": "not-a-bound-digest",
-            "scope": "tenant/workspace",
-        }
+        evidence["ACL_STORE"]["digest"] = "not-a-bound-digest"
         result = tenant_persistence_readiness(evidence)
-        self.assertIn("EVIDENCE_ACL_STORE_DIGEST_INVALID", result["blockers"])
+        self.assertIn("EVIDENCE_ACL_STORE_BINDING_INVALID", result["blockers"])
         self.assertFalse(result["evidence"]["ACL_STORE"]["valid"])
         self.assertFalse(result["evidence_ready"])
 
@@ -59,16 +57,18 @@ class AionTenantPersistenceGateTests(unittest.TestCase):
         evidence = _pass_evidence()
         evidence["ACL_STORE"]["scope"] = "admin/global"
         result = tenant_persistence_readiness(evidence)
-        self.assertIn("EVIDENCE_ACL_STORE_DIGEST_INVALID", result["blockers"])
+        self.assertIn("EVIDENCE_ACL_STORE_BINDING_INVALID", result["blockers"])
         self.assertFalse(result["evidence_ready"])
 
     def test_failed_evidence_remains_blocking(self):
         evidence = _pass_evidence()
-        evidence["TENANT_E2E"] = {
-            "status": "FAIL",
-            "digest": "sha256:" + ("b" * 64),
-            "scope": "tenant/workspace",
-        }
+        evidence["TENANT_E2E"] = build_evidence_record(
+            "TENANT_E2E",
+            subject_digest="sha256:" + ("a" * 64),
+            result_digest="sha256:" + ("c" * 64),
+            test_count=3,
+            status="FAIL",
+        )
         result = tenant_persistence_readiness(evidence)
         self.assertIn("EVIDENCE_TENANT_E2E_NOT_PASS", result["blockers"])
         self.assertEqual(result["state"], "BLOCKED")

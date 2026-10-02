@@ -17,7 +17,8 @@
     "TENANT_DURABLE_STORE_IDENTITY_ACL_E2E_V1_LOCAL",
     "CORE_NIGHTSHIFT_MEMORY_PROVENANCE_TRUST_CONSOLIDATION_V1_LOCAL",
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING_LOCAL",
-    "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING_LOCAL"
+    "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING_LOCAL",
+    "TENANT_EVIDENCE_DIGEST_BINDING_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -32,7 +33,8 @@
     "atlasquant_aion_tenant_persistence_gate.py",
     "atlasquant_aion_tenant_durable_store.py",
     "atlasquant_aion_core_consolidation_gate.py",
-    "atlasquant_aion_recovery_traceability_gate.py"
+    "atlasquant_aion_recovery_traceability_gate.py",
+    "atlasquant_aion_tenant_evidence_binding.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
@@ -45,7 +47,8 @@
     "test_atlasquant_aion_core_consolidation_gate.py",
     "test_atlasquant_aion_core_nightshift_bridge.py",
     "atlasquant_aion_developer_adversarial_auditor.py",
-    "test_atlasquant_aion_recovery_traceability_gate.py"
+    "test_atlasquant_aion_recovery_traceability_gate.py",
+    "test_atlasquant_aion_tenant_evidence_binding.py"
   ],
   "production_baseline": {
     "sha": "27b605c3088a955934a60a8544245ab41894029b",
@@ -78,7 +81,8 @@
     "windows_symlink_fixture": "UNAVAILABLE_FAIL_CLOSED",
     "recovery_traceability_bundle": "120 passed / 0 failed",
     "aion_full_regression": "2160 passed / 0 failed / 1 skipped",
-    "windows_symlink_environment_error": "CLOSED - full AION suite green"
+    "windows_symlink_environment_error": "CLOSED - full AION suite green",
+    "tenant_evidence_binding_bundle": "51 passed / 0 failed"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -125,7 +129,8 @@
       "BACKUP_RESTORE",
       "REVOCATION_REPLAY"
     ],
-    "fake_green_evidence_can_bypass_code_policy": false
+    "fake_green_evidence_can_bypass_code_policy": false,
+    "cryptographic_binding_required": true
   },
   "six_day_critical_path": [
     "PERSISTENT_IDENTITY_ACL_TENANT_WORKSPACE",
@@ -134,9 +139,9 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "TENANT_EVIDENCE_DIGEST_BINDING_AND_ADMIN_REVIEW_PREP",
+  "next_wave": "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP",
   "known_blockers": [
-    "Formal tenant/workspace evidence digests still need to be generated and bound before persistence admin review",
+    "A real local tenant evidence bundle still needs to be generated from a bound test run before admin review",
     "Production tenant persistence remains intentionally disabled and requires explicit authorization after evidence review",
     "Drael local key/config is absent; main development flow must not wait for it",
     "Current changes remain local only until a later authorized remote publication step"
@@ -203,5 +208,19 @@
     "automatic_retry": false,
     "checkpoint_saved": false,
     "network_called": false
+  },
+  "tenant_evidence_binding": {
+    "state": "LOCAL_VALIDATED",
+    "named_evidence_kind_required": true,
+    "subject_digest_required": true,
+    "result_digest_required": true,
+    "positive_test_count_required": true,
+    "tenant_workspace_scope_required": true,
+    "internal_evidence_digest_recomputed": true,
+    "kind_swap_detected": true,
+    "subject_tamper_detected": true,
+    "result_tamper_detected": true,
+    "evidence_is_authority": false,
+    "automatic_activation": false
   }
 }

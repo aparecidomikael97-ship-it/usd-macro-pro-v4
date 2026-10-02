@@ -6,12 +6,12 @@ can document progress but never grants authority or bypasses code-level policy.
 from __future__ import annotations
 
 from typing import Any, Mapping
-import re
 
 from atlasquant_aion_tenant import tenant_policy_snapshot
 from atlasquant_aion_tenant_store import tenant_store_policy
 from atlasquant_aion_tenant_durable_store import durable_store_policy
 from atlasquant_aion_tenant_privacy import tenant_privacy_readiness
+from atlasquant_aion_tenant_evidence_binding import validate_evidence_record
 
 SCHEMA = "ATLASQUANT_AION_TENANT_PERSISTENCE_GATE_V1"
 REQUIRED_EVIDENCE = (
@@ -22,24 +22,20 @@ REQUIRED_EVIDENCE = (
     "BACKUP_RESTORE",
     "REVOCATION_REPLAY",
 )
-_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
-
-
-def _evidence_state(raw: Any) -> dict[str, Any]:
-    row = dict(raw) if isinstance(raw, Mapping) else {}
-    status = str(row.get("status") or "").strip().upper()
-    digest = str(row.get("digest") or "").strip().lower()
-    scope = str(row.get("scope") or "").strip().lower()
-    valid = (
-        status == "PASS"
-        and bool(_DIGEST.fullmatch(digest))
-        and scope == "tenant/workspace"
-    )
+def _evidence_state(raw: Any, expected_kind: str) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {
+            "status": "MISSING", "digest": "", "scope": "",
+            "valid": False, "binding_valid": False, "reasons": ["MISSING"],
+        }
+    checked = validate_evidence_record(raw, expected_kind=expected_kind)
+    status = str(checked.get("status") or "MISSING").upper()
+    binding_valid = checked.get("valid") is True
     return {
-        "status": status or "MISSING",
-        "digest": digest if valid else "",
-        "scope": scope,
-        "valid": valid,
+        **checked,
+        "status": status,
+        "binding_valid": binding_valid,
+        "valid": binding_valid and status == "PASS",
     }
 
 
@@ -52,7 +48,7 @@ def tenant_persistence_readiness(
     privacy = tenant_privacy_readiness()
     supplied = dict(evidence or {})
     evidence_view = {
-        name: _evidence_state(supplied.get(name))
+        name: _evidence_state(supplied.get(name), name)
         for name in REQUIRED_EVIDENCE
     }
     blockers: list[str] = []
@@ -85,8 +81,8 @@ def tenant_persistence_readiness(
             blockers.append(f"EVIDENCE_{name}_MISSING")
         elif row["status"] != "PASS":
             blockers.append(f"EVIDENCE_{name}_NOT_PASS")
-        elif not row["valid"]:
-            blockers.append(f"EVIDENCE_{name}_DIGEST_INVALID")
+        elif not row["binding_valid"]:
+            blockers.append(f"EVIDENCE_{name}_BINDING_INVALID")
 
     code_ready = (
         local_durable_ready
