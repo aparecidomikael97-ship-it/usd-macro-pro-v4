@@ -494,6 +494,18 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertNotIn("st.tabs(",src)
         self.assertIn("atlasquant_view_mode",src)
 
+    def test_experience_switch_defers_mode_context_to_home_or_stable_navigation(self):
+        import inspect
+        from atlasquant_ui_v1 import render_experience_mode_switch
+        src=inspect.getsource(render_experience_mode_switch)
+
+        self.assertIn('st.radio(',src)
+        self.assertIn('atlasquant_view_mode',src)
+        self.assertNotIn('st.caption("Modo Iniciante',src)
+        self.assertNotIn('st.caption("Modo Avançado',src)
+        self.assertIn("overview da home",src)
+        self.assertIn("seletor estável",src)
+
     def test_advanced_radar_pair_intelligence_is_fault_isolated(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
