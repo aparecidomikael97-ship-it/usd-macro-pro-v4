@@ -159,8 +159,16 @@ class AionCoreRuntimeBridgeTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "UNAVAILABLE")
         self.assertFalse(result["memory_auto_written"])
-        self.assertEqual(result["persistence"]["state"], "UNAVAILABLE")
+        self.assertEqual(result["persistence"]["state"], "LOCAL_DURABLE_AVAILABLE")
+        self.assertEqual(
+            result["persistence"]["storage"],
+            "LOCAL_TENANT_WORKSPACE_FILESYSTEM",
+        )
+        self.assertTrue(result["persistence"]["tenant_code_ready"])
+        self.assertFalse(result["persistence"]["tenant_evidence_ready"])
         self.assertFalse(result["persistence"]["automatic_database_creation"])
+        self.assertFalse(result["persistence"]["memory_auto_write"])
+        self.assertFalse(result["persistence"]["production_persistence_activated"])
 
     def test_sensitive_action_is_never_executed(self):
         result = handle_runtime_intent(
@@ -187,12 +195,36 @@ class AionCoreRuntimeBridgeTests(unittest.TestCase):
                 self.assertFalse(result["provider_called"])
                 self.assertFalse(result["execution_authorized"])
 
-    def test_persistence_contract_is_explicitly_unavailable(self):
+    def test_persistence_contract_exposes_local_capability_without_activation(self):
         contract = persistence_contract()
-        self.assertEqual(contract["state"], "UNAVAILABLE")
-        self.assertEqual(contract["storage"], "NONE")
+        self.assertEqual(contract["state"], "LOCAL_DURABLE_AVAILABLE")
+        self.assertEqual(contract["storage"], "LOCAL_TENANT_WORKSPACE_FILESYSTEM")
+        self.assertEqual(contract["identity_acl"], "LOCAL_READY")
+        self.assertTrue(contract["explicit_write_approval_required"])
+        self.assertTrue(contract["tenant_code_ready"])
+        self.assertFalse(contract["tenant_evidence_ready"])
+        self.assertEqual(
+            contract["tenant_evidence_source"],
+            "NOT_INJECTED_REVIEW_ARTIFACT",
+        )
+        self.assertFalse(contract["tenant_evidence_auto_loaded"])
+        self.assertFalse(contract["runtime_bridge_connected"])
         self.assertFalse(contract["automatic_directory_creation"])
         self.assertFalse(contract["automatic_database_creation"])
+        self.assertFalse(contract["memory_auto_write"])
+        self.assertFalse(contract["production_persistence_activated"])
+        self.assertFalse(contract["automatic_activation"])
+
+    def test_checkpoint_bridge_and_local_durable_capability_stay_separate(self):
+        contract = persistence_contract(True)
+        self.assertEqual(
+            contract["state"],
+            "STAGED_CHECKPOINT_AND_LOCAL_DURABLE_AVAILABLE",
+        )
+        self.assertTrue(contract["runtime_bridge_connected"])
+        self.assertIn("CHECKPOINT_MASTER_STAGED", contract["storage"])
+        self.assertFalse(contract["memory_auto_write"])
+        self.assertFalse(contract["production_persistence_activated"])
 
     def test_bridge_has_no_network_subprocess_or_store_constructor(self):
         source = Path("atlasquant_aion_core_runtime_bridge.py").read_text(encoding="utf-8")

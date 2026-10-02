@@ -1,7 +1,7 @@
 {
-  "base_sha": "27b605c3088a955934a60a8544245ab41894029b",
-  "session": "retomada-05-giant-block",
-  "branch": "integration/aion-library-document-intelligence-v1-20261001",
+  "base_sha": "a44e31795519aa31b32fe2df2b8eb172cff504d1",
+  "session": "post-515-core-e2e-consolidation-v1",
+  "branch": "integration/aion-core-e2e-consolidation-v1-20261002",
   "completed_waves": [
     "A_DOMAIN_REGISTRY",
     "B_MEMORY_ARCHITECTURE",
@@ -20,7 +20,11 @@
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING_LOCAL",
     "TENANT_EVIDENCE_DIGEST_BINDING_LOCAL",
     "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP_LOCAL",
-    "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP"
+    "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP",
+    "CORE_EXECUTOR_TENANT_RECOVERY_E2E_V2_LOCAL",
+    "CORE_FINAL_CAPABILITY_WIRING_AND_ORPHAN_AUDIT",
+    "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL",
+    "POST_515_LOCAL_RELEASE_CANDIDATE_V2_AUDIT"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -37,7 +41,10 @@
     "atlasquant_aion_core_consolidation_gate.py",
     "atlasquant_aion_recovery_traceability_gate.py",
     "atlasquant_aion_tenant_evidence_binding.py",
-    "atlasquant_aion_tenant_evidence_bundle.py"
+    "atlasquant_aion_tenant_evidence_bundle.py",
+    "atlasquant_aion_recovery_review.py",
+    "atlasquant_aion_library_preview.py",
+    "atlasquant_aion_tenant_persistence_review.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
@@ -53,16 +60,28 @@
     "test_atlasquant_aion_recovery_traceability_gate.py",
     "test_atlasquant_aion_tenant_evidence_binding.py",
     "test_atlasquant_aion_tenant_evidence_bundle.py",
-    "docs/aion/evidence/tenant_persistence_local_evidence.json"
+    "docs/aion/evidence/tenant_persistence_local_evidence.json",
+    "atlasquant_aion_local_executor.py",
+    "test_atlasquant_aion_core_checkpoint_bridge.py",
+    "test_atlasquant_aion_core_runtime_bridge.py",
+    "test_atlasquant_aion_local_executor.py",
+    "test_atlasquant_aion_core_e2e_integration.py",
+    "atlasquant_aion_admin.py",
+    "test_atlasquant_aion_admin.py",
+    "test_atlasquant_aion_recovery_review.py",
+    "test_atlasquant_aion_library_preview.py",
+    "test_atlasquant_aion_core_wiring.py",
+    "test_atlasquant_aion_tenant_persistence_review.py"
   ],
   "production_baseline": {
-    "sha": "27b605c3088a955934a60a8544245ab41894029b",
-    "pr_514_merged": true,
-    "production_health": "PASS",
-    "source_backup_zip": "PASS",
-    "quality_tests": "PASS",
-    "production_build_identity": "PASS",
-    "pages_build_deployment": "PASS"
+    "sha": "a44e31795519aa31b32fe2df2b8eb172cff504d1",
+    "pr_515_merged": true,
+    "production_health": "PASS #499",
+    "source_backup_zip": "PASS #222",
+    "quality_tests": "PASS #2879",
+    "production_build_identity": "PASS #697 exact SHA",
+    "pages_build_deployment": "PASS #1381",
+    "manual_deploy_triggered": false
   },
   "validation": {
     "document_intelligence": "9 passed / 0 failed",
@@ -94,7 +113,26 @@
     "final_developer_adversarial_audit": "348 cases / 0 gaps / 334 blocked-by-design / 14 pass",
     "finalization_audit": "internal_release_preparation_complete=true",
     "git_fsck": "PASS / exit code 0 / dangling objects only",
-    "fresh_origin_main_compare": "0 behind / 9 ahead"
+    "fresh_origin_main_compare": "0 behind / 9 ahead",
+    "core_e2e_integration_bundle": "85 passed / 0 failed",
+    "aion_full_regression_post_515": "2181 passed / 0 failed / 1 skipped",
+    "contract_audit_post_515": "17 checks / 0 failures",
+    "developer_adversarial_post_515": "348 cases / 0 gaps / 0 critical / 0 high",
+    "tenant_evidence_revalidation": "bundle valid / gate READY_FOR_ADMIN_REVIEW / activation false",
+    "core_wiring_focused": "125 passed / 0 failed",
+    "library_admin_bundle": "137 passed / 0 failed",
+    "recovery_admin_bundle": "148 passed / 0 failed",
+    "aion_full_regression_wiring": "2193 passed / 0 failed / 1 skipped",
+    "contract_audit_wiring": "17 checks / 0 failures",
+    "developer_adversarial_wiring": "348 cases / 0 gaps / 0 critical / 0 high",
+    "tenant_persistence_admin_review_bundle": "113 passed / 0 failed",
+    "tenant_review_wiring_guard": "93 passed / 0 failed",
+    "aion_full_regression_tenant_review": "2198 passed / 0 failed / 1 skipped",
+    "contract_audit_tenant_review": "17 checks / 0 failures",
+    "developer_adversarial_tenant_review": "348 cases / 0 gaps / 0 critical / 0 high",
+    "finalization_audit_v2": "internal_release_preparation_complete=true",
+    "git_fsck_v2": "PASS / exit code 0 / dangling objects only",
+    "fresh_origin_main_compare_v2": "0 behind / 3 ahead before checkpoint finalization commit"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -127,7 +165,7 @@
     "drael_key_required_for_aion_local_executor": false
   },
   "tenant_persistence_gate": {
-    "state": "LOCAL_CODE_READY_EVIDENCE_PENDING",
+    "state": "READY_FOR_ADMIN_REVIEW_LOCAL_ONLY",
     "durable_io_implemented": true,
     "tenant_persistence_enabled": false,
     "cross_tenant_access_allowed": false,
@@ -142,7 +180,9 @@
       "REVOCATION_REPLAY"
     ],
     "fake_green_evidence_can_bypass_code_policy": false,
-    "cryptographic_binding_required": true
+    "cryptographic_binding_required": true,
+    "evidence_ready": true,
+    "persistence_activation_authorized": false
   },
   "six_day_critical_path": [
     "PERSISTENT_IDENTITY_ACL_TENANT_WORKSPACE",
@@ -151,12 +191,12 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "REMOTE_CI_BRANCH_PUBLICATION_PENDING_EXPLICIT_AUTHORIZATION",
+  "next_wave": "REMOTE_CI_BRANCH_PUBLICATION_PENDING_EXPLICIT_AUTHORIZATION_V2",
   "known_blockers": [
-    "The local release candidate branch has not been pushed; remote CI has not run for these commits",
-    "Production tenant persistence remains intentionally disabled and requires explicit administrative authorization after evidence review",
-    "Merge and deploy remain prohibited without explicit authorization",
-    "Drael local key/config is absent; main development flow must not wait for it"
+    "The post-515 local release candidate has not been pushed; remote CI has not run for this V2 branch.",
+    "Production tenant persistence remains disabled and requires a separate explicit administrative authorization; no activation control exists in the review surface.",
+    "Merge and deploy remain prohibited without explicit authorization.",
+    "Drael local key/config is absent; main development flow must not wait for it."
   ],
   "hourly_night_shift_enabled": true,
   "protected_ledger_unchanged": true,
@@ -249,17 +289,114 @@
     "automatic_activation": false
   },
   "local_release_candidate": {
+    "state": "MERGED_AND_PRODUCTION_VALIDATED",
+    "pr": 515,
+    "merge_sha": "a44e31795519aa31b32fe2df2b8eb172cff504d1",
+    "source_head_sha": "a412dd2d7ec31e272ee5600d8ab5fd956e1ba249",
+    "remote_ci_run": true,
+    "remote_ci_green": true,
+    "production_build_identity_exact_sha": true,
+    "auto_deploy_expected_and_validated": true,
+    "manual_deploy_triggered": false,
+    "production_persistence_activated": false,
+    "real_trading_enabled": false
+  },
+  "executor_runtime_sanitization": {
+    "state": "LOCAL_VALIDATED",
+    "argument_max_depth": 6,
+    "argument_max_items": 24,
+    "runtime_context_max_depth": 8,
+    "runtime_context_max_items": 64,
+    "checkpoint_integrity_preserved": true,
+    "secret_redaction_preserved": true,
+    "output_max_depth": 6,
+    "output_max_items": 24,
+    "network_called": false,
+    "external_action_executed": false
+  },
+  "runtime_persistence_contract": {
+    "state": "LOCAL_DURABLE_AVAILABLE",
+    "storage": "LOCAL_TENANT_WORKSPACE_FILESYSTEM",
+    "identity_acl": "LOCAL_READY",
+    "tenant_code_ready": true,
+    "tenant_evidence_ready": true,
+    "tenant_gate_state": "READY_FOR_ADMIN_REVIEW",
+    "runtime_bridge_auto_connected": false,
+    "explicit_write_approval_required": true,
+    "memory_auto_write": false,
+    "automatic_activation": false,
+    "production_persistence_activated": false,
+    "tenant_evidence_source": "NOT_INJECTED_REVIEW_ARTIFACT",
+    "tenant_evidence_auto_loaded": false
+  },
+  "critical_path_status": "PR515_CORE_CRITICAL_PATH_CLOSED_AND_PRODUCTION_VALIDATED",
+  "core_wiring_audit": {
+    "state": "LOCAL_VALIDATED",
+    "recovery_traceability_gate_production_consumers": 1,
+    "recovery_review_admin_consumer": true,
+    "library_document_intelligence_production_consumers": 1,
+    "library_preview_admin_consumer": true,
+    "tenant_evidence_bundle_runtime_consumers": 0,
+    "tenant_evidence_bundle_classification": "INTENTIONAL_REVIEW_ARTIFACT",
+    "tenant_evidence_auto_loaded": false,
+    "orphan_critical_modules_remaining": 0,
+    "automatic_merge": false,
+    "automatic_deploy": false,
+    "production_persistence_activated": false,
+    "tenant_evidence_bundle_admin_review_consumer": true
+  },
+  "recovery_admin_review": {
+    "state": "READY_FOR_ADMIN_REVIEW_GATE_WIRED",
+    "checkpoint_local_inspection_required": true,
+    "traceability_safe_local_required": true,
+    "conditional_recovery_preflight_required": true,
+    "explicit_restore_confirmation_required": true,
+    "restore_authorized_by_review": false,
+    "automatic_restore": false,
+    "automatic_retry": false
+  },
+  "library_admin_preview": {
+    "state": "OFFLINE_PREVIEW_WIRED",
+    "workspace": "Biblioteca",
+    "pdf_upload_local": true,
+    "document_intelligence": true,
+    "provenance_staging": true,
+    "topic_classification": true,
+    "temporary_index_after_human_review": true,
+    "ocr_plan_only": true,
+    "ocr_automatic_execution": false,
+    "external_persistence": false,
+    "memory_auto_promotion": false,
+    "provider_calls": false,
+    "model_calls": false
+  },
+  "tenant_persistence_admin_review": {
+    "state": "READY_FOR_ADMIN_REVIEW_LOCAL",
+    "explicit_admin_context_required": true,
+    "bundle_loaded_only_by_review_surface": true,
+    "bundle_revalidated_against_current_sources": true,
+    "gate_recomputed": true,
+    "code_ready": true,
+    "evidence_ready": true,
+    "activation_authorized": false,
+    "production_persistence_activated": false,
+    "automatic_activation": false,
+    "external_action_executed": false,
+    "network_called": false,
+    "activation_button_present": false
+  },
+  "local_release_candidate_v2": {
     "state": "READY_FOR_REMOTE_CI_LOCAL_ONLY",
-    "branch": "integration/aion-library-document-intelligence-v1-20261001",
-    "base_sha": "27b605c3088a955934a60a8544245ab41894029b",
-    "component_head_sha": "5bec4637bbd8d20d9a90d3427336a6a2df37eb10",
-    "component_commits": 9,
-    "changed_files": 21,
-    "insertions": 3248,
-    "deletions": 35,
+    "branch": "integration/aion-core-e2e-consolidation-v1-20261002",
+    "base_sha": "a44e31795519aa31b32fe2df2b8eb172cff504d1",
+    "audited_component_head_sha": "76946d292ca505098656a221e9ce94bf8699334c",
+    "component_commits": 3,
+    "changed_files": 17,
+    "insertions": 1727,
+    "deletions": 90,
     "behind_origin_main": 0,
-    "ahead_origin_main": 9,
-    "full_aion_tests": 2173,
+    "ahead_origin_main": 3,
+    "full_aion_tests": 2198,
     "full_aion_failures": 0,
     "full_aion_skipped": 1,
     "contract_checks": 17,
@@ -267,12 +404,16 @@
     "adversarial_cases": 348,
     "adversarial_gaps": 0,
     "internal_release_preparation_complete": true,
-    "tenant_evidence_gate": "READY_FOR_ADMIN_REVIEW",
+    "recovery_review_wired": true,
+    "library_preview_wired": true,
+    "tenant_persistence_admin_review_wired": true,
+    "tenant_persistence_activation_authorized": false,
     "production_persistence_activated": false,
     "real_trading_enabled": false,
     "automatic_merge": false,
     "automatic_deploy": false,
     "branch_pushed": false,
-    "remote_ci_run": false
+    "remote_ci_run": false,
+    "checkpoint_finalization_commit_follows_audit": true
   }
 }

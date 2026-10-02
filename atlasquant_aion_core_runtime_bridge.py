@@ -20,6 +20,8 @@ from atlasquant_aion_core_voice_automation import (
     CheckpointAutomationAdapter,
 )
 from atlasquant_aion_core_consolidation_gate import consolidate_runtime_knowledge
+from atlasquant_aion_tenant_durable_store import durable_store_policy
+from atlasquant_aion_tenant_persistence_gate import tenant_persistence_readiness
 
 
 SCHEMA = "ATLASQUANT_AION_CORE_RUNTIME_BRIDGE_V1"
@@ -229,27 +231,63 @@ def _context_for_intent(
 
 
 def persistence_contract(connected: bool = False) -> dict[str, Any]:
-    if connected:
-        return {
-            "state": "STAGED_CHECKPOINT",
-            "reason": "CHECKPOINT_MASTER_REQUIRES_EXPLICIT_SAVE",
-            "storage": "CHECKPOINT_MASTER_STAGED",
-            "automatic_directory_creation": False,
-            "automatic_database_creation": False,
-            "memory_auto_write": False,
-            "remote_persistence": "REQUIRES_EXPLICIT_CHECKPOINT_SAVE",
-            "backup_restore": "INHERITS_CHECKPOINT_MASTER_HISTORY",
-        }
-    return {
-        "state": "UNAVAILABLE",
-        "reason": "PERSISTENCE_NOT_CONNECTED_IN_RUNTIME_BRIDGE_V1",
-        "storage": "NONE",
+    durable = durable_store_policy()
+    readiness = tenant_persistence_readiness()
+    local_ready = (
+        durable.get("local_durable_io_implemented") is True
+        and durable.get("identity_registry_implemented") is True
+        and durable.get("acl_store_implemented") is True
+        and durable.get("production_persistence_activated") is False
+    )
+    base = {
+        "state": "LOCAL_DURABLE_AVAILABLE" if local_ready else "UNAVAILABLE",
+        "reason": (
+            "LOCAL_DURABLE_REQUIRES_EXPLICIT_APPROVAL_AND_EVIDENCE"
+            if local_ready else
+            "LOCAL_DURABLE_CAPABILITY_NOT_READY"
+        ),
+        "storage": (
+            "LOCAL_TENANT_WORKSPACE_FILESYSTEM"
+            if local_ready else "NONE"
+        ),
+        "runtime_bridge_connected": False,
         "automatic_directory_creation": False,
         "automatic_database_creation": False,
         "memory_auto_write": False,
-        "remote_persistence": "UNAVAILABLE",
-        "backup_restore": "UNAVAILABLE",
+        "remote_persistence": "DISABLED",
+        "backup_restore": (
+            "LOCAL_AVAILABLE_EXPLICIT_APPROVAL"
+            if durable.get("backup_restore_implemented") is True
+            else "UNAVAILABLE"
+        ),
+        "identity_acl": (
+            "LOCAL_READY"
+            if durable.get("identity_registry_implemented") is True
+            and durable.get("acl_store_implemented") is True
+            else "UNAVAILABLE"
+        ),
+        "explicit_write_approval_required": (
+            durable.get("explicit_write_approval_required") is True
+        ),
+        "tenant_gate_state": str(readiness.get("state") or "BLOCKED"),
+        "tenant_code_ready": readiness.get("code_ready") is True,
+        "tenant_evidence_ready": readiness.get("evidence_ready") is True,
+        "tenant_evidence_source": "NOT_INJECTED_REVIEW_ARTIFACT",
+        "tenant_evidence_auto_loaded": False,
+        "production_persistence_activated": False,
+        "automatic_activation": False,
     }
+    if connected:
+        return {
+            **base,
+            "state": "STAGED_CHECKPOINT_AND_LOCAL_DURABLE_AVAILABLE",
+            "reason": "CHECKPOINT_MASTER_REQUIRES_EXPLICIT_SAVE",
+            "storage": "CHECKPOINT_MASTER_STAGED+LOCAL_TENANT_WORKSPACE_FILESYSTEM",
+            "remote_persistence": "REQUIRES_EXPLICIT_CHECKPOINT_SAVE",
+            "backup_restore": "LOCAL_AVAILABLE_EXPLICIT_APPROVAL",
+            "runtime_bridge_connected": True,
+        }
+    return base
 
 
 def handle_runtime_intent(

@@ -33,6 +33,7 @@ from atlasquant_aion_core import (
 )
 from atlasquant_aion_gateway import local_answer, provider_status
 from atlasquant_aion_command_orchestrator import orchestrate_local_command
+from atlasquant_aion_library_preview import build_library_pdf_preview
 from atlasquant_aion_workspaces import (
     AION_PERSONAS,
     admin_brief_lines,
@@ -75,9 +76,9 @@ from atlasquant_aion_memory import (
 from atlasquant_aion_recovery import (
     list_checkpoint_revisions,
     load_checkpoint_revision,
-    recovery_preflight,
     restore_checkpoint_revision,
 )
+from atlasquant_aion_recovery_review import build_recovery_review
 from atlasquant_aion_continuity import (
     MISSION_STATUSES,
     append_handoff,
@@ -180,6 +181,9 @@ from atlasquant_aion_tenant import (
 from atlasquant_aion_tenant_privacy import (
     tenant_privacy_policy_snapshot,
     tenant_privacy_readiness,
+)
+from atlasquant_aion_tenant_persistence_review import (
+    build_tenant_persistence_admin_review,
 )
 from atlasquant_aion_incident_center import (
     collect_incidents,
@@ -587,6 +591,7 @@ except Exception:
 SCHEMA = "ATLASQUANT_AION_ADMIN_V1"
 AION_WORKSPACES = (
     "🧠 Central",
+    "📚 Biblioteca",
     "🗂️ Secretaria",
     "📈 Trading",
     "🎬 Studio",
@@ -1027,6 +1032,12 @@ def _workspace_overview_items(
             "detail": "Comando, memória, estado mestre e perguntas ao AION.",
         },
         {
+            "name": "📚 Biblioteca",
+            "state": "OFFLINE / REVISÃO",
+            "tone": "info",
+            "detail": "PDFs locais com proveniência, inspeção, classificação e índice temporário sob revisão humana.",
+        },
+        {
             "name": "🗂️ Secretaria",
             "state": f"{int(task_summary.get('active') or 0)} ATIVAS",
             "tone": "info",
@@ -1083,7 +1094,7 @@ def _render_workspace_overview(
 ) -> None:
     st.markdown("#### Mapa Operacional AION")
     st.caption(
-        "Visão rápida das 9 áreas administrativas. O mapa é somente leitura: "
+        "Visão rápida das 10 áreas administrativas. O mapa é somente leitura: "
         "não aprova, publica, cobra, provisiona acesso nem envia ordens."
     )
     cards = []
@@ -7538,6 +7549,60 @@ def _render_developer_intelligence() -> None:
         )
 
 
+
+def _render_tenant_persistence_review(access: Mapping[str, Any]) -> None:
+    with st.expander(
+        "Persistência tenant · revisão administrativa",
+        expanded=False,
+    ):
+        review = build_tenant_persistence_admin_review(
+            access,
+            repository_root=Path(__file__).resolve().parent,
+        )
+        r1,r2,r3,r4 = st.columns(4)
+        r1.metric("Estado", str(review.get("state") or "UNKNOWN"))
+        r2.metric(
+            "Bundle",
+            "VÁLIDO" if review.get("bundle_valid") is True else "BLOQUEADO",
+        )
+        r3.metric("Gate", str(review.get("gate_state") or "UNKNOWN"))
+        r4.metric("Testes", int(review.get("test_count") or 0))
+
+        if review.get("state") == "READY_FOR_ADMIN_REVIEW":
+            st.success(
+                "Código e evidências locais estão prontos para revisão administrativa. "
+                "Isso não ativa persistência em produção."
+            )
+        else:
+            reasons = ", ".join(
+                str(x) for x in review.get("bundle_reasons") or []
+            )
+            st.warning(
+                "A revisão de persistência está bloqueada em modo seguro. "
+                f"{review.get('reason') or reasons or 'evidência não confirmada'}."
+            )
+
+        rows = list(review.get("evidence_rows") or [])
+        if rows:
+            st.dataframe(
+                rows,
+                width="stretch",
+                hide_index=True,
+            )
+        digest = str(review.get("bundle_digest") or "")
+        source_sha = str(review.get("source_head_sha") or "")
+        if digest:
+            st.caption(f"Bundle: {digest[:28]}…")
+        if source_sha:
+            st.caption(f"Fonte do bundle: {source_sha[:12]}")
+
+        st.caption(
+            "Superfície somente leitura: sem botão de ativação, sem escrita, sem mudança "
+            "de ACL e sem auto-carregamento pelo Core runtime. "
+            "activation_authorized=false · production_persistence_activated=false."
+        )
+
+
 def _render_development(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -7562,6 +7627,7 @@ def _render_development(
         ),
         key="aion_development_voice",
     )
+    _render_tenant_persistence_review(access)
     _render_developer_intelligence()
     with st.expander("Política de confiança e rollback do AION Desenvolvedor"):
         policy = developer_trust_policy()
@@ -10278,11 +10344,20 @@ def _render_development(
                 if isinstance(candidate.get("integrity"), Mapping)
                 else {}
             )
-            preview_preflight = recovery_preflight(runtime_result, candidate)
-            rc1,rc2,rc3 = st.columns(3)
+            session = access.get("session") if isinstance(access.get("session"), Mapping) else {}
+            preview_review = build_recovery_review(
+                access,
+                runtime_result,
+                candidate,
+                authenticated_admin=str(session.get("role") or "").upper() == "ADMIN",
+                request_id="admin-recovery-preview",
+            )
+            preview_preflight = preview_review.get("recovery_preflight") or {}
+            rc1,rc2,rc3,rc4 = st.columns(4)
             rc1.metric("Revisão", str(candidate.get("revision") or "")[:10])
             rc2.metric("Integridade", str(integrity.get("state") or "UNKNOWN"))
-            rc3.metric("Digest", str(candidate.get("digest") or "")[:16])
+            rc3.metric("Rastreabilidade", str(preview_review.get("traceability_security") or "UNKNOWN"))
+            rc4.metric("Digest", str(candidate.get("digest") or "")[:16])
 
             local_dirty = bool(st.session_state.get(_WORKING_DIRTY_KEY, False))
             if local_dirty:
@@ -10290,10 +10365,11 @@ def _render_development(
                     "Há alterações locais ainda não persistidas. "
                     "Salve ou descarte essas alterações antes de restaurar uma revisão histórica."
                 )
-            elif not preview_preflight.get("allowed"):
+            elif preview_review.get("state") != "READY_FOR_ADMIN_REVIEW":
+                blockers = ", ".join(str(x) for x in preview_review.get("blockers") or [])
                 st.warning(
                     "Restauração bloqueada em modo seguro: "
-                    f"{preview_preflight.get('reason','preflight não confirmado')}."
+                    f"{preview_preflight.get('reason') or blockers or 'revisão de rastreabilidade não confirmada'}."
                 )
             else:
                 st.warning(
@@ -10349,6 +10425,146 @@ def _render_development(
     st.markdown("#### Camada de Verdade")
     for item in TRUTH_RULES:
         st.markdown(f"- {item}")
+
+
+
+def _render_library(access: Mapping[str, Any]) -> None:
+    st.markdown("### 📚 Biblioteca AION")
+    _context_voice(
+        "Biblioteca",
+        (
+            "Bem-vindo à Biblioteca AION. Aqui os PDFs são inspecionados localmente, "
+            "classificados e preparados para revisão. Nenhum documento vira verdade, "
+            "memória ou ação automaticamente."
+        ),
+        key="aion_library_voice",
+    )
+    st.caption(
+        "Fluxo offline: upload → inspeção → staging com proveniência → inteligência "
+        "do documento → revisão humana opcional → índice local temporário. "
+        "Sem OCR automático, sem provedor externo e sem persistência automática."
+    )
+
+    uploaded = st.file_uploader(
+        "PDF para análise local",
+        type=["pdf"],
+        key="aion_library_pdf_upload",
+        help="O arquivo é processado na sessão atual e não é publicado automaticamente.",
+    )
+    title = st.text_input(
+        "Título opcional",
+        value="",
+        key="aion_library_pdf_title",
+    )
+    rights_status = st.selectbox(
+        "Direitos de uso",
+        ("UNKNOWN", "OWNED", "LICENSED", "PUBLIC"),
+        key="aion_library_rights_status",
+    )
+
+    if uploaded is None:
+        st.info("Envie um PDF para iniciar a inspeção local.")
+        return
+
+    raw = uploaded.getvalue()
+    preview = build_library_pdf_preview(
+        access,
+        pdf_bytes=raw,
+        filename=uploaded.name,
+        title=title,
+        rights_status=rights_status,
+        approve_review=False,
+    )
+    status = str(preview.get("status") or "UNKNOWN")
+    intelligence = (
+        preview.get("intelligence")
+        if isinstance(preview.get("intelligence"), Mapping)
+        else {}
+    )
+    quality = (
+        intelligence.get("quality")
+        if isinstance(intelligence.get("quality"), Mapping)
+        else {}
+    )
+    b1,b2,b3,b4 = st.columns(4)
+    b1.metric("Estado", status)
+    b2.metric("Páginas", int(intelligence.get("page_count") or 0))
+    b3.metric("Qualidade", str(quality.get("band") or "UNKNOWN"))
+    b4.metric("Scan provável", str(intelligence.get("scanned_likelihood") or "UNKNOWN"))
+
+    if status == "BLOCKED":
+        blockers = ", ".join(str(x) for x in preview.get("blockers") or [])
+        st.warning(f"PDF bloqueado em modo seguro: {blockers or 'motivo não confirmado'}.")
+        return
+
+    metadata = (
+        intelligence.get("metadata")
+        if isinstance(intelligence.get("metadata"), Mapping)
+        else {}
+    )
+    if metadata:
+        with st.expander("Metadados extraídos", expanded=False):
+            st.json(dict(metadata))
+
+    ocr = preview.get("ocr_handoff") if isinstance(preview.get("ocr_handoff"), Mapping) else {}
+    if intelligence.get("ocr_recommended") is True:
+        st.warning(
+            "O documento parece depender de OCR. O AION apenas preparou um plano; "
+            "OCR não foi executado e exige etapa isolada/aprovação explícita."
+        )
+        if ocr.get("plan_digest"):
+            st.caption(f"Plano OCR: {str(ocr.get('plan_digest'))[:28]}…")
+
+    staged = preview.get("staged") if isinstance(preview.get("staged"), Mapping) else {}
+    topics = (
+        staged.get("topic_classification")
+        if isinstance(staged.get("topic_classification"), Mapping)
+        else {}
+    )
+    if topics:
+        with st.expander("Classificação local", expanded=False):
+            st.json(dict(topics))
+
+    if status != "PREVIEW_READY":
+        st.caption(
+            "O documento permanece em revisão; nada foi persistido ou promovido à memória."
+        )
+        return
+
+    confirm = st.checkbox(
+        "Revisei este PDF e autorizo montar somente um índice local temporário nesta sessão",
+        value=False,
+        key="aion_library_review_confirm",
+    )
+    if st.button(
+        "✅ Validar e montar índice local temporário",
+        key="aion_library_review_index",
+        disabled=not bool(confirm),
+        width="stretch",
+    ):
+        reviewed = build_library_pdf_preview(
+            access,
+            pdf_bytes=raw,
+            filename=uploaded.name,
+            title=title,
+            rights_status=rights_status,
+            approve_review=True,
+        )
+        if reviewed.get("status") == "REVIEW_INDEX_READY":
+            result = reviewed.get("review") if isinstance(reviewed.get("review"), Mapping) else {}
+            st.success(
+                f"Revisão concluída. {int(result.get('indexed_passages') or 0)} "
+                "passagem(ns) montada(s) no índice temporário."
+            )
+            st.caption(
+                "O índice não foi persistido externamente, não promoveu memória e não autorizou ações."
+            )
+        else:
+            blockers = ", ".join(str(x) for x in reviewed.get("blockers") or [])
+            st.error(
+                "A revisão/indexação local não pôde ser concluída. "
+                f"{blockers or 'Estado não confirmado'}."
+            )
 
 
 def _render_promotions(
@@ -11293,6 +11509,8 @@ def render_aion_admin_console(
                 executive_snapshot, copilot_snapshot,
                 specialist_snapshot=specialist_snapshot,
             )
+        elif selected_workspace == "📚 Biblioteca":
+            _render_library(access_map)
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
         elif selected_workspace == "📈 Trading":

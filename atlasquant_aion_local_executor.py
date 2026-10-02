@@ -31,8 +31,12 @@ from atlasquant_aion_local_traceability import local_contract_fingerprint
 SCHEMA = "ATLASQUANT_AION_LOCAL_TOOL_RESULT_V1"
 ALLOWED_KINDS = frozenset({"READ", "SEARCH", "DRAFT"})
 FORBIDDEN_KINDS = frozenset({"WRITE", "PUBLISH", "PRODUCTION", "SECRETS", "FINANCIAL"})
-_MAX_DEPTH = 6
-_MAX_ITEMS = 24
+_MAX_INPUT_DEPTH = 6
+_MAX_INPUT_ITEMS = 24
+_MAX_RUNTIME_DEPTH = 8
+_MAX_RUNTIME_ITEMS = 64
+_MAX_OUTPUT_DEPTH = 6
+_MAX_OUTPUT_ITEMS = 24
 _MAX_TEXT = 500
 _PRESERVE = frozenset({
     "truth_state", "freshness", "observed_at", "valid_until", "origin",
@@ -69,37 +73,75 @@ def _events(runtime: Mapping[str, Any]) -> list[Any]:
     return _rows(_operating(runtime).get("events"))
 
 
-def sanitize_local_arguments(value: Any, depth: int = 0) -> Any:
-    """Redact secret-like input without stringifying datetimes."""
+def _sanitize_local_value(
+    value: Any,
+    *,
+    depth: int,
+    max_depth: int,
+    max_items: int,
+) -> Any:
     if isinstance(value, datetime):
         return value
     if value is None or isinstance(value, (bool, int, float)):
         return value
-    if depth >= _MAX_DEPTH:
+    if depth >= max_depth:
         return "[TRUNCATED]"
     if isinstance(value, str):
         return redact_text(value)[:_MAX_TEXT]
     if isinstance(value, Mapping):
         out: dict[str, Any] = {}
-        for key, item in list(value.items())[:_MAX_ITEMS]:
+        for key, item in list(value.items())[:max_items]:
             if is_secret_key(key):
                 continue
-            out[redact_text(key)[:80]] = sanitize_local_arguments(item, depth + 1)
+            out[redact_text(key)[:80]] = _sanitize_local_value(
+                item,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_items=max_items,
+            )
         return out
     if isinstance(value, (list, tuple)):
-        return [sanitize_local_arguments(item, depth + 1) for item in list(value)[:_MAX_ITEMS]]
+        return [
+            _sanitize_local_value(
+                item,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_items=max_items,
+            )
+            for item in list(value)[:max_items]
+        ]
     return redact_text(value)[:_MAX_TEXT]
+
+
+def sanitize_local_arguments(value: Any, depth: int = 0) -> Any:
+    """Redact and bound caller arguments using the original tight limits."""
+    return _sanitize_local_value(
+        value,
+        depth=depth,
+        max_depth=_MAX_INPUT_DEPTH,
+        max_items=_MAX_INPUT_ITEMS,
+    )
+
+
+def _sanitize_runtime_context(value: Any) -> Any:
+    """Preserve the full local checkpoint shape while still redacting secrets."""
+    return _sanitize_local_value(
+        value,
+        depth=0,
+        max_depth=_MAX_RUNTIME_DEPTH,
+        max_items=_MAX_RUNTIME_ITEMS,
+    )
 
 
 def _bound(value: Any, depth: int = 0) -> tuple[Any, bool]:
     if isinstance(value, datetime):
         return value.isoformat(), False
-    if depth >= _MAX_DEPTH:
+    if depth >= _MAX_OUTPUT_DEPTH:
         return "[TRUNCATED]", True
     if isinstance(value, Mapping):
         preserved = [(key, item) for key, item in value.items() if str(key) in _PRESERVE]
         rest = [(key, item) for key, item in value.items() if str(key) not in _PRESERVE]
-        chosen = preserved + rest[: max(0, _MAX_ITEMS - len(preserved))]
+        chosen = preserved + rest[: max(0, _MAX_OUTPUT_ITEMS - len(preserved))]
         truncated = len(preserved) + len(rest) > len(chosen)
         out: dict[str, Any] = {}
         for key, item in chosen:
@@ -108,9 +150,9 @@ def _bound(value: Any, depth: int = 0) -> tuple[Any, bool]:
             truncated = truncated or child
         return out, truncated
     if isinstance(value, (list, tuple)):
-        truncated = len(value) > _MAX_ITEMS
+        truncated = len(value) > _MAX_OUTPUT_ITEMS
         rows = []
-        for item in list(value)[:_MAX_ITEMS]:
+        for item in list(value)[:_MAX_OUTPUT_ITEMS]:
             bounded, child = _bound(item, depth + 1)
             rows.append(bounded)
             truncated = truncated or child
@@ -240,7 +282,7 @@ def _checkpoint_inspect(arguments: Mapping[str, Any], runtime: Mapping[str, Any]
     durable = _mapping(checkpoint.get("durable_tasks"))
     areas_raw = checkpoint.get("areas") if isinstance(checkpoint.get("areas"), Mapping) else {}
     areas = {}
-    for key, value in list(areas_raw.items())[:_MAX_ITEMS]:
+    for key, value in list(areas_raw.items())[:_MAX_OUTPUT_ITEMS]:
         if isinstance(value, Mapping):
             areas[str(key)[:40]] = str(value.get("state") or value.get("status") or "")[:40]
         else:
@@ -438,7 +480,7 @@ def execute_local_tool(
     key = str(tool_id or "").strip()
     runtime = _mapping(runtime_context if runtime_context is not None else context)
     clean_arguments = sanitize_local_arguments(_mapping(arguments))
-    clean_runtime = sanitize_local_arguments(runtime)
+    clean_runtime = _sanitize_runtime_context(runtime)
     if not isinstance(clean_arguments, Mapping):
         clean_arguments = {}
     if not isinstance(clean_runtime, Mapping):

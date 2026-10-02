@@ -42,7 +42,7 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
 
     def test_admin_uses_stable_single_workspace_navigation(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertEqual(len(AION_WORKSPACES),9)
+        self.assertEqual(len(AION_WORKSPACES),10)
         self.assertIn('st.selectbox(',src)
         self.assertIn('"Área AION"',src)
         self.assertIn('key="aion_admin_workspace"',src)
@@ -847,13 +847,29 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Recuperação / Rollback do Checkpoint",src)
         self.assertIn("list_checkpoint_revisions(",src)
         self.assertIn("load_checkpoint_revision(",src)
-        self.assertIn("recovery_preflight(runtime_result, candidate)",src)
+        self.assertIn("build_recovery_review(",src)
+        self.assertIn('preview_review.get("state") != "READY_FOR_ADMIN_REVIEW"',src)
+        self.assertIn('preview_review.get("traceability_security")',src)
         self.assertIn('"restore_checkpoint"',src)
         self.assertIn("restore_checkpoint_revision(",src)
         self.assertIn("Confirmo que revisei esta versão",src)
         self.assertIn("Não existe restauração automática.",src)
         self.assertIn("Há alterações locais ainda não persistidas",src)
         self.assertIn("checkpoint_recovery_restored",Path("atlasquant_aion_recovery.py").read_text(encoding="utf-8"))
+
+    def test_development_exposes_read_only_tenant_persistence_review(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "from atlasquant_aion_tenant_persistence_review import",
+            src,
+        )
+        self.assertIn("def _render_tenant_persistence_review(", src)
+        self.assertIn("_render_tenant_persistence_review(access)", src)
+        self.assertIn("Persistência tenant · revisão administrativa", src)
+        self.assertIn("sem botão de ativação", src)
+        self.assertIn("activation_authorized=false", src)
+        self.assertIn("production_persistence_activated=false", src)
+        self.assertNotIn("activate_tenant_persistence(", src)
 
     def test_promotions_heading_no_longer_mixes_subscriptions_workspace(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
@@ -879,9 +895,9 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
 
     def test_contextual_voice_exists_for_all_aion_workspaces(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertGreaterEqual(src.count("_context_voice("),9)
+        self.assertGreaterEqual(src.count("_context_voice("),10)
         for area in (
-            "Central","Secretaria","Trading","Studio",
+            "Central","Biblioteca","Secretaria","Trading","Studio",
             "Negócios","Laboratório","Desenvolvimento","Assinaturas","Promoções",
         ):
             self.assertIn(f'"{area}",', src)
