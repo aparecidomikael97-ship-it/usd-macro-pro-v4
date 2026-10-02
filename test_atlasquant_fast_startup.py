@@ -164,11 +164,12 @@ class FastStartupTests(unittest.TestCase):
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
         self.assertIn('"💰 Investir"',src)
         self.assertIn('render_investment_center("Iniciante")',src)
-        self.assertIn('experience_compass_html("Iniciante", page)',src)
         pages=src.index('_fast_pages=["🎯 Radar"')
-        compass=src.index('experience_compass_html("Iniciante", page)',pages)
+        guard=src.index('if experience_compass_html is not None and page != "🎯 Radar":',pages)
+        compass=src.index('experience_compass_html("Iniciante", page)',guard)
         radar=src.index('if page=="🎯 Radar":',compass)
-        self.assertLess(pages,compass)
+        self.assertLess(pages,guard)
+        self.assertLess(guard,compass)
         self.assertLess(compass,radar)
 
     def test_fast_home_keeps_classic_area_selector_as_compact_fallback_only(self):
