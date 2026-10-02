@@ -6,6 +6,7 @@ from atlasquant_navigation_bridge import (
     consume_navigation_request,
     consume_revalidation_request,
     request_business_workspace,
+    request_investments_page,
     request_return_to_aion,
     request_surface_revalidation,
     revalidation_result,
@@ -118,6 +119,43 @@ class AtlasQuantNavigationBridgeTests(unittest.TestCase):
         self.assertEqual(state["atlasquant_advanced_area"], "🧠 AION")
         self.assertEqual(state["atlasquant_stable_nav_fallback"], "🧠 AION")
 
+
+    def test_investments_request_opens_existing_page_and_preserves_mode(self):
+        for initial_mode, target_key in (
+            ("Iniciante", "atlasquant_beginner_area_full"),
+            ("Avançado", "atlasquant_advanced_area"),
+        ):
+            with self.subTest(mode=initial_mode):
+                state={"atlasquant_experience_mode":initial_mode}
+                request=request_investments_page(state)
+                self.assertEqual(request["page"],"💰 Investir")
+                self.assertEqual(request["state"],"INVESTMENTS_PAGE_REQUESTED")
+                self.assertFalse(request["executes_action"])
+                self.assertFalse(request["real_orders_enabled"])
+                consumed=consume_navigation_request(
+                    state,
+                    available_pages=["🎯 Radar","💰 Investir","🧠 AION"],
+                )
+                self.assertEqual(consumed["page"],"💰 Investir")
+                self.assertEqual(state["atlasquant_experience_mode"],initial_mode)
+                self.assertEqual(state[target_key],"💰 Investir")
+                if initial_mode == "Iniciante":
+                    self.assertEqual(state["aq_beginner_page"],"💰 Investir")
+                else:
+                    self.assertNotIn("aq_beginner_page",state)
+                self.assertEqual(state["atlasquant_stable_nav_fallback"],"💰 Investir")
+
+    def test_investments_request_fails_closed_when_page_is_unavailable(self):
+        state={"atlasquant_experience_mode":"Avançado"}
+        request_investments_page(state)
+        result=consume_navigation_request(
+            state,
+            available_pages=["🎯 Radar","🧠 AION"],
+        )
+        self.assertEqual(result["state"],"NAVIGATION_BLOCKED")
+        self.assertEqual(result["reason"],"TARGET_PAGE_UNAVAILABLE")
+        self.assertNotIn("atlasquant_advanced_area",state)
+        self.assertNotIn("atlasquant_stable_nav_fallback",state)
 
     def test_business_workspace_reuses_aion_navigation_without_execution(self):
         state={}

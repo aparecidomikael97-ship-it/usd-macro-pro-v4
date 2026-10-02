@@ -214,6 +214,15 @@ class ProductionAdminFlowTests(unittest.TestCase):
 
         go("central")
         go("investimentos")
+        # The Central root does not mount the experience-mode widget. Streamlit
+        # may therefore drop that widget-backed state between reruns. The
+        # investments bridge intentionally fails safe to Iniciante when no
+        # current mode survives, while still opening the real Investir page.
+        self.assertEqual(at.session_state["atlasquant_experience_mode"], "Iniciante")
+        self.assertEqual(at.session_state["atlasquant_beginner_area_full"], "💰 Investir")
+        self.assertEqual(at.session_state["aq_beginner_page"], "💰 Investir")
+        self.assertEqual(at.session_state["atlasquant_stable_nav_fallback"], "💰 Investir")
+        self.assertIn("Seja bem-vindo à área de Investimentos.", self._html(at))
         go("central")
         go("trader")
 

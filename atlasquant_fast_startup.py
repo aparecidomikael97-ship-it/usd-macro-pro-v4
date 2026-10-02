@@ -383,7 +383,11 @@ def render_beginner_shell(
 
     _fast_pages=["🎯 Radar","🎙️ Macro","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"]
     try:
-        from atlasquant_premium_shell import consume_premium_navigation, render_premium_catalog
+        from atlasquant_premium_shell import (
+            consume_premium_navigation,
+            render_premium_catalog,
+            workspace_welcome_html,
+        )
         consume_premium_navigation(
             st.session_state,
             mode="Iniciante",
@@ -392,6 +396,7 @@ def render_beginner_shell(
         )
     except Exception:
         render_premium_catalog = None
+        workspace_welcome_html = None
 
     age=float(check["age_minutes"] or 0.0)
     _obs=dict(snapshot.get("_fast_boot_observability",{}) or {})
@@ -441,6 +446,10 @@ def render_beginner_shell(
             active_page=str(st.session_state.get("aq_beginner_page") or "🎯 Radar"),
         )
     page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
+    if workspace_welcome_html is not None:
+        _welcome = workspace_welcome_html(page, mode="Iniciante")
+        if _welcome:
+            st.markdown(_welcome, unsafe_allow_html=True)
     if experience_compass_html is not None:
         st.markdown(
             experience_compass_html("Iniciante", page),
