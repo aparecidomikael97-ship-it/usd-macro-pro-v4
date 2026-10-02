@@ -22,7 +22,8 @@
     "TENANT_LOCAL_EVIDENCE_BUNDLE_AND_ADMIN_REVIEW_PREP_LOCAL",
     "FINAL_LOCAL_INTEGRATION_AUDIT_AND_RELEASE_CANDIDATE_PREP",
     "CORE_EXECUTOR_TENANT_RECOVERY_E2E_V2_LOCAL",
-    "CORE_FINAL_CAPABILITY_WIRING_AND_ORPHAN_AUDIT"
+    "CORE_FINAL_CAPABILITY_WIRING_AND_ORPHAN_AUDIT",
+    "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -41,7 +42,8 @@
     "atlasquant_aion_tenant_evidence_binding.py",
     "atlasquant_aion_tenant_evidence_bundle.py",
     "atlasquant_aion_recovery_review.py",
-    "atlasquant_aion_library_preview.py"
+    "atlasquant_aion_library_preview.py",
+    "atlasquant_aion_tenant_persistence_review.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
@@ -67,7 +69,8 @@
     "test_atlasquant_aion_admin.py",
     "test_atlasquant_aion_recovery_review.py",
     "test_atlasquant_aion_library_preview.py",
-    "test_atlasquant_aion_core_wiring.py"
+    "test_atlasquant_aion_core_wiring.py",
+    "test_atlasquant_aion_tenant_persistence_review.py"
   ],
   "production_baseline": {
     "sha": "a44e31795519aa31b32fe2df2b8eb172cff504d1",
@@ -120,7 +123,12 @@
     "recovery_admin_bundle": "148 passed / 0 failed",
     "aion_full_regression_wiring": "2193 passed / 0 failed / 1 skipped",
     "contract_audit_wiring": "17 checks / 0 failures",
-    "developer_adversarial_wiring": "348 cases / 0 gaps / 0 critical / 0 high"
+    "developer_adversarial_wiring": "348 cases / 0 gaps / 0 critical / 0 high",
+    "tenant_persistence_admin_review_bundle": "113 passed / 0 failed",
+    "tenant_review_wiring_guard": "93 passed / 0 failed",
+    "aion_full_regression_tenant_review": "2198 passed / 0 failed / 1 skipped",
+    "contract_audit_tenant_review": "17 checks / 0 failures",
+    "developer_adversarial_tenant_review": "348 cases / 0 gaps / 0 critical / 0 high"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -179,11 +187,11 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL",
+  "next_wave": "POST_515_LOCAL_RELEASE_CANDIDATE_V2_AUDIT",
   "known_blockers": [
-    "Production tenant persistence remains disabled and requires explicit administrative authorization despite READY_FOR_ADMIN_REVIEW evidence.",
-    "The tenant evidence bundle is intentionally a review artifact and is not auto-loaded by the Core runtime.",
-    "Current post-515 branch is local only; no push, PR, merge or deploy is authorized for this new wave.",
+    "Production tenant persistence remains disabled and requires a separate explicit administrative authorization; the review surface has no activation control.",
+    "The Core runtime does not auto-load the tenant evidence artifact; only the explicit admin review surface revalidates it.",
+    "Current post-515 branch is local only; no push, PR, merge or deploy is authorized.",
     "Drael local key/config is absent; main development flow must not wait for it."
   ],
   "hourly_night_shift_enabled": true,
@@ -330,7 +338,8 @@
     "orphan_critical_modules_remaining": 0,
     "automatic_merge": false,
     "automatic_deploy": false,
-    "production_persistence_activated": false
+    "production_persistence_activated": false,
+    "tenant_evidence_bundle_admin_review_consumer": true
   },
   "recovery_admin_review": {
     "state": "READY_FOR_ADMIN_REVIEW_GATE_WIRED",
@@ -356,5 +365,20 @@
     "memory_auto_promotion": false,
     "provider_calls": false,
     "model_calls": false
+  },
+  "tenant_persistence_admin_review": {
+    "state": "READY_FOR_ADMIN_REVIEW_LOCAL",
+    "explicit_admin_context_required": true,
+    "bundle_loaded_only_by_review_surface": true,
+    "bundle_revalidated_against_current_sources": true,
+    "gate_recomputed": true,
+    "code_ready": true,
+    "evidence_ready": true,
+    "activation_authorized": false,
+    "production_persistence_activated": false,
+    "automatic_activation": false,
+    "external_action_executed": false,
+    "network_called": false,
+    "activation_button_present": false
   }
 }

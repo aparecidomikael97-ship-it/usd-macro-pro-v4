@@ -182,6 +182,9 @@ from atlasquant_aion_tenant_privacy import (
     tenant_privacy_policy_snapshot,
     tenant_privacy_readiness,
 )
+from atlasquant_aion_tenant_persistence_review import (
+    build_tenant_persistence_admin_review,
+)
 from atlasquant_aion_incident_center import (
     collect_incidents,
     incident_center_rows,
@@ -7546,6 +7549,60 @@ def _render_developer_intelligence() -> None:
         )
 
 
+
+def _render_tenant_persistence_review(access: Mapping[str, Any]) -> None:
+    with st.expander(
+        "Persistência tenant · revisão administrativa",
+        expanded=False,
+    ):
+        review = build_tenant_persistence_admin_review(
+            access,
+            repository_root=Path(__file__).resolve().parent,
+        )
+        r1,r2,r3,r4 = st.columns(4)
+        r1.metric("Estado", str(review.get("state") or "UNKNOWN"))
+        r2.metric(
+            "Bundle",
+            "VÁLIDO" if review.get("bundle_valid") is True else "BLOQUEADO",
+        )
+        r3.metric("Gate", str(review.get("gate_state") or "UNKNOWN"))
+        r4.metric("Testes", int(review.get("test_count") or 0))
+
+        if review.get("state") == "READY_FOR_ADMIN_REVIEW":
+            st.success(
+                "Código e evidências locais estão prontos para revisão administrativa. "
+                "Isso não ativa persistência em produção."
+            )
+        else:
+            reasons = ", ".join(
+                str(x) for x in review.get("bundle_reasons") or []
+            )
+            st.warning(
+                "A revisão de persistência está bloqueada em modo seguro. "
+                f"{review.get('reason') or reasons or 'evidência não confirmada'}."
+            )
+
+        rows = list(review.get("evidence_rows") or [])
+        if rows:
+            st.dataframe(
+                rows,
+                width="stretch",
+                hide_index=True,
+            )
+        digest = str(review.get("bundle_digest") or "")
+        source_sha = str(review.get("source_head_sha") or "")
+        if digest:
+            st.caption(f"Bundle: {digest[:28]}…")
+        if source_sha:
+            st.caption(f"Fonte do bundle: {source_sha[:12]}")
+
+        st.caption(
+            "Superfície somente leitura: sem botão de ativação, sem escrita, sem mudança "
+            "de ACL e sem auto-carregamento pelo Core runtime. "
+            "activation_authorized=false · production_persistence_activated=false."
+        )
+
+
 def _render_development(
     access: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -7570,6 +7627,7 @@ def _render_development(
         ),
         key="aion_development_voice",
     )
+    _render_tenant_persistence_review(access)
     _render_developer_intelligence()
     with st.expander("Política de confiança e rollback do AION Desenvolvedor"):
         policy = developer_trust_policy()

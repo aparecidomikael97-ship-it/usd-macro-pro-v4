@@ -857,6 +857,20 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Há alterações locais ainda não persistidas",src)
         self.assertIn("checkpoint_recovery_restored",Path("atlasquant_aion_recovery.py").read_text(encoding="utf-8"))
 
+    def test_development_exposes_read_only_tenant_persistence_review(self):
+        src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "from atlasquant_aion_tenant_persistence_review import",
+            src,
+        )
+        self.assertIn("def _render_tenant_persistence_review(", src)
+        self.assertIn("_render_tenant_persistence_review(access)", src)
+        self.assertIn("Persistência tenant · revisão administrativa", src)
+        self.assertIn("sem botão de ativação", src)
+        self.assertIn("activation_authorized=false", src)
+        self.assertIn("production_persistence_activated=false", src)
+        self.assertNotIn("activate_tenant_persistence(", src)
+
     def test_promotions_heading_no_longer_mixes_subscriptions_workspace(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
         self.assertIn('st.markdown("### 🎟️ Promoções")',src)

@@ -65,6 +65,24 @@ class AionCoreWiringTests(unittest.TestCase):
         self.assertIn('"automatic_activation": False', runtime)
         self.assertIn('"production_persistence_activated": False', runtime)
 
+    def test_tenant_evidence_bundle_has_admin_review_consumer_but_no_core_autoload(self):
+        review = self._text("atlasquant_aion_tenant_persistence_review.py")
+        runtime = self._text("atlasquant_aion_core_runtime_bridge.py")
+        admin = self._text("atlasquant_aion_admin.py")
+        self.assertIn("from atlasquant_aion_tenant_evidence_bundle import", review)
+        self.assertIn("verify_local_evidence_bundle(", review)
+        self.assertIn(
+            "from atlasquant_aion_tenant_persistence_review import",
+            admin,
+        )
+        self.assertIn("build_tenant_persistence_admin_review(", admin)
+        self.assertNotIn("atlasquant_aion_tenant_evidence_bundle", runtime)
+        self.assertNotIn(
+            "docs/aion/evidence/tenant_persistence_local_evidence.json",
+            runtime,
+        )
+        self.assertIn('"tenant_evidence_auto_loaded": False', runtime)
+
     def test_new_bridges_remain_non_authoritative_and_non_executing(self):
         recovery = self._text("atlasquant_aion_recovery_review.py")
         library = self._text("atlasquant_aion_library_preview.py")
