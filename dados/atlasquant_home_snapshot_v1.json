@@ -1,19 +1,19 @@
 {
   "schema": "ATLASQUANT_HOME_SNAPSHOT_V1",
-  "generated_at": "2026-10-02T20:49:52.406523+00:00",
-  "runtime_generated_at": "2026-10-02T20:51:41.301324+00:00",
+  "generated_at": "2026-10-02T21:08:28.493725+00:00",
+  "runtime_generated_at": "2026-10-02T21:08:50.897328+00:00",
   "engine_version": "V11.0.8 / AtlasQuant Runtime",
   "inputs": {
     "version": "V10.7_FAST_BOOT_1",
-    "generated_at": "2026-10-02T20:49:52.406523+00:00",
+    "generated_at": "2026-10-02T21:08:28.493725+00:00",
     "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
     "core_evidence": [
       {
         "claim": "build",
-        "value": "37b343755251fe63",
+        "value": "48cca0435652a293",
         "truth_state": "CONFIRMED",
         "source": "AtlasQuant runtime identity",
-        "source_ref": "runtime-build:37b343755251fe63",
+        "source_ref": "runtime-build:48cca0435652a293",
         "time_sensitive": false
       }
     ],
@@ -33,7 +33,7 @@
         "Score final": 89.0,
         "Qualidade": 91.0,
         "Confluência": "ALTA",
-        "Dif. macro": 26.3,
+        "Dif. macro": 25.3,
         "Índice ranking": 89.9
       },
       {
@@ -51,7 +51,7 @@
         "Score final": 84.0,
         "Qualidade": 91.0,
         "Confluência": "ALTA",
-        "Dif. macro": -17.0,
+        "Dif. macro": -15.7,
         "Índice ranking": 87.1
       },
       {
@@ -60,7 +60,7 @@
         "Score final": 91.0,
         "Qualidade": 70.0,
         "Confluência": "MODERADA",
-        "Dif. macro": -18.1,
+        "Dif. macro": -17.0,
         "Índice ranking": 82.5
       },
       {
@@ -69,7 +69,7 @@
         "Score final": 78.0,
         "Qualidade": 70.0,
         "Confluência": "MODERADA",
-        "Dif. macro": -13.5,
+        "Dif. macro": -12.0,
         "Índice ranking": 75.2
       },
       {
@@ -78,7 +78,7 @@
         "Score final": 55.0,
         "Qualidade": 91.0,
         "Confluência": "BAIXA",
-        "Dif. macro": -13.7,
+        "Dif. macro": -12.3,
         "Índice ranking": 69.4
       }
     ],
@@ -444,14 +444,14 @@
           "juros": 3.75,
           "inflacao": 3.35302,
           "pib": 2.19157,
-          "sentimento": 50.0,
+          "sentimento": 48.148148148148145,
           "fonte": "FRED + transformação anual"
         },
         "EUR": {
           "juros": 2.5,
           "inflacao": 3.22645,
           "pib": 1.6603,
-          "sentimento": 42.85714285714286,
+          "sentimento": 50.0,
           "fonte": "FRED + transformação anual"
         },
         "GBP": {
@@ -486,7 +486,7 @@
           "juros": 4.51,
           "inflacao": 2.7,
           "pib": 2.13764,
-          "sentimento": 58.33333333333333,
+          "sentimento": 50.0,
           "fonte": "FRED + transformação anual + fallback parcial"
         },
         "NZD": {
@@ -497,7 +497,7 @@
           "fonte": "FRED + transformação anual + fallback parcial"
         },
         "BRL": {
-          "juros": 13.75,
+          "juros": 10.75,
           "inflacao": 4.22,
           "pib": 2.4,
           "sentimento": 83.33333333333333,
@@ -507,13 +507,13 @@
       "ranking": [
         {
           "Código": "BRL",
-          "juros": 13.8,
+          "juros": 10.8,
           "inflacao": 4.2,
           "pib": 2.4,
           "sentimento": 83.3,
           "fonte": "BCB + validação + fallback parcial",
           "Moeda": "Real Brasileiro",
-          "juros_reais": 9.5,
+          "juros_reais": 6.5,
           "n_juros": 100.0,
           "n_inflacao": 100.0,
           "n_pib": 83.49591589284022,
@@ -545,14 +545,14 @@
           "juros": 3.8,
           "inflacao": 3.4,
           "pib": 2.2,
-          "sentimento": 50.0,
+          "sentimento": 48.1,
           "fonte": "FRED + transformação anual",
           "Moeda": "Dólar Americano",
           "juros_reais": 0.4,
           "n_juros": 65.816,
           "n_inflacao": 62.67743,
           "n_pib": 73.09578815534078,
-          "n_sentimento": 50.0,
+          "n_sentimento": 48.148148148148145,
           "n_emprego": 44.675,
           "n_atividade": 52.0,
           "Pontuação_Macro": 57.7,
@@ -585,18 +585,18 @@
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Libra Esterlina",
           "juros_reais": 0.8,
-          "n_juros": 19.698663024131786,
+          "n_juros": 27.20620462297768,
           "n_inflacao": 66.22516556291392,
           "n_pib": 18.629216959148952,
           "n_sentimento": 100.0,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 46.7,
+          "Pontuação_Macro": 48.2,
           "Influência_Fed": -0.4,
-          "Pontuação_Final": 46.3,
+          "Pontuação_Final": 47.8,
           "strength_attribution": {
             "factors": {
-              "Juros / Treasury": 3.9397326048263572,
+              "Juros / Treasury": 5.441240924595537,
               "Inflação": 9.933774834437086,
               "PIB": 2.794382543872343,
               "Emprego": 10.0,
@@ -607,7 +607,7 @@
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 46.27368998313579
+            "unrounded_final": 47.77519830290497
           },
           "Posição": 3
         },
@@ -616,33 +616,33 @@
           "juros": 4.5,
           "inflacao": 2.7,
           "pib": 2.1,
-          "sentimento": 58.3,
+          "sentimento": 50.0,
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Dólar Australiano",
           "juros_reais": 1.8,
-          "n_juros": 28.98896661469615,
+          "n_juros": 40.03722265627481,
           "n_inflacao": 49.66887417218545,
           "n_pib": 70.40481809880697,
-          "n_sentimento": 58.33333333333333,
+          "n_sentimento": 50.0,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 49.6,
+          "Pontuação_Macro": 51.0,
           "Influência_Fed": -3.5,
-          "Pontuação_Final": 46.1,
+          "Pontuação_Final": 47.5,
           "strength_attribution": {
             "factors": {
-              "Juros / Treasury": 5.79779332293923,
+              "Juros / Treasury": 8.007444531254961,
               "Inflação": 7.450331125827817,
               "PIB": 10.560722714821045,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 5.833333333333333
+              "Sentimento": 5.0
             },
             "fed": -3.5478,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 46.094380496921424
+            "unrounded_final": 47.47069837190382
           },
           "Posição": 4
         },
@@ -655,18 +655,18 @@
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Dólar Neozelandês",
           "juros_reais": 0.5,
-          "n_juros": 16.755200500388625,
+          "n_juros": 23.140931582725127,
           "n_inflacao": 43.046357615894046,
           "n_pib": 43.57794731826098,
           "n_sentimento": 100.0,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 46.3,
+          "Pontuação_Macro": 47.6,
           "Influência_Fed": -3.5,
-          "Pontuação_Final": 42.8,
+          "Pontuação_Final": 44.1,
           "strength_attribution": {
             "factors": {
-              "Juros / Treasury": 3.351040100077725,
+              "Juros / Treasury": 4.628186316545025,
               "Inflação": 6.456953642384106,
               "PIB": 6.536692097739147,
               "Emprego": 10.0,
@@ -677,9 +677,44 @@
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 42.79688584020098
+            "unrounded_final": 44.07403205666828
           },
           "Posição": 5
+        },
+        {
+          "Código": "EUR",
+          "juros": 2.5,
+          "inflacao": 3.2,
+          "pib": 1.7,
+          "sentimento": 50.0,
+          "fonte": "FRED + transformação anual",
+          "Moeda": "Euro",
+          "juros_reais": -0.7,
+          "n_juros": 7.814217022060458,
+          "n_inflacao": 67.10099337748345,
+          "n_pib": 46.58676419956989,
+          "n_sentimento": 50.0,
+          "n_emprego": 50.0,
+          "n_atividade": 50.0,
+          "Pontuação_Macro": 43.6,
+          "Influência_Fed": -0.8,
+          "Pontuação_Final": 42.8,
+          "strength_attribution": {
+            "factors": {
+              "Juros / Treasury": 1.5628434044120916,
+              "Inflação": 10.065149006622518,
+              "PIB": 6.988014629935484,
+              "Emprego": 10.0,
+              "Atividade": 10.0,
+              "Sentimento": 5.0
+            },
+            "fed": -0.7884000000000001,
+            "other": {
+              "Limite da escala 0–100": -7.105427357601002e-15
+            },
+            "unrounded_final": 42.827607040970086
+          },
+          "Posição": 6
         },
         {
           "Código": "CHF",
@@ -690,7 +725,7 @@
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Franco Suíço",
           "juros_reais": -1.2,
-          "n_juros": 0.8880978333356321,
+          "n_juros": 1.2265691001136996,
           "n_inflacao": 0.0,
           "n_pib": 100.0,
           "n_sentimento": 50.0,
@@ -701,7 +736,7 @@
           "Pontuação_Final": 41.8,
           "strength_attribution": {
             "factors": {
-              "Juros / Treasury": 0.17761956666712642,
+              "Juros / Treasury": 0.24531382002273994,
               "Inflação": 0.0,
               "PIB": 15.0,
               "Emprego": 10.0,
@@ -710,44 +745,9 @@
             },
             "fed": 1.5768000000000002,
             "other": {
-              "Limite da escala 0–100": 0.0
+              "Limite da escala 0–100": 7.105427357601002e-15
             },
-            "unrounded_final": 41.754419566667124
-          },
-          "Posição": 6
-        },
-        {
-          "Código": "EUR",
-          "juros": 2.5,
-          "inflacao": 3.2,
-          "pib": 1.7,
-          "sentimento": 42.9,
-          "fonte": "FRED + transformação anual",
-          "Moeda": "Euro",
-          "juros_reais": -0.7,
-          "n_juros": 5.657886869857563,
-          "n_inflacao": 67.10099337748345,
-          "n_pib": 46.58676419956989,
-          "n_sentimento": 42.85714285714286,
-          "n_emprego": 50.0,
-          "n_atividade": 50.0,
-          "Pontuação_Macro": 42.5,
-          "Influência_Fed": -0.8,
-          "Pontuação_Final": 41.7,
-          "strength_attribution": {
-            "factors": {
-              "Juros / Treasury": 1.1315773739715127,
-              "Inflação": 10.065149006622518,
-              "PIB": 6.988014629935484,
-              "Emprego": 10.0,
-              "Atividade": 10.0,
-              "Sentimento": 4.2857142857142865
-            },
-            "fed": -0.7884000000000001,
-            "other": {
-              "Limite da escala 0–100": 0.0
-            },
-            "unrounded_final": 41.682055296243796
+            "unrounded_final": 41.82211382002274
           },
           "Posição": 7
         },
@@ -760,18 +760,18 @@
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Dólar Canadense",
           "juros_reais": -0.0,
-          "n_juros": 12.15604030703993,
+          "n_juros": 16.78894245733051,
           "n_inflacao": 36.42384105960265,
           "n_pib": 20.021356113187398,
           "n_sentimento": 50.0,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 35.9,
+          "Pontuação_Macro": 36.8,
           "Influência_Fed": -2.4,
-          "Pontuação_Final": 33.5,
+          "Pontuação_Final": 34.5,
           "strength_attribution": {
             "factors": {
-              "Juros / Treasury": 2.431208061407986,
+              "Juros / Treasury": 3.3577884914661023,
               "Inflação": 5.4635761589403975,
               "PIB": 3.0032034169781094,
               "Emprego": 10.0,
@@ -782,7 +782,7 @@
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 33.53278763732649
+            "unrounded_final": 34.45936806738461
           },
           "Posição": 8
         },
@@ -897,7 +897,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -17.0,
+      "matrix_diff": -15.7,
       "h4": "🟢 CONFIRMA",
       "h1": "🟢 PULLBACK OK",
       "m15": "🔴 SEM GATILHO",
@@ -1252,7 +1252,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1.5,
+      "technical_age": 18.7,
       "data_ready": {
         "score": 100.0,
         "label": "🟢 DADOS SUFICIENTES",
@@ -1260,21 +1260,21 @@
         "institutional_data_ready": true,
         "timeframes": {
           "m15": {
-            "age_minutes": 1.5,
+            "age_minutes": 18.7,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h1": {
-            "age_minutes": 88.8,
+            "age_minutes": 106.0,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h4": {
-            "age_minutes": 208.2,
+            "age_minutes": 225.5,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
@@ -1294,9 +1294,9 @@
       "scanner_processed_at": 1790974206.2825315,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 156.57868968333332,
+        "age_minutes": 173.80597578333334,
         "current": true,
-        "label": "🟢 SWEEP RECENTE · 157 min"
+        "label": "🟢 SWEEP RECENTE · 174 min"
       },
       "strength": {
         "base": "NZD",
@@ -1392,10 +1392,10 @@
         "reference_at": "2026-10-02T20:50:06.230708+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.7,
         "valid_until": "2026-10-02T21:50:06.230708+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.3,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": false,
@@ -1407,7 +1407,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-02T19:31:59.478711+00:00",
         "blocked_at": "2026-10-02T13:26:06.861484+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00"
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00"
       }
     },
     {
@@ -1776,7 +1776,7 @@
         "H4/H1/M15 fortemente alinhados"
       ],
       "executable": false,
-      "technical_age": 0.5,
+      "technical_age": 17.8,
       "data_ready": {
         "score": 100.0,
         "label": "🟢 DADOS SUFICIENTES",
@@ -1784,21 +1784,21 @@
         "institutional_data_ready": true,
         "timeframes": {
           "m15": {
-            "age_minutes": 0.5,
+            "age_minutes": 17.8,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h1": {
-            "age_minutes": 0.5,
+            "age_minutes": 17.8,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h4": {
-            "age_minutes": 88.8,
+            "age_minutes": 106.0,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
@@ -1818,9 +1818,9 @@
       "scanner_processed_at": 1790974263.3755884,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 96.58029958333333,
+        "age_minutes": 113.80667518333333,
         "current": true,
-        "label": "🟢 SWEEP RECENTE · 97 min"
+        "label": "🟢 SWEEP RECENTE · 114 min"
       },
       "strength": {
         "base": "USD",
@@ -1916,10 +1916,10 @@
         "reference_at": "2026-10-02T20:51:03.037992+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:51 UTC",
-        "age_minutes": 0.6,
+        "age_minutes": 17.8,
         "valid_until": "2026-10-02T21:51:03.037992+00:00",
         "valid_until_display": "02/10/2026 21:51 UTC",
-        "remaining_minutes": 59.4,
+        "remaining_minutes": 42.2,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": false,
@@ -1931,7 +1931,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-10-02T08:27:04.698792+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00"
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00"
       }
     },
     {
@@ -1946,7 +1946,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": 26.3,
+      "matrix_diff": 25.3,
       "h4": "🟢 CONFIRMA",
       "h1": "🟢 PULLBACK OK",
       "m15": "🔴 SEM GATILHO",
@@ -2302,7 +2302,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1.5,
+      "technical_age": 18.7,
       "data_ready": {
         "score": 100.0,
         "label": "🟢 DADOS SUFICIENTES",
@@ -2310,21 +2310,21 @@
         "institutional_data_ready": true,
         "timeframes": {
           "m15": {
-            "age_minutes": 1.5,
+            "age_minutes": 18.7,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h1": {
-            "age_minutes": 1.5,
+            "age_minutes": 18.7,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h4": {
-            "age_minutes": 208.2,
+            "age_minutes": 225.4,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
@@ -2442,10 +2442,10 @@
         "reference_at": "2026-10-02T20:50:07.763529+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.7,
         "valid_until": "2026-10-02T21:50:07.763529+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.3,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -2457,7 +2457,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-10-02T16:24:59.398133+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00"
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00"
       }
     },
     {
@@ -2472,7 +2472,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -13.7,
+      "matrix_diff": -12.3,
       "h4": "⚪ MACRO AGUARDAR",
       "h1": "⚪ MACRO AGUARDAR",
       "m15": "⚪ MACRO AGUARDAR",
@@ -2747,7 +2747,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1.5,
+      "technical_age": 18.7,
       "data_ready": {
         "score": 100.0,
         "label": "🟢 DADOS SUFICIENTES",
@@ -2755,21 +2755,21 @@
         "institutional_data_ready": true,
         "timeframes": {
           "m15": {
-            "age_minutes": 1.5,
+            "age_minutes": 18.7,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h1": {
-            "age_minutes": 88.8,
+            "age_minutes": 106.0,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h4": {
-            "age_minutes": 208.3,
+            "age_minutes": 225.5,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
@@ -2789,9 +2789,9 @@
       "scanner_processed_at": 1790974204.6363814,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 21.577067633333336,
+        "age_minutes": 38.80527686666667,
         "current": true,
-        "label": "🟢 SWEEP RECENTE · 22 min"
+        "label": "🟢 SWEEP RECENTE · 39 min"
       },
       "strength": {
         "base": "AUD",
@@ -2887,10 +2887,10 @@
         "reference_at": "2026-10-02T20:50:04.587032+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.8,
         "valid_until": "2026-10-02T21:50:04.587032+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.2,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": false,
@@ -2899,7 +2899,7 @@
         "automatic_execution": false,
         "real_orders_enabled": false,
         "generation": 0,
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00"
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00"
       }
     },
     {
@@ -2914,7 +2914,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -18.1,
+      "matrix_diff": -17.0,
       "h4": "🟢 CONFIRMA",
       "h1": "🟢 PULLBACK OK",
       "m15": "🟡 AGUARDAR GATILHO",
@@ -3306,7 +3306,7 @@
         "H4/H1/M15 fortemente alinhados"
       ],
       "executable": false,
-      "technical_age": 1.5,
+      "technical_age": 18.8,
       "data_ready": {
         "score": 100.0,
         "label": "🟢 DADOS SUFICIENTES",
@@ -3314,21 +3314,21 @@
         "institutional_data_ready": true,
         "timeframes": {
           "m15": {
-            "age_minutes": 1.5,
+            "age_minutes": 18.8,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h1": {
-            "age_minutes": 88.8,
+            "age_minutes": 106.0,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h4": {
-            "age_minutes": 208.3,
+            "age_minutes": 225.5,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
@@ -3348,9 +3348,9 @@
       "scanner_processed_at": 1790974202.6733456,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 21.57384625,
+        "age_minutes": 38.80387978333333,
         "current": true,
-        "label": "🟢 SWEEP RECENTE · 22 min"
+        "label": "🟢 SWEEP RECENTE · 39 min"
       },
       "strength": {
         "base": "EUR",
@@ -3446,10 +3446,10 @@
         "reference_at": "2026-10-02T20:50:02.620100+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.6,
+        "age_minutes": 18.8,
         "valid_until": "2026-10-02T21:50:02.620100+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.4,
+        "remaining_minutes": 41.2,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -3461,7 +3461,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-02T19:31:59.478711+00:00",
         "blocked_at": "2026-10-02T19:51:15.219328+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00"
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00"
       }
     },
     {
@@ -3476,7 +3476,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -13.5,
+      "matrix_diff": -12.0,
       "h4": "🟡 PARCIAL",
       "h1": "🔴 CONTRA",
       "m15": "🔴 SEM GATILHO",
@@ -3815,7 +3815,7 @@
       ],
       "positives": [],
       "executable": false,
-      "technical_age": 1.6,
+      "technical_age": 18.8,
       "data_ready": {
         "score": 100.0,
         "label": "🟢 DADOS SUFICIENTES",
@@ -3823,21 +3823,21 @@
         "institutional_data_ready": true,
         "timeframes": {
           "m15": {
-            "age_minutes": 1.6,
+            "age_minutes": 18.8,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h1": {
-            "age_minutes": 88.8,
+            "age_minutes": 106.0,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h4": {
-            "age_minutes": 208.3,
+            "age_minutes": 225.6,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
@@ -3955,10 +3955,10 @@
         "reference_at": "2026-10-02T20:50:00.792469+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.6,
+        "age_minutes": 18.8,
         "valid_until": "2026-10-02T21:50:00.792469+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.4,
+        "remaining_minutes": 41.2,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -3970,7 +3970,7 @@
         "observed_at": "2026-10-02T09:51:01.932488+00:00",
         "expired_at": "2026-10-02T19:31:59.478711+00:00",
         "blocked_at": "2026-10-02T19:51:15.219328+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00"
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00"
       }
     },
     {
@@ -4337,7 +4337,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1.4,
+      "technical_age": 18.6,
       "data_ready": {
         "score": 100.0,
         "label": "🟢 DADOS SUFICIENTES",
@@ -4345,21 +4345,21 @@
         "institutional_data_ready": true,
         "timeframes": {
           "m15": {
-            "age_minutes": 1.4,
+            "age_minutes": 18.6,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h1": {
-            "age_minutes": 1.4,
+            "age_minutes": 18.6,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
             "usable": true
           },
           "h4": {
-            "age_minutes": 208.2,
+            "age_minutes": 225.4,
             "state": "🟢 FRESCO",
             "score": 100.0,
             "fresh": true,
@@ -4379,9 +4379,9 @@
       "scanner_processed_at": 1790974210.1219885,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 186.58191589999998,
+        "age_minutes": 203.80737136666667,
         "current": true,
-        "label": "🟢 SWEEP RECENTE · 187 min"
+        "label": "🟢 SWEEP RECENTE · 204 min"
       },
       "strength": {
         "base": "USD",
@@ -4477,10 +4477,10 @@
         "reference_at": "2026-10-02T20:50:09.782932+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.7,
         "valid_until": "2026-10-02T21:50:09.782932+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.3,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -4492,13 +4492,13 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-10-01T08:27:52.231008+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00"
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00"
       }
     }
   ],
   "signal_lifecycle": {
     "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
-    "updated_at": "2026-10-02T20:51:35.403842+00:00",
+    "updated_at": "2026-10-02T21:08:48.742428+00:00",
     "pairs": {
       "NZD/USD": {
         "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
@@ -4509,10 +4509,10 @@
         "reference_at": "2026-10-02T20:50:06.230708+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.7,
         "valid_until": "2026-10-02T21:50:06.230708+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.3,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": false,
@@ -4526,7 +4526,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T19:31:59.478711+00:00",
         "blocked_at": "2026-10-02T13:26:06.861484+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00",
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00",
         "previous_status_code": "POSSIBLE",
         "previous_side": "SELL"
       },
@@ -4539,10 +4539,10 @@
         "reference_at": "2026-10-02T20:51:03.037992+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:51 UTC",
-        "age_minutes": 0.5,
+        "age_minutes": 17.8,
         "valid_until": "2026-10-02T21:51:03.037992+00:00",
         "valid_until_display": "02/10/2026 21:51 UTC",
-        "remaining_minutes": 59.5,
+        "remaining_minutes": 42.2,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": false,
@@ -4556,7 +4556,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-10-02T08:27:04.698792+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00",
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00",
         "previous_status_code": "POSSIBLE",
         "previous_side": "BUY"
       },
@@ -4569,10 +4569,10 @@
         "reference_at": "2026-10-02T20:50:07.763529+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.7,
         "valid_until": "2026-10-02T21:50:07.763529+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.3,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -4586,7 +4586,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-10-02T16:24:59.398133+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00",
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00",
         "previous_status_code": "BLOCKED",
         "previous_side": "BUY"
       },
@@ -4599,10 +4599,10 @@
         "reference_at": "2026-10-02T20:50:04.587032+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.7,
         "valid_until": "2026-10-02T21:50:04.587032+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.3,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": false,
@@ -4616,7 +4616,7 @@
         "confirmed_at": "",
         "expired_at": "",
         "blocked_at": "",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00",
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00",
         "previous_status_code": "NO_SIGNAL",
         "previous_side": "WAIT"
       },
@@ -4629,10 +4629,10 @@
         "reference_at": "2026-10-02T20:50:02.620100+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.5,
+        "age_minutes": 18.8,
         "valid_until": "2026-10-02T21:50:02.620100+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.5,
+        "remaining_minutes": 41.2,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -4646,7 +4646,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T19:31:59.478711+00:00",
         "blocked_at": "2026-10-02T19:51:15.219328+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00",
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00",
         "previous_status_code": "BLOCKED",
         "previous_side": "SELL"
       },
@@ -4659,10 +4659,10 @@
         "reference_at": "2026-10-02T20:50:00.792469+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.6,
+        "age_minutes": 18.8,
         "valid_until": "2026-10-02T21:50:00.792469+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.4,
+        "remaining_minutes": 41.2,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -4676,7 +4676,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T19:31:59.478711+00:00",
         "blocked_at": "2026-10-02T19:51:15.219328+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00",
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00",
         "previous_status_code": "BLOCKED",
         "previous_side": "SELL"
       },
@@ -4689,10 +4689,10 @@
         "reference_at": "2026-10-02T20:50:09.782932+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1.4,
+        "age_minutes": 18.6,
         "valid_until": "2026-10-02T21:50:09.782932+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
-        "remaining_minutes": 58.6,
+        "remaining_minutes": 41.4,
         "timezone": "UTC",
         "m15_fresh_limit_minutes": 60.0,
         "requires_revalidation": true,
@@ -4706,7 +4706,7 @@
         "confirmed_at": "",
         "expired_at": "2026-09-25T21:21:12.905285+00:00",
         "blocked_at": "2026-10-01T08:27:52.231008+00:00",
-        "last_seen_at": "2026-10-02T20:51:35.403842+00:00",
+        "last_seen_at": "2026-10-02T21:08:48.742428+00:00",
         "previous_status_code": "BLOCKED",
         "previous_side": "BUY"
       }
@@ -6698,7 +6698,7 @@
     "automatic_promotion": false
   },
   "runtime": {
-    "market_open": true,
+    "market_open": false,
     "scanner_pairs": 7,
     "market_map_pairs": 7,
     "news_available": true
