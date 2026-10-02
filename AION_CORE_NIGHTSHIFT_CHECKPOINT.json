@@ -25,7 +25,8 @@
     "CORE_FINAL_CAPABILITY_WIRING_AND_ORPHAN_AUDIT",
     "TENANT_PERSISTENCE_ADMIN_REVIEW_SURFACE_LOCAL",
     "POST_515_LOCAL_RELEASE_CANDIDATE_V2_AUDIT",
-    "POST516_LIBRARY_CANONICAL_CROSS_SOURCE_V1"
+    "POST516_LIBRARY_CANONICAL_CROSS_SOURCE_V1",
+    "LIBRARY_CHECKPOINT_DURABILITY_AND_REVIEW_HISTORY_LOCAL"
   ],
   "implemented_files": [
     "aion_core/domain_registry.py",
@@ -46,7 +47,8 @@
     "atlasquant_aion_recovery_review.py",
     "atlasquant_aion_library_preview.py",
     "atlasquant_aion_tenant_persistence_review.py",
-    "atlasquant_aion_library_cross_source.py"
+    "atlasquant_aion_library_cross_source.py",
+    "atlasquant_aion_library_checkpoint.py"
   ],
   "modified_files": [
     ".github/workflows/quality-tests.yml",
@@ -78,7 +80,10 @@
     "atlasquant_aion_library_preview.py",
     "test_atlasquant_aion_ecosystem.py",
     "test_atlasquant_aion_workspaces.py",
-    "test_atlasquant_aion_library_cross_source.py"
+    "test_atlasquant_aion_library_cross_source.py",
+    "atlasquant_aion_memory.py",
+    "test_atlasquant_aion_memory.py",
+    "test_atlasquant_aion_library_checkpoint.py"
   ],
   "production_baseline": {
     "sha": "a38ad022c5dc1e97cd934f115cf2c58731bbb5ed",
@@ -147,7 +152,12 @@
     "library_canonical_registry_bundle": "132 passed / 0 failed",
     "aion_full_regression_post516_library": "2209 passed / 0 failed / 1 skipped",
     "contract_audit_post516_library": "17 checks / 0 failures",
-    "developer_adversarial_post516_library": "348 cases / 0 gaps / 0 critical / 0 high"
+    "developer_adversarial_post516_library": "348 cases / 0 gaps / 0 critical / 0 high",
+    "library_checkpoint_durability_focused": "208 passed / 0 failed",
+    "aion_full_regression_library_durability": "2216 passed / 0 failed / 1 skipped",
+    "contract_audit_library_durability": "17 checks / 0 failures",
+    "developer_adversarial_library_durability": "348 cases / 0 gaps / 0 critical / 0 high",
+    "library_checkpoint_compile": "PASS"
   },
   "document_intelligence_contract": {
     "rich_pdf_metadata": true,
@@ -206,9 +216,10 @@
     "DEVELOPER_INTELLIGENCE_ENGINE_HARDENING",
     "RECOVERY_BACKUP_INTEGRITY_TRACEABILITY_FINAL_HARDENING"
   ],
-  "next_wave": "LIBRARY_CHECKPOINT_DURABILITY_AND_REVIEW_HISTORY_LOCAL",
+  "next_wave": "POST516_LOCAL_RELEASE_CANDIDATE_V3_AUDIT",
   "known_blockers": [
-    "Library reviewed records currently remain session-local; durable Checkpoint integration must preserve review states and must not auto-promote memory.",
+    "Library checkpoint changes are local only and have not run remote CI.",
+    "Saving a staged Library review to runtime still requires the existing explicit guarded Checkpoint save flow; no auto-save exists.",
     "Production tenant persistence remains disabled and requires separate explicit administrative authorization.",
     "Current post-516 branch is local only; no push, PR, merge or deploy is authorized.",
     "Drael local key/config is absent; main development flow must not wait for it."
@@ -343,7 +354,7 @@
     "tenant_evidence_source": "NOT_INJECTED_REVIEW_ARTIFACT",
     "tenant_evidence_auto_loaded": false
   },
-  "critical_path_status": "PR516_PRODUCTION_VALIDATED_LIBRARY_HARDENING_CONTINUES_LOCAL",
+  "critical_path_status": "POST516_LIBRARY_CANONICAL_AND_CHECKPOINT_DURABILITY_LOCAL_VALIDATED",
   "core_wiring_audit": {
     "state": "LOCAL_VALIDATED",
     "recovery_traceability_gate_production_consumers": 1,
@@ -483,6 +494,30 @@
     "ocr_automatic_execution": false,
     "provider_calls": false,
     "model_calls": false,
-    "external_action_executed": false
+    "external_action_executed": false,
+    "checkpoint_history_available": true,
+    "session_only_history": false,
+    "max_persisted_reviewed_records": 100,
+    "max_persisted_review_history": 500
+  },
+  "library_checkpoint_durability": {
+    "state": "LOCAL_VALIDATED",
+    "checkpoint_section": "library",
+    "checkpoint_version_bump_required": false,
+    "legacy_v18_without_library_compatible": true,
+    "max_reviewed_records": 100,
+    "max_review_history_events": 500,
+    "digest_bound": true,
+    "tamper_detection": true,
+    "same_document_latest_record_replaces_previous": true,
+    "review_history_preserved": true,
+    "raw_pdf_persisted": false,
+    "passages_persisted": false,
+    "memory_auto_promotion": false,
+    "automatic_state_transition": false,
+    "external_action_authority": false,
+    "working_checkpoint_dirty_on_stage": true,
+    "runtime_save_automatic": false,
+    "explicit_guarded_checkpoint_save_required": true
   }
 }

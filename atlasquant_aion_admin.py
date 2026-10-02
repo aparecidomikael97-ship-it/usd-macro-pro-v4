@@ -56,6 +56,7 @@ from atlasquant_aion_memory import (
     runtime_configuration_status,
     save_runtime_checkpoint,
     search_canonical_memory,
+    stage_library_review_checkpoint,
     update_business_checkpoint,
     update_entitlements_checkpoint,
     update_continuity_checkpoint,
@@ -1015,11 +1016,13 @@ def _workspace_overview_items(
     task_summary = queue_summary(tasks)
 
     studio = checkpoint.get("studio") if isinstance(checkpoint.get("studio"), Mapping) else {}
+    library = checkpoint.get("library") if isinstance(checkpoint.get("library"), Mapping) else {}
     business = checkpoint.get("business") if isinstance(checkpoint.get("business"), Mapping) else {}
     promotions = checkpoint.get("promotions") if isinstance(checkpoint.get("promotions"), Mapping) else {}
     entitlements = checkpoint.get("entitlements") if isinstance(checkpoint.get("entitlements"), Mapping) else {}
 
     projects = list(studio.get("projects", []) or [])
+    library_records = list(library.get("records", []) or [])
     products = list(business.get("products", []) or [])
     campaigns = list(promotions.get("campaigns", []) or [])
     records = list(entitlements.get("records", []) or [])
@@ -1035,9 +1038,9 @@ def _workspace_overview_items(
         },
         {
             "name": "📚 Biblioteca",
-            "state": "OFFLINE / REVISÃO",
+            "state": f"{len(library_records)} REVISADOS",
             "tone": "info",
-            "detail": "PDFs locais com proveniência, inspeção, classificação e índice temporário sob revisão humana.",
+            "detail": "PDFs locais com proveniência, revisão multiestado e histórico no Checkpoint Mestre; sem promoção automática.",
         },
         {
             "name": "🗂️ Secretaria",
@@ -10430,7 +10433,7 @@ def _render_development(
 
 
 
-def _render_library(access: Mapping[str, Any]) -> None:
+def _render_library(access: Mapping[str, Any], checkpoint: Mapping[str, Any]) -> None:
     st.markdown("### 📚 Biblioteca AION")
     _render_persona_capabilities(
         "library",
@@ -10554,11 +10557,35 @@ def _render_library(access: Mapping[str, Any]) -> None:
         )
         return
 
-    reviewed_records = [
+    library_state = (
+        checkpoint.get("library")
+        if isinstance(checkpoint.get("library"), Mapping)
+        else {}
+    )
+    checkpoint_records = [
+        dict(item)
+        for item in list(library_state.get("records", []) or [])
+        if isinstance(item, Mapping)
+    ]
+    session_records = [
         dict(item)
         for item in list(st.session_state.get(_AION_LIBRARY_REVIEWED_RECORDS_KEY, []) or [])
         if isinstance(item, Mapping)
     ]
+    reviewed_by_id: dict[str, dict[str, Any]] = {}
+    reviewed_order: list[str] = []
+    for item in checkpoint_records + session_records:
+        doc_id = str(item.get("document_id") or "").strip()
+        if not doc_id:
+            continue
+        if doc_id not in reviewed_by_id:
+            reviewed_order.append(doc_id)
+        reviewed_by_id[doc_id] = item
+    reviewed_records = [
+        reviewed_by_id[doc_id]
+        for doc_id in reviewed_order
+        if doc_id in reviewed_by_id
+    ][-100:]
     staged_record = (
         dict(staged.get("record") or {})
         if isinstance(staged.get("record"), Mapping)
@@ -10638,14 +10665,47 @@ def _render_library(access: Mapping[str, Any]) -> None:
                 if isinstance(reviewed.get("reviewed_record"), Mapping)
                 else {}
             )
-            doc_id = str(reviewed_record.get("document_id") or "")
-            updated_records = [
-                row for row in reviewed_records
-                if str(row.get("document_id") or "") != doc_id
+            session = (
+                access.get("session")
+                if isinstance(access.get("session"), Mapping)
+                else access
+            )
+            reviewer_id = str(
+                (session or {}).get("username")
+                if isinstance(session, Mapping)
+                else ""
+            )
+            staged_checkpoint = stage_library_review_checkpoint(
+                checkpoint,
+                reviewed_record,
+                reviewer_id=reviewer_id,
+                related_document_ids=related_document_ids,
+                reason=review_reason,
+            )
+            if staged_checkpoint.get("status") != "STAGED":
+                blockers = ", ".join(
+                    str(x) for x in staged_checkpoint.get("blockers") or []
+                )
+                st.error(
+                    "A revisão foi calculada, mas não pôde ser preparada no "
+                    f"Checkpoint Mestre: {blockers or 'estado não confirmado'}."
+                )
+                return
+
+            _set_working_checkpoint(
+                staged_checkpoint["checkpoint"],
+                dirty=True,
+            )
+            checkpoint_library = (
+                staged_checkpoint.get("library")
+                if isinstance(staged_checkpoint.get("library"), Mapping)
+                else {}
+            )
+            st.session_state[_AION_LIBRARY_REVIEWED_RECORDS_KEY] = [
+                dict(row)
+                for row in list(checkpoint_library.get("records", []) or [])[-50:]
+                if isinstance(row, Mapping)
             ]
-            if reviewed_record:
-                updated_records.append(reviewed_record)
-            st.session_state[_AION_LIBRARY_REVIEWED_RECORDS_KEY] = updated_records[-50:]
 
             state = str(reviewed_record.get("state") or review_decision)
             if reviewed.get("status") == "REVIEW_INDEX_READY":
@@ -10656,12 +10716,17 @@ def _render_library(access: Mapping[str, Any]) -> None:
                 )
             else:
                 st.info(
-                    f"Revisão {state} registrada somente na sessão. "
-                    "Este estado não é indexável e foi preservado para auditoria."
+                    f"Revisão {state} preservada para auditoria; este estado não "
+                    "é indexável."
                 )
+            st.warning(
+                "A revisão foi preparada no Checkpoint Mestre local e está pendente "
+                "do fluxo administrativo de Salvar Checkpoint. Nada foi salvo "
+                "automaticamente no runtime."
+            )
             st.caption(
-                "Nada foi persistido externamente, nada foi promovido à memória, "
-                "OCR não foi executado e nenhuma ação ganhou autoridade."
+                "PDF bruto e passagens não entram no Checkpoint; nada foi promovido "
+                "à memória, OCR não foi executado e nenhuma ação ganhou autoridade."
             )
         else:
             blockers = ", ".join(str(x) for x in reviewed.get("blockers") or [])
@@ -11614,7 +11679,7 @@ def render_aion_admin_console(
                 specialist_snapshot=specialist_snapshot,
             )
         elif selected_workspace == "📚 Biblioteca":
-            _render_library(access_map)
+            _render_library(access_map, checkpoint)
         elif selected_workspace == "🗂️ Secretaria":
             _render_secretary(access_map, checkpoint, flags, system, market, status_board, approval_inbox)
         elif selected_workspace == "📈 Trading":

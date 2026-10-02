@@ -45,7 +45,8 @@ class AionCoreWiringTests(unittest.TestCase):
             admin,
         )
         self.assertIn('"📚 Biblioteca"', admin)
-        self.assertIn("_render_library(access_map)", admin)
+        self.assertIn("_render_library(access_map, checkpoint)", admin)
+        self.assertIn("stage_library_review_checkpoint(", admin)
         self.assertIn("build_library_pdf_preview(", admin)
         self.assertIn("from atlasquant_aion_library_cross_source import compare_library_records", admin)
         self.assertIn("compare_library_records(", admin)

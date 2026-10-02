@@ -109,6 +109,13 @@ from atlasquant_aion_memory_layers import (
     default_memory_layers,
     normalize_memory_layers,
 )
+from atlasquant_aion_library_checkpoint import (
+    default_library_checkpoint,
+    normalize_library_checkpoint,
+    normalize_library_records,
+    normalize_review_history as normalize_library_review_history,
+    library_checkpoint_digest,
+)
 from atlasquant_aion_memory_quarantine import (
     CHECKPOINT_NAMESPACE as AION_MEMORY_QUARANTINE_NAMESPACE,
     quarantine_checkpoint_integrity,
@@ -697,6 +704,7 @@ def default_checkpoint() -> dict[str, Any]:
             "projects": [],
             "digest": studio_digest([]),
         },
+        "library": default_library_checkpoint(),
         "business": _empty_business_section(),
         "promotions": {
             "campaigns": [],
@@ -813,6 +821,12 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         "projects": studio_projects,
         "digest": studio_digest(studio_projects),
     }
+
+    payload["library"] = normalize_library_checkpoint(
+        payload.get("library")
+        if isinstance(payload.get("library"), Mapping)
+        else {}
+    )
 
     business = payload.get("business")
     if not isinstance(business, Mapping):
@@ -1097,6 +1111,133 @@ def update_studio_checkpoint(
     payload["operating"]["dirty"] = bool(dirty)
     payload["updated_at"] = _now()
     return payload
+
+
+
+def update_library_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    *,
+    records: Any = None,
+    review_history: Any = None,
+    dirty: bool = True,
+) -> dict[str, Any]:
+    """Return a normalized checkpoint with Library review metadata only.
+
+    Raw PDF bytes, extracted passages and semantic-memory promotion are never
+    stored by this section.
+    """
+    payload = ensure_operating_checkpoint(checkpoint)
+    current = (
+        payload.get("library")
+        if isinstance(payload.get("library"), Mapping)
+        else {}
+    )
+    rows = normalize_library_records(
+        current.get("records", []) if records is None else records
+    )
+    history = normalize_library_review_history(
+        current.get("review_history", []) if review_history is None else review_history
+    )
+    payload["library"] = normalize_library_checkpoint({
+        "records": rows,
+        "review_history": history,
+    })
+    payload["operating"]["dirty"] = bool(dirty)
+    payload["updated_at"] = _now()
+    return payload
+
+
+def stage_library_review_checkpoint(
+    checkpoint: Mapping[str, Any] | None,
+    reviewed_record: Mapping[str, Any] | None,
+    *,
+    reviewer_id: Any = "",
+    related_document_ids: Any = None,
+    reason: Any = "",
+) -> dict[str, Any]:
+    """Stage one explicit Library review into the working Checkpoint.
+
+    The caller still must use the ordinary guarded Checkpoint save flow.
+    """
+    normalized = normalize_library_records([reviewed_record] if isinstance(reviewed_record, Mapping) else [])
+    if not normalized:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "blockers": ["LIBRARY_REVIEW_RECORD_INVALID"],
+            "checkpoint": ensure_operating_checkpoint(checkpoint),
+            "requires_checkpoint_save": False,
+            "external_persisted": False,
+            "memory_promoted": False,
+            "execution_authorized": False,
+            "external_action_executed": False,
+        }
+
+    row = normalized[0]
+    payload = ensure_operating_checkpoint(checkpoint)
+    current = (
+        payload.get("library")
+        if isinstance(payload.get("library"), Mapping)
+        else {}
+    )
+    rows = normalize_library_records(current.get("records", []))
+    rows = [item for item in rows if item.get("document_id") != row.get("document_id")]
+    rows.append(row)
+    rows = normalize_library_records(rows)
+
+    history = normalize_library_review_history(current.get("review_history", []))
+    reviewed_at = _now()
+    clean_related = []
+    for raw in list(related_document_ids or [])[:50] if isinstance(related_document_ids, (list, tuple, set)) else []:
+        value = " ".join(str(raw or "").split())[:180]
+        if value and value not in clean_related:
+            clean_related.append(value)
+    clean_reason = " ".join(str(reason or "").split())[:500]
+    clean_reviewer = " ".join(str(reviewer_id or "").split())[:120]
+    event_basis = {
+        "document_id": row.get("document_id"),
+        "state": row.get("state"),
+        "reason": clean_reason,
+        "evidence_refs": list(row.get("evidence_refs") or []),
+        "related_document_ids": clean_related,
+        "reviewer_id": clean_reviewer,
+        "reviewed_at": reviewed_at,
+    }
+    review_id = "LIBREV-" + hashlib.sha256(
+        json.dumps(
+            event_basis,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()[:24].upper()
+    history.append({
+        "review_id": review_id,
+        **event_basis,
+        "automatic_decision": False,
+        "external_action_executed": False,
+    })
+    history = normalize_library_review_history(history)
+
+    payload = update_library_checkpoint(
+        payload,
+        records=rows,
+        review_history=history,
+        dirty=True,
+    )
+    return {
+        "schema": SCHEMA,
+        "status": "STAGED",
+        "document_id": row.get("document_id"),
+        "review_id": review_id,
+        "checkpoint": payload,
+        "library": payload.get("library"),
+        "requires_checkpoint_save": True,
+        "external_persisted": False,
+        "memory_promoted": False,
+        "execution_authorized": False,
+        "external_action_executed": False,
+    }
 
 
 def update_business_checkpoint(
@@ -2583,6 +2724,20 @@ def checkpoint_integrity_report(
         add_check("studio", studio.get("digest"), studio_digest(projects))
     except OptionalProductAdapterUnavailableError as exc:
         add_unavailable("studio", studio.get("digest"), str(exc))
+
+    if "library" in raw:
+        library_raw = raw.get("library") if isinstance(raw.get("library"), Mapping) else {}
+        library_records = normalize_library_records(
+            library_raw.get("records") if isinstance(library_raw, Mapping) else []
+        )
+        library_history = normalize_library_review_history(
+            library_raw.get("review_history") if isinstance(library_raw, Mapping) else []
+        )
+        add_check(
+            "library",
+            library_raw.get("digest"),
+            library_checkpoint_digest(library_records, library_history),
+        )
 
     business = raw.get("business") if isinstance(raw.get("business"), Mapping) else {}
     normalize_products, business_digest, normalize_business_metrics, business_metrics_digest = (
