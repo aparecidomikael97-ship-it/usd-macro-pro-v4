@@ -138,6 +138,8 @@ _CENTRAL_CSS = """
 .aq-central-choices{display:grid;grid-template-columns:1fr;gap:12px}
 .aq-central-choice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-decoration:none;color:var(--aq-text);border:1px solid var(--aq-line);border-radius:18px;padding:14px;background:linear-gradient(180deg,rgba(16,24,46,.92),rgba(7,17,31,.9))}
 .aq-central-choice small{color:var(--aq-muted);font-size:.75rem;line-height:1.35}
+.aq-central-route{display:inline-flex;align-items:center;gap:5px;margin-top:3px;border:1px solid rgba(79,163,255,.34);border-radius:999px;padding:4px 8px;color:#dbeaff;font-size:.62rem;font-weight:850;letter-spacing:.06em;background:rgba(79,163,255,.08)}
+.aq-central-route:before{content:"";width:6px;height:6px;border-radius:50%;background:#8fd0c4}
 .aq-central-back{color:var(--aq-aion,#b48cff);font-weight:800;text-decoration:none}
 @media (min-width:900px){.aq-central-choices{grid-template-columns:1fr 1fr}}
 .aq-aion-home .aq-hero{margin-bottom:8px}
@@ -405,16 +407,20 @@ def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = Non
 
 
 def central_card_html(area: Any) -> str:
-    """Visual shell for one ecosystem area. Not a product implementation."""
+    """Visual route state for one connected ecosystem area.
+
+    CONNECTED describes only the validated navigation path. It is not a claim
+    that every feature inside the destination is complete or production-ready.
+    """
     area_id = _canon_area(area)
     if area_id not in _AREAS:
         raise ValueError("unknown central area")
     spec = _AREAS[area_id]
-    badge = state_badge_html("EM CONSTRUÇÃO", "warn")
+    badge = state_badge_html("NAVEGAÇÃO CONECTADA", "info")
     return (
         '<article class="aq-central-card" data-area="'
         + escape(area_id)
-        + '" data-truth="UNKNOWN">'
+        + '" data-truth="UNKNOWN" data-route-state="CONNECTED">'
         + _ART[area_id]()
         + "<h2>"
         + escape(spec["label"])
@@ -756,7 +762,8 @@ def central_selector_html(
             f'<article class="aq-central-choice" data-central-area="{area_id}">'
             f"{_ART[area_id]()}"
             f"<strong>{escape(spec['label'])}</strong>"
-            f"<small>{escape(spec['sentence'])}</small></article>"
+            f"<small>{escape(spec['sentence'])}</small>"
+            '<span class="aq-central-route">ACESSO CONECTADO</span></article>'
         )
     presence = aion_login_presence_html(
         access,
