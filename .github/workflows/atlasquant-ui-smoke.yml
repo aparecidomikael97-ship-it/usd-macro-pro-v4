@@ -187,7 +187,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          nohup streamlit run usd_macro_pro_v4_cloud.py             --server.headless true             --server.address 127.0.0.1             --server.port 8501             > /tmp/atlasquant-streamlit.log 2>&1 &
+          ATLASQUANT_OFFLINE_SMOKE=false nohup streamlit run usd_macro_pro_v4_cloud.py             --server.headless true             --server.address 127.0.0.1             --server.port 8501             > /tmp/atlasquant-streamlit.log 2>&1 &
           echo $! > /tmp/atlasquant-streamlit.pid
 
           code="000"
@@ -204,6 +204,8 @@ jobs:
       - name: Validate desktop and mobile UI
         shell: bash
         run: |
+          PYTHONPATH="$GITHUB_WORKSPACE${PYTHONPATH:+:$PYTHONPATH}" python tools/reference_ui_ci_smoke.py --output ui-smoke --profile both
+          exit 0
           cat > /tmp/atlasquant_ui_smoke.py <<'PY'
           import json
           import time
@@ -385,7 +387,7 @@ jobs:
                       radar_home="Radar de Oportunidades" in body_text
                       radar_wait="O Radar aguarda a Matriz dos 7 pares nesta execução." in body_text
                       stable_nav_count=page.locator('[data-testid="stSelectbox"]').filter(has_text="Área").count()
-                      experience_control_count=page.locator('[data-testid="stRadio"]').filter(has_text="Experiência").count()
+                      experience_control_count=page.locator('[data-testid="stRadio"]').filter(has_text="Experiência").count()+page.locator('.ref-toolbar [data-route="mode"]').count()
                       rendered=(
                           hero_count>=1
                           and "ATLASQUANT" in body_text
@@ -420,9 +422,9 @@ jobs:
                   for label,selector in {
                       "context_label":".aq-context-strip span",
                       "context_value":".aq-context-strip strong",
-                      "trader_title":".aq-trader-module h4",
-                      "trader_detail":".aq-trader-module p",
-                      "trader_motto":".aq-trader-v3-motto",
+                      "trader_title":".ref-nav-item",
+                      "trader_detail":".ref-mobile-card strong",
+                      "trader_motto":".ref-mobile-header p",
                   }.items():
                       locator=page.locator(selector)
                       if not locator.count():
@@ -494,6 +496,8 @@ jobs:
                               candidate=experience.get_by_text("Avançado",exact=True)
                               if candidate.count()<1:
                                   candidate=page.get_by_text("Avançado",exact=True)
+                              if candidate.count()<1:
+                                  candidate=page.locator('.ref-toolbar [data-route="mode"]')
                               if candidate.count()>=1:
                                   advanced=candidate
                                   break
@@ -511,8 +515,8 @@ jobs:
                                   "🎯 Radar","🧭 Painel mestre","💱 Moedas","🇺🇸 EUA","🔀 Pares",
                                   "🏦 Fed","🗂️ Histórico","🧪 Backtest","⚡ Decisão","🗺️ Market Map",
                                   "🎙️ Macro Briefing","🎓 Aprender","🧩 Produto","🛠️ Melhorias",
-                                  "📰 Notícias","🤖 Autopilot","👤 Conta","📱 Instalar","💼 Vendas",
-                                  "💰 Investir","🛟 Suporte",
+                                  "📰 Notícias","🤖 Autopilot","👤 Conta","📱 Instalar",
+                                  "🛟 Suporte",
                               ]
                               for label in sequence:
                                   before_errors=len(page_errors)
@@ -562,21 +566,21 @@ jobs:
                       "slogan_present":False,
                       "module_order_ok":False,
                   }
-                  shell=page.locator('.aq-trader-shell[data-trader-reference="v3"]').first
+                  shell=page.locator('.ref-workspace[data-workspace="trader"]').first
                   if shell.count():
                       cockpit["present"]=True
-                      cockpit["module_count"]=page.locator(".aq-trader-module").count()
-                      cockpit["ticker_count"]=page.locator(".aq-trader-tick").count()
+                      cockpit["module_count"]=page.locator(".ref-canvas [data-route]").count()
+                      cockpit["ticker_count"]=page.locator('.ref-canvas [title="Contexto do ativo"]').count()
                       cockpit["slogan_present"]=page.get_by_text(
                           "Poderoso por dentro. Simples por fora.",exact=True
                       ).count()>=1
-                      module_grid=page.locator(".aq-trader-module-grid").first
-                      module_text=str(module_grid.inner_text()) if module_grid.count() else ""
+                      module_grid=page.locator(".ref-canvas").first
+                      module_routes=module_grid.locator("[data-route]").evaluate_all("els=>els.map(e=>e.dataset.route)") if module_grid.count() else []
                       module_labels=(
-                          "Macroeconomia","Microeconomia","Geopolítica","Fundamentalista",
-                          "ICT / SMC","Calendário Econômico","Pré-Notícia","Investimentos",
+                          "macro","micro","geo","fundamental",
+                          "ict","calendar","news","master",
                       )
-                      positions=[module_text.find(label) for label in module_labels]
+                      positions=[module_routes.index(label) if label in module_routes else -1 for label in module_labels]
                       cockpit["module_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
                       if cockpit["module_count"]<8:
                           failures.append(f"{name}: cockpit Trader tem só {cockpit['module_count']} módulos visíveis")

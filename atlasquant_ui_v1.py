@@ -779,6 +779,11 @@ def navigation_mode_css(mode: object) -> str:
 
 
 def render_experience_mode_switch() -> str:
+    pending=st.session_state.pop("_aq_reference_mode_request",None)
+    if pending is not None:
+        # This runs before the radio is instantiated, so the canonical widget
+        # key can be synchronized safely from the reference cockpit event.
+        st.session_state["atlasquant_experience_mode"]=normalize_experience_mode(pending)
     current=normalize_experience_mode(st.session_state.get("atlasquant_experience_mode","Iniciante"))
     # The fast beginner shell may already have mounted this radio in the same
     # run. Creating it again crashes the switch into Modo Avançado.

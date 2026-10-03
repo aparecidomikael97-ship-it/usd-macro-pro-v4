@@ -815,44 +815,11 @@ def central_selector_html(
     confirmed_status: Mapping[str, Any] | None = None,
     timezone_name: str | None = None,
 ) -> str:
-    """Four-sector door for an admin session. Non-admin sessions get no private cards."""
-    model = central_visibility_model(access)
-    if not model["admin"]:
+    """Four approved visual cards, each is the access itself."""
+    if not central_visibility_model(access)["admin"]:
         return ""
-    choices = []
-    for area in model["areas"]:
-        area_id = area["id"]
-        choices.append(central_reference_card_html(area_id, _ART[area_id]()))
-    presence = aion_login_presence_html(
-        access,
-        now=now,
-        confirmed_status=confirmed_status,
-        timezone_name=timezone_name,
-    )
-    # The hub reference uses the role label visually. The personalized AION
-    # greeting remains in the hidden/voice presence model and is not discarded.
-    display_name = "Administrador"
-    return (
-        '<section class="aq-central-root" data-root="central_root">'
-        '<header class="aq-central-topbar">'
-        '<div class="aq-central-brand"><span class="aq-central-brand-mark">A</span>'
-        '<span class="aq-central-brand-copy"><strong>ATLASQUANT</strong><small>PODEROSO POR DENTRO. SIMPLES POR FORA.</small></span></div>'
-        '<div class="aq-central-search">Buscar no ecossistema...</div>'
-        '<div class="aq-central-user"><span class="aq-central-user-icons">◌ ⚙</span>'
-        '<span class="aq-central-avatar">A</span><span class="aq-central-user-copy"><strong>Administrador</strong><small>AtlasQuant</small></span></div>'
-        '</header>'
-        + presence
-        + '<section class="aq-central-welcome"><h2>Bem-vindo, <b>'
-        + display_name
-        + '</b></h2><p>Escolha uma área para acessar o seu ecossistema.</p></section>'
-        + '<div class="aq-central-reference-grid">'
-        + "".join(choices)
-        + '</div>'
-        + '<footer class="aq-central-footer"><div><strong>Um ecossistema completo<br>para você ir mais longe.</strong>'
-        '<span>CONHECIMENTO · ESTRATÉGIA · NEGÓCIOS · PATRIMÔNIO · INTELIGÊNCIA</span></div>'
-        '<div class="aq-central-footer-brand"><strong>ATLASQUANT</strong><span>PODEROSO POR DENTRO. SIMPLES POR FORA.</span></div></footer>'
-        + "</section>"
-    )
+    from atlasquant_reference_ui import CSS, reference_html
+    return "<style>" + CSS.read_text(encoding="utf-8") + "</style>" + reference_html("central", name="")
 
 
 def central_surface_html(
@@ -865,52 +832,16 @@ def central_surface_html(
     home_claims: Mapping[str, Any] | None = None,
     defer_aion_home: bool = False,
 ) -> str:
-    """Rail plus the allowed stage. A denial does not leak private labels."""
+    """Only the selected environment. No cross-sector rail or duplicate access."""
     resolved = resolve_central_area(access, requested)
-    at_root = bool(resolved.get("root"))
-    rail = ecosystem_rail_html(access, active_area="" if at_root else resolved["area"])
     if resolved["denied"]:
-        stage = '<p class="aq-central-denied">Área privada indisponível para esta sessão.</p>'
-    elif at_root:
-        stage = central_selector_html(
-            access,
-            now=now,
-            confirmed_status=confirmed_status,
-            timezone_name=timezone_name,
-        )
-    elif resolved["area"] == "aion" and defer_aion_home:
-        stage = workspace_cockpit_html("aion", mode="Avançado")
-    elif resolved["area"] == "aion":
-        stage = workspace_cockpit_html(
-            "aion",
-            mode="Avançado",
-            connected_html=aion_home_html(home_claims),
-        )
-    elif resolved["area"] == "negocios":
-        stage = workspace_cockpit_html(
-            "negocios",
-            mode="Sessão atual",
-            extra_truth=("TENANT ISOLADO", "PUBLICAÇÃO REQUER APROVAÇÃO"),
-        )
-    elif resolved["area"] == "investimentos":
-        stage = workspace_cockpit_html(
-            "investimentos",
-            mode="Sessão atual",
-            extra_truth=("SEM ORDEM AUTOMÁTICA", "SEM PROMESSA DE RETORNO"),
-        )
-    else:
-        stage = central_card_html(resolved["area"])
-    back = ""
-    if _admin(access) and not at_root:
-        back = '<p class="aq-central-back">Voltar à Central Principal pelos controles abaixo.</p>'
-    return (
-        '<div class="aq-central-layout">'
-        + rail
-        + '<div class="aq-central-stage">'
-        + stage
-        + back
-        + "</div></div>"
-    )
+        return '<p class="aq-central-denied">Área privada indisponível para esta sessão.</p>'
+    if resolved["root"]:
+        return central_selector_html(access, now=now, confirmed_status=confirmed_status, timezone_name=timezone_name)
+    if resolved["area"] == "trader":
+        return ""
+    from atlasquant_reference_ui import CSS, reference_html
+    return "<style>" + CSS.read_text(encoding="utf-8") + "</style>" + reference_html(resolved["area"])
 
 
 def render_aion_home_viewer(
@@ -938,46 +869,9 @@ def render_aion_home_viewer(
     return html
 
 
-def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, resolved: Mapping[str, Any]) -> None:
-    """Authenticated navigation stays inside Streamlit session_state.
-
-    HTML cards/rail are presentation only. The existing access mapping remains
-    the authority and request_central_destination performs the validated state
-    transition before a rerun.
-    """
-    if not _admin(access):
-        return
-
-    current = CENTRAL_ROOT if resolved.get("root") else str(resolved.get("area") or "")
-    model = central_visibility_model(access)
-    area_targets = [
-        (str(area["id"]), str(area["label"])) for area in model["areas"]
-    ]
-    if current == CENTRAL_ROOT:
-        targets = area_targets
-        st.markdown("#### Acessar ambiente")
-        st.caption("Os quatro acessos abaixo usam a mesma sessão autenticada e as rotas validadas.")
-    else:
-        targets = [("central", "Central Principal")] + [
-            item for item in area_targets if item[0] != current
-        ]
-        st.markdown("#### Trocar de setor")
-        st.caption("Navegue pelo ecossistema sem sair da sessão autenticada.")
-    columns = st.columns(4 if current == CENTRAL_ROOT else 2)
-    for index, (area_id, label) in enumerate(targets):
-        action_label = (
-            "← Central Principal"
-            if area_id == "central"
-            else ("Acessar " if current == CENTRAL_ROOT else "Abrir ") + label
-        )
-        with columns[index % 2]:
-            if st.button(
-                action_label,
-                key=f"aq_central_stateful_{area_id}",
-                width="stretch",
-            ):
-                request_central_destination(st.session_state, access, area_id)
-                st.rerun()
+def _render_central_navigation_controls(st, access, resolved):
+    """Compatibility edge: card events are mounted directly, with no duplicate strip."""
+    return None
 
 
 def render_central_hub(
@@ -990,36 +884,23 @@ def render_central_hub(
     home_claims: Mapping[str, Any] | None = None,
     defer_aion_home: bool = False,
 ) -> dict[str, Any]:
-    """Streamlit edge. Import stays local so pure tests need no server."""
+    """Mount same-session clickable reference UI after the unchanged area gate."""
     import streamlit as st
-
     resolved = resolve_central_area(access, requested)
-    st.markdown(
-        central_surface_html(
-            access,
-            requested,
-            now=now,
-            confirmed_status=confirmed_status,
-            timezone_name=timezone_name,
-            home_claims=home_claims,
-            defer_aion_home=defer_aion_home,
-        ),
-        unsafe_allow_html=True,
-    )
-    if resolved.get("root"):
-        try:
-            acknowledge_login_greeting(
-                st.session_state,
-                access,
-                now=now,
-                confirmed_status=confirmed_status,
-                timezone_name=timezone_name,
-            )
-        except Exception:
-            pass
     if resolved["denied"]:
         st.error("Área privada indisponível para esta sessão.")
-    _render_central_navigation_controls(st, access, resolved)
+        return resolved
+    if resolved.get("root"):
+        try:
+            acknowledge_login_greeting(st.session_state, access, now=now,
+                confirmed_status=confirmed_status, timezone_name=timezone_name)
+        except Exception:
+            pass
+    area = "central" if resolved.get("root") else resolved["area"]
+    if area != "trader":
+        from atlasquant_reference_ui import render_reference_workspace
+        render_reference_workspace(st, access, area)
+        resolved["shell"] = True
     return resolved
 
 

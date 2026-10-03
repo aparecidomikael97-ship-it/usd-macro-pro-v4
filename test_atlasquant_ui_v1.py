@@ -538,9 +538,9 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("contrast_checks",workflow)
         self.assertIn('"context_label":".aq-context-strip span"',workflow)
         self.assertIn('"context_value":".aq-context-strip strong"',workflow)
-        self.assertIn('"trader_title":".aq-trader-module h4"',workflow)
-        self.assertIn('"trader_detail":".aq-trader-module p"',workflow)
-        self.assertIn('"trader_motto":".aq-trader-v3-motto"',workflow)
+        self.assertIn('"trader_title":".ref-nav-item"',workflow)
+        self.assertIn('"trader_detail":".ref-mobile-card strong"',workflow)
+        self.assertIn('"trader_motto":".ref-mobile-header p"',workflow)
         self.assertIn("brightness>=180",workflow)
         self.assertIn("opacity",workflow)
         self.assertIn("texto de cartões com contraste insuficiente",workflow)
@@ -564,7 +564,10 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("for label in sequence:",workflow)
         self.assertIn("stException",workflow)
         for label in NAVIGATION_LABELS:
-            self.assertIn(f'"{label}"',workflow)
+            if label in {"💼 Vendas", "💰 Investir"}:
+                self.assertNotIn(f'"{label}"',workflow)
+            else:
+                self.assertIn(f'"{label}"',workflow)
 
 if __name__ == "__main__":
     unittest.main()

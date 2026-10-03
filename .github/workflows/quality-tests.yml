@@ -39,6 +39,7 @@ jobs:
         run: |
           python -m pip install pip==26.2.1
           pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
       - name: Compile Python sources
         run: |
           python -m compileall -q .
@@ -116,6 +117,8 @@ jobs:
             test_atlasquant_fast_startup.py \
             test_atlasquant_advanced_boot.py \
             test_atlasquant_production_admin_flow.py \
+            test_atlasquant_reference_ui.py \
+            test_atlasquant_reference_browser.py \
             test_atlasquant_aion_workspaces.py \
             test_atlasquant_aion_ecosystem.py \
             test_atlasquant_aion_persona_memory.py \
@@ -412,3 +415,10 @@ jobs:
             tests/test_atlasquant_scanner_coverage.py \
             tests/test_atlasquant_scanner_scheduler.py \
             tests/test_atlasquant_timeframe_resampler.py
+      - name: Run reference interface contracts and actual browser checks
+        run: |
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+          python -m playwright install --with-deps chromium
+          python -m pytest -q \
+            test_atlasquant_reference_ui.py \
+            test_atlasquant_reference_browser.py

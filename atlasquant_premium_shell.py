@@ -726,7 +726,7 @@ def request_premium_card(
     return target
 
 
-TRADER_REFERENCE_MODULE_IDS = ("macro", "micro", "geo", "fundamental", "ict", "calendar", "news", "invest")
+TRADER_REFERENCE_MODULE_IDS = ("macro", "micro", "geo", "fundamental", "ict", "calendar", "news", "master")
 TRADER_REFERENCE_ICONS = {
     "macro": "▥", "micro": "⌁", "geo": "◎", "fundamental": "▤",
     "ict": "◈", "calendar": "□", "news": "⚠", "invest": "◆",
@@ -759,88 +759,9 @@ def trader_cockpit_html(
     fast: bool = False,
     ticker_items: Sequence[Mapping[str, object]] | None = None,
 ) -> str:
-    """Reference-driven Trader home. Presentation only; routes remain stateful below."""
-    beginner = not str(mode or "").casefold().startswith("avan")
-    pages = {str(item) for item in list(available_pages or [])}
-    open_pages = set(BEGINNER_OPEN_AREAS) | {"🎙️ Macro"}
-    modules = _trader_module_lookup()
-
-    tickers = list(ticker_items or [])
-    if not tickers:
-        tickers = [
-            {"label": "DXY", "value": "PRÉVIA"},
-            {"label": "EURUSD", "value": "PRÉVIA"},
-            {"label": "GBPUSD", "value": "PRÉVIA"},
-            {"label": "USDJPY", "value": "PRÉVIA"},
-            {"label": "BTCUSD", "value": "PRÉVIA"},
-            {"label": "SPX500", "value": "PRÉVIA"},
-            {"label": "NASDAQ", "value": "PRÉVIA"},
-            {"label": "WIN", "value": "PRÉVIA"},
-            {"label": "PETR4", "value": "PRÉVIA"},
-            {"label": "VALE3", "value": "PRÉVIA"},
-        ]
-    ticker_html = "".join(_trader_score_chip(item) for item in tickers[:10])
-
-    module_cards: list[str] = []
-    for module_id in TRADER_REFERENCE_MODULE_IDS:
-        module = modules[module_id]
-        destination = _destination(module, fast=fast)
-        available = bool(destination) and destination in pages
-        locked = beginner and available and destination not in open_pages and destination != "🧠 AION"
-        state = "INDISPONÍVEL" if not available else ("PRÉVIA AVANÇADA" if locked else "ACESSO SEGURO")
-        state_class = "off" if not available else ("locked" if locked else "")
-        module_cards.append(
-            '<article class="aq-trader-module">'
-            f'<div class="aq-trader-module-icon">{escape(TRADER_REFERENCE_ICONS.get(module_id, "◇"))}</div>'
-            f'<small>{escape(str(module.get("sector") or "TRADER"))}</small>'
-            f'<h4>{escape(str(module.get("title") or ""))}</h4>'
-            f'<p>{escape(str(module.get("summary") or ""))}</p>'
-            f'<span class="state {state_class}">{escape(state)}</span>'
-            '</article>'
-        )
-
-    mode_label = "INICIANTE" if beginner else "AVANÇADO"
-    nav_items = (
-        "Início", "Radar", "Macro", "Micro", "Geopolítica", "Fundamentalista",
-        "Calendário", "Pré-Notícia", "Vídeos", "Análises", "Backtest", "Paper Trading",
-        "Guardião de Risco", "Investimentos", "Negócios", "Corretoras", "Comunidade", "Configurações",
-    )
-    nav_html = "".join(
-        f'<span><i>{"⌂" if index == 0 else "◇"}</i>{escape(label)}</span>'
-        for index, label in enumerate(nav_items)
-    )
-    return (
-        '<section class="aq-trader-shell" data-trader-reference="v3" aria-label="Cockpit Trader AtlasQuant">'
-        '<div class="aq-trader-v3-grid">'
-        '<aside class="aq-trader-v3-side"><div class="aq-trader-v3-side-brand"><b>A</b><span>ATLASQUANT</span></div>'
-        f'<div class="aq-trader-v3-nav">{nav_html}</div>'
-        '<div class="aq-trader-v3-aion"><strong>AION</strong><small>Assistente de IA</small><b>Converse com o AION ›</b></div></aside>'
-        '<main class="aq-trader-v3-main">'
-        '<header class="aq-trader-v3-head"><div class="aq-trader-v3-title">ATLASQUANT · ECOSSISTEMA</div>'
-        '<div class="aq-trader-v3-motto">Poderoso por dentro. Simples por fora.</div>'
-        f'<div class="aq-trader-v3-tools"><span class="aq-trader-v3-search">⌕ Buscar no AtlasQuant...</span><span>● ONLINE</span><span>MODO {mode_label}</span></div></header>'
-        f'<div class="aq-trader-ticker" aria-label="Ativos em prévia">{ticker_html}</div>'
-        '<div class="aq-trader-v3-tabs"><div class="aq-trader-v3-tab">VISÃO GERAL</div><div class="aq-trader-v3-tab">ANÁLISE DA SEMANA</div>'
-        '<div class="aq-trader-v3-tab">ANÁLISE DO DIA</div><div class="aq-trader-v3-tab">FECHAMENTO DO DIA</div><div class="aq-trader-v3-tab">FECHAMENTO SEMANAL</div></div>'
-        '<div class="aq-trader-v3-media">'
-        '<article class="aq-trader-v3-video big badge"><strong>ANÁLISE DA SEMANA</strong><small>FOREX · CRIPTO · ÍNDICES · COMMODITIES · AÇÕES</small></article>'
-        '<article class="aq-trader-v3-video"><strong>ANÁLISE DO DIA</strong><small>Panorama e oportunidades</small></article>'
-        '<article class="aq-trader-v3-video"><strong>FECHAMENTO DO DIA</strong><small>O que realmente aconteceu</small></article>'
-        '<article class="aq-trader-v3-video"><strong>FECHAMENTO SEMANAL</strong><small>Comparativo completo</small></article>'
-        '</div>'
-        f'<div class="aq-trader-module-grid">{"".join(module_cards)}</div>'
-        '<div class="aq-trader-v3-intel">'
-        '<div class="aq-trader-v3-stack"><section class="aq-trader-v3-panel"><h4>Mapa de Risco Global</h4><div class="aq-trader-v3-lines">'
-        '<span>EUA <b>INFLAÇÃO</b></span><span>Europa <b>JUROS</b></span><span>China <b>ATIVIDADE</b></span><span>América Latina <b>RISCO POLÍTICO</b></span></div></section>'
-        '<section class="aq-trader-v3-panel"><h4>Notícias em Tempo Real</h4><div class="aq-trader-v3-lines"><span>Feed validado <b>PRÉVIA</b></span><span>Fontes e horário <b>RASTREÁVEIS</b></span></div></section></div>'
-        '<section class="aq-trader-v3-center"><div class="aq-trader-globe"><div class="aq-trader-core-logo">A</div></div><span class="aq-trader-v3-center-label">GLOBAL INTELLIGENCE CORE</span></section>'
-        '<div class="aq-trader-v3-stack"><section class="aq-trader-v3-panel"><h4>Viés Atual do Mercado</h4><div class="aq-trader-v3-lines"><span>DXY <b>PRÉVIA</b></span><span>EURUSD <b>PRÉVIA</b></span><span>NASDAQ <b>PRÉVIA</b></span><span>BTCUSD <b>PRÉVIA</b></span></div></section>'
-        '<section class="aq-trader-v3-panel"><h4>Calendário & Geopolítica</h4><div class="aq-trader-v3-lines"><span>Eventos econômicos <b>CONTEXTO</b></span><span>Alertas geopolíticos <b>CONTEXTO</b></span></div></section></div>'
-        '</div>'
-        '<div class="aq-trader-v3-shortcuts"><div class="aq-trader-v3-shortcut">Academy</div><div class="aq-trader-v3-shortcut">Laboratório</div>'
-        '<div class="aq-trader-v3-shortcut">Paper Trading</div><div class="aq-trader-v3-shortcut">Guardião de Risco</div><div class="aq-trader-v3-shortcut">Treasury & Growth</div></div>'
-        '</main></div></section>'
-    )
+    """Use the approved art, with functional card hit regions and scoped menu."""
+    from atlasquant_reference_ui import CSS, reference_html
+    return "<style>" + CSS.read_text(encoding="utf-8") + "</style>" + reference_html("trader", mode=mode)
 
 
 def premium_catalog_html(
@@ -943,14 +864,22 @@ def render_premium_catalog(
     fast: bool = False,
     active_page: str = "",
     ticker_items: Sequence[Mapping[str, object]] | None = None,
+    access: Mapping[str, object] | None = None,
 ) -> None:
     """Render the catalog on Radar home; elsewhere keep only shared premium CSS."""
     pages = {str(item) for item in list(available_pages or [])}
+    if st.session_state.get("aq_reference_connected"):
+        st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
+        return
     if not catalog_is_home(active_page):
         # Off-home navigation already has the stable selector, contextual welcome
         # and Compass. Keep the premium design tokens without adding a second
         # generic navigation panel or a redundant "back home" action.
         st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
+        return
+    if access and access.get("allowed") is True:
+        from atlasquant_reference_ui import render_reference_workspace
+        render_reference_workspace(st, access, "trader", mode=mode)
         return
     st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
     st.markdown(
@@ -962,8 +891,5 @@ def render_premium_catalog(
         ),
         unsafe_allow_html=True,
     )
-    _render_premium_stateful_controls(
-        mode=mode,
-        available_pages=list(pages),
-        fast=fast,
-    )
+    # Clicks are handled directly on the cards by the same-session V2 component.
+    # No duplicate navigation strip is mounted below the artwork.
