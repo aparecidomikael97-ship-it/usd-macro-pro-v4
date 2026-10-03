@@ -454,11 +454,15 @@ def render_reference_workspace(st, access, area, *, mode=None):
         return False
     from atlasquant_central_hub_ui import assert_area_access
     st.markdown(
+        '<span id="aq-reference-active" aria-hidden="true"></span>'
         '<style>'
         '[data-testid="stMainBlockContainer"]{max-width:1600px;padding-top:.55rem;padding-left:1rem;padding-right:1rem}'
+        '[data-testid="stElementContainer"]:has(#aq-reference-active){height:0!important;min-height:0!important;margin:0!important;padding:0!important}'
         '@media(max-width:700px){'
-        '[data-testid="stHeader"]{height:2.5rem;min-height:2.5rem}'
-        '[data-testid="stMainBlockContainer"]{padding-top:.15rem!important;padding-left:.5rem!important;padding-right:.5rem!important}'
+        '.stApp:has(#aq-reference-active) [data-testid="stHeader"]{display:none!important;height:0!important;min-height:0!important}'
+        '.stApp:has(#aq-reference-active) [data-testid="stSidebarCollapsedControl"]{display:none!important}'
+        '.stApp:has(#aq-reference-active) [data-testid="stMainBlockContainer"],'
+        '.stApp:has(#aq-reference-active) .block-container{padding-top:0!important;padding-left:.5rem!important;padding-right:.5rem!important}'
         '}'
         '</style>',
         unsafe_allow_html=True,
