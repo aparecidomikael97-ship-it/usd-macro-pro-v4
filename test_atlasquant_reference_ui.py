@@ -180,6 +180,14 @@ def test_trader_mobile_v6_has_explicit_card_identity_without_route_collisions():
     assert 'data-mobile-kind="icon" data-mobile-crop="908,639,96,38"' in html
 
 
+def test_reference_mobile_chrome_is_hidden_only_when_reference_cockpit_is_active():
+    src=Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+    assert 'id="aq-reference-active"' in src
+    assert '.stApp:has(#aq-reference-active) [data-testid="stHeader"]{display:none!important' in src
+    assert '.stApp:has(#aq-reference-active) [data-testid="stSidebarCollapsedControl"]{display:none!important}' in src
+    assert '.stApp:has(#aq-reference-active) .block-container{padding-top:0!important' in src
+
+
 def test_mobile_v5_v6_css_compacts_and_stops_card_stretching():
     css=CSS.read_text(encoding="utf-8")
     assert "Fidelity polish v5" in css
