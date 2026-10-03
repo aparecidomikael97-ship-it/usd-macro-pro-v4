@@ -53,7 +53,7 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
             "Suporte / SLA",
             "Hub de Integrações",
             "Auditoria / LGPD",
-            "Equipe & Acessos",
+            "Equipe &amp; Acessos",
             "Demo / Sandbox",
             "AION Negócios",
         )
@@ -67,7 +67,7 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
     def test_investments_cockpit_is_truthful_and_non_executing(self):
         html=workspace_cockpit_html("investimentos")
         for label in (
-            "Renda Fixa","Renda Variável","Fundos e Produtos","Carteira & Alocação",
+            "Renda Fixa","Renda Variável","Fundos e Produtos","Carteira &amp; Alocação",
             "Análise de Risco","Planejamento","Renda & Dividendos","Crescimento",
             "Relatórios Patrimoniais","Educação Financeira","AION Investimentos",
         ):
@@ -79,7 +79,7 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
     def test_aion_cockpit_prepares_chat_library_checkpoint_and_english_without_fake_readiness(self):
         html=workspace_cockpit_html("aion")
         for label in (
-            "Chat do AION","Histórico","Memória","Tarefas & Execução","Biblioteca AION",
+            "Chat do AION","Histórico","Memória","Tarefas &amp; Execução","Biblioteca AION",
             "Pesquisa & Inteligência","Checkpoint Mestre","Núcleo / Orquestração",
             "8 Papéis Internos","Auditoria / Guardião","Academy","AION English",
         ):
