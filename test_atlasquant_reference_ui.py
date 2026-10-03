@@ -6,7 +6,7 @@ import json
 import re
 import pytest
 from PIL import Image, ImageChops
-from atlasquant_reference_ui import (MOBILE_CROPS, NAV, REGIONS, SURFACES, ASSET_ROOT, CSS, action_labels,
+from atlasquant_reference_ui import (TRADER_MOBILE_CARDS, NAV, REGIONS, SURFACES, ASSET_ROOT, CSS, action_labels,
     apply_event, asset_uri, reference_html, render_trader_entry)
 
 
@@ -163,23 +163,42 @@ def test_mobile_hero_has_environment_identity(area):
     assert f"ref-mobile-header-{area}" in html
     assert "ECOSSISTEMA ATLASQUANT" in html
 
-def test_mobile_hotfix_uses_explicit_trader_crops_and_route_classes():
+def test_trader_mobile_v6_has_explicit_card_identity_without_route_collisions():
     html=reference_html("trader")
-    assert MOBILE_CROPS[("trader","news")] == (923,338,95,108)
-    assert MOBILE_CROPS[("trader","master")] == (1040,376,144,72)
-    assert 'class="ref-mobile-card ref-mobile-card-news"' in html
-    assert 'data-mobile-crop="923,338,95,108"' in html
-    assert 'class="ref-mobile-card ref-mobile-card-master"' in html
-    assert 'data-mobile-crop="1040,376,144,72"' in html
+    cards={(route,label):(box,kind) for route,label,box,kind in TRADER_MOBILE_CARDS}
+    assert cards[("news","Pré-Notícia")] == ((915,332,111,65),"icon")
+    assert cards[("news","Notícias em Tempo Real")] == ((163,604,276,111),"panel")
+    assert cards[("calendar","Calendário Econômico")] in {
+        ((798,332,112,65),"icon"),
+        ((1006,464,257,134),"panel"),
+    }
+    assert cards[("master","Painel Mestre")] == ((1031,332,162,65),"icon")
+    assert cards[("journal","Diário")] == ((908,639,96,38),"icon")
+    assert 'data-mobile-kind="icon" data-mobile-crop="915,332,111,65"' in html
+    assert 'data-mobile-kind="panel" data-mobile-crop="163,604,276,111"' in html
+    assert 'data-mobile-kind="icon" data-mobile-crop="1031,332,162,65"' in html
+    assert 'data-mobile-kind="icon" data-mobile-crop="908,639,96,38"' in html
 
 
-def test_mobile_v5_css_compacts_central_and_contains_toolbar():
+def test_reference_mobile_chrome_is_hidden_only_when_reference_cockpit_is_active():
+    src=Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+    assert 'id="aq-reference-active"' in src
+    assert '.stApp:has(#aq-reference-active) [data-testid="stHeader"]{display:none!important' in src
+    assert '.stApp:has(#aq-reference-active) [data-testid="stSidebarCollapsedControl"]{display:none!important}' in src
+    assert '.stApp:has(#aq-reference-active) [data-testid="stElementContainer"]:has([data-testid="stRadio"]){display:none!important}' in src
+    assert '.stApp:has(#aq-reference-active) .block-container{padding-top:0!important' in src
+
+
+def test_mobile_v5_v6_css_compacts_and_stops_card_stretching():
     css=CSS.read_text(encoding="utf-8")
     assert "Fidelity polish v5" in css
+    assert "Fidelity polish v6" in css
     assert ".ref-central .ref-mobile-grid{grid-template-columns:repeat(2,minmax(0,1fr))" in css
     assert ".ref-central .ref-mobile-art{aspect-ratio:4/3!important}" in css
     assert ".ref-toolbar{width:calc(100% - 16px);min-width:0;overflow:hidden}" in css
-    assert ".ref-trader .ref-mobile-card-master .ref-mobile-art{aspect-ratio:2/1!important" in css
+    assert ".ref-mobile-grid{align-items:start}" in css
+    assert ".ref-mobile-card{align-self:start;height:auto}" in css
+    assert ".ref-trader .ref-mobile-card-icon .ref-mobile-art{" in css
 
 
 def test_eight_roles_one_shared_aion():

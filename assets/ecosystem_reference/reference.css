@@ -194,7 +194,6 @@ button:focus-visible,summary:focus-visible{outline:3px solid #6ee7ff;outline-off
   font-size:10px;line-height:1.2
  }
  .ref-trader .ref-mobile-card-news .ref-mobile-art{background-color:#061020}
- .ref-trader .ref-mobile-card-master .ref-mobile-art{aspect-ratio:2/1!important;background-color:#061020}
 }
 @media(max-width:420px){
  .ref-toolbar{gap:4px}
@@ -202,4 +201,32 @@ button:focus-visible,summary:focus-visible{outline:3px solid #6ee7ff;outline-off
  .ref-toolbar-context{flex-basis:58px;font-size:9px!important}
  .ref-central .ref-mobile-grid{gap:6px;padding-inline:6px}
  .ref-central .ref-mobile-card strong{font-size:9px}
+}
+
+
+/* Fidelity polish v6 — explicit Trader mobile card identity. */
+@media(max-width:700px){
+ .ref-mobile-grid{align-items:start}
+ .ref-mobile-card{align-self:start;height:auto}
+ .ref-trader .ref-mobile-card-icon .ref-mobile-art{
+  min-height:72px;
+  background-color:#061020;
+ }
+ .ref-trader .ref-mobile-card-icon strong{
+  min-height:36px;
+  padding:8px 7px 9px;
+  font-size:10px;
+  letter-spacing:.01em;
+ }
+ .ref-trader .ref-mobile-card-panel,
+ .ref-trader .ref-mobile-card-video{
+  align-self:start;
+ }
+ .ref-trader .ref-mobile-card-panel .ref-mobile-art{
+  background-color:#061020;
+ }
+}
+@media(max-width:420px){
+ .ref-trader .ref-mobile-card-icon .ref-mobile-art{min-height:66px}
+ .ref-trader .ref-mobile-card-icon strong{font-size:9.5px}
 }

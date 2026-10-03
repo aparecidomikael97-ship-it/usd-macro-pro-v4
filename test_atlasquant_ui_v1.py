@@ -109,6 +109,16 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
+    def test_mobile_theme_collapses_streamlit_top_reserve(self):
+        css=ATLASQUANT_CSS
+        self.assertIn('[data-testid="stHeader"] { height:2.25rem!important; min-height:2.25rem!important; }',css)
+        self.assertIn('[data-testid="stMain"] { padding-top:0!important; }',css)
+        self.assertIn('[data-testid="stMain"] > div { padding-top:0!important; }',css)
+        self.assertIn('[data-testid="stAppViewBlockContainer"]',css)
+        self.assertIn('.block-container { padding-top:0!important; }',css)
+        self.assertIn('.stMainBlockContainer { padding-left:.85rem; padding-right:.85rem; padding-top:0!important; }',css)
+
+
     def test_reusable_ui_primitives_escape_text_and_restrict_tones(self):
         section=section_title_html("<script>x</script>","⚡")
         badge=state_badge_html("<b>READY</b>","evil")
