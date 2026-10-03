@@ -42,7 +42,7 @@ from atlasquant_ui_v1 import ATLASQUANT_CSS
 from atlasquant_aion_internal_roles import internal_roles_snapshot
 
 
-_PRIVATE_LABELS = ("AION IA", "Negócios", "Renda Fixa")
+_PRIVATE_LABELS = ("AION", "Negócios", "Investimentos")
 _AION_TITLES = (
     "Orquestrador",
     "Arquiteto / Estrategista",
@@ -62,13 +62,13 @@ def _access(role, **extra):
 
 
 class CentralHubUiTests(unittest.TestCase):
-    def test_admin_sees_four_areas_with_aion_first(self):
+    def test_admin_sees_four_areas_in_canonical_ecosystem_order(self):
         model = central_visibility_model(_access("ADMIN"))
         self.assertEqual(
             [area["label"] for area in model["areas"]],
-            ["AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"],
+            ["Trader", "Negócios", "Investimentos", "AION"],
         )
-        self.assertEqual(model["area_ids"], ("aion", "negocios", "trader", "investimentos"))
+        self.assertEqual(model["area_ids"], ("trader", "negocios", "investimentos", "aion"))
         self.assertEqual(model["priority_area"], "aion")
         self.assertEqual(model["default_area"], CENTRAL_ROOT)
         self.assertEqual(model["entry"], CENTRAL_ROOT)
@@ -169,14 +169,14 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertIn("@media (max-width:760px)", html)
         self.assertIn("<details", html)
         self.assertNotIn("flex-direction:row", html)
-        self.assertLess(html.index("AION IA"), html.index("Negócios"))
-        self.assertLess(html.index("Negócios"), html.index("Trader"))
-        self.assertLess(html.index(">Trader<"), html.index("Renda Fixa"))
+        self.assertLess(html.index(">Trader<"), html.index(">Negócios<"))
+        self.assertLess(html.index(">Negócios<"), html.index(">Investimentos<"))
+        self.assertLess(html.index(">Investimentos<"), html.index(">AION<"))
         self.assertEqual(html.count('<svg class="aq-central-art"'), 4)
         self.assertIn(".aq-central-rail .aq-central-art{width:44px;height:30px}", html)
         student = ecosystem_rail_html(_access("USER"))
         self.assertEqual(student.count('<svg class="aq-central-art"'), 1)
-        self.assertNotIn("AION IA", student)
+        self.assertNotIn(">AION<", student)
 
     def test_existing_tokens_remain_and_aion_token_is_additive(self):
         self.assertIn("--aq-bg: #07111f;", ATLASQUANT_CSS)
@@ -220,7 +220,7 @@ class CentralHubUiTests(unittest.TestCase):
         model = central_visibility_model(_access("SALES"))
         self.assertEqual(model["default_area"], "trader")
         surface = central_surface_html(_access("ADMIN"), "aion")
-        self.assertIn("AION IA", surface)
+        self.assertIn(">AION<", surface)
         self.assertEqual(surface.count('class="aq-aion-module"'), 8)
 
     def test_trader_central_leaves_aion_and_investments_opens_real_page(self):
@@ -309,15 +309,21 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertFalse(resolved["shell"])
         html = central_surface_html(admin)
         self.assertIn("CENTRAL PRINCIPAL", html)
-        self.assertIn("Escolha um setor", html)
+        self.assertIn("Central AtlasQuant", html)
+        self.assertIn("Escolha o ambiente que você quer abrir.", html)
         self.assertIn("Poderoso por dentro. Simples por fora.", html)
-        for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
+        for label in ("Trader", "Negócios", "Investimentos", "AION"):
             self.assertIn(label, html)
         self.assertNotIn("?central=", html)
         for area_id in ("aion", "trader", "negocios", "investimentos"):
             self.assertIn(f'data-central-area="{area_id}"', html)
         self.assertNotIn('aria-current="page">', html)
         self.assertEqual(html.count('<svg class="aq-central-art"'), 8)
+        self.assertEqual(html.count('class="aq-central-choice-index"'), 4)
+        self.assertIn('data-central-area="trader"', html)
+        self.assertNotIn(">AION IA<", html)
+        self.assertNotIn(">Renda Fixa / Investimentos<", html)
+        self.assertIn(".aq-central-choice-index", html)
         state = {}
         self.assertIsNone(request_central_destination(state, admin, "central"))
         self.assertEqual(state[CENTRAL_CHOICE_KEY], CENTRAL_ROOT)
@@ -406,7 +412,7 @@ class LoginGreetingTests(unittest.TestCase):
         self.assertIn("Mikael, boa noite. AION ativo.", html)
         self.assertIn("Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?", html)
         self.assertIn("Abrir AION", html)
-        for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
+        for label in ("Trader", "Negócios", "Investimentos", "AION"):
             self.assertIn(label, html)
         self.assertIn('data-root="central_root"', html)
         state = {}
@@ -612,7 +618,7 @@ class AionHomeViewerTests(unittest.TestCase):
         user = _access("USER", session={"username": "cliente", "role": "USER"})
         self.assertEqual(aion_home_viewer_html(user, {"truth_state": "CONFIRMED"}), "")
         surface = central_surface_html(user, "aion")
-        self.assertNotIn("AION IA", surface)
+        self.assertNotIn(">AION<", surface)
         self.assertNotIn("module=", surface)
         state = {}
         self.assertEqual(consume_aion_module_jump(state, user, "orchestrator"), "")
