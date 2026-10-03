@@ -187,7 +187,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          nohup streamlit run usd_macro_pro_v4_cloud.py             --server.headless true             --server.address 127.0.0.1             --server.port 8501             > /tmp/atlasquant-streamlit.log 2>&1 &
+          ATLASQUANT_OFFLINE_SMOKE=false nohup streamlit run usd_macro_pro_v4_cloud.py             --server.headless true             --server.address 127.0.0.1             --server.port 8501             > /tmp/atlasquant-streamlit.log 2>&1 &
           echo $! > /tmp/atlasquant-streamlit.pid
 
           code="000"
