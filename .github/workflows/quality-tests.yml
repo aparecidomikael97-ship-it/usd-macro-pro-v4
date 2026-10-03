@@ -3,7 +3,7 @@ name: Quality tests
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, integration/aion-unified-core-v2-20261003]
   push:
     branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final, atlasquant-render-fast-home, atlasquant-mobile-dom-stability, atlasquant-natural-deep-voice]
     paths:
@@ -427,6 +427,8 @@ jobs:
           python -m pytest -q -s \
             test_atlasquant_aion_chat_foundation.py \
             test_atlasquant_aion_chat_load.py \
-            test_atlasquant_aion_unified_runtime.py
+            test_atlasquant_aion_unified_runtime.py \
+            test_atlasquant_aion_chat_checkpoint_adapter.py \
+            test_atlasquant_aion_chat_library_adapter.py
           python -m pytest -q -s \
             test_atlasquant_aion_chat_browser.py
