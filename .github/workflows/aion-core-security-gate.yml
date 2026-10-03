@@ -41,8 +41,6 @@ jobs:
             atlasquant_aion_dev_fusion.py \
             atlasquant_aion_chat_checkpoint_adapter.py \
             atlasquant_aion_chat_library_adapter.py \
-            atlasquant_aion_chat_checkpoint_adapter.py \
-            atlasquant_aion_chat_library_adapter.py \
             test_atlasquant_aion_chat_checkpoint_adapter.py \
             test_atlasquant_aion_chat_library_adapter.py \
             test_atlasquant_aion_security_adversarial.py \
@@ -107,7 +105,9 @@ jobs:
             atlasquant_aion_portable.py \
             atlasquant_aion_durable_tasks.py \
             atlasquant_aion_digital_twin.py \
-            atlasquant_aion_dev_fusion.py
+            atlasquant_aion_dev_fusion.py \
+            atlasquant_aion_chat_checkpoint_adapter.py \
+            atlasquant_aion_chat_library_adapter.py
       - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
         run: |
           python -m pip freeze --all > /tmp/aion-resolved-requirements.txt
