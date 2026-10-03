@@ -156,6 +156,28 @@ def module_panel(area, selected, *, resident=None):
         cards = '<label>Buscar módulo <input class="ref-search" type="search" placeholder="Radar, Macro, Calendário…" aria-label="Buscar módulo"></label><div class="ref-search-results">' + ''.join(
             f'<button data-route="{route}">{escape(label)}</button>'
             for route,label in NAV.get(area,()) if route != "home") + '</div>'
+    if not cards and area in {"negocios", "investimentos", "aion"}:
+        preview = {
+            "negocios": (
+                ("ESCOPO B2B", "Workspace isolado por empresa"),
+                ("DADOS", "Somente fontes e integrações autorizadas"),
+                ("AÇÃO EXTERNA", "Exige permissão e trilha de auditoria"),
+            ),
+            "investimentos": (
+                ("ESCOPO", "Leitura e comparação de investimentos"),
+                ("DADOS", "Sem cotação viva nesta prévia"),
+                ("EXECUÇÃO", "Nenhuma ordem financeira automática"),
+            ),
+            "aion": (
+                ("NÚCLEO", "Um único AION Core compartilhado"),
+                ("CONHECIMENTO", "Memória e fontes com proveniência"),
+                ("AUTORIDADE", "Ações críticas permanecem controladas"),
+            ),
+        }[area]
+        cards = '<div class="ref-preview-grid">' + ''.join(
+            f'<article><small>{escape(kicker)}</small><strong>{escape(text)}</strong></article>'
+            for kicker, text in preview
+        ) + '</div>'
     notice = ("28 pares Forex · Top 10 em destaque · posições e direção aguardam ranking validado."
               if cards and area == "trader" else f"Prévia visual de {title}. Dados e conteúdo ainda não conectados nesta apresentação.")
     connected = ('<button class="ref-primary" data-route="connected:' + escape(selected) + '">Abrir análise existente</button>'
@@ -266,7 +288,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         + (f'<div class="ref-toolbar" aria-label="Controles do ambiente">{top}{mode_html}<span class="ref-toolbar-context">{escape(name)}</span></div>' if area != "central" else "") + drawer
         + (f'<div class="ref-detail-layout"><nav class="ref-detail-nav">{nav_html(area,mode)}</nav>{detail}</div>' if detail else
            f'<div class="ref-canvas" role="group" aria-label="{escape(area)} · cockpit AtlasQuant">{sidebar}{hits}</div>'
-           f'<div class="ref-mobile-header" style="{hero_style}"><h1>ATLASQUANT · {escape(area.upper())}</h1><p>Poderoso por dentro. Simples por fora.</p></div>'
+           f'<div class="ref-mobile-header ref-mobile-header-{escape(area)}" style="{hero_style}"><span class="ref-mobile-kicker">ECOSSISTEMA ATLASQUANT</span><h1>ATLASQUANT · {escape(area.upper())}</h1><p>{escape({"trader":"Mercado, contexto e risco em uma única leitura.","negocios":"Operação B2B, crescimento e automação com controle.","investimentos":"Estratégia hoje. Patrimônio amanhã.","aion":"Inteligência que integra todo o ecossistema.","central":"Poderoso por dentro. Simples por fora."}[area])}</p></div>'
            f'<div class="ref-mobile-grid">{"".join(mobile)}</div>')
         + truth + "</section>")
 
