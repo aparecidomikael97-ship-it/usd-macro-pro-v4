@@ -14,11 +14,13 @@ SURFACES = {"central": ("central.webp", 768, 512),
             "negocios": ("negocios-body.webp", 768, 434),
             "investimentos": ("investimentos-body.webp", 1048, 665),
             "aion": ("aion-body.webp", 1048, 665)}
-TRADER_NAV = (("home", "Início"), ("radar_master", "Radar Mestre"), ("radar", "Radar"),
-    ("master", "Painel Mestre"), ("macro", "Macro"), ("micro", "Micro"),
-    ("geo", "Geopolítica"), ("fundamental", "Fundamentalista"), ("ict", "ICT / SMC"),
-    ("calendar", "Calendário Econômico"), ("news", "Pré-Notícia"), ("lab", "Laboratório / Backtests"),
-    ("paper", "Paper Trading"), ("guardian", "Guardião de Risco"), ("academy", "Academia"),
+TRADER_NAV = (("home", "Início"), ("radar", "Radar"), ("scanner", "Scanner Técnico"),
+    ("master", "Painel Mestre"), ("macro", "Macro · EUA"), ("fed", "Fed"), ("micro", "Micro"),
+    ("geo", "Geopolítica"), ("market_news", "Notícias"), ("fundamental", "Fundamentalista"),
+    ("ict", "ICT / SMC"), ("calendar", "Calendário Econômico"),
+    ("news", "Pré-Notícia / Macro Briefing"), ("market_map", "Market Map"),
+    ("lab", "Laboratório / Backtests"), ("paper", "Paper Trading"),
+    ("guardian", "Guardião de Risco"), ("autopilot", "Autopilot"), ("academy", "Academia"),
     ("journal", "Diário"), ("video", "Vídeos / Conteúdo"), ("aion_specialist", "AION Trader"),
     ("profile", "Perfil / Configurações"))
 NAV = {
@@ -111,7 +113,7 @@ REGIONS["investimentos"][:5]=[("stocks","Ações Globais",(173,317,162,113)),
     ("crypto","Criptomoedas",(687,317,165,113)),("portfolio","Carteira Global",(862,317,170,113))]
 EXTRA = {"trader": (("indexes","Índices"),("commodities","Commodities"),("stocks","Ações"),("week","Análise da Semana"),("day","Análise do Dia"),("close_day","Fechamento do Dia"),("close_week","Fechamento Semanal")),
  "central": (("profile","Perfil"),("notifications","Notificações"),("settings","Configurações"),("session","Sessão"))}
-BEGINNER = {"home","radar","radar_master","master","macro","news","academy","aion_specialist","profile","week","day","close_day","close_week"}
+BEGINNER = {"home","radar","scanner","master","macro","news","market_news","academy","aion_specialist","profile","week","day","close_day","close_week"}
 CSS = (Path(__file__).parent / "assets" / "ecosystem_reference" / "reference.css")
 
 
@@ -184,8 +186,12 @@ def module_panel(area, selected, *, resident=None):
             f'<strong>{escape(pair)}</strong><span>Direção: aguardando dados</span>'
             f'<button data-route="why:{escape(pair)}">Ver por quê</button></article>'
             for i, pair in enumerate(OFFICIAL_PAIRS)) + "</div>"
+    if area == "trader" and selected == "scanner":
+        cards = ('<div class="ref-master-summary"><button data-route="connected:scanner">'
+                 '<strong>Scanner Técnico existente</strong><span>Abrir no Painel Mestre legado</span></button></div>'
+                 '<p>O scanner reutiliza o motor legado e a cobertura já existente; esta camada não recalcula sinais.</p>')
     if area == "trader" and selected == "master":
-        essentials = (("Radar Mestre", "28 pares · aguardando ranking", "radar_master"),
+        essentials = (("Scanner Técnico", "Scanner legado disponível no painel", "scanner"),
                       ("Contexto Macro", "Dados ainda não validados", "macro"),
                       ("Guardião de Risco", "Consultar leitura de risco", "guardian"),
                       ("AION Trader", "Seu copiloto neste ambiente", "aion_specialist"))
@@ -228,7 +234,7 @@ def module_panel(area, selected, *, resident=None):
     notice = ("28 pares Forex · Top 10 em destaque · posições e direção aguardam ranking validado."
               if cards and area == "trader" else f"Prévia visual de {title}. Dados e conteúdo ainda não conectados nesta apresentação.")
     connected = ('<button class="ref-primary" data-route="connected:' + escape(selected) + '">Abrir análise existente</button>'
-                 if area == "trader" and selected in {"radar","radar_master","master","macro","micro","geo","fundamental","ict","calendar","news","lab","paper","guardian","academy","journal","video","profile"} else "")
+                 if area == "trader" and selected in {"radar","radar_master","scanner","master","macro","fed","micro","geo","market_news","fundamental","ict","calendar","news","market_map","lab","paper","guardian","autopilot","academy","journal","video","profile"} else "")
     if selected.startswith("why:"):
         notice = "A direção deste par ainda não foi validada. Nenhuma recomendação de compra/venda é apresentada."
     return (f'<main class="ref-detail" data-module="{escape(selected)}">'
