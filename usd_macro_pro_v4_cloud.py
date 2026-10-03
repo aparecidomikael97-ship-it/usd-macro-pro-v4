@@ -473,8 +473,11 @@ def _central_request_for_render(*, active_index=None) -> str:
     requested = _central_query_value()
     if not requested:
         try:
-            if str(st.session_state.get(CENTRAL_CHOICE_KEY) or "") == CENTRAL_ROOT:
+            stored_choice = str(st.session_state.get(CENTRAL_CHOICE_KEY) or "").strip()
+            if stored_choice == CENTRAL_ROOT:
                 requested = "central"
+            elif stored_choice in {"trader", "negocios", "investimentos", "aion"}:
+                requested = stored_choice
         except Exception:
             pass
     if active_index == 21 and not requested:
