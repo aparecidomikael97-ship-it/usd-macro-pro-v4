@@ -467,6 +467,7 @@ def render_reference_workspace(st, access, area, *, mode=None):
         '.stApp:has(#aq-reference-active) [data-testid="stElementContainer"]:has(.aq-boot-banner),'
         '.stApp:has(#aq-reference-active) [data-testid="stElementContainer"]:has(.aq-voice-dock){display:none!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important}'
         '.stApp:has(#aq-reference-active) [data-testid="stElementContainer"]:has(.aq-voice-dock) + [data-testid="stHorizontalBlock"]{display:none!important}'
+        '.stApp:has(#aq-reference-active) .block-container{padding-top:0!important}'
         'html:has(#aq-reference-active) [data-testid="stAppViewContainer"],'
         'html:has(#aq-reference-active) [data-testid="stMain"],'
         'html:has(#aq-reference-active) [data-testid="stMainBlockContainer"],'
