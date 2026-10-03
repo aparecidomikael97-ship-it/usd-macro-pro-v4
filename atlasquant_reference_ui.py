@@ -11,9 +11,9 @@ import base64
 ASSET_ROOT = Path(__file__).parent / "assets" / "ecosystem_reference"
 SURFACES = {"central": ("central.webp", 768, 512),
             "trader": ("trader.jpg", 1280, 720),
-            "negocios": ("negocios.webp", 768, 512),
-            "investimentos": ("investimentos.webp", 1048, 748),
-            "aion": ("aion.webp", 1048, 748)}
+            "negocios": ("negocios-body.webp", 768, 434),
+            "investimentos": ("investimentos-body.webp", 1048, 665),
+            "aion": ("aion-body.webp", 1048, 665)}
 TRADER_NAV = (("home", "Início"), ("radar_master", "Radar Mestre"), ("radar", "Radar"),
     ("master", "Painel Mestre"), ("macro", "Macro"), ("micro", "Micro"),
     ("geo", "Geopolítica"), ("fundamental", "Fundamentalista"), ("ict", "ICT / SMC"),
@@ -25,7 +25,7 @@ NAV = {
  "trader": TRADER_NAV,
  "negocios": (("home", "Visão Geral"), ("opportunities", "Oportunidades"), ("sectors", "Setores"),
     ("companies", "Empresas"), ("ma", "M&A"), ("global", "Mercado Global"), ("corporate", "Notícias Corporativas"),
-    ("results", "Calendário de Resultados"), ("flow", "Fluxo Institucional"), ("watchlist", "Watchlist"),
+    ("results", "Calendário de Resultados"), ("flow", "Fluxo Institucional"), ("watchlist", "Lista de acompanhamento"),
     ("reports", "Relatórios"), ("aion_specialist", "AION Negócios"), ("profile", "Configurações")),
  "investimentos": (("home", "Visão Geral"), ("radar", "Radar"), ("week", "Análise da Semana"),
     ("indexes", "Índices"), ("commodities", "Commodities"), ("stocks", "Ações Globais"),
@@ -36,7 +36,7 @@ NAV = {
     ("learning", "Aprendizado"), ("knowledge", "Base de Conhecimento"), ("integrations", "Integrações"),
     ("security", "Segurança"), ("monitoring", "Monitoramento"), ("reports", "Relatórios"),
     ("chat", "Chat do AION"), ("memory", "Memória / Checkpoint"), ("roles", "8 Papéis Internos"),
-    ("english", "AION English"), ("profile", "Configurações")),
+    ("english", "AION · Inglês"), ("profile", "Configurações")),
 }
 # Coordinates use pixels in the approved single-workspace reference.
 REGIONS = {
@@ -102,7 +102,14 @@ TRADER_MOBILE_CARDS = (
     ("journal", "Diário", (908,639,96,38), "icon"),
 )
 
-EXTRA = {"trader": (("week","Análise da Semana"),("day","Análise do Dia"),("close_day","Fechamento do Dia"),("close_week","Fechamento Semanal")),
+# Remove global market image bands at the asset source, not through CSS hiding.
+for _area,_cut in (("negocios",78),("investimentos",83),("aion",83)):
+    REGIONS[_area]=[(route,label,(x,y-_cut,w,h)) for route,label,(x,y,w,h) in REGIONS[_area]]
+# Original ETF/crypto hit rectangles were 15-18 px left of the artwork border.
+REGIONS["investimentos"][:5]=[("stocks","Ações Globais",(173,317,162,113)),
+    ("fixed","Renda Fixa",(344,317,163,113)),("funds","Fundos e ETFs",(516,317,163,113)),
+    ("crypto","Criptomoedas",(687,317,165,113)),("portfolio","Carteira Global",(862,317,170,113))]
+EXTRA = {"trader": (("indexes","Índices"),("commodities","Commodities"),("stocks","Ações"),("week","Análise da Semana"),("day","Análise do Dia"),("close_day","Fechamento do Dia"),("close_week","Fechamento Semanal")),
  "central": (("profile","Perfil"),("notifications","Notificações"),("settings","Configurações"),("session","Sessão"))}
 BEGINNER = {"home","radar","radar_master","master","macro","news","academy","aion_specialist","profile","week","day","close_day","close_week"}
 CSS = (Path(__file__).parent / "assets" / "ecosystem_reference" / "reference.css")
@@ -117,7 +124,7 @@ def asset_uri(filename):
 
 def dimensions(area):
     if area in {"investimentos", "aion"}:
-        return 1048, 748
+        return SURFACES[area][1:]
     return SURFACES[area][1:]
 
 
@@ -135,7 +142,11 @@ def action_labels(area):
 def hotspot(area, route, label, box, *, visible=False):
     w, h = dimensions(area)
     x, y, bw, bh = box
-    style = f"left:{x/w*100:.5f}%;top:{y/h*100:.5f}%;width:{bw/w*100:.5f}%;height:{bh/h*100:.5f}%"
+    radius = 16 if area == "central" and route.startswith("area:") else 8
+    style = f"left:{x/w*100:.5f}%;top:{y/h*100:.5f}%;width:{bw/w*100:.5f}%;height:{bh/h*100:.5f}%;border-radius:{radius/bw*100:.3f}% / {radius/bh*100:.3f}%"
+    if area == "central" and route.startswith("area:"):
+        accent={"area:trader":"#21b9ff","area:negocios":"#ff9d1c","area:investimentos":"#28eaa7","area:aion":"#b678ff"}[route]
+        style += f";--accent:{accent}"
     return (f'<button class="ref-hit{" ref-mask" if visible else ""}" data-route="{escape(route)}" '
             f'aria-label="{escape(label)}" title="{escape(label)}" style="{style}">'
             f'<span{" class=ref-sr" if not visible else ""}>{escape(label)}</span></button>')
@@ -149,6 +160,9 @@ def nav_html(area, mode):
         index = next((i for i,(key,_) in enumerate(rows) if key == route), 0)
         icon = f'<span class="ref-nav-icon" aria-hidden="true" style="background-size:18px {18*len(rows)}px;background-position:0 -{index*18}px"></span>'
         return f'<button data-route="{escape(route)}" class="ref-nav-item">{icon}{escape(label)}</button>'
+    if area == "trader":
+        # Experience mode changes guidance, never module discovery or availability.
+        return "".join(row(k,v) for k,v in rows)
     essential = [row(k,v) for k,v in rows if area != "trader" or advanced or k in BEGINNER]
     secondary = [row(k,v) for k,v in rows if area == "trader" and not advanced and k not in BEGINNER]
     if area in {"negocios", "investimentos", "aion"}:
@@ -236,9 +250,13 @@ def module_panel(area, selected, *, resident=None):
         '<section data-tab-panel="status" hidden><p>Aguardando dados validados.</p></section></main>')
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
+    if area == "trader":
+        from atlasquant_compact_cockpit import trader_html
+        return trader_html(mode=mode,selected=selected,name=name,show_central=show_central,
+            nav_html=nav_html,module_panel=module_panel,uri=asset_uri,market_items=market_items)
     filename = SURFACES[area][0]
     uri = asset_uri(filename)
     w,h = dimensions(area)
@@ -278,18 +296,9 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         hits += hotspot(area,"settings","Configurações",(1045,8,34,35))
         hits += hotspot(area,"profile","Perfil / Configurações",(1082,8,156,35))
         hits += hotspot(area,"aion_specialist","AION Trader",(15,586,139,121))
-    elif area == "negocios":
-        for i in range(5):
-            hits += hotspot(area,"global","Contexto do mercado",(212+i*84,25,80,45))
-        hits += hotspot(area,"profile","Perfil",(638,25,104,43))
-        hits += hotspot(area,"session","Sessão",(744,25,20,43))
     elif area in {"investimentos","aion"}:
-        for i in range(5):
-            hits += hotspot(area,"radar" if area=="investimentos" else "monitoring","Contexto do mercado",(185+i*131,17,125,51))
-        hits += hotspot(area,"profile","Perfil / Configurações",(843,15,135,55))
-        hits += hotspot(area,"notifications","Notificações",(979,15,32,55))
-        hits += hotspot(area,"settings","Configurações",(1012,15,34,55))
-        hits += hotspot(area,"aion_specialist" if area=="investimentos" else "chat","Conversar com o AION",(794,322,190,69) if area=="investimentos" else (848,191,183,112))
+        box=(794,239,190,69) if area=="investimentos" else (848,108,183,112)
+        hits+=hotspot(area,"aion_specialist" if area=="investimentos" else "chat","Conversar com o AION",box)
     sidebar = ""
     if area != "central":
         side_width = {"trader":12,"negocios":21.8,"investimentos":16.7,"aion":18.5}[area]
@@ -320,14 +329,17 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     id_box = {"central":(591,13,75,32),"trader":(1121,8,87,34),"negocios":(682,29,64,30),"investimentos":(876,22,100,35),"aion":(876,22,100,35)}[area]
     ix,iy,iw,ih=id_box
     identity=f'<span class="ref-identity" style="left:{ix/w*100}%;top:{iy/h*100}%;width:{iw/w*100}%;height:{ih/h*100}%">{escape(name)}</span>'
-    hits += identity
+    if area == "central":
+        hits += identity
     hx,hy,hw,hh = {"central":(170,60,450,220),"trader":(535,450,268,180),
-                   "negocios":(170,79,590,115),"investimentos":(170,80,870,305),
-                   "aion":(184,80,856,305)}[area]
+                   "negocios":(170,1,590,115),"investimentos":(170,0,870,305),
+                   "aion":(184,0,856,305)}[area]
     hero_style = f"background-size:{100*w/hw}%;background-position:{100*hx/max(1,w-hw)}% {100*hy/max(1,h-hh)}%"
     truth = "" if area == "central" else '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; métricas e execução não validadas</p>'
+    from atlasquant_compact_cockpit import header_html
+    header=header_html(area,name,mode,top,market_items=market_items) if area != "central" else ""
     return (f'<section class="ref-workspace ref-{escape(area)}" data-workspace="{escape(area)}" style="{settings}">'
-        + (f'<div class="ref-toolbar" aria-label="Controles do ambiente">{top}{mode_html}<span class="ref-toolbar-context">{escape(name)}</span></div>' if area != "central" else "") + drawer
+        + header + drawer
         + (f'<div class="ref-detail-layout"><nav class="ref-detail-nav">{nav_html(area,mode)}</nav>{detail}</div>' if detail else
            f'<div class="ref-canvas" role="group" aria-label="{escape(area)} · cockpit AtlasQuant">{sidebar}{hits}</div>'
            f'<div class="ref-mobile-header ref-mobile-header-{escape(area)}" style="{hero_style}"><span class="ref-mobile-kicker">ECOSSISTEMA ATLASQUANT</span><h1>ATLASQUANT · {escape(area.upper())}</h1><p>{escape({"trader":"Mercado, contexto e risco em uma única leitura.","negocios":"Operação B2B, crescimento e automação com controle.","investimentos":"Estratégia hoje. Patrimônio amanhã.","aion":"Inteligência que integra todo o ecossistema.","central":"Poderoso por dentro. Simples por fora."}[area])}</p></div>'
@@ -351,8 +363,13 @@ export default function(component) {
    const img=new Image();
    img.onload=()=>{root.dataset.artReady='true';};
    img.onerror=()=>{root.dataset.artReady='error';};
-   img.src=src;
+   if(value==='none'){Promise.all([...root.querySelectorAll('img')].map(image=>image.decode())).then(()=>root.dataset.artReady='true').catch(()=>root.dataset.artReady='error');}else{img.src=src;}
  }else{root.dataset.artReady='true';}
+ root.querySelectorAll('[data-ticker-step]').forEach(b=>{
+   b.onclick=()=>root.querySelector('.cq-ticker')?.scrollBy({left:Number(b.dataset.tickerStep)*root.querySelector('.cq-ticker').clientWidth*.75,behavior:'smooth'});
+ });
+ const ticker=root.querySelector('.cq-ticker');
+ if(ticker){ticker.onkeydown=e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();ticker.scrollBy({left:e.key==='ArrowRight'?160:-160,behavior:'smooth'});}};}
  const search=root.querySelector('.ref-search');
  if(search){search.oninput=()=>{
    const term=search.value.toLocaleLowerCase();
@@ -489,7 +506,7 @@ def render_reference_workspace(st, access, area, *, mode=None):
     session = access.get("session") or {}
     name = str(access.get("display_name") or session.get("username") or access.get("username") or "Usuário")
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN"),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items")),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()

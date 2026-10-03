@@ -198,7 +198,15 @@ class PremiumShellTests(unittest.TestCase):
         for title in ("Macro", "Micro", "Geopolítica", "ICT / SMC", "Painel Mestre", "Radar Mestre", "Diário"):
             self.assertIn(title, html)
         beginner = trader_cockpit_html(mode="Iniciante", available_pages=pages)
-        self.assertIn("Todas as funções · Avançado", beginner)
+        self.assertIn("Funções do Trader · 19", beginner)
+        self.assertIn("inclusive avançadas, continuam disponíveis", beginner)
+        from atlasquant_reference_ui import NAV, nav_html
+        navigation = nav_html("trader", "Iniciante")
+        self.assertEqual(len(NAV["trader"]), 19)
+        self.assertEqual(navigation.count('class="ref-nav-item"'), 19)
+        self.assertNotIn('<details>', navigation)
+        for route, _ in NAV["trader"]:
+            self.assertIn(f'data-route="{route}"', navigation)
         state = {}
         self.assertEqual(request_premium_card(state, "macro", mode="Avançado", available_pages=pages), "🇺🇸 EUA")
         self.assertEqual(consume_premium_navigation(state, mode="Avançado", available_pages=pages), "🇺🇸 EUA")

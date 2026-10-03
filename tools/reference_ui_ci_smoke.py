@@ -53,7 +53,7 @@ def _open_reference(
         # In the production entry the responsive card layer is the authoritative
         # mobile readiness signal. The custom component's image preload marker
         # can lag behind the already-painted mobile cards on slower CI runners.
-        page.locator(".ref-mobile-grid .ref-mobile-card").first.wait_for(
+        page.locator(".cq-cards .ref-mobile-card").first.wait_for(
             state="visible", timeout=90_000
         )
         root = page.locator(".ref-component-root").first
@@ -151,7 +151,7 @@ def _mobile(page, failures: list[str], trace: list[dict], stress: bool) -> None:
 
     if stress:
         for route in ("radar", "macro", "master", "academy", "journal", "radar"):
-            locator = page.locator(f'.ref-mobile-card[data-route="{route}"]').first
+            locator = page.locator(f'.cq-main [data-route="{route}"]').first
             if not locator.count():
                 failures.append(f"mobile-stress: cartão ausente: {route}")
                 continue
