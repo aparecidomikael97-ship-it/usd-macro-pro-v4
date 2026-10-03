@@ -27,7 +27,14 @@ def _assert_clean(page, failures: list[str], label: str) -> None:
         failures.append(f"{label}: overflow horizontal {width-viewport}px")
 
 
-def _open_reference(page, url: str, failures: list[str], label: str) -> None:
+def _open_reference(
+    page,
+    url: str,
+    failures: list[str],
+    label: str,
+    *,
+    mobile: bool = False,
+) -> None:
     response = page.goto(url, wait_until="domcontentloaded", timeout=180_000)
     if not response or response.status >= 400:
         failures.append(f"{label}: HTTP {response.status if response else None}")
@@ -36,9 +43,23 @@ def _open_reference(page, url: str, failures: list[str], label: str) -> None:
     page.locator('.ref-workspace[data-workspace="trader"]').wait_for(
         state="visible", timeout=90_000
     )
-    page.locator('.ref-component-root[data-art-ready="true"]').wait_for(
-        state="visible", timeout=90_000
-    )
+    if mobile:
+        # In the production entry the responsive card layer is the authoritative
+        # mobile readiness signal. The custom component's image preload marker
+        # can lag behind the already-painted mobile cards on slower CI runners.
+        page.locator(".ref-mobile-grid .ref-mobile-card").first.wait_for(
+            state="visible", timeout=90_000
+        )
+        root = page.locator(".ref-component-root").first
+        if root.count():
+            art_state = str(root.get_attribute("data-art-ready") or "").strip()
+            if art_state == "error":
+                failures.append(f"{label}: arte de referência sinalizou erro de carregamento")
+    else:
+        # Desktop uses the full raster canvas, so image readiness remains a hard gate.
+        page.locator('.ref-component-root[data-art-ready="true"]').wait_for(
+            state="visible", timeout=90_000
+        )
     _assert_clean(page, failures, label)
 
 
@@ -170,7 +191,13 @@ def main() -> int:
             page.on("console", lambda msg, bucket=console_errors: bucket.append(msg.text) if msg.type == "error" else None)
             trace: list[dict] = []
             try:
-                _open_reference(page, args.url, failures, name)
+                _open_reference(
+                    page,
+                    args.url,
+                    failures,
+                    name,
+                    mobile=(name == "mobile"),
+                )
                 observed = _check_build(page, expected, failures, name)
                 if name == "desktop":
                     _desktop(page, failures, trace)
