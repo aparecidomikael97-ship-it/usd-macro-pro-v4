@@ -162,11 +162,20 @@ def module_panel(area, selected, *, resident=None):
                  if area == "trader" and selected in {"radar","radar_master","master","macro","micro","geo","fundamental","ict","calendar","news","lab","paper","guardian","academy","journal","video","profile"} else "")
     if selected.startswith("why:"):
         notice = "A direção deste par ainda não foi validada. Nenhuma recomendação de compra/venda é apresentada."
-    return (f'<main class="ref-detail" data-module="{escape(selected)}"><div class="ref-detail-head">'
+    return (f'<main class="ref-detail" data-module="{escape(selected)}">'
+        f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
+        '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
         '<p class="ref-state">PRÉVIA · sem execução automática</p>'
-        f'<p>{notice}</p>{connected}<div class="ref-tabs"><button data-local-tab="overview">Visão geral</button>'
-        '<button data-local-tab="context">Contexto</button><button data-local-tab="status">Estado</button></div>'
+        f'<p class="ref-detail-lede">{notice}</p>'
+        '<div class="ref-detail-status">'
+        f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
+        '<span><small>EXECUÇÃO</small><strong>BLOQUEADA</strong></span>'
+        '<span><small>DADOS</small><strong>VALIDAÇÃO PENDENTE</strong></span>'
+        f'</div>{connected}'
+        '<div class="ref-tabs" role="tablist"><button data-local-tab="overview" aria-selected="true">Visão geral</button>'
+        '<button data-local-tab="context" aria-selected="false">Contexto</button>'
+        '<button data-local-tab="status" aria-selected="false">Estado</button></div>'
         f'<section data-tab-panel="overview">{cards or "<p>Nenhum dado validado disponível para exibir.</p>"}</section>'
         '<section data-tab-panel="context" hidden><p>Conteúdo complementar será exibido nesta aba.</p></section>'
         '<section data-tab-panel="status" hidden><p>Aguardando dados validados.</p></section></main>')
@@ -254,7 +263,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     hero_style = f"background-size:{100*w/hw}%;background-position:{100*hx/max(1,w-hw)}% {100*hy/max(1,h-hh)}%"
     truth = "" if area == "central" else '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; métricas e execução não validadas</p>'
     return (f'<section class="ref-workspace ref-{escape(area)}" data-workspace="{escape(area)}" style="{settings}">'
-        + (f'<div class="ref-toolbar">{top}{mode_html}<span>{escape(name)}</span></div>' if area != "central" else "") + drawer
+        + (f'<div class="ref-toolbar" aria-label="Controles do ambiente">{top}{mode_html}<span class="ref-toolbar-context">{escape(name)}</span></div>' if area != "central" else "") + drawer
         + (f'<div class="ref-detail-layout"><nav class="ref-detail-nav">{nav_html(area,mode)}</nav>{detail}</div>' if detail else
            f'<div class="ref-canvas" role="group" aria-label="{escape(area)} · cockpit AtlasQuant">{sidebar}{hits}</div>'
            f'<div class="ref-mobile-header" style="{hero_style}"><h1>ATLASQUANT · {escape(area.upper())}</h1><p>Poderoso por dentro. Simples por fora.</p></div>'
@@ -289,7 +298,11 @@ export default function(component) {
    button.onclick=()=>{button.setAttribute('aria-busy','true');setTriggerValue('navigate',button.dataset.route);};
  });
  root.querySelectorAll('[data-local-tab]').forEach(button=>{
-   button.onclick=()=>{root.querySelectorAll('[data-tab-panel]').forEach(panel=>panel.hidden=panel.dataset.tabPanel!==button.dataset.localTab);};
+   button.onclick=()=>{
+     const selected=button.dataset.localTab;
+     root.querySelectorAll('[data-tab-panel]').forEach(panel=>panel.hidden=panel.dataset.tabPanel!==selected);
+     root.querySelectorAll('[data-local-tab]').forEach(tab=>tab.setAttribute('aria-selected',tab===button?'true':'false'));
+   };
  });
  // The selected workspace always opens at the first fold.
  if(root.querySelector('.ref-detail')) window.scrollTo({top:0,behavior:'instant'});
