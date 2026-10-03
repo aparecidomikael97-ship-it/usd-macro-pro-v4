@@ -1147,10 +1147,14 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("O AION não mostra raciocínio privado/chain-of-thought",src)
         self.assertIn("Conselho usado:",src)
 
-    def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
+    def test_business_panel_keeps_unconfirmed_metrics_truthful(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertIn("não representam vendas confirmadas", src)
-        self.assertIn("integrações de pedidos não estiverem conectadas", src)
+        start = src.index("def _render_business(")
+        end = src.index("\ndef _render_laboratory(", start)
+        body = src[start:end]
+        self.assertIn("N/D permanece N/D", body)
+        self.assertIn("o AION não fabrica resultado", body)
+        self.assertIn("Dados reais entram somente quando a integração correspondente estiver validada.", body)
 
 
     def test_workspace_dispatch_is_fault_isolated_and_does_not_echo_raw_exception(self):
