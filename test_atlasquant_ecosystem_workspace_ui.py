@@ -68,7 +68,7 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
         html=workspace_cockpit_html("investimentos")
         for label in (
             "Renda Fixa","Renda Variável","Fundos e Produtos","Carteira &amp; Alocação",
-            "Análise de Risco","Planejamento","Renda & Dividendos","Crescimento",
+            "Análise de Risco","Planejamento","Renda &amp; Dividendos","Crescimento",
             "Relatórios Patrimoniais","Educação Financeira","AION Investimentos",
         ):
             self.assertIn(label,html)
@@ -80,7 +80,7 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
         html=workspace_cockpit_html("aion")
         for label in (
             "Chat do AION","Histórico","Memória","Tarefas &amp; Execução","Biblioteca AION",
-            "Pesquisa & Inteligência","Checkpoint Mestre","Núcleo / Orquestração",
+            "Pesquisa &amp; Inteligência","Checkpoint Mestre","Núcleo / Orquestração",
             "8 Papéis Internos","Auditoria / Guardião","Academy","AION English",
         ):
             self.assertIn(label,html)
