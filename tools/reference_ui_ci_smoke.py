@@ -89,12 +89,11 @@ def _desktop(page, failures: list[str], trace: list[dict]) -> None:
     pairs = page.locator(".ref-detail .ref-pair").count()
     if pairs != 28:
         failures.append(f"desktop: Painel Mestre exibiu {pairs} pares; esperado=28")
-    top_text = " ".join(
-        page.locator(".ref-detail .ref-pair").nth(i).inner_text()
-        for i in range(min(10, pairs))
-    )
-    if top_text.count("TOP 10") < min(10, pairs):
-        failures.append("desktop: TOP 10 não está marcado nos dez primeiros pares")
+    top_badges = page.locator(".ref-detail .ref-pair small").filter(has_text="TOP 10").count()
+    if top_badges != 10:
+        failures.append(
+            f"desktop: TOP 10 marcou {top_badges} pares; esperado=10"
+        )
     trace.append({"action": "master", "pairs": pairs, "ms": round((time.perf_counter()-start)*1000)})
 
     bridge = page.locator('.ref-detail [data-route="connected:master"]')
@@ -105,6 +104,9 @@ def _desktop(page, failures: list[str], trace: list[dict]) -> None:
         # ProductionAdminFlowTests. This browser smoke remains provider-free and
         # validates that the bridge is visibly available from the new cockpit.
         trace.append({"action": "connected-master-bridge-present", "ok": True})
+
+    page.locator('.ref-detail [data-route="home"]').click()
+    page.locator(".ref-canvas").wait_for(state="visible", timeout=30_000)
 
     mode = page.locator(".ref-mode")
     if not mode.count():
