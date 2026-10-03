@@ -196,6 +196,10 @@ def test_mobile_v7_collapses_duplicate_production_chrome_before_reference_cockpi
     assert '[data-testid="stElementContainer"]:has(.aq-boot-banner)' in src
     assert '[data-testid="stElementContainer"]:has(.aq-voice-dock)' in src
     assert ':has(.aq-voice-dock) + [data-testid="stHorizontalBlock"]{display:none!important}' in src
+    assert 'html:has(#aq-reference-active) [data-testid="stAppViewContainer"]' in src
+    assert 'html:has(#aq-reference-active) [data-testid="stMain"]' in src
+    assert 'html:has(#aq-reference-active) [data-testid="stMainBlockContainer"]' in src
+    assert 'margin-top:0!important;top:0!important;padding-top:0!important' in src
 
 
 def test_mobile_v7_equalizes_video_art_and_centers_journal():
