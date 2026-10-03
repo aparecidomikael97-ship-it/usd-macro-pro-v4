@@ -13,7 +13,7 @@ class HistoricalCommitmentsTests(unittest.TestCase):
         report = history.validate_repository(ROOT)
         self.assertEqual(report["errors"], [], "\n".join(report["errors"]))
         self.assertTrue(report["ok"])
-        self.assertGreaterEqual(report["count"], 108)
+        self.assertGreaterEqual(report["count"], 118)
         self.assertEqual(report["daily_coverage_count"], 18)
         self.assertEqual(report["unresolved_days"], [])
 
@@ -35,6 +35,18 @@ class HistoricalCommitmentsTests(unittest.TestCase):
         item["implemented"] = True
         errors = history.validate_commitment(item, set())
         self.assertTrue(any("pending commitment" in error for error in errors))
+
+    def test_newer_decisions_preserve_supersession_precedence(self):
+        manifest = history.load_manifest(ROOT)
+        items = {item["id"]: item for item in manifest["commitments"]}
+        marketplace = items["D-2026-09-24-BUSINESS-MARKETPLACE-IN-ECOSYSTEM"]
+        self.assertEqual(marketplace["state"], "SUBSTITUÍDO")
+        self.assertEqual(marketplace["superseded_by"], "D-2026-09-29-BUSINESS-TOP5-ONLY")
+        old_priority = items["D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS"]
+        self.assertEqual(old_priority["state"], "SUBSTITUÍDO")
+        self.assertEqual(old_priority["superseded_by"], "D-2026-10-02-PRIORITY-INTERFACE-FIRST")
+        self.assertEqual(items["D-2026-10-01-AION-ENGLISH"]["state"], "APROVADO / PENDENTE")
+        self.assertEqual(items["D-2026-10-02-AION-CONTINUOUS-CHAT"]["state"], "APROVADO / PENDENTE")
 
     def test_day_cannot_close_while_commitments_are_non_terminal(self):
         manifest = history.load_manifest(ROOT)
@@ -95,6 +107,16 @@ class HistoricalCommitmentsTests(unittest.TestCase):
             "D-2026-10-02-DAILY-HISTORICAL-SWEEP",
             "D-2026-10-02-PHASE2-60-20-20",
             "D-2026-10-02-DECEMBER-90-PLANNING-TARGET",
+            "D-2026-09-20-ACCOUNT-SESSION-ONBOARDING",
+            "D-2026-09-21-INTRO-VIDEO-ONBOARDING",
+            "D-2026-09-29-BUSINESS-TOP5-ONLY",
+            "D-2026-09-29-MARKET-VIDEO-EDITORIAL-PROTOCOL",
+            "D-2026-09-29-PERMANENT-SLOGAN",
+            "D-2026-10-01-AION-ENGLISH",
+            "D-2026-10-02-INTERFACE-REFERENCE-FREEZE",
+            "D-2026-10-02-PRIORITY-INTERFACE-FIRST",
+            "D-2026-10-02-AION-CONTINUOUS-CHAT",
+            "D-2026-10-02-FEATURE-FREEZE-UNTIL-CLOSE",
         }
         self.assertTrue(required.issubset(ids))
 
