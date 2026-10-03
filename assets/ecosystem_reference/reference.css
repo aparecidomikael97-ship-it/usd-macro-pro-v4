@@ -146,3 +146,31 @@ button:focus-visible,summary:focus-visible{outline:3px solid #6ee7ff;outline-off
  .ref-master-summary{grid-template-columns:1fr 1fr;gap:8px}
  .ref-master-summary button{min-height:96px}
 }
+
+
+/* Fidelity polish v3 — distinct private workspaces and mobile hierarchy. */
+.ref-preview-grid{display:grid;grid-template-columns:repeat(3,minmax(160px,1fr));gap:12px;margin-top:18px}
+.ref-preview-grid article{position:relative;overflow:hidden;min-height:130px;padding:18px;border:1px solid color-mix(in srgb,var(--accent) 40%,#2d536c);border-radius:14px;background:linear-gradient(145deg,#091b2f,#0a1021);box-shadow:inset 0 0 26px color-mix(in srgb,var(--accent) 8%,transparent),0 10px 28px #0003}
+.ref-preview-grid article::after{content:"";position:absolute;width:110px;height:110px;right:-44px;bottom:-48px;border-radius:50%;background:color-mix(in srgb,var(--accent) 13%,transparent)}
+.ref-preview-grid small{display:block;position:relative;z-index:1;margin-bottom:14px;color:var(--accent);font-size:9px;font-weight:900;letter-spacing:.14em}
+.ref-preview-grid strong{display:block;position:relative;z-index:1;max-width:24ch;color:#edf8ff;font-size:16px;line-height:1.35}
+.ref-negocios .ref-preview-grid article{background:linear-gradient(145deg,#251709,#15100d)}
+.ref-investimentos .ref-preview-grid article{background:linear-gradient(145deg,#201b09,#10150e)}
+.ref-aion .ref-preview-grid article{background:linear-gradient(145deg,#07152e,#0d0f28)}
+
+.ref-mobile-kicker{position:relative;z-index:1;display:block;margin-bottom:5px;color:var(--accent);font-size:8px;font-weight:900;letter-spacing:.18em}
+@media(max-width:700px){
+ .ref-mobile-header::before{background:linear-gradient(90deg,#020917e8 0%,#020917c8 45%,#02091778 100%)}
+ .ref-mobile-header-investimentos::before{background:linear-gradient(90deg,#090a06ef 0%,#0a1209c9 46%,#10130768 100%)}
+ .ref-mobile-header-aion::before{background:linear-gradient(90deg,#020817ef 0%,#031128c4 45%,#07102a66 100%)}
+ .ref-mobile-header-negocios::before{background:linear-gradient(90deg,#100704ef 0%,#180b06c4 45%,#1a09055f 100%)}
+ .ref-investimentos .ref-mobile-card{border-color:#b9913c99;box-shadow:0 8px 22px #0004,0 0 16px #d8a93415}
+ .ref-investimentos .ref-mobile-card strong{color:#ffe8a9}
+ .ref-aion .ref-mobile-card{border-color:#347ed399;box-shadow:0 8px 22px #0004,0 0 18px #2b7fff16}
+ .ref-aion .ref-mobile-card strong{color:#d7e6ff}
+ .ref-negocios .ref-mobile-card{border-color:#a75d3799;box-shadow:0 8px 22px #0004,0 0 16px #ff812215}
+ .ref-negocios .ref-mobile-card strong{color:#ffd6c0}
+ .ref-preview-grid{grid-template-columns:1fr;gap:8px}
+ .ref-preview-grid article{min-height:92px;padding:14px}
+ .ref-preview-grid strong{font-size:14px}
+}
