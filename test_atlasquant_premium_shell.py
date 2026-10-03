@@ -200,13 +200,13 @@ class PremiumShellTests(unittest.TestCase):
             fast=False,
             ticker_items=tickers,
         )
-        self.assertIn('data-trader-reference="v1"', html)
-        self.assertIn("ATLASQUANT · TRADER", html)
+        self.assertIn('data-trader-reference="v3"', html)
+        self.assertIn("ATLASQUANT · ECOSSISTEMA", html)
         self.assertIn("Poderoso por dentro. Simples por fora.", html)
-        self.assertIn("Trader · Mercado & Estratégia", html)
-        self.assertIn("RADAR 28FX", html)
-        self.assertIn("PIPELINE 7 PARES", html)
-        self.assertIn("ORDENS REAIS BLOQUEADAS", html)
+        self.assertIn("ANÁLISE DA SEMANA", html)
+        self.assertIn("Mapa de Risco Global", html)
+        self.assertIn("GLOBAL INTELLIGENCE CORE", html)
+        self.assertIn("Guardião de Risco", html)
         self.assertIn("FORÇA 62", html)
         self.assertIn("FORÇA 43", html)
         self.assertNotIn("62%", html)
@@ -229,7 +229,7 @@ class PremiumShellTests(unittest.TestCase):
 
         fast_pages = ["🎯 Radar", "🎙️ Macro", "🎓 Aprender", "👤 Conta", "📱 Instalar", "💰 Investir", "🛟 Suporte"]
         fast_html = premium_catalog_html(mode="Iniciante", available_pages=fast_pages, fast=True)
-        self.assertIn('data-trader-reference="v1"', fast_html)
+        self.assertIn('data-trader-reference="v3"', fast_html)
         self.assertIn("INDISPONÍVEL", fast_html)
 
         state = {}

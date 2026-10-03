@@ -110,17 +110,17 @@ _AION_MODULES = _canonical_aion_modules()
 
 _CENTRAL_CSS = """
 <style>
-.aq-central-layout{display:grid;grid-template-columns:228px minmax(0,1fr);gap:16px;align-items:start;margin:0 0 18px}
+.aq-central-layout{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0;align-items:stretch;width:100%;margin:0 0 18px;min-height:760px;background:#020610;border:1px solid rgba(74,136,220,.14);border-radius:22px;overflow:hidden}
 .aq-central-rail{display:flex;flex-direction:column;gap:8px;min-width:0}
-.aq-central-rail-fold{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--aq-line);border-radius:18px;background:linear-gradient(180deg,rgba(12,18,36,.94),rgba(7,17,31,.92));box-shadow:0 16px 40px rgba(0,0,0,.22)}
+.aq-central-rail-fold{display:flex;flex-direction:column;gap:8px;height:100%;padding:10px 8px 16px;border:0;border-right:1px solid rgba(69,138,232,.18);border-radius:0;background:linear-gradient(180deg,#061326 0%,#030b18 100%);box-shadow:inset -12px 0 34px rgba(0,0,0,.25)}.aq-central-rail-logo{display:grid;place-items:center;width:54px;height:54px;margin:2px auto 2px;color:#e4f7ff;font-size:2rem;font-weight:1000;text-shadow:0 0 18px #2d9fff}
 .aq-central-rail-fold>summary{display:none;cursor:pointer;color:var(--aq-text);font-size:.78rem;font-weight:800;letter-spacing:.08em;list-style:none}
-.aq-central-kicker{color:var(--aq-warn);font-size:.62rem;font-weight:800;letter-spacing:.14em;margin:0 2px 2px}
-.aq-central-link{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-decoration:none;color:var(--aq-text);border:1px solid transparent;border-radius:14px;padding:10px 12px;background:rgba(8,16,32,.55)}
+.aq-central-kicker{color:#72cfff;font-size:.58rem;font-weight:900;letter-spacing:.14em;margin:0 2px 8px;text-align:center}
+.aq-central-link{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:78px;text-decoration:none;color:#aebed5;border:1px solid transparent;border-radius:13px;padding:8px 5px;background:rgba(5,15,31,.5);text-align:center}
 .aq-central-link small{color:var(--aq-muted);font-size:.68rem;font-weight:650}
-.aq-central-link strong{font-size:.92rem}
-.aq-central-priority{border-color:var(--aq-aion,#b48cff);box-shadow:inset 0 0 0 1px rgba(180,140,255,.28)}
-.aq-central-link[aria-current="page"]{background:rgba(180,140,255,.14)}
-.aq-central-stage{min-width:0}
+.aq-central-link strong{font-size:.62rem;line-height:1.15}.aq-central-link .aq-central-art{width:34px;height:28px}.aq-central-nav-icon{display:grid;place-items:center;width:30px;height:30px;color:#aebed5;font-size:1.15rem}.aq-central-link[aria-current="page"] .aq-central-nav-icon{color:#55c6ff;text-shadow:0 0 12px rgba(85,198,255,.8)}
+.aq-central-priority{border-color:rgba(67,166,255,.35);box-shadow:0 0 22px rgba(34,126,255,.12),inset 0 0 18px rgba(34,126,255,.08)}
+.aq-central-link[aria-current="page"]{color:#eef8ff;border-color:#268dff;background:linear-gradient(180deg,rgba(19,91,166,.55),rgba(6,33,72,.76));box-shadow:0 0 24px rgba(32,137,255,.22),inset 3px 0 0 #2aa8ff}
+.aq-central-stage{min-width:0;background:radial-gradient(circle at 52% 16%,rgba(15,91,170,.10),transparent 34rem),linear-gradient(180deg,#020914,#020610);}
 .aq-central-card,.aq-aion-module{border:1px solid var(--aq-line);border-radius:18px;padding:14px;background:linear-gradient(180deg,rgba(16,24,46,.92),rgba(7,17,31,.9));min-width:0}
 .aq-central-card h2,.aq-aion-module h3{margin:.35rem 0 .2rem;color:var(--aq-text);font-size:1rem}
 .aq-central-card p,.aq-aion-module p{margin:0;color:var(--aq-muted);font-size:.8rem;line-height:1.35}
@@ -139,11 +139,11 @@ _CENTRAL_CSS = """
 .aq-aion-presence-state{margin:.25rem 0 .4rem;color:var(--aq-text);font-size:.78rem;font-weight:800;letter-spacing:.08em}
 .aq-aion-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#8fd0c4;margin-right:6px}
 .aq-aion-presence-line{margin:.15rem 0;color:var(--aq-text);font-size:.92rem;line-height:1.4}
-.aq-central-root{position:relative;overflow:hidden;border:1px solid rgba(113,139,255,.22);border-radius:26px;padding:22px;background:radial-gradient(circle at 82% 10%,rgba(142,109,255,.12),transparent 28%),linear-gradient(145deg,rgba(10,18,38,.94),rgba(5,11,25,.94));box-shadow:0 24px 70px rgba(0,0,0,.3)}
-.aq-central-root:before{content:"";position:absolute;width:260px;height:260px;right:-120px;top:-150px;border-radius:50%;border:1px solid rgba(84,215,255,.16);box-shadow:0 0 70px rgba(84,215,255,.08);pointer-events:none}
+.aq-central-root{position:relative;overflow:hidden;border:0;border-radius:0;padding:0 20px 18px;background:transparent;box-shadow:none;min-height:760px}
+.aq-central-root:before{content:"";position:absolute;inset:auto 0 0;height:155px;background:radial-gradient(ellipse at 50% 110%,rgba(41,151,255,.40) 0%,rgba(16,66,130,.22) 30%,transparent 66%);border-top:1px solid rgba(77,157,255,.14);pointer-events:none}
 .aq-central-root>*{position:relative;z-index:1}
-.aq-central-root h2{margin:.2rem 0 .25rem;color:var(--aq-text);font-size:clamp(1.45rem,2.6vw,2rem);letter-spacing:-.02em}
-.aq-central-root-copy{margin:0 0 1rem;color:var(--aq-muted);font-size:.84rem}
+.aq-central-root h2{margin:.2rem 0 .15rem;color:#f6f8ff;font-size:clamp(1.65rem,2.6vw,2.2rem);letter-spacing:-.03em}
+.aq-central-root-copy{margin:0 0 1.1rem;color:#9ba9bf;font-size:.82rem}
 .aq-central-choices{display:grid;grid-template-columns:1fr;gap:12px}
 .aq-central-choice{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;min-height:168px;text-decoration:none;color:var(--aq-text);border:1px solid var(--aq-line);border-radius:20px;padding:16px;background:linear-gradient(180deg,rgba(18,28,52,.94),rgba(7,17,31,.92));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
 .aq-central-choice[data-central-area="trader"]{border-color:rgba(84,215,255,.28)}
@@ -156,15 +156,26 @@ _CENTRAL_CSS = """
 .aq-central-route{display:inline-flex;align-items:center;gap:5px;margin-top:3px;border:1px solid rgba(79,163,255,.34);border-radius:999px;padding:4px 8px;color:#dbeaff;font-size:.62rem;font-weight:850;letter-spacing:.06em;background:rgba(79,163,255,.08)}
 .aq-central-route:before{content:"";width:6px;height:6px;border-radius:50%;background:#8fd0c4}
 .aq-central-back{color:var(--aq-aion,#b48cff);font-weight:800;text-decoration:none}
-@media (min-width:900px){.aq-central-choices{grid-template-columns:1fr 1fr}}
+.aq-central-root>.aq-aion-presence{display:none}
+.aq-central-topbar{display:grid;grid-template-columns:minmax(230px,.8fr) minmax(280px,1.45fr) minmax(220px,.8fr);align-items:center;gap:18px;min-height:72px;margin:0 -20px 18px;padding:0 22px;border-bottom:1px solid rgba(69,139,232,.16);background:linear-gradient(180deg,rgba(3,12,26,.98),rgba(3,10,22,.94));box-shadow:0 12px 28px rgba(0,0,0,.22)}
+.aq-central-brand{display:flex;align-items:center;gap:10px;color:#f2f6ff;font-weight:950;letter-spacing:.12em}.aq-central-brand-mark{display:grid;place-items:center;width:42px;height:42px;font-size:1.65rem;font-weight:1000;color:#dff7ff;text-shadow:0 0 18px #36a9ff}.aq-central-brand-copy{display:flex;flex-direction:column}.aq-central-brand-copy strong{font-size:1rem}.aq-central-brand-copy small{color:#7f91aa;font-size:.53rem;letter-spacing:.08em}
+.aq-central-search{height:38px;border:1px solid rgba(113,158,218,.23);border-radius:20px;background:rgba(7,18,37,.72);color:#61748e;display:flex;align-items:center;padding:0 16px;font-size:.69rem}.aq-central-search:before{content:"⌕";margin-right:9px;color:#8ab5e6;font-size:1rem}
+.aq-central-user{display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#f4f7ff}.aq-central-user-icons{display:flex;gap:8px;color:#9fb5d1}.aq-central-avatar{display:grid;place-items:center;width:38px;height:38px;border:1px solid #3e80ff;border-radius:50%;background:linear-gradient(145deg,#102b58,#151c4f);box-shadow:0 0 18px rgba(61,122,255,.22);font-weight:900}.aq-central-user-copy{display:flex;flex-direction:column;line-height:1.15}.aq-central-user-copy strong{font-size:.72rem}.aq-central-user-copy small{color:#7f91aa;font-size:.57rem}
+.aq-central-welcome{text-align:center;margin:4px auto 18px}.aq-central-welcome h2{font-size:clamp(1.75rem,2.4vw,2.35rem);font-weight:680}.aq-central-welcome h2 b{color:#3b94ff}.aq-central-welcome p{margin:.25rem 0 0;color:#909db1;font-size:.82rem}
+.aq-central-footer{position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;min-height:118px;margin:14px 0 0;padding:26px 20px 14px;border:1px solid rgba(66,132,214,.16);border-radius:15px;background:radial-gradient(ellipse at 52% 118%,rgba(40,142,255,.48),rgba(11,48,100,.28) 34%,transparent 65%),linear-gradient(180deg,rgba(4,13,28,.72),rgba(2,8,18,.94))}.aq-central-footer:before{content:"";position:absolute;left:10%;right:10%;bottom:-78px;height:150px;border-radius:50% 50% 0 0;border-top:2px solid rgba(73,172,255,.5);box-shadow:0 -10px 44px rgba(40,140,255,.20)}.aq-central-footer>*{position:relative;z-index:1}.aq-central-footer strong{display:block;color:#f4f8ff;font-size:.85rem}.aq-central-footer span{color:#8e9bb0;font-size:.64rem}.aq-central-footer-brand{text-align:right;letter-spacing:.08em}.aq-central-footer-brand strong{font-size:1rem}
+@media (min-width:900px){.aq-central-choices{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .aq-aion-home .aq-hero{margin-bottom:8px}
 @media (max-width:760px){
-  .aq-central-layout{grid-template-columns:1fr;gap:10px}
-  .aq-central-root{padding:16px;border-radius:22px}
+  .aq-central-layout{grid-template-columns:1fr;gap:0;width:100%;margin:0 0 12px;border-radius:16px}
+  .aq-central-root{padding:0 16px 16px;border-radius:0;min-height:0}
+  .aq-central-topbar{grid-template-columns:1fr auto;margin:0 -16px 14px;padding:8px 12px;min-height:62px}
+  .aq-central-search{display:none}.aq-central-user-copy{display:none}.aq-central-brand-copy small{display:none}
   .aq-central-choice{min-height:150px}
+  .aq-central-rail{display:none}
   .aq-central-rail-fold{padding:8px}
   .aq-central-rail-fold>summary{display:flex;align-items:center;min-height:36px}
   .aq-central-link{padding:8px 10px}
+  .aq-central-footer{min-height:105px;flex-direction:column;align-items:flex-start}.aq-central-footer-brand{text-align:left}
   .aq-aion-grid{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion: reduce){
@@ -317,49 +328,67 @@ def sync_central_choice(session_state, access: Mapping[str, Any] | None, request
 
 def _svg_aion() -> str:
     return (
-        '<svg class="aq-central-art" viewBox="0 0 72 48" aria-hidden="true">'
-        '<g fill="none" stroke="#b48cff" stroke-width="1.4">'
-        '<circle cx="14" cy="30" r="3" fill="#b48cff"/>'
-        '<circle cx="32" cy="14" r="3.5" fill="#d8c6ff"/>'
-        '<circle cx="50" cy="24" r="3" fill="#b48cff"/>'
-        '<circle cx="62" cy="12" r="2" fill="#f2c14e"/>'
-        '<path d="M14 30 L32 14 L50 24 L62 12 M32 14 L50 36 M14 30 L50 24"/>'
-        '<circle cx="50" cy="36" r="2.4" fill="#f2c14e" stroke="none"/>'
-        "</g></svg>"
+        '<svg class="aq-central-art" viewBox="0 0 320 180" aria-hidden="true">'
+        '<defs><radialGradient id="aionOrb" cx="50%" cy="45%" r="58%">'
+        '<stop offset="0" stop-color="#8c44ff" stop-opacity=".88"/><stop offset=".58" stop-color="#35126f" stop-opacity=".82"/>'
+        '<stop offset="1" stop-color="#06091a" stop-opacity="0"/></radialGradient></defs>'
+        '<rect width="320" height="180" fill="#06081b"/><circle cx="244" cy="84" r="70" fill="url(#aionOrb)"/>'
+        '<g fill="none" stroke="#bb69ff" opacity=".62"><circle cx="244" cy="84" r="46"/><ellipse cx="244" cy="84" rx="46" ry="18"/>'
+        '<path d="M198 84h92M244 38c-13 13-20 29-20 46s7 33 20 46M244 38c13 13 20 29 20 46s-7 33-20 46"/></g>'
+        '<path d="M68 151 C55 122 58 94 75 72 C87 56 103 45 123 42 C144 38 159 45 170 60 C181 75 180 91 170 104'
+        ' C163 112 159 124 159 151 Z" fill="#120d32" stroke="#ba68ff" stroke-width="2"/>'
+        '<path d="M100 61 C116 50 139 53 151 67 L145 84 L132 90 L129 111 L115 121 L96 111 L88 88 Z"'
+        ' fill="#4a2587" stroke="#de9cff" stroke-width="1.5"/>'
+        '<circle cx="124" cy="78" r="5" fill="#e5b5ff"/><path d="M126 78 L165 64 M126 78 L171 95 M126 78 L152 126"'
+        ' stroke="#c978ff" stroke-width="1.2" opacity=".8"/><g fill="#d88cff"><circle cx="165" cy="64" r="3"/><circle cx="171" cy="95" r="3"/><circle cx="152" cy="126" r="3"/></g>'
+        '<path d="M18 148 H302" stroke="#8f4cff" stroke-opacity=".45"/><path d="M15 162 C90 139 229 141 305 160" stroke="#6224bf" fill="none" opacity=".7"/>'
+        '</svg>'
     )
 
 
 def _svg_business() -> str:
     return (
-        '<svg class="aq-central-art" viewBox="0 0 72 48" aria-hidden="true">'
-        '<g fill="none" stroke="#f2c14e" stroke-width="1.6">'
-        '<path d="M8 38 H64"/>'
-        '<path d="M12 34 L24 26 L34 30 L48 16 L62 12"/>'
-        '<path d="M54 12 H62 V20" stroke="#b48cff"/>'
-        "</g></svg>"
+        '<svg class="aq-central-art" viewBox="0 0 320 180" aria-hidden="true">'
+        '<defs><linearGradient id="bizBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#052c24"/><stop offset="1" stop-color="#06121b"/></linearGradient></defs>'
+        '<rect width="320" height="180" fill="url(#bizBg)"/><g opacity=".2" stroke="#38e5ad"><path d="M0 145H320M0 120H320M0 95H320"/>'
+        '<path d="M55 0V180M105 0V180M155 0V180M205 0V180M255 0V180"/></g>'
+        '<rect x="190" y="42" width="98" height="70" rx="5" fill="#09291f" stroke="#28dca2"/><path d="M202 92 L221 76 L238 83 L264 58 L279 63" fill="none" stroke="#67ffc9" stroke-width="3"/>'
+        '<g fill="#59462d" stroke="#8f7549"><rect x="104" y="94" width="53" height="42"/><rect x="151" y="80" width="56" height="56"/><rect x="72" y="113" width="42" height="30"/></g>'
+        '<g stroke="#d9b46f" opacity=".75"><path d="M104 108h53M151 96h56M72 125h42"/><path d="M130 94v42M179 80v56M93 113v30"/></g>'
+        '<path d="M27 82 h20 l9 45 h74 l11-34 H52" fill="none" stroke="#45f2ba" stroke-width="4" stroke-linejoin="round"/>'
+        '<circle cx="69" cy="139" r="7" fill="#0b2e25" stroke="#45f2ba" stroke-width="3"/><circle cx="119" cy="139" r="7" fill="#0b2e25" stroke="#45f2ba" stroke-width="3"/>'
+        '<path d="M16 153 H304" stroke="#35d9a5" stroke-opacity=".45"/></svg>'
     )
 
 
 def _svg_trader() -> str:
     return (
-        '<svg class="aq-central-art" viewBox="0 0 72 48" aria-hidden="true">'
-        '<g stroke="#9eb6d4" stroke-width="1.3">'
-        '<path d="M16 10 V34 M28 16 V38 M40 8 V30 M52 18 V40" fill="none"/>'
-        '<path d="M12 22 H20" stroke="#42d392"/>'
-        '<path d="M24 20 H32" stroke="#ff6b7a"/>'
-        '<path d="M36 14 H44" stroke="#42d392"/>'
-        '<path d="M48 26 H56" stroke="#f2c14e"/>'
-        "</g></svg>"
+        '<svg class="aq-central-art" viewBox="0 0 320 180" aria-hidden="true">'
+        '<defs><radialGradient id="earth" cx="45%" cy="35%" r="65%"><stop offset="0" stop-color="#2c9cff"/><stop offset=".55" stop-color="#103c87"/><stop offset="1" stop-color="#04132f"/></radialGradient></defs>'
+        '<rect width="320" height="180" fill="#04101f"/><circle cx="222" cy="88" r="74" fill="url(#earth)" stroke="#43b7ff" stroke-opacity=".75"/>'
+        '<g fill="none" stroke="#64c6ff" stroke-opacity=".38"><ellipse cx="222" cy="88" rx="74" ry="26"/><ellipse cx="222" cy="88" rx="30" ry="74"/>'
+        '<path d="M148 88h148M161 49c35 18 88 18 122 0M160 127c38-18 89-18 125 0"/></g>'
+        '<path d="M152 74l18-8 13 12 20-9 14 7 20-16 18 8 17-12" fill="none" stroke="#7ee6ff" stroke-width="2" opacity=".8"/>'
+        '<g stroke-width="2"><path d="M24 38v81" stroke="#6bbcff"/><path d="M18 55h12" stroke="#59e6b5"/><path d="M45 44v96" stroke="#7bbcff"/>'
+        '<path d="M39 78h12" stroke="#ff627b"/><path d="M67 26v100" stroke="#6bbcff"/><path d="M61 48h12" stroke="#59e6b5"/>'
+        '<path d="M90 50v91" stroke="#6bbcff"/><path d="M84 92h12" stroke="#f3c45e"/><path d="M112 34v82" stroke="#6bbcff"/><path d="M106 67h12" stroke="#59e6b5"/></g>'
+        '<polyline points="15,132 45,116 73,121 103,92 129,99 157,72 183,78 207,52" fill="none" stroke="#33b8ff" stroke-width="3"/>'
+        '<path d="M12 153 H307" stroke="#258ee5" stroke-opacity=".55"/></svg>'
     )
 
 
 def _svg_investments() -> str:
     return (
-        '<svg class="aq-central-art" viewBox="0 0 72 48" aria-hidden="true">'
-        '<g fill="none" stroke="#f2c14e" stroke-width="1.5">'
-        '<path d="M36 6 L58 16 V28 C58 38 36 44 36 44 C36 44 14 38 14 28 V16 Z"/>'
-        '<path d="M28 26 L34 32 L46 20" stroke="#b48cff"/>'
-        "</g></svg>"
+        '<svg class="aq-central-art" viewBox="0 0 320 180" aria-hidden="true">'
+        '<defs><radialGradient id="goldGlow"><stop stop-color="#e7a82f" stop-opacity=".38"/><stop offset="1" stop-color="#080d17" stop-opacity="0"/></radialGradient></defs>'
+        '<rect width="320" height="180" fill="#0d0c0a"/><circle cx="214" cy="73" r="100" fill="url(#goldGlow)"/>'
+        '<g fill="#b77616" stroke="#ffd36e" stroke-width="1.4"><ellipse cx="76" cy="131" rx="35" ry="9"/><path d="M41 110v21c0 5 16 9 35 9s35-4 35-9v-21"/>'
+        '<ellipse cx="76" cy="110" rx="35" ry="9"/><path d="M46 91v19c0 5 14 8 30 8s30-3 30-8V91"/><ellipse cx="76" cy="91" rx="30" ry="8"/>'
+        '<ellipse cx="159" cy="132" rx="29" ry="8"/><path d="M130 112v20c0 4 13 8 29 8s29-4 29-8v-20"/><ellipse cx="159" cy="112" rx="29" ry="8"/>'
+        '<ellipse cx="231" cy="134" rx="24" ry="7"/><path d="M207 120v14c0 4 11 7 24 7s24-3 24-7v-14"/><ellipse cx="231" cy="120" rx="24" ry="7"/></g>'
+        '<g fill="#986711" opacity=".72"><rect x="180" y="86" width="12" height="35"/><rect x="202" y="72" width="12" height="49"/><rect x="224" y="56" width="12" height="65"/><rect x="246" y="41" width="12" height="80"/></g>'
+        '<path d="M132 94 L164 78 L188 82 L215 58 L244 49 L268 25" fill="none" stroke="#ffd86e" stroke-width="4"/><path d="M255 26h15v15" fill="none" stroke="#ffe49b" stroke-width="4"/>'
+        '<path d="M25 153 H297" stroke="#c98e28" stroke-opacity=".55"/></svg>'
     )
 
 
@@ -390,7 +419,7 @@ _ART = {
 
 
 def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = None) -> str:
-    """Vertical ecosystem rail. Hidden areas are omitted from the markup."""
+    """Vertical ecosystem rail. Root follows the approved hub reference."""
     model = central_visibility_model(access)
     current = ""
     if str(active_area or "").strip() and not _explicit_root(active_area):
@@ -400,17 +429,34 @@ def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = Non
             current = "" if model["admin"] else "trader"
     elif not model["admin"]:
         current = "trader"
-    links = []
-    for area in model["areas"]:
-        area_id = area["id"]
-        current_attr = ' aria-current="page"' if area_id == current else ""
-        priority = " aq-central-priority" if area_id == model["priority_area"] else ""
-        label = escape(area["label"])
-        links.append(
-            f'<div class="aq-central-link{priority}" data-central-area="{area_id}"{current_attr}>'
-            f"{_ART[area_id]()}"
-            f"<strong>{label}</strong></div>"
+
+    links: list[str] = []
+    if model["admin"] and not current:
+        root_items = (
+            ("⌂", "Início", True),
+            ("♙", "Perfil", False),
+            ("♢", "Segurança", False),
+            ("⚙", "Configurações", False),
+            ("?", "Ajuda", False),
         )
+        for icon, label, active in root_items:
+            current_attr = ' aria-current="page"' if active else ""
+            links.append(
+                f'<div class="aq-central-link" data-central-nav="{escape(label.casefold())}"{current_attr}>'
+                f'<span class="aq-central-nav-icon">{escape(icon)}</span>'
+                f'<strong>{escape(label)}</strong></div>'
+            )
+    else:
+        for area in model["areas"]:
+            area_id = area["id"]
+            current_attr = ' aria-current="page"' if area_id == current else ""
+            priority = " aq-central-priority" if area_id == model["priority_area"] else ""
+            label = escape(area["label"])
+            links.append(
+                f'<div class="aq-central-link{priority}" data-central-area="{area_id}"{current_attr}>'
+                f"{_ART[area_id]()}"
+                f"<strong>{label}</strong></div>"
+            )
     body = "".join(links)
     return (
         _CENTRAL_CSS
@@ -418,6 +464,7 @@ def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = Non
         + '<nav class="aq-central-rail" aria-label="Ecossistema AtlasQuant">'
         + '<details class="aq-central-rail-fold" open>'
         + "<summary>Ecossistema</summary>"
+        + '<div class="aq-central-rail-logo" aria-hidden="true">A</div>'
         + '<div class="aq-central-kicker">ATLASQUANT</div>'
         + body
         + "</details></nav>"
@@ -782,16 +829,29 @@ def central_selector_html(
         confirmed_status=confirmed_status,
         timezone_name=timezone_name,
     )
+    # The hub reference uses the role label visually. The personalized AION
+    # greeting remains in the hidden/voice presence model and is not discarded.
+    display_name = "Administrador"
     return (
         '<section class="aq-central-root" data-root="central_root">'
+        '<header class="aq-central-topbar">'
+        '<div class="aq-central-brand"><span class="aq-central-brand-mark">A</span>'
+        '<span class="aq-central-brand-copy"><strong>ATLASQUANT</strong><small>PODEROSO POR DENTRO. SIMPLES POR FORA.</small></span></div>'
+        '<div class="aq-central-search">Buscar no ecossistema...</div>'
+        '<div class="aq-central-user"><span class="aq-central-user-icons">◌ ⚙</span>'
+        '<span class="aq-central-avatar">A</span><span class="aq-central-user-copy"><strong>Administrador</strong><small>AtlasQuant</small></span></div>'
+        '</header>'
         + presence
-        + '<p class="aq-aion-motto">Poderoso por dentro. Simples por fora.</p>'
-        + '<p class="aq-central-kicker">CENTRAL PRINCIPAL</p>'
-        "<h2>Central AtlasQuant</h2>"
-        '<p class="aq-central-root-copy">Escolha o ambiente que você quer abrir.</p>'
-        '<div class="aq-central-reference-grid">'
+        + '<section class="aq-central-welcome"><h2>Bem-vindo, <b>'
+        + display_name
+        + '</b></h2><p>Escolha uma área para acessar o seu ecossistema.</p></section>'
+        + '<div class="aq-central-reference-grid">'
         + "".join(choices)
-        + "</div></section>"
+        + '</div>'
+        + '<footer class="aq-central-footer"><div><strong>Um ecossistema completo<br>para você ir mais longe.</strong>'
+        '<span>CONHECIMENTO · ESTRATÉGIA · NEGÓCIOS · PATRIMÔNIO · INTELIGÊNCIA</span></div>'
+        '<div class="aq-central-footer-brand"><strong>ATLASQUANT</strong><span>PODEROSO POR DENTRO. SIMPLES POR FORA.</span></div></footer>'
+        + "</section>"
     )
 
 

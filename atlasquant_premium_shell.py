@@ -201,6 +201,22 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 @keyframes aq-orbit{from{transform:scaleX(.42) rotate(0)}to{transform:scaleX(.42) rotate(360deg)}}@keyframes aq-orbit-rev{from{transform:scaleY(.42) rotate(360deg)}to{transform:scaleY(.42) rotate(0)}}
 @media (prefers-reduced-motion:reduce){.aq-trader-globe:before,.aq-trader-globe:after{animation:none !important}}
 
+/* Reference-faithful Trader V3: dense cockpit matching the approved composition. */
+.aq-trader-shell[data-trader-reference="v3"]{padding:0;border-radius:18px;background:linear-gradient(180deg,#020a17,#020610);min-height:700px}
+.aq-trader-v3-grid{display:grid;grid-template-columns:154px minmax(0,1fr);min-height:700px}.aq-trader-v3-side{display:flex;flex-direction:column;padding:10px 7px;border-right:1px solid rgba(48,139,255,.35);background:linear-gradient(180deg,rgba(5,24,52,.98),rgba(2,10,25,.99));box-shadow:inset -12px 0 36px rgba(0,0,0,.3)}
+.aq-trader-v3-side-brand{display:flex;align-items:center;gap:7px;padding:2px 7px 10px;color:#fff;font-weight:950;font-size:.78rem;letter-spacing:.08em}.aq-trader-v3-side-brand b{display:grid;place-items:center;width:32px;height:32px;color:#e7fbff;font-size:1.35rem;text-shadow:0 0 16px #32aaff}
+.aq-trader-v3-nav{display:grid;gap:2px}.aq-trader-v3-nav span{display:flex;align-items:center;gap:7px;min-height:27px;padding:4px 7px;border:1px solid transparent;border-radius:7px;color:#c7d7eb;font-size:.58rem;font-weight:760}.aq-trader-v3-nav span:first-child{color:#fff;border-color:#2c92ff;background:linear-gradient(90deg,rgba(20,103,205,.78),rgba(7,37,82,.88));box-shadow:0 0 15px rgba(36,133,255,.25)}.aq-trader-v3-nav i{width:15px;text-align:center;color:#7fd8ff;font-style:normal}
+.aq-trader-v3-aion{margin-top:auto;border:1px solid #328fff;border-radius:11px;padding:8px;background:linear-gradient(160deg,rgba(18,70,135,.75),rgba(12,22,65,.92));box-shadow:0 0 20px rgba(35,132,255,.18)}.aq-trader-v3-aion strong{display:block;color:#7fe1ff;font-size:.75rem}.aq-trader-v3-aion small{display:block;color:#b8c9df;font-size:.53rem;margin:2px 0 6px}.aq-trader-v3-aion b{display:block;border:1px solid rgba(91,195,255,.38);border-radius:6px;padding:5px;color:#eefaff;font-size:.54rem;text-align:center}
+.aq-trader-v3-main{min-width:0;padding:7px 9px 9px;background:radial-gradient(circle at 51% 65%,rgba(26,108,255,.12),transparent 27rem)}
+.aq-trader-v3-head{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(260px,1fr) minmax(250px,.75fr);align-items:center;gap:10px;min-height:40px;border-bottom:1px solid rgba(70,157,255,.23)}.aq-trader-v3-title{color:#fff;font-weight:950;font-size:.76rem;letter-spacing:.08em}.aq-trader-v3-motto{text-align:center;color:#fff;font-weight:900;font-size:.77rem}.aq-trader-v3-tools{display:flex;justify-content:flex-end;align-items:center;gap:8px;color:#bed0e8;font-size:.55rem}.aq-trader-v3-search{min-width:125px;border:1px solid rgba(89,156,237,.25);border-radius:7px;padding:5px 8px;color:#627b99;background:rgba(5,17,37,.7)}
+.aq-trader-shell[data-trader-reference="v3"] .aq-trader-ticker{padding:6px 0}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick{min-width:91px;border-radius:8px;padding:5px 7px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick small{font-size:.48rem}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick strong{font-size:.62rem}
+.aq-trader-v3-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:2px 0 7px}.aq-trader-v3-tab{border:1px solid rgba(52,136,244,.48);border-radius:7px;padding:6px 5px;color:#dceaff;text-align:center;font-size:.54rem;font-weight:900;background:linear-gradient(180deg,rgba(13,57,119,.82),rgba(5,25,57,.88));box-shadow:inset 0 0 16px rgba(45,135,255,.08)}.aq-trader-v3-tab:first-child{border-color:#27a5ff;box-shadow:0 0 14px rgba(31,143,255,.25),inset 0 0 15px rgba(32,139,255,.13)}
+.aq-trader-v3-media{display:grid;grid-template-columns:1.75fr repeat(3,1fr);gap:7px;margin-bottom:7px}.aq-trader-v3-video{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;min-height:132px;border:1px solid rgba(56,151,255,.5);border-radius:9px;padding:9px;background:radial-gradient(circle at 50% 34%,rgba(42,122,255,.45),transparent 42%),linear-gradient(150deg,#123b79,#07172f 58%,#050c1d);box-shadow:inset 0 0 28px rgba(41,121,255,.12)}.aq-trader-v3-video.big{min-height:150px}.aq-trader-v3-video:before{content:"▶";position:absolute;left:50%;top:43%;transform:translate(-50%,-50%);display:grid;place-items:center;width:38px;height:38px;border:2px solid #dffaff;border-radius:50%;color:#fff;background:rgba(17,76,162,.58);box-shadow:0 0 18px #2a9bff}.aq-trader-v3-video.badge:after{content:"AO VIVO";position:absolute;left:8px;top:8px;border-radius:4px;padding:3px 6px;background:#ff315d;color:#fff;font-size:.48rem;font-weight:950}.aq-trader-v3-video strong{position:relative;color:#fff;font-size:.73rem;text-align:center}.aq-trader-v3-video small{position:relative;color:#a8bed9;font-size:.48rem;text-align:center;margin-top:2px}
+.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module{min-height:104px;padding:7px;border-radius:9px;text-align:center}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-icon{margin:auto;width:31px;height:31px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module small{font-size:.43rem;margin-top:5px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module h4{font-size:.62rem;margin:.15rem 0}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module p{font-size:.49rem;line-height:1.24;max-height:2.5em;overflow:hidden}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module .state{display:none}
+.aq-trader-v3-intel{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:7px;margin-top:7px}.aq-trader-v3-stack{display:grid;gap:6px}.aq-trader-v3-panel{border:1px solid rgba(52,142,250,.32);border-radius:8px;padding:7px;background:linear-gradient(160deg,rgba(7,30,63,.9),rgba(3,14,31,.95));min-height:76px}.aq-trader-v3-panel h4{margin:0 0 5px;color:#dff4ff;font-size:.58rem}.aq-trader-v3-lines{display:grid;gap:3px}.aq-trader-v3-lines span{display:flex;justify-content:space-between;gap:5px;color:#aebfd4;font-size:.46rem}.aq-trader-v3-lines b{color:#62e2ba;font-size:.45rem}.aq-trader-v3-center{position:relative;display:grid;place-items:center;min-height:170px;border:1px solid rgba(46,145,255,.4);border-radius:10px;background:radial-gradient(circle at 50% 55%,rgba(45,132,255,.27),transparent 46%),linear-gradient(180deg,rgba(4,21,48,.92),rgba(2,10,24,.97))}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-globe{width:138px;height:138px}.aq-trader-v3-center-label{position:absolute;bottom:8px;color:#9ec9ef;font-size:.48rem;font-weight:850;letter-spacing:.08em}
+.aq-trader-v3-shortcuts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:7px}.aq-trader-v3-shortcut{border:1px solid rgba(58,147,255,.35);border-radius:8px;padding:7px;text-align:center;background:linear-gradient(180deg,rgba(8,37,77,.88),rgba(4,17,38,.92));color:#e8f5ff;font-size:.53rem;font-weight:850}
+@media(max-width:1000px){.aq-trader-v3-grid{grid-template-columns:118px minmax(0,1fr)}.aq-trader-v3-media{grid-template-columns:1fr 1fr}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.aq-trader-v3-intel{grid-template-columns:1fr}.aq-trader-v3-head{grid-template-columns:1fr}.aq-trader-v3-tools{justify-content:flex-start}}
+@media(max-width:600px){.aq-trader-v3-grid{grid-template-columns:1fr}.aq-trader-v3-side{display:none}.aq-trader-v3-tabs{grid-template-columns:1fr 1fr}.aq-trader-v3-media{grid-template-columns:1fr}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-trader-v3-shortcuts{grid-template-columns:1fr 1fr}.aq-trader-v3-main{padding:7px}.aq-trader-v3-motto{text-align:left}}
 @media (prefers-reduced-motion:reduce){
   .aq-premium-row{scroll-behavior:auto}
   .aq-premium-card,.aq-radar-dot,.aq-radar-sweep{animation:none !important}
@@ -752,12 +768,16 @@ def trader_cockpit_html(
     tickers = list(ticker_items or [])
     if not tickers:
         tickers = [
-            {"label": "FOREX", "value": "28 PARES"},
-            {"label": "DXY", "value": "CONTEXTO"},
-            {"label": "ÍNDICES", "value": "ÁREA"},
-            {"label": "CRIPTO", "value": "ÁREA"},
-            {"label": "COMMODITIES", "value": "ÁREA"},
-            {"label": "RISCO", "value": "GUARDIÃO"},
+            {"label": "DXY", "value": "PRÉVIA"},
+            {"label": "EURUSD", "value": "PRÉVIA"},
+            {"label": "GBPUSD", "value": "PRÉVIA"},
+            {"label": "USDJPY", "value": "PRÉVIA"},
+            {"label": "BTCUSD", "value": "PRÉVIA"},
+            {"label": "SPX500", "value": "PRÉVIA"},
+            {"label": "NASDAQ", "value": "PRÉVIA"},
+            {"label": "WIN", "value": "PRÉVIA"},
+            {"label": "PETR4", "value": "PRÉVIA"},
+            {"label": "VALE3", "value": "PRÉVIA"},
         ]
     ticker_html = "".join(_trader_score_chip(item) for item in tickers[:10])
 
@@ -780,46 +800,46 @@ def trader_cockpit_html(
         )
 
     mode_label = "INICIANTE" if beginner else "AVANÇADO"
+    nav_items = (
+        "Início", "Radar", "Macro", "Micro", "Geopolítica", "Fundamentalista",
+        "Calendário", "Pré-Notícia", "Vídeos", "Análises", "Backtest", "Paper Trading",
+        "Guardião de Risco", "Investimentos", "Negócios", "Corretoras", "Comunidade", "Configurações",
+    )
+    nav_html = "".join(
+        f'<span><i>{"⌂" if index == 0 else "◇"}</i>{escape(label)}</span>'
+        for index, label in enumerate(nav_items)
+    )
     return (
-        '<section class="aq-trader-shell" data-trader-reference="v1" aria-label="Cockpit Trader AtlasQuant">'
-        '<div class="aq-trader-topline">'
-        '<div class="aq-trader-brand"><span class="aq-trader-brand-mark">A</span>'
-        '<span>ATLASQUANT · TRADER</span></div>'
-        '<div class="aq-trader-motto">Poderoso por dentro. Simples por fora.</div>'
+        '<section class="aq-trader-shell" data-trader-reference="v3" aria-label="Cockpit Trader AtlasQuant">'
+        '<div class="aq-trader-v3-grid">'
+        '<aside class="aq-trader-v3-side"><div class="aq-trader-v3-side-brand"><b>A</b><span>ATLASQUANT</span></div>'
+        f'<div class="aq-trader-v3-nav">{nav_html}</div>'
+        '<div class="aq-trader-v3-aion"><strong>AION</strong><small>Assistente de IA</small><b>Converse com o AION ›</b></div></aside>'
+        '<main class="aq-trader-v3-main">'
+        '<header class="aq-trader-v3-head"><div class="aq-trader-v3-title">ATLASQUANT · ECOSSISTEMA</div>'
+        '<div class="aq-trader-v3-motto">Poderoso por dentro. Simples por fora.</div>'
+        f'<div class="aq-trader-v3-tools"><span class="aq-trader-v3-search">⌕ Buscar no AtlasQuant...</span><span>● ONLINE</span><span>MODO {mode_label}</span></div></header>'
+        f'<div class="aq-trader-ticker" aria-label="Ativos em prévia">{ticker_html}</div>'
+        '<div class="aq-trader-v3-tabs"><div class="aq-trader-v3-tab">VISÃO GERAL</div><div class="aq-trader-v3-tab">ANÁLISE DA SEMANA</div>'
+        '<div class="aq-trader-v3-tab">ANÁLISE DO DIA</div><div class="aq-trader-v3-tab">FECHAMENTO DO DIA</div><div class="aq-trader-v3-tab">FECHAMENTO SEMANAL</div></div>'
+        '<div class="aq-trader-v3-media">'
+        '<article class="aq-trader-v3-video big badge"><strong>ANÁLISE DA SEMANA</strong><small>FOREX · CRIPTO · ÍNDICES · COMMODITIES · AÇÕES</small></article>'
+        '<article class="aq-trader-v3-video"><strong>ANÁLISE DO DIA</strong><small>Panorama e oportunidades</small></article>'
+        '<article class="aq-trader-v3-video"><strong>FECHAMENTO DO DIA</strong><small>O que realmente aconteceu</small></article>'
+        '<article class="aq-trader-v3-video"><strong>FECHAMENTO SEMANAL</strong><small>Comparativo completo</small></article>'
         '</div>'
-        f'<div class="aq-trader-ticker" aria-label="Força e contexto">{ticker_html}</div>'
-        '<div class="aq-trader-lenses">'
-        '<div class="aq-trader-lens"><small>VISÃO</small><strong>GLOBAL</strong></div>'
-        '<div class="aq-trader-lens"><small>LEITURA</small><strong>MACRO & MICRO</strong></div>'
-        '<div class="aq-trader-lens"><small>CONTEXTO</small><strong>GEO & FUNDAMENTOS</strong></div>'
-        '<div class="aq-trader-lens"><small>VALIDAÇÃO</small><strong>ICT / SMC & RISCO</strong></div>'
-        '</div>'
-        '<div class="aq-trader-stage">'
-        '<article class="aq-trader-sidepanel"><small>MERCADOS GLOBAIS</small><h3>Mapa de contexto</h3>'
-        '<p>Intermercado, eventos e geopolítica ficam visíveis como contexto. Relação observada não vira causalidade automática.</p>'
-        '<div class="aq-trader-side-list"><span>Forex <b>28 PARES</b></span><span>Índices <b>SEPARADOS</b></span>'
-        '<span>Cripto <b>SEPARADO</b></span><span>Commodities <b>CONTEXTO</b></span></div></article>'
-        '<article class="aq-trader-core"><div class="aq-trader-globe"><div class="aq-trader-core-logo">A</div></div>'
-        '<h2>Trader · Mercado & Estratégia</h2>'
-        '<p>Macro direciona. ICT/SMC localiza. O Guardião de Risco pode vetar. Dado insuficiente continua sendo não operar.</p>'
-        '<div class="aq-trader-core-status"><span>RADAR 28FX</span><span>PIPELINE 7 PARES</span>'
-        f'<span>MODO {mode_label}</span><span>ORDENS REAIS BLOQUEADAS</span></div></article>'
-        '<article class="aq-trader-sidepanel"><small>VISÃO ESTRATÉGICA</small><h3>Leitura por camadas</h3>'
-        '<p>O cockpit organiza as áreas existentes sem criar motor novo, score novo ou autorização operacional.</p>'
-        '<div class="aq-trader-side-list"><span>Macro <b>CENÁRIO</b></span><span>Eventos <b>RISCO</b></span>'
-        '<span>ICT / SMC <b>TIMING</b></span><span>Safety Core <b>VETO</b></span></div></article>'
-        '</div>'
-        '<div class="aq-trader-modules-title"><h3>Áreas principais do Trader</h3>'
-        '<span>Os controles reais de abertura ficam logo abaixo.</span></div>'
         f'<div class="aq-trader-module-grid">{"".join(module_cards)}</div>'
-        '<div class="aq-trader-bottom">'
-        '<article class="aq-trader-bottom-card"><small>MAPA GLOBAL</small><strong>Intermarket & risco</strong>'
-        '<p>Contexto cruzado sem transformar correlação em certeza.</p></article>'
-        '<article class="aq-trader-bottom-card"><small>RANKING</small><strong>Força & oportunidades</strong>'
-        '<p>Ranking é evidência de leitura; não é probabilidade de lucro.</p></article>'
-        '<article class="aq-trader-bottom-card"><small>AION</small><strong>Explicação integrada</strong>'
-        '<p>O AION organiza contexto e evidências, sujeito às permissões do Core.</p></article>'
-        '</div></section>'
+        '<div class="aq-trader-v3-intel">'
+        '<div class="aq-trader-v3-stack"><section class="aq-trader-v3-panel"><h4>Mapa de Risco Global</h4><div class="aq-trader-v3-lines">'
+        '<span>EUA <b>INFLAÇÃO</b></span><span>Europa <b>JUROS</b></span><span>China <b>ATIVIDADE</b></span><span>América Latina <b>RISCO POLÍTICO</b></span></div></section>'
+        '<section class="aq-trader-v3-panel"><h4>Notícias em Tempo Real</h4><div class="aq-trader-v3-lines"><span>Feed validado <b>PRÉVIA</b></span><span>Fontes e horário <b>RASTREÁVEIS</b></span></div></section></div>'
+        '<section class="aq-trader-v3-center"><div class="aq-trader-globe"><div class="aq-trader-core-logo">A</div></div><span class="aq-trader-v3-center-label">GLOBAL INTELLIGENCE CORE</span></section>'
+        '<div class="aq-trader-v3-stack"><section class="aq-trader-v3-panel"><h4>Viés Atual do Mercado</h4><div class="aq-trader-v3-lines"><span>DXY <b>PRÉVIA</b></span><span>EURUSD <b>PRÉVIA</b></span><span>NASDAQ <b>PRÉVIA</b></span><span>BTCUSD <b>PRÉVIA</b></span></div></section>'
+        '<section class="aq-trader-v3-panel"><h4>Calendário & Geopolítica</h4><div class="aq-trader-v3-lines"><span>Eventos econômicos <b>CONTEXTO</b></span><span>Alertas geopolíticos <b>CONTEXTO</b></span></div></section></div>'
+        '</div>'
+        '<div class="aq-trader-v3-shortcuts"><div class="aq-trader-v3-shortcut">Academy</div><div class="aq-trader-v3-shortcut">Laboratório</div>'
+        '<div class="aq-trader-v3-shortcut">Paper Trading</div><div class="aq-trader-v3-shortcut">Guardião de Risco</div><div class="aq-trader-v3-shortcut">Treasury & Growth</div></div>'
+        '</main></div></section>'
     )
 
 

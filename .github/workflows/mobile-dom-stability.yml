@@ -432,7 +432,7 @@ jobs:
                       "slogan_present":False,
                       "module_order_ok":False,
                   }
-                  shell=visual_page.locator('.aq-trader-shell[data-trader-reference="v1"]').first
+                  shell=visual_page.locator('.aq-trader-shell[data-trader-reference="v3"]').first
                   if shell.count():
                       cockpit["present"]=True
                       cockpit["module_count"]=visual_page.locator(".aq-trader-module").count()
@@ -466,7 +466,7 @@ jobs:
                           "(el)=>({color:getComputedStyle(el).color,fontWeight:getComputedStyle(el).fontWeight})"
                       )
                   card_samples={}
-                  for selector in (".aq-home-grid span",".aq-home-state",".aq-trader-module h4",".aq-trader-module p",".aq-trader-motto"):
+                  for selector in (".aq-home-grid span",".aq-home-state",".aq-trader-module h4",".aq-trader-module p",".aq-trader-v3-motto"):
                       node=visual_page.locator(selector).first
                       if node.count():
                           card_samples[selector]=node.evaluate(
