@@ -21,6 +21,7 @@ from aion_chat.models import ActionClass, Scope
 from atlasquant_aion_action_receipt import seal_action_receipt
 from atlasquant_aion_cognitive_orchestrator import route_specialists
 from atlasquant_aion_internal_roles import internal_roles_snapshot
+from atlasquant_aion_role_authority import official_role_authority_matrix
 from atlasquant_aion_model_router import route_intelligence
 from atlasquant_aion_orchestrator import orchestrate
 from atlasquant_aion_truth import assess_truth
@@ -146,17 +147,24 @@ class AionResponse:
 
 def official_roles_snapshot() -> dict[str, Any]:
     legacy = internal_roles_snapshot()
-    rows = [
-        {
+    matrix = official_role_authority_matrix()
+    authority_by_role = {row["role_id"]: dict(row) for row in matrix["roles"]}
+    rows = []
+    for role_id, label in OFFICIAL_ROLES:
+        authority = authority_by_role[role_id]
+        rows.append({
             "role_id": role_id,
             "label": label,
             "legacy_role_ids": list(LEGACY_ROLE_COMPATIBILITY[role_id]),
             "shared_core": True,
             "independent_ai": False,
             "external_action_authority": False,
-        }
-        for role_id, label in OFFICIAL_ROLES
-    ]
+            "may_approve_critical": authority["may_approve_critical"],
+            "may_execute_external_without_explicit_approval": authority[
+                "may_execute_external_without_explicit_approval"
+            ],
+            "authority": authority,
+        })
     return {
         "schema": SCHEMA,
         "count": len(rows),
@@ -164,6 +172,10 @@ def official_roles_snapshot() -> dict[str, Any]:
         "single_shared_aion_core": True,
         "legacy_registry_schema": legacy.get("schema"),
         "legacy_registry_preserved": True,
+        "authority_matrix_schema": matrix["schema"],
+        "human_owner_retains_critical_approval": (
+            matrix.get("critical_approval_owner") == "HUMAN_OWNER"
+        ),
         "execution_authority": False,
     }
 
@@ -273,6 +285,7 @@ def process_aion_request(
     if not isinstance(request, AionRequest):
         raise TypeError("AionRequest required")
     _validate_source_scope(request)
+    approved_exact = approved is True
 
     action_class = classify_action(str(request.requested_action or "query")).value
     selected_role, supporting_roles = select_official_role(request)
@@ -299,7 +312,7 @@ def process_aion_request(
         },
         evidence=request.evidence,
         requested_action=core_action,
-        approved=approved,
+        approved=approved_exact,
     )
 
     model_route = route_intelligence(
@@ -308,13 +321,13 @@ def process_aion_request(
         external_feature_enabled=external_feature_enabled,
         budget=budget,
         estimated_request_cost_usd=0.0,
-        request_approved=approved,
+        request_approved=approved_exact,
         force_private=False,
     )
 
     pending = []
     warnings = []
-    if action_class == ActionClass.REQUIRES_APPROVAL.value and not approved:
+    if action_class == ActionClass.REQUIRES_APPROVAL.value and not approved_exact:
         pending.append({
             "kind": "EXPLICIT_APPROVAL_REQUIRED",
             "action": request.requested_action,
@@ -353,7 +366,7 @@ def process_aion_request(
             "policy_ref": SCHEMA,
             "guardian": core.get("guardian") or {},
             "evidence_refs": evidence_refs,
-            "approval_refs": [request.request_id] if approved else [],
+            "approval_refs": [request.request_id] if approved_exact else [],
             "capability": (core.get("selected_capability") or {}).get("capability_id") or "UNRESOLVED",
             "tool_id": "aion-unified-runtime",
             "state": state,

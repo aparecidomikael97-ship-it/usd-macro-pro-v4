@@ -1,101 +1,157 @@
-# AION Unified Core V2.1 — hardening e adapters
+# AION Unified Core V2.1 — hardening, adapters e continuidade
 
 ## Base
 
-Esta etapa é stacked sobre a Draft PR #550, branch `integration/aion-unified-core-v2-20261003`.
+Esta etapa permanece stacked sobre a Draft PR #550, branch `integration/aion-unified-core-v2-20261003`.
 
-Ela não toca na PR #551 da interface e não liga o Chat AION ao app principal.
+Ela continua separada da PR #551 da interface. Não liga o Chat AION ao app principal, não faz merge, deploy, chamada de provider externo, transação financeira nem trade real.
 
-## Objetivos implementados nesta etapa
+## Bloco V2.1A — Chat, Checkpoint Mestre e Biblioteca
 
 ### Browser reduced-motion
 
-O teste do Chat verificava `transitionDuration` com uma avaliação crua imediatamente após abrir uma conversa. O fluxo `open()` chama `list()`, que reconstrói os botões `.conversation` via `replaceChildren()`. Isso permite que uma avaliação pontual alcance um nó durante a substituição do DOM.
+O contrato Chromium foi estabilizado para o fluxo em que `chat.js` reconstrói os cards `.conversation` com `replaceChildren()`. O teste re-resolve o elemento conectado e usa retry nativo do Playwright sem afrouxar o contrato:
 
-O contrato foi mantido, mas agora usa assertions Playwright com retry sobre o locator re-resolvido:
-
-- `matchMedia('(prefers-reduced-motion: reduce)') == true`;
+- `prefers-reduced-motion: reduce` confirmado;
 - elemento anexado;
 - `transition-duration: 0s`;
 - `transform: none`.
 
-O gate específico executa o browser cinco vezes em sequência para expor flakiness.
+O gate específico executa o browser cinco vezes em sequência.
 
 ### Chat -> Checkpoint Mestre
 
-`atlasquant_aion_chat_checkpoint_adapter.py` implementa o contrato `CheckpointMasterAdapter` sobre o `CheckpointCoreStore` existente.
-
-Princípios:
+`atlasquant_aion_chat_checkpoint_adapter.py` implementa o bridge sobre o `CheckpointCoreStore` existente:
 
 - scope owner/tenant/workspace validado;
 - export canônico com digest;
 - nenhuma gravação automática;
-- receipt de aprovação obrigatório;
-- receipt vinculado ao digest do payload;
-- replay para payload diferente é rejeitado;
-- repetição idêntica é idempotente;
-- o conteúdo da conversa não é promovido para fato/decisão;
-- o Core recebe somente uma âncora `CURRENT_STATE` com digest, conversa e sequência;
-- a âncora usa `Origin.UNKNOWN`, portanto não se disfarça de memória aprovada;
-- o bundle produzido continua no fluxo explícito do Checkpoint Mestre.
+- receipt de aprovação obrigatório e vinculado ao digest;
+- replay para payload diferente rejeitado;
+- repetição idêntica idempotente;
+- conversa não vira decisão ou fato oficial automaticamente;
+- Core recebe apenas âncora de export aprovado;
+- nenhuma promoção automática para memória.
 
 ### Chat -> Biblioteca AION
 
-`atlasquant_aion_chat_library_adapter.py` reutiliza:
+`atlasquant_aion_chat_library_adapter.py` mantém anexos como dados não confiáveis:
 
-- validação de anexos do Chat;
-- `stage_pdf_document`;
-- `ingest_document`;
-- `search_library_index`.
+- quarentena por padrão;
+- hash, tamanho, nome e MIME real validados;
+- PDF reutiliza pipeline existente;
+- TXT entra somente como documento staged/reviewável;
+- nenhum index, review, provider ou memory promotion automático;
+- retrieval permanece isolado por tenant/workspace.
 
-Princípios:
+O bridge agora também rejeita índices forjados como "revisados" quando o schema, estado do documento, estado da passagem ou vínculo documento/passagem não satisfazem o contrato real da Library.
 
-- anexo começa em quarentena;
-- hash, tamanho, nome e MIME real devem coincidir com os metadados;
-- análise requer ação explícita;
-- PDF usa o pipeline PDF existente;
-- TXT pode ser staged na Library Foundation;
-- outros MIME permanecem `REVIEW_REQUIRED`;
-- nenhuma revisão administrativa automática;
-- nenhum index automático;
-- nenhum provider;
-- nenhuma promoção para memória;
-- retrieval aceita somente índice já revisado instalado para o mesmo tenant/workspace.
+## Bloco V2.1B — continuidade do núcleo
 
-## Segurança / isolamento
+### Unified Request Event Journal
 
-Testes novos cobrem:
+`atlasquant_aion_unified_journal.py` cria uma trilha específica do lifecycle do request unificado, separada do journal de eventos de mercado.
 
-- cross-tenant no checkpoint;
-- payload de checkpoint alterado após aprovação;
-- receipt ausente;
-- replay do mesmo receipt para payload diferente;
-- idempotência;
-- digest/tamanho/MIME de anexo;
-- path traversal;
-- quarentena sem análise explícita;
-- retrieval isolado por tenant/workspace.
+Características:
 
-## CI stacked
+- scope owner/tenant/workspace/request;
+- cadeia de hash por evento;
+- revision/head digest verificáveis;
+- metadata limitada e secret-redacted;
+- detecção de tamper e replay cross-tenant;
+- journal não autoriza execução, não promove memória e não grava Checkpoint Mestre.
 
-Durante esta Draft PR, os workflows relevantes aceitam também a branch-base da #550 para validar o delta V2.1 antes da integração:
+### Durable / Recovery
+
+`atlasquant_aion_unified_durable_bridge.py` liga o preflight unificado ao `atlasquant_aion_durable_tasks.py` existente sem criar um segundo motor de tarefas.
+
+O handoff registra o preflight já concluído e preserva a continuação como `PAUSED`, `WAITING_APPROVAL` ou `BLOCKED`.
+
+Recovery:
+
+- exige journal íntegro e mesmo request/scope;
+- respeita digest do checkpoint e optimistic revision;
+- restaura cursor/contexto somente;
+- não executa próximo passo;
+- não limpa aprovação pendente;
+- não faz restore externo automático.
+
+### Matriz dos 8 papéis
+
+`atlasquant_aion_role_authority.py` formaliza os oito papéis oficiais:
+
+1. Orquestrador / Núcleo;
+2. Arquiteto / Estrategista;
+3. Guardião / Auditor;
+4. Prime / Execução;
+5. Shadow / Pesquisa e Triagem;
+6. Sentinel / Monitoramento;
+7. Comercial / Leads e CRM;
+8. Educador / Treinamento.
+
+Todos continuam responsabilidades do mesmo AION Core. Nenhum papel pode sozinho:
+
+- conceder aprovação crítica;
+- executar ação externa sem gates;
+- promover memória automaticamente;
+- gravar checkpoint automaticamente;
+- mergear `main`;
+- deployar produção;
+- gastar dinheiro;
+- ler credenciais;
+- habilitar trade real.
+
+Aprovação crítica permanece com o proprietário humano. Mesmo uma aprovação humana explícita não equivale, por si só, à execução: o downstream execution gate continua obrigatório.
+
+### Truth / Knowledge mapping
+
+`atlasquant_aion_truth_mapping.py` reconcilia, de forma fail-closed, os estados do evidence engine com os estados da Biblioteca.
+
+Regras centrais:
+
+- `VALIDATED + SUPPORTED` pode ser mapeado a `CONFIRMED`, sem ganhar autoridade de decisão e sem promoção automática de memória;
+- `CONFLICTING`, `STALE`, `QUARANTINED`, `REVIEW_REQUIRED` e `REJECTED` nunca viram fato operacional confirmado;
+- conflito preserva retrieval para revisão quando permitido, mas o runtime recebe `UNKNOWN`;
+- conhecimento revisado ainda passa por quarantine/policy antes de memória.
+
+### Aprovação estritamente booleana
+
+O runtime unificado agora considera aprovação somente quando `approved is True`. Valores truthy como `"yes"`, `"true"` ou `1` não liberam o gate nem entram como approval receipt.
+
+## Testes adversariais V2.1
+
+`test_atlasquant_aion_unified_hardening_v21.py` cobre:
+
+- tamper da cadeia do journal;
+- replay cross-tenant;
+- metadata secreta;
+- checkpoint drift;
+- recovery com journal alterado;
+- preservação de `WAITING_APPROVAL`;
+- fake approvals truthy;
+- autoridade crítica dos oito papéis;
+- truth mapping conflitante/stale/quarentena/rejeitado;
+- índice revisado forjado;
+- retrieval conflitante sem promoção para fato confirmado.
+
+## CI
+
+Os gates específicos do AION aceitam a branch-base da #550 enquanto esta PR stacked está em revisão:
 
 - AION Unified Core;
-- AION Core Security Gate;
-- Quality tests;
-- AtlasQuant Release Readiness.
+- AION Core Security Gate.
 
-Os testes de browser do Chat rodam cinco vezes no gate específico.
+Os workflows globais `Quality tests` e `AtlasQuant - Release Readiness` permanecem `main`-only, preservando o contrato de produção. O Quality completo será exercitado quando a cadeia chegar à integração normal contra `main`.
 
-## Limites desta etapa
+## Limites remanescentes
 
-Ainda não implementado nesta revisão:
+Continuam fora desta revisão:
 
-- journal genérico do request unificado;
-- bridge para durable/recovery;
-- matriz aprofundada de autoridade dos oito papéis;
-- truth/knowledge state adapter;
 - provider runtime real;
-- ligação do Chat à UI principal.
+- ligação do Chat AION à UI principal;
+- merge/deploy;
+- execução externa;
+- trade real;
+- ação financeira.
 
 Nada nesta etapa executa ação externa, provider real, trade, merge ou deploy.

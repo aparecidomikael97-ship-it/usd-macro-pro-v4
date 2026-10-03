@@ -15,7 +15,13 @@ from typing import Any, Mapping
 from aion_chat.attachments import detect_mime, sanitize_name, validate_metadata
 from aion_chat.models import Attachment, Scope
 from atlasquant_aion_library_foundation import ingest_document
-from atlasquant_aion_library_index import empty_library_index, search_library_index
+from atlasquant_aion_library_index import (
+    INDEXABLE_STATES,
+    SCHEMA as LIBRARY_INDEX_SCHEMA,
+    empty_library_index,
+    search_library_index,
+)
+from atlasquant_aion_truth_mapping import map_truth_knowledge_state
 from atlasquant_aion_library_pdf_ingestion import stage_pdf_document
 
 SCHEMA = "ATLASQUANT_AION_CHAT_LIBRARY_ADAPTER_V1"
@@ -136,17 +142,37 @@ class AionChatLibraryAdapter:
         if not isinstance(scope, Scope):
             raise TypeError("Scope required")
         state = deepcopy(dict(index or empty_library_index()))
+        if state.get("schema") != LIBRARY_INDEX_SCHEMA:
+            raise ValueError("invalid library index schema")
         docs = [x for x in list(state.get("documents") or []) if isinstance(x, Mapping)]
         passages = [x for x in list(state.get("passages") or []) if isinstance(x, Mapping)]
-        for row in [*docs, *passages]:
+
+        doc_ids: set[str] = set()
+        for row in docs:
             if row.get("tenant_id") != scope.tenant_id or row.get("workspace_id") != scope.workspace_id:
                 raise ValueError("library index crosses scope")
+            if row.get("state") not in INDEXABLE_STATES:
+                raise ValueError("library index contains unreviewed document")
+            document_id = str(row.get("document_id") or "").strip()
+            if not document_id or document_id in doc_ids:
+                raise ValueError("library index document identity invalid")
+            doc_ids.add(document_id)
+
+        for row in passages:
+            if row.get("tenant_id") != scope.tenant_id or row.get("workspace_id") != scope.workspace_id:
+                raise ValueError("library index crosses scope")
+            if row.get("state") != "INDEXED":
+                raise ValueError("library index contains unreviewed passage")
+            if str(row.get("document_id") or "").strip() not in doc_ids:
+                raise ValueError("library index passage references unknown document")
+
         self._indexes[_scope_key(scope)] = state
         return {
             "schema": SCHEMA,
             "status": "REVIEWED_INDEX_INSTALLED",
             "documents": len(docs),
             "passages": len(passages),
+            "truth_mapping_enforced": True,
             "memory_promoted": False,
             "external_persisted": False,
         }
@@ -161,7 +187,19 @@ class AionChatLibraryAdapter:
             trusted_context=_trusted_scope(scope),
             limit=20,
         )
-        return [dict(x) for x in list(result.get("hits") or [])]
+        hits = []
+        for item in list(result.get("hits") or []):
+            row = dict(item)
+            mapping = map_truth_knowledge_state(
+                evidence_truth_state=row.get("truth_state"),
+                library_state=row.get("document_state"),
+                library_truth_state=row.get("truth_state"),
+            )
+            row["runtime_truth_state"] = mapping["operational_truth_state"]
+            row["usable_as_confirmed_fact"] = mapping["usable_as_confirmed_fact"]
+            row["truth_mapping"] = mapping
+            hits.append(row)
+        return hits
 
 
 __all__ = ["SCHEMA", "AionChatLibraryAdapter"]
