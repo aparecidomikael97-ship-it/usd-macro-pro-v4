@@ -14,7 +14,8 @@ def resident_fixture():
     rows = [dict(pair=pair, priority=90-i, data_score=90, data_ready=True,
                  provenance_state='CONFIRMADA', evidence_source='TEST FIXTURE',
                  pipeline={'ranking':'ELEGÍVEL PARA ESTUDO'}, session_match='MATCH',
-                 action='NÃO OPERAR', reason='Synthetic test evidence')
+                 action='NÃO OPERAR', reason='Synthetic test evidence',
+                 signal={'status_code':'CONFIRMED','valid_until':(now+timedelta(minutes=30)).isoformat()})
             for i,pair in enumerate(OFFICIAL_PAIRS)]
     return {'rows':rows,'freshness':{'state':'VALIDATED_SNAPSHOT',
             'generated_at':now.isoformat(),'source':'TEST FIXTURE'}}, now

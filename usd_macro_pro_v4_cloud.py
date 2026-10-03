@@ -2326,17 +2326,12 @@ if _aq_early_pages:
     except Exception:
         pass
 _hold_admin_before_trader_shell()
-# UI-only early return: the cockpit needs no provider, scanner or snapshot fetch.
-# The existing authenticated access and central area gates run before this point.
-if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
-    from atlasquant_reference_ui import render_trader_entry
-    if render_trader_entry(st, _ATLASQUANT_ACCESS):
-        st.stop()
-st.session_state["_aq_experience_switch_mounted"] = False
+# Read the existing bounded runtime artifact before the reference cockpit stops.
+# Authentication and central area gates have already run; no heavy provider runs here.
 _fast_snapshot = {}
 if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
     try:
-        from atlasquant_fast_startup import load_home_snapshot, render_beginner_shell
+        from atlasquant_fast_startup import load_home_snapshot
         _fast_repo = str(_config_value(
             "GITHUB_REPO_HISTORICO",
             "aparecidomikael97-ship-it/usd-macro-pro-v4",
@@ -2346,12 +2341,20 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE
             _config_value("GITHUB_BRANCH_HISTORICO"),
         )
         _fast_token = str(_config_value("GITHUB_TOKEN_HISTORICO") or "").strip()
-        _fast_snapshot = load_home_snapshot(
-            _fast_repo,
-            _fast_branch,
-            _fast_token,
-            4.0,
-        )
+        _fast_snapshot = load_home_snapshot(_fast_repo, _fast_branch, _fast_token, 4.0)
+    except Exception as _fast_exc:
+        st.session_state["atlasquant_fast_startup_error"] = type(_fast_exc).__name__
+
+if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
+    from atlasquant_trader_resident import hydrate_trader_resident_state
+    hydrate_trader_resident_state(st.session_state, _fast_snapshot)
+    from atlasquant_reference_ui import render_trader_entry
+    if render_trader_entry(st, _ATLASQUANT_ACCESS):
+        st.stop()
+st.session_state["_aq_experience_switch_mounted"] = False
+if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
+    try:
+        from atlasquant_fast_startup import render_beginner_shell
         _fast_result = render_beginner_shell(
             _fast_snapshot,
             access=_ATLASQUANT_ACCESS,

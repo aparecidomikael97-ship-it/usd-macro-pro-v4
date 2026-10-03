@@ -344,3 +344,54 @@ def test_validated_top_ten_fixture_layout_matrix():
             assert page.locator('.final-ring').first.evaluate('(e)=>getComputedStyle(e).animationName') == 'none'
             page.screenshot(path=str(artifacts/f'final-top10-test-fixture-{width}.png'),full_page=True)
         browser.close()
+
+
+def test_resident_sidebar_and_bias_hotfix_at_requested_sizes():
+    from atlasquant_reference_ui import CSS, reference_html
+    from atlasquant_trader_resident import resident_trader_state
+    from test_atlasquant_reference_resident import fresh_snapshot
+    value, now = fresh_snapshot()
+    state = resident_trader_state(value, now=now)
+    artifacts = Path('visual_review'); artifacts.mkdir(exist_ok=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(reduced_motion='reduce')
+        for available in (False, True):
+            html = reference_html('trader', mode='Iniciante',
+                market_items=state['atlasquant_validated_market_items'] if available else None,
+                fx_population=state['atlasquant_reference_fx_population'] if available else None)
+            page.set_content('<style>'+CSS.read_text(encoding='utf-8')+'</style><p style="color:white;background:#17334a">QA LOCAL · FIXTURE SINTÉTICA · SEM DADOS DE MERCADO</p>'+html)
+            for width,height in ((1280,720),(1440,900),(1024,768),(390,844)):
+                page.set_viewport_size({'width':width,'height':height})
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                if width > 700:
+                    nav = page.locator('.cq-nav')
+                    expect(nav.locator('.ref-nav-item')).to_have_count(24)
+                    assert nav.bounding_box()['width'] >= 160
+                    for button in nav.locator('.ref-nav-item').all():
+                        button.scroll_into_view_if_needed()
+                        assert button.evaluate('(e)=>getComputedStyle(e).overflowWrap') == 'normal'
+                        assert button.evaluate('''(e)=>{
+                            const icon=e.querySelector('.ref-nav-icon').getBoundingClientRect();
+                            const text=Array.from(e.childNodes).find(n=>n.nodeType===3&&n.textContent.trim());
+                            const range=document.createRange();range.selectNodeContents(text);
+                            return Array.from(range.getClientRects()).every(r=>r.x >= icon.right-0.5 && r.right <= e.getBoundingClientRect().right+0.5);
+                        }''')
+                        before=button.bounding_box();button.hover();button.focus()
+                        assert all(abs(before[k]-button.bounding_box()[k]) < .1 for k in before)
+                    page.locator('.cq-nav .ref-nav-item').first.scroll_into_view_if_needed()
+                else:
+                    summary=page.locator('.cq-functions summary')
+                    expect(summary).to_be_visible()
+                    summary.click()
+                    expect(page.locator('.cq-functions .ref-nav-item')).to_have_count(24)
+                    page.screenshot(path=str(artifacts/f'hotfix-functions-{width}-{available}.png'),full_page=True)
+                    summary.click()
+                if available:
+                    expect(page.locator('.cq-market-state')).to_contain_text('DADOS RESIDENTES VALIDADOS')
+                    expect(page.locator('.cq-engine-bias')).to_have_count(2)
+                else:
+                    expect(page.locator('.cq-market-state')).to_contain_text('PRÉVIA / aguardando dados validados')
+                    expect(page.locator('.cq-engine-bias')).to_have_count(0)
+                page.screenshot(path=str(artifacts/f'hotfix-trader-{width}-{available}.png'),full_page=True)
+        browser.close()

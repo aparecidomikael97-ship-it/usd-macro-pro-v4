@@ -1,5 +1,11 @@
 # Estado vigente — PR #554
 
+## Hotfix de runtime — 03/10/2026
+
+Auditoria completa em [TRADER_RUNTIME_CHECKUP_20261003.md](trader/TRADER_RUNTIME_CHECKUP_20261003.md). Os **24 acessos** vigentes continuam presentes. Sidebar desktop168 px/tablet148 px, ícones18 px e quebra normal. Mobile mostra `Funções do Trader · 24` e a lista completa; Iniciante mantém os módulos avançados.
+
+O snapshot existente agora chega à home antes do retorno do shell. Último viés técnico expirado aparece com `EXPIRED / REVALIDAR`; snapshot recém-gerado não renova sinal nem publica Top10. Macro/Fed e projeção Market Map reutilizam dados persistidos. Sem candles fechados validados não há mini-gráfico; DXY representa força USD macro, sem preço spot inventado. Índices/criptos têm universo implementado e coleta live específica não encontrada. APIs, cota, scanner e núcleo AION preservados.
+
 A revisão consolidada atual está em [atlasquant_final_interface_review.md](atlasquant_final_interface_review.md). A branch `fix/trader-scanner-nav-20261003` preserva **24 funções**, sem Radar Mestre duplicado. Desktop: barra lateral com rolagem; mobile: **Funções do Trader · 24 / Ver todas as funções · inclui avançadas**. Iniciante e Avançado expõem a mesma lista completa. Nenhuma função foi removida. Ranking sem evidência fica aguardando dados validados; o universo monitorado de 28 não implica cobertura técnica nos 28. O texto abaixo registra revisões anteriores e suas contagens históricas.
 
 # AtlasQuant — refinamento compacto sobre a main atual

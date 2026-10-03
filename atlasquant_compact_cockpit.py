@@ -71,6 +71,9 @@ def normalized_market_items(items):
                 result[key]=value
         if item.get('bias') in ('Compra','Venda','Neutro'):
             result['bias']=item['bias']
+        if item.get('last_bias') in ('COMPRA','VENDA','NEUTRO','AGUARDAR'):
+            result['last_bias']=item['last_bias']
+            result['temporal_state']=str(item.get('temporal_state') or 'UNVERIFIED')
         series=item.get('series')
         if isinstance(series,(list,tuple)) and len(series)>=2 and all(isinstance(x,(int,float)) and not isinstance(x,bool) and math.isfinite(x) for x in series) and max(series)>min(series):
             result['series']=list(series)[-30:]
@@ -90,7 +93,12 @@ def ticker_html(area,items=None):
         item=records.get(asset,{})
         price=(f"{item['price']:,.4f}".replace(',','|').replace('.',',').replace('|','.')) if 'price' in item else '—'
         change=f"{item['change_pct']:+.2f}%".replace('.',',') if 'change_pct' in item else '—'
-        state=item.get('bias') or (f"Força {item['score']:.1f}" if 'score' in item else 'PRÉVIA')
+        state=item.get('bias') or (f"Força {item['score']:.1f}" if 'score' in item else 'DADOS VALIDADOS' if item else 'PRÉVIA')
+        if 'last_bias' in item:
+            state='Último viés: '+item['last_bias']+' · '+item['temporal_state']+' / REVALIDAR'
+        if asset == 'DXY' and 'score' in item:
+            state=f"Força USD {item['score']:.1f} · macro, sem cotação DXY"
+        state=escape(state)
         spark=''
         if 'series' in item:
             values=item['series'];lo,hi=min(values),max(values)
@@ -98,7 +106,8 @@ def ticker_html(area,items=None):
             spark=f'<svg class="cq-real-spark" viewBox="0 0 50 20" aria-label="Série validada"><polyline points="{points}" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>'
         tiles.append(f'<button class="cq-tick" data-route="radar" data-asset="{escape(asset)}" aria-label="{escape(asset)} · {state}"><span class="cq-symbols">{asset_symbol(asset)}</span><span><strong>{escape(asset)}</strong><small>Preço: {price}</small><small>Variação: {change}</small><em>{state}</em></span>{spark}</button>')
     verified_label='Ordem validada do motor' if verified else 'Ordem de referência'
-    return f'<section class="cq-market" aria-label="Faixa de ativos"><button class="cq-scroll" data-ticker-step="-1" aria-label="Ativos anteriores">‹</button><div class="cq-ticker" tabindex="0" role="region" aria-label="Ativos · rolagem horizontal">{"".join(tiles)}</div><button class="cq-scroll" data-ticker-step="1" aria-label="Mais ativos">›</button></section><div class="cq-market-state">PRÉVIA / aguardando dados quando indisponíveis <label>Organização <select aria-label="Organização dos ativos"><option>{verified_label}</option><option disabled>Melhor viés · requer lista validada</option></select></label></div>'
+    global_state='DADOS RESIDENTES VALIDADOS · cotação indisponível onde não houver fonte confirmada' if verified else 'PRÉVIA / aguardando dados validados'
+    return f'<section class="cq-market" aria-label="Faixa de ativos"><button class="cq-scroll" data-ticker-step="-1" aria-label="Ativos anteriores">‹</button><div class="cq-ticker" tabindex="0" role="region" aria-label="Ativos · rolagem horizontal">{"".join(tiles)}</div><button class="cq-scroll" data-ticker-step="1" aria-label="Mais ativos">›</button></section><div class="cq-market-state">{global_state} <label>Organização <select aria-label="Organização dos ativos"><option>{verified_label}</option><option disabled>Melhor viés · requer lista validada</option></select></label></div>'
 
 
 def header_html(area,name,mode,top,market_items=None):
@@ -125,11 +134,36 @@ def trader_html(*,mode,selected,name,show_central,nav_html,module_panel,uri,mark
             art=f'<img src="{uri(image)}" alt=""/>' if image else f'<span class="cq-card-icon" aria-hidden="true">{icon}</span>'
             cards.append(f'<button class="cq-card ref-mobile-card" data-route="{route}" aria-label="{label}">{art}<strong>{label}</strong><small>{desc}</small></button>')
         from atlasquant_fx_universe import OFFICIAL_PAIRS
-        from atlasquant_interface_final import eligible_fx_population
+        from atlasquant_interface_final import eligible_fx_population, temporal_signal_status
         population=eligible_fx_population(fx_population)
-        pairs=[row['pair'] for row in population['ranked'][:10]] or list(OFFICIAL_PAIRS)[:10]
+        history=(fx_population or {}).get('history') or []
+        pairs=[row['pair'] for row in population['ranked'][:10]] or [row['pair'] for row in history] or list(OFFICIAL_PAIRS)[:10]
         ranking_label='Top 10 · ranking validado' if population['ranked'] else 'Ranking aguardando dados validados'
-        rows=''.join(f'<div class="cq-pair"><span class="cq-symbols">{asset_symbol(pair)}</span><strong>{escape(pair)}</strong><span class="cq-pending">{"#"+str(i+1) if population["ranked"] else "—"}</span><button data-route="why:{pair}">Ver por quê</button></div>' for i,pair in enumerate(pairs))
+        resident_rows={row['pair']:row for row in history}
+        resident_rows.update({row['pair']:row for row in population['ranked']})
+        published={row['pair'] for row in population['ranked']}
+        rows=[]
+        for i,pair in enumerate(pairs):
+            row=resident_rows.get(pair,{})
+            bias=row.get('action') if row.get('action') in {'COMPRA','VENDA','NEUTRO','NÃO OPERAR','NAO OPERAR'} else ''
+            if row and pair not in published:
+                bias='Último viés: '+str(row.get('bias') or 'AGUARDAR')
+            bias_html=f'<small class="cq-engine-bias">{escape(bias)}</small>' if bias else ''
+            facts=[]
+            if row:
+                facts.append(str(row.get('state') or 'Estado indisponível'))
+                signal=row.get('signal') or {}
+                facts.append('Status temporal: '+temporal_signal_status(signal)+(' / REVALIDAR' if pair not in published else ''))
+                facts.append('Validade técnica: '+str(signal.get('valid_until') or '—'))
+                facts.append(f"Prioridade {row['priority']:.1f} · Qualidade {row['data_score']:.1f}")
+                technical=' · '.join(f'{key.upper()}: {row[key]}' for key in ('h4','h1','m15') if row.get(key) not in (None,'','—','N/D'))
+                if technical: facts.append(technical)
+                facts.append('Gate: '+str(row.get('gate') or '—'))
+                facts.append('Snapshot: '+str((fx_population.get('freshness') or {}).get('generated_at') or '—'))
+            context_html=''.join(f'<small class="cq-engine-context">{escape(fact)}</small>' for fact in facts)
+            position='#'+str(i+1) if population['ranked'] else '—'
+            rows.append(f'<div class="cq-pair"><span class="cq-symbols">{asset_symbol(pair)}</span><strong>{escape(pair)}{bias_html}{context_html}</strong><span class="cq-pending">{position}</span><button data-route="why:{pair}">Ver por quê</button></div>')
+        rows=''.join(rows)
         radar=f'<section class="cq-panel cq-bias"><button class="cq-panel-head" data-route="radar">Viés Atual do Mercado <span>↗</span></button><p class="cq-pending">{ranking_label}</p><div class="cq-neutral-bar" aria-hidden="true"></div><button class="cq-panel-head" data-route="scanner">Scanner Técnico · universo Forex</button><p class="cq-note">28 pares monitorados; cobertura técnica conforme o motor.</p><div class="cq-pairs" data-universe="forex">{rows}</div></section>'
         globe=f'<button class="cq-globe" data-route="master" aria-label="Painel Mestre"><img src="{uri("trader-globe.webp")}" alt="Globo do cockpit Trader"/><span>Painel Mestre · 28 pares</span></button>'
         aion=f'<button class="cq-panel cq-aion" data-route="aion_specialist"><img src="{uri("trader-aion.webp")}" alt=""/><span><strong>AION Trader</strong><small>Inteligência neste ambiente</small></span><b>›</b></button>'

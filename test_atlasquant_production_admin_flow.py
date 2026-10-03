@@ -133,7 +133,9 @@ class ProductionAdminFlowTests(unittest.TestCase):
         at.run(timeout=180)
         self._assert_clean(at)
         self.assertIn('data-workspace="trader"', self._html(at))
-        self.assertEqual(self.snapshot_calls, [])
+        self.assertEqual(self.snapshot_calls, ["atlasquant-runtime"])
+        self.assertIn("DADOS RESIDENTES VALIDADOS", self._html(at))
+        self.assertEqual(self.refresh_calls, [])
         from atlasquant_reference_ui import apply_event
         apply_event(at.session_state, {"allowed":True,"role":"ADMIN"}, "trader", "aion_specialist")
         at.run(timeout=180)
@@ -167,7 +169,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
                 at.session_state[key] = value
             at.run(timeout=180)
             self._assert_clean(at)
-        self.assertEqual(self.snapshot_calls, [])
+        self.assertEqual(self.snapshot_calls, ["atlasquant-runtime"])
         self.assertEqual(self.refresh_calls, [])
 
 
@@ -239,7 +241,9 @@ class ProductionAdminFlowTests(unittest.TestCase):
         for area in ("negocios","investimentos","aion"):
             self.assertNotIn('data-route="area:' + area + '"', html)
         self.assertNotIn("AION_CONSOLE_RENDERED", html)
-        self.assertEqual(self.snapshot_calls, [])
+        self.assertEqual(self.snapshot_calls, ["atlasquant-runtime"])
+        self.assertIn("DADOS RESIDENTES VALIDADOS", html)
+        self.assertEqual(self.refresh_calls, [])
         self.assertFalse(any("🧠 AION" in list(getattr(x,"options",[])) for x in at.selectbox))
 
     def test_render_entrypoint_is_the_app_that_carries_the_premium_flow(self):
