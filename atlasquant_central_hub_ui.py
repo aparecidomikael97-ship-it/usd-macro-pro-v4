@@ -551,7 +551,7 @@ def aion_home_html(claims: Mapping[str, Any] | None = None, **_ignored: Any) -> 
         '<section class="aq-aion-home" data-truth="UNKNOWN">'
         + '<p class="aq-aion-priority">PRIORIDADE ATUAL</p>'
         + hero_html("AION", "LOCAL")
-        + section_title_html("AION IA · 8 NÚCLEOS INTERNOS")
+        + section_title_html("AION · 8 PAPÉIS INTERNOS")
         + '<p class="aq-aion-core-note"><strong>8 núcleos especializados, 1 AION Core.</strong> Cada cartão representa uma responsabilidade interna coordenada pelo mesmo núcleo. Não são oito IAs independentes e nenhum núcleo recebe autoridade autônoma para merge, deploy, publicação, cobrança ou trade real.</p>'
         + '<p class="aq-aion-motto">Poderoso por dentro. Simples por fora.</p>'
         + '<div class="aq-aion-grid">'
