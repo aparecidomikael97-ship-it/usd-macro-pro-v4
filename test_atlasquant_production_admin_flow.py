@@ -122,7 +122,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("Central AtlasQuant", door)
         self.assertIn("Escolha o ambiente que você quer abrir.", door)
         self.assertIn('data-root="central_root"', door)
-        for label in ("AION IA", "Negócios", "Trader", "Renda Fixa / Investimentos"):
+        for label in ("Trader", "Negócios", "Investimentos", "AION"):
             self.assertIn(label, door)
         self.assertIn("Mikael, ", door)
         self.assertIn("AION ativo.", door)
@@ -133,7 +133,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertNotIn("aq-premium-hero", door)
         self.assertEqual(
             at.button(key="aq_central_stateful_aion").label,
-            "Abrir AION IA",
+            "Abrir AION",
         )
         self.assertEqual(
             at.button(key="aq_central_stateful_negocios").label,
@@ -145,7 +145,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         )
         self.assertEqual(
             at.button(key="aq_central_stateful_investimentos").label,
-            "Abrir Renda Fixa / Investimentos",
+            "Abrir Investimentos",
         )
         self.assertEqual([r for r in at.radio if r.key == "atlasquant_experience_mode"], [])
         self.assertEqual(self.snapshot_calls, [])
