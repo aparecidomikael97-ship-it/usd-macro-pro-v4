@@ -20,7 +20,7 @@ TRADER_NAV = (("home", "Início"), ("radar", "Radar"), ("scanner", "Scanner Téc
     ("ict", "ICT / SMC"), ("calendar", "Calendário Econômico"),
     ("news", "Pré-Notícia / Macro Briefing"), ("market_map", "Market Map"),
     ("lab", "Laboratório / Backtests"), ("paper", "Paper Trading"),
-    ("guardian", "Guardião de Risco"), ("autopilot", "Autopilot"), ("academy", "Academia"),
+    ("guardian", "Guardião de Risco"), ("autopilot", "Autopilot"), ("performance", "Performance / Melhorias"), ("academy", "Academia"),
     ("journal", "Diário"), ("video", "Vídeos / Conteúdo"), ("aion_specialist", "AION Trader"),
     ("profile", "Perfil / Configurações"))
 NAV = {
@@ -234,7 +234,7 @@ def module_panel(area, selected, *, resident=None):
     notice = ("28 pares Forex · Top 10 em destaque · posições e direção aguardam ranking validado."
               if cards and area == "trader" else f"Prévia visual de {title}. Dados e conteúdo ainda não conectados nesta apresentação.")
     connected = ('<button class="ref-primary" data-route="connected:' + escape(selected) + '">Abrir análise existente</button>'
-                 if area == "trader" and selected in {"radar","radar_master","scanner","master","macro","fed","micro","geo","market_news","fundamental","ict","calendar","news","market_map","lab","paper","guardian","autopilot","academy","journal","video","profile"} else "")
+                 if area == "trader" and selected in {"radar","radar_master","scanner","master","macro","fed","micro","geo","market_news","fundamental","ict","calendar","news","market_map","lab","paper","guardian","autopilot","performance","academy","journal","video","profile"} else "")
     if selected.startswith("why:"):
         notice = "A direção deste par ainda não foi validada. Nenhuma recomendação de compra/venda é apresentada."
     return (f'<main class="ref-detail" data-module="{escape(selected)}">'
