@@ -59,8 +59,9 @@ def test_reference_has_accessible_routes_and_no_duplicate_strip(area):
 
 def test_separation_and_complete_trader_menu():
     nav=dict(NAV["trader"])
-    assert len(nav)==19
-    assert {"radar_master","master","radar","ict","academy","journal","video","profile"}<=nav.keys()
+    assert len(nav)==23
+    assert {"scanner","master","radar","fed","market_news","market_map","autopilot","ict","academy","journal","video","profile"}<=nav.keys()
+    assert "radar_master" not in nav
     assert "Negócios" not in nav.values() and "Investimentos" not in nav.values()
     for area in ("negocios","investimentos"):
         assert not any(v in {"Trader","Negócios","Investimentos"} for v in dict(NAV[area]).values())
@@ -106,6 +107,22 @@ def test_connected_master_uses_existing_navigation_and_no_auth_mutation():
     assert state["atlasquant_access_session"]==before
 
 
+
+@pytest.mark.parametrize(("route","target"), [
+    ("scanner","🧭 Painel mestre"),
+    ("fed","🏦 Fed"),
+    ("market_news","📰 Notícias"),
+    ("market_map","🗺️ Market Map"),
+    ("autopilot","🤖 Autopilot"),
+])
+def test_restored_legacy_trader_routes_open_existing_functional_pages(route, target):
+    state={}
+    apply_event(state,ADMIN,"trader",f"connected:{route}")
+    assert state["aq_reference_connected"]
+    assert state["aq_beginner_page"]==target
+    assert state["atlasquant_advanced_area"]==target
+
+
 def test_return_home_resets_legacy_selection_without_changing_auth():
     state={"aq_reference_connected":True,"atlasquant_advanced_area":"master", "atlasquant_access_session":{"username":"same"}}
     apply_event(state,USER,"trader","home")
@@ -117,7 +134,7 @@ def test_return_home_resets_legacy_selection_without_changing_auth():
 def test_mode_preserves_all_functions_and_changes_only_visible_depth():
     advanced=reference_html("trader",mode="Avançado")
     beginner=reference_html("trader",mode="Iniciante")
-    assert "Funções do Trader · 19" in beginner
+    assert "Funções do Trader · 23" in beginner
     assert "inclusive avançadas, continuam disponíveis" in beginner
     for route,_ in NAV["trader"]:
         assert f'data-route="{route}"' in advanced and f'data-route="{route}"' in beginner
@@ -127,9 +144,10 @@ def test_mode_preserves_all_functions_and_changes_only_visible_depth():
 def test_exact_trader_navigation_contract_without_nested_hidden_modules(mode):
     from html.parser import HTMLParser
     from atlasquant_reference_ui import nav_html
-    expected = ('home', 'radar_master', 'radar', 'master', 'macro', 'micro',
-        'geo', 'fundamental', 'ict', 'calendar', 'news', 'lab', 'paper',
-        'guardian', 'academy', 'journal', 'video', 'aion_specialist', 'profile')
+    expected = ('home', 'radar', 'scanner', 'master', 'macro', 'fed', 'micro',
+        'geo', 'market_news', 'fundamental', 'ict', 'calendar', 'news', 'market_map',
+        'lab', 'paper', 'guardian', 'autopilot', 'academy', 'journal', 'video',
+        'aion_specialist', 'profile')
     class Routes(HTMLParser):
         def __init__(self):
             super().__init__(); self.routes = []; self.details = 0
@@ -139,7 +157,7 @@ def test_exact_trader_navigation_contract_without_nested_hidden_modules(mode):
     parser = Routes(); parser.feed(nav_html('trader', mode))
     assert tuple(route for route, _ in NAV['trader']) == expected
     assert tuple(parser.routes) == expected
-    assert len(set(parser.routes)) == 19
+    assert len(set(parser.routes)) == 23
     assert parser.details == 0
 
 
