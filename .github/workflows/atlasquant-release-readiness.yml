@@ -3,7 +3,7 @@ name: AtlasQuant - Release Readiness
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, integration/aion-unified-core-v2-20261003]
   push:
     branches: [main, atlasquant-final-release-prep]
     paths:
