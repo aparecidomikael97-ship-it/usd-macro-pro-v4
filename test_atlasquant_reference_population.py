@@ -112,3 +112,11 @@ def test_master_data_status_matches_resident_evidence():
     resident,_ = resident_fixture()
     assert 'LEITURAS VALIDADAS' in reference_html('trader',selected='master',fx_population=resident)
     assert 'VALIDAÇÃO PENDENTE' in reference_html('trader',selected='master')
+
+
+def test_investment_reference_numbers_are_covered_by_neutral_native_states():
+    from atlasquant_reference_ui import reference_html
+    html = reference_html('investimentos')
+    assert html.count('class="ref-hit ref-neutral-region"') == 3
+    assert html.count('ref-mobile-card-neutral"') == 3
+    assert html.count('PRÉVIA · aguardando dados validados') == 3

@@ -290,7 +290,14 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     detail = module_panel(area,selected) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
-    hits = "".join(hotspot(area,*row) for row in REGIONS[area])
+    hits = ""
+    for route, label, box in REGIONS[area]:
+        hit = hotspot(area, route, label, box)
+        if area == "investimentos" and box[1] > 400:
+            hit = hit.replace('class="ref-hit"', 'class="ref-hit ref-neutral-region"')
+            start = hit.index('<span'); end = hit.index('</button>')
+            hit = hit[:start] + f'<strong>{escape(label)}</strong><b>—</b><small>PRÉVIA · aguardando dados validados</small>' + hit[end:]
+        hits += hit
     if area == "trader":
         # Explicit requested corrections cover the source's cross-environment row/card labels.
         hits += hotspot(area,"master","Painel Mestre",(1031,411,162,43),visible=True)
@@ -326,12 +333,17 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         posx = 100*x/max(1,w-bw)
         posy = 100*y/max(1,h-bh)
         style = f"aspect-ratio:{bw}/{bh};background-size:{scale}%;background-position:{posx}% {posy}%"
+        neutral = area == "investimentos" and y > 400
+        if neutral:
+            style = "background-image:none"
+            kind = "neutral"
+        art_content = '<b>—</b><small>PRÉVIA · aguardando dados</small>' if neutral else ''
         mobile.append(
             f'<button class="ref-mobile-card ref-mobile-card-{escape(route)} '
             f'ref-mobile-card-{escape(kind)}" data-route="{escape(route)}" '
             f'data-mobile-kind="{escape(kind)}" data-mobile-crop="{x},{y},{bw},{bh}" '
             f'aria-label="{escape(label)}">'
-            f'<span class="ref-mobile-art" style="{style}"></span>'
+            f'<span class="ref-mobile-art" style="{style}">{art_content}</span>'
             f'<strong>{escape(label)}</strong></button>'
         )
     # Replace screenshot identity text with the current authenticated identity.

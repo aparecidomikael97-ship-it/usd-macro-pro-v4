@@ -43,7 +43,7 @@ Para publicar posição, a leitura precisa ter par oficial, dados prontos, prove
 
 Sem evidência: `Ranking aguardando dados validados`; os 28 pares permanecem monitorados, sem numeração arbitrária. Nunca há `TOP 10` junto de `POSIÇÃO A VALIDAR`. Universo de 28 não significa cobertura técnica institucional nos 28: o runtime atual continua tendo cobertura conforme seus packs reais, frequentemente sete pares. Destaque para estudo nunca autoriza entrada.
 
-Ticker continua com `PRÉVIA` / `—` quando não há dados residentes validados. Negócios não recebe ticker Forex; Investimentos mantém universo próprio. Não há rentabilidade inventada.
+Ticker continua com `PRÉVIA` / `—` quando não há dados residentes validados. Negócios não recebe ticker Forex; Investimentos mantém universo próprio. Os três painéis inferiores de Investimentos recebem estados nativos neutros que cobrem cotações e percentuais desenhados na referência, inclusive no hover/focus e no mobile. Não há rentabilidade inventada.
 
 ## Histórico de Validação AtlasQuant
 
