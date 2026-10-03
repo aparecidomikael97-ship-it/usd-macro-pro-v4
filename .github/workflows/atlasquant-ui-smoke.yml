@@ -570,12 +570,13 @@ jobs:
                       cockpit["slogan_present"]=page.get_by_text(
                           "Poderoso por dentro. Simples por fora.",exact=True
                       ).count()>=1
-                      shell_text=str(shell.inner_text())
+                      module_grid=page.locator(".aq-trader-module-grid").first
+                      module_text=str(module_grid.inner_text()) if module_grid.count() else ""
                       module_labels=(
                           "Macroeconomia","Microeconomia","Geopolítica","Fundamentalista",
                           "ICT / SMC","Calendário Econômico","Pré-Notícia","Investimentos",
                       )
-                      positions=[shell_text.find(label) for label in module_labels]
+                      positions=[module_text.find(label) for label in module_labels]
                       cockpit["module_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
                       if cockpit["module_count"]<8:
                           failures.append(f"{name}: cockpit Trader tem só {cockpit['module_count']} módulos visíveis")
