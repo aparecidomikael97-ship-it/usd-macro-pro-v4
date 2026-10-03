@@ -147,8 +147,10 @@ class ProductionAdminFlowTests(unittest.TestCase):
         initial = dict(at.session_state["atlasquant_access_session"])
         from atlasquant_reference_ui import apply_event
         access = {"allowed":True,"role":"ADMIN"}
+        # Keep navigation event state separate from AppTest's SessionState proxy.
+        # The authenticated session stays owned by AppTest and is asserted below.
+        state = {"atlasquant_experience_mode": "Iniciante"}
         for area in ("trader","negocios","investimentos","aion"):
-            state = at.session_state.filtered_state
             apply_event(state, access, "central", "area:" + area)
             for key, value in state.items():
                 at.session_state[key] = value
@@ -160,7 +162,6 @@ class ProductionAdminFlowTests(unittest.TestCase):
             self.assertEqual(current["role"], initial["role"])
             self.assertEqual(current["authenticated_at"], initial["authenticated_at"])
             self.assertFalse(any("senha" in str(getattr(x,"label","")).casefold() for x in at.text_input))
-            state = at.session_state.filtered_state
             apply_event(state, access, area, "central")
             for key, value in state.items():
                 at.session_state[key] = value
