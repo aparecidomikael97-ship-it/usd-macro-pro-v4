@@ -1,0 +1,39 @@
+name: AION Biblioteca — responsive sandbox shell browser checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - review/aion-library-admin-shell-sandbox-v1-20261001
+    paths:
+      - 'atlasquant_aion_library_acl_postgres.py'
+      - 'test_atlasquant_aion_library_acl_postgres*.py'
+      - 'atlasquant_aion_library_workspace_shell.py'
+      - 'scripts/aion_library_shell_browser_fixture.py'
+      - 'scripts/test_aion_library_shell_browser.py'
+      - '.github/workflows/aion-library-acl-browser.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-desktop-sandbox-library-shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      ATLASQUANT_ENV: SANDBOX
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: 'false'
+    steps:
+      - name: Checkout isolated candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install isolated browser fixture dependencies
+        run: |
+          python -m pip install 'streamlit==1.64.0' 'playwright==1.63.0'
+          python -m playwright install --with-deps chromium
+      - name: Validate synthetic sandbox shell at mobile and desktop widths
+        run: python scripts/test_aion_library_shell_browser.py
