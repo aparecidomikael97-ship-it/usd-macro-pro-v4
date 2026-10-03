@@ -114,6 +114,8 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn('[data-testid="stHeader"] { height:2.25rem!important; min-height:2.25rem!important; }',css)
         self.assertIn('[data-testid="stMain"] { padding-top:0!important; }',css)
         self.assertIn('[data-testid="stMain"] > div { padding-top:0!important; }',css)
+        self.assertIn('[data-testid="stAppViewBlockContainer"]',css)
+        self.assertIn('.block-container { padding-top:0!important; }',css)
         self.assertIn('.stMainBlockContainer { padding-left:.85rem; padding-right:.85rem; padding-top:0!important; }',css)
 
 
