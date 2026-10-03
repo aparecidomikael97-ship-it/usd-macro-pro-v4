@@ -132,7 +132,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("Mikael, ", door)
         self.assertIn("AION ativo.", door)
         self.assertIn("Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?", door)
-        self.assertIn("Acessar AION", door)
+        self.assertIn("ACESSAR AION", door)
         self.assertNotIn("AION_CONSOLE_RENDERED", door)
         self.assertNotIn('id="aq-account-identity"', door)
         self.assertNotIn("aq-premium-hero", door)
