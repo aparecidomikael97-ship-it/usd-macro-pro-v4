@@ -118,6 +118,77 @@ Regras centrais:
 
 O runtime unificado agora considera aprovação somente quando `approved is True`. Valores truthy como `"yes"`, `"true"` ou `1` não liberam o gate nem entram como approval receipt.
 
+## Bloco V2.1C — Journal store físico e recovery
+
+\`atlasquant_aion_unified_journal_store.py\` adiciona persistência física fail-closed ao journal lógico sem mover autoridade, truth mapping, aprovação ou execução para a camada de armazenamento.
+
+### Layout e atomicidade
+
+A persistência usa IDs derivados por digest e separação por scope/request:
+
+\`\`\`text
+root/
+  <scope-safe-id>/
+    requests/
+      <request-safe-id>/
+        events/
+          00000001_<event-digest>.json
+        head.json
+        metadata.json
+        idempotency.json
+        acks.json
+        quarantine/
+\`\`\`
+
+Cada evento durável é imutável. A escrita usa arquivo temporário, \`flush\`, \`fsync\` do arquivo, \`os.replace\` atômico e \`fsync\` do diretório quando a plataforma suporta. O \`head.json\`, o índice de idempotência e o ledger de ACK são atualizados por substituição atômica.
+
+Identificadores externos nunca viram paths brutos. Owner, tenant, workspace e request passam por validação, normalização e derivação por digest. Traversal, paths absolutos, drive letters, UNC, NUL e symlink escape são rejeitados.
+
+### Estados de persistência
+
+O ciclo físico é:
+
+- \`STAGED\`: request conhecido, sem evento confirmado em disco;
+- \`JOURNALED\`: evento já pertence ao journal lógico verificado;
+- \`DURABLE\`: registro imutável confirmado no spool;
+- \`ACKNOWLEDGED\`: ACK físico confirmado depois do commit;
+- \`QUARANTINED\`: corrupção, conflito ou integridade insuficiente para recovery seguro;
+- \`REJECTED\`: entrada rejeitada antes de virar estado durável confiável.
+
+Não existem \`VALIDATED\`, \`TRUSTED\` ou \`APPROVED_BY_RECOVERY\` nessa camada. Persistência não equivale a verdade, aprovação nem permissão de execução.
+
+### Idempotência, replay e causation
+
+A chave de idempotência é persistida somente por digest, vinculada ao digest estável do payload. Após restart:
+
+- mesma chave + mesmo payload retorna resultado idempotente;
+- mesma chave + payload diferente falha fechado;
+- sequence ocupada por outro digest falha fechado;
+- quebra de \`prev_digest\` ou digest do payload falha fechado.
+
+\`correlation_id\` e \`causation_id\` são metadados explícitos da camada de persistência V2; o schema V1 do journal lógico não é alterado.
+
+### Recovery
+
+O recovery reabre somente o scope autorizado, valida metadata/version, sequência, cadeia de digest, scope fingerprint, índice de idempotência, head e ACK. Arquivos temporários órfãos são isolados em \`quarantine/\` e nunca tratados como eventos duráveis.
+
+Janelas de crash cobertas:
+
+- antes do durable commit;
+- depois do fsync do temp e antes do rename;
+- depois do commit do evento e antes do head/ACK;
+- depois do head e antes do ACK;
+- depois do ACK.
+
+O recovery reconstrói somente estado. Ele não chama provider, não envia mensagem externa, não executa trade, não executa ação financeira, não escreve Checkpoint Mestre, não remove aprovação pendente e não promove memória.
+
+### Concorrência e limites
+
+O locking é por request/scope, com timeout e sem lock global. Escritas concorrentes com a mesma idempotency key são deduplicadas; tenants/workspaces distintos usam storage e lock scopes distintos.
+
+Há limites para tamanho de evento, metadata, índice, chave de idempotência e número máximo de eventos recuperados. Estados acima desses limites falham fechado.
+
+
 ## Testes adversariais V2.1
 
 `test_atlasquant_aion_unified_hardening_v21.py` cobre:
