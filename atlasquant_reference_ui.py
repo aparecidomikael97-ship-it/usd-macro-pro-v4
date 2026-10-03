@@ -461,6 +461,7 @@ def render_reference_workspace(st, access, area, *, mode=None):
         '@media(max-width:700px){'
         '.stApp:has(#aq-reference-active) [data-testid="stHeader"]{display:none!important;height:0!important;min-height:0!important}'
         '.stApp:has(#aq-reference-active) [data-testid="stSidebarCollapsedControl"]{display:none!important}'
+        '.stApp:has(#aq-reference-active) [data-testid="stElementContainer"]:has([data-testid="stRadio"]){display:none!important}'
         '.stApp:has(#aq-reference-active) [data-testid="stMainBlockContainer"],'
         '.stApp:has(#aq-reference-active) .block-container{padding-top:0!important;padding-left:.5rem!important;padding-right:.5rem!important}'
         '}'
