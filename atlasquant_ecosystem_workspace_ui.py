@@ -229,7 +229,16 @@ def workspace_cockpit_html(
         "SEM EXECUÇÃO AUTOMÁTICA",
         "ESTADOS DE VERDADE ATIVOS",
     ]
-    truth.extend(str(item) for item in (extra_truth or ()) if str(item).strip())
+    if key == "negocios":
+        truth.extend(("TENANT ISOLADO", "PUBLICAÇÃO REQUER APROVAÇÃO"))
+    elif key == "investimentos":
+        truth.extend(("SEM ORDEM AUTOMÁTICA", "SEM PROMESSA DE RETORNO"))
+    elif key == "aion":
+        truth.extend(("AUTORIDADE CONTROLADA", "AÇÕES SENSÍVEIS REQUEREM GATE"))
+    for item in (extra_truth or ()):
+        value = str(item).strip()
+        if value and value not in truth:
+            truth.append(value)
     truth_html = "".join(f"<span>{escape(item)}</span>" for item in truth)
     detail = f'<div class="aq-ws-connected">{connected_html}</div>' if connected_html else ""
     return (
