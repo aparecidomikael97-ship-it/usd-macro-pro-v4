@@ -25,6 +25,7 @@ jobs:
         run: |
           python -m pip install pip==26.2.1
           pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
       - name: Compile security-critical modules
         run: |
           python -m py_compile \
