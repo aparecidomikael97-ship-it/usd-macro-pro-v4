@@ -70,13 +70,37 @@ REGIONS = {
    ("reports", "Atividades Recentes", (745,526,289,207))],
 }
 
-# Mobile crops are intentionally separate from desktop hit regions. The approved
-# desktop artwork remains untouched; these insets prevent adjacent raster cards
-# from bleeding into narrow mobile tiles and keep focal art above HTML labels.
-MOBILE_CROPS = {
-    ("trader", "news"): (923, 338, 95, 108),
-    ("trader", "master"): (1040, 376, 144, 72),
-}
+# The Trader mobile home has an explicit visual contract instead of deriving
+# cards from route ids. Several desktop regions intentionally reuse the same
+# route (geo/news/calendar) and some source-art labels are legacy text hidden by
+# desktop masks. Keeping the mobile card identity by (route, label, crop, kind)
+# prevents route collisions and crops icon tiles above rasterized legacy labels.
+# Desktop artwork and hit regions remain unchanged.
+TRADER_MOBILE_CARDS = (
+    ("week", "Análise da Semana", (180,151,414,177), "video"),
+    ("day", "Análise do Dia", (599,153,182,173), "video"),
+    ("close_day", "Fechamento do Dia", (787,151,187,176), "video"),
+    ("close_week", "Fechamento Semanal", (979,151,213,176), "video"),
+    ("macro", "Macro", (178,332,112,65), "icon"),
+    ("micro", "Micro", (295,331,116,65), "icon"),
+    ("geo", "Geopolítica", (415,331,140,65), "icon"),
+    ("fundamental", "Fundamentalista", (560,332,117,65), "icon"),
+    ("ict", "ICT / SMC", (679,332,114,65), "icon"),
+    ("calendar", "Calendário Econômico", (798,332,112,65), "icon"),
+    ("news", "Pré-Notícia", (915,332,111,65), "icon"),
+    ("master", "Painel Mestre", (1031,332,162,65), "icon"),
+    ("geo", "Mapa de Risco Global", (163,465,369,133), "panel"),
+    ("news", "Notícias em Tempo Real", (163,604,276,111), "panel"),
+    ("radar_master", "Radar Mestre", (541,456,252,253), "panel"),
+    ("radar", "Viés Atual do Mercado", (830,463,173,170), "panel"),
+    ("calendar", "Calendário Econômico", (1006,464,257,134), "panel"),
+    ("geo", "Eventos Geopolíticos", (1006,602,257,108), "panel"),
+    ("academy", "Academia", (448,640,105,38), "icon"),
+    ("lab", "Laboratório", (559,638,117,40), "icon"),
+    ("paper", "Paper Trading", (681,639,106,40), "icon"),
+    ("guardian", "Guardião de Risco", (793,639,111,40), "icon"),
+    ("journal", "Diário", (908,639,96,38), "icon"),
+)
 
 EXTRA = {"trader": (("week","Análise da Semana"),("day","Análise do Dia"),("close_day","Fechamento do Dia"),("close_week","Fechamento Semanal")),
  "central": (("profile","Perfil"),("notifications","Notificações"),("settings","Configurações"),("session","Sessão"))}
@@ -271,17 +295,23 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         side_width = {"trader":12,"negocios":21.8,"investimentos":16.7,"aion":18.5}[area]
         sidebar = f'<nav class="ref-sidebar ref-{escape(area)}" style="--side-width:{side_width}%">' + nav_html(area,mode) + "</nav>"
     mobile = []
-    for route,label,box in REGIONS[area]:
+    mobile_rows = (
+        TRADER_MOBILE_CARDS
+        if area == "trader"
+        else tuple((route, label, box, "default") for route, label, box in REGIONS[area])
+    )
+    for route,label,box,kind in mobile_rows:
         if route in {"profile","notifications","settings","session"}:
             continue
-        x,y,bw,bh = MOBILE_CROPS.get((area, route), box)
+        x,y,bw,bh = box
         scale = 100*w/bw
         posx = 100*x/max(1,w-bw)
         posy = 100*y/max(1,h-bh)
         style = f"aspect-ratio:{bw}/{bh};background-size:{scale}%;background-position:{posx}% {posy}%"
         mobile.append(
-            f'<button class="ref-mobile-card ref-mobile-card-{escape(route)}" '
-            f'data-route="{escape(route)}" data-mobile-crop="{x},{y},{bw},{bh}" '
+            f'<button class="ref-mobile-card ref-mobile-card-{escape(route)} '
+            f'ref-mobile-card-{escape(kind)}" data-route="{escape(route)}" '
+            f'data-mobile-kind="{escape(kind)}" data-mobile-crop="{x},{y},{bw},{bh}" '
             f'aria-label="{escape(label)}">'
             f'<span class="ref-mobile-art" style="{style}"></span>'
             f'<strong>{escape(label)}</strong></button>'
