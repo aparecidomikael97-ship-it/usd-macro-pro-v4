@@ -1062,9 +1062,9 @@ def _workspace_overview_items(
         },
         {
             "name": "💼 Negócios",
-            "state": f"{len(products)} CANDIDATOS",
+            "state": "5 FRENTES",
             "tone": "info",
-            "detail": "Produtos, margem, fornecedores e evidências de tendência.",
+            "detail": "Automação B2B, Revenue Ops, Micro-SaaS, serviços internacionais e produtos digitais próprios.",
         },
         {
             "name": "🧪 Laboratório",
