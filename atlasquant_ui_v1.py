@@ -372,7 +372,9 @@ html { scroll-behavior: smooth; }
   [data-testid="stHeader"] { height:2.25rem!important; min-height:2.25rem!important; }
   [data-testid="stMain"] { padding-top:0!important; }
   [data-testid="stMain"] > div { padding-top:0!important; }
-  .stAppViewBlockContainer { padding-top:0!important; }
+  .stAppViewBlockContainer,
+  [data-testid="stAppViewBlockContainer"],
+  .block-container { padding-top:0!important; }
   .stMainBlockContainer { padding-left:.85rem; padding-right:.85rem; padding-top:0!important; }
   [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: .55rem !important; }
   [data-testid="stColumn"] { min-width: 150px !important; flex: 1 1 150px !important; }
