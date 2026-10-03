@@ -110,13 +110,14 @@ def header_html(area,name,mode,top,market_items=None):
 def trader_html(*,mode,selected,name,show_central,nav_html,module_panel,uri,market_items=None):
     top='<button data-route="central" class="ref-return">← Central</button>' if show_central else ''
     header=header_html('trader',name,mode,top,market_items)
-    drawer=f'<details class="ref-drawer"><summary>Menu · Trader</summary><nav>{nav_html("trader",mode)}</nav></details>'
-    nav=f'<nav class="cq-nav ref-sidebar ref-trader">{nav_html("trader",mode)}</nav>'
+    guidance = 'Iniciante: orientação simplificada; todas as funções, inclusive avançadas, continuam disponíveis.' if str(mode).startswith('Inic') else 'Avançado: acesso direto a todas as funções.'
+    drawer=f'<details class="ref-drawer cq-functions"><summary><strong>Funções do Trader · 19</strong><span>Ver todas as funções · inclui avançadas</span></summary><p class="cq-functions-note">{guidance}</p><nav aria-label="19 funções do Trader">{nav_html("trader",mode)}</nav></details>'
+    nav=f'<nav class="cq-nav ref-sidebar ref-trader" aria-label="19 funções do Trader"><strong class="cq-nav-title">Funções · 19</strong>{nav_html("trader",mode)}</nav>'
     detail=module_panel('trader',selected) if selected else ''
     if selected.startswith('why:'):
         detail=f'<main class="ref-detail"><div class="ref-detail-head"><h1>{escape(selected[4:])} · Ver por quê</h1><button data-route="home">Voltar à visão geral</button></div><p>Direção aguardando ranking validado.</p><button data-route="radar">Voltar ao Radar</button></main>'
     if detail:
-        content=f'<div class="ref-detail-layout"><nav class="ref-detail-nav">{nav_html("trader",mode)}</nav>{detail}</div>'
+        content=f'<div class="ref-detail-layout"><nav class="ref-detail-nav" aria-label="19 funções do Trader"><strong class="cq-nav-title">Funções · 19</strong>{nav_html("trader",mode)}</nav>{detail}</div>'
     else:
         cards=[]
         for route,label,desc,image,icon in [('indexes','Índices','S&P 500 · Nasdaq','trader-indices.webp',''),('commodities','Commodities','Ouro · Petróleo','trader-commodities.webp',''),('stocks','Ações','Principais bolsas','trader-stocks.webp',''),('day','Manhã','Panorama do dia','','☀'),('close_day','Fechamento do Dia','Resumo e movimentos','','↗'),('close_week','Fechamento da Semana','Desempenho e contexto','','▦'),('week','Análise da Semana','Tendências e oportunidades','','▥')]:

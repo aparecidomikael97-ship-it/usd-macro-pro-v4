@@ -160,6 +160,9 @@ def nav_html(area, mode):
         index = next((i for i,(key,_) in enumerate(rows) if key == route), 0)
         icon = f'<span class="ref-nav-icon" aria-hidden="true" style="background-size:18px {18*len(rows)}px;background-position:0 -{index*18}px"></span>'
         return f'<button data-route="{escape(route)}" class="ref-nav-item">{icon}{escape(label)}</button>'
+    if area == "trader":
+        # Experience mode changes guidance, never module discovery or availability.
+        return "".join(row(k,v) for k,v in rows)
     essential = [row(k,v) for k,v in rows if area != "trader" or advanced or k in BEGINNER]
     secondary = [row(k,v) for k,v in rows if area == "trader" and not advanced and k not in BEGINNER]
     if area in {"negocios", "investimentos", "aion"}:

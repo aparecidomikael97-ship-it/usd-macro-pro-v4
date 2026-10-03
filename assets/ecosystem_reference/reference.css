@@ -331,4 +331,12 @@ button:focus-visible,summary:focus-visible{outline:3px solid #6ee7ff;outline-off
 
 .cq-tick{line-height:1.15;min-height:70px;padding:5px}.cq-tick small{margin-top:3px;line-height:1.2}.cq-tick em{line-height:1.2}.cq-tick strong{line-height:1.2}
 .cq-workspace:has(.ref-detail) .cq-market-state{display:none}
+.cq-nav-title{display:block;padding:7px 5px;color:#9be3ff;font-size:12px}
+.cq-functions summary strong,.cq-functions summary span{display:block}
+.cq-functions summary span{font-size:11px;font-weight:400;color:#c1d9e8;margin-top:3px}
+.cq-functions-note{font-size:11px;color:#c1d9e8;margin:8px 12px;line-height:1.4}
+.cq-functions summary:hover,.cq-functions summary:focus-visible{outline:none;transform:none;box-shadow:inset 0 0 0 2px #6ee7ff}
+.cq-functions nav{max-height:58dvh;overflow-y:auto;overscroll-behavior-y:contain}
+.cq-workspace:has(.ref-detail) .cq-functions summary span{display:none}
+.cq-workspace:has(.ref-detail) .cq-functions summary{padding:8px 12px}
 @media(max-width:700px){.cq-header .cq-brand small{font-size:8px}.cq-header .cq-brand img.cq-mark{width:34px;height:28px}.cq-header .ref-toolbar{gap:5px;padding:4px 8px;min-height:0}.cq-header .cq-header-actions button{min-height:26px;padding:3px 6px;font-size:10px}.cq-header .cq-brand{line-height:1.1}.cq-header-actions{gap:4px}.cq-workspace:has(.ref-detail) .cq-brand small{display:none}}

@@ -10,6 +10,7 @@ from atlasquant_reference_ui import render_reference_workspace
 st.set_page_config(page_title="AtlasQuant · revisão visual local",layout="wide")
 st.markdown("<style>[data-testid='stHeader']{display:none}.stApp{background:#020813}</style>",unsafe_allow_html=True)
 access={"allowed":True,"role":"ADMIN","mode":"PREVIEW","session":{"username":"Mikael · revisão local"}}
+st.session_state.setdefault("atlasquant_experience_mode", "Avançado")
 area=st.session_state.get("atlasquant_central_choice","central_root")
 area="central" if area=="central_root" else area
 render_reference_workspace(st,access,area,mode=st.session_state.get("atlasquant_experience_mode") or "Avançado")

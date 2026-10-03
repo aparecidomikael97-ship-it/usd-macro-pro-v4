@@ -15,11 +15,32 @@ Sem merge ou deploy.
 - Mantidas as melhorias mobile da main. A regra antiga de controles flutuantes ficou restrita ao cockpit raster; o novo cabeçalho não cobre o ticker.
 - Rótulos e números nativos em PT-BR. Fechamento do Dia, Calendário Econômico e Eventos Geopolíticos seguem o padrão de bordas e contraste do cockpit.
 
-## Contrato de dados de apresentação
+## Descoberta das 19 funções — revisão final do Trader
+
+Continuação confirmada antes de editar: branch `integration/trader-main-refinement-20261003`, head `eb4bad9f61b8d0972eaca32c0c2b80531cace964`, Draft PR #551. PR #552 não foi tocada.
+
+No desktop e no tablet, a barra lateral permanece com o título **Funções · 19** e os 19 botões diretamente na lista, com rolagem interna quando necessário. Nas páginas profundas, a navegação lateral também continua disponível. Nenhuma função é filtrada por breakpoint ou modo.
+
+No mobile, acima da home e também nas páginas profundas, o acesso **Funções do Trader · 19** apresenta a instrução **Ver todas as funções · inclui avançadas**. Ao abrir, mostra a lista completa em duas colunas, com rolagem interna. Não existe um segundo grupo recolhido para esconder as funções avançadas. Os cards e demais atalhos da home foram preservados.
+
+Iniciante oferece orientação simplificada, com aviso explícito de que funções avançadas continuam disponíveis. Avançado oferece acesso direto com orientação correspondente. Ambos apresentam as mesmas 19 funções e conservam o modo ao navegar e voltar à home; o modo não muda permissões nem disponibiliza dados inexistentes.
+
+Lista preservada: Início; Radar Mestre; Radar; Painel Mestre; Macro; Micro; Geopolítica; Fundamentalista; ICT/SMC; Calendário Econômico; Pré-Notícia; Laboratório/Backtests; Paper Trading; Guardião de Risco; Academia; Diário; Vídeos/Conteúdo; AION Trader; Perfil/Configurações. Nenhuma função foi removida.
+
+O novo teste de contrato compara a lista com as 19 rotas explicitamente esperadas, sem duplicatas ou grupos recolhidos. O teste Chromium percorre cada uma nos dois modos em 1280×720, 1024×768, 768×1024 e 390×844; verifica descoberta, clique, retorno à home, cards preservados, geometria de hover/focus, ausência de overflow e reduced-motion determinístico. Gera capturas da home, lista mobile aberta, Iniciante, Painel Mestre, ICT/SMC e retorno.
+
+Pendências de dados permanecem: sem cotação residente validada, preço/variação mostram `—`, estados ficam `PRÉVIA` ou aguardando dados. A lista Top 10 da home ainda é uma estrutura em ordem do universo, não um ranking validado. Conteúdos e análises não conectados permanecem identificados como prévias. Nenhuma API/provider ou lógica financeira foi alterada.
 
 `reference_html(..., market_items=[...])` e o estado residente `atlasquant_validated_market_items` aceitam registros com `asset`, `source`, `as_of` ISO com fuso e `validated=True`. Campos opcionais: `price`, `change_pct`, `score`, `bias` (Compra/Venda/Neutro), `series` numérica real. A ordem recebida é mantida. Dados ausentes, inválidos, futuros ou com mais de uma hora não viram preço, percentual ou ranking. A camada não coleta APIs, não calcula sinais e não modifica o motor financeiro. A lista Forex continua separada das outras classes; os 28 pares permanecem no Radar.
 
-## Validação
+## Validação da revisão final
+
+- Integração local atualizada: 160 testes e 48 subtestes passaram; inclui dois contratos explícitos das 19 rotas, um para cada modo.
+- Compilação dos módulos e testes alterados e `git diff --check` passaram.
+- A nova matriz Chromium e as capturas estão no teste `test_trader_19_functions_discoverable_and_clickable_in_both_modes`; as evidências finais e o status dos workflows são publicados junto ao Draft PR #551.
+- O harness de prévia inicializa o modo Avançado no estado, de acordo com seu rótulo inicial. Não modifica autenticação, RBAC ou a inicialização de produção.
+
+## Validação anterior no head de partida
 
 - Integração local: 158 testes e 48 subtestes passaram.
 - Contratos de apresentação: 35 testes passaram.

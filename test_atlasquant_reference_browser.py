@@ -206,3 +206,84 @@ def test_central_and_legacy_cards_keep_exact_hover_and_keyboard_geometry(preview
             assert button.evaluate('(e)=>getComputedStyle(e).boxShadow')!='none'
         page.screenshot(path=str(artifacts/'legacy-cards-focus.png'),full_page=True)
         browser.close()
+
+
+def test_trader_19_functions_discoverable_and_clickable_in_both_modes(preview_url):
+    artifacts = Path('visual_review'); artifacts.mkdir(exist_ok=True)
+    expected_routes = [route for route, _ in NAV['trader']]
+    assert len(expected_routes) == len(set(expected_routes)) == 19
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={'width':1280, 'height':720}, reduced_motion='reduce')
+        errors = []; page.on('pageerror', lambda error: errors.append(str(error)))
+        page.goto(preview_url)
+        page.locator('.ref-canvas [data-route="area:trader"]').click(timeout=30000)
+        expect(page.locator('.cq-main')).to_be_visible(timeout=30000)
+        for width, height in ((1280,720), (1024,768), (768,1024), (390,844)):
+            page.set_viewport_size({'width':width, 'height':height})
+            for mode in ('Avançado', 'Iniciante'):
+                mode_button = page.locator('.ref-mode')
+                for _ in range(2):
+                    if mode_button.inner_text() == 'Modo ' + mode: break
+                    mode_button.click()
+                    expect(mode_button).not_to_have_attribute('aria-busy', 'true')
+                    expect(page.locator('.cq-main')).to_be_visible()
+                expect(mode_button).to_have_text('Modo ' + mode)
+                expect(page.locator('.ref-detail')).to_have_count(0)
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                # Existing home shortcuts remain present in both experience modes.
+                for route in ('indexes','commodities','stocks','week','day','close_day',
+                        'close_week','radar','master','news','calendar','geo','guardian','aion_specialist'):
+                    expect(page.locator(f'.cq-main [data-route="{route}"]').first).to_be_visible()
+                if width == 390:
+                    summary = page.locator('.cq-functions summary')
+                    expect(summary).to_be_visible()
+                    expect(summary).to_contain_text('Funções do Trader · 19')
+                    expect(summary).to_contain_text('inclui avançadas')
+                    summary.scroll_into_view_if_needed()
+                    assert summary.bounding_box()['y'] < height
+                    before = summary.bounding_box(); summary.hover(); summary.focus()
+                    assert all(abs(before[k]-summary.bounding_box()[k]) < .1 for k in before)
+                    assert summary.evaluate('(e)=>getComputedStyle(e).transform') == 'none'
+                    assert summary.evaluate('(e)=>getComputedStyle(e).animationName') == 'none'
+                    assert summary.evaluate('(e)=>getComputedStyle(e).transitionDuration') == '0s'
+                    page.screenshot(path=str(artifacts/f'trader-functions-mobile-{mode}.png'), full_page=True)
+                    summary.click()
+                    expect(page.locator('.cq-functions')).to_have_attribute('open', '')
+                    if mode == 'Iniciante':
+                        expect(page.locator('.cq-functions-note')).to_contain_text('inclusive avançadas')
+                    page.screenshot(path=str(artifacts/f'trader-functions-mobile-open-{mode}.png'), full_page=True)
+                    nav_selector = '.cq-functions nav'
+                else:
+                    expect(page.locator('.cq-nav-title').first).to_have_text('Funções · 19')
+                    nav_selector = '.cq-nav'
+                    page.screenshot(path=str(artifacts/f'trader-functions-{width}-{mode}.png'), full_page=True)
+                # Exact route set, direct buttons; no nested disclosure or CSS hiding.
+                buttons = page.locator(nav_selector + ' [data-route]')
+                assert buttons.evaluate_all('(els)=>els.map(e=>e.dataset.route)') == expected_routes
+                expect(buttons).to_have_count(19)
+                expect(page.locator(nav_selector + ' details')).to_have_count(0)
+                for route in expected_routes:
+                    if width == 390 and page.locator('.cq-functions').get_attribute('open') is None:
+                        page.locator('.cq-functions summary').click()
+                    button = page.locator(nav_selector + f' [data-route="{route}"]')
+                    expect(button).to_be_visible()
+                    button.scroll_into_view_if_needed()
+                    before = button.bounding_box(); button.hover(); button.focus()
+                    assert all(abs(before[k]-button.bounding_box()[k]) < .1 for k in before)
+                    assert button.evaluate('(e)=>getComputedStyle(e).transform') == 'none'
+                    button.click()
+                    if route != 'home':
+                        expect(page.locator('.ref-detail')).to_be_visible()
+                        if width == 390 and mode == 'Iniciante' and route in ('master','ict'):
+                            page.screenshot(path=str(artifacts/f'trader-functions-mobile-{route}.png'), full_page=True)
+                        page.locator('.ref-detail [data-route="home"]').click()
+                    expect(page.locator('.cq-main')).to_be_visible()
+                    expect(page.locator('.ref-detail')).to_have_count(0)
+                    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                    expect(page.locator('.ref-mode')).to_have_text('Modo ' + mode)
+                if width == 390:
+                    page.locator('.cq-functions summary').scroll_into_view_if_needed()
+                    page.screenshot(path=str(artifacts/f'trader-functions-mobile-return-{mode}.png'), full_page=True)
+        assert not errors
+        browser.close()

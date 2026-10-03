@@ -117,9 +117,30 @@ def test_return_home_resets_legacy_selection_without_changing_auth():
 def test_mode_preserves_all_functions_and_changes_only_visible_depth():
     advanced=reference_html("trader",mode="Avançado")
     beginner=reference_html("trader",mode="Iniciante")
-    assert "Todas as funções · Avançado" in beginner
+    assert "Funções do Trader · 19" in beginner
+    assert "inclusive avançadas, continuam disponíveis" in beginner
     for route,_ in NAV["trader"]:
         assert f'data-route="{route}"' in advanced and f'data-route="{route}"' in beginner
+
+
+@pytest.mark.parametrize("mode", ["Iniciante", "Avançado"])
+def test_exact_trader_navigation_contract_without_nested_hidden_modules(mode):
+    from html.parser import HTMLParser
+    from atlasquant_reference_ui import nav_html
+    expected = ('home', 'radar_master', 'radar', 'master', 'macro', 'micro',
+        'geo', 'fundamental', 'ict', 'calendar', 'news', 'lab', 'paper',
+        'guardian', 'academy', 'journal', 'video', 'aion_specialist', 'profile')
+    class Routes(HTMLParser):
+        def __init__(self):
+            super().__init__(); self.routes = []; self.details = 0
+        def handle_starttag(self, tag, attrs):
+            if tag == 'details': self.details += 1
+            if tag == 'button': self.routes.append(dict(attrs).get('data-route'))
+    parser = Routes(); parser.feed(nav_html('trader', mode))
+    assert tuple(route for route, _ in NAV['trader']) == expected
+    assert tuple(parser.routes) == expected
+    assert len(set(parser.routes)) == 19
+    assert parser.details == 0
 
 
 def test_master_first_fold_and_radar_truth():
