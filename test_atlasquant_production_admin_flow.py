@@ -208,7 +208,8 @@ class ProductionAdminFlowTests(unittest.TestCase):
             )
         self.assertNotIn("🧠 AION", at.selectbox(key="atlasquant_advanced_area").options)
         self.assertNotIn("💰 Investir", at.selectbox(key="atlasquant_advanced_area").options)
-        self.assertEqual(at.button(key="aq_voice_dock_aion").label, "Abrir central AION")
+        self.assertFalse(any(getattr(button, "key", None) == "aq_voice_dock_aion" for button in at.button))
+        self.assertIn('data-route="central"', self._html(at))
         # The whole Advanced script, including the Radar workspace, runs offline here.
         self.assertLess(elapsed, 60)
         print(f"\n[advanced-click] AppTest full rerun {elapsed:.2f}s, cache state {boot['state']}")
@@ -248,7 +249,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("from atlasquant_premium_shell import", app)
         self.assertIn("render_premium_catalog(", app)
         self.assertIn("render_account_identity(_ATLASQUANT_ACCESS)", app)
-        self.assertIn("render_top_voice_access(st.session_state, pages=_nav_items", app)
+        self.assertIn("render_top_voice_access(st.session_state, pages=_aq_trader_nav_items", app)
 
 
 class AccountIdentityRulesTests(unittest.TestCase):

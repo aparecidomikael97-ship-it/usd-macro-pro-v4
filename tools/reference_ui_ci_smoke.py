@@ -21,6 +21,12 @@ def _assert_clean(page, failures: list[str], label: str) -> None:
     exc = page.locator('[data-testid="stException"]').count()
     if exc:
         failures.append(f"{label}: {exc} stException")
+    text = page.locator("body").inner_text()
+    for signature in ("NotFoundError", "removeChild", "Traceback (most recent call last)",
+                      "NameError:", "UnboundLocalError:", "AttributeError:",
+                      "O Painel Mestre encontrou um erro", "Painel Mestre aguardando a Matriz dos 7 pares"):
+        if signature in text:
+            failures.append(f"{label}: {signature}")
     width = int(page.evaluate("document.documentElement.scrollWidth"))
     viewport = int(page.evaluate("window.innerWidth"))
     if width - viewport > 8:

@@ -54,8 +54,8 @@ snapshot e refresh nas homes. O preview isolado usa identidade de revisão e nã
 
 - Suíte de interface, startup, fluxo autenticado, acesso e bridge: 142 testes e
   48 subtestes passaram.
-- Regressões após as correções de CI: 109 testes e 26 subtestes passaram.
-- Contratos da nova interface após os recortes: 20 testes passaram.
+- Regressões após as correções de CI: 110 testes e 26 subtestes passaram.
+- Contratos da nova interface após os recortes: 21 testes passaram.
 - Chromium real: 1440 × 1000 e 390 × 844; cinco telas, cartões, menus, ferramentas,
   retorno, posição do título, ausência de overflow e movimento reduzido.
 - O navegador exige decodificação bem-sucedida da imagem. Essa verificação
@@ -113,7 +113,7 @@ verificada é da arte original, antes dos controles e adaptações descritos aci
 - Arte: `assets/ecosystem_reference/central.webp`, `trader.jpg`, `negocios.webp`,
   `investimentos.webp`, `aion.webp`, `trader_nav.webp`, `negocios_nav.webp`,
   `investimentos_nav.webp`, `aion_nav.webp`, `manifest.json`, `reference.css`.
-- Revisão/CI: `tools/reference_ui_preview.py`,
+- Revisão/CI: `tools/reference_ui_preview.py`, `tools/reference_ui_ci_smoke.py`,
   `.github/workflows/atlasquant-reference-ui.yml`,
   `.github/workflows/atlasquant-ui-smoke.yml`,
   `.github/workflows/mobile-dom-stability.yml`,

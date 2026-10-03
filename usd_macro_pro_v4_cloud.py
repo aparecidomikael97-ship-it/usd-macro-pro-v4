@@ -2328,7 +2328,7 @@ if _aq_early_pages:
 _hold_admin_before_trader_shell()
 # UI-only early return: the cockpit needs no provider, scanner or snapshot fetch.
 # The existing authenticated access and central area gates run before this point.
-if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
+if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
     from atlasquant_reference_ui import render_trader_entry
     if render_trader_entry(st, _ATLASQUANT_ACCESS):
         st.stop()
@@ -4609,6 +4609,11 @@ except Exception:
 if str(_ATLASQUANT_ACCESS.get("role") or "").upper() == "ADMIN":
     _nav_items.append("🧠 AION")
 
+# Workspace separation affects the visible selector only. Keep the canonical
+# page sequence intact because the existing analytical dispatcher uses indexes.
+_aq_trader_nav_items = [item for item in _nav_items
+    if item not in {"💰 Investir", "🧠 AION", "💼 Negócios", "💼 Vendas"}]
+
 # AION Portable Core — single-link entry contract.
 # The same private app can be opened with ?aion=1. This only requests the AION
 # workspace after an ADMIN session is already authenticated; it never bypasses
@@ -4673,11 +4678,12 @@ def _aq_complete_guided_revalidation(surface, *, succeeded, error_type=""):
             "O resultado não será tratado como saudável."
         )
     if "🧠 AION" in _nav_items and st.button(
-        "↩️ Voltar para a Central AION",
+        "← Central",
         key=f"aq_guided_return_{surface}",
         width="stretch",
     ):
-        request_return_to_aion(st.session_state)
+        from atlasquant_central_hub_ui import request_central_destination
+        request_central_destination(st.session_state, _ATLASQUANT_ACCESS, "central")
         st.rerun()
     return result
 
@@ -4689,7 +4695,7 @@ _aq_experience_mode = (
 )
 try:
     from atlasquant_voice_assistant import render_top_voice_access
-    render_top_voice_access(st.session_state, pages=_nav_items, fast=False)
+    render_top_voice_access(st.session_state, pages=_aq_trader_nav_items, fast=False)
 except Exception:
     pass
 if consume_premium_navigation is not None:
@@ -4735,13 +4741,9 @@ if render_premium_catalog is not None:
         fast=False,
         active_page=_aq_catalog_active_page,
         ticker_items=_aq_trader_ticker_items,
-        access=_ATLASQUANT_ACCESS,
+        access=_ATLASQUANT_ACCESS if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" else None,
     )
 
-# Workspace separation affects the visible selector only. Keep the canonical
-# page sequence intact because the existing analytical dispatcher uses indexes.
-_aq_trader_nav_items = [item for item in _nav_items
-    if item not in {"💰 Investir", "🧠 AION", "💼 Negócios", "💼 Vendas"}]
 if render_stable_navigation is not None:
     _aq_active_page = render_stable_navigation(
         _aq_trader_nav_items,

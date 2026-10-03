@@ -106,6 +106,14 @@ def test_connected_master_uses_existing_navigation_and_no_auth_mutation():
     assert state["atlasquant_access_session"]==before
 
 
+def test_return_home_resets_legacy_selection_without_changing_auth():
+    state={"aq_reference_connected":True,"atlasquant_advanced_area":"master", "atlasquant_access_session":{"username":"same"}}
+    apply_event(state,USER,"trader","home")
+    assert not state["aq_reference_connected"]
+    assert state["atlasquant_advanced_area"]=="🎯 Radar"
+    assert state["atlasquant_access_session"]=={"username":"same"}
+
+
 def test_mode_preserves_all_functions_and_changes_only_visible_depth():
     advanced=reference_html("trader",mode="Avançado")
     beginner=reference_html("trader",mode="Iniciante")

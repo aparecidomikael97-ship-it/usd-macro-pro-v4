@@ -355,6 +355,12 @@ def apply_event(session, access, area, event):
     elif event == "home":
         session.pop("aq_reference_module",None)
         session["aq_reference_connected"] = False
+        if area == "trader":
+            # Keep the legacy selector aligned with the cockpit when returning
+            # from a requested analytical page. No authentication state changes.
+            session["atlasquant_advanced_area"] = "🎯 Radar"
+            session["atlasquant_beginner_area_full"] = "🎯 Radar"
+            session["aq_beginner_page"] = "🎯 Radar"
     elif event.startswith("why:") and area == "trader":
         from atlasquant_fx_universe import OFFICIAL_PAIRS
         if event[4:] not in OFFICIAL_PAIRS:
