@@ -126,7 +126,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          nohup streamlit run usd_macro_pro_v4_cloud.py \
+          ATLASQUANT_OFFLINE_SMOKE=false nohup streamlit run usd_macro_pro_v4_cloud.py \
             --server.headless true \
             --server.address 127.0.0.1 \
             --server.port 8501 \
