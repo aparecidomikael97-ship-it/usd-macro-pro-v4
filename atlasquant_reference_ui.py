@@ -52,7 +52,7 @@ REGIONS = {
    ("fundamental", "Fundamentalista", (560,332,117,123)), ("ict", "ICT / SMC", (679,332,114,123)),
    ("calendar", "Calendário Econômico", (798,332,112,123)), ("news", "Pré-Notícia", (915,332,111,123)),
    ("master", "Painel Mestre", (1031,332,162,123)), ("geo", "Mapa de Risco Global", (163,465,369,133)),
-   ("news", "Notícias em Tempo Real", (163,604,276,111)), ("radar_master", "Radar Mestre", (541,456,252,253)),
+   ("news", "Notícias em Tempo Real", (163,604,276,111)), ("scanner", "Scanner Técnico", (541,456,252,253)),
    ("radar", "Viés Atual do Mercado", (830,463,173,170)), ("calendar", "Calendário Econômico", (1006,464,257,134)),
    ("geo", "Eventos Geopolíticos", (1006,602,257,108)), ("academy", "Academia", (448,640,105,76)),
    ("lab", "Laboratório", (559,638,117,78)), ("paper", "Paper Trading", (681,639,106,77)),
