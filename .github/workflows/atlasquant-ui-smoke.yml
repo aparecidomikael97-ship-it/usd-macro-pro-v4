@@ -422,7 +422,7 @@ jobs:
                       "context_value":".aq-context-strip strong",
                       "trader_title":".aq-trader-module h4",
                       "trader_detail":".aq-trader-module p",
-                      "trader_motto":".aq-trader-motto",
+                      "trader_motto":".aq-trader-v3-motto",
                   }.items():
                       locator=page.locator(selector)
                       if not locator.count():
@@ -562,7 +562,7 @@ jobs:
                       "slogan_present":False,
                       "module_order_ok":False,
                   }
-                  shell=page.locator('.aq-trader-shell[data-trader-reference="v1"]').first
+                  shell=page.locator('.aq-trader-shell[data-trader-reference="v3"]').first
                   if shell.count():
                       cockpit["present"]=True
                       cockpit["module_count"]=page.locator(".aq-trader-module").count()
