@@ -189,6 +189,30 @@ def test_reference_mobile_chrome_is_hidden_only_when_reference_cockpit_is_active
     assert '.stApp:has(#aq-reference-active) .block-container{padding-top:0!important' in src
 
 
+def test_mobile_v7_collapses_duplicate_production_chrome_before_reference_cockpit():
+    src=Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+    assert '[data-testid="stElementContainer"]:has(.aq-hero)' in src
+    assert '[data-testid="stElementContainer"]:has(#aq-account-identity)' in src
+    assert '[data-testid="stElementContainer"]:has(.aq-boot-banner)' in src
+    assert '[data-testid="stElementContainer"]:has(.aq-voice-dock)' in src
+    assert ':has(.aq-voice-dock) + [data-testid="stHorizontalBlock"]{display:none!important}' in src
+    assert 'html:has(#aq-reference-active) [data-testid="stAppViewContainer"]' in src
+    assert 'html:has(#aq-reference-active) [data-testid="stMain"]' in src
+    assert 'html:has(#aq-reference-active) [data-testid="stMainBlockContainer"]' in src
+    assert 'margin-top:0!important;top:0!important;padding-top:0!important' in src
+    assert '[data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"]{gap:0!important}' in src
+
+
+def test_mobile_v7_equalizes_video_art_and_centers_journal():
+    css=CSS.read_text(encoding="utf-8")
+    assert "Fidelity polish v7" in css
+    assert ".ref-trader .ref-mobile-card-video .ref-mobile-art{" in css
+    assert "height:clamp(112px,31vw,132px)" in css
+    assert ".ref-trader .ref-mobile-card-journal{" in css
+    assert "grid-column:1/-1" in css
+    assert "justify-self:center" in css
+
+
 def test_mobile_v5_v6_css_compacts_and_stops_card_stretching():
     css=CSS.read_text(encoding="utf-8")
     assert "Fidelity polish v5" in css

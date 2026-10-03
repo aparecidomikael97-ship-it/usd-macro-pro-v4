@@ -216,6 +216,60 @@ def main() -> int:
                     failures.append(f"{name}: {len(page_errors)} pageerror")
                 if any("NotFoundError" in x or "removeChild" in x for x in console_errors):
                     failures.append(f"{name}: console contém NotFoundError/removeChild")
+                layout_probe = page.evaluate("""
+() => {
+  const describe = (el, selector) => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return {
+      selector,
+      tag: el.tagName,
+      className: String(el.className || ""),
+      testid: el.getAttribute("data-testid"),
+      top: Math.round(r.top * 10) / 10,
+      bottom: Math.round(r.bottom * 10) / 10,
+      height: Math.round(r.height * 10) / 10,
+      display: s.display,
+      visibility: s.visibility,
+      position: s.position,
+      marginTop: s.marginTop,
+      marginBottom: s.marginBottom,
+      paddingTop: s.paddingTop,
+      paddingBottom: s.paddingBottom,
+      text: (el.innerText || "").trim().slice(0, 100),
+    };
+  };
+  const selectors = [
+    '[data-testid="stAppViewContainer"]',
+    '[data-testid="stMain"]',
+    '[data-testid="stMainBlockContainer"]',
+    '.block-container',
+    '.ref-workspace[data-workspace="trader"]',
+    '.aq-hero',
+    '#aq-account-identity',
+    '.aq-boot-banner',
+    '.aq-voice-dock',
+    '[data-testid="stRadio"]'
+  ];
+  const selected = selectors.map(sel => describe(document.querySelector(sel), sel));
+  const block = document.querySelector('[data-testid="stMainBlockContainer"]') || document.querySelector('.block-container');
+  const children = block ? [...block.querySelectorAll(':scope > div, :scope > div > div, :scope > div > div > div')]
+    .filter(el => {
+      const r = el.getBoundingClientRect();
+      const s = getComputedStyle(el);
+      return r.height > 0 && s.display !== 'none' && r.top < 420;
+    })
+    .slice(0, 30)
+    .map((el, i) => describe(el, 'visible-child-' + i)) : [];
+  return {
+    scrollY: window.scrollY,
+    viewportHeight: window.innerHeight,
+    selected,
+    children,
+  };
+}
+""")
                 page.screenshot(path=str(out / f"{name}.png"), full_page=True)
                 report["profiles"][name] = {
                     "source_build": observed,
@@ -224,6 +278,7 @@ def main() -> int:
                     "console_errors": console_errors[-10:],
                     "document_width": int(page.evaluate("document.documentElement.scrollWidth")),
                     "viewport_width": int(page.evaluate("window.innerWidth")),
+                    "layout_probe": layout_probe,
                 }
             except Exception as exc:
                 failures.append(f"{name}: {type(exc).__name__}: {exc}")

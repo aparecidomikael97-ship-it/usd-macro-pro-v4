@@ -230,3 +230,27 @@ button:focus-visible,summary:focus-visible{outline:3px solid #6ee7ff;outline-off
  .ref-trader .ref-mobile-card-icon .ref-mobile-art{min-height:66px}
  .ref-trader .ref-mobile-card-icon strong{font-size:9.5px}
 }
+
+
+/* Fidelity polish v7 — final mobile rhythm and last-row cleanup. */
+@media(max-width:700px){
+ .ref-trader .ref-mobile-card-video .ref-mobile-art{
+  aspect-ratio:auto!important;
+  height:clamp(112px,31vw,132px);
+ }
+ .ref-trader .ref-mobile-card-video strong{
+  display:grid;
+  place-items:center;
+  min-height:38px;
+  padding:8px 7px 9px;
+ }
+ .ref-trader .ref-mobile-card-journal{
+  grid-column:1/-1;
+  width:calc((100% - 8px)/2);
+  justify-self:center;
+ }
+}
+@media(max-width:420px){
+ .ref-trader .ref-mobile-card-video .ref-mobile-art{height:clamp(108px,31vw,126px)}
+ .ref-trader .ref-mobile-card-journal{width:calc((100% - 6px)/2)}
+}
