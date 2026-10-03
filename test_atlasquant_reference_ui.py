@@ -6,7 +6,7 @@ import json
 import re
 import pytest
 from PIL import Image, ImageChops
-from atlasquant_reference_ui import (NAV, REGIONS, SURFACES, ASSET_ROOT, CSS, action_labels,
+from atlasquant_reference_ui import (MOBILE_CROPS, NAV, REGIONS, SURFACES, ASSET_ROOT, CSS, action_labels,
     apply_event, asset_uri, reference_html, render_trader_entry)
 
 
@@ -162,6 +162,25 @@ def test_mobile_hero_has_environment_identity(area):
     html=reference_html(area)
     assert f"ref-mobile-header-{area}" in html
     assert "ECOSSISTEMA ATLASQUANT" in html
+
+def test_mobile_hotfix_uses_explicit_trader_crops_and_route_classes():
+    html=reference_html("trader")
+    assert MOBILE_CROPS[("trader","news")] == (923,338,95,108)
+    assert MOBILE_CROPS[("trader","master")] == (1040,376,144,72)
+    assert 'class="ref-mobile-card ref-mobile-card-news"' in html
+    assert 'data-mobile-crop="923,338,95,108"' in html
+    assert 'class="ref-mobile-card ref-mobile-card-master"' in html
+    assert 'data-mobile-crop="1040,376,144,72"' in html
+
+
+def test_mobile_v5_css_compacts_central_and_contains_toolbar():
+    css=CSS.read_text(encoding="utf-8")
+    assert "Fidelity polish v5" in css
+    assert ".ref-central .ref-mobile-grid{grid-template-columns:repeat(2,minmax(0,1fr))" in css
+    assert ".ref-central .ref-mobile-art{aspect-ratio:4/3!important}" in css
+    assert ".ref-toolbar{width:calc(100% - 16px);min-width:0;overflow:hidden}" in css
+    assert ".ref-trader .ref-mobile-card-master .ref-mobile-art{aspect-ratio:2/1!important" in css
+
 
 def test_eight_roles_one_shared_aion():
     html=reference_html("aion",selected="roles")

@@ -69,6 +69,15 @@ REGIONS = {
    ("monitoring", "Status do Núcleo AION", (188,526,244,207)), ("knowledge", "Núcleo Global", (428,526,305,207)),
    ("reports", "Atividades Recentes", (745,526,289,207))],
 }
+
+# Mobile crops are intentionally separate from desktop hit regions. The approved
+# desktop artwork remains untouched; these insets prevent adjacent raster cards
+# from bleeding into narrow mobile tiles and keep focal art above HTML labels.
+MOBILE_CROPS = {
+    ("trader", "news"): (923, 338, 95, 108),
+    ("trader", "master"): (1040, 376, 144, 72),
+}
+
 EXTRA = {"trader": (("week","Análise da Semana"),("day","Análise do Dia"),("close_day","Fechamento do Dia"),("close_week","Fechamento Semanal")),
  "central": (("profile","Perfil"),("notifications","Notificações"),("settings","Configurações"),("session","Sessão"))}
 BEGINNER = {"home","radar","radar_master","master","macro","news","academy","aion_specialist","profile","week","day","close_day","close_week"}
@@ -265,15 +274,18 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     for route,label,box in REGIONS[area]:
         if route in {"profile","notifications","settings","session"}:
             continue
-        x,y,bw,bh = box
-        if area == "trader" and route in {"master", "journal"}:
-            bh = min(bh, 65 if route == "master" else 40)
+        x,y,bw,bh = MOBILE_CROPS.get((area, route), box)
         scale = 100*w/bw
         posx = 100*x/max(1,w-bw)
         posy = 100*y/max(1,h-bh)
         style = f"aspect-ratio:{bw}/{bh};background-size:{scale}%;background-position:{posx}% {posy}%"
-        mobile.append(f'<button class="ref-mobile-card" data-route="{escape(route)}" aria-label="{escape(label)}">'
-                      f'<span class="ref-mobile-art" style="{style}"></span><strong>{escape(label)}</strong></button>')
+        mobile.append(
+            f'<button class="ref-mobile-card ref-mobile-card-{escape(route)}" '
+            f'data-route="{escape(route)}" data-mobile-crop="{x},{y},{bw},{bh}" '
+            f'aria-label="{escape(label)}">'
+            f'<span class="ref-mobile-art" style="{style}"></span>'
+            f'<strong>{escape(label)}</strong></button>'
+        )
     # Replace screenshot identity text with the current authenticated identity.
     id_box = {"central":(591,13,75,32),"trader":(1121,8,87,34),"negocios":(682,29,64,30),"investimentos":(876,22,100,35),"aion":(876,22,100,35)}[area]
     ix,iy,iw,ih=id_box
@@ -411,7 +423,16 @@ def render_reference_workspace(st, access, area, *, mode=None):
     if not access or access.get("allowed") is not True:
         return False
     from atlasquant_central_hub_ui import assert_area_access
-    st.markdown('<style>[data-testid="stMainBlockContainer"]{max-width:1600px;padding-top:1rem;padding-left:1rem;padding-right:1rem}</style>',unsafe_allow_html=True)
+    st.markdown(
+        '<style>'
+        '[data-testid="stMainBlockContainer"]{max-width:1600px;padding-top:.55rem;padding-left:1rem;padding-right:1rem}'
+        '@media(max-width:700px){'
+        '[data-testid="stHeader"]{height:2.5rem;min-height:2.5rem}'
+        '[data-testid="stMainBlockContainer"]{padding-top:.15rem!important;padding-left:.5rem!important;padding-right:.5rem!important}'
+        '}'
+        '</style>',
+        unsafe_allow_html=True,
+    )
     if area != "central":
         assert_area_access(access,area)
     elif str(access.get("role") or "").upper() != "ADMIN":

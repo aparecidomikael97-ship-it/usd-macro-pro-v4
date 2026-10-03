@@ -369,7 +369,7 @@ html { scroll-behavior: smooth; }
 .aq-preview-lock .lock{font-size:1.5rem}.aq-preview-lock h3{margin:.2rem 0 .4rem;color:var(--aq-text)}.aq-preview-lock p{color:var(--aq-muted);margin:.2rem 0 .7rem}
 .aq-preview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.aq-preview-card{border:1px solid var(--aq-line);border-radius:12px;padding:11px 12px;background:rgba(10,25,44,.78);color:#f0f6ff;font-size:.8rem;font-weight:700;line-height:1.35}
 @media (max-width: 760px) {
-  .stMainBlockContainer { padding-left: .85rem; padding-right: .85rem; padding-top: .7rem; }
+  .stMainBlockContainer { padding-left: .85rem; padding-right: .85rem; padding-top: .3rem; }
   [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: .55rem !important; }
   [data-testid="stColumn"] { min-width: 150px !important; flex: 1 1 150px !important; }
   .aq-hero { padding: 15px 16px 14px; border-radius: 14px; }
