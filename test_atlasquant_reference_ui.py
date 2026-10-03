@@ -139,6 +139,30 @@ def test_master_first_fold_and_radar_truth():
         apply_event(state,USER,"trader","why:fake")
 
 
+
+
+@pytest.mark.parametrize(
+    ("area","selected","expected"),
+    [
+        ("negocios","opportunities",("ESCOPO B2B","Workspace isolado por empresa","AÇÃO EXTERNA")),
+        ("investimentos","stocks",("ESCOPO","Leitura e comparação de investimentos","EXECUÇÃO")),
+        ("aion","models",("NÚCLEO","Um único AION Core compartilhado","AUTORIDADE")),
+    ],
+)
+def test_private_preview_panels_have_workspace_specific_identity(area, selected, expected):
+    html=reference_html(area,selected=selected)
+    assert 'class="ref-preview-grid"' in html
+    for text in expected:
+        assert text in html
+    assert "Nenhum dado validado disponível para exibir." not in html
+
+
+@pytest.mark.parametrize("area",("negocios","investimentos","aion"))
+def test_mobile_hero_has_environment_identity(area):
+    html=reference_html(area)
+    assert f"ref-mobile-header-{area}" in html
+    assert "ECOSSISTEMA ATLASQUANT" in html
+
 def test_eight_roles_one_shared_aion():
     html=reference_html("aion",selected="roles")
     assert "Não são oito IAs independentes" in html
