@@ -189,69 +189,24 @@ class PremiumShellTests(unittest.TestCase):
 
     def test_catalog_uses_reference_trader_cockpit_without_fake_market_prices(self):
         pages = list(NAVIGATION_LABELS) + ["🧠 AION"]
-        tickers = [
-            {"label": "USD", "score": 62},
-            {"label": "EUR", "score": 43},
-            {"label": "JPY", "score": 50},
-        ]
-        html = premium_catalog_html(
-            mode="Avançado",
-            available_pages=pages,
-            fast=False,
-            ticker_items=tickers,
-        )
-        self.assertIn('data-trader-reference="v3"', html)
-        self.assertIn("ATLASQUANT · ECOSSISTEMA", html)
-        self.assertIn("Poderoso por dentro. Simples por fora.", html)
-        self.assertIn("ANÁLISE DA SEMANA", html)
+        html = trader_cockpit_html(mode="Avançado", available_pages=pages)
+        self.assertIn('data-workspace="trader"', html)
         self.assertIn("Mapa de Risco Global", html)
-        self.assertIn("GLOBAL INTELLIGENCE CORE", html)
-        self.assertIn("Guardião de Risco", html)
-        self.assertIn("FORÇA 62", html)
-        self.assertIn("FORÇA 43", html)
-        self.assertNotIn("62%", html)
-        for title in (
-            "Macroeconomia", "Microeconomia", "Geopolítica", "Fundamentalista",
-            "ICT / SMC", "Calendário Econômico", "Pré-Notícia", "Investimentos",
-        ):
+        self.assertIn("dados da imagem ilustrativos", html)
+        self.assertNotIn("Negócios", html)
+        self.assertNotIn("Investimentos", html)
+        for title in ("Macro", "Micro", "Geopolítica", "ICT / SMC", "Painel Mestre", "Radar Mestre", "Diário"):
             self.assertIn(title, html)
-        self.assertNotIn("?aq_card=", html)
-        self.assertNotIn('<a class="aq-premium-card"', html)
-
-        beginner = trader_cockpit_html(
-            mode="Iniciante",
-            available_pages=pages,
-            fast=False,
-            ticker_items=tickers,
-        )
-        self.assertIn("MODO INICIANTE", beginner)
-        self.assertIn("PRÉVIA AVANÇADA", beginner)
-
-        fast_pages = ["🎯 Radar", "🎙️ Macro", "🎓 Aprender", "👤 Conta", "📱 Instalar", "💰 Investir", "🛟 Suporte"]
-        fast_html = premium_catalog_html(mode="Iniciante", available_pages=fast_pages, fast=True)
-        self.assertIn('data-trader-reference="v3"', fast_html)
-        self.assertIn("INDISPONÍVEL", fast_html)
-
+        beginner = trader_cockpit_html(mode="Iniciante", available_pages=pages)
+        self.assertIn("Todas as funções · Avançado", beginner)
         state = {}
-        self.assertEqual(
-            request_premium_card(state, "macro", mode="Avançado", available_pages=pages, fast=False),
-            "🇺🇸 EUA",
-        )
-        self.assertEqual(
-            consume_premium_navigation(state, mode="Avançado", available_pages=pages),
-            "🇺🇸 EUA",
-        )
-        self.assertEqual(
-            request_premium_card({}, "mesa secreta", mode="Avançado", available_pages=pages),
-            "",
-        )
-        blocked = {}
-        self.assertEqual(
-            request_premium_card(blocked, "ict", mode="Iniciante", available_pages=fast_pages, fast=True),
-            "",
-        )
-        self.assertNotIn("atlasquant_premium_nav_target", blocked)
+        self.assertEqual(request_premium_card(state, "macro", mode="Avançado", available_pages=pages), "🇺🇸 EUA")
+        self.assertEqual(consume_premium_navigation(state, mode="Avançado", available_pages=pages), "🇺🇸 EUA")
 
+        self.assertEqual(request_premium_card({}, "mesa secreta", mode="Avançado", available_pages=pages), "")
+        blocked = {}
+        self.assertEqual(request_premium_card(blocked, "ict", mode="Iniciante", available_pages=["🎯 Radar"], fast=True), "")
+        self.assertNotIn("atlasquant_premium_nav_target", blocked)
 
     def test_workspace_welcome_covers_every_navigation_area_and_aion(self):
         expected = set(NAVIGATION_LABELS) | {"🧠 AION"}

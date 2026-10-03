@@ -8,6 +8,7 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import requests
@@ -59,6 +60,11 @@ class ProductionAdminFlowTests(unittest.TestCase):
         from atlasquant_advanced_boot import reset_live_refresh_for_tests
         reset_live_refresh_for_tests()
         self.snapshot_calls = []
+        self.component_html = ""
+        def component_mount(**kwargs):
+            self.component_html = kwargs["data"]
+            return SimpleNamespace(navigate=None)
+
         self.refresh_calls = []
         fresh = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
         self.fixture = snapshot(generated_at=fresh)
@@ -75,6 +81,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
             raise AssertionError(f"remote write during UI test: {url}")
 
         self.patches = [
+            patch("atlasquant_reference_ui._component", return_value=component_mount),
             patch("atlasquant_fast_startup.load_home_snapshot", side_effect=fake_snapshot),
             patch("atlasquant_advanced_boot.start_live_refresh", side_effect=fake_refresh),
             patch("atlasquant_aion_admin.render_aion_admin_console", side_effect=_aion_stub),
@@ -105,9 +112,8 @@ class ProductionAdminFlowTests(unittest.TestCase):
         at.session_state["atlasquant_access_session"] = _session(username, password)
         return at
 
-    @staticmethod
-    def _html(at):
-        return " ".join(str(item.value) for item in at.markdown)
+    def _html(self, at):
+        return self.component_html + " ".join(str(item.value) for item in at.markdown)
 
     def _assert_clean(self, at):
         errors = [str(getattr(exc, "value", exc)) for exc in at.exception]
@@ -117,128 +123,59 @@ class ProductionAdminFlowTests(unittest.TestCase):
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
         at.run(timeout=180)
         self._assert_clean(at)
-        door = self._html(at)
-        self.assertIn("aq-central-topbar", door)
-        self.assertIn("Bem-vindo, <b>Administrador</b>", door)
-        self.assertIn("Escolha uma área para acessar o seu ecossistema.", door)
-        self.assertIn("aq-central-reference-grid", door)
-        self.assertIn("ACESSAR TRADER", door)
-        self.assertIn("ACESSAR NEGÓCIOS", door)
-        self.assertIn("ACESSAR INVESTIMENTOS", door)
-        self.assertIn("ACESSAR AION", door)
-        self.assertIn('data-root="central_root"', door)
-        for label in ("Trader", "Negócios", "Investimentos", "AION"):
-            self.assertIn(label, door)
-        self.assertIn("Mikael, ", door)
-        self.assertIn("AION ativo.", door)
-        self.assertIn("Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?", door)
-        self.assertIn("ACESSAR AION", door)
-        self.assertNotIn("AION_CONSOLE_RENDERED", door)
-        self.assertNotIn('id="aq-account-identity"', door)
-        self.assertNotIn("aq-premium-hero", door)
-        self.assertEqual(
-            at.button(key="aq_central_stateful_aion").label,
-            "Acessar AION",
-        )
-        self.assertEqual(
-            at.button(key="aq_central_stateful_negocios").label,
-            "Acessar Negócios",
-        )
-        self.assertEqual(
-            at.button(key="aq_central_stateful_trader").label,
-            "Acessar Trader",
-        )
-        self.assertEqual(
-            at.button(key="aq_central_stateful_investimentos").label,
-            "Acessar Investimentos",
-        )
-        self.assertEqual([r for r in at.radio if r.key == "atlasquant_experience_mode"], [])
+        html = self._html(at)
+        self.assertIn('data-workspace="central"', html)
+        for area in ("trader","negocios","investimentos","aion"):
+            self.assertIn('data-route="area:' + area + '"', html)
+        self.assertNotIn("Acessar ambiente", html)
         self.assertEqual(self.snapshot_calls, [])
-
         at.session_state["atlasquant_central_choice"] = "trader"
         at.run(timeout=180)
         self._assert_clean(at)
-        html = self._html(at)
-        self.assertIn('id="aq-account-identity"', html)
-        self.assertIn('data-role="ADMIN"', html)
-        self.assertIn("aparecidomikael · ADMIN", html)
-        self.assertIn("aq-trader-shell", html)
-        self.assertIn('data-trader-reference="v3"', html)
-        self.assertIn("ATLASQUANT · ECOSSISTEMA", html)
-        self.assertIn("Poderoso por dentro. Simples por fora.", html)
-        self.assertIn("Mapa de Risco Global", html)
-        self.assertEqual(self.snapshot_calls[0], "atlasquant-runtime")
-        self.assertEqual(at.session_state["atlasquant_fast_boot_observability"]["mode"], "Iniciante")
-        dock = at.button(key="aq_voice_dock_aion")
-        self.assertEqual(dock.label, "Abrir central AION")
-
-        dock.click().run(timeout=180)
+        self.assertIn('data-workspace="trader"', self._html(at))
+        self.assertEqual(self.snapshot_calls, [])
+        from atlasquant_reference_ui import apply_event
+        apply_event(at.session_state, {"allowed":True,"role":"ADMIN"}, "trader", "aion_specialist")
+        at.run(timeout=180)
         self._assert_clean(at)
-        self.assertEqual(at.session_state["atlasquant_experience_mode"], "Avançado")
-        self.assertEqual(at.session_state["atlasquant_advanced_area"], "🧠 AION")
-        self.assertIn("AION_CONSOLE_RENDERED", self._html(at))
-        self.assertIn("aparecidomikael · ADMIN", self._html(at))
-        nav = at.selectbox(key="atlasquant_advanced_area")
-        self.assertIn("🧠 AION", nav.options)
-        self.assertEqual(nav.value, "🧠 AION")
+        self.assertIn('data-module="aion_specialist"', self._html(at))
+        self.assertNotIn("AION_CONSOLE_RENDERED", self._html(at))
 
     def test_admin_stateful_sector_navigation_preserves_one_authenticated_session(self):
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
         at.run(timeout=180)
-        self._assert_clean(at)
-
         initial = dict(at.session_state["atlasquant_access_session"])
-        initial_authenticated_at = initial["authenticated_at"]
-        initial_username = initial.get("username")
-        initial_role = initial.get("role")
-
-        def assert_session_preserved():
+        from atlasquant_reference_ui import apply_event
+        access = {"allowed":True,"role":"ADMIN"}
+        for area in ("trader","negocios","investimentos","aion"):
+            state = at.session_state.filtered_state
+            apply_event(state, access, "central", "area:" + area)
+            for key, value in state.items():
+                at.session_state[key] = value
+            at.run(timeout=180)
             self._assert_clean(at)
-            session = dict(at.session_state["atlasquant_access_session"])
-            self.assertEqual(session.get("username"), initial_username)
-            self.assertEqual(session.get("role"), initial_role)
-            self.assertEqual(session["authenticated_at"], initial_authenticated_at)
-            self.assertGreaterEqual(session["last_seen"], initial["last_seen"])
-            password_fields = [
-                item for item in at.text_input
-                if "senha" in str(getattr(item, "label", "")).casefold()
-                or "password" in str(getattr(item, "label", "")).casefold()
-            ]
-            self.assertEqual(password_fields, [])
-
-        def go(area_id):
-            at.button(key=f"aq_central_stateful_{area_id}").click().run(timeout=180)
-            assert_session_preserved()
-
-        assert_session_preserved()
-        go("trader")
-        go("central")
-
-        go("negocios")
-        self.assertEqual(at.session_state["atlasquant_experience_mode"], "Avançado")
-        self.assertEqual(at.session_state["atlasquant_advanced_area"], "🧠 AION")
-        self.assertEqual(at.session_state["aion_admin_workspace_jump"], "💼 Negócios")
-        self.assertNotEqual(at.session_state["atlasquant_advanced_area"], "💼 Vendas")
-        self.assertIn("AION_CONSOLE_RENDERED", self._html(at))
-
-        go("central")
-        go("investimentos")
-        # The Central root does not mount the experience-mode widget. Streamlit
-        # may therefore drop that widget-backed state between reruns. The
-        # investments bridge intentionally fails safe to Iniciante when no
-        # current mode survives, while still opening the real Investir page.
-        self.assertEqual(at.session_state["atlasquant_experience_mode"], "Iniciante")
-        self.assertEqual(at.session_state["atlasquant_beginner_area_full"], "💰 Investir")
-        self.assertEqual(at.session_state["aq_beginner_page"], "💰 Investir")
-        self.assertEqual(at.session_state["atlasquant_stable_nav_fallback"], "💰 Investir")
-        self.assertIn("Seja bem-vindo à área de Investimentos.", self._html(at))
-        go("central")
-        go("trader")
+            self.assertIn('data-workspace="' + area + '"', self._html(at))
+            current = dict(at.session_state["atlasquant_access_session"])
+            self.assertEqual(current["username"], initial["username"])
+            self.assertEqual(current["role"], initial["role"])
+            self.assertEqual(current["authenticated_at"], initial["authenticated_at"])
+            self.assertFalse(any("senha" in str(getattr(x,"label","")).casefold() for x in at.text_input))
+            state = at.session_state.filtered_state
+            apply_event(state, access, area, "central")
+            for key, value in state.items():
+                at.session_state[key] = value
+            at.run(timeout=180)
+            self._assert_clean(at)
+        self.assertEqual(self.snapshot_calls, [])
+        self.assertEqual(self.refresh_calls, [])
 
 
     def test_admin_advanced_click_paints_from_the_runtime_snapshot(self):
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
         at.session_state["atlasquant_central_choice"] = "trader"
+        at.run(timeout=180)
+        self._assert_clean(at)
+        at.session_state["aq_reference_connected"] = True
         at.run(timeout=180)
         self._assert_clean(at)
         radio = at.radio(key="atlasquant_experience_mode")
@@ -268,7 +205,8 @@ class ProductionAdminFlowTests(unittest.TestCase):
                 str(advanced_surface.get("state") or "").upper(),
                 "ERROR",
             )
-        self.assertIn("🧠 AION", at.selectbox(key="atlasquant_advanced_area").options)
+        self.assertNotIn("🧠 AION", at.selectbox(key="atlasquant_advanced_area").options)
+        self.assertNotIn("💰 Investir", at.selectbox(key="atlasquant_advanced_area").options)
         self.assertEqual(at.button(key="aq_voice_dock_aion").label, "Abrir central AION")
         # The whole Advanced script, including the Radar workspace, runs offline here.
         self.assertLess(elapsed, 60)
@@ -279,6 +217,7 @@ class ProductionAdminFlowTests(unittest.TestCase):
         at = self._app("aparecidomikael", _ADMIN_PASSWORD)
         at.session_state["atlasquant_central_choice"] = "trader"
         at.session_state["atlasquant_experience_mode"] = "Avançado"
+        at.session_state["aq_reference_connected"] = True
         at.run(timeout=180)
         self._assert_clean(at)
         boot = at.session_state["atlasquant_advanced_boot"]
@@ -292,24 +231,14 @@ class ProductionAdminFlowTests(unittest.TestCase):
         at.run(timeout=180)
         self._assert_clean(at)
         html = self._html(at)
-        self.assertIn("cliente.teste · USER", html)
-        self.assertIn('data-role="USER"', html)
-        self.assertNotIn("· ADMIN", html)
-        self.assertNotIn("CENTRAL PRINCIPAL", html)
-        self.assertNotIn("<h2>Escolha um setor</h2>", html)
-        self.assertNotIn('data-root="central_root"', html)
-        self.assertNotIn("AION IA", html)
-        self.assertNotIn("Renda Fixa", html)
-        self.assertNotIn('href="?central=aion"', html)
-        self.assertNotIn('href="?central=negocios"', html)
-        self.assertNotIn('href="?central=investimentos"', html)
-        self.assertNotIn("AION ativo", html)
-        self.assertNotIn('<section class="aq-aion-presence"', html)
-        self.assertNotIn("Bem-vindo ao AtlasQuant", html)
-        self.assertNotIn("AION liberado", html)
+        self.assertIn("cliente.teste", html)
+        self.assertIn('data-workspace="trader"', html)
+        self.assertNotIn('data-route="central"', html)
+        for area in ("negocios","investimentos","aion"):
+            self.assertNotIn('data-route="area:' + area + '"', html)
         self.assertNotIn("AION_CONSOLE_RENDERED", html)
-        self.assertNotIn("🧠 AION", at.selectbox(key="atlasquant_advanced_area").options)
-        self.assertEqual([b for b in at.button if b.key == "aq_voice_dock_aion"], [])
+        self.assertEqual(self.snapshot_calls, [])
+        self.assertFalse(any("🧠 AION" in list(getattr(x,"options",[])) for x in at.selectbox))
 
     def test_render_entrypoint_is_the_app_that_carries_the_premium_flow(self):
         blueprint = Path("render.yaml").read_text(encoding="utf-8")

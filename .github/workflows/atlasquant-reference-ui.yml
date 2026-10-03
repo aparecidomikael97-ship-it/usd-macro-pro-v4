@@ -1,0 +1,40 @@
+name: AtlasQuant Reference UI
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_reference_ui.py"
+      - "atlasquant_central_hub_ui.py"
+      - "atlasquant_premium_shell.py"
+      - "usd_macro_pro_v4_cloud.py"
+      - "assets/ecosystem_reference/**"
+      - "test_atlasquant_reference*.py"
+      - "tools/reference_ui_preview.py"
+      - ".github/workflows/atlasquant-reference-ui.yml"
+permissions:
+  contents: read
+jobs:
+  reference-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r requirements.txt pytest==9.1.1 playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - name: Validate reference assets, authenticated navigation and lazy entry
+        run: |
+          python -m pytest -q test_atlasquant_reference_ui.py test_atlasquant_central_hub_ui.py test_atlasquant_premium_shell.py test_atlasquant_ecosystem_workspace_ui.py test_atlasquant_fast_startup.py test_atlasquant_production_admin_flow.py test_atlasquant_access_panel.py test_atlasquant_navigation_bridge.py
+      - name: Validate actual desktop and mobile clicks in local Chromium
+        run: python -m pytest -q -s test_atlasquant_reference_browser.py
+      - name: Save visual evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: atlasquant-reference-ui-evidence
+          path: visual_review/
+          if-no-files-found: ignore

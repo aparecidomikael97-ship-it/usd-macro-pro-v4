@@ -507,7 +507,7 @@ def _hold_admin_before_trader_shell() -> None:
     if sync_central_choice is None:
         return
     resolved = sync_central_choice(st.session_state, _ATLASQUANT_ACCESS, requested)
-    if not (resolved.get("root") or resolved.get("shell")):
+    if not (resolved.get("root") or resolved.get("shell") or resolved.get("area") in {"negocios", "investimentos", "aion"}):
         return
     _render_atlasquant_central_hub(stop_for_shell=False)
     st.stop()
@@ -2326,6 +2326,12 @@ if _aq_early_pages:
     except Exception:
         pass
 _hold_admin_before_trader_shell()
+# UI-only early return: the cockpit needs no provider, scanner or snapshot fetch.
+# The existing authenticated access and central area gates run before this point.
+if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
+    from atlasquant_reference_ui import render_trader_entry
+    if render_trader_entry(st, _ATLASQUANT_ACCESS):
+        st.stop()
 st.session_state["_aq_experience_switch_mounted"] = False
 _fast_snapshot = {}
 if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
@@ -4731,18 +4737,22 @@ if render_premium_catalog is not None:
         ticker_items=_aq_trader_ticker_items,
     )
 
+# Workspace separation affects the visible selector only. Keep the canonical
+# page sequence intact because the existing analytical dispatcher uses indexes.
+_aq_trader_nav_items = [item for item in _nav_items
+    if item not in {"💰 Investir", "🧠 AION", "💼 Negócios", "💼 Vendas"}]
 if render_stable_navigation is not None:
     _aq_active_page = render_stable_navigation(
-        _nav_items,
+        _aq_trader_nav_items,
         mode=_aq_experience_mode,
         compact=_aq_catalog_home,
     )
 else:
     _aq_allowed_nav = (
-        _nav_items
+        _aq_trader_nav_items
         if str(_aq_experience_mode).casefold().startswith("avan")
         else [
-            item for item in _nav_items
+            item for item in _aq_trader_nav_items
             if item in {"🎯 Radar","🎙️ Macro Briefing","🎓 Aprender","👤 Conta","📱 Instalar","💰 Investir","🛟 Suporte"}
         ]
     )
