@@ -196,21 +196,19 @@ class AtlasQuantUiTests(unittest.TestCase):
 
 
 
-    def test_main_workspace_surfaces_focus_strip_only_on_radar_home(self):
+    def test_main_radar_builds_real_g8_strength_ticker_for_reference_cockpit(self):
         app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         active=app.index('_aq_catalog_active_page = str(')
-        radar=app.index('_aq_radar_home = _aq_catalog_active_page == "🎯 Radar"',active)
-        guard=app.index("if _aq_radar_home and operation_focus_html is not None:",radar)
-        focus=app.index("operation_focus_html(",guard)
-        nav=app.index("render_stable_navigation(",focus)
-        self.assertLess(active,radar)
-        self.assertLess(radar,guard)
-        self.assertLess(guard,focus)
-        self.assertLess(focus,nav)
-        self.assertIn('decision="Radar em foco"',app[guard:nav])
-        self.assertIn('safety="Safety Core monitorado"',app[guard:nav])
-        self.assertNotIn('Radar pronto para leitura',app)
-
+        ticker=app.index("_aq_trader_ticker_items = []",active)
+        loop=app.index("for _, _aq_tick_row in ranking.head(8).iterrows():",ticker)
+        score=app.index('"score": float(_aq_tick_row.get("Pontuação_Final", 50.0))',loop)
+        catalog=app.index("render_premium_catalog(",score)
+        call=app[catalog:catalog+500]
+        self.assertLess(active,ticker)
+        self.assertLess(ticker,loop)
+        self.assertLess(loop,score)
+        self.assertIn("ticker_items=_aq_trader_ticker_items",call)
+        self.assertNotIn('decision="Radar em foco"',app[ticker:catalog])
 
     def test_mobile_navigation_is_compact_sticky_and_labeled(self):
         self.assertIn('content:"NAVEGAÇÃO"',ATLASQUANT_CSS)
@@ -232,15 +230,12 @@ class AtlasQuantUiTests(unittest.TestCase):
         call=app[app.index("render_stable_navigation("):app.index("else:",app.index("render_stable_navigation("))]
         self.assertIn("compact=_aq_catalog_home",call)
 
-    def test_mobile_navigation_guidance_precedes_stable_selector(self):
+    def test_mobile_navigation_hint_primitive_remains_but_radar_does_not_stack_it(self):
         app=(__import__("pathlib").Path(__file__).resolve().parent/"usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("mobile_navigation_hint_html",app)
-        hint=app.index("mobile_navigation_hint_html()")
-        nav=app.index("render_stable_navigation(",hint)
-        self.assertLess(hint,nav)
+        self.assertNotIn("mobile_navigation_hint_html()",app)
         self.assertIn(".aq-mobile-hint{display:none",ATLASQUANT_CSS)
         self.assertIn(".aq-mobile-hint{display:block}",ATLASQUANT_CSS)
-
 
     def test_ui_1_0_does_not_claim_live_safety_state_in_static_header(self):
         self.assertEqual(UI_VERSION,"1.0")
@@ -377,18 +372,16 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("aq-mode-strip",ATLASQUANT_CSS)
         self.assertIn("aq-mode-chip",ATLASQUANT_CSS)
 
-    def test_main_limits_experience_overview_to_radar_home(self):
+    def test_main_radar_uses_one_reference_cockpit_instead_of_generic_strips(self):
         from pathlib import Path
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         radar=src.index('_aq_radar_home = _aq_catalog_active_page == "🎯 Radar"')
-        guard=src.index("if _aq_radar_home and experience_mode_overview_html is not None:",radar)
-        overview=src.index("experience_mode_overview_html(_aq_experience_mode)",guard)
-        focus=src.index("if _aq_radar_home and operation_focus_html is not None:",overview)
-        nav=src.index("render_stable_navigation(",focus)
-        self.assertLess(radar,guard)
-        self.assertLess(guard,overview)
-        self.assertLess(overview,focus)
-        self.assertLess(focus,nav)
+        catalog=src.index("render_premium_catalog(",radar)
+        block=src[radar:catalog]
+        self.assertIn("_aq_trader_ticker_items",block)
+        self.assertNotIn("experience_mode_overview_html(_aq_experience_mode)",block)
+        self.assertNotIn("operation_focus_html(",block)
+        self.assertNotIn("mobile_navigation_hint_html()",block)
 
     def test_beginner_mode_hides_advanced_tab_buttons_without_changing_indices(self):
         self.assertEqual(normalize_experience_mode("iniciante"),"Iniciante")
@@ -545,8 +538,10 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("contrast_checks",workflow)
         self.assertIn('"context_label":".aq-context-strip span"',workflow)
         self.assertIn('"context_value":".aq-context-strip strong"',workflow)
-        self.assertIn('"focus_detail":".aq-focus-card span"',workflow)
-        self.assertIn("brightness>=200",workflow)
+        self.assertIn('"trader_title":".aq-trader-module h4"',workflow)
+        self.assertIn('"trader_detail":".aq-trader-module p"',workflow)
+        self.assertIn('"trader_motto":".aq-trader-motto"',workflow)
+        self.assertIn("brightness>=180",workflow)
         self.assertIn("opacity",workflow)
         self.assertIn("texto de cartões com contraste insuficiente",workflow)
 

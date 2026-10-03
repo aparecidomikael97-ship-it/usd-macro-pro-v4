@@ -23,6 +23,11 @@ from atlasquant_navigation_bridge import (
 )
 from atlasquant_ui_v1 import hero_html, section_title_html, state_badge_html
 from atlasquant_aion_internal_roles import internal_roles_snapshot
+from atlasquant_ecosystem_workspace_ui import (
+    WORKSPACE_CSS,
+    central_reference_card_html,
+    workspace_cockpit_html,
+)
 
 _AREA_ORDER = ("trader", "negocios", "investimentos", "aion")
 CENTRAL_ROOT = "central_root"
@@ -38,12 +43,12 @@ _AREAS = {
     },
     "negocios": {
         "label": "Negócios",
-        "sentence": "Cockpit operacional Business do AION, com pesquisa, economia unitária e aprovação humana.",
+        "sentence": "Automação B2B, Revenue Ops, Micro-SaaS, serviços internacionais e produtos digitais próprios.",
         "private": True,
     },
     "trader": {
         "label": "Trader",
-        "sentence": "Console operacional já existente do AtlasQuant.",
+        "sentence": "Mercado, macro, micro, geopolítica, fundamentalista, ICT/SMC, calendário e risco.",
         "private": False,
     },
     "investimentos": {
@@ -409,6 +414,7 @@ def ecosystem_rail_html(access: Mapping[str, Any] | None, active_area: Any = Non
     body = "".join(links)
     return (
         _CENTRAL_CSS
+        + WORKSPACE_CSS
         + '<nav class="aq-central-rail" aria-label="Ecossistema AtlasQuant">'
         + '<details class="aq-central-rail-fold" open>'
         + "<summary>Ecossistema</summary>"
@@ -545,7 +551,7 @@ def aion_home_html(claims: Mapping[str, Any] | None = None, **_ignored: Any) -> 
         '<section class="aq-aion-home" data-truth="UNKNOWN">'
         + '<p class="aq-aion-priority">PRIORIDADE ATUAL</p>'
         + hero_html("AION", "LOCAL")
-        + section_title_html("AION IA · 8 NÚCLEOS INTERNOS")
+        + section_title_html("AION · 8 PAPÉIS INTERNOS")
         + '<p class="aq-aion-core-note"><strong>8 núcleos especializados, 1 AION Core.</strong> Cada cartão representa uma responsabilidade interna coordenada pelo mesmo núcleo. Não são oito IAs independentes e nenhum núcleo recebe autoridade autônoma para merge, deploy, publicação, cobrança ou trade real.</p>'
         + '<p class="aq-aion-motto">Poderoso por dentro. Simples por fora.</p>'
         + '<div class="aq-aion-grid">'
@@ -767,17 +773,9 @@ def central_selector_html(
     if not model["admin"]:
         return ""
     choices = []
-    for index, area in enumerate(model["areas"], start=1):
+    for area in model["areas"]:
         area_id = area["id"]
-        spec = _AREAS[area_id]
-        choices.append(
-            f'<article class="aq-central-choice" data-central-area="{area_id}">'
-            f'<span class="aq-central-choice-index">{index:02d}</span>'
-            f"{_ART[area_id]()}"
-            f"<strong>{escape(spec['label'])}</strong>"
-            f"<small>{escape(spec['sentence'])}</small>"
-            '<span class="aq-central-route">ACESSO CONECTADO</span></article>'
-        )
+        choices.append(central_reference_card_html(area_id, _ART[area_id]()))
     presence = aion_login_presence_html(
         access,
         now=now,
@@ -791,7 +789,7 @@ def central_selector_html(
         + '<p class="aq-central-kicker">CENTRAL PRINCIPAL</p>'
         "<h2>Central AtlasQuant</h2>"
         '<p class="aq-central-root-copy">Escolha o ambiente que você quer abrir.</p>'
-        '<div class="aq-central-choices">'
+        '<div class="aq-central-reference-grid">'
         + "".join(choices)
         + "</div></section>"
     )
@@ -821,9 +819,25 @@ def central_surface_html(
             timezone_name=timezone_name,
         )
     elif resolved["area"] == "aion" and defer_aion_home:
-        stage = ""
+        stage = workspace_cockpit_html("aion", mode="Avançado")
     elif resolved["area"] == "aion":
-        stage = aion_home_html(home_claims)
+        stage = workspace_cockpit_html(
+            "aion",
+            mode="Avançado",
+            connected_html=aion_home_html(home_claims),
+        )
+    elif resolved["area"] == "negocios":
+        stage = workspace_cockpit_html(
+            "negocios",
+            mode="Sessão atual",
+            extra_truth=("TENANT ISOLADO", "PUBLICAÇÃO REQUER APROVAÇÃO"),
+        )
+    elif resolved["area"] == "investimentos":
+        stage = workspace_cockpit_html(
+            "investimentos",
+            mode="Sessão atual",
+            extra_truth=("SEM ORDEM AUTOMÁTICA", "SEM PROMESSA DE RETORNO"),
+        )
     else:
         stage = central_card_html(resolved["area"])
     back = ""
@@ -881,20 +895,20 @@ def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, re
     ]
     if current == CENTRAL_ROOT:
         targets = area_targets
-        st.markdown("#### Escolha e abra um setor")
-        st.caption("Acesso protegido pela sessão autenticada atual.")
+        st.markdown("#### Acessar ambiente")
+        st.caption("Os quatro acessos abaixo usam a mesma sessão autenticada e as rotas validadas.")
     else:
         targets = [("central", "Central Principal")] + [
             item for item in area_targets if item[0] != current
         ]
         st.markdown("#### Trocar de setor")
         st.caption("Navegue pelo ecossistema sem sair da sessão autenticada.")
-    columns = st.columns(2)
+    columns = st.columns(4 if current == CENTRAL_ROOT else 2)
     for index, (area_id, label) in enumerate(targets):
         action_label = (
             "← Central Principal"
             if area_id == "central"
-            else "Abrir " + label
+            else ("Acessar " if current == CENTRAL_ROOT else "Abrir ") + label
         )
         with columns[index % 2]:
             if st.button(

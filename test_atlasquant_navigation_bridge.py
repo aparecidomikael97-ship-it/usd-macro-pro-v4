@@ -129,6 +129,7 @@ class AtlasQuantNavigationBridgeTests(unittest.TestCase):
                 state={"atlasquant_experience_mode":initial_mode}
                 request=request_investments_page(state)
                 self.assertEqual(request["page"],"💰 Investir")
+                self.assertEqual(request["label"],"Investimentos")
                 self.assertEqual(request["state"],"INVESTMENTS_PAGE_REQUESTED")
                 self.assertFalse(request["executes_action"])
                 self.assertFalse(request["real_orders_enabled"])

@@ -121,31 +121,36 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("CENTRAL PRINCIPAL", door)
         self.assertIn("Central AtlasQuant", door)
         self.assertIn("Escolha o ambiente que você quer abrir.", door)
+        self.assertIn("aq-central-reference-grid", door)
+        self.assertIn("ACESSAR TRADER", door)
+        self.assertIn("ACESSAR NEGÓCIOS", door)
+        self.assertIn("ACESSAR INVESTIMENTOS", door)
+        self.assertIn("ACESSAR AION", door)
         self.assertIn('data-root="central_root"', door)
         for label in ("Trader", "Negócios", "Investimentos", "AION"):
             self.assertIn(label, door)
         self.assertIn("Mikael, ", door)
         self.assertIn("AION ativo.", door)
         self.assertIn("Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?", door)
-        self.assertIn("Abrir AION", door)
+        self.assertIn("ACESSAR AION", door)
         self.assertNotIn("AION_CONSOLE_RENDERED", door)
         self.assertNotIn('id="aq-account-identity"', door)
         self.assertNotIn("aq-premium-hero", door)
         self.assertEqual(
             at.button(key="aq_central_stateful_aion").label,
-            "Abrir AION",
+            "Acessar AION",
         )
         self.assertEqual(
             at.button(key="aq_central_stateful_negocios").label,
-            "Abrir Negócios",
+            "Acessar Negócios",
         )
         self.assertEqual(
             at.button(key="aq_central_stateful_trader").label,
-            "Abrir Trader",
+            "Acessar Trader",
         )
         self.assertEqual(
             at.button(key="aq_central_stateful_investimentos").label,
-            "Abrir Investimentos",
+            "Acessar Investimentos",
         )
         self.assertEqual([r for r in at.radio if r.key == "atlasquant_experience_mode"], [])
         self.assertEqual(self.snapshot_calls, [])
@@ -157,8 +162,10 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn('id="aq-account-identity"', html)
         self.assertIn('data-role="ADMIN"', html)
         self.assertIn("aparecidomikael · ADMIN", html)
-        self.assertIn("aq-premium-hero", html)
-        self.assertIn("Central do ecossistema", html)
+        self.assertIn("aq-trader-shell", html)
+        self.assertIn("ATLASQUANT · TRADER", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
+        self.assertIn("ORDENS REAIS BLOQUEADAS", html)
         self.assertEqual(self.snapshot_calls[0], "atlasquant-runtime")
         self.assertEqual(at.session_state["atlasquant_fast_boot_observability"]["mode"], "Iniciante")
         dock = at.button(key="aq_voice_dock_aion")

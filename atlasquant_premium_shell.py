@@ -155,6 +155,52 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 @keyframes aq-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes aq-ping{0%{box-shadow:0 0 0 0 rgba(143,208,196,.55)}100%{box-shadow:0 0 0 10px rgba(143,208,196,0)}}
 @keyframes aq-sweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+/* Trader reference cockpit — inspired by the approved AtlasQuant visual direction. */
+.aq-trader-shell{position:relative;overflow:hidden;margin:4px 0 16px;border:1px solid rgba(69,174,255,.28);border-radius:26px;padding:16px;background:
+  radial-gradient(circle at 50% 28%,rgba(49,111,255,.18),transparent 31rem),
+  radial-gradient(circle at 86% 18%,rgba(135,72,255,.14),transparent 24rem),
+  linear-gradient(145deg,rgba(5,15,35,.98),rgba(5,12,27,.99) 56%,rgba(8,20,43,.98));
+  box-shadow:0 28px 80px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.045)}
+.aq-trader-shell:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.24;background-image:
+  linear-gradient(rgba(65,165,255,.11) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(65,165,255,.09) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,black,transparent 72%)}
+.aq-trader-shell>*{position:relative;z-index:1}
+.aq-trader-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 4px 12px;border-bottom:1px solid rgba(104,180,255,.16)}
+.aq-trader-brand{display:flex;align-items:center;gap:10px;color:#fff;font-size:1.02rem;font-weight:900;letter-spacing:.05em}
+.aq-trader-brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:linear-gradient(145deg,#23d8ff,#386dff 58%,#a55bff);box-shadow:0 0 26px rgba(47,149,255,.34);color:#04101e;font-weight:1000}
+.aq-trader-motto{color:#eef6ff;font-size:.78rem;font-weight:850;letter-spacing:.02em;text-align:right}
+.aq-trader-ticker{display:flex;gap:8px;overflow-x:auto;max-width:100%;padding:11px 2px 8px;scrollbar-width:thin;scrollbar-color:#398cff rgba(255,255,255,.06)}
+.aq-trader-ticker::-webkit-scrollbar{height:6px}.aq-trader-ticker::-webkit-scrollbar-thumb{background:#398cff;border-radius:99px}
+.aq-trader-tick{flex:0 0 auto;min-width:116px;border:1px solid rgba(82,158,255,.22);border-radius:12px;padding:8px 10px;background:linear-gradient(180deg,rgba(11,30,62,.86),rgba(5,17,37,.9));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.aq-trader-tick small{display:block;color:#8fc8ff;font-size:.59rem;font-weight:900;letter-spacing:.12em}.aq-trader-tick strong{display:block;color:#fff;margin-top:2px;font-size:.82rem}.aq-trader-tick.good strong{color:#59e4af}.aq-trader-tick.warn strong{color:#ff7d91}.aq-trader-tick.neutral strong{color:#dce8f7}
+.aq-trader-lenses{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:8px 0 12px}
+.aq-trader-lens{border:1px solid rgba(91,159,255,.22);border-radius:12px;padding:9px 10px;background:linear-gradient(180deg,rgba(13,35,69,.84),rgba(7,19,40,.86));text-align:center}
+.aq-trader-lens small{display:block;color:#86bfff;font-size:.58rem;font-weight:900;letter-spacing:.11em}.aq-trader-lens strong{display:block;color:#fff;font-size:.76rem;margin-top:2px}
+.aq-trader-stage{display:grid;grid-template-columns:minmax(0,.9fr) minmax(250px,1.15fr) minmax(0,.9fr);gap:12px;align-items:stretch;margin:12px 0}
+.aq-trader-sidepanel{border:1px solid rgba(67,160,255,.24);border-radius:18px;padding:14px;background:linear-gradient(160deg,rgba(9,30,59,.92),rgba(7,18,38,.94));min-width:0}
+.aq-trader-sidepanel small{display:block;color:#73d7ff;font-size:.61rem;font-weight:900;letter-spacing:.12em}.aq-trader-sidepanel h3{margin:.3rem 0 .35rem;color:#fff;font-size:1rem}.aq-trader-sidepanel p{margin:0;color:#cbdcf1;font-size:.75rem;line-height:1.42}
+.aq-trader-side-list{display:grid;gap:7px;margin-top:11px}.aq-trader-side-list span{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid rgba(127,184,255,.14);border-radius:9px;padding:7px 8px;color:#e7f1ff;background:rgba(7,18,38,.58);font-size:.68rem;font-weight:800}.aq-trader-side-list b{color:#5ce1ff;font-size:.59rem;letter-spacing:.07em}
+.aq-trader-core{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;border:1px solid rgba(88,161,255,.28);border-radius:22px;padding:14px;background:radial-gradient(circle at 50% 47%,rgba(47,119,255,.24),transparent 45%),linear-gradient(180deg,rgba(9,27,58,.9),rgba(4,14,32,.94));overflow:hidden}
+.aq-trader-globe{position:relative;width:190px;height:190px;border-radius:50%;border:1px solid rgba(107,215,255,.72);box-shadow:0 0 28px rgba(45,157,255,.32),inset 0 0 38px rgba(55,118,255,.2);background:
+  radial-gradient(circle at 38% 30%,rgba(96,231,255,.33),transparent 18%),
+  radial-gradient(circle at 62% 58%,rgba(123,76,255,.3),transparent 22%),
+  radial-gradient(circle,#0b3a75 0,#071d42 58%,#041027 100%)}
+.aq-trader-globe:before,.aq-trader-globe:after{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid rgba(91,211,255,.5)}
+.aq-trader-globe:before{transform:scaleX(.42);animation:aq-orbit 10s linear infinite}.aq-trader-globe:after{transform:scaleY(.42);animation:aq-orbit-rev 12s linear infinite}
+.aq-trader-core-logo{position:absolute;inset:0;display:grid;place-items:center;color:#dff9ff;font-size:3rem;font-weight:1000;text-shadow:0 0 24px #37bfff}
+.aq-trader-core h2{margin:12px 0 4px;color:#fff;font-size:1.35rem;text-align:center}.aq-trader-core p{margin:0;color:#cbdcf1;text-align:center;font-size:.76rem;max-width:38ch}.aq-trader-core-status{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}.aq-trader-core-status span{border:1px solid rgba(94,181,255,.22);border-radius:999px;padding:4px 8px;color:#e7f4ff;background:rgba(6,20,44,.72);font-size:.59rem;font-weight:850}
+.aq-trader-modules-title{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:15px 2px 9px}.aq-trader-modules-title h3{margin:0;color:#fff;font-size:1rem}.aq-trader-modules-title span{color:#8db5df;font-size:.65rem}
+.aq-trader-module-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.aq-trader-module{position:relative;overflow:hidden;min-width:0;border:1px solid rgba(73,158,255,.24);border-radius:14px;padding:11px;background:linear-gradient(160deg,rgba(11,32,65,.92),rgba(6,18,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.aq-trader-module:before{content:"";position:absolute;inset:auto -30px -42px auto;width:92px;height:92px;border-radius:50%;background:radial-gradient(circle,rgba(75,111,255,.18),transparent 66%)}
+.aq-trader-module-icon{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(93,194,255,.34);border-radius:10px;background:linear-gradient(145deg,rgba(14,86,154,.82),rgba(31,42,105,.88));color:#fff;font-size:1.05rem;box-shadow:0 0 20px rgba(53,140,255,.16)}
+.aq-trader-module small{display:block;margin-top:8px;color:#72d8ff;font-size:.55rem;font-weight:900;letter-spacing:.1em}.aq-trader-module h4{margin:.2rem 0 .3rem;color:#fff;font-size:.86rem}.aq-trader-module p{margin:0;color:#c7d8ed;font-size:.66rem;line-height:1.36}.aq-trader-module .state{display:inline-flex;margin-top:8px;border-radius:999px;padding:3px 7px;font-size:.55rem;font-weight:900;border:1px solid rgba(116,195,255,.22);color:#eaf6ff}.aq-trader-module .state.locked{color:#ffe39c;border-color:rgba(255,201,92,.32)}.aq-trader-module .state.off{color:#a9b9cb}
+.aq-trader-bottom{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}.aq-trader-bottom-card{border:1px solid rgba(71,157,255,.2);border-radius:14px;padding:11px;background:rgba(6,20,43,.8)}.aq-trader-bottom-card small{color:#75d8ff;font-size:.57rem;font-weight:900;letter-spacing:.1em}.aq-trader-bottom-card strong{display:block;color:#fff;margin-top:3px;font-size:.82rem}.aq-trader-bottom-card p{margin:4px 0 0;color:#bcd0e6;font-size:.65rem;line-height:1.35}
+@media (max-width:980px){.aq-trader-stage{grid-template-columns:1fr}.aq-trader-core{order:-1;min-height:270px}.aq-trader-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-trader-lenses{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.aq-trader-shell{padding:10px;border-radius:19px}.aq-trader-topline{align-items:flex-start;flex-direction:column}.aq-trader-motto{text-align:left}.aq-trader-module-grid,.aq-trader-bottom{grid-template-columns:1fr}.aq-trader-globe{width:150px;height:150px}.aq-trader-core{min-height:245px}.aq-trader-tick{min-width:102px}}
+@keyframes aq-orbit{from{transform:scaleX(.42) rotate(0)}to{transform:scaleX(.42) rotate(360deg)}}@keyframes aq-orbit-rev{from{transform:scaleY(.42) rotate(360deg)}to{transform:scaleY(.42) rotate(0)}}
+@media (prefers-reduced-motion:reduce){.aq-trader-globe:before,.aq-trader-globe:after{animation:none !important}}
+
 @media (prefers-reduced-motion:reduce){
   .aq-premium-row{scroll-behavior:auto}
   .aq-premium-card,.aq-radar-dot,.aq-radar-sweep{animation:none !important}
@@ -362,6 +408,7 @@ PREMIUM_MODULES: tuple[dict[str, str], ...] = (
     {"id":"micro","sector":"Leitura","title":"Microeconomia","motif":"micro","page":"💱 Moedas","fast_page":"","summary":"Abre Moedas, a comparação de força que já existe. Não cria um modelo microeconômico novo."},
     {"id":"geo","sector":"Leitura","title":"Geopolítica","motif":"geo","page":"📰 Notícias","fast_page":"","summary":"Abre Notícias. Eventos globais aparecem como contexto da leitura atual, sem fonte nova."},
     {"id":"fundamental","sector":"Leitura","title":"Fundamentalista","motif":"fundamental","page":"🔀 Pares","fast_page":"","summary":"Abre Pares, onde a confluência já calculada fica visível. O cartão não recalcula score."},
+    {"id":"ict","sector":"Leitura","title":"ICT / SMC","motif":"lab","page":"🔀 Pares","fast_page":"","summary":"Estrutura, liquidez e timing técnico aparecem como evidência contextual; o cartão não cria entrada nem ordem."},
     {"id":"calendar","sector":"Leitura","title":"Calendário Econômico","motif":"calendar","page":"🗂️ Histórico","fast_page":"","summary":"Abre Histórico para a evidência temporal já persistida. Não altera o calendário de coleta."},
     {"id":"lab","sector":"Operação","title":"Laboratório / Backtests","motif":"lab","page":"🧪 Backtest","fast_page":"","summary":"Abre o laboratório existente. Replay e métricas continuam os mesmos."},
     {"id":"paper","sector":"Operação","title":"Paper Trading","motif":"paper","page":"🧪 Backtest","fast_page":"","summary":"Não há mesa de execução nesta entrega. O cartão leva ao laboratório e não envia ordem, nem simulada nem real."},
@@ -663,55 +710,133 @@ def request_premium_card(
     return target
 
 
+TRADER_REFERENCE_MODULE_IDS = ("macro", "micro", "geo", "fundamental", "ict", "calendar", "news", "invest")
+TRADER_REFERENCE_ICONS = {
+    "macro": "▥", "micro": "⌁", "geo": "◎", "fundamental": "▤",
+    "ict": "◈", "calendar": "□", "news": "⚠", "invest": "◆",
+}
+
+
+def _trader_module_lookup() -> dict[str, Mapping[str, str]]:
+    return {str(item.get("id") or ""): item for item in PREMIUM_MODULES}
+
+
+def _trader_score_chip(item: Mapping[str, object]) -> str:
+    label = escape(str(item.get("label") or item.get("currency") or "MERCADO"))
+    raw = item.get("score", item.get("value"))
+    try:
+        score = max(0.0, min(100.0, float(raw)))
+    except (TypeError, ValueError):
+        value = escape(str(raw or "CONTEXTO"))
+        return f'<div class="aq-trader-tick neutral"><small>{label}</small><strong>{value}</strong></div>'
+    tone = "good" if score >= 55 else ("warn" if score <= 45 else "neutral")
+    return (
+        f'<div class="aq-trader-tick {tone}"><small>{label}</small>'
+        f'<strong>FORÇA {score:.0f}</strong></div>'
+    )
+
+
+def trader_cockpit_html(
+    *,
+    mode: str,
+    available_pages: Sequence[str],
+    fast: bool = False,
+    ticker_items: Sequence[Mapping[str, object]] | None = None,
+) -> str:
+    """Reference-driven Trader home. Presentation only; routes remain stateful below."""
+    beginner = not str(mode or "").casefold().startswith("avan")
+    pages = {str(item) for item in list(available_pages or [])}
+    open_pages = set(BEGINNER_OPEN_AREAS) | {"🎙️ Macro"}
+    modules = _trader_module_lookup()
+
+    tickers = list(ticker_items or [])
+    if not tickers:
+        tickers = [
+            {"label": "FOREX", "value": "28 PARES"},
+            {"label": "DXY", "value": "CONTEXTO"},
+            {"label": "ÍNDICES", "value": "ÁREA"},
+            {"label": "CRIPTO", "value": "ÁREA"},
+            {"label": "COMMODITIES", "value": "ÁREA"},
+            {"label": "RISCO", "value": "GUARDIÃO"},
+        ]
+    ticker_html = "".join(_trader_score_chip(item) for item in tickers[:10])
+
+    module_cards: list[str] = []
+    for module_id in TRADER_REFERENCE_MODULE_IDS:
+        module = modules[module_id]
+        destination = _destination(module, fast=fast)
+        available = bool(destination) and destination in pages
+        locked = beginner and available and destination not in open_pages and destination != "🧠 AION"
+        state = "INDISPONÍVEL" if not available else ("PRÉVIA AVANÇADA" if locked else "ACESSO SEGURO")
+        state_class = "off" if not available else ("locked" if locked else "")
+        module_cards.append(
+            '<article class="aq-trader-module">'
+            f'<div class="aq-trader-module-icon">{escape(TRADER_REFERENCE_ICONS.get(module_id, "◇"))}</div>'
+            f'<small>{escape(str(module.get("sector") or "TRADER"))}</small>'
+            f'<h4>{escape(str(module.get("title") or ""))}</h4>'
+            f'<p>{escape(str(module.get("summary") or ""))}</p>'
+            f'<span class="state {state_class}">{escape(state)}</span>'
+            '</article>'
+        )
+
+    mode_label = "INICIANTE" if beginner else "AVANÇADO"
+    return (
+        '<section class="aq-trader-shell" data-trader-reference="v1" aria-label="Cockpit Trader AtlasQuant">'
+        '<div class="aq-trader-topline">'
+        '<div class="aq-trader-brand"><span class="aq-trader-brand-mark">A</span>'
+        '<span>ATLASQUANT · TRADER</span></div>'
+        '<div class="aq-trader-motto">Poderoso por dentro. Simples por fora.</div>'
+        '</div>'
+        f'<div class="aq-trader-ticker" aria-label="Força e contexto">{ticker_html}</div>'
+        '<div class="aq-trader-lenses">'
+        '<div class="aq-trader-lens"><small>VISÃO</small><strong>GLOBAL</strong></div>'
+        '<div class="aq-trader-lens"><small>LEITURA</small><strong>MACRO & MICRO</strong></div>'
+        '<div class="aq-trader-lens"><small>CONTEXTO</small><strong>GEO & FUNDAMENTOS</strong></div>'
+        '<div class="aq-trader-lens"><small>VALIDAÇÃO</small><strong>ICT / SMC & RISCO</strong></div>'
+        '</div>'
+        '<div class="aq-trader-stage">'
+        '<article class="aq-trader-sidepanel"><small>MERCADOS GLOBAIS</small><h3>Mapa de contexto</h3>'
+        '<p>Intermercado, eventos e geopolítica ficam visíveis como contexto. Relação observada não vira causalidade automática.</p>'
+        '<div class="aq-trader-side-list"><span>Forex <b>28 PARES</b></span><span>Índices <b>SEPARADOS</b></span>'
+        '<span>Cripto <b>SEPARADO</b></span><span>Commodities <b>CONTEXTO</b></span></div></article>'
+        '<article class="aq-trader-core"><div class="aq-trader-globe"><div class="aq-trader-core-logo">A</div></div>'
+        '<h2>Trader · Mercado & Estratégia</h2>'
+        '<p>Macro direciona. ICT/SMC localiza. O Guardião de Risco pode vetar. Dado insuficiente continua sendo não operar.</p>'
+        '<div class="aq-trader-core-status"><span>RADAR 28FX</span><span>PIPELINE 7 PARES</span>'
+        f'<span>MODO {mode_label}</span><span>ORDENS REAIS BLOQUEADAS</span></div></article>'
+        '<article class="aq-trader-sidepanel"><small>VISÃO ESTRATÉGICA</small><h3>Leitura por camadas</h3>'
+        '<p>O cockpit organiza as áreas existentes sem criar motor novo, score novo ou autorização operacional.</p>'
+        '<div class="aq-trader-side-list"><span>Macro <b>CENÁRIO</b></span><span>Eventos <b>RISCO</b></span>'
+        '<span>ICT / SMC <b>TIMING</b></span><span>Safety Core <b>VETO</b></span></div></article>'
+        '</div>'
+        '<div class="aq-trader-modules-title"><h3>Áreas principais do Trader</h3>'
+        '<span>Os controles reais de abertura ficam logo abaixo.</span></div>'
+        f'<div class="aq-trader-module-grid">{"".join(module_cards)}</div>'
+        '<div class="aq-trader-bottom">'
+        '<article class="aq-trader-bottom-card"><small>MAPA GLOBAL</small><strong>Intermarket & risco</strong>'
+        '<p>Contexto cruzado sem transformar correlação em certeza.</p></article>'
+        '<article class="aq-trader-bottom-card"><small>RANKING</small><strong>Força & oportunidades</strong>'
+        '<p>Ranking é evidência de leitura; não é probabilidade de lucro.</p></article>'
+        '<article class="aq-trader-bottom-card"><small>AION</small><strong>Explicação integrada</strong>'
+        '<p>O AION organiza contexto e evidências, sujeito às permissões do Core.</p></article>'
+        '</div></section>'
+    )
+
+
 def premium_catalog_html(
     *,
     mode: str,
     available_pages: Sequence[str],
     fast: bool = False,
+    ticker_items: Sequence[Mapping[str, object]] | None = None,
 ) -> str:
-    """One horizontal strip per sector. The action lives inside the card."""
-    beginner = not str(mode or "").casefold().startswith("avan")
-    if beginner:
-        hero = section_hero_html(
-            "ATLASQUANT",
-            "Central do ecossistema",
-            "Comece pelo que está acontecendo. Os setores avançados continuam visíveis, "
-            "mas no Iniciante abrem só a prévia já existente.",
-        )
-    else:
-        hero = section_hero_html(
-            "ATLASQUANT",
-            "Central do ecossistema",
-            "Escolha um setor pelo cartão. A área avançada continua a mesma; "
-            "mudou a apresentação, não o cálculo.",
-        )
-    rows = []
-    for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
-        modules = [item for item in PREMIUM_MODULES if item["sector"] == sector]
-        if not modules:
-            continue
-        cards = []
-        known_pages = {str(item) for item in list(available_pages or [])}
-        open_pages = set(BEGINNER_OPEN_AREAS) | {"🎙️ Macro"}
-        for module in modules:
-            destination = _destination(module, fast=fast)
-            available = bool(destination) and destination in known_pages
-            locked = beginner and available and destination not in open_pages and destination != "🧠 AION"
-            cards.append(premium_module_card_html(
-                module,
-                locked=locked,
-                available=available,
-                href="",
-            ))
-        rows.append(
-            '<section class="aq-premium-sector">'
-            f"<h3>{escape(sector)}</h3>"
-            '<p class="aq-premium-scroll-hint"><b>←</b> deslize, role ou use as setas para explorar <b>→</b></p>'
-            f'<div class="aq-premium-row" tabindex="0" aria-label="{escape(sector)}">'
-            + "".join(cards)
-            + "</div></section>"
-        )
-    return '<div class="aq-premium">' + hero + "".join(rows) + "</div>"
+    """Reference-driven Trader cockpit for the Radar home."""
+    return trader_cockpit_html(
+        mode=mode,
+        available_pages=available_pages,
+        fast=fast,
+        ticker_items=ticker_items,
+    )
 
 
 def catalog_is_home(active_page: str) -> bool:
@@ -725,11 +850,16 @@ def _render_premium_stateful_controls(
     available_pages: Sequence[str],
     fast: bool,
 ) -> None:
-    """Render only valid authenticated launch actions for the current session."""
+    """Render valid authenticated actions without duplicating the whole visual catalog."""
     pages = [str(item) for item in list(available_pages or [])]
-    for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
-        launchable = []
-        for module in (item for item in PREMIUM_MODULES if item["sector"] == sector):
+    modules = _trader_module_lookup()
+
+    def launchable(module_ids: Sequence[str]) -> list[tuple[Mapping[str, str], str]]:
+        rows: list[tuple[Mapping[str, str], str]] = []
+        for module_id in module_ids:
+            module = modules.get(str(module_id))
+            if not module:
+                continue
             target = allowed_premium_target(
                 module["id"],
                 mode=mode,
@@ -737,16 +867,18 @@ def _render_premium_stateful_controls(
                 fast=fast,
             )
             if target:
-                launchable.append((module, target))
-        if not launchable:
-            continue
-        st.caption(f"Acessos seguros · {sector}")
-        columns = st.columns(min(4, len(launchable)))
-        for index, (module, _target) in enumerate(launchable):
+                rows.append((module, target))
+        return rows
+
+    primary = launchable(TRADER_REFERENCE_MODULE_IDS)
+    if primary:
+        st.caption("Acessos do cockpit")
+        columns = st.columns(min(4, len(primary)))
+        for index, (module, _target) in enumerate(primary):
             with columns[index % len(columns)]:
                 if st.button(
-                    "Abrir · " + str(module["title"]),
-                    key=f"aq_premium_stateful_{'fast' if fast else 'full'}_{module['id']}",
+                    str(module["title"]),
+                    key=f"aq_trader_primary_{'fast' if fast else 'full'}_{module['id']}",
                     width="stretch",
                 ):
                     request_premium_card(
@@ -758,6 +890,31 @@ def _render_premium_stateful_controls(
                     )
                     st.rerun()
 
+    primary_ids = set(TRADER_REFERENCE_MODULE_IDS)
+    secondary_ids = [
+        str(item["id"]) for item in PREMIUM_MODULES
+        if str(item["id"]) not in primary_ids
+    ]
+    secondary = launchable(secondary_ids)
+    if secondary:
+        with st.expander("Mais áreas do Trader", expanded=False):
+            columns = st.columns(min(4, len(secondary)))
+            for index, (module, _target) in enumerate(secondary):
+                with columns[index % len(columns)]:
+                    if st.button(
+                        str(module["title"]),
+                        key=f"aq_trader_secondary_{'fast' if fast else 'full'}_{module['id']}",
+                        width="stretch",
+                    ):
+                        request_premium_card(
+                            st.session_state,
+                            module["id"],
+                            mode=mode,
+                            available_pages=pages,
+                            fast=fast,
+                        )
+                        st.rerun()
+
 
 def render_premium_catalog(
     *,
@@ -765,6 +922,7 @@ def render_premium_catalog(
     available_pages: Sequence[str],
     fast: bool = False,
     active_page: str = "",
+    ticker_items: Sequence[Mapping[str, object]] | None = None,
 ) -> None:
     """Render the catalog on Radar home; elsewhere keep only shared premium CSS."""
     pages = {str(item) for item in list(available_pages or [])}
@@ -776,7 +934,12 @@ def render_premium_catalog(
         return
     st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
     st.markdown(
-        premium_catalog_html(mode=mode, available_pages=list(pages), fast=fast),
+        premium_catalog_html(
+            mode=mode,
+            available_pages=list(pages),
+            fast=fast,
+            ticker_items=ticker_items,
+        ),
         unsafe_allow_html=True,
     )
     _render_premium_stateful_controls(

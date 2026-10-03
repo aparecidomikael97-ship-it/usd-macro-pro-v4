@@ -953,14 +953,22 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
-    def test_business_is_persistent_evidence_based_and_marketplace_guarded(self):
+    def test_business_workspace_uses_current_five_front_scope_and_preserves_checkpoint_guardrails(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertIn("new_product_candidate(", src)
-        self.assertIn("update_business_checkpoint(", src)
-        self.assertIn("trend_assessment(", src)
-        self.assertIn("marketplace_preflight(", src)
-        self.assertIn("Tendências confirmadas", src)
-        self.assertIn("Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada.", src)
+        start = src.index("def _render_business(")
+        end = src.index("\ndef _render_laboratory(", start)
+        body = src[start:end]
+        self.assertIn("update_business_checkpoint(", body)
+        self.assertIn("Automação empresarial B2B", body)
+        self.assertIn("Revenue Ops", body)
+        self.assertIn("Micro-SaaS", body)
+        self.assertIn("Serviços Internacionais", body)
+        self.assertIn("Produtos Digitais", body)
+        self.assertIn("LGPD / Auditoria", body)
+        self.assertIn("fail-closed", body)
+        self.assertNotIn("marketplace_preflight(", body)
+        self.assertNotIn("Candidato de produto", body)
+        self.assertNotIn("Afiliados/comissões", body)
 
     def test_promotions_workspace_is_persistent_copy_once_and_provider_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
@@ -1139,10 +1147,14 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("O AION não mostra raciocínio privado/chain-of-thought",src)
         self.assertIn("Conselho usado:",src)
 
-    def test_business_panel_labels_unconnected_sales_as_unconfirmed(self):
+    def test_business_panel_keeps_unconfirmed_metrics_truthful(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertIn("não representam vendas confirmadas", src)
-        self.assertIn("integrações de pedidos não estiverem conectadas", src)
+        start = src.index("def _render_business(")
+        end = src.index("\ndef _render_laboratory(", start)
+        body = src[start:end]
+        self.assertIn("N/D permanece N/D", body)
+        self.assertIn("o AION não fabrica resultado", body)
+        self.assertIn("Dados reais entram somente quando a integração correspondente estiver validada.", body)
 
 
     def test_workspace_dispatch_is_fault_isolated_and_does_not_echo_raw_exception(self):

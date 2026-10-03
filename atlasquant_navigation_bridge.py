@@ -191,7 +191,7 @@ def request_investments_page(
         "surface": "investments",
         "page": "💰 Investir",
         "mode": mode,
-        "label": "Renda Fixa / Investimentos",
+        "label": "Investimentos",
         "build_id": "",
         "state": "INVESTMENTS_PAGE_REQUESTED",
         "explicit_user_action": True,

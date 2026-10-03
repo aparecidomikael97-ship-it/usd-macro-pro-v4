@@ -450,25 +450,37 @@ def render_beginner_shell(
             if st.button("↻ Atualizar",key="aq_fast_refresh",width="stretch"):
                 load_home_snapshot.clear()
                 st.rerun()
+    _aq_fast_ticker_items=[]
     if _aq_fast_catalog_home:
-        if experience_mode_overview_html is not None:
-            st.markdown(experience_mode_overview_html("Iniciante"), unsafe_allow_html=True)
-        if mobile_navigation_hint_html is not None:
-            st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
+        try:
+            _aq_fast_boot=dict(dict(snapshot.get("inputs",{}) or {}).get("fast_boot",{}) or {})
+            for _aq_tick in list(_aq_fast_boot.get("ranking",[]) or [])[:8]:
+                if not isinstance(_aq_tick,dict):
+                    continue
+                _aq_code=str(_aq_tick.get("Código") or _aq_tick.get("currency") or "").strip()
+                if not _aq_code:
+                    continue
+                _aq_fast_ticker_items.append({
+                    "label":_aq_code,
+                    "score":_finite(_aq_tick.get("Pontuação_Final",_aq_tick.get("score",50)),50),
+                })
+        except Exception:
+            _aq_fast_ticker_items=[]
     if render_premium_catalog is not None:
         render_premium_catalog(
             mode="Iniciante",
             available_pages=pages,
             fast=True,
             active_page=_aq_fast_active_page,
+            ticker_items=_aq_fast_ticker_items,
         )
     if _aq_fast_catalog_home:
         with st.expander("Navegação alternativa",expanded=False):
-            st.caption("Use o seletor clássico se preferir. Os cartões continuam sendo a navegação principal da home.")
+            st.caption("Use o seletor clássico se preferir. O cockpit continua sendo a entrada visual principal da home.")
             page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
     else:
         page=st.radio("Área",pages,horizontal=True,key="aq_beginner_page",label_visibility="collapsed")
-    if workspace_welcome_html is not None:
+    if workspace_welcome_html is not None and page != "🎯 Radar":
         _welcome = workspace_welcome_html(page, mode="Iniciante")
         if _welcome:
             st.markdown(_welcome, unsafe_allow_html=True)
