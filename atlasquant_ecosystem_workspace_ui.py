@@ -147,8 +147,9 @@ WORKSPACE_CSS = r"""
 .aq-ws-motto{color:#eef6ff;font-size:.76rem;font-weight:850}.aq-ws-layout{display:grid;grid-template-columns:205px minmax(0,1fr);gap:12px;margin-top:12px}
 .aq-ws-side{border:1px solid rgba(123,173,229,.16);border-radius:18px;padding:10px;background:rgba(6,18,39,.78);min-width:0}
 .aq-ws-side-kicker{color:var(--ws-accent);font-size:.58rem;font-weight:950;letter-spacing:.12em;padding:3px 7px 8px}
-.aq-ws-nav{display:grid;gap:4px}.aq-ws-nav span{display:block;border:1px solid transparent;border-radius:9px;padding:6px 8px;color:#cfe0f3;font-size:.64rem;font-weight:760;line-height:1.2}
-.aq-ws-nav span:first-child{border-color:color-mix(in srgb,var(--ws-accent) 36%,transparent);background:color-mix(in srgb,var(--ws-accent) 10%,transparent);color:#fff}
+.aq-ws-nav{display:grid;gap:4px}.aq-ws-nav a{display:block;text-decoration:none;border:1px solid transparent;border-radius:9px;padding:6px 8px;color:#cfe0f3;font-size:.64rem;font-weight:760;line-height:1.2}
+.aq-ws-nav a:hover,.aq-ws-nav a:focus-visible{border-color:color-mix(in srgb,var(--ws-accent) 42%,transparent);background:color-mix(in srgb,var(--ws-accent) 9%,transparent);color:#fff;outline:none}
+.aq-ws-nav a:first-child{border-color:color-mix(in srgb,var(--ws-accent) 36%,transparent);background:color-mix(in srgb,var(--ws-accent) 10%,transparent);color:#fff}
 .aq-ws-main{min-width:0}.aq-ws-hero{display:grid;grid-template-columns:minmax(0,1.2fr) 180px;align-items:center;gap:12px;border:1px solid color-mix(in srgb,var(--ws-accent) 28%,transparent);border-radius:20px;padding:16px;background:linear-gradient(145deg,rgba(11,31,63,.92),rgba(7,17,39,.94))}
 .aq-ws-kicker{color:var(--ws-accent);font-size:.6rem;font-weight:950;letter-spacing:.14em}.aq-ws-hero h2{margin:.3rem 0 .4rem;color:#fff;font-size:clamp(1.35rem,2.5vw,2rem);letter-spacing:-.02em}
 .aq-ws-hero p{margin:0;color:#cadbee;font-size:.75rem;line-height:1.45}
@@ -176,10 +177,10 @@ WORKSPACE_CSS = r"""
 .aq-ws-orb:before,.aq-ws-orb:after{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid color-mix(in srgb,var(--ws-accent) 52%,transparent);animation:aq-ws-orbit 12s linear infinite}
 .aq-ws-orb:before{transform:scaleX(.45)}.aq-ws-orb:after{transform:scaleY(.45);animation-direction:reverse}.aq-ws-orb b{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:2.2rem;text-shadow:0 0 20px var(--ws-accent)}
 .aq-ws-section-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:14px 2px 8px}.aq-ws-section-head h3{margin:0;color:#fff;font-size:.95rem}.aq-ws-section-head span{color:#8fb2d8;font-size:.62rem}
-.aq-ws-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.aq-ws-card{position:relative;overflow:hidden;min-height:145px;border:1px solid color-mix(in srgb,var(--ws-accent) 22%,rgba(111,169,234,.19));border-radius:15px;padding:11px;background:
+.aq-ws-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.aq-ws-card{position:relative;overflow:hidden;display:block;text-decoration:none;color:inherit;min-height:145px;border:1px solid color-mix(in srgb,var(--ws-accent) 22%,rgba(111,169,234,.19));border-radius:15px;padding:11px;background:
  radial-gradient(circle at 100% 0%,var(--ws-glow),transparent 44%),
  linear-gradient(155deg,rgba(12,34,67,.94),rgba(6,18,39,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.035);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
-.aq-ws-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 45%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow)}
+.aq-ws-card:hover,.aq-ws-card:focus-visible{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 58%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow);outline:none}
 .aq-ws-card small{display:block;color:var(--ws-accent);font-size:.54rem;font-weight:950;letter-spacing:.11em}.aq-ws-card h4{margin:.3rem 0 .35rem;color:#fff;font-size:.82rem;line-height:1.25}.aq-ws-card p{margin:0;color:#c8d8eb;font-size:.65rem;line-height:1.38}
 .aq-ws-state{display:inline-flex;margin-top:8px;border:1px solid color-mix(in srgb,var(--ws-accent) 32%,transparent);border-radius:999px;padding:3px 7px;color:#edf7ff;font-size:.53rem;font-weight:900;letter-spacing:.05em;background:rgba(5,18,40,.62)}
 .aq-ws-state[data-state="CONECTADO"]{color:#79efc1;border-color:rgba(90,225,171,.35)}.aq-ws-state[data-state="PLANEJADO"]{color:#ffd98a;border-color:rgba(255,205,95,.34)}
@@ -257,17 +258,79 @@ def workspace_cockpit_html(
         raise ValueError("Trader uses atlasquant_premium_shell.trader_cockpit_html")
     spec = _WORKSPACES[key]
     nav = _SIDE_NAV.get(key, ())
-    nav_html = "".join(f"<span>{escape(item)}</span>" for item in nav)
+    modules = _MODULES.get(key, ())
+    module_ids = {str(item["id"]): item for item in modules}
+    title_to_id = {str(item["title"]).casefold(): str(item["id"]) for item in modules}
+    nav_aliases = {
+        "início": "aq-ws-overview",
+        "visão geral": "aq-ws-overview",
+        "empresas / clientes": "b2b",
+        "automação b2b": "b2b",
+        "leads": "revenue",
+        "revenue ops": "revenue",
+        "crm": "revenue",
+        "propostas": "revenue",
+        "follow-up": "revenue",
+        "micro-saas": "saas",
+        "serviços internacionais": "international",
+        "produtos digitais": "digital",
+        "integrações": "integrations",
+        "financeiro / finops": "finops",
+        "roi": "finops",
+        "saúde do cliente": "success",
+        "sla / suporte": "sla",
+        "auditoria / lgpd": "privacy",
+        "equipe & acessos": "team",
+        "demo / sandbox": "sandbox",
+        "aion negócios": "aion-business",
+        "renda fixa": "fixed",
+        "renda variável": "variable",
+        "fundos": "funds",
+        "produtos": "funds",
+        "carteira": "allocation",
+        "alocação": "allocation",
+        "risco": "risk",
+        "planejamento": "planning",
+        "objetivos": "planning",
+        "dividendos": "income",
+        "longo prazo": "growth",
+        "relatórios": "reports",
+        "educação financeira": "education",
+        "aion investimentos": "aion-invest",
+        "chat": "chat",
+        "histórico": "history",
+        "memória": "memory",
+        "tarefas": "tasks",
+        "biblioteca": "library",
+        "pesquisa": "research",
+        "checkpoint mestre": "checkpoint",
+        "núcleo": "core",
+        "8 papéis internos": "roles",
+        "auditoria": "audit",
+        "academy": "academy",
+        "aion english": "english",
+        "configurações": "aq-ws-overview",
+    }
+    nav_html_parts = []
+    for item in nav:
+        key_name = str(item).casefold()
+        target = nav_aliases.get(key_name) or title_to_id.get(key_name) or "aq-ws-overview"
+        if target != "aq-ws-overview" and target not in module_ids:
+            target = "aq-ws-overview"
+        href = "#aq-ws-overview" if target == "aq-ws-overview" else f"#aq-ws-{target}"
+        nav_html_parts.append(f'<a href="{escape(href, quote=True)}">{escape(item)}</a>')
+    nav_html = "".join(nav_html_parts)
     cards = []
-    for item in _MODULES.get(key, ()):
+    for item in modules:
+        module_id = escape(item["id"])
         cards.append(
-            f'<article class="aq-ws-card" data-module="{escape(item["id"])}" '
+            f'<a class="aq-ws-card" id="aq-ws-{module_id}" href="#aq-ws-{module_id}" data-module="{module_id}" '
             f'data-feature-state="{escape(item["state"])}">'
             f'<small>{escape(item["group"])}</small>'
             f'<h4>{escape(item["title"])}</h4>'
             f'<p>{escape(item["summary"])}</p>'
             f'<span class="aq-ws-state" data-state="{escape(item["state"])}">{escape(item["state"])}</span>'
-            '</article>'
+            '</a>'
         )
     mode_label = str(mode or "").strip() or "SESSÃO ATUAL"
     module_count = len(_MODULES.get(key, ()))
@@ -314,7 +377,7 @@ def workspace_cockpit_html(
         '<div class="aq-ws-motto">Poderoso por dentro. Simples por fora.</div></div>'
         '<div class="aq-ws-layout">'
         f'<aside class="aq-ws-side"><div class="aq-ws-side-kicker">{escape(spec["title"].upper())}</div><div class="aq-ws-nav">{nav_html}</div></aside>'
-        '<main class="aq-ws-main">'
+        '<main class="aq-ws-main" id="aq-ws-overview">'
         '<section class="aq-ws-hero">'
         f'<div><div class="aq-ws-kicker">{escape(spec["kicker"])}</div><h2>{escape(spec["title"])}</h2><p>{escape(spec["hero"])}</p>'
         f'<div class="aq-ws-truth">{truth_html}</div><div class="aq-ws-kpis">{kpis}</div></div>'
