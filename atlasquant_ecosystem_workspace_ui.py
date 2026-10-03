@@ -202,6 +202,14 @@ WORKSPACE_CSS = r"""
 .aq-ws-state[data-state="CONECTADO"]{color:#79efc1;border-color:rgba(90,225,171,.35)}.aq-ws-state[data-state="PLANEJADO"]{color:#ffd98a;border-color:rgba(255,205,95,.34)}
 .aq-ws-state[data-state="EM CONSTRUÇÃO"],.aq-ws-state[data-state="EM EVOLUÇÃO"]{color:#ffd38c;border-color:rgba(255,190,80,.28)}
 .aq-ws-connected{margin-top:12px;border-top:1px solid rgba(129,175,226,.16);padding-top:12px}.aq-ws-truth{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.aq-ws-truth span{border:1px solid rgba(126,175,230,.2);border-radius:999px;padding:4px 8px;color:#dceafd;font-size:.56rem;font-weight:850;background:rgba(5,18,40,.58)}
+.aq-ws-dashboard{display:grid;grid-template-columns:1.15fr .9fr .95fr;gap:9px;margin-top:11px}.aq-ws-dash-card{border:1px solid color-mix(in srgb,var(--ws-accent) 24%,transparent);border-radius:14px;padding:11px;background:
+ radial-gradient(circle at 100% 0%,var(--ws-glow),transparent 42%),
+ linear-gradient(155deg,rgba(9,28,57,.93),rgba(5,16,35,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}.aq-ws-dash-card h4{margin:0 0 8px;color:#fff;font-size:.72rem}.aq-ws-dash-lines{display:grid;gap:6px}.aq-ws-dash-lines span{display:flex;justify-content:space-between;gap:8px;padding-bottom:4px;border-bottom:1px solid rgba(119,169,225,.10);color:#bcd0e6;font-size:.54rem}.aq-ws-dash-lines b{color:var(--ws-accent);font-size:.53rem}.aq-ws-mini-chart{height:74px;border:1px solid color-mix(in srgb,var(--ws-accent) 18%,transparent);border-radius:10px;background:
+ linear-gradient(180deg,color-mix(in srgb,var(--ws-accent) 8%,transparent),transparent),
+ repeating-linear-gradient(0deg,transparent 0 17px,rgba(118,168,225,.08) 17px 18px),
+ repeating-linear-gradient(90deg,transparent 0 25px,rgba(118,168,225,.06) 25px 26px);position:relative;overflow:hidden}.aq-ws-mini-chart:after{content:"";position:absolute;left:8px;right:8px;top:42px;height:2px;background:linear-gradient(90deg,var(--ws-accent),color-mix(in srgb,var(--ws-accent2) 78%,white 8%));transform:skewY(-7deg);box-shadow:0 0 10px var(--ws-glow)}.aq-ws-donut{width:72px;height:72px;margin:2px auto;border-radius:50%;background:conic-gradient(var(--ws-accent) 0 42%,var(--ws-accent2) 42% 64%,#2f6ca5 64% 79%,#193652 79%);position:relative;box-shadow:0 0 18px var(--ws-glow)}.aq-ws-donut:after{content:"";position:absolute;inset:16px;border-radius:50%;background:#071426;border:1px solid rgba(122,171,224,.16)}.aq-ws-status-list{display:grid;gap:5px}.aq-ws-status-list span{display:flex;align-items:center;justify-content:space-between;color:#bfd1e5;font-size:.53rem}.aq-ws-status-list i{width:7px;height:7px;border-radius:50%;background:var(--ws-accent);box-shadow:0 0 8px var(--ws-glow)}
+@media (max-width:950px){.aq-ws-dashboard{grid-template-columns:1fr 1fr}.aq-ws-dashboard>.aq-ws-dash-card:first-child{grid-column:1/-1}}
+@media (max-width:620px){.aq-ws-dashboard{grid-template-columns:1fr}.aq-ws-dashboard>.aq-ws-dash-card:first-child{grid-column:auto}}
 .aq-central-reference-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch;max-width:1180px;margin:0 auto}.aq-central-reference-card{--card-accent:#28a8ff;--card-glow:rgba(40,168,255,.28);position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:286px;border:1px solid color-mix(in srgb,var(--card-accent) 68%,transparent);border-radius:16px;padding:0 13px 12px;background:linear-gradient(180deg,rgba(5,17,36,.98),rgba(3,10,23,.985));box-shadow:0 16px 38px rgba(0,0,0,.34),0 0 24px var(--card-glow),inset 0 0 28px rgba(30,104,190,.05);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
 .aq-central-reference-card[data-area="negocios"]{--card-accent:#34e3a4;--card-glow:rgba(52,227,164,.24)}.aq-central-reference-card[data-area="investimentos"]{--card-accent:#f0bd58;--card-glow:rgba(240,189,88,.24)}.aq-central-reference-card[data-area="aion"]{--card-accent:#c05cff;--card-glow:rgba(192,92,255,.27)}
 .aq-central-reference-card:hover{transform:translateY(-5px);box-shadow:0 22px 46px rgba(0,0,0,.42),0 0 26px var(--card-glow)}
@@ -396,6 +404,24 @@ def workspace_cockpit_html(
         if value and value not in truth:
             truth.append(value)
     truth_html = "".join(f"<span>{escape(item)}</span>" for item in truth)
+    dashboard_templates = {
+        "negocios": (
+            '<section class="aq-ws-dash-card"><h4>Oportunidades & Mercado</h4><div class="aq-ws-mini-chart"></div><div class="aq-ws-dash-lines"><span>Pipeline <b>PRÉVIA</b></span><span>Mercado Global <b>CONTEXTO</b></span><span>Notícias Corporativas <b>CONTEXTO</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Próximos Eventos</h4><div class="aq-ws-dash-lines"><span>Resultados <b>PRÉVIA</b></span><span>Assembleias <b>PRÉVIA</b></span><span>Implantações <b>PRÉVIA</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Saúde da Operação</h4><div class="aq-ws-status-list"><span><i></i>Tenant isolado <b>CONECTADO</b></span><span><i></i>FinOps <b>EM CONSTRUÇÃO</b></span><span><i></i>SLA <b>EM CONSTRUÇÃO</b></span></div></section>',
+        ),
+        "investimentos": (
+            '<section class="aq-ws-dash-card"><h4>Mercados em Destaque</h4><div class="aq-ws-mini-chart"></div><div class="aq-ws-dash-lines"><span>Renda Fixa <b>CONECTADO</b></span><span>Renda Variável <b>PRÉVIA</b></span><span>Fundos & ETFs <b>PRÉVIA</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Alocação Educacional</h4><div class="aq-ws-donut"></div><div class="aq-ws-dash-lines"><span>Diversificação <b>PRÉVIA</b></span><span>Liquidez <b>PRÉVIA</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Oportunidades da Semana</h4><div class="aq-ws-dash-lines"><span>Ações globais <b>PRÉVIA</b></span><span>Renda & Dividendos <b>CONECTADO</b></span><span>Mercados internacionais <b>PRÉVIA</b></span></div></section>',
+        ),
+        "aion": (
+            '<section class="aq-ws-dash-card"><h4>Status do Núcleo AION</h4><div class="aq-ws-status-list"><span><i></i>Memória <b>CONECTADO</b></span><span><i></i>Tarefas <b>CONECTADO</b></span><span><i></i>Pesquisa <b>CONECTADO</b></span><span><i></i>Biblioteca <b>EM EVOLUÇÃO</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Processamento & Aprendizado</h4><div class="aq-ws-mini-chart"></div><div class="aq-ws-dash-lines"><span>Modelos de IA <b>PRÉVIA</b></span><span>Aprendizado contínuo <b>CONECTADO</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Atividades Recentes</h4><div class="aq-ws-dash-lines"><span>Checkpoint <b>CONECTADO</b></span><span>Auditoria <b>CONECTADO</b></span><span>AION English <b>PLANEJADO</b></span></div></section>',
+        ),
+    }
+    dashboard_html = '<div class="aq-ws-dashboard">' + "".join(dashboard_templates[key]) + "</div>"
     detail = f'<div class="aq-ws-connected">{connected_html}</div>' if connected_html else ""
     return (
         WORKSPACE_CSS
@@ -413,6 +439,7 @@ def workspace_cockpit_html(
         '</section>'
         '<div class="aq-ws-section-head"><h3>Áreas do workspace</h3><span>Estrutura pronta para evolução funcional por módulo.</span></div>'
         f'<div class="aq-ws-modules">{"".join(cards)}</div>'
+        f'{dashboard_html}'
         f'{detail}'
         '</main></div></section>'
     )
