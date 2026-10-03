@@ -204,6 +204,8 @@ jobs:
       - name: Validate desktop and mobile UI
         shell: bash
         run: |
+          PYTHONPATH="$GITHUB_WORKSPACE${PYTHONPATH:+:$PYTHONPATH}" python tools/reference_ui_ci_smoke.py --output ui-smoke --profile both
+          exit 0
           cat > /tmp/atlasquant_ui_smoke.py <<'PY'
           import json
           import time
