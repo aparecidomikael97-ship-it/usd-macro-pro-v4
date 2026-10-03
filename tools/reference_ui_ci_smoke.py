@@ -112,12 +112,17 @@ def _desktop(page, failures: list[str], trace: list[dict]) -> None:
     if not mode.count():
         failures.append("desktop: controle de modo da referência ausente")
     else:
-        before = mode.first.inner_text()
+        before = mode.first.inner_text().strip()
+        expected_after = (
+            "Modo Avançado" if "Iniciante" in before else "Modo Iniciante"
+        )
         mode.first.click()
-        page.locator(".ref-canvas").wait_for(state="visible", timeout=90_000)
-        after = page.locator(".ref-mode").first.inner_text()
-        if before == after:
-            failures.append("desktop: alternância Iniciante/Avançado não mudou o modo")
+        # The canvas is already visible before the click, so it cannot be used
+        # as rerun completion evidence. Wait for the mode label itself to change.
+        expect(page.locator(".ref-mode").first).to_have_text(
+            expected_after, timeout=30_000
+        )
+        after = page.locator(".ref-mode").first.inner_text().strip()
         trace.append({"action": "mode-toggle", "before": before, "after": after})
     _assert_clean(page, failures, "desktop-final")
 
