@@ -3,7 +3,7 @@ name: AION Core Security Gate
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, integration/aion-unified-core-v2-20261003]
 
 permissions:
   contents: read
@@ -25,6 +25,7 @@ jobs:
         run: |
           python -m pip install pip==26.2.1
           pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
       - name: Compile security-critical modules
         run: |
           python -m py_compile \
@@ -39,6 +40,16 @@ jobs:
             atlasquant_aion_durable_tasks.py \
             atlasquant_aion_digital_twin.py \
             atlasquant_aion_dev_fusion.py \
+            atlasquant_aion_chat_checkpoint_adapter.py \
+            atlasquant_aion_chat_library_adapter.py \
+            atlasquant_aion_unified_runtime.py \
+            atlasquant_aion_unified_journal.py \
+            atlasquant_aion_unified_durable_bridge.py \
+            atlasquant_aion_role_authority.py \
+            atlasquant_aion_truth_mapping.py \
+            test_atlasquant_aion_chat_checkpoint_adapter.py \
+            test_atlasquant_aion_chat_library_adapter.py \
+            test_atlasquant_aion_unified_hardening_v21.py \
             test_atlasquant_aion_security_adversarial.py \
             test_atlasquant_aion_chaos_recovery.py \
             atlasquant_aion_critical_review.py \
@@ -66,6 +77,12 @@ jobs:
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
             test_atlasquant_aion_supply_chain_pinning.py
+      - name: Run AION v2.1 scope and quarantine tests
+        run: |
+          python -m pytest -q \
+            test_atlasquant_aion_chat_checkpoint_adapter.py \
+            test_atlasquant_aion_chat_library_adapter.py \
+            test_atlasquant_aion_unified_hardening_v21.py
 
   supply-chain-audit:
     name: Supply-chain audit
@@ -96,7 +113,14 @@ jobs:
             atlasquant_aion_portable.py \
             atlasquant_aion_durable_tasks.py \
             atlasquant_aion_digital_twin.py \
-            atlasquant_aion_dev_fusion.py
+            atlasquant_aion_dev_fusion.py \
+            atlasquant_aion_chat_checkpoint_adapter.py \
+            atlasquant_aion_chat_library_adapter.py \
+            atlasquant_aion_unified_runtime.py \
+            atlasquant_aion_unified_journal.py \
+            atlasquant_aion_unified_durable_bridge.py \
+            atlasquant_aion_role_authority.py \
+            atlasquant_aion_truth_mapping.py
       - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
         run: |
           python -m pip freeze --all > /tmp/aion-resolved-requirements.txt

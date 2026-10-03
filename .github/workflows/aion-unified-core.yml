@@ -3,17 +3,27 @@ name: AION Unified Core
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, integration/aion-unified-core-v2-20261003]
     paths:
       - "aion_chat/**"
       - "atlasquant_aion_unified_runtime.py"
       - "atlasquant_aion_chat_ui.py"
+      - "atlasquant_aion_chat_checkpoint_adapter.py"
+      - "atlasquant_aion_chat_library_adapter.py"
+      - "atlasquant_aion_unified_journal.py"
+      - "atlasquant_aion_unified_durable_bridge.py"
+      - "atlasquant_aion_role_authority.py"
+      - "atlasquant_aion_truth_mapping.py"
       - "test_atlasquant_aion_chat_foundation.py"
       - "test_atlasquant_aion_chat_browser.py"
       - "test_atlasquant_aion_chat_load.py"
       - "test_atlasquant_aion_unified_runtime.py"
+      - "test_atlasquant_aion_chat_checkpoint_adapter.py"
+      - "test_atlasquant_aion_chat_library_adapter.py"
+      - "test_atlasquant_aion_unified_hardening_v21.py"
       - "docs/aion/AION_CHAT_FOUNDATION_V1.md"
       - "docs/aion/AION_UNIFIED_CORE_V2.md"
+      - "docs/aion/AION_UNIFIED_CORE_V21.md"
       - ".github/workflows/aion-unified-core.yml"
 
 permissions:
@@ -41,9 +51,9 @@ jobs:
       - name: Compile AION chat and unified runtime
         run: |
           python -m compileall -q aion_chat
-          python -m py_compile atlasquant_aion_chat_ui.py atlasquant_aion_unified_runtime.py
+          python -m py_compile atlasquant_aion_chat_ui.py atlasquant_aion_unified_runtime.py atlasquant_aion_chat_checkpoint_adapter.py atlasquant_aion_chat_library_adapter.py atlasquant_aion_unified_journal.py atlasquant_aion_unified_durable_bridge.py atlasquant_aion_role_authority.py atlasquant_aion_truth_mapping.py
       - name: Run chat foundation, load and unified runtime tests
-        run: python -m pytest -q -s test_atlasquant_aion_chat_foundation.py test_atlasquant_aion_chat_load.py test_atlasquant_aion_unified_runtime.py
+        run: python -m pytest -q -s test_atlasquant_aion_chat_foundation.py test_atlasquant_aion_chat_load.py test_atlasquant_aion_unified_runtime.py test_atlasquant_aion_chat_checkpoint_adapter.py test_atlasquant_aion_chat_library_adapter.py test_atlasquant_aion_unified_hardening_v21.py
 
   browser:
     name: Chat browser contract
@@ -60,5 +70,9 @@ jobs:
           pip install -r requirements.txt
           python -m pip install pytest==9.1.1 playwright==1.63.0
           python -m playwright install --with-deps chromium
-      - name: Run real Chromium chat test
-        run: python -m pytest -q -s test_atlasquant_aion_chat_browser.py
+      - name: Run real Chromium chat test five times
+        run: |
+          for attempt in 1 2 3 4 5; do
+            echo "AION chat browser stability attempt $attempt/5"
+            python -m pytest -q -s test_atlasquant_aion_chat_browser.py
+          done
