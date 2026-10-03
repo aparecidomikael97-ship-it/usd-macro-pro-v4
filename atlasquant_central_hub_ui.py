@@ -808,6 +808,31 @@ def clear_login_greeting(session_state) -> None:
         return
 
 
+def pull_central_area_id(query_params) -> str:
+    """Read and clear a Central hero-card destination.
+
+    The query value is never authority: request_central_destination validates
+    it against the authenticated access mapping before any state transition.
+    """
+    if query_params is None:
+        return ""
+    try:
+        raw = query_params.get("aq_central", "")
+    except Exception:
+        return ""
+    if isinstance(raw, (list, tuple)):
+        raw = raw[0] if raw else ""
+    area_id = str(raw or "").strip()
+    if not area_id:
+        return ""
+    try:
+        del query_params["aq_central"]
+    except Exception:
+        pass
+    return area_id
+
+
+
 def central_selector_html(
     access: Mapping[str, Any] | None,
     *,
@@ -949,35 +974,17 @@ def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, re
         return
 
     current = CENTRAL_ROOT if resolved.get("root") else str(resolved.get("area") or "")
-    model = central_visibility_model(access)
-    area_targets = [
-        (str(area["id"]), str(area["label"])) for area in model["areas"]
-    ]
+    # On the Central root the four visual hero cards are the access controls.
+    # Do not duplicate them with a second "Acessar ambiente" strip below.
     if current == CENTRAL_ROOT:
-        targets = area_targets
-        st.markdown("#### Acessar ambiente")
-        st.caption("Os quatro acessos abaixo usam a mesma sessão autenticada e as rotas validadas.")
-    else:
-        targets = [("central", "Central Principal")] + [
-            item for item in area_targets if item[0] != current
-        ]
-        st.markdown("#### Trocar de setor")
-        st.caption("Navegue pelo ecossistema sem sair da sessão autenticada.")
-    columns = st.columns(4 if current == CENTRAL_ROOT else 2)
-    for index, (area_id, label) in enumerate(targets):
-        action_label = (
-            "← Central Principal"
-            if area_id == "central"
-            else ("Acessar " if current == CENTRAL_ROOT else "Abrir ") + label
-        )
-        with columns[index % 2]:
-            if st.button(
-                action_label,
-                key=f"aq_central_stateful_{area_id}",
-                width="stretch",
-            ):
-                request_central_destination(st.session_state, access, area_id)
-                st.rerun()
+        return
+    if st.button(
+        "← Central Principal",
+        key="aq_central_stateful_central",
+        width="stretch",
+    ):
+        request_central_destination(st.session_state, access, "central")
+        st.rerun()
 
 
 def render_central_hub(
@@ -992,6 +999,19 @@ def render_central_hub(
 ) -> dict[str, Any]:
     """Streamlit edge. Import stays local so pure tests need no server."""
     import streamlit as st
+
+    # Central hero cards use a lightweight query id, then immediately cross
+    # the existing authenticated navigation bridge. The raw query is cleared
+    # before rerun and never bypasses RBAC.
+    if not str(requested or "").strip():
+        card_area = pull_central_area_id(getattr(st, "query_params", None))
+        if card_area:
+            try:
+                request_central_destination(st.session_state, access, card_area)
+            except ValueError:
+                pass
+            else:
+                st.rerun()
 
     resolved = resolve_central_area(access, requested)
     st.markdown(
