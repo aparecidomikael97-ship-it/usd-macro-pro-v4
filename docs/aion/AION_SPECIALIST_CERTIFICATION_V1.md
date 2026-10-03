@@ -45,8 +45,10 @@ deles. O especialista não amplia role, scope ou ferramenta do contexto pai.
 Papel, ferramenta, escopo ou ação do perfil são metadata
 (`profile_allowed_roles`, `profile_allowed_tools`, `profile_allowed_actions`).
 Eles só entram em `granted_roles`, `granted_tools`, `granted_scopes` ou
-`granted_actions` quando o contexto pai traz essa autoridade. Pai ausente ou
-vazio não concede nada: `authority_bound=false` e `permissions_expanded=false`.
+`granted_actions` quando o contexto pai traz essa autoridade. Scope efetivo
+ainda exige a allowlist do perfil, o guardião e runtime ligado. `*` não abre
+acesso. Pai ausente ou vazio não concede nada: `authority_bound=false` e
+`permissions_expanded=false`.
 Quando aplicável, a seleção também reporta `external_action_executed=false`,
 `real_trading_enabled=false`, `payment_executed=false` e
 `publication_executed=false`.

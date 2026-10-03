@@ -1,8 +1,9 @@
 """Layered, deduplicated and persona-aware AION memory fabric."""
 from __future__ import annotations
 
+from collections import Counter
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
 import json
@@ -74,7 +75,31 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
         tag = _clean(value, 80).lower()
         if tag and tag not in tags:
             tags.append(tag)
-    created_at = _clean(item.get("created_at"), 80) or _now()
+    created_raw = _clean(item.get("created_at"), 80)
+    created_at = created_raw or _now()
+    timestamp_valid = _valid_until(created_at) is not None
+    valid_until = _clean(item.get("valid_until"), 80)
+    valid_until_valid = (not valid_until) or _valid_until(valid_until) is not None
+    raw_content = str(item.get("content") or "")
+    if len(raw_content) > 8000:
+        raw_content = raw_content[:8000]
+        content_truncated = True
+    else:
+        content_truncated = False
+    full_content = " ".join(raw_content.replace("\x00", "").split())
+    if len(full_content) > 4000:
+        content_truncated = True
+    content = full_content[:4000]
+    raw_refs = list(item.get("source_refs") or [])
+    refs_truncated = len(raw_refs) > 30 or item.get("truncated") is True
+    content_truncated = content_truncated or item.get("truncated") is True
+    if not timestamp_valid or not valid_until_valid or content_truncated or refs_truncated:
+        if truth == "CONFIRMED" or not timestamp_valid or not valid_until_valid:
+            truth = "UNKNOWN"
+    tenant = _clean(item.get("tenant"), 80).lower()
+    workspace = _clean(item.get("workspace"), 80).lower()
+    actor = _clean(item.get("actor"), 80).lower()
+    task = _clean(item.get("task"), 80)
     domain = _clean(item.get("domain"), 40).upper()
     if domain and domain not in MEMORY_DOMAINS:
         domain = "UNKNOWN"
@@ -91,8 +116,15 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
     }
     if domain:
         fingerprint_payload["domain"] = domain
+    context = {
+        key: value for key, value in (
+            ("tenant", tenant), ("workspace", workspace), ("actor", actor), ("task", task),
+        ) if value
+    }
+    if context:
+        fingerprint_payload["context"] = context
     fingerprint = _digest(fingerprint_payload)
-    return {
+    entry = {
         "memory_id": _clean(item.get("memory_id"), 80) or "MEM-" + fingerprint.upper(),
         "memory_key": memory_key,
         "layer": layer,
@@ -100,7 +132,6 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
         "origin": origin,
         "created_at": created_at,
         "confidence": round(confidence, 2),
-        "valid_until": _clean(item.get("valid_until"), 80),
         "category": category,
         "version": version,
         "tags": tags,
@@ -109,9 +140,14 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
         "truth_state": truth,
         "persona": persona,
         "domain": domain,
-        "source_refs": [_clean(x, 300) for x in list(item.get("source_refs") or [])[:30] if _clean(x, 300)],
+        "valid_until": valid_until,
+        "source_refs": [_clean(x, 300) for x in raw_refs[:30] if _clean(x, 300)],
         "fingerprint": fingerprint,
     }
+    entry.update(context)
+    if content_truncated or refs_truncated:
+        entry["truncated"] = True
+    return entry
 
 
 def normalize_memory_layers(raw: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -156,10 +192,15 @@ def remember(
     confidence: Any = 0,
     truth_state: Any = "UNKNOWN",
     valid_until: Any = "",
+    created_at: Any = "",
     version: Any = "1",
     tags: Sequence[Any] | None = None,
     persona: Any = "",
     domain: Any = "",
+    tenant: Any = "",
+    workspace: Any = "",
+    actor: Any = "",
+    task: Any = "",
     source_refs: Sequence[Any] | None = None,
     memory_key: Any = "",
 ) -> dict[str, Any]:
@@ -167,7 +208,9 @@ def remember(
     candidate = normalize_memory_entry({
         "layer": layer, "content": content, "origin": origin, "category": category,
         "confidence": confidence, "truth_state": truth_state, "valid_until": valid_until,
+        "created_at": created_at,
         "version": version, "tags": list(tags or []), "persona": persona, "domain": domain,
+        "tenant": tenant, "workspace": workspace, "actor": actor, "task": task,
         "source_refs": list(source_refs or []), "memory_key": memory_key,
     })
     entries = deepcopy(state["entries"])
@@ -202,6 +245,10 @@ def recall(
     layers: Sequence[str] | None = None,
     persona: Any = "",
     domain: Any = "",
+    tenant: Any = "",
+    workspace: Any = "",
+    actor: Any = "",
+    task: Any = "",
     accessor_profile: Any = "",
     explicit_domains: Sequence[Any] | None = None,
     tags: Sequence[Any] | None = None,
@@ -247,6 +294,30 @@ def recall(
                 continue
         if requested_tags and not requested_tags.intersection(row["tags"]):
             continue
+        context_pairs = (
+            ("tenant", _clean(tenant, 80).lower()),
+            ("workspace", _clean(workspace, 80).lower()),
+            ("actor", _clean(actor, 80).lower()),
+            ("task", _clean(task, 80)),
+        )
+        context_hidden = False
+        for field, requested in context_pairs:
+            row_value = _clean(row.get(field), 80)
+            if field != "task":
+                row_value = row_value.lower()
+            if row_value and row_value != requested:
+                context_hidden = True
+                break
+        if context_hidden:
+            continue
+        created = _valid_until(row.get("created_at"))
+        if row.get("created_at") and created is None:
+            continue
+        wall = datetime.now(timezone.utc)
+        if created is not None and created > wall + timedelta(days=1):
+            continue
+        if row.get("valid_until") and _valid_until(row.get("valid_until")) is None:
+            continue
         deadline = _valid_until(row.get("valid_until"))
         expired = deadline is not None and deadline <= current
         if expired and not include_expired:
@@ -257,6 +328,8 @@ def recall(
         item["promoted"] = False
         if cross_domain:
             item["explicit_cross_domain"] = True
+        if item.get("truth_state") not in TRUTH_STATES:
+            item["truth_state"] = "UNKNOWN"
         if expired:
             item["status"] = "EXPIRED"
             if item.get("truth_state") == "CONFIRMED":
@@ -265,6 +338,31 @@ def recall(
         if len(out) >= max(1, min(int(limit), 200)):
             break
     return out
+
+
+def memory_integrity_report(memory: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Reject a corrupt layer document instead of calling it intact."""
+    if not isinstance(memory, Mapping) or memory.get("schema") != SCHEMA or memory.get("version") != VERSION:
+        return {"schema": SCHEMA, "state": "REJECTED", "intact": False, "reason": "SCHEMA_OR_VERSION"}
+    state = normalize_memory_layers(memory)
+    identifiers = [str(row.get("memory_id") or "") for row in state["entries"]]
+    counts = Counter(identifiers)
+    duplicate_ids = sorted(item for item, count in counts.items() if item and count > 1)
+    duplicates_truncated = len(duplicate_ids) > 20
+    digest_matches = memory.get("digest") == state["digest"]
+    rejected = int((state.get("recovery") or {}).get("rejected") or 0)
+    intact = digest_matches is True and not duplicate_ids and rejected == 0
+    return {
+        "schema": SCHEMA,
+        "state": "INTACT" if intact else "MISMATCH",
+        "intact": intact,
+        "digest": state["digest"],
+        "supplied_digest": memory.get("digest"),
+        "duplicate_ids": duplicate_ids[:20],
+        "duplicates_truncated": duplicates_truncated,
+        "rejected": rejected,
+        "reason": "INTACT" if intact else "DIGEST_CONTEXT_OR_DUPLICATE",
+    }
 
 
 def memory_layer_summary(memory: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -285,5 +383,5 @@ def memory_layer_summary(memory: Mapping[str, Any] | None) -> dict[str, Any]:
 __all__ = [
     "SCHEMA", "VERSION", "LAYERS", "STATUSES", "default_memory_layers",
     "normalize_memory_entry", "normalize_memory_layers", "remember", "recall",
-    "memory_layer_summary",
+    "memory_integrity_report", "memory_layer_summary",
 ]
