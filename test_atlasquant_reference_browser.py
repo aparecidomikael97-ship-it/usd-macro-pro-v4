@@ -208,10 +208,10 @@ def test_central_and_legacy_cards_keep_exact_hover_and_keyboard_geometry(preview
         browser.close()
 
 
-def test_trader_19_functions_discoverable_and_clickable_in_both_modes(preview_url):
+def test_trader_24_functions_discoverable_and_clickable_in_both_modes(preview_url):
     artifacts = Path('visual_review'); artifacts.mkdir(exist_ok=True)
     expected_routes = [route for route, _ in NAV['trader']]
-    assert len(expected_routes) == len(set(expected_routes)) == 19
+    assert len(expected_routes) == len(set(expected_routes)) == 24
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(viewport={'width':1280, 'height':720}, reduced_motion='reduce')
@@ -238,7 +238,7 @@ def test_trader_19_functions_discoverable_and_clickable_in_both_modes(preview_ur
                 if width == 390:
                     summary = page.locator('.cq-functions summary')
                     expect(summary).to_be_visible()
-                    expect(summary).to_contain_text('Funções do Trader · 19')
+                    expect(summary).to_contain_text('Funções do Trader · 24')
                     expect(summary).to_contain_text('inclui avançadas')
                     summary.scroll_into_view_if_needed()
                     assert summary.bounding_box()['y'] < height
@@ -255,13 +255,13 @@ def test_trader_19_functions_discoverable_and_clickable_in_both_modes(preview_ur
                     page.screenshot(path=str(artifacts/f'trader-functions-mobile-open-{mode}.png'), full_page=True)
                     nav_selector = '.cq-functions nav'
                 else:
-                    expect(page.locator('.cq-nav-title').first).to_have_text('Funções · 19')
+                    expect(page.locator('.cq-nav-title').first).to_have_text('Funções · 24')
                     nav_selector = '.cq-nav'
                     page.screenshot(path=str(artifacts/f'trader-functions-{width}-{mode}.png'), full_page=True)
                 # Exact route set, direct buttons; no nested disclosure or CSS hiding.
                 buttons = page.locator(nav_selector + ' [data-route]')
                 assert buttons.evaluate_all('(els)=>els.map(e=>e.dataset.route)') == expected_routes
-                expect(buttons).to_have_count(19)
+                expect(buttons).to_have_count(24)
                 expect(page.locator(nav_selector + ' details')).to_have_count(0)
                 for route in expected_routes:
                     if width == 390 and page.locator('.cq-functions').get_attribute('open') is None:
