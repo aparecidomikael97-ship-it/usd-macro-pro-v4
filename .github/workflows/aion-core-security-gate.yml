@@ -3,7 +3,7 @@ name: AION Core Security Gate
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, integration/aion-unified-core-v2-20261003]
 
 permissions:
   contents: read
@@ -39,6 +39,12 @@ jobs:
             atlasquant_aion_durable_tasks.py \
             atlasquant_aion_digital_twin.py \
             atlasquant_aion_dev_fusion.py \
+            atlasquant_aion_chat_checkpoint_adapter.py \
+            atlasquant_aion_chat_library_adapter.py \
+            atlasquant_aion_chat_checkpoint_adapter.py \
+            atlasquant_aion_chat_library_adapter.py \
+            test_atlasquant_aion_chat_checkpoint_adapter.py \
+            test_atlasquant_aion_chat_library_adapter.py \
             test_atlasquant_aion_security_adversarial.py \
             test_atlasquant_aion_chaos_recovery.py \
             atlasquant_aion_critical_review.py \
@@ -66,6 +72,11 @@ jobs:
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
             test_atlasquant_aion_supply_chain_pinning.py
+      - name: Run AION v2.1 scope and quarantine tests
+        run: |
+          python -m pytest -q \
+            test_atlasquant_aion_chat_checkpoint_adapter.py \
+            test_atlasquant_aion_chat_library_adapter.py
 
   supply-chain-audit:
     name: Supply-chain audit
