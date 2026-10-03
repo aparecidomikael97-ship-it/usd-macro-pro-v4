@@ -169,10 +169,18 @@ WORKSPACE_CSS = r"""
 .aq-central-reference-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch}.aq-central-reference-card{--card-accent:#28a8ff;--card-glow:rgba(40,168,255,.28);position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:520px;border:1px solid color-mix(in srgb,var(--card-accent) 62%,transparent);border-radius:16px;padding:0 14px 14px;background:linear-gradient(180deg,rgba(5,17,36,.98),rgba(3,10,23,.985));box-shadow:0 16px 38px rgba(0,0,0,.34),inset 0 0 28px rgba(30,104,190,.05);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
 .aq-central-reference-card[data-area="negocios"]{--card-accent:#34e3a4;--card-glow:rgba(52,227,164,.24)}.aq-central-reference-card[data-area="investimentos"]{--card-accent:#f0bd58;--card-glow:rgba(240,189,88,.24)}.aq-central-reference-card[data-area="aion"]{--card-accent:#c05cff;--card-glow:rgba(192,92,255,.27)}
 .aq-central-reference-card:hover{transform:translateY(-5px);box-shadow:0 22px 46px rgba(0,0,0,.42),0 0 26px var(--card-glow)}
-.aq-central-reference-art{position:relative;display:grid;place-items:center;height:164px;margin:0 -14px 14px;border:0;border-bottom:1px solid color-mix(in srgb,var(--card-accent) 38%,transparent);border-radius:15px 15px 0 0;background:radial-gradient(circle at 50% 55%,var(--card-glow),transparent 52%),linear-gradient(145deg,rgba(11,39,79,.88),rgba(4,14,31,.94))}
-.aq-central-reference-art:after{content:"";position:absolute;inset:auto 0 0;height:48%;background:linear-gradient(180deg,transparent,rgba(1,6,16,.68));pointer-events:none}.aq-central-reference-art .aq-central-art{width:100%;height:100%;object-fit:cover;filter:drop-shadow(0 0 16px var(--card-glow))}
-.aq-central-reference-card h3{margin:.1rem 0 .3rem;color:#fff;font-size:1.22rem;letter-spacing:.01em;text-transform:uppercase}.aq-central-reference-card p{margin:0;color:#aebdd2;font-size:.70rem;line-height:1.42;min-height:3.1em}
+.aq-central-reference-art{position:relative;display:grid;place-items:center;height:174px;margin:0 -14px 20px;border:0;border-bottom:1px solid color-mix(in srgb,var(--card-accent) 46%,transparent);border-radius:15px 15px 0 0;background:
+ radial-gradient(circle at 50% 48%,var(--card-glow),transparent 48%),
+ linear-gradient(145deg,rgba(11,39,79,.92),rgba(4,14,31,.97));overflow:hidden}
+.aq-central-reference-art:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.32;background-image:
+ linear-gradient(color-mix(in srgb,var(--card-accent) 12%,transparent) 1px,transparent 1px),
+ linear-gradient(90deg,color-mix(in srgb,var(--card-accent) 10%,transparent) 1px,transparent 1px);background-size:24px 24px;mask-image:linear-gradient(to bottom,#000,transparent 85%)}
+.aq-central-reference-art:after{content:"";position:absolute;inset:auto 0 0;height:52%;background:linear-gradient(180deg,transparent,rgba(1,6,16,.76));pointer-events:none}.aq-central-reference-art .aq-central-art{width:100%;height:100%;object-fit:cover;filter:drop-shadow(0 0 20px var(--card-glow)) saturate(1.18)}
+.aq-central-reference-icon{position:absolute;left:16px;top:151px;z-index:3;display:grid;place-items:center;width:46px;height:46px;border:1px solid color-mix(in srgb,var(--card-accent) 75%,white 5%);border-radius:12px;background:linear-gradient(145deg,color-mix(in srgb,var(--card-accent) 34%,#071426),#07101f);box-shadow:0 0 24px var(--card-glow),inset 0 1px 0 rgba(255,255,255,.18);color:#fff;font-size:1.05rem;font-weight:950}
+.aq-central-reference-card h3{margin:.35rem 0 .3rem;color:#fff;font-size:1.22rem;letter-spacing:.01em;text-transform:uppercase}.aq-central-reference-card p{margin:0;color:#aebdd2;font-size:.70rem;line-height:1.42;min-height:3.1em}
 .aq-central-reference-list{display:grid;grid-template-columns:1fr;gap:4px;margin:12px 0 14px;padding-top:10px;border-top:1px solid rgba(130,174,225,.12)}.aq-central-reference-list span{position:relative;border:0;border-radius:0;padding:3px 4px 3px 18px;color:#d9e4f2;font-size:.62rem;font-weight:720;background:transparent}.aq-central-reference-list span:before{content:"◈";position:absolute;left:2px;top:2px;color:var(--card-accent);font-size:.63rem}
+.aq-central-reference-card{text-decoration:none;color:inherit;cursor:pointer}
+.aq-central-reference-card:focus-visible{outline:2px solid var(--card-accent);outline-offset:3px}
 .aq-central-reference-cta{display:flex;align-items:center;justify-content:center;margin-top:auto;border:1px solid color-mix(in srgb,var(--card-accent) 68%,transparent);border-radius:9px;min-height:42px;color:#fff;font-size:.68rem;font-weight:900;letter-spacing:.03em;background:linear-gradient(90deg,color-mix(in srgb,var(--card-accent) 22%,#071426),rgba(6,17,37,.92));box-shadow:0 0 18px var(--card-glow)}
 @keyframes aq-ws-orbit{from{transform:rotate(0) scaleX(.45)}to{transform:rotate(360deg) scaleX(.45)}}
 @media (max-width:1100px){.aq-central-reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -204,14 +212,17 @@ def central_reference_card_html(area: object, art_html: str = "") -> str:
     key = _area(area)
     spec = _WORKSPACES[key]
     bullets = "".join(f"<span>{escape(str(item))}</span>" for item in spec["central_bullets"])
+    icons = {"trader": "↗", "negocios": "▦", "investimentos": "◫", "aion": "✦"}
     return (
-        f'<article class="aq-central-reference-card" data-area="{escape(key)}">'
+        f'<a class="aq-central-reference-card" data-area="{escape(key)}" '
+        f'href="?aq_central={escape(key, quote=True)}" aria-label="Acessar {escape(spec["title"])}">'
         f'<div class="aq-central-reference-art">{art_html}</div>'
+        f'<span class="aq-central-reference-icon" aria-hidden="true">{escape(icons.get(key, "◇"))}</span>'
         f'<h3>{escape(spec["title"])}</h3>'
         f'<p>{escape(spec["summary"])}</p>'
         f'<div class="aq-central-reference-list">{bullets}</div>'
-        f'<div class="aq-central-reference-cta">ACESSAR {escape(spec["title"].upper())}</div>'
-        '</article>'
+        f'<div class="aq-central-reference-cta">ACESSAR {escape(spec["title"].upper())} <span aria-hidden="true">→</span></div>'
+        '</a>'
     )
 
 
