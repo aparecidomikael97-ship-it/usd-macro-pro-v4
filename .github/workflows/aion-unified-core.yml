@@ -3,7 +3,7 @@ name: AION Unified Core
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main, integration/aion-unified-core-v2-20261003]
+    branches: [main, integration/aion-unified-core-v2-20261003, integration/aion-core-v21-hardening-adapters-20261003]
     paths:
       - "aion_chat/**"
       - "atlasquant_aion_unified_runtime.py"
@@ -12,6 +12,7 @@ on:
       - "atlasquant_aion_chat_library_adapter.py"
       - "atlasquant_aion_unified_journal.py"
       - "atlasquant_aion_unified_durable_bridge.py"
+      - "atlasquant_aion_unified_journal_store.py"
       - "atlasquant_aion_role_authority.py"
       - "atlasquant_aion_truth_mapping.py"
       - "test_atlasquant_aion_chat_foundation.py"
@@ -21,6 +22,7 @@ on:
       - "test_atlasquant_aion_chat_checkpoint_adapter.py"
       - "test_atlasquant_aion_chat_library_adapter.py"
       - "test_atlasquant_aion_unified_hardening_v21.py"
+      - "test_atlasquant_aion_unified_journal_store.py"
       - "docs/aion/AION_CHAT_FOUNDATION_V1.md"
       - "docs/aion/AION_UNIFIED_CORE_V2.md"
       - "docs/aion/AION_UNIFIED_CORE_V21.md"
@@ -51,9 +53,9 @@ jobs:
       - name: Compile AION chat and unified runtime
         run: |
           python -m compileall -q aion_chat
-          python -m py_compile atlasquant_aion_chat_ui.py atlasquant_aion_unified_runtime.py atlasquant_aion_chat_checkpoint_adapter.py atlasquant_aion_chat_library_adapter.py atlasquant_aion_unified_journal.py atlasquant_aion_unified_durable_bridge.py atlasquant_aion_role_authority.py atlasquant_aion_truth_mapping.py
+          python -m py_compile atlasquant_aion_chat_ui.py atlasquant_aion_unified_runtime.py atlasquant_aion_chat_checkpoint_adapter.py atlasquant_aion_chat_library_adapter.py atlasquant_aion_unified_journal.py atlasquant_aion_unified_durable_bridge.py atlasquant_aion_unified_journal_store.py atlasquant_aion_role_authority.py atlasquant_aion_truth_mapping.py
       - name: Run chat foundation, load and unified runtime tests
-        run: python -m pytest -q -s test_atlasquant_aion_chat_foundation.py test_atlasquant_aion_chat_load.py test_atlasquant_aion_unified_runtime.py test_atlasquant_aion_chat_checkpoint_adapter.py test_atlasquant_aion_chat_library_adapter.py test_atlasquant_aion_unified_hardening_v21.py
+        run: python -m pytest -q -s test_atlasquant_aion_chat_foundation.py test_atlasquant_aion_chat_load.py test_atlasquant_aion_unified_runtime.py test_atlasquant_aion_chat_checkpoint_adapter.py test_atlasquant_aion_chat_library_adapter.py test_atlasquant_aion_unified_hardening_v21.py test_atlasquant_aion_unified_journal_store.py
 
   browser:
     name: Chat browser contract
