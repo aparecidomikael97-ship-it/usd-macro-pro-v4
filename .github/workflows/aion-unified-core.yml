@@ -1,0 +1,64 @@
+name: AION Unified Core
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "aion_chat/**"
+      - "atlasquant_aion_unified_runtime.py"
+      - "atlasquant_aion_chat_ui.py"
+      - "test_atlasquant_aion_chat_foundation.py"
+      - "test_atlasquant_aion_chat_browser.py"
+      - "test_atlasquant_aion_unified_runtime.py"
+      - "docs/aion/AION_CHAT_FOUNDATION_V1.md"
+      - "docs/aion/AION_UNIFIED_CORE_V2.md"
+      - ".github/workflows/aion-unified-core.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-unified-core-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: Unified core contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Compile AION chat and unified runtime
+        run: |
+          python -m compileall -q aion_chat
+          python -m py_compile atlasquant_aion_chat_ui.py atlasquant_aion_unified_runtime.py
+      - name: Run chat foundation and unified runtime tests
+        run: |
+          python -m pytest -q             test_atlasquant_aion_chat_foundation.py             test_atlasquant_aion_unified_runtime.py
+
+  browser:
+    name: Chat browser contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - name: Run real Chromium chat test
+        run: python -m pytest -q -s test_atlasquant_aion_chat_browser.py
