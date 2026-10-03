@@ -191,7 +191,7 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 .aq-trader-core h2{margin:12px 0 4px;color:#fff;font-size:1.35rem;text-align:center}.aq-trader-core p{margin:0;color:#cbdcf1;text-align:center;font-size:.76rem;max-width:38ch}.aq-trader-core-status{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}.aq-trader-core-status span{border:1px solid rgba(94,181,255,.22);border-radius:999px;padding:4px 8px;color:#e7f4ff;background:rgba(6,20,44,.72);font-size:.59rem;font-weight:850}
 .aq-trader-modules-title{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:15px 2px 9px}.aq-trader-modules-title h3{margin:0;color:#fff;font-size:1rem}.aq-trader-modules-title span{color:#8db5df;font-size:.65rem}
 .aq-trader-module-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
-.aq-trader-module{position:relative;overflow:hidden;min-width:0;border:1px solid rgba(73,158,255,.24);border-radius:14px;padding:11px;background:linear-gradient(160deg,rgba(11,32,65,.92),rgba(6,18,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.aq-trader-module{position:relative;overflow:hidden;min-width:0;text-decoration:none;color:inherit;cursor:pointer;border:1px solid rgba(73,158,255,.24);border-radius:14px;padding:11px;background:linear-gradient(160deg,rgba(11,32,65,.92),rgba(6,18,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 .aq-trader-module:before{content:"";position:absolute;inset:auto -30px -42px auto;width:92px;height:92px;border-radius:50%;background:radial-gradient(circle,rgba(75,111,255,.18),transparent 66%)}
 .aq-trader-module-icon{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(93,194,255,.34);border-radius:10px;background:linear-gradient(145deg,rgba(14,86,154,.82),rgba(31,42,105,.88));color:#fff;font-size:1.05rem;box-shadow:0 0 20px rgba(53,140,255,.16)}
 .aq-trader-module small{display:block;margin-top:8px;color:#72d8ff;font-size:.55rem;font-weight:900;letter-spacing:.1em}.aq-trader-module h4{margin:.2rem 0 .3rem;color:#fff;font-size:.86rem}.aq-trader-module p{margin:0;color:#c7d8ed;font-size:.66rem;line-height:1.36}.aq-trader-module .state{display:inline-flex;margin-top:8px;border-radius:999px;padding:3px 7px;font-size:.55rem;font-weight:900;border:1px solid rgba(116,195,255,.22);color:#eaf6ff}.aq-trader-module .state.locked{color:#ffe39c;border-color:rgba(255,201,92,.32)}.aq-trader-module .state.off{color:#a9b9cb}
@@ -205,8 +205,8 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 .aq-trader-shell[data-trader-reference="v3"]{padding:0;border-radius:18px;background:linear-gradient(180deg,#020a17,#020610);min-height:700px}
 .aq-trader-v3-grid{display:grid;grid-template-columns:154px minmax(0,1fr);min-height:700px}.aq-trader-v3-side{display:flex;flex-direction:column;padding:10px 7px;border-right:1px solid rgba(48,139,255,.35);background:linear-gradient(180deg,rgba(5,24,52,.98),rgba(2,10,25,.99));box-shadow:inset -12px 0 36px rgba(0,0,0,.3)}
 .aq-trader-v3-side-brand{display:flex;align-items:center;gap:7px;padding:2px 7px 10px;color:#fff;font-weight:950;font-size:.78rem;letter-spacing:.08em}.aq-trader-v3-side-brand b{display:grid;place-items:center;width:32px;height:32px;color:#e7fbff;font-size:1.35rem;text-shadow:0 0 16px #32aaff}
-.aq-trader-v3-nav{display:grid;gap:2px}.aq-trader-v3-nav span{display:flex;align-items:center;gap:7px;min-height:27px;padding:4px 7px;border:1px solid transparent;border-radius:7px;color:#c7d7eb;font-size:.58rem;font-weight:760}.aq-trader-v3-nav span:first-child{color:#fff;border-color:#2c92ff;background:linear-gradient(90deg,rgba(20,103,205,.78),rgba(7,37,82,.88));box-shadow:0 0 15px rgba(36,133,255,.25)}.aq-trader-v3-nav i{width:15px;text-align:center;color:#7fd8ff;font-style:normal}
-.aq-trader-v3-aion{margin-top:auto;border:1px solid #328fff;border-radius:11px;padding:8px;background:linear-gradient(160deg,rgba(18,70,135,.75),rgba(12,22,65,.92));box-shadow:0 0 20px rgba(35,132,255,.18)}.aq-trader-v3-aion strong{display:block;color:#7fe1ff;font-size:.75rem}.aq-trader-v3-aion small{display:block;color:#b8c9df;font-size:.53rem;margin:2px 0 6px}.aq-trader-v3-aion b{display:block;border:1px solid rgba(91,195,255,.38);border-radius:6px;padding:5px;color:#eefaff;font-size:.54rem;text-align:center}
+.aq-trader-v3-nav{display:grid;gap:2px}.aq-trader-v3-nav a{text-decoration:none;color:inherit}.aq-trader-v3-nav span{display:flex;align-items:center;gap:7px;min-height:27px;padding:4px 7px;border:1px solid transparent;border-radius:7px;color:#c7d7eb;font-size:.58rem;font-weight:760}.aq-trader-v3-nav a:first-child span{color:#fff;border-color:#2c92ff;background:linear-gradient(90deg,rgba(20,103,205,.78),rgba(7,37,82,.88));box-shadow:0 0 15px rgba(36,133,255,.25)}.aq-trader-v3-nav i{width:15px;text-align:center;color:#7fd8ff;font-style:normal}
+.aq-trader-v3-aion{display:block;text-decoration:none;color:inherit;margin-top:auto;border:1px solid #328fff;border-radius:11px;padding:8px;background:linear-gradient(160deg,rgba(18,70,135,.75),rgba(12,22,65,.92));box-shadow:0 0 20px rgba(35,132,255,.18)}.aq-trader-v3-aion strong{display:block;color:#7fe1ff;font-size:.75rem}.aq-trader-v3-aion small{display:block;color:#b8c9df;font-size:.53rem;margin:2px 0 6px}.aq-trader-v3-aion b{display:block;border:1px solid rgba(91,195,255,.38);border-radius:6px;padding:5px;color:#eefaff;font-size:.54rem;text-align:center}
 .aq-trader-v3-main{min-width:0;padding:7px 9px 9px;background:radial-gradient(circle at 51% 65%,rgba(26,108,255,.12),transparent 27rem)}
 .aq-trader-v3-head{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(260px,1fr) minmax(250px,.75fr);align-items:center;gap:10px;min-height:40px;border-bottom:1px solid rgba(70,157,255,.23)}.aq-trader-v3-title{color:#fff;font-weight:950;font-size:.76rem;letter-spacing:.08em}.aq-trader-v3-motto{text-align:center;color:#fff;font-weight:900;font-size:.77rem}.aq-trader-v3-tools{display:flex;justify-content:flex-end;align-items:center;gap:8px;color:#bed0e8;font-size:.55rem}.aq-trader-v3-search{min-width:125px;border:1px solid rgba(89,156,237,.25);border-radius:7px;padding:5px 8px;color:#627b99;background:rgba(5,17,37,.7)}
 .aq-trader-shell[data-trader-reference="v3"] .aq-trader-ticker{padding:6px 0}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick{min-width:91px;border-radius:8px;padding:5px 7px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick small{font-size:.48rem}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick strong{font-size:.62rem}
@@ -726,7 +726,7 @@ def request_premium_card(
     return target
 
 
-TRADER_REFERENCE_MODULE_IDS = ("macro", "micro", "geo", "fundamental", "ict", "calendar", "news", "invest")
+TRADER_REFERENCE_MODULE_IDS = ("macro", "micro", "geo", "fundamental", "ict", "calendar", "news", "master")
 TRADER_REFERENCE_ICONS = {
     "macro": "▥", "micro": "⌁", "geo": "◎", "fundamental": "▤",
     "ict": "◈", "calendar": "□", "news": "⚠", "invest": "◆",
@@ -789,32 +789,54 @@ def trader_cockpit_html(
         locked = beginner and available and destination not in open_pages and destination != "🧠 AION"
         state = "INDISPONÍVEL" if not available else ("PRÉVIA AVANÇADA" if locked else "ACESSO SEGURO")
         state_class = "off" if not available else ("locked" if locked else "")
+        card_href = f"?aq_card={escape(str(module_id), quote=True)}" if available else ""
+        card_tag = "a" if card_href else "article"
+        href_attr = f' href="{card_href}"' if card_href else ""
         module_cards.append(
-            '<article class="aq-trader-module">'
+            f'<{card_tag} class="aq-trader-module"{href_attr} data-module="{escape(str(module_id))}">'
             f'<div class="aq-trader-module-icon">{escape(TRADER_REFERENCE_ICONS.get(module_id, "◇"))}</div>'
             f'<small>{escape(str(module.get("sector") or "TRADER"))}</small>'
             f'<h4>{escape(str(module.get("title") or ""))}</h4>'
             f'<p>{escape(str(module.get("summary") or ""))}</p>'
             f'<span class="state {state_class}">{escape(state)}</span>'
-            '</article>'
+            f'</{card_tag}>'
         )
 
     mode_label = "INICIANTE" if beginner else "AVANÇADO"
     nav_items = (
-        "Início", "Radar", "Macro", "Micro", "Geopolítica", "Fundamentalista",
-        "Calendário", "Pré-Notícia", "Vídeos", "Análises", "Backtest", "Paper Trading",
-        "Guardião de Risco", "Investimentos", "Negócios", "Corretoras", "Comunidade", "Configurações",
+        ("Início", "radar"),
+        ("Radar Mestre", "master"),
+        ("Radar", "radar"),
+        ("Painel Mestre", "master"),
+        ("Macro", "macro"),
+        ("Micro", "micro"),
+        ("Geopolítica", "geo"),
+        ("Fundamentalista", "fundamental"),
+        ("ICT / SMC", "ict"),
+        ("Calendário", "calendar"),
+        ("Pré-Notícia", "news"),
+        ("Laboratório / Backtests", "lab"),
+        ("Paper Trading", "paper"),
+        ("Guardião de Risco", "guardian"),
+        ("Academia", "academy"),
+        ("Diário", "journal"),
+        ("Vídeos / Conteúdo", "video"),
+        ("AION", "aion"),
+        ("Perfil / Configurações", "profile"),
     )
     nav_html = "".join(
-        f'<span><i>{"⌂" if index == 0 else "◇"}</i>{escape(label)}</span>'
-        for index, label in enumerate(nav_items)
+        (
+            f'<a href="?aq_card={escape(card_id, quote=True)}">'
+            f'<span><i>{"⌂" if index == 0 else "◇"}</i>{escape(label)}</span></a>'
+        )
+        for index, (label, card_id) in enumerate(nav_items)
     )
     return (
         '<section class="aq-trader-shell" data-trader-reference="v3" aria-label="Cockpit Trader AtlasQuant">'
         '<div class="aq-trader-v3-grid">'
         '<aside class="aq-trader-v3-side"><div class="aq-trader-v3-side-brand"><b>A</b><span>ATLASQUANT</span></div>'
         f'<div class="aq-trader-v3-nav">{nav_html}</div>'
-        '<div class="aq-trader-v3-aion"><strong>AION</strong><small>Assistente de IA</small><b>Converse com o AION ›</b></div></aside>'
+        '<a class="aq-trader-v3-aion" href="?aq_card=aion"><strong>AION</strong><small>Assistente de IA</small><b>Converse com o AION ›</b></a></aside>'
         '<main class="aq-trader-v3-main">'
         '<header class="aq-trader-v3-head"><div class="aq-trader-v3-title">ATLASQUANT · ECOSSISTEMA</div>'
         '<div class="aq-trader-v3-motto">Poderoso por dentro. Simples por fora.</div>'
@@ -962,8 +984,6 @@ def render_premium_catalog(
         ),
         unsafe_allow_html=True,
     )
-    _render_premium_stateful_controls(
-        mode=mode,
-        available_pages=list(pages),
-        fast=fast,
-    )
+    # V4: the reference cockpit itself owns navigation through validated aq_card links.
+    # Do not render a duplicated button strip below the cockpit.
+    return None
