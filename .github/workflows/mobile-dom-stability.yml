@@ -425,42 +425,38 @@ jobs:
                   viewport_w=visual_page.evaluate("window.innerWidth")
                   document_w=visual_page.evaluate("document.documentElement.scrollWidth")
                   visual_overflow=max(0,int(document_w)-int(viewport_w))
-                  carousel={
+                  cockpit={
                       "present":False,
-                      "scroll_width":0,
-                      "client_width":0,
-                      "before":0,
-                      "after_right":0,
-                      "after_left":0,
-                      "essential_order_ok":False,
+                      "module_count":0,
+                      "ticker_count":0,
+                      "slogan_present":False,
+                      "module_order_ok":False,
                   }
-                  row=visual_page.locator(".aq-premium-row").first
-                  if row.count():
-                      carousel["present"]=True
-                      dims=row.evaluate("(el)=>({scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,scrollLeft:el.scrollLeft})")
-                      carousel["scroll_width"]=int(dims["scrollWidth"])
-                      carousel["client_width"]=int(dims["clientWidth"])
-                      carousel["before"]=int(dims["scrollLeft"])
-                      row.focus()
-                      row.press("ArrowRight")
-                      visual_page.wait_for_timeout(250)
-                      carousel["after_right"]=int(row.evaluate("(el)=>el.scrollLeft"))
-                      row.press("ArrowLeft")
-                      visual_page.wait_for_timeout(250)
-                      carousel["after_left"]=int(row.evaluate("(el)=>el.scrollLeft"))
-                      essential_text=str(row.inner_text())
-                      positions=[essential_text.find(label) for label in ("Radar","Painel Mestre","Macroeconomia")]
-                      carousel["essential_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
-                      if carousel["scroll_width"]<=carousel["client_width"]:
-                          errors.append(f"visual-{width}: carrossel premium sem overflow interno")
-                      if carousel["after_right"]<=carousel["before"]:
-                          errors.append(f"visual-{width}: ArrowRight não moveu carrossel")
-                      if carousel["after_left"]>=carousel["after_right"]:
-                          errors.append(f"visual-{width}: ArrowLeft não retornou carrossel")
-                      if not carousel["essential_order_ok"]:
-                          errors.append(f"visual-{width}: ordem Radar/Painel Mestre/Macroeconomia regrediu")
+                  shell=visual_page.locator('.aq-trader-shell[data-trader-reference="v1"]').first
+                  if shell.count():
+                      cockpit["present"]=True
+                      cockpit["module_count"]=visual_page.locator(".aq-trader-module").count()
+                      cockpit["ticker_count"]=visual_page.locator(".aq-trader-tick").count()
+                      cockpit["slogan_present"]=visual_page.get_by_text(
+                          "Poderoso por dentro. Simples por fora.",exact=True
+                      ).count()>=1
+                      shell_text=str(shell.inner_text())
+                      module_labels=(
+                          "Macroeconomia","Microeconomia","Geopolítica","Fundamentalista",
+                          "ICT / SMC","Calendário Econômico","Pré-Notícia","Investimentos",
+                      )
+                      positions=[shell_text.find(label) for label in module_labels]
+                      cockpit["module_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
+                      if cockpit["module_count"]<8:
+                          errors.append(f"visual-{width}: cockpit Trader tem só {cockpit['module_count']} módulos")
+                      if cockpit["ticker_count"]<1:
+                          errors.append(f"visual-{width}: ticker do cockpit Trader ausente")
+                      if not cockpit["slogan_present"]:
+                          errors.append(f"visual-{width}: slogan do cockpit Trader ausente")
+                      if not cockpit["module_order_ok"]:
+                          errors.append(f"visual-{width}: ordem dos módulos do cockpit Trader regrediu")
                   else:
-                      errors.append(f"visual-{width}: carrossel premium ausente")
+                      errors.append(f"visual-{width}: cockpit Trader de referência ausente")
 
                   metrics=visual_page.locator('[data-testid="stMetricValue"]')
                   metric_sample=""
@@ -469,7 +465,7 @@ jobs:
                           "(el)=>({color:getComputedStyle(el).color,fontWeight:getComputedStyle(el).fontWeight})"
                       )
                   card_samples={}
-                  for selector in (".aq-home-grid span",".aq-home-state",".aq-focus-card span"):
+                  for selector in (".aq-home-grid span",".aq-home-state",".aq-trader-module h4",".aq-trader-module p",".aq-trader-motto"):
                       node=visual_page.locator(selector).first
                       if node.count():
                           card_samples[selector]=node.evaluate(
@@ -480,7 +476,7 @@ jobs:
                       "viewport_width":viewport_w,
                       "document_width":document_w,
                       "horizontal_overflow_px":visual_overflow,
-                      "premium_carousel":carousel,
+                      "trader_cockpit":cockpit,
                       "metric_style":metric_sample,
                       "card_text_styles":card_samples,
                       "page_errors":visual_errors[-5:],
