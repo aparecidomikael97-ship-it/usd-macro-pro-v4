@@ -74,7 +74,17 @@ def test_browser_desktop_mobile_send_attachments_history(preview, tmp_path):
         bounds = page.locator("#composer").bounding_box()
         assert bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= 390
         assert bounds["y"] + bounds["height"] <= 844
-        assert page.locator(".conversation").first.evaluate("(e)=>getComputedStyle(e).transitionDuration") == "0s"
+
+        # open() refreshes the conversation list asynchronously via replaceChildren().
+        # Re-resolve the locator and let Playwright retry while that DOM replacement
+        # settles, preserving the same reduced-motion contract without accepting a
+        # detached node's empty computed style.
+        assert page.evaluate("matchMedia('(prefers-reduced-motion: reduce)').matches") is True
+        conversation = page.locator(".conversation").first
+        expect(conversation).to_be_attached()
+        expect(conversation).to_have_css("transition-duration", "0s")
+        expect(conversation).to_have_css("transform", "none")
+
         page.screenshot(path=str(tmp_path / "mobile.png"), full_page=True)
         # Keep reviewable screenshots outside Git.
         qa = Path("chat_preview_artifacts")
