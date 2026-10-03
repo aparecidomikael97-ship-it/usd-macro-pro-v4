@@ -163,21 +163,15 @@ def test_mobile_hero_has_environment_identity(area):
     assert f"ref-mobile-header-{area}" in html
     assert "ECOSSISTEMA ATLASQUANT" in html
 
-def test_trader_mobile_v6_has_explicit_card_identity_without_route_collisions():
+def test_compact_trader_preserves_routes_and_uses_readable_native_labels():
     html=reference_html("trader")
-    cards={(route,label):(box,kind) for route,label,box,kind in TRADER_MOBILE_CARDS}
-    assert cards[("news","Pré-Notícia")] == ((915,332,111,65),"icon")
-    assert cards[("news","Notícias em Tempo Real")] == ((163,604,276,111),"panel")
-    assert cards[("calendar","Calendário Econômico")] in {
-        ((798,332,112,65),"icon"),
-        ((1006,464,257,134),"panel"),
-    }
-    assert cards[("master","Painel Mestre")] == ((1031,332,162,65),"icon")
-    assert cards[("journal","Diário")] == ((908,639,96,38),"icon")
-    assert 'data-mobile-kind="icon" data-mobile-crop="915,332,111,65"' in html
-    assert 'data-mobile-kind="panel" data-mobile-crop="163,604,276,111"' in html
-    assert 'data-mobile-kind="icon" data-mobile-crop="1031,332,162,65"' in html
-    assert 'data-mobile-kind="icon" data-mobile-crop="908,639,96,38"' in html
+    for route,label in NAV["trader"]:
+        assert f'data-route="{route}"' in html
+    assert 'cq-cards' in html and 'cq-tools' in html
+    assert 'Fechamento do Dia' in html and 'Fechamento da Semana' in html
+    assert 'Notícias em Tempo Real' in html and 'Calendário Econômico' in html
+    assert 'Eventos Geopolíticos' in html and 'Mapa de Risco Global' in html
+    assert 'data-mobile-crop=' not in html
 
 
 def test_reference_mobile_chrome_is_hidden_only_when_reference_cockpit_is_active():
@@ -256,3 +250,45 @@ def test_reduced_motion_and_drawer_css():
     assert "@media(max-width:700px)" in css
     assert ".ref-drawer{display:block" in css
     assert "minmax(0,1fr)" in css
+
+
+def test_compact_ticker_data_is_verified_before_any_price_or_order_is_used():
+    from atlasquant_compact_cockpit import ticker_html,asset_symbol,normalized_market_items
+    from datetime import datetime,timezone
+    assert ticker_html('negocios') == ''
+    assert 'cq-market' not in reference_html('negocios')
+    empty=ticker_html('trader')
+    assert 'Preço: —' in empty and 'Variação: —' in empty and 'PRÉVIA' in empty
+    assert 'polyline' not in empty and '%' not in empty
+    assert 'data-country="US"' in asset_symbol('DXY')
+    for pair,country in [('EUR/USD','EU'),('GBP/USD','GB'),('USD/JPY','JP'),('AUD/USD','AU')]:
+        assert f'data-country="{country}"' in asset_symbol(pair) and 'data-country="US"' in asset_symbol(pair)
+    for asset in ('PETR4','VALE3'):
+        assert 'data-country="BR"' in asset_symbol(asset)
+    for asset in ('NASDAQ','BTC','OURO'):
+        assert 'cq-class-icon' in asset_symbol(asset) and 'cq-flag' not in asset_symbol(asset)
+    assert normalized_market_items([{'asset':'DXY','price':123,'validated':False}]) == []
+    stamp=datetime.now(timezone.utc).isoformat()
+    rows=[{'asset':'USD/JPY','source':'test-fixture','validated':True,'as_of':stamp,'price':150.5,'change_pct':-.3,'score':70,'series':[2,3,2.5]},
+          {'asset':'DXY','source':'test-fixture','validated':True,'as_of':stamp,'price':float('nan'),'change_pct':float('inf')}]
+    html=ticker_html('trader',rows)
+    assert html.index('data-asset="USD/JPY"') < html.index('data-asset="DXY"')
+    assert '150,5000' in html and '-0,30%' in html and 'polyline' in html
+    assert 'nan' not in html and 'inf' not in html
+    assert 'USD/JPY' not in ticker_html('investimentos',rows)
+
+
+def test_crypto_hit_region_is_aligned_to_source_border():
+    assert next(box for route,_,box in REGIONS['investimentos'] if route=='crypto') == (687,317,165,113)
+    assert 'translateY(-2px)' not in CSS.read_text(encoding='utf-8')
+
+
+def test_refined_graphic_crops_are_lossless_from_new_user_reference():
+    manifest=json.loads((ASSET_ROOT/'manifest.json').read_text(encoding='utf-8'))
+    for filename,entry in manifest.items():
+        if not (filename.endswith('-body.webp') or filename.startswith('trader-')):
+            continue
+        source=Path('C:/Users/apare/Downloads')/entry['source_name']
+        if source.exists():
+            expected=Image.open(source).convert('RGB').crop(entry['crop'])
+            assert ImageChops.difference(expected,Image.open(ASSET_ROOT/filename).convert('RGB')).getbbox() is None

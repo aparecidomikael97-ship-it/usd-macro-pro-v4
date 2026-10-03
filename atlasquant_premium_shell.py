@@ -92,8 +92,8 @@ PREMIUM_CSS = """
 .aq-premium-grid{display:grid;grid-template-columns:1fr;gap:12px}
 .aq-premium-card{flex:0 0 340px;scroll-snap-align:start;min-width:0;border:1px solid rgba(198,214,232,.22);border-radius:18px;padding:14px 14px 12px;background:linear-gradient(180deg,rgba(23,48,74,.96),rgba(12,26,44,.94));box-shadow:0 10px 24px rgba(0,0,0,.18);animation:aq-rise .5s ease both}
 a.aq-premium-card{display:block;color:inherit;text-decoration:none}
-.aq-premium-card:hover{border-color:rgba(215,181,109,.55);transform:translateY(-2px)}
-.aq-premium-card:focus-within{outline:2px solid #d7b56d;outline-offset:3px}
+.aq-premium-card:hover{border-color:rgba(215,181,109,.55);transform:none}
+.aq-premium-card:focus-within,.aq-premium-card:focus-visible{outline:none;border-color:#d7b56d;box-shadow:inset 0 0 0 2px #d7b56d}
 .aq-premium-art{position:relative;height:74px;border-radius:14px;margin-bottom:10px;overflow:hidden;background:
   radial-gradient(circle at 20% 18%,rgba(143,208,196,.12),transparent 30%),
   radial-gradient(circle at 84% 20%,rgba(215,181,109,.10),transparent 28%),
@@ -145,9 +145,9 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 .stApp [data-testid="stDataFrame"]{border:1px solid rgba(142,183,232,.18);border-radius:13px;overflow:hidden;background:#0c1a2c}
 .stApp [data-testid="stSelectbox"] [role="combobox"]:focus-visible{outline:2px solid #d7b56d;outline-offset:2px}
 .stApp [data-testid="stButton"] button{transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
-.stApp [data-testid="stButton"] button:hover:not(:disabled){transform:translateY(-1px);border-color:#8fd0c4 !important;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+.stApp [data-testid="stButton"] button:hover:not(:disabled){transform:none;border-color:#8fd0c4 !important;box-shadow:0 8px 20px rgba(0,0,0,.18)}
 .stApp a{color:#d6e8ff;text-decoration:underline;text-underline-offset:2px;font-weight:750}
-.stApp button:focus-visible,.stApp [role="tab"]:focus-visible,.stApp a:focus-visible{outline:2px solid #d7b56d;outline-offset:2px}
+.stApp button:focus-visible,.stApp [role="tab"]:focus-visible,.stApp a:focus-visible{outline:none;outline-offset:0;box-shadow:inset 0 0 0 2px #d7b56d}
 .stApp [data-testid="stButton"] button:disabled{color:#d7e4f2 !important;-webkit-text-fill-color:#d7e4f2 !important;background:#1c3048 !important;opacity:1 !important;border-color:rgba(215,181,109,.4) !important}
 @media (min-width:760px){.aq-premium-grid{grid-template-columns:1fr 1fr}.aq-master-rail{grid-template-columns:1fr 1fr 1fr}}
 @media (min-width:1200px){.aq-premium-grid{grid-template-columns:1fr 1fr 1fr}}
@@ -222,7 +222,11 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
   .aq-premium-card,.aq-radar-dot,.aq-radar-sweep{animation:none !important}
   .aq-premium-card:hover{transform:none}
 }
+
+.aq-ws-card,.aq-central-reference-card,.aq-premium-card{box-sizing:border-box;transform:none}
+.aq-ws-card:focus-visible,.aq-central-reference-card:focus-visible,.aq-premium-card:focus-visible{outline:none;outline-offset:0;box-shadow:inset 0 0 0 2px #6ddaff,inset 0 0 20px #168cff22}
 </style>
+
 """
 
 

@@ -89,9 +89,9 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
         self.assertIn("#537",html)
         self.assertIn("#483",html)
 
-    def test_cards_float_discretely_and_reduced_motion_disables_movement(self):
-        self.assertIn(".aq-ws-card:hover{transform:translateY(-5px)",WORKSPACE_CSS)
-        self.assertIn(".aq-central-reference-card:hover{transform:translateY(-5px)",WORKSPACE_CSS)
+    def test_cards_illuminate_without_moving_and_keep_keyboard_focus(self):
+        self.assertIn(".aq-ws-card:hover{transform:none",WORKSPACE_CSS)
+        self.assertIn(".aq-central-reference-card:hover{transform:none",WORKSPACE_CSS)
         self.assertIn("@media (prefers-reduced-motion:reduce)",WORKSPACE_CSS)
         self.assertIn(".aq-ws-card:hover,.aq-central-reference-card:hover{transform:none}",WORKSPACE_CSS)
 

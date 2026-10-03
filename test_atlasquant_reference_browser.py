@@ -58,6 +58,31 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             expect(page.locator('[data-testid="stException"]')).to_have_count(0)
             page.mouse.move(0,0)
             page.screenshot(path=str(artifacts/(area+"-desktop.png")),full_page=True)
+            # Hover/focus cannot change the physical rectangle of any card.
+            for button in page.locator('.ref-hit,.cq-card,.cq-panel,.cq-globe').all():
+                if not button.is_visible(): continue
+                button.scroll_into_view_if_needed()
+                before=button.bounding_box()
+                button.hover()
+                after=button.bounding_box()
+                assert all(abs(before[k]-after[k]) < .1 for k in ('x','y','width','height'))
+                assert button.evaluate('(e)=>getComputedStyle(e).transform') == 'none'
+                button.focus()
+                focused=button.bounding_box()
+                assert all(abs(before[k]-focused[k]) < .1 for k in ('x','y','width','height'))
+            if area in ('trader','investimentos'):
+                ticker=page.locator('.cq-ticker')
+                assert ticker.evaluate('(e)=>e.scrollWidth > e.clientWidth')
+                page.locator('[data-ticker-step="1"]').click()
+                page.wait_for_function('el=>el.scrollLeft > 20',arg=ticker.element_handle())
+                page.locator('[data-ticker-step="-1"]').click()
+            if area=='negocios':
+                expect(page.locator('.cq-market,.cq-tick')).to_have_count(0)
+            for width,height in ((1280,720),(1024,768),(768,1024)):
+                page.set_viewport_size({'width':width,'height':height})
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                page.screenshot(path=str(artifacts/(area+f'-{width}.png')),full_page=True)
+            page.set_viewport_size({'width':1440,'height':1000})
             # Every visual card/tab/panel region opens a detail at the first fold.
             routes=list(dict.fromkeys(page.locator(".ref-canvas [data-route]").evaluate_all("els=>els.map(e=>e.dataset.route)")))
             routes=[route for route in routes if route != "home"]
@@ -107,14 +132,26 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             expect(page.locator(".ref-drawer")).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible()
-            mobile_art=page.locator(".ref-mobile-art").first
-            expect(mobile_art).to_be_visible()
-            assert mobile_art.evaluate("(e)=>getComputedStyle(e).backgroundImage")!="none"
+            if area == 'trader':
+                mobile_art=page.locator('.cq-card img').first
+                expect(mobile_art).to_be_visible()
+                assert mobile_art.evaluate('(e)=>e.complete && e.naturalWidth>0')
+            else:
+                mobile_art=page.locator(".ref-mobile-art").first
+                expect(mobile_art).to_be_visible()
+                assert mobile_art.evaluate("(e)=>getComputedStyle(e).backgroundImage")!="none"
             workspace=page.locator(".ref-workspace").first
-            assert workspace.evaluate("(e)=>getComputedStyle(e).backgroundSize")=="0px 0px"
+            if area == 'trader':
+                assert workspace.evaluate('(e)=>getComputedStyle(e).backgroundImage') == 'none'
+            else:
+                assert workspace.evaluate("(e)=>getComputedStyle(e).backgroundSize")=="0px 0px"
             page.mouse.move(0,0)
             page.screenshot(path=str(artifacts/(area+"-mobile.png")),full_page=True)
             expect(page.locator(".ref-detail")).to_have_count(0)
+            if area in ('trader','investimentos'):
+                ticker=page.locator('.cq-ticker')
+                ticker.focus();ticker.press('ArrowRight')
+                page.wait_for_function('el=>el.scrollLeft > 20',arg=ticker.element_handle())
             page.locator(".ref-drawer summary").first.click()
             expect(page.locator(".ref-drawer")).to_have_attribute("open", "")
             page.locator('.ref-drawer [data-route="profile"]').click()
