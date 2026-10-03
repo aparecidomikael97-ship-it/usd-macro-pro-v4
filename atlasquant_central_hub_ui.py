@@ -865,7 +865,7 @@ def render_aion_home_viewer(
         st.markdown(html, unsafe_allow_html=True)
         modules = [spec for spec in _AION_MODULES if spec["id"] in AION_MODULE_WORKSPACES]
         st.caption("8 núcleos internos do AION · navegação na mesma sessão, sem autoridade autônoma")
-        columns = st.columns(4 if current == CENTRAL_ROOT else 2)
+        columns = st.columns(2)
         for index, spec in enumerate(modules):
             with columns[index % 2]:
                 if st.button(
@@ -903,7 +903,7 @@ def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, re
         ]
         st.markdown("#### Trocar de setor")
         st.caption("Navegue pelo ecossistema sem sair da sessão autenticada.")
-    columns = st.columns(2)
+    columns = st.columns(4 if current == CENTRAL_ROOT else 2)
     for index, (area_id, label) in enumerate(targets):
         action_label = (
             "← Central Principal"
