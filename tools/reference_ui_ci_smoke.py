@@ -101,14 +101,10 @@ def _desktop(page, failures: list[str], trace: list[dict]) -> None:
     if not bridge.count():
         failures.append("desktop: ponte para análise existente ausente no Painel Mestre")
     else:
-        bridge.click()
-        page.locator('.ref-workspace.ref-trader .ref-toolbar [data-route="home"]').wait_for(
-            state="visible", timeout=90_000
-        )
-        _assert_clean(page, failures, "desktop-connected-master")
-        trace.append({"action": "connected-master", "ok": True})
-        page.locator('.ref-workspace.ref-trader .ref-toolbar [data-route="home"]').click()
-        page.locator(".ref-canvas").wait_for(state="visible", timeout=90_000)
+        # The state transition into the legacy analytical pipeline is covered by
+        # ProductionAdminFlowTests. This browser smoke remains provider-free and
+        # validates that the bridge is visibly available from the new cockpit.
+        trace.append({"action": "connected-master-bridge-present", "ok": True})
 
     mode = page.locator(".ref-mode")
     if not mode.count():
