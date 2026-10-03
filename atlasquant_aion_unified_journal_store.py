@@ -288,9 +288,9 @@ class UnifiedJournalStore:
         requests_dir = scope_dir / "requests"
         request_dir = requests_dir / request_key
         for path in (scope_dir, requests_dir, request_dir):
-            self._assert_within_root(path)
             if path.exists() and path.is_symlink():
                 raise JournalStoreIntegrityError("symlink escape rejected")
+            self._assert_within_root(path)
             if create:
                 path.mkdir(exist_ok=True)
         self._assert_within_root(request_dir)
@@ -315,9 +315,9 @@ class UnifiedJournalStore:
         }
         for key in ("events", "quarantine"):
             path = paths[key]
-            self._assert_within_root(path)
             if path.exists() and path.is_symlink():
                 raise JournalStoreIntegrityError("symlink escape rejected")
+            self._assert_within_root(path)
             path.mkdir(exist_ok=True)
         return paths
 
