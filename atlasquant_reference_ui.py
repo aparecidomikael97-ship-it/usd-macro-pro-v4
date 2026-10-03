@@ -321,7 +321,21 @@ def apply_event(session, access, area, event):
         session.pop("aq_reference_module",None)
         session["aq_reference_connected"] = False
     elif event == "mode":
-        session["atlasquant_experience_mode"] = ("Iniciante" if str(session.get("atlasquant_experience_mode","")).startswith("Avan") else "Avançado")
+        target_mode = (
+            "Iniciante"
+            if str(session.get("atlasquant_experience_mode", "")).startswith("Avan")
+            else "Avançado"
+        )
+        # Streamlit forbids mutating a widget-owned key after that widget has
+        # been instantiated in the current run. Persist a separate request that
+        # the experience switch consumes before recreating the radio on rerun.
+        session["_aq_reference_mode_request"] = target_mode
+        try:
+            # Plain mappings used by unit tests and callers without a mounted
+            # Streamlit radio can update immediately.
+            session["atlasquant_experience_mode"] = target_mode
+        except Exception:
+            pass
     elif event.startswith("connected:") and area == "trader":
         key = event.split(":",1)[1]
         key = "radar" if key == "radar_master" else key
