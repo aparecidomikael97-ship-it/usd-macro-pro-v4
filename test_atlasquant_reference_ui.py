@@ -185,6 +185,7 @@ def test_reference_mobile_chrome_is_hidden_only_when_reference_cockpit_is_active
     assert 'id="aq-reference-active"' in src
     assert '.stApp:has(#aq-reference-active) [data-testid="stHeader"]{display:none!important' in src
     assert '.stApp:has(#aq-reference-active) [data-testid="stSidebarCollapsedControl"]{display:none!important}' in src
+    assert '.stApp:has(#aq-reference-active) [data-testid="stElementContainer"]:has([data-testid="stRadio"]){display:none!important}' in src
     assert '.stApp:has(#aq-reference-active) .block-container{padding-top:0!important' in src
 
 
