@@ -4701,24 +4701,22 @@ _aq_catalog_home = bool(
     render_premium_catalog is not None
     and _aq_radar_home
 )
-if _aq_radar_home and experience_mode_overview_html is not None:
-    st.markdown(
-        experience_mode_overview_html(_aq_experience_mode),
-        unsafe_allow_html=True,
-    )
-if _aq_radar_home and operation_focus_html is not None:
-    st.markdown(
-        operation_focus_html(
-            decision="Radar em foco",
-            market="G8 + 7 pares",
-            data="Frescor monitorado",
-            safety="Safety Core monitorado",
-        ),
-        unsafe_allow_html=True,
-    )
-if _aq_catalog_home:
-    if mobile_navigation_hint_html is not None:
-        st.markdown(mobile_navigation_hint_html(), unsafe_allow_html=True)
+# A home Trader usa um cockpit único. Evita empilhar as faixas genéricas de
+# modo/foco/navegação acima dele; o modo, o universo e o bloqueio operacional
+# ficam explícitos dentro do próprio cockpit e o seletor estável continua abaixo.
+_aq_trader_ticker_items = []
+if _aq_radar_home:
+    try:
+        for _, _aq_tick_row in ranking.head(8).iterrows():
+            _aq_code = str(_aq_tick_row.get("Código") or "").strip()
+            if not _aq_code:
+                continue
+            _aq_trader_ticker_items.append({
+                "label": _aq_code,
+                "score": float(_aq_tick_row.get("Pontuação_Final", 50.0)),
+            })
+    except Exception:
+        _aq_trader_ticker_items = []
 # Fora da home, o seletor estável já informa o grupo atual na própria legenda.
 # Evita uma segunda faixa horizontal de navegação antes do workspace.
 if render_premium_catalog is not None:
@@ -4727,6 +4725,7 @@ if render_premium_catalog is not None:
         available_pages=_nav_items,
         fast=False,
         active_page=_aq_catalog_active_page,
+        ticker_items=_aq_trader_ticker_items,
     )
 
 if render_stable_navigation is not None:
@@ -4749,7 +4748,7 @@ else:
         _aq_allowed_nav,
         key="atlasquant_stable_nav_fallback",
     )
-if workspace_welcome_html is not None:
+if workspace_welcome_html is not None and _aq_active_page != "🎯 Radar":
     _aq_welcome = workspace_welcome_html(
         _aq_active_page,
         mode=_aq_experience_mode,
