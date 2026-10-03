@@ -151,7 +151,24 @@ WORKSPACE_CSS = r"""
 .aq-ws-nav span:first-child{border-color:color-mix(in srgb,var(--ws-accent) 36%,transparent);background:color-mix(in srgb,var(--ws-accent) 10%,transparent);color:#fff}
 .aq-ws-main{min-width:0}.aq-ws-hero{display:grid;grid-template-columns:minmax(0,1.2fr) 180px;align-items:center;gap:12px;border:1px solid color-mix(in srgb,var(--ws-accent) 28%,transparent);border-radius:20px;padding:16px;background:linear-gradient(145deg,rgba(11,31,63,.92),rgba(7,17,39,.94))}
 .aq-ws-kicker{color:var(--ws-accent);font-size:.6rem;font-weight:950;letter-spacing:.14em}.aq-ws-hero h2{margin:.3rem 0 .4rem;color:#fff;font-size:clamp(1.35rem,2.5vw,2rem);letter-spacing:-.02em}
-.aq-ws-hero p{margin:0;color:#cadbee;font-size:.75rem;line-height:1.45}.aq-ws-orb{position:relative;width:128px;height:128px;margin:auto;border-radius:50%;border:1px solid color-mix(in srgb,var(--ws-accent) 72%,transparent);background:
+.aq-ws-hero p{margin:0;color:#cadbee;font-size:.75rem;line-height:1.45}
+.aq-ws-hero-visual{position:relative;overflow:hidden;width:100%;height:158px;border:1px solid color-mix(in srgb,var(--ws-accent) 44%,transparent);border-radius:16px;background:
+ radial-gradient(circle at 68% 42%,color-mix(in srgb,var(--ws-accent) 34%,transparent),transparent 30%),
+ linear-gradient(145deg,rgba(8,28,58,.96),rgba(4,12,28,.99));box-shadow:inset 0 0 30px var(--ws-glow),0 0 24px var(--ws-glow)}
+.aq-ws-hero-visual:before,.aq-ws-hero-visual:after{content:"";position:absolute;pointer-events:none}
+.aq-ws-shell[data-workspace="negocios"] .aq-ws-hero-visual:before{left:18px;right:18px;bottom:22px;height:72px;background:
+ linear-gradient(90deg,transparent 0 4%,#e58e1f 4% 11%,transparent 11% 15%,#ffad2f 15% 25%,transparent 25% 31%,#d77a19 31% 42%,transparent 42% 100%);clip-path:polygon(0 100%,0 62%,11% 62%,11% 43%,24% 43%,24% 23%,36% 23%,36% 55%,49% 55%,49% 35%,61% 35%,61% 12%,74% 12%,74% 52%,87% 52%,87% 30%,100% 30%,100% 100%)}
+.aq-ws-shell[data-workspace="negocios"] .aq-ws-hero-visual:after{left:22px;right:22px;top:26px;height:70px;border-top:3px solid #ffb143;transform:skewY(-7deg);box-shadow:0 -11px 20px rgba(255,146,43,.15)}
+.aq-ws-shell[data-workspace="investimentos"] .aq-ws-hero-visual:before{left:20px;right:20px;bottom:22px;height:82px;background:linear-gradient(90deg,#6a4710 0 9%,transparent 9% 13%,#9b6b17 13% 24%,transparent 24% 29%,#b77d1f 29% 42%,transparent 42% 47%,#d7982b 47% 61%,transparent 61% 67%,#f0b845 67% 82%,transparent 82%);clip-path:polygon(0 100%,0 67%,9% 67%,9% 56%,24% 56%,24% 45%,42% 45%,42% 33%,61% 33%,61% 20%,82% 20%,82% 8%,100% 8%,100% 100%)}
+.aq-ws-shell[data-workspace="investimentos"] .aq-ws-hero-visual:after{width:88px;height:88px;border-radius:50%;right:32px;top:24px;border:1px solid rgba(255,218,109,.72);box-shadow:0 0 30px rgba(255,188,64,.25),inset 0 0 26px rgba(255,183,52,.16);background:repeating-linear-gradient(90deg,transparent 0 11px,rgba(255,218,109,.12) 11px 12px)}
+.aq-ws-shell[data-workspace="aion"] .aq-ws-hero-visual:before{width:96px;height:122px;right:28px;top:18px;border:2px solid #b980ff;border-radius:54% 46% 46% 54%/42% 42% 58% 58%;background:
+ radial-gradient(circle at 58% 34%,#d8bcff 0 3px,transparent 4px),
+ linear-gradient(145deg,rgba(112,54,203,.68),rgba(22,20,75,.75));box-shadow:0 0 36px rgba(171,92,255,.32)}
+.aq-ws-shell[data-workspace="aion"] .aq-ws-hero-visual:after{width:116px;height:116px;border-radius:50%;left:34px;top:22px;border:1px solid rgba(82,170,255,.65);background:
+ repeating-radial-gradient(circle,rgba(84,180,255,.12) 0 1px,transparent 1px 10px),
+ radial-gradient(circle,rgba(56,128,255,.32),rgba(18,27,83,.14) 58%,transparent 60%);box-shadow:0 0 34px rgba(63,140,255,.18)}
+.aq-ws-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 0}.aq-ws-kpi{border:1px solid color-mix(in srgb,var(--ws-accent) 26%,transparent);border-radius:11px;padding:8px 9px;background:rgba(4,15,33,.72);box-shadow:inset 0 0 18px var(--ws-glow)}.aq-ws-kpi small{display:block;color:#8faaca;font-size:.5rem;font-weight:800;letter-spacing:.06em}.aq-ws-kpi strong{display:block;margin-top:3px;color:#f6fbff;font-size:.68rem}
+.aq-ws-orb{position:relative;width:128px;height:128px;margin:auto;border-radius:50%;border:1px solid color-mix(in srgb,var(--ws-accent) 72%,transparent);background:
  radial-gradient(circle at 35% 28%,color-mix(in srgb,var(--ws-accent) 42%,transparent),transparent 17%),
  radial-gradient(circle at 62% 63%,color-mix(in srgb,var(--ws-accent2) 45%,transparent),transparent 28%),
  radial-gradient(circle,#0a3268,#07162f 64%,#030c1c);
@@ -159,7 +176,9 @@ WORKSPACE_CSS = r"""
 .aq-ws-orb:before,.aq-ws-orb:after{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid color-mix(in srgb,var(--ws-accent) 52%,transparent);animation:aq-ws-orbit 12s linear infinite}
 .aq-ws-orb:before{transform:scaleX(.45)}.aq-ws-orb:after{transform:scaleY(.45);animation-direction:reverse}.aq-ws-orb b{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:2.2rem;text-shadow:0 0 20px var(--ws-accent)}
 .aq-ws-section-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:14px 2px 8px}.aq-ws-section-head h3{margin:0;color:#fff;font-size:.95rem}.aq-ws-section-head span{color:#8fb2d8;font-size:.62rem}
-.aq-ws-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.aq-ws-card{position:relative;overflow:hidden;min-height:145px;border:1px solid rgba(111,169,234,.19);border-radius:15px;padding:11px;background:linear-gradient(155deg,rgba(12,34,67,.92),rgba(6,18,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.035);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.aq-ws-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.aq-ws-card{position:relative;overflow:hidden;min-height:145px;border:1px solid color-mix(in srgb,var(--ws-accent) 22%,rgba(111,169,234,.19));border-radius:15px;padding:11px;background:
+ radial-gradient(circle at 100% 0%,var(--ws-glow),transparent 44%),
+ linear-gradient(155deg,rgba(12,34,67,.94),rgba(6,18,39,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.035);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
 .aq-ws-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 45%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow)}
 .aq-ws-card small{display:block;color:var(--ws-accent);font-size:.54rem;font-weight:950;letter-spacing:.11em}.aq-ws-card h4{margin:.3rem 0 .35rem;color:#fff;font-size:.82rem;line-height:1.25}.aq-ws-card p{margin:0;color:#c8d8eb;font-size:.65rem;line-height:1.38}
 .aq-ws-state{display:inline-flex;margin-top:8px;border:1px solid color-mix(in srgb,var(--ws-accent) 32%,transparent);border-radius:999px;padding:3px 7px;color:#edf7ff;font-size:.53rem;font-weight:900;letter-spacing:.05em;background:rgba(5,18,40,.62)}
@@ -184,7 +203,7 @@ WORKSPACE_CSS = r"""
 .aq-central-reference-cta{display:flex;align-items:center;justify-content:center;margin-top:auto;border:1px solid color-mix(in srgb,var(--card-accent) 68%,transparent);border-radius:9px;min-height:42px;color:#fff;font-size:.68rem;font-weight:900;letter-spacing:.03em;background:linear-gradient(90deg,color-mix(in srgb,var(--card-accent) 22%,#071426),rgba(6,17,37,.92));box-shadow:0 0 18px var(--card-glow)}
 @keyframes aq-ws-orbit{from{transform:rotate(0) scaleX(.45)}to{transform:rotate(360deg) scaleX(.45)}}
 @media (max-width:1100px){.aq-central-reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:800px){.aq-ws-layout{grid-template-columns:1fr}.aq-ws-side{display:none}.aq-ws-hero{grid-template-columns:1fr}.aq-ws-orb{width:110px;height:110px}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:800px){.aq-ws-layout{grid-template-columns:1fr}.aq-ws-side{display:none}.aq-ws-hero{grid-template-columns:1fr}.aq-ws-orb{width:110px;height:110px}.aq-ws-hero-visual{height:140px}.aq-ws-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.aq-ws-shell{padding:9px;border-radius:19px}.aq-ws-top{align-items:flex-start;flex-direction:column}.aq-ws-motto{text-align:left}.aq-central-reference-grid,.aq-ws-modules{grid-template-columns:1fr}.aq-central-reference-card{min-height:0}.aq-ws-card{min-height:0}.aq-ws-hero{padding:12px}}
 @media (prefers-reduced-motion:reduce){.aq-ws-card,.aq-central-reference-card{transition:none}.aq-ws-card:hover,.aq-central-reference-card:hover{transform:none}.aq-ws-orb:before,.aq-ws-orb:after{animation:none !important}}
 </style>
@@ -251,6 +270,25 @@ def workspace_cockpit_html(
             '</article>'
         )
     mode_label = str(mode or "").strip() or "SESSÃO ATUAL"
+    module_count = len(_MODULES.get(key, ()))
+    connected_count = sum(1 for item in _MODULES.get(key, ()) if item.get("state") == "CONECTADO")
+    preview_count = sum(1 for item in _MODULES.get(key, ()) if item.get("state") == "PRÉVIA")
+    kpi_labels = {
+        "negocios": ("Módulos", "Conectados", "Prévias", "Tenant"),
+        "investimentos": ("Módulos", "Conectados", "Prévias", "Execução"),
+        "aion": ("Módulos", "Conectados", "Prévias", "Core"),
+    }
+    kpi_values = {
+        "negocios": (str(module_count), str(connected_count), str(preview_count), "ISOLADO"),
+        "investimentos": (str(module_count), str(connected_count), str(preview_count), "BLOQUEADA"),
+        "aion": (str(module_count), str(connected_count), str(preview_count), "ÚNICO"),
+    }
+    labels = kpi_labels[key]
+    values = kpi_values[key]
+    kpis = "".join(
+        f'<div class="aq-ws-kpi"><small>{escape(label)}</small><strong>{escape(value)}</strong></div>'
+        for label, value in zip(labels, values)
+    )
     truth = [
         f"MODO {mode_label.upper()}",
         "SEM EXECUÇÃO AUTOMÁTICA",
@@ -279,8 +317,8 @@ def workspace_cockpit_html(
         '<main class="aq-ws-main">'
         '<section class="aq-ws-hero">'
         f'<div><div class="aq-ws-kicker">{escape(spec["kicker"])}</div><h2>{escape(spec["title"])}</h2><p>{escape(spec["hero"])}</p>'
-        f'<div class="aq-ws-truth">{truth_html}</div></div>'
-        f'<div class="aq-ws-orb" aria-hidden="true"><b>{escape(spec["title"][:1])}</b></div>'
+        f'<div class="aq-ws-truth">{truth_html}</div><div class="aq-ws-kpis">{kpis}</div></div>'
+        f'<div class="aq-ws-hero-visual" data-scene="{escape(key)}" aria-hidden="true"><div class="aq-ws-orb"><b>{escape(spec["title"][:1])}</b></div></div>'
         '</section>'
         '<div class="aq-ws-section-head"><h3>Áreas do workspace</h3><span>Estrutura pronta para evolução funcional por módulo.</span></div>'
         f'<div class="aq-ws-modules">{"".join(cards)}</div>'
