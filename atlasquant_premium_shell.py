@@ -864,6 +864,7 @@ def render_premium_catalog(
     fast: bool = False,
     active_page: str = "",
     ticker_items: Sequence[Mapping[str, object]] | None = None,
+    access: Mapping[str, object] | None = None,
 ) -> None:
     """Render the catalog on Radar home; elsewhere keep only shared premium CSS."""
     pages = {str(item) for item in list(available_pages or [])}
@@ -875,6 +876,10 @@ def render_premium_catalog(
         # and Compass. Keep the premium design tokens without adding a second
         # generic navigation panel or a redundant "back home" action.
         st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
+        return
+    if access and access.get("allowed") is True:
+        from atlasquant_reference_ui import render_reference_workspace
+        render_reference_workspace(st, access, "trader", mode=mode)
         return
     st.markdown(PREMIUM_CSS, unsafe_allow_html=True)
     st.markdown(

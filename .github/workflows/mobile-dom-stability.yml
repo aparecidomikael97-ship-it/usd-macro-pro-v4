@@ -305,6 +305,8 @@ jobs:
               if advanced.count()<1:
                   advanced=page.get_by_text("Avançado",exact=True)
               if advanced.count()<1:
+                  advanced=page.locator('.ref-toolbar [data-route="mode"]')
+              if advanced.count()<1:
                   # Capture a real UI failure only after a bounded retry window.
                   deadline=time.time()+30
                   while time.time()<deadline and advanced.count()<1:
@@ -361,8 +363,6 @@ jobs:
                       "🤖 Autopilot",
                       "👤 Conta",
                       "📱 Instalar",
-                      "💼 Vendas",
-                      "💰 Investir",
                       "🛟 Suporte",
                       "🎯 Radar",
                       "⚡ Decisão",
@@ -383,6 +383,8 @@ jobs:
                   beginner=experience.get_by_text("Iniciante",exact=True)
                   if beginner.count()<1:
                       beginner=page.get_by_text("Iniciante",exact=True)
+                  if beginner.count()<1:
+                      beginner=page.locator('.ref-toolbar [data-route="mode"]').filter(has_text="Avançado")
                   if beginner.count():
                       beginner.first.click()
                       wait_radar_state(page,timeout=90_000)
@@ -391,6 +393,8 @@ jobs:
                   advanced=experience.get_by_text("Avançado",exact=True)
                   if advanced.count()<1:
                       advanced=page.get_by_text("Avançado",exact=True)
+                  if advanced.count()<1:
+                      advanced=page.locator('.ref-toolbar [data-route="mode"]').filter(has_text="Iniciante")
                   if advanced.count():
                       advanced.first.click()
                       page.wait_for_timeout(900)
@@ -434,21 +438,21 @@ jobs:
                       "slogan_present":False,
                       "module_order_ok":False,
                   }
-                  shell=visual_page.locator('.aq-trader-shell[data-trader-reference="v3"]').first
+                  shell=visual_page.locator('.ref-workspace[data-workspace="trader"]').first
                   if shell.count():
                       cockpit["present"]=True
-                      cockpit["module_count"]=visual_page.locator(".aq-trader-module").count()
-                      cockpit["ticker_count"]=visual_page.locator(".aq-trader-tick").count()
+                      cockpit["module_count"]=visual_page.locator(".ref-canvas [data-route]").count()
+                      cockpit["ticker_count"]=visual_page.locator('.ref-canvas [title="Contexto do ativo"]').count()
                       cockpit["slogan_present"]=visual_page.get_by_text(
                           "Poderoso por dentro. Simples por fora.",exact=True
                       ).count()>=1
-                      module_grid=visual_page.locator(".aq-trader-module-grid").first
-                      module_text=str(module_grid.inner_text()) if module_grid.count() else ""
+                      module_grid=visual_page.locator(".ref-canvas").first
+                      module_routes=module_grid.locator("[data-route]").evaluate_all("els=>els.map(e=>e.dataset.route)") if module_grid.count() else []
                       module_labels=(
-                          "Macroeconomia","Microeconomia","Geopolítica","Fundamentalista",
-                          "ICT / SMC","Calendário Econômico","Pré-Notícia","Investimentos",
+                          "macro","micro","geo","fundamental",
+                          "ict","calendar","news","master",
                       )
-                      positions=[module_text.find(label) for label in module_labels]
+                      positions=[module_routes.index(label) if label in module_routes else -1 for label in module_labels]
                       cockpit["module_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
                       if cockpit["module_count"]<8:
                           errors.append(f"visual-{width}: cockpit Trader tem só {cockpit['module_count']} módulos")
@@ -468,7 +472,7 @@ jobs:
                           "(el)=>({color:getComputedStyle(el).color,fontWeight:getComputedStyle(el).fontWeight})"
                       )
                   card_samples={}
-                  for selector in (".aq-home-grid span",".aq-home-state",".aq-trader-module h4",".aq-trader-module p",".aq-trader-v3-motto"):
+                  for selector in (".aq-home-grid span",".aq-home-state",".ref-nav-item",".ref-mobile-card strong",".ref-mobile-header p"):
                       node=visual_page.locator(selector).first
                       if node.count():
                           card_samples[selector]=node.evaluate(

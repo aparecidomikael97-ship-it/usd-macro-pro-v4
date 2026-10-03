@@ -4735,6 +4735,7 @@ if render_premium_catalog is not None:
         fast=False,
         active_page=_aq_catalog_active_page,
         ticker_items=_aq_trader_ticker_items,
+        access=_ATLASQUANT_ACCESS,
     )
 
 # Workspace separation affects the visible selector only. Keep the canonical

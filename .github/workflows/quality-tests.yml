@@ -415,3 +415,10 @@ jobs:
             tests/test_atlasquant_scanner_coverage.py \
             tests/test_atlasquant_scanner_scheduler.py \
             tests/test_atlasquant_timeframe_resampler.py
+      - name: Run reference interface contracts and actual browser checks
+        run: |
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+          python -m playwright install --with-deps chromium
+          python -m pytest -q \
+            test_atlasquant_reference_ui.py \
+            test_atlasquant_reference_browser.py

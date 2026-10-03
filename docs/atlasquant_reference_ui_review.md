@@ -54,6 +54,7 @@ snapshot e refresh nas homes. O preview isolado usa identidade de revisão e nã
 
 - Suíte de interface, startup, fluxo autenticado, acesso e bridge: 142 testes e
   48 subtestes passaram.
+- Regressões após as correções de CI: 109 testes e 26 subtestes passaram.
 - Contratos da nova interface após os recortes: 20 testes passaram.
 - Chromium real: 1440 × 1000 e 390 × 844; cinco telas, cartões, menus, ferramentas,
   retorno, posição do título, ausência de overflow e movimento reduzido.
@@ -108,12 +109,15 @@ verificada é da arte original, antes dos controles e adaptações descritos aci
   `atlasquant_premium_shell.py`, `usd_macro_pro_v4_cloud.py`.
 - Testes: `test_atlasquant_reference_ui.py`, `test_atlasquant_reference_browser.py`,
   `test_atlasquant_central_hub_ui.py`, `test_atlasquant_premium_shell.py`,
-  `test_atlasquant_production_admin_flow.py`.
+  `test_atlasquant_production_admin_flow.py`, `test_atlasquant_ui_v1.py`.
 - Arte: `assets/ecosystem_reference/central.webp`, `trader.jpg`, `negocios.webp`,
   `investimentos.webp`, `aion.webp`, `trader_nav.webp`, `negocios_nav.webp`,
   `investimentos_nav.webp`, `aion_nav.webp`, `manifest.json`, `reference.css`.
 - Revisão/CI: `tools/reference_ui_preview.py`,
-  `.github/workflows/atlasquant-reference-ui.yml` e este relatório.
+  `.github/workflows/atlasquant-reference-ui.yml`,
+  `.github/workflows/atlasquant-ui-smoke.yml`,
+  `.github/workflows/mobile-dom-stability.yml`,
+  `.github/workflows/quality-tests.yml` e este relatório.
 
 As capturas locais em `visual_review/` ficam fora do commit. A CI produz suas
 próprias capturas e as publica somente como artefato do workflow.
