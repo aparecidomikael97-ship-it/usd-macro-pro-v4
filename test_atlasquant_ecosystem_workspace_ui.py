@@ -89,6 +89,24 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
         self.assertIn("#537",html)
         self.assertIn("#483",html)
 
+    def test_workspace_sidebars_and_cards_are_real_navigation_targets(self):
+        for area in ("negocios", "investimentos", "aion"):
+            html = workspace_cockpit_html(area)
+            self.assertIn('id="aq-ws-overview"', html)
+            self.assertIn('class="aq-ws-nav"', html)
+            self.assertIn('href="#aq-ws-overview"', html)
+            self.assertIn('class="aq-ws-card"', html)
+            self.assertNotIn('<div class="aq-ws-nav"><span>', html)
+        business = workspace_cockpit_html("negocios")
+        self.assertIn('href="#aq-ws-b2b"', business)
+        self.assertIn('id="aq-ws-b2b"', business)
+        investments = workspace_cockpit_html("investimentos")
+        self.assertIn('href="#aq-ws-fixed"', investments)
+        self.assertIn('id="aq-ws-fixed"', investments)
+        aion = workspace_cockpit_html("aion")
+        self.assertIn('href="#aq-ws-chat"', aion)
+        self.assertIn('id="aq-ws-chat"', aion)
+
     def test_cards_float_discretely_and_reduced_motion_disables_movement(self):
         self.assertIn(".aq-ws-card:hover{transform:translateY(-5px)",WORKSPACE_CSS)
         self.assertIn(".aq-central-reference-card:hover{transform:translateY(-5px)",WORKSPACE_CSS)

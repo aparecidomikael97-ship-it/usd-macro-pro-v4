@@ -191,7 +191,7 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 .aq-trader-core h2{margin:12px 0 4px;color:#fff;font-size:1.35rem;text-align:center}.aq-trader-core p{margin:0;color:#cbdcf1;text-align:center;font-size:.76rem;max-width:38ch}.aq-trader-core-status{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}.aq-trader-core-status span{border:1px solid rgba(94,181,255,.22);border-radius:999px;padding:4px 8px;color:#e7f4ff;background:rgba(6,20,44,.72);font-size:.59rem;font-weight:850}
 .aq-trader-modules-title{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:15px 2px 9px}.aq-trader-modules-title h3{margin:0;color:#fff;font-size:1rem}.aq-trader-modules-title span{color:#8db5df;font-size:.65rem}
 .aq-trader-module-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
-.aq-trader-module{position:relative;overflow:hidden;min-width:0;border:1px solid rgba(73,158,255,.24);border-radius:14px;padding:11px;background:linear-gradient(160deg,rgba(11,32,65,.92),rgba(6,18,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.aq-trader-module{position:relative;overflow:hidden;min-width:0;text-decoration:none;color:inherit;cursor:pointer;border:1px solid rgba(73,158,255,.24);border-radius:14px;padding:11px;background:linear-gradient(160deg,rgba(11,32,65,.92),rgba(6,18,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 .aq-trader-module:before{content:"";position:absolute;inset:auto -30px -42px auto;width:92px;height:92px;border-radius:50%;background:radial-gradient(circle,rgba(75,111,255,.18),transparent 66%)}
 .aq-trader-module-icon{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(93,194,255,.34);border-radius:10px;background:linear-gradient(145deg,rgba(14,86,154,.82),rgba(31,42,105,.88));color:#fff;font-size:1.05rem;box-shadow:0 0 20px rgba(53,140,255,.16)}
 .aq-trader-module small{display:block;margin-top:8px;color:#72d8ff;font-size:.55rem;font-weight:900;letter-spacing:.1em}.aq-trader-module h4{margin:.2rem 0 .3rem;color:#fff;font-size:.86rem}.aq-trader-module p{margin:0;color:#c7d8ed;font-size:.66rem;line-height:1.36}.aq-trader-module .state{display:inline-flex;margin-top:8px;border-radius:999px;padding:3px 7px;font-size:.55rem;font-weight:900;border:1px solid rgba(116,195,255,.22);color:#eaf6ff}.aq-trader-module .state.locked{color:#ffe39c;border-color:rgba(255,201,92,.32)}.aq-trader-module .state.off{color:#a9b9cb}
@@ -202,19 +202,59 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
 @media (prefers-reduced-motion:reduce){.aq-trader-globe:before,.aq-trader-globe:after{animation:none !important}}
 
 /* Reference-faithful Trader V3: dense cockpit matching the approved composition. */
-.aq-trader-shell[data-trader-reference="v3"]{padding:0;border-radius:18px;background:linear-gradient(180deg,#020a17,#020610);min-height:700px}
-.aq-trader-v3-grid{display:grid;grid-template-columns:154px minmax(0,1fr);min-height:700px}.aq-trader-v3-side{display:flex;flex-direction:column;padding:10px 7px;border-right:1px solid rgba(48,139,255,.35);background:linear-gradient(180deg,rgba(5,24,52,.98),rgba(2,10,25,.99));box-shadow:inset -12px 0 36px rgba(0,0,0,.3)}
+.aq-trader-shell[data-trader-reference="v3"]{padding:0;border-radius:18px;border-color:rgba(56,155,255,.52);background:
+ radial-gradient(circle at 50% 0%,rgba(28,96,210,.10),transparent 34rem),
+ linear-gradient(180deg,#020a17,#020610);min-height:700px;box-shadow:0 0 34px rgba(22,112,255,.12),inset 0 0 34px rgba(31,91,188,.06)}
+.aq-trader-v3-grid{display:grid;grid-template-columns:154px minmax(0,1fr);min-height:700px}.aq-trader-v3-side{display:flex;flex-direction:column;padding:10px 7px;border-right:1px solid rgba(48,139,255,.42);background:
+ radial-gradient(circle at 45% 10%,rgba(32,122,255,.14),transparent 16rem),
+ linear-gradient(180deg,rgba(5,24,52,.99),rgba(2,10,25,.995));box-shadow:inset -12px 0 36px rgba(0,0,0,.3),8px 0 28px rgba(17,96,215,.05)}
 .aq-trader-v3-side-brand{display:flex;align-items:center;gap:7px;padding:2px 7px 10px;color:#fff;font-weight:950;font-size:.78rem;letter-spacing:.08em}.aq-trader-v3-side-brand b{display:grid;place-items:center;width:32px;height:32px;color:#e7fbff;font-size:1.35rem;text-shadow:0 0 16px #32aaff}
-.aq-trader-v3-nav{display:grid;gap:2px}.aq-trader-v3-nav span{display:flex;align-items:center;gap:7px;min-height:27px;padding:4px 7px;border:1px solid transparent;border-radius:7px;color:#c7d7eb;font-size:.58rem;font-weight:760}.aq-trader-v3-nav span:first-child{color:#fff;border-color:#2c92ff;background:linear-gradient(90deg,rgba(20,103,205,.78),rgba(7,37,82,.88));box-shadow:0 0 15px rgba(36,133,255,.25)}.aq-trader-v3-nav i{width:15px;text-align:center;color:#7fd8ff;font-style:normal}
-.aq-trader-v3-aion{margin-top:auto;border:1px solid #328fff;border-radius:11px;padding:8px;background:linear-gradient(160deg,rgba(18,70,135,.75),rgba(12,22,65,.92));box-shadow:0 0 20px rgba(35,132,255,.18)}.aq-trader-v3-aion strong{display:block;color:#7fe1ff;font-size:.75rem}.aq-trader-v3-aion small{display:block;color:#b8c9df;font-size:.53rem;margin:2px 0 6px}.aq-trader-v3-aion b{display:block;border:1px solid rgba(91,195,255,.38);border-radius:6px;padding:5px;color:#eefaff;font-size:.54rem;text-align:center}
+.aq-trader-v3-nav{display:grid;gap:2px}.aq-trader-v3-nav a{text-decoration:none;color:inherit}.aq-trader-v3-nav span{display:flex;align-items:center;gap:7px;min-height:27px;padding:4px 7px;border:1px solid transparent;border-radius:7px;color:#c7d7eb;font-size:.58rem;font-weight:760}.aq-trader-v3-nav a:first-child span{color:#fff;border-color:#2c92ff;background:linear-gradient(90deg,rgba(20,103,205,.78),rgba(7,37,82,.88));box-shadow:0 0 15px rgba(36,133,255,.25)}.aq-trader-v3-nav i{width:15px;text-align:center;color:#7fd8ff;font-style:normal}
+.aq-trader-v3-aion{display:block;text-decoration:none;color:inherit;margin-top:auto;border:1px solid #328fff;border-radius:11px;padding:8px;background:linear-gradient(160deg,rgba(18,70,135,.75),rgba(12,22,65,.92));box-shadow:0 0 20px rgba(35,132,255,.18)}.aq-trader-v3-aion strong{display:block;color:#7fe1ff;font-size:.75rem}.aq-trader-v3-aion small{display:block;color:#b8c9df;font-size:.53rem;margin:2px 0 6px}.aq-trader-v3-aion b{display:block;border:1px solid rgba(91,195,255,.38);border-radius:6px;padding:5px;color:#eefaff;font-size:.54rem;text-align:center}
 .aq-trader-v3-main{min-width:0;padding:7px 9px 9px;background:radial-gradient(circle at 51% 65%,rgba(26,108,255,.12),transparent 27rem)}
-.aq-trader-v3-head{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(260px,1fr) minmax(250px,.75fr);align-items:center;gap:10px;min-height:40px;border-bottom:1px solid rgba(70,157,255,.23)}.aq-trader-v3-title{color:#fff;font-weight:950;font-size:.76rem;letter-spacing:.08em}.aq-trader-v3-motto{text-align:center;color:#fff;font-weight:900;font-size:.77rem}.aq-trader-v3-tools{display:flex;justify-content:flex-end;align-items:center;gap:8px;color:#bed0e8;font-size:.55rem}.aq-trader-v3-search{min-width:125px;border:1px solid rgba(89,156,237,.25);border-radius:7px;padding:5px 8px;color:#627b99;background:rgba(5,17,37,.7)}
-.aq-trader-shell[data-trader-reference="v3"] .aq-trader-ticker{padding:6px 0}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick{min-width:91px;border-radius:8px;padding:5px 7px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick small{font-size:.48rem}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick strong{font-size:.62rem}
-.aq-trader-v3-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:2px 0 7px}.aq-trader-v3-tab{border:1px solid rgba(52,136,244,.48);border-radius:7px;padding:6px 5px;color:#dceaff;text-align:center;font-size:.54rem;font-weight:900;background:linear-gradient(180deg,rgba(13,57,119,.82),rgba(5,25,57,.88));box-shadow:inset 0 0 16px rgba(45,135,255,.08)}.aq-trader-v3-tab:first-child{border-color:#27a5ff;box-shadow:0 0 14px rgba(31,143,255,.25),inset 0 0 15px rgba(32,139,255,.13)}
-.aq-trader-v3-media{display:grid;grid-template-columns:1.75fr repeat(3,1fr);gap:7px;margin-bottom:7px}.aq-trader-v3-video{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;min-height:132px;border:1px solid rgba(56,151,255,.5);border-radius:9px;padding:9px;background:radial-gradient(circle at 50% 34%,rgba(42,122,255,.45),transparent 42%),linear-gradient(150deg,#123b79,#07172f 58%,#050c1d);box-shadow:inset 0 0 28px rgba(41,121,255,.12)}.aq-trader-v3-video.big{min-height:150px}.aq-trader-v3-video:before{content:"▶";position:absolute;left:50%;top:43%;transform:translate(-50%,-50%);display:grid;place-items:center;width:38px;height:38px;border:2px solid #dffaff;border-radius:50%;color:#fff;background:rgba(17,76,162,.58);box-shadow:0 0 18px #2a9bff}.aq-trader-v3-video.badge:after{content:"AO VIVO";position:absolute;left:8px;top:8px;border-radius:4px;padding:3px 6px;background:#ff315d;color:#fff;font-size:.48rem;font-weight:950}.aq-trader-v3-video strong{position:relative;color:#fff;font-size:.73rem;text-align:center}.aq-trader-v3-video small{position:relative;color:#a8bed9;font-size:.48rem;text-align:center;margin-top:2px}
-.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module{min-height:104px;padding:7px;border-radius:9px;text-align:center}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-icon{margin:auto;width:31px;height:31px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module small{font-size:.43rem;margin-top:5px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module h4{font-size:.62rem;margin:.15rem 0}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module p{font-size:.49rem;line-height:1.24;max-height:2.5em;overflow:hidden}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module .state{display:none}
-.aq-trader-v3-intel{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:7px;margin-top:7px}.aq-trader-v3-stack{display:grid;gap:6px}.aq-trader-v3-panel{border:1px solid rgba(52,142,250,.32);border-radius:8px;padding:7px;background:linear-gradient(160deg,rgba(7,30,63,.9),rgba(3,14,31,.95));min-height:76px}.aq-trader-v3-panel h4{margin:0 0 5px;color:#dff4ff;font-size:.58rem}.aq-trader-v3-lines{display:grid;gap:3px}.aq-trader-v3-lines span{display:flex;justify-content:space-between;gap:5px;color:#aebfd4;font-size:.46rem}.aq-trader-v3-lines b{color:#62e2ba;font-size:.45rem}.aq-trader-v3-center{position:relative;display:grid;place-items:center;min-height:170px;border:1px solid rgba(46,145,255,.4);border-radius:10px;background:radial-gradient(circle at 50% 55%,rgba(45,132,255,.27),transparent 46%),linear-gradient(180deg,rgba(4,21,48,.92),rgba(2,10,24,.97))}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-globe{width:138px;height:138px}.aq-trader-v3-center-label{position:absolute;bottom:8px;color:#9ec9ef;font-size:.48rem;font-weight:850;letter-spacing:.08em}
-.aq-trader-v3-shortcuts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:7px}.aq-trader-v3-shortcut{border:1px solid rgba(58,147,255,.35);border-radius:8px;padding:7px;text-align:center;background:linear-gradient(180deg,rgba(8,37,77,.88),rgba(4,17,38,.92));color:#e8f5ff;font-size:.53rem;font-weight:850}
+.aq-trader-v3-head{display:grid;grid-template-columns:minmax(170px,.7fr) minmax(260px,1fr) minmax(250px,.75fr);align-items:center;gap:10px;min-height:40px;border-bottom:1px solid rgba(70,157,255,.23)}.aq-trader-v3-title{color:#fff;font-weight:950;font-size:.76rem;letter-spacing:.08em}.aq-trader-v3-motto{text-align:center;color:#fff;font-weight:900;font-size:.77rem}.aq-trader-v3-tools{display:flex;justify-content:flex-end;align-items:center;gap:7px;color:#bed0e8;font-size:.55rem}.aq-trader-v3-search{min-width:116px;border:1px solid rgba(89,156,237,.25);border-radius:7px;padding:5px 8px;color:#627b99;background:rgba(5,17,37,.7)}.aq-trader-user{display:flex;align-items:center;gap:6px;border-left:1px solid rgba(91,158,238,.18);padding-left:7px}.aq-trader-user-avatar{display:grid;place-items:center;width:27px;height:27px;border:1px solid #4aa4ff;border-radius:50%;background:linear-gradient(145deg,#10356c,#272065);color:#fff;font-size:.62rem;font-weight:950;box-shadow:0 0 13px rgba(50,144,255,.22)}.aq-trader-user-copy{display:flex;flex-direction:column;line-height:1.05}.aq-trader-user-copy strong{color:#fff;font-size:.54rem}.aq-trader-user-copy small{color:#8097b5;font-size:.44rem}
+.aq-trader-shell[data-trader-reference="v3"] .aq-trader-ticker{padding:6px 0}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick{position:relative;min-width:104px;border-radius:8px;padding:5px 7px 7px;overflow:hidden}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick small{font-size:.48rem}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-tick strong{font-size:.62rem}.aq-trader-spark{display:block;width:100%;height:20px;margin-top:3px;opacity:.9}.aq-trader-spark path.grid{stroke:rgba(121,177,239,.16);stroke-width:.7}.aq-trader-spark polyline{fill:none;stroke:#55d6ff;stroke-width:2}.aq-trader-tick.good .aq-trader-spark polyline{stroke:#59e4af}.aq-trader-tick.warn .aq-trader-spark polyline{stroke:#ff7d91}
+.aq-trader-v3-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:2px 0 7px}.aq-trader-v3-tab{display:block;text-decoration:none;border:1px solid rgba(52,136,244,.48);border-radius:7px;padding:6px 5px;color:#dceaff;text-align:center;font-size:.54rem;font-weight:900;background:linear-gradient(180deg,rgba(13,57,119,.82),rgba(5,25,57,.88));box-shadow:inset 0 0 16px rgba(45,135,255,.08);transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}.aq-trader-v3-tab:hover{transform:translateY(-1px);border-color:#5ecbff;box-shadow:0 0 17px rgba(45,154,255,.28)}.aq-trader-v3-tab.active{border-color:#28c8ff;color:#fff;background:linear-gradient(180deg,rgba(20,91,186,.95),rgba(7,38,90,.95));box-shadow:0 0 18px rgba(31,166,255,.34),inset 0 0 18px rgba(32,139,255,.18)}
+.aq-trader-v3-media{display:grid;grid-template-columns:1.75fr repeat(3,1fr);gap:7px;margin-bottom:7px}.aq-trader-v3-video{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;min-height:132px;text-decoration:none;border:1px solid rgba(56,151,255,.5);border-radius:9px;padding:9px;background:
+ radial-gradient(circle at 50% 28%,rgba(68,151,255,.42),transparent 35%),
+ linear-gradient(135deg,rgba(19,74,150,.96),rgba(8,25,57,.97) 55%,rgba(4,12,29,.99));box-shadow:inset 0 0 28px rgba(41,121,255,.12)}.aq-trader-v3-video.big{min-height:150px}.aq-trader-v3-video:before{content:"▶";position:absolute;left:50%;top:43%;transform:translate(-50%,-50%);display:grid;place-items:center;width:38px;height:38px;border:2px solid #dffaff;border-radius:50%;color:#fff;background:rgba(17,76,162,.58);box-shadow:0 0 18px #2a9bff}.aq-trader-v3-video:after{content:attr(data-badge);position:absolute;left:8px;top:8px;border:1px solid rgba(139,219,255,.44);border-radius:4px;padding:3px 6px;background:rgba(3,20,49,.82);color:#dff7ff;font-size:.46rem;font-weight:950;letter-spacing:.05em}.aq-trader-v3-video.badge:after{background:#ff315d;border-color:#ff6d88;color:#fff}.aq-trader-v3-video:hover{border-color:#5ccfff;box-shadow:0 0 22px rgba(42,156,255,.22)}.aq-trader-v3-video strong{position:relative;color:#fff;font-size:.73rem;text-align:center}.aq-trader-v3-video small{position:relative;color:#a8bed9;font-size:.48rem;text-align:center;margin-top:2px}.aq-trader-v3-duration{position:absolute;right:7px;bottom:6px;border:1px solid rgba(141,202,255,.28);border-radius:4px;padding:2px 4px;background:rgba(3,12,28,.82);color:#dceeff;font-size:.42rem;font-weight:850}
+.aq-trader-v3-video:nth-child(1){background:
+ radial-gradient(circle at 68% 32%,rgba(55,198,255,.34),transparent 21%),
+ radial-gradient(circle at 55% 40%,rgba(48,101,255,.34),transparent 42%),
+ linear-gradient(145deg,#133f82,#071630 62%,#030918)}
+.aq-trader-v3-video:nth-child(2){border-color:rgba(255,174,63,.62);background:
+ radial-gradient(circle at 72% 20%,rgba(255,214,99,.60),transparent 15%),
+ linear-gradient(180deg,#5d3218 0%,#18315d 48%,#071226 100%);box-shadow:inset 0 0 34px rgba(255,155,55,.16)}
+.aq-trader-v3-video:nth-child(3){border-color:rgba(116,127,255,.52);background:
+ radial-gradient(circle at 72% 20%,rgba(179,196,255,.24),transparent 15%),
+ linear-gradient(180deg,#17224d 0%,#09152f 55%,#030918 100%)}
+.aq-trader-v3-video:nth-child(4){border-color:rgba(179,91,255,.56);background:
+ linear-gradient(145deg,rgba(70,23,127,.82),rgba(17,29,75,.96) 52%,#050b20),
+ repeating-linear-gradient(90deg,transparent 0 18px,rgba(112,211,255,.08) 18px 19px)}
+.aq-trader-module{--module-accent:#49c9ff;--module-glow:rgba(73,201,255,.18)}
+.aq-trader-module[data-module="macro"]{--module-accent:#39b9ff;--module-glow:rgba(57,185,255,.24)}
+.aq-trader-module[data-module="micro"]{--module-accent:#7b73ff;--module-glow:rgba(123,115,255,.24)}
+.aq-trader-module[data-module="geo"]{--module-accent:#b36cff;--module-glow:rgba(179,108,255,.26)}
+.aq-trader-module[data-module="fundamental"]{--module-accent:#43e0d2;--module-glow:rgba(67,224,210,.22)}
+.aq-trader-module[data-module="ict"]{--module-accent:#8f6dff;--module-glow:rgba(143,109,255,.25)}
+.aq-trader-module[data-module="calendar"]{--module-accent:#ff5fd2;--module-glow:rgba(255,95,210,.22)}
+.aq-trader-module[data-module="news"]{--module-accent:#55caff;--module-glow:rgba(85,202,255,.22)}
+.aq-trader-module[data-module="master"]{--module-accent:#ffbd58;--module-glow:rgba(255,189,88,.22)}
+.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module{border-color:color-mix(in srgb,var(--module-accent) 48%,transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 16px var(--module-glow)}
+.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module:hover{border-color:var(--module-accent);box-shadow:0 0 24px var(--module-glow),inset 0 0 20px var(--module-glow)}
+.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-icon{border-color:color-mix(in srgb,var(--module-accent) 58%,transparent);background:linear-gradient(145deg,color-mix(in srgb,var(--module-accent) 38%,#0d315f),#161e57);box-shadow:0 0 18px var(--module-glow)}
+.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module{min-height:124px;padding:0 7px 7px;border-radius:9px;text-align:center;text-decoration:none}.aq-trader-module-art{position:relative;height:50px;margin:0 -7px 5px;overflow:hidden;border-radius:8px 8px 5px 5px;border-bottom:1px solid rgba(82,173,255,.2);background:radial-gradient(circle at 50% 45%,rgba(40,143,255,.20),transparent 58%)}.aq-trader-module-art svg{width:100%;height:50px;display:block;filter:saturate(1.2) drop-shadow(0 0 8px rgba(75,174,255,.14))}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-icon{position:absolute;left:7px;top:36px;margin:0;width:24px;height:24px;font-size:.75rem;z-index:2}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module small{font-size:.41rem;margin-top:6px}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module h4{font-size:.60rem;margin:.14rem 0;white-space:normal}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module p{display:none}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module .state{display:none}
+.aq-trader-v3-intel{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:7px;margin-top:7px}.aq-trader-v3-stack{display:grid;gap:6px}.aq-trader-v3-panel{border:1px solid rgba(52,142,250,.42);border-radius:8px;padding:7px;background:
+ radial-gradient(circle at 100% 0%,rgba(54,133,255,.10),transparent 45%),
+ linear-gradient(160deg,rgba(7,30,63,.94),rgba(3,14,31,.97));min-height:82px;box-shadow:inset 0 0 22px rgba(31,105,212,.06),0 0 14px rgba(27,104,214,.06)}.aq-trader-v3-panel h4{margin:0 0 5px;color:#dff4ff;font-size:.58rem}.aq-trader-v3-lines{display:grid;gap:4px}.aq-trader-v3-lines span{display:flex;justify-content:space-between;gap:5px;padding-bottom:2px;border-bottom:1px solid rgba(93,154,224,.08);color:#aebfd4;font-size:.46rem}.aq-trader-v3-lines b{color:#62e2ba;font-size:.45rem}.aq-trader-v3-center{position:relative;display:grid;place-items:center;min-height:184px;border:1px solid rgba(46,145,255,.4);border-radius:10px;background:
+ radial-gradient(circle at 50% 53%,rgba(45,132,255,.32),transparent 44%),
+ radial-gradient(circle at 26% 30%,rgba(65,222,255,.08),transparent 22%),
+ linear-gradient(180deg,rgba(4,21,48,.92),rgba(2,10,24,.97));overflow:hidden}.aq-trader-v3-center:before{content:"";position:absolute;width:210px;height:86px;border:1px solid rgba(79,198,255,.25);border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 22px rgba(55,160,255,.12)}.aq-trader-v3-center:after{content:"";position:absolute;width:190px;height:190px;border-radius:50%;opacity:.38;background-image:radial-gradient(circle,#78dfff 1px,transparent 1.6px);background-size:12px 12px;mask-image:radial-gradient(circle,#000 0 62%,transparent 64%)}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-globe{width:145px;height:145px;z-index:2;background:
+ radial-gradient(circle at 38% 30%,rgba(105,239,255,.38),transparent 18%),
+ radial-gradient(circle at 62% 58%,rgba(123,76,255,.32),transparent 22%),
+ repeating-radial-gradient(circle at 50% 50%,rgba(64,170,255,.08) 0 2px,transparent 2px 8px),
+ radial-gradient(circle,#0b3a75 0,#071d42 58%,#041027 100%)}.aq-trader-v3-center-label{position:absolute;bottom:8px;z-index:3;color:#9ec9ef;font-size:.48rem;font-weight:850;letter-spacing:.08em}
+.aq-trader-v3-shortcuts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:7px}.aq-trader-v3-shortcut{display:block;text-decoration:none;border:1px solid rgba(58,147,255,.35);border-radius:8px;padding:7px;text-align:center;background:linear-gradient(180deg,rgba(8,37,77,.88),rgba(4,17,38,.92));color:#e8f5ff;font-size:.53rem;font-weight:850}.aq-trader-v3-shortcut:hover{border-color:#5ecbff;box-shadow:0 0 14px rgba(40,154,255,.2)}
 @media(max-width:1000px){.aq-trader-v3-grid{grid-template-columns:118px minmax(0,1fr)}.aq-trader-v3-media{grid-template-columns:1fr 1fr}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.aq-trader-v3-intel{grid-template-columns:1fr}.aq-trader-v3-head{grid-template-columns:1fr}.aq-trader-v3-tools{justify-content:flex-start}}
 @media(max-width:600px){.aq-trader-v3-grid{grid-template-columns:1fr}.aq-trader-v3-side{display:none}.aq-trader-v3-tabs{grid-template-columns:1fr 1fr}.aq-trader-v3-media{grid-template-columns:1fr}.aq-trader-shell[data-trader-reference="v3"] .aq-trader-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-trader-v3-shortcuts{grid-template-columns:1fr 1fr}.aq-trader-v3-main{padding:7px}.aq-trader-v3-motto{text-align:left}}
 @media (prefers-reduced-motion:reduce){
@@ -726,7 +766,7 @@ def request_premium_card(
     return target
 
 
-TRADER_REFERENCE_MODULE_IDS = ("macro", "micro", "geo", "fundamental", "ict", "calendar", "news", "invest")
+TRADER_REFERENCE_MODULE_IDS = ("macro", "micro", "geo", "fundamental", "ict", "calendar", "news", "master")
 TRADER_REFERENCE_ICONS = {
     "macro": "▥", "micro": "⌁", "geo": "◎", "fundamental": "▤",
     "ict": "◈", "calendar": "□", "news": "⚠", "invest": "◆",
@@ -740,15 +780,21 @@ def _trader_module_lookup() -> dict[str, Mapping[str, str]]:
 def _trader_score_chip(item: Mapping[str, object]) -> str:
     label = escape(str(item.get("label") or item.get("currency") or "MERCADO"))
     raw = item.get("score", item.get("value"))
+    spark = (
+        '<svg class="aq-trader-spark" viewBox="0 0 92 20" aria-hidden="true">'
+        '<path class="grid" d="M0 6H92M0 14H92"/>'
+        '<polyline points="0,14 11,11 22,13 33,7 44,9 55,5 66,8 78,4 92,6"/>'
+        '</svg>'
+    )
     try:
         score = max(0.0, min(100.0, float(raw)))
     except (TypeError, ValueError):
         value = escape(str(raw or "CONTEXTO"))
-        return f'<div class="aq-trader-tick neutral"><small>{label}</small><strong>{value}</strong></div>'
+        return f'<div class="aq-trader-tick neutral"><small>{label}</small><strong>{value}</strong>{spark}</div>'
     tone = "good" if score >= 55 else ("warn" if score <= 45 else "neutral")
     return (
         f'<div class="aq-trader-tick {tone}"><small>{label}</small>'
-        f'<strong>FORÇA {score:.0f}</strong></div>'
+        f'<strong>FORÇA {score:.0f}</strong>{spark}</div>'
     )
 
 
@@ -789,44 +835,68 @@ def trader_cockpit_html(
         locked = beginner and available and destination not in open_pages and destination != "🧠 AION"
         state = "INDISPONÍVEL" if not available else ("PRÉVIA AVANÇADA" if locked else "ACESSO SEGURO")
         state_class = "off" if not available else ("locked" if locked else "")
+        card_href = f"?aq_card={escape(str(module_id), quote=True)}" if available else ""
+        card_tag = "a" if card_href else "article"
+        href_attr = f' href="{card_href}"' if card_href else ""
         module_cards.append(
-            '<article class="aq-trader-module">'
+            f'<{card_tag} class="aq-trader-module"{href_attr} data-module="{escape(str(module_id))}">'
+            f'<div class="aq-trader-module-art">{_svg(str(module.get("motif") or "radar"))}</div>'
             f'<div class="aq-trader-module-icon">{escape(TRADER_REFERENCE_ICONS.get(module_id, "◇"))}</div>'
             f'<small>{escape(str(module.get("sector") or "TRADER"))}</small>'
             f'<h4>{escape(str(module.get("title") or ""))}</h4>'
             f'<p>{escape(str(module.get("summary") or ""))}</p>'
             f'<span class="state {state_class}">{escape(state)}</span>'
-            '</article>'
+            f'</{card_tag}>'
         )
 
     mode_label = "INICIANTE" if beginner else "AVANÇADO"
     nav_items = (
-        "Início", "Radar", "Macro", "Micro", "Geopolítica", "Fundamentalista",
-        "Calendário", "Pré-Notícia", "Vídeos", "Análises", "Backtest", "Paper Trading",
-        "Guardião de Risco", "Investimentos", "Negócios", "Corretoras", "Comunidade", "Configurações",
+        ("Início", "radar"),
+        ("Radar Mestre", "master"),
+        ("Radar", "radar"),
+        ("Painel Mestre", "master"),
+        ("Macro", "macro"),
+        ("Micro", "micro"),
+        ("Geopolítica", "geo"),
+        ("Fundamentalista", "fundamental"),
+        ("ICT / SMC", "ict"),
+        ("Calendário", "calendar"),
+        ("Pré-Notícia", "news"),
+        ("Laboratório / Backtests", "lab"),
+        ("Paper Trading", "paper"),
+        ("Guardião de Risco", "guardian"),
+        ("Academia", "academy"),
+        ("Diário", "journal"),
+        ("Vídeos / Conteúdo", "video"),
+        ("AION", "aion"),
+        ("Perfil / Configurações", "profile"),
     )
     nav_html = "".join(
-        f'<span><i>{"⌂" if index == 0 else "◇"}</i>{escape(label)}</span>'
-        for index, label in enumerate(nav_items)
+        (
+            f'<a href="?aq_card={escape(card_id, quote=True)}">'
+            f'<span><i>{"⌂" if index == 0 else "◇"}</i>{escape(label)}</span></a>'
+        )
+        for index, (label, card_id) in enumerate(nav_items)
     )
     return (
         '<section class="aq-trader-shell" data-trader-reference="v3" aria-label="Cockpit Trader AtlasQuant">'
         '<div class="aq-trader-v3-grid">'
         '<aside class="aq-trader-v3-side"><div class="aq-trader-v3-side-brand"><b>A</b><span>ATLASQUANT</span></div>'
         f'<div class="aq-trader-v3-nav">{nav_html}</div>'
-        '<div class="aq-trader-v3-aion"><strong>AION</strong><small>Assistente de IA</small><b>Converse com o AION ›</b></div></aside>'
+        '<a class="aq-trader-v3-aion" href="?aq_card=aion"><strong>AION</strong><small>Assistente de IA</small><b>Converse com o AION ›</b></a></aside>'
         '<main class="aq-trader-v3-main">'
         '<header class="aq-trader-v3-head"><div class="aq-trader-v3-title">ATLASQUANT · ECOSSISTEMA</div>'
         '<div class="aq-trader-v3-motto">Poderoso por dentro. Simples por fora.</div>'
-        f'<div class="aq-trader-v3-tools"><span class="aq-trader-v3-search">⌕ Buscar no AtlasQuant...</span><span>● ONLINE</span><span>MODO {mode_label}</span></div></header>'
+        f'<div class="aq-trader-v3-tools"><span class="aq-trader-v3-search">⌕ Buscar no AtlasQuant...</span><span>● ONLINE</span><span>MODO {mode_label}</span>'
+        '<span class="aq-trader-user"><span class="aq-trader-user-avatar">M</span><span class="aq-trader-user-copy"><strong>Mikael</strong><small>Administrador</small></span></span></div></header>'
         f'<div class="aq-trader-ticker" aria-label="Ativos em prévia">{ticker_html}</div>'
-        '<div class="aq-trader-v3-tabs"><div class="aq-trader-v3-tab">VISÃO GERAL</div><div class="aq-trader-v3-tab">ANÁLISE DA SEMANA</div>'
-        '<div class="aq-trader-v3-tab">ANÁLISE DO DIA</div><div class="aq-trader-v3-tab">FECHAMENTO DO DIA</div><div class="aq-trader-v3-tab">FECHAMENTO SEMANAL</div></div>'
+        '<div class="aq-trader-v3-tabs"><a class="aq-trader-v3-tab active" href="?aq_card=radar">VISÃO GERAL</a><a class="aq-trader-v3-tab" href="?aq_card=video">ANÁLISE DA SEMANA</a>'
+        '<a class="aq-trader-v3-tab" href="?aq_card=video">ANÁLISE DO DIA</a><a class="aq-trader-v3-tab" href="?aq_card=video">FECHAMENTO DO DIA</a><a class="aq-trader-v3-tab" href="?aq_card=video">FECHAMENTO SEMANAL</a></div>'
         '<div class="aq-trader-v3-media">'
-        '<article class="aq-trader-v3-video big badge"><strong>ANÁLISE DA SEMANA</strong><small>FOREX · CRIPTO · ÍNDICES · COMMODITIES · AÇÕES</small></article>'
-        '<article class="aq-trader-v3-video"><strong>ANÁLISE DO DIA</strong><small>Panorama e oportunidades</small></article>'
-        '<article class="aq-trader-v3-video"><strong>FECHAMENTO DO DIA</strong><small>O que realmente aconteceu</small></article>'
-        '<article class="aq-trader-v3-video"><strong>FECHAMENTO SEMANAL</strong><small>Comparativo completo</small></article>'
+        '<a class="aq-trader-v3-video big badge" data-badge="AO VIVO" href="?aq_card=video"><strong>ANÁLISE DA SEMANA</strong><small>FOREX · CRIPTO · ÍNDICES · COMMODITIES · AÇÕES</small><span class="aq-trader-v3-duration">28:15</span></a>'
+        '<a class="aq-trader-v3-video" data-badge="MANHÃ" href="?aq_card=video"><strong>ANÁLISE DO DIA</strong><small>Panorama e oportunidades</small><span class="aq-trader-v3-duration">07:15</span></a>'
+        '<a class="aq-trader-v3-video" data-badge="FECHAMENTO" href="?aq_card=video"><strong>FECHAMENTO DO DIA</strong><small>O que realmente aconteceu</small><span class="aq-trader-v3-duration">10:12</span></a>'
+        '<a class="aq-trader-v3-video" data-badge="SEMANA" href="?aq_card=video"><strong>FECHAMENTO SEMANAL</strong><small>Comparativo completo</small><span class="aq-trader-v3-duration">32:18</span></a>'
         '</div>'
         f'<div class="aq-trader-module-grid">{"".join(module_cards)}</div>'
         '<div class="aq-trader-v3-intel">'
@@ -837,8 +907,8 @@ def trader_cockpit_html(
         '<div class="aq-trader-v3-stack"><section class="aq-trader-v3-panel"><h4>Viés Atual do Mercado</h4><div class="aq-trader-v3-lines"><span>DXY <b>PRÉVIA</b></span><span>EURUSD <b>PRÉVIA</b></span><span>NASDAQ <b>PRÉVIA</b></span><span>BTCUSD <b>PRÉVIA</b></span></div></section>'
         '<section class="aq-trader-v3-panel"><h4>Calendário & Geopolítica</h4><div class="aq-trader-v3-lines"><span>Eventos econômicos <b>CONTEXTO</b></span><span>Alertas geopolíticos <b>CONTEXTO</b></span></div></section></div>'
         '</div>'
-        '<div class="aq-trader-v3-shortcuts"><div class="aq-trader-v3-shortcut">Academy</div><div class="aq-trader-v3-shortcut">Laboratório</div>'
-        '<div class="aq-trader-v3-shortcut">Paper Trading</div><div class="aq-trader-v3-shortcut">Guardião de Risco</div><div class="aq-trader-v3-shortcut">Treasury & Growth</div></div>'
+        '<div class="aq-trader-v3-shortcuts"><a class="aq-trader-v3-shortcut" href="?aq_card=academy">Academia</a><a class="aq-trader-v3-shortcut" href="?aq_card=lab">Laboratório</a>'
+        '<a class="aq-trader-v3-shortcut" href="?aq_card=paper">Paper Trading</a><a class="aq-trader-v3-shortcut" href="?aq_card=guardian">Guardião de Risco</a><a class="aq-trader-v3-shortcut" href="?aq_card=journal">Diário</a></div>'
         '</main></div></section>'
     )
 
@@ -962,8 +1032,6 @@ def render_premium_catalog(
         ),
         unsafe_allow_html=True,
     )
-    _render_premium_stateful_controls(
-        mode=mode,
-        available_pages=list(pages),
-        fast=fast,
-    )
+    # V4: the reference cockpit itself owns navigation through validated aq_card links.
+    # Do not render a duplicated button strip below the cockpit.
+    return None

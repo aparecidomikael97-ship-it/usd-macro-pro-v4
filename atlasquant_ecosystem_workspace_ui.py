@@ -134,9 +134,9 @@ WORKSPACE_CSS = r"""
   radial-gradient(circle at 52% 18%,var(--ws-glow),transparent 28rem),
   linear-gradient(145deg,rgba(5,15,35,.985),rgba(4,11,25,.99));
   box-shadow:0 28px 82px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.045)}
-.aq-ws-shell[data-workspace="negocios"]{--ws-accent:#49e6b2;--ws-accent2:#1eae8b;--ws-glow:rgba(49,212,166,.17)}
-.aq-ws-shell[data-workspace="investimentos"]{--ws-accent:#ffd36a;--ws-accent2:#c88f28;--ws-glow:rgba(226,171,63,.16)}
-.aq-ws-shell[data-workspace="aion"]{--ws-accent:#bd8cff;--ws-accent2:#5f7dff;--ws-glow:rgba(156,100,255,.19)}
+.aq-ws-shell[data-workspace="negocios"]{--ws-accent:#ff9d2f;--ws-accent2:#d66316;--ws-glow:rgba(255,130,38,.20)}
+.aq-ws-shell[data-workspace="investimentos"]{--ws-accent:#ffd36a;--ws-accent2:#c88f28;--ws-glow:rgba(226,171,63,.18)}
+.aq-ws-shell[data-workspace="aion"]{--ws-accent:#67c9ff;--ws-accent2:#7c53ff;--ws-glow:rgba(87,131,255,.22)}
 .aq-ws-shell:before{content:"";position:absolute;inset:0;opacity:.2;pointer-events:none;background-image:
  linear-gradient(color-mix(in srgb,var(--ws-accent) 14%,transparent) 1px,transparent 1px),
  linear-gradient(90deg,color-mix(in srgb,var(--ws-accent) 12%,transparent) 1px,transparent 1px);
@@ -147,11 +147,43 @@ WORKSPACE_CSS = r"""
 .aq-ws-motto{color:#eef6ff;font-size:.76rem;font-weight:850}.aq-ws-layout{display:grid;grid-template-columns:205px minmax(0,1fr);gap:12px;margin-top:12px}
 .aq-ws-side{border:1px solid rgba(123,173,229,.16);border-radius:18px;padding:10px;background:rgba(6,18,39,.78);min-width:0}
 .aq-ws-side-kicker{color:var(--ws-accent);font-size:.58rem;font-weight:950;letter-spacing:.12em;padding:3px 7px 8px}
-.aq-ws-nav{display:grid;gap:4px}.aq-ws-nav span{display:block;border:1px solid transparent;border-radius:9px;padding:6px 8px;color:#cfe0f3;font-size:.64rem;font-weight:760;line-height:1.2}
-.aq-ws-nav span:first-child{border-color:color-mix(in srgb,var(--ws-accent) 36%,transparent);background:color-mix(in srgb,var(--ws-accent) 10%,transparent);color:#fff}
+.aq-ws-nav{display:grid;gap:4px}.aq-ws-nav a{display:block;text-decoration:none;border:1px solid transparent;border-radius:9px;padding:6px 8px;color:#cfe0f3;font-size:.64rem;font-weight:760;line-height:1.2}
+.aq-ws-nav a:hover,.aq-ws-nav a:focus-visible{border-color:color-mix(in srgb,var(--ws-accent) 42%,transparent);background:color-mix(in srgb,var(--ws-accent) 9%,transparent);color:#fff;outline:none}
+.aq-ws-nav a:first-child{border-color:color-mix(in srgb,var(--ws-accent) 36%,transparent);background:color-mix(in srgb,var(--ws-accent) 10%,transparent);color:#fff}
 .aq-ws-main{min-width:0}.aq-ws-hero{display:grid;grid-template-columns:minmax(0,1.2fr) 180px;align-items:center;gap:12px;border:1px solid color-mix(in srgb,var(--ws-accent) 28%,transparent);border-radius:20px;padding:16px;background:linear-gradient(145deg,rgba(11,31,63,.92),rgba(7,17,39,.94))}
 .aq-ws-kicker{color:var(--ws-accent);font-size:.6rem;font-weight:950;letter-spacing:.14em}.aq-ws-hero h2{margin:.3rem 0 .4rem;color:#fff;font-size:clamp(1.35rem,2.5vw,2rem);letter-spacing:-.02em}
-.aq-ws-hero p{margin:0;color:#cadbee;font-size:.75rem;line-height:1.45}.aq-ws-orb{position:relative;width:128px;height:128px;margin:auto;border-radius:50%;border:1px solid color-mix(in srgb,var(--ws-accent) 72%,transparent);background:
+.aq-ws-hero p{margin:0;color:#cadbee;font-size:.75rem;line-height:1.45}
+.aq-ws-hero-visual{position:relative;overflow:hidden;width:100%;height:158px;border:1px solid color-mix(in srgb,var(--ws-accent) 44%,transparent);border-radius:16px;background:
+ radial-gradient(circle at 68% 42%,color-mix(in srgb,var(--ws-accent) 34%,transparent),transparent 30%),
+ linear-gradient(145deg,rgba(8,28,58,.96),rgba(4,12,28,.99));box-shadow:inset 0 0 30px var(--ws-glow),0 0 24px var(--ws-glow)}
+.aq-ws-hero-visual:before,.aq-ws-hero-visual:after{content:"";position:absolute;pointer-events:none}
+.aq-ws-shell[data-workspace="negocios"] .aq-ws-hero-visual{background:
+ radial-gradient(circle at 76% 30%,rgba(255,173,74,.30),transparent 22%),
+ linear-gradient(145deg,#281105 0%,#1a1a1e 48%,#07111f 100%)}
+.aq-ws-shell[data-workspace="negocios"] .aq-ws-hero-visual:before{left:16px;right:16px;bottom:18px;height:94px;background:
+ linear-gradient(90deg,transparent 0 3%,#7d3a10 3% 10%,transparent 10% 13%,#9f4b12 13% 22%,transparent 22% 25%,#c16619 25% 36%,transparent 36% 39%,#e88320 39% 51%,transparent 51% 54%,#f6a033 54% 67%,transparent 67% 70%,#d4781e 70% 84%,transparent 84%);clip-path:polygon(0 100%,0 72%,10% 72%,10% 55%,22% 55%,22% 38%,36% 38%,36% 64%,51% 64%,51% 31%,67% 31%,67% 12%,84% 12%,84% 46%,100% 46%,100% 100%);filter:drop-shadow(0 0 12px rgba(255,133,31,.25))}
+.aq-ws-shell[data-workspace="negocios"] .aq-ws-hero-visual:after{left:18px;right:20px;top:30px;height:64px;border-top:3px solid #ffb143;transform:skewY(-8deg);box-shadow:0 -12px 24px rgba(255,146,43,.22)}
+.aq-ws-shell[data-workspace="investimentos"] .aq-ws-hero-visual{background:
+ radial-gradient(circle at 73% 38%,rgba(255,210,92,.28),transparent 25%),
+ linear-gradient(145deg,#201708 0%,#17150f 52%,#08101b 100%)}
+.aq-ws-shell[data-workspace="investimentos"] .aq-ws-hero-visual:before{left:16px;right:18px;bottom:18px;height:92px;background:linear-gradient(90deg,#5b3d0c 0 8%,transparent 8% 12%,#7c5412 12% 23%,transparent 23% 28%,#a87519 28% 41%,transparent 41% 46%,#cb9324 46% 60%,transparent 60% 66%,#edb846 66% 81%,transparent 81%);clip-path:polygon(0 100%,0 72%,8% 72%,8% 60%,23% 60%,23% 47%,41% 47%,41% 34%,60% 34%,60% 20%,81% 20%,81% 7%,100% 7%,100% 100%);filter:drop-shadow(0 0 12px rgba(255,198,73,.20))}
+.aq-ws-shell[data-workspace="investimentos"] .aq-ws-hero-visual:after{width:104px;height:104px;border-radius:50%;right:24px;top:18px;border:1px solid rgba(255,218,109,.82);box-shadow:0 0 36px rgba(255,188,64,.30),inset 0 0 30px rgba(255,183,52,.18);background:
+ repeating-linear-gradient(90deg,transparent 0 12px,rgba(255,218,109,.13) 12px 13px),
+ repeating-radial-gradient(circle,transparent 0 15px,rgba(255,218,109,.12) 15px 16px)}
+.aq-ws-shell[data-workspace="aion"] .aq-ws-hero-visual{background:
+ radial-gradient(circle at 30% 48%,rgba(70,155,255,.26),transparent 28%),
+ radial-gradient(circle at 77% 33%,rgba(154,92,255,.25),transparent 24%),
+ linear-gradient(145deg,#061a3b 0%,#0b183e 52%,#160d3d 100%)}
+.aq-ws-shell[data-workspace="aion"] .aq-ws-hero-visual:before{width:92px;height:126px;right:24px;top:15px;border:2px solid #84d7ff;border-radius:54% 46% 46% 54%/42% 42% 58% 58%;background:
+ radial-gradient(circle at 58% 32%,#e3f6ff 0 3px,transparent 4px),
+ radial-gradient(circle at 54% 34%,rgba(89,184,255,.42),transparent 25%),
+ linear-gradient(145deg,rgba(69,108,208,.76),rgba(51,28,117,.78));box-shadow:0 0 42px rgba(92,150,255,.36);clip-path:polygon(18% 4%,78% 0,100% 23%,91% 60%,73% 72%,68% 100%,29% 100%,25% 72%,9% 58%,0 25%)}
+.aq-ws-shell[data-workspace="aion"] .aq-ws-hero-visual:after{width:124px;height:124px;border-radius:50%;left:22px;top:18px;border:1px solid rgba(82,190,255,.72);background:
+ repeating-radial-gradient(circle,rgba(84,180,255,.13) 0 1px,transparent 1px 10px),
+ repeating-linear-gradient(0deg,transparent 0 11px,rgba(92,164,255,.08) 11px 12px),
+ radial-gradient(circle,rgba(56,128,255,.36),rgba(18,27,83,.16) 58%,transparent 60%);box-shadow:0 0 38px rgba(63,140,255,.22)}
+.aq-ws-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 0}.aq-ws-kpi{border:1px solid color-mix(in srgb,var(--ws-accent) 26%,transparent);border-radius:11px;padding:8px 9px;background:rgba(4,15,33,.72);box-shadow:inset 0 0 18px var(--ws-glow)}.aq-ws-kpi small{display:block;color:#8faaca;font-size:.5rem;font-weight:800;letter-spacing:.06em}.aq-ws-kpi strong{display:block;margin-top:3px;color:#f6fbff;font-size:.68rem}
+.aq-ws-orb{position:relative;width:128px;height:128px;margin:auto;border-radius:50%;border:1px solid color-mix(in srgb,var(--ws-accent) 72%,transparent);background:
  radial-gradient(circle at 35% 28%,color-mix(in srgb,var(--ws-accent) 42%,transparent),transparent 17%),
  radial-gradient(circle at 62% 63%,color-mix(in srgb,var(--ws-accent2) 45%,transparent),transparent 28%),
  radial-gradient(circle,#0a3268,#07162f 64%,#030c1c);
@@ -159,24 +191,44 @@ WORKSPACE_CSS = r"""
 .aq-ws-orb:before,.aq-ws-orb:after{content:"";position:absolute;inset:16%;border-radius:50%;border:1px solid color-mix(in srgb,var(--ws-accent) 52%,transparent);animation:aq-ws-orbit 12s linear infinite}
 .aq-ws-orb:before{transform:scaleX(.45)}.aq-ws-orb:after{transform:scaleY(.45);animation-direction:reverse}.aq-ws-orb b{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:2.2rem;text-shadow:0 0 20px var(--ws-accent)}
 .aq-ws-section-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:14px 2px 8px}.aq-ws-section-head h3{margin:0;color:#fff;font-size:.95rem}.aq-ws-section-head span{color:#8fb2d8;font-size:.62rem}
-.aq-ws-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.aq-ws-card{position:relative;overflow:hidden;min-height:145px;border:1px solid rgba(111,169,234,.19);border-radius:15px;padding:11px;background:linear-gradient(155deg,rgba(12,34,67,.92),rgba(6,18,39,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.035);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
-.aq-ws-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 45%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow)}
+.aq-ws-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.aq-ws-card{position:relative;overflow:hidden;display:block;text-decoration:none;color:inherit;min-height:145px;border:1px solid color-mix(in srgb,var(--ws-accent) 22%,rgba(111,169,234,.19));border-radius:15px;padding:11px;background:
+ radial-gradient(circle at 100% 0%,var(--ws-glow),transparent 44%),
+ linear-gradient(155deg,rgba(12,34,67,.94),rgba(6,18,39,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.035);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.aq-ws-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 58%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow)}
+.aq-ws-card:focus-visible{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 58%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow);outline:2px solid var(--ws-accent);outline-offset:2px}
+.aq-ws-card-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:9px;border:1px solid color-mix(in srgb,var(--ws-accent) 48%,transparent);border-radius:10px;background:linear-gradient(145deg,color-mix(in srgb,var(--ws-accent) 24%,#0d2b50),rgba(7,18,39,.94));color:#fff;font-size:.95rem;box-shadow:0 0 16px var(--ws-glow)}
 .aq-ws-card small{display:block;color:var(--ws-accent);font-size:.54rem;font-weight:950;letter-spacing:.11em}.aq-ws-card h4{margin:.3rem 0 .35rem;color:#fff;font-size:.82rem;line-height:1.25}.aq-ws-card p{margin:0;color:#c8d8eb;font-size:.65rem;line-height:1.38}
 .aq-ws-state{display:inline-flex;margin-top:8px;border:1px solid color-mix(in srgb,var(--ws-accent) 32%,transparent);border-radius:999px;padding:3px 7px;color:#edf7ff;font-size:.53rem;font-weight:900;letter-spacing:.05em;background:rgba(5,18,40,.62)}
 .aq-ws-state[data-state="CONECTADO"]{color:#79efc1;border-color:rgba(90,225,171,.35)}.aq-ws-state[data-state="PLANEJADO"]{color:#ffd98a;border-color:rgba(255,205,95,.34)}
 .aq-ws-state[data-state="EM CONSTRUÇÃO"],.aq-ws-state[data-state="EM EVOLUÇÃO"]{color:#ffd38c;border-color:rgba(255,190,80,.28)}
 .aq-ws-connected{margin-top:12px;border-top:1px solid rgba(129,175,226,.16);padding-top:12px}.aq-ws-truth{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.aq-ws-truth span{border:1px solid rgba(126,175,230,.2);border-radius:999px;padding:4px 8px;color:#dceafd;font-size:.56rem;font-weight:850;background:rgba(5,18,40,.58)}
-.aq-central-reference-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch}.aq-central-reference-card{--card-accent:#28a8ff;--card-glow:rgba(40,168,255,.28);position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:520px;border:1px solid color-mix(in srgb,var(--card-accent) 62%,transparent);border-radius:16px;padding:0 14px 14px;background:linear-gradient(180deg,rgba(5,17,36,.98),rgba(3,10,23,.985));box-shadow:0 16px 38px rgba(0,0,0,.34),inset 0 0 28px rgba(30,104,190,.05);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.aq-ws-dashboard{display:grid;grid-template-columns:1.15fr .9fr .95fr;gap:9px;margin-top:11px}.aq-ws-dash-card{border:1px solid color-mix(in srgb,var(--ws-accent) 24%,transparent);border-radius:14px;padding:11px;background:
+ radial-gradient(circle at 100% 0%,var(--ws-glow),transparent 42%),
+ linear-gradient(155deg,rgba(9,28,57,.93),rgba(5,16,35,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}.aq-ws-dash-card h4{margin:0 0 8px;color:#fff;font-size:.72rem}.aq-ws-dash-lines{display:grid;gap:6px}.aq-ws-dash-lines span{display:flex;justify-content:space-between;gap:8px;padding-bottom:4px;border-bottom:1px solid rgba(119,169,225,.10);color:#bcd0e6;font-size:.54rem}.aq-ws-dash-lines b{color:var(--ws-accent);font-size:.53rem}.aq-ws-mini-chart{height:74px;border:1px solid color-mix(in srgb,var(--ws-accent) 18%,transparent);border-radius:10px;background:
+ linear-gradient(180deg,color-mix(in srgb,var(--ws-accent) 8%,transparent),transparent),
+ repeating-linear-gradient(0deg,transparent 0 17px,rgba(118,168,225,.08) 17px 18px),
+ repeating-linear-gradient(90deg,transparent 0 25px,rgba(118,168,225,.06) 25px 26px);position:relative;overflow:hidden}.aq-ws-mini-chart:after{content:"";position:absolute;left:8px;right:8px;top:42px;height:2px;background:linear-gradient(90deg,var(--ws-accent),color-mix(in srgb,var(--ws-accent2) 78%,white 8%));transform:skewY(-7deg);box-shadow:0 0 10px var(--ws-glow)}.aq-ws-donut{width:72px;height:72px;margin:2px auto;border-radius:50%;background:conic-gradient(var(--ws-accent) 0 42%,var(--ws-accent2) 42% 64%,#2f6ca5 64% 79%,#193652 79%);position:relative;box-shadow:0 0 18px var(--ws-glow)}.aq-ws-donut:after{content:"";position:absolute;inset:16px;border-radius:50%;background:#071426;border:1px solid rgba(122,171,224,.16)}.aq-ws-status-list{display:grid;gap:5px}.aq-ws-status-list span{display:flex;align-items:center;justify-content:space-between;color:#bfd1e5;font-size:.53rem}.aq-ws-status-list i{width:7px;height:7px;border-radius:50%;background:var(--ws-accent);box-shadow:0 0 8px var(--ws-glow)}
+@media (max-width:950px){.aq-ws-dashboard{grid-template-columns:1fr 1fr}.aq-ws-dashboard>.aq-ws-dash-card:first-child{grid-column:1/-1}}
+@media (max-width:620px){.aq-ws-dashboard{grid-template-columns:1fr}.aq-ws-dashboard>.aq-ws-dash-card:first-child{grid-column:auto}}
+.aq-central-reference-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch;max-width:1180px;margin:0 auto}.aq-central-reference-card{--card-accent:#28a8ff;--card-glow:rgba(40,168,255,.28);position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:286px;border:1px solid color-mix(in srgb,var(--card-accent) 68%,transparent);border-radius:16px;padding:0 13px 12px;background:linear-gradient(180deg,rgba(5,17,36,.98),rgba(3,10,23,.985));box-shadow:0 16px 38px rgba(0,0,0,.34),0 0 24px var(--card-glow),inset 0 0 28px rgba(30,104,190,.05);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
 .aq-central-reference-card[data-area="negocios"]{--card-accent:#34e3a4;--card-glow:rgba(52,227,164,.24)}.aq-central-reference-card[data-area="investimentos"]{--card-accent:#f0bd58;--card-glow:rgba(240,189,88,.24)}.aq-central-reference-card[data-area="aion"]{--card-accent:#c05cff;--card-glow:rgba(192,92,255,.27)}
 .aq-central-reference-card:hover{transform:translateY(-5px);box-shadow:0 22px 46px rgba(0,0,0,.42),0 0 26px var(--card-glow)}
-.aq-central-reference-art{position:relative;display:grid;place-items:center;height:164px;margin:0 -14px 14px;border:0;border-bottom:1px solid color-mix(in srgb,var(--card-accent) 38%,transparent);border-radius:15px 15px 0 0;background:radial-gradient(circle at 50% 55%,var(--card-glow),transparent 52%),linear-gradient(145deg,rgba(11,39,79,.88),rgba(4,14,31,.94))}
-.aq-central-reference-art:after{content:"";position:absolute;inset:auto 0 0;height:48%;background:linear-gradient(180deg,transparent,rgba(1,6,16,.68));pointer-events:none}.aq-central-reference-art .aq-central-art{width:100%;height:100%;object-fit:cover;filter:drop-shadow(0 0 16px var(--card-glow))}
-.aq-central-reference-card h3{margin:.1rem 0 .3rem;color:#fff;font-size:1.22rem;letter-spacing:.01em;text-transform:uppercase}.aq-central-reference-card p{margin:0;color:#aebdd2;font-size:.70rem;line-height:1.42;min-height:3.1em}
-.aq-central-reference-list{display:grid;grid-template-columns:1fr;gap:4px;margin:12px 0 14px;padding-top:10px;border-top:1px solid rgba(130,174,225,.12)}.aq-central-reference-list span{position:relative;border:0;border-radius:0;padding:3px 4px 3px 18px;color:#d9e4f2;font-size:.62rem;font-weight:720;background:transparent}.aq-central-reference-list span:before{content:"◈";position:absolute;left:2px;top:2px;color:var(--card-accent);font-size:.63rem}
-.aq-central-reference-cta{display:flex;align-items:center;justify-content:center;margin-top:auto;border:1px solid color-mix(in srgb,var(--card-accent) 68%,transparent);border-radius:9px;min-height:42px;color:#fff;font-size:.68rem;font-weight:900;letter-spacing:.03em;background:linear-gradient(90deg,color-mix(in srgb,var(--card-accent) 22%,#071426),rgba(6,17,37,.92));box-shadow:0 0 18px var(--card-glow)}
+.aq-central-reference-art{position:relative;display:grid;place-items:center;height:160px;margin:0 -13px 18px;border:0;border-bottom:1px solid color-mix(in srgb,var(--card-accent) 46%,transparent);border-radius:15px 15px 0 0;background:
+ radial-gradient(circle at 50% 48%,var(--card-glow),transparent 48%),
+ linear-gradient(145deg,rgba(11,39,79,.92),rgba(4,14,31,.97));overflow:hidden}
+.aq-central-reference-art:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.32;background-image:
+ linear-gradient(color-mix(in srgb,var(--card-accent) 12%,transparent) 1px,transparent 1px),
+ linear-gradient(90deg,color-mix(in srgb,var(--card-accent) 10%,transparent) 1px,transparent 1px);background-size:24px 24px;mask-image:linear-gradient(to bottom,#000,transparent 85%)}
+.aq-central-reference-art:after{content:"";position:absolute;inset:auto 0 0;height:52%;background:linear-gradient(180deg,transparent,rgba(1,6,16,.76));pointer-events:none}.aq-central-reference-art .aq-central-art{width:100%;height:100%;object-fit:cover;filter:drop-shadow(0 0 20px var(--card-glow)) saturate(1.18)}
+.aq-central-reference-icon{position:absolute;left:14px;top:138px;z-index:3;display:grid;place-items:center;width:46px;height:46px;border:1px solid color-mix(in srgb,var(--card-accent) 75%,white 5%);border-radius:12px;background:linear-gradient(145deg,color-mix(in srgb,var(--card-accent) 34%,#071426),#07101f);box-shadow:0 0 24px var(--card-glow),inset 0 1px 0 rgba(255,255,255,.18);color:#fff;font-size:1.05rem;font-weight:950}
+.aq-central-reference-card h3{margin:.3rem 0 .25rem;color:#fff;font-size:1.15rem;letter-spacing:.01em;text-transform:none}.aq-central-reference-card p{margin:0;color:#c6d4e6;font-size:.69rem;line-height:1.38;min-height:2.7em;text-align:center}.aq-central-reference-card h3{text-align:center}
+.aq-central-reference-list{display:none}
+.aq-central-reference-card{text-decoration:none;color:inherit;cursor:pointer}
+.aq-central-reference-card:focus-visible{outline:2px solid var(--card-accent);outline-offset:3px}
+.aq-central-reference-cta{display:flex;align-items:center;justify-content:center;margin-top:auto;border:1px solid color-mix(in srgb,var(--card-accent) 78%,transparent);border-radius:18px;min-height:36px;color:#fff;font-size:.64rem;font-weight:900;letter-spacing:.02em;background:linear-gradient(90deg,color-mix(in srgb,var(--card-accent) 24%,#071426),rgba(6,17,37,.92));box-shadow:0 0 18px var(--card-glow)}
 @keyframes aq-ws-orbit{from{transform:rotate(0) scaleX(.45)}to{transform:rotate(360deg) scaleX(.45)}}
 @media (max-width:1100px){.aq-central-reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:800px){.aq-ws-layout{grid-template-columns:1fr}.aq-ws-side{display:none}.aq-ws-hero{grid-template-columns:1fr}.aq-ws-orb{width:110px;height:110px}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:800px){.aq-ws-layout{grid-template-columns:1fr}.aq-ws-side{display:none}.aq-ws-hero{grid-template-columns:1fr}.aq-ws-orb{width:110px;height:110px}.aq-ws-hero-visual{height:140px}.aq-ws-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.aq-ws-shell{padding:9px;border-radius:19px}.aq-ws-top{align-items:flex-start;flex-direction:column}.aq-ws-motto{text-align:left}.aq-central-reference-grid,.aq-ws-modules{grid-template-columns:1fr}.aq-central-reference-card{min-height:0}.aq-ws-card{min-height:0}.aq-ws-hero{padding:12px}}
 @media (prefers-reduced-motion:reduce){.aq-ws-card,.aq-central-reference-card{transition:none}.aq-ws-card:hover,.aq-central-reference-card:hover{transform:none}.aq-ws-orb:before,.aq-ws-orb:after{animation:none !important}}
 </style>
@@ -204,14 +256,17 @@ def central_reference_card_html(area: object, art_html: str = "") -> str:
     key = _area(area)
     spec = _WORKSPACES[key]
     bullets = "".join(f"<span>{escape(str(item))}</span>" for item in spec["central_bullets"])
+    icons = {"trader": "↗", "negocios": "▦", "investimentos": "◫", "aion": "✦"}
     return (
-        f'<article class="aq-central-reference-card" data-area="{escape(key)}">'
+        f'<a class="aq-central-reference-card" data-area="{escape(key)}" '
+        f'href="?aq_central={escape(key, quote=True)}" aria-label="Acessar {escape(spec["title"])}">'
         f'<div class="aq-central-reference-art">{art_html}</div>'
+        f'<span class="aq-central-reference-icon" aria-hidden="true">{escape(icons.get(key, "◇"))}</span>'
         f'<h3>{escape(spec["title"])}</h3>'
         f'<p>{escape(spec["summary"])}</p>'
         f'<div class="aq-central-reference-list">{bullets}</div>'
-        f'<div class="aq-central-reference-cta">ACESSAR {escape(spec["title"].upper())}</div>'
-        '</article>'
+        f'<div class="aq-central-reference-cta">ACESSAR {escape(spec["title"].upper())} <span aria-hidden="true">→</span></div>'
+        '</a>'
     )
 
 
@@ -227,19 +282,112 @@ def workspace_cockpit_html(
         raise ValueError("Trader uses atlasquant_premium_shell.trader_cockpit_html")
     spec = _WORKSPACES[key]
     nav = _SIDE_NAV.get(key, ())
-    nav_html = "".join(f"<span>{escape(item)}</span>" for item in nav)
+    modules = _MODULES.get(key, ())
+    module_ids = {str(item["id"]): item for item in modules}
+    title_to_id = {str(item["title"]).casefold(): str(item["id"]) for item in modules}
+    nav_aliases = {
+        "início": "aq-ws-overview",
+        "visão geral": "aq-ws-overview",
+        "empresas / clientes": "b2b",
+        "automação b2b": "b2b",
+        "leads": "revenue",
+        "revenue ops": "revenue",
+        "crm": "revenue",
+        "propostas": "revenue",
+        "follow-up": "revenue",
+        "micro-saas": "saas",
+        "serviços internacionais": "international",
+        "produtos digitais": "digital",
+        "integrações": "integrations",
+        "financeiro / finops": "finops",
+        "roi": "finops",
+        "saúde do cliente": "success",
+        "sla / suporte": "sla",
+        "auditoria / lgpd": "privacy",
+        "equipe & acessos": "team",
+        "demo / sandbox": "sandbox",
+        "aion negócios": "aion-business",
+        "renda fixa": "fixed",
+        "renda variável": "variable",
+        "fundos": "funds",
+        "produtos": "funds",
+        "carteira": "allocation",
+        "alocação": "allocation",
+        "risco": "risk",
+        "planejamento": "planning",
+        "objetivos": "planning",
+        "dividendos": "income",
+        "longo prazo": "growth",
+        "relatórios": "reports",
+        "educação financeira": "education",
+        "aion investimentos": "aion-invest",
+        "chat": "chat",
+        "histórico": "history",
+        "memória": "memory",
+        "tarefas": "tasks",
+        "biblioteca": "library",
+        "pesquisa": "research",
+        "checkpoint mestre": "checkpoint",
+        "núcleo": "core",
+        "8 papéis internos": "roles",
+        "auditoria": "audit",
+        "academy": "academy",
+        "aion english": "english",
+        "configurações": "aq-ws-overview",
+    }
+    nav_html_parts = []
+    for item in nav:
+        key_name = str(item).casefold()
+        target = nav_aliases.get(key_name) or title_to_id.get(key_name) or "aq-ws-overview"
+        if target != "aq-ws-overview" and target not in module_ids:
+            target = "aq-ws-overview"
+        href = "#aq-ws-overview" if target == "aq-ws-overview" else f"#aq-ws-{target}"
+        nav_html_parts.append(f'<a href="{escape(href, quote=True)}">{escape(item)}</a>')
+    nav_html = "".join(nav_html_parts)
+    icons = {
+        "b2b": "⚙", "revenue": "◎", "saas": "▦", "international": "◉", "digital": "◇",
+        "finops": "◫", "success": "♡", "sla": "⏱", "integrations": "⌘", "privacy": "⌾",
+        "team": "◌", "sandbox": "◈", "aion-business": "A",
+        "fixed": "◆", "variable": "▥", "funds": "ETF", "allocation": "◔", "risk": "⛨",
+        "planning": "◎", "income": "◉", "growth": "↗", "reports": "▤", "education": "▱", "aion-invest": "A",
+        "chat": "◍", "history": "↺", "memory": "◫", "tasks": "✓", "library": "▤",
+        "research": "⌕", "checkpoint": "◇", "core": "A", "roles": "8", "audit": "⛨",
+        "academy": "⌂", "english": "EN",
+    }
     cards = []
-    for item in _MODULES.get(key, ()):
+    for item in modules:
+        module_id = escape(item["id"])
+        icon = escape(icons.get(str(item["id"]), "◇"))
         cards.append(
-            f'<article class="aq-ws-card" data-module="{escape(item["id"])}" '
+            f'<a class="aq-ws-card" id="aq-ws-{module_id}" href="#aq-ws-{module_id}" data-module="{module_id}" '
             f'data-feature-state="{escape(item["state"])}">'
+            f'<span class="aq-ws-card-icon" aria-hidden="true">{icon}</span>'
             f'<small>{escape(item["group"])}</small>'
             f'<h4>{escape(item["title"])}</h4>'
             f'<p>{escape(item["summary"])}</p>'
             f'<span class="aq-ws-state" data-state="{escape(item["state"])}">{escape(item["state"])}</span>'
-            '</article>'
+            '</a>'
         )
     mode_label = str(mode or "").strip() or "SESSÃO ATUAL"
+    module_count = len(_MODULES.get(key, ()))
+    connected_count = sum(1 for item in _MODULES.get(key, ()) if item.get("state") == "CONECTADO")
+    preview_count = sum(1 for item in _MODULES.get(key, ()) if item.get("state") == "PRÉVIA")
+    kpi_labels = {
+        "negocios": ("Módulos", "Conectados", "Prévias", "Tenant"),
+        "investimentos": ("Módulos", "Conectados", "Prévias", "Execução"),
+        "aion": ("Módulos", "Conectados", "Prévias", "Core"),
+    }
+    kpi_values = {
+        "negocios": (str(module_count), str(connected_count), str(preview_count), "ISOLADO"),
+        "investimentos": (str(module_count), str(connected_count), str(preview_count), "BLOQUEADA"),
+        "aion": (str(module_count), str(connected_count), str(preview_count), "ÚNICO"),
+    }
+    labels = kpi_labels[key]
+    values = kpi_values[key]
+    kpis = "".join(
+        f'<div class="aq-ws-kpi"><small>{escape(label)}</small><strong>{escape(value)}</strong></div>'
+        for label, value in zip(labels, values)
+    )
     truth = [
         f"MODO {mode_label.upper()}",
         "SEM EXECUÇÃO AUTOMÁTICA",
@@ -256,6 +404,24 @@ def workspace_cockpit_html(
         if value and value not in truth:
             truth.append(value)
     truth_html = "".join(f"<span>{escape(item)}</span>" for item in truth)
+    dashboard_templates = {
+        "negocios": (
+            '<section class="aq-ws-dash-card"><h4>Oportunidades & Mercado</h4><div class="aq-ws-mini-chart"></div><div class="aq-ws-dash-lines"><span>Pipeline <b>PRÉVIA</b></span><span>Mercado Global <b>CONTEXTO</b></span><span>Notícias Corporativas <b>CONTEXTO</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Próximos Eventos</h4><div class="aq-ws-dash-lines"><span>Resultados <b>PRÉVIA</b></span><span>Assembleias <b>PRÉVIA</b></span><span>Implantações <b>PRÉVIA</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Saúde da Operação</h4><div class="aq-ws-status-list"><span><i></i>Tenant isolado <b>CONECTADO</b></span><span><i></i>FinOps <b>EM CONSTRUÇÃO</b></span><span><i></i>SLA <b>EM CONSTRUÇÃO</b></span></div></section>',
+        ),
+        "investimentos": (
+            '<section class="aq-ws-dash-card"><h4>Mercados em Destaque</h4><div class="aq-ws-mini-chart"></div><div class="aq-ws-dash-lines"><span>Renda Fixa <b>CONECTADO</b></span><span>Renda Variável <b>PRÉVIA</b></span><span>Fundos & ETFs <b>PRÉVIA</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Alocação Educacional</h4><div class="aq-ws-donut"></div><div class="aq-ws-dash-lines"><span>Diversificação <b>PRÉVIA</b></span><span>Liquidez <b>PRÉVIA</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Oportunidades da Semana</h4><div class="aq-ws-dash-lines"><span>Ações globais <b>PRÉVIA</b></span><span>Renda & Dividendos <b>CONECTADO</b></span><span>Mercados internacionais <b>PRÉVIA</b></span></div></section>',
+        ),
+        "aion": (
+            '<section class="aq-ws-dash-card"><h4>Status do Núcleo AION</h4><div class="aq-ws-status-list"><span><i></i>Memória <b>CONECTADO</b></span><span><i></i>Tarefas <b>CONECTADO</b></span><span><i></i>Pesquisa <b>CONECTADO</b></span><span><i></i>Biblioteca <b>EM EVOLUÇÃO</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Processamento & Aprendizado</h4><div class="aq-ws-mini-chart"></div><div class="aq-ws-dash-lines"><span>Modelos de IA <b>PRÉVIA</b></span><span>Aprendizado contínuo <b>CONECTADO</b></span></div></section>',
+            '<section class="aq-ws-dash-card"><h4>Atividades Recentes</h4><div class="aq-ws-dash-lines"><span>Checkpoint <b>CONECTADO</b></span><span>Auditoria <b>CONECTADO</b></span><span>AION English <b>PLANEJADO</b></span></div></section>',
+        ),
+    }
+    dashboard_html = '<div class="aq-ws-dashboard">' + "".join(dashboard_templates[key]) + "</div>"
     detail = f'<div class="aq-ws-connected">{connected_html}</div>' if connected_html else ""
     return (
         WORKSPACE_CSS
@@ -265,14 +431,15 @@ def workspace_cockpit_html(
         '<div class="aq-ws-motto">Poderoso por dentro. Simples por fora.</div></div>'
         '<div class="aq-ws-layout">'
         f'<aside class="aq-ws-side"><div class="aq-ws-side-kicker">{escape(spec["title"].upper())}</div><div class="aq-ws-nav">{nav_html}</div></aside>'
-        '<main class="aq-ws-main">'
+        '<main class="aq-ws-main" id="aq-ws-overview">'
         '<section class="aq-ws-hero">'
         f'<div><div class="aq-ws-kicker">{escape(spec["kicker"])}</div><h2>{escape(spec["title"])}</h2><p>{escape(spec["hero"])}</p>'
-        f'<div class="aq-ws-truth">{truth_html}</div></div>'
-        f'<div class="aq-ws-orb" aria-hidden="true"><b>{escape(spec["title"][:1])}</b></div>'
+        f'<div class="aq-ws-truth">{truth_html}</div><div class="aq-ws-kpis">{kpis}</div></div>'
+        f'<div class="aq-ws-hero-visual" data-scene="{escape(key)}" aria-hidden="true"><div class="aq-ws-orb"><b>{escape(spec["title"][:1])}</b></div></div>'
         '</section>'
         '<div class="aq-ws-section-head"><h3>Áreas do workspace</h3><span>Estrutura pronta para evolução funcional por módulo.</span></div>'
         f'<div class="aq-ws-modules">{"".join(cards)}</div>'
+        f'{dashboard_html}'
         f'{detail}'
         '</main></div></section>'
     )

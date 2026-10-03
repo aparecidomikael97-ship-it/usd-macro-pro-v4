@@ -30,12 +30,21 @@ A Central deve manter:
 
 ## Trader
 
-Preservar o cockpit validado pela PR #541:
+Preservar o cockpit visual aprovado como referência, com navegação funcional no próprio desenho:
 - ticker/contexto;
 - núcleo visual central;
-- Macro, Micro, Geopolítica, Fundamentalista, ICT/SMC, Calendário, Pré-Notícia e Investimentos;
+- Macro, Micro, Geopolítica, Fundamentalista, ICT/SMC, Calendário, Pré-Notícia e Painel Mestre;
+- Radar Mestre, Radar, Painel Mestre, Laboratório/Backtests, Paper Trading, Guardião de Risco, Academia, Diário, Vídeo/Conteúdo, AION e Perfil/Configurações acessíveis no ambiente Trader;
+- cards, atalhos e itens laterais clicáveis no próprio elemento visual, sem faixa duplicada de botões abaixo;
+- o conteúdo selecionado deve abrir como workspace principal, evitando rolagem longa para localizar a função;
+- Trader não exibe atalhos de Negócios nem Investimentos; troca de ecossistema ocorre somente pela Central;
+- AION permanece transversal e pode existir como assistente especializado no Trader;
 - estados e força sem inventar preço ou probabilidade;
 - ordens reais bloqueadas.
+
+### Regra funcional posterior
+
+Após o fechamento visual, indicadores e itens analíticos detalhados (por exemplo CPI/IPC anual, desemprego e séries mensais) devem abrir em clique próprio com explicação, cálculo, histórico e relatórios já disponíveis. Essa etapa funcional não deve bloquear o fechamento atual da interface.
 
 ## Negócios
 

@@ -111,6 +111,10 @@ _AION_MODULES = _canonical_aion_modules()
 _CENTRAL_CSS = """
 <style>
 .aq-central-layout{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0;align-items:stretch;width:100%;margin:0 0 18px;min-height:760px;background:#020610;border:1px solid rgba(74,136,220,.14);border-radius:22px;overflow:hidden}
+.aq-central-layout[data-central-root="true"]{grid-template-columns:1fr;min-height:720px;background:
+ radial-gradient(circle at 50% 0%,rgba(31,103,204,.13),transparent 34rem),
+ linear-gradient(180deg,#020915,#020610)}
+.aq-central-layout[data-central-root="true"]>.aq-central-rail{display:none}
 .aq-central-rail{display:flex;flex-direction:column;gap:8px;min-width:0}
 .aq-central-rail-fold{display:flex;flex-direction:column;gap:8px;height:100%;padding:10px 8px 16px;border:0;border-right:1px solid rgba(69,138,232,.18);border-radius:0;background:linear-gradient(180deg,#061326 0%,#030b18 100%);box-shadow:inset -12px 0 34px rgba(0,0,0,.25)}.aq-central-rail-logo{display:grid;place-items:center;width:54px;height:54px;margin:2px auto 2px;color:#e4f7ff;font-size:2rem;font-weight:1000;text-shadow:0 0 18px #2d9fff}
 .aq-central-rail-fold>summary{display:none;cursor:pointer;color:var(--aq-text);font-size:.78rem;font-weight:800;letter-spacing:.08em;list-style:none}
@@ -139,7 +143,7 @@ _CENTRAL_CSS = """
 .aq-aion-presence-state{margin:.25rem 0 .4rem;color:var(--aq-text);font-size:.78rem;font-weight:800;letter-spacing:.08em}
 .aq-aion-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#8fd0c4;margin-right:6px}
 .aq-aion-presence-line{margin:.15rem 0;color:var(--aq-text);font-size:.92rem;line-height:1.4}
-.aq-central-root{position:relative;overflow:hidden;border:0;border-radius:0;padding:0 20px 18px;background:transparent;box-shadow:none;min-height:760px}
+.aq-central-root{position:relative;overflow:hidden;border:0;border-radius:0;padding:0 20px 18px;background:transparent;box-shadow:none;min-height:720px}
 .aq-central-root:before{content:"";position:absolute;inset:auto 0 0;height:155px;background:radial-gradient(ellipse at 50% 110%,rgba(41,151,255,.40) 0%,rgba(16,66,130,.22) 30%,transparent 66%);border-top:1px solid rgba(77,157,255,.14);pointer-events:none}
 .aq-central-root>*{position:relative;z-index:1}
 .aq-central-root h2{margin:.2rem 0 .15rem;color:#f6f8ff;font-size:clamp(1.65rem,2.6vw,2.2rem);letter-spacing:-.03em}
@@ -157,11 +161,11 @@ _CENTRAL_CSS = """
 .aq-central-route:before{content:"";width:6px;height:6px;border-radius:50%;background:#8fd0c4}
 .aq-central-back{color:var(--aq-aion,#b48cff);font-weight:800;text-decoration:none}
 .aq-central-root>.aq-aion-presence{display:none}
-.aq-central-topbar{display:grid;grid-template-columns:minmax(230px,.8fr) minmax(280px,1.45fr) minmax(220px,.8fr);align-items:center;gap:18px;min-height:72px;margin:0 -20px 18px;padding:0 22px;border-bottom:1px solid rgba(69,139,232,.16);background:linear-gradient(180deg,rgba(3,12,26,.98),rgba(3,10,22,.94));box-shadow:0 12px 28px rgba(0,0,0,.22)}
-.aq-central-brand{display:flex;align-items:center;gap:10px;color:#f2f6ff;font-weight:950;letter-spacing:.12em}.aq-central-brand-mark{display:grid;place-items:center;width:42px;height:42px;font-size:1.65rem;font-weight:1000;color:#dff7ff;text-shadow:0 0 18px #36a9ff}.aq-central-brand-copy{display:flex;flex-direction:column}.aq-central-brand-copy strong{font-size:1rem}.aq-central-brand-copy small{color:#7f91aa;font-size:.53rem;letter-spacing:.08em}
-.aq-central-search{height:38px;border:1px solid rgba(113,158,218,.23);border-radius:20px;background:rgba(7,18,37,.72);color:#61748e;display:flex;align-items:center;padding:0 16px;font-size:.69rem}.aq-central-search:before{content:"⌕";margin-right:9px;color:#8ab5e6;font-size:1rem}
+.aq-central-topbar{display:grid;grid-template-columns:minmax(250px,.8fr) minmax(320px,1fr) minmax(220px,.8fr);align-items:center;gap:18px;min-height:72px;margin:0 -20px 18px;padding:0 22px;border-bottom:1px solid rgba(69,139,232,.16);background:linear-gradient(180deg,rgba(3,12,26,.98),rgba(3,10,22,.94));box-shadow:0 12px 28px rgba(0,0,0,.22)}
+.aq-central-brand{display:flex;align-items:center;gap:10px;color:#f2f6ff;font-weight:950;letter-spacing:.12em}.aq-central-brand-mark{display:grid;place-items:center;width:42px;height:42px;font-size:1.65rem;font-weight:1000;color:#dff7ff;text-shadow:0 0 18px #36a9ff}.aq-central-brand-copy{display:flex;flex-direction:column}.aq-central-brand-copy strong{font-size:1rem}.aq-central-brand-copy small{color:#58d5ff;font-size:.53rem;letter-spacing:.22em}
+.aq-central-top-motto{text-align:center;color:#f5f8ff;font-size:.87rem;font-weight:760;letter-spacing:.01em}.aq-central-top-motto b{font-weight:950}
 .aq-central-user{display:flex;align-items:center;justify-content:flex-end;gap:10px;color:#f4f7ff}.aq-central-user-icons{display:flex;gap:8px;color:#9fb5d1}.aq-central-avatar{display:grid;place-items:center;width:38px;height:38px;border:1px solid #3e80ff;border-radius:50%;background:linear-gradient(145deg,#102b58,#151c4f);box-shadow:0 0 18px rgba(61,122,255,.22);font-weight:900}.aq-central-user-copy{display:flex;flex-direction:column;line-height:1.15}.aq-central-user-copy strong{font-size:.72rem}.aq-central-user-copy small{color:#7f91aa;font-size:.57rem}
-.aq-central-welcome{text-align:center;margin:4px auto 18px}.aq-central-welcome h2{font-size:clamp(1.75rem,2.4vw,2.35rem);font-weight:680}.aq-central-welcome h2 b{color:#3b94ff}.aq-central-welcome p{margin:.25rem 0 0;color:#909db1;font-size:.82rem}
+.aq-central-welcome{text-align:center;margin:8px auto 18px}.aq-central-welcome h2{font-size:clamp(1.6rem,2.15vw,2rem);font-weight:680}.aq-central-welcome h2 b{color:#3b94ff}.aq-central-welcome p{margin:.25rem 0 0;color:#909db1;font-size:.78rem}
 .aq-central-footer{position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;min-height:118px;margin:14px 0 0;padding:26px 20px 14px;border:1px solid rgba(66,132,214,.16);border-radius:15px;background:radial-gradient(ellipse at 52% 118%,rgba(40,142,255,.48),rgba(11,48,100,.28) 34%,transparent 65%),linear-gradient(180deg,rgba(4,13,28,.72),rgba(2,8,18,.94))}.aq-central-footer:before{content:"";position:absolute;left:10%;right:10%;bottom:-78px;height:150px;border-radius:50% 50% 0 0;border-top:2px solid rgba(73,172,255,.5);box-shadow:0 -10px 44px rgba(40,140,255,.20)}.aq-central-footer>*{position:relative;z-index:1}.aq-central-footer strong{display:block;color:#f4f8ff;font-size:.85rem}.aq-central-footer span{color:#8e9bb0;font-size:.64rem}.aq-central-footer-brand{text-align:right;letter-spacing:.08em}.aq-central-footer-brand strong{font-size:1rem}
 @media (min-width:900px){.aq-central-choices{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .aq-aion-home .aq-hero{margin-bottom:8px}
@@ -169,7 +173,7 @@ _CENTRAL_CSS = """
   .aq-central-layout{grid-template-columns:1fr;gap:0;width:100%;margin:0 0 12px;border-radius:16px}
   .aq-central-root{padding:0 16px 16px;border-radius:0;min-height:0}
   .aq-central-topbar{grid-template-columns:1fr auto;margin:0 -16px 14px;padding:8px 12px;min-height:62px}
-  .aq-central-search{display:none}.aq-central-user-copy{display:none}.aq-central-brand-copy small{display:none}
+  .aq-central-top-motto{display:none}.aq-central-user-copy{display:none}.aq-central-brand-copy small{display:none}
   .aq-central-choice{min-height:150px}
   .aq-central-rail{display:none}
   .aq-central-rail-fold{padding:8px}
@@ -808,6 +812,31 @@ def clear_login_greeting(session_state) -> None:
         return
 
 
+def pull_central_area_id(query_params) -> str:
+    """Read and clear a Central hero-card destination.
+
+    The query value is never authority: request_central_destination validates
+    it against the authenticated access mapping before any state transition.
+    """
+    if query_params is None:
+        return ""
+    try:
+        raw = query_params.get("aq_central", "")
+    except Exception:
+        return ""
+    if isinstance(raw, (list, tuple)):
+        raw = raw[0] if raw else ""
+    area_id = str(raw or "").strip()
+    if not area_id:
+        return ""
+    try:
+        del query_params["aq_central"]
+    except Exception:
+        pass
+    return area_id
+
+
+
 def central_selector_html(
     access: Mapping[str, Any] | None,
     *,
@@ -836,10 +865,10 @@ def central_selector_html(
         '<section class="aq-central-root" data-root="central_root">'
         '<header class="aq-central-topbar">'
         '<div class="aq-central-brand"><span class="aq-central-brand-mark">A</span>'
-        '<span class="aq-central-brand-copy"><strong>ATLASQUANT</strong><small>PODEROSO POR DENTRO. SIMPLES POR FORA.</small></span></div>'
-        '<div class="aq-central-search">Buscar no ecossistema...</div>'
-        '<div class="aq-central-user"><span class="aq-central-user-icons">◌ ⚙</span>'
-        '<span class="aq-central-avatar">A</span><span class="aq-central-user-copy"><strong>Administrador</strong><small>AtlasQuant</small></span></div>'
+        '<span class="aq-central-brand-copy"><strong>ATLASQUANT</strong><small>ECOSSISTEMA</small></span></div>'
+        '<div class="aq-central-top-motto">Poderoso por dentro. <b>Simples por fora.</b></div>'
+        '<div class="aq-central-user"><span class="aq-central-user-icons">◌ ⚙ ⏻</span>'
+        '<span class="aq-central-avatar">M</span><span class="aq-central-user-copy"><strong>Mikael</strong><small>Administrador</small></span></div>'
         '</header>'
         + presence
         + '<section class="aq-central-welcome"><h2>Bem-vindo, <b>'
@@ -904,7 +933,9 @@ def central_surface_html(
     if _admin(access) and not at_root:
         back = '<p class="aq-central-back">Voltar à Central Principal pelos controles abaixo.</p>'
     return (
-        '<div class="aq-central-layout">'
+        '<div class="aq-central-layout" data-central-root="'
+        + ("true" if at_root else "false")
+        + '">'
         + rail
         + '<div class="aq-central-stage">'
         + stage
@@ -949,35 +980,17 @@ def _render_central_navigation_controls(st, access: Mapping[str, Any] | None, re
         return
 
     current = CENTRAL_ROOT if resolved.get("root") else str(resolved.get("area") or "")
-    model = central_visibility_model(access)
-    area_targets = [
-        (str(area["id"]), str(area["label"])) for area in model["areas"]
-    ]
+    # On the Central root the four visual hero cards are the access controls.
+    # Do not duplicate them with a second "Acessar ambiente" strip below.
     if current == CENTRAL_ROOT:
-        targets = area_targets
-        st.markdown("#### Acessar ambiente")
-        st.caption("Os quatro acessos abaixo usam a mesma sessão autenticada e as rotas validadas.")
-    else:
-        targets = [("central", "Central Principal")] + [
-            item for item in area_targets if item[0] != current
-        ]
-        st.markdown("#### Trocar de setor")
-        st.caption("Navegue pelo ecossistema sem sair da sessão autenticada.")
-    columns = st.columns(4 if current == CENTRAL_ROOT else 2)
-    for index, (area_id, label) in enumerate(targets):
-        action_label = (
-            "← Central Principal"
-            if area_id == "central"
-            else ("Acessar " if current == CENTRAL_ROOT else "Abrir ") + label
-        )
-        with columns[index % 2]:
-            if st.button(
-                action_label,
-                key=f"aq_central_stateful_{area_id}",
-                width="stretch",
-            ):
-                request_central_destination(st.session_state, access, area_id)
-                st.rerun()
+        return
+    if st.button(
+        "← Central Principal",
+        key="aq_central_stateful_central",
+        width="stretch",
+    ):
+        request_central_destination(st.session_state, access, "central")
+        st.rerun()
 
 
 def render_central_hub(
@@ -992,6 +1005,19 @@ def render_central_hub(
 ) -> dict[str, Any]:
     """Streamlit edge. Import stays local so pure tests need no server."""
     import streamlit as st
+
+    # Central hero cards use a lightweight query id, then immediately cross
+    # the existing authenticated navigation bridge. The raw query is cleared
+    # before rerun and never bypasses RBAC.
+    if not str(requested or "").strip():
+        card_area = pull_central_area_id(getattr(st, "query_params", None))
+        if card_area:
+            try:
+                request_central_destination(st.session_state, access, card_area)
+            except ValueError:
+                pass
+            else:
+                st.rerun()
 
     resolved = resolve_central_area(access, requested)
     st.markdown(

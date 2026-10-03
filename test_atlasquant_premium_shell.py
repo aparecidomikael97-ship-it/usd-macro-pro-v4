@@ -212,11 +212,13 @@ class PremiumShellTests(unittest.TestCase):
         self.assertNotIn("62%", html)
         for title in (
             "Macroeconomia", "Microeconomia", "Geopolítica", "Fundamentalista",
-            "ICT / SMC", "Calendário Econômico", "Pré-Notícia", "Investimentos",
+            "ICT / SMC", "Calendário Econômico", "Pré-Notícia", "Painel Mestre",
         ):
             self.assertIn(title, html)
-        self.assertNotIn("?aq_card=", html)
-        self.assertNotIn('<a class="aq-premium-card"', html)
+        self.assertNotIn(">Investimentos<", html)
+        self.assertNotIn(">Negócios<", html)
+        self.assertIn("?aq_card=", html)
+        self.assertIn('class="aq-trader-module"', html)
 
         beginner = trader_cockpit_html(
             mode="Iniciante",
@@ -273,21 +275,16 @@ class PremiumShellTests(unittest.TestCase):
         self.assertIn(".aq-workspace-welcome", PREMIUM_CSS)
         self.assertIn("overflow:hidden", PREMIUM_CSS)
 
-    def test_catalog_renderer_uses_only_valid_native_stateful_launchers(self):
+    def test_catalog_renderer_uses_validated_clickable_cockpit_without_duplicate_controls(self):
         shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
-        controls = shell[
-            shell.index("def _render_premium_stateful_controls"):
-            shell.index("def render_premium_catalog")
-        ]
-        self.assertIn("TRADER_REFERENCE_MODULE_IDS", controls)
-        self.assertIn("def launchable(", controls)
-        self.assertIn('st.caption("Acessos do cockpit")', controls)
-        self.assertIn('st.expander("Mais áreas do Trader"', controls)
-        self.assertIn("request_premium_card(", controls)
-        self.assertIn("st.rerun()", controls)
-        self.assertNotIn("disabled=not bool(target)", controls)
-        self.assertNotIn('href=f"?aq_card=', shell)
-        self.assertNotIn('href="?aq_card=', shell)
+        self.assertIn("def pull_premium_card_id", shell)
+        self.assertIn("def request_premium_card", shell)
+        self.assertIn('del query_params["aq_card"]', shell)
+        self.assertIn('href="?aq_card=', shell)
+        render = shell[shell.index("def render_premium_catalog"):]
+        self.assertIn("Do not render a duplicated button strip below the cockpit.", render)
+        self.assertNotIn("_render_premium_stateful_controls(", render)
+        self.assertNotIn("disabled=not bool(target)", shell)
 
     def test_catalog_renderer_is_css_only_outside_radar_home(self):
         shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")

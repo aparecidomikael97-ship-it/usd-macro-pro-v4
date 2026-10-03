@@ -32,6 +32,7 @@ from atlasquant_central_hub_ui import (
     ecosystem_rail_html,
     greeting_period,
     login_greeting,
+    pull_central_area_id,
     request_central_destination,
     resolve_central_area,
     sync_central_choice,
@@ -364,26 +365,35 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertTrue(resolve_central_area(admin, "central")["root"])
         self.assertTrue(resolve_central_area(admin, "central_root")["root"])
 
-    def test_root_controls_do_not_render_a_disabled_self_button(self):
+    def test_root_cards_are_the_only_primary_environment_controls(self):
         source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
         controls = source[source.index("def _render_central_navigation_controls"):source.index("def render_central_hub")]
         self.assertIn("if current == CENTRAL_ROOT:", controls)
-        self.assertIn("targets = area_targets", controls)
-        self.assertIn('targets = [("central", "Central Principal")] + [', controls)
-        self.assertIn("if item[0] != current", controls)
+        self.assertIn("return", controls)
+        self.assertIn('"← Central Principal"', controls)
+        self.assertNotIn("#### Acessar ambiente", controls)
+        self.assertNotIn("#### Trocar de setor", controls)
         self.assertNotIn("disabled=disabled", controls)
 
-    def test_streamlit_edge_uses_stateful_controls_not_query_anchors(self):
+    def test_central_visual_links_cross_the_validated_navigation_bridge(self):
         source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
-        self.assertIn("def _render_central_navigation_controls", source)
-        self.assertIn("request_central_destination(st.session_state, access, area_id)", source)
+        self.assertIn("def pull_central_area_id", source)
+        self.assertIn('del query_params["aq_central"]', source)
+        self.assertIn("request_central_destination(st.session_state, access, card_area)", source)
         self.assertIn("st.rerun()", source)
         self.assertNotIn('href="?central=', source)
+        html = central_selector_html(_access("ADMIN"))
+        for area in ("trader", "negocios", "investimentos", "aion"):
+            self.assertIn(f'href="?aq_central={area}"', html)
+        params = {"aq_central": "trader"}
+        self.assertEqual(pull_central_area_id(params), "trader")
+        self.assertNotIn("aq_central", params)
+        with self.assertRaisesRegex(ValueError, "central area access denied"):
+            request_central_destination({}, _access("USER"), "aion")
 
         cloud = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn('del st.query_params["central"]', cloud)
         self.assertIn("Consume a deep-link once", cloud)
-        self.assertNotIn('requested = st.query_params.get("central", "")\n        if isinstance(requested', cloud[cloud.index("def _apply_central_trader_navigation"):])
 
     def test_student_still_enters_trader_and_cannot_open_the_selector(self):
         user = _access("ALUNO")
@@ -734,15 +744,13 @@ class AionHomeViewerTests(unittest.TestCase):
         self.assertNotIn("aion_admin_workspace\"]", viewer[viewer.index("def consume_aion_module_jump"):viewer.index("def central_selector_html")])
 
 
-    def test_central_controls_are_explicit_and_master_panel_stays_visible(self):
+    def test_central_cards_are_direct_access_and_master_panel_stays_visible(self):
         hub = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
-        self.assertIn("#### Acessar ambiente", hub)
-        self.assertIn("#### Trocar de setor", hub)
-        self.assertIn("Os quatro acessos abaixo usam a mesma sessão autenticada", hub)
-        self.assertIn("Navegue pelo ecossistema sem sair da sessão autenticada.", hub)
-        self.assertIn('("Acessar " if current == CENTRAL_ROOT else "Abrir ") + label', hub)
+        self.assertNotIn("#### Acessar ambiente", hub)
+        self.assertNotIn("#### Trocar de setor", hub)
+        self.assertIn("pull_central_area_id", hub)
+        self.assertIn("request_central_destination(st.session_state, access, card_area)", hub)
         self.assertIn('"← Central Principal"', hub)
-        self.assertIn('key=f"aq_central_stateful_{area_id}"', hub)
         self.assertNotIn("Os cartões acima são um mapa visual; a navegação real acontece aqui.", hub)
 
         admin = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
