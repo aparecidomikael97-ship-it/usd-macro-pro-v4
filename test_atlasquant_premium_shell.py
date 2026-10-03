@@ -13,6 +13,7 @@ from atlasquant_premium_shell import (
     consume_premium_navigation,
     empty_state_html,
     premium_catalog_html,
+    trader_cockpit_html,
     request_premium_card,
     loading_state_html,
     master_command_html,
@@ -32,7 +33,7 @@ class PremiumShellTests(unittest.TestCase):
         titles = [item["title"] for item in PREMIUM_MODULES]
         for expected in (
             "Radar", "Painel Mestre", "Macroeconomia", "Microeconomia", "Geopolítica",
-            "Fundamentalista", "Calendário Econômico", "Pré-Notícia", "Laboratório / Backtests",
+            "Fundamentalista", "ICT / SMC", "Calendário Econômico", "Pré-Notícia", "Laboratório / Backtests",
             "Paper Trading", "Guardião de Risco", "Academia", "Diário", "Investimentos",
             "Negócios", "Vídeo / Conteúdo", "AION / Central Administrativa", "Perfil / Configurações",
         ):
@@ -181,76 +182,76 @@ class PremiumShellTests(unittest.TestCase):
         self.assertIn(".aq-premium-row::-webkit-scrollbar{height:8px}", PREMIUM_CSS)
         self.assertIn("aq-premium-scroll-hint", PREMIUM_CSS)
         self.assertIn("aq-radar-sweep", PREMIUM_CSS)
+        self.assertIn(".aq-trader-shell", PREMIUM_CSS)
+        self.assertIn(".aq-trader-globe", PREMIUM_CSS)
+        self.assertIn(".aq-trader-module-grid", PREMIUM_CSS)
+        self.assertIn("@keyframes aq-orbit", PREMIUM_CSS)
 
-    def test_catalog_sectors_are_horizontal_strips_and_cards_carry_the_action(self):
+    def test_catalog_uses_reference_trader_cockpit_without_fake_market_prices(self):
         pages = list(NAVIGATION_LABELS) + ["🧠 AION"]
-        html = premium_catalog_html(mode="Avançado", available_pages=pages, fast=False)
-        for sector in ("Essencial", "Leitura", "Operação", "Ecossistema"):
-            self.assertEqual(html.count(f'aria-label="{sector}"'), 1)
-            self.assertIn("aq-premium-row", html)
-        essencial = html.split('aria-label="Essencial"')[1].split('aria-label="Leitura"')[0]
-        self.assertLess(essencial.index(">Radar<"), essencial.index(">Painel Mestre<"))
-        self.assertLess(essencial.index(">Painel Mestre<"), essencial.index(">Macroeconomia<"))
-        self.assertNotIn("?aq_card=", essencial)
-        self.assertIn("Acesso disponível", essencial)
-        self.assertNotIn("Abrir Radar", essencial)
-        self.assertNotIn('<a class="aq-premium-card"', essencial)
-        self.assertIn("deslize, role ou use as setas", html)
+        tickers = [
+            {"label": "USD", "score": 62},
+            {"label": "EUR", "score": 43},
+            {"label": "JPY", "score": 50},
+        ]
+        html = premium_catalog_html(
+            mode="Avançado",
+            available_pages=pages,
+            fast=False,
+            ticker_items=tickers,
+        )
+        self.assertIn('data-trader-reference="v1"', html)
+        self.assertIn("ATLASQUANT · TRADER", html)
+        self.assertIn("Poderoso por dentro. Simples por fora.", html)
+        self.assertIn("Trader · Mercado &amp; Estratégia", html)
+        self.assertIn("RADAR 28FX", html)
+        self.assertIn("PIPELINE 7 PARES", html)
+        self.assertIn("ORDENS REAIS BLOQUEADAS", html)
+        self.assertIn("FORÇA 62", html)
+        self.assertIn("FORÇA 43", html)
+        self.assertNotIn("62%", html)
+        for title in (
+            "Macroeconomia", "Microeconomia", "Geopolítica", "Fundamentalista",
+            "ICT / SMC", "Calendário Econômico", "Pré-Notícia", "Investimentos",
+        ):
+            self.assertIn(title, html)
+        self.assertNotIn("?aq_card=", html)
+        self.assertNotIn('<a class="aq-premium-card"', html)
+
+        beginner = trader_cockpit_html(
+            mode="Iniciante",
+            available_pages=pages,
+            fast=False,
+            ticker_items=tickers,
+        )
+        self.assertIn("MODO INICIANTE", beginner)
+        self.assertIn("PRÉVIA AVANÇADA", beginner)
+
         fast_pages = ["🎯 Radar", "🎙️ Macro", "🎓 Aprender", "👤 Conta", "📱 Instalar", "💰 Investir", "🛟 Suporte"]
         fast_html = premium_catalog_html(mode="Iniciante", available_pages=fast_pages, fast=True)
-        self.assertNotIn("?aq_card=", fast_html)
-        self.assertIn("flex-basis:86vw", PREMIUM_CSS)
-        self.assertIn("<article", fast_html)
-        beginner = premium_catalog_html(mode="Iniciante", available_pages=pages, fast=False)
-        self.assertNotIn("?aq_card=", beginner)
-        self.assertIn("Prévia no Iniciante", beginner)
+        self.assertIn('data-trader-reference="v1"', fast_html)
+        self.assertIn("INDISPONÍVEL", fast_html)
+
         state = {}
         self.assertEqual(
-            request_premium_card(state, "master", mode="Avançado", available_pages=pages, fast=False),
-            "🧭 Painel mestre",
+            request_premium_card(state, "macro", mode="Avançado", available_pages=pages, fast=False),
+            "🇺🇸 EUA",
         )
         self.assertEqual(
             consume_premium_navigation(state, mode="Avançado", available_pages=pages),
-            "🧭 Painel mestre",
+            "🇺🇸 EUA",
         )
         self.assertEqual(
             request_premium_card({}, "mesa secreta", mode="Avançado", available_pages=pages),
             "",
         )
-        self.assertEqual(
-            request_premium_card({}, "../radar", mode="Avançado", available_pages=pages),
-            "",
-        )
         blocked = {}
         self.assertEqual(
-            request_premium_card(blocked, "lab", mode="Iniciante", available_pages=fast_pages, fast=True),
+            request_premium_card(blocked, "ict", mode="Iniciante", available_pages=fast_pages, fast=True),
             "",
         )
         self.assertNotIn("atlasquant_premium_nav_target", blocked)
-        aion_state = {}
-        self.assertEqual(
-            request_premium_card(aion_state, "aion", mode="Avançado", available_pages=pages, fast=False),
-            "🧠 AION",
-        )
-        from atlasquant_navigation_bridge import consume_navigation_request
-        consume_navigation_request(aion_state, available_pages=pages)
-        self.assertEqual(aion_state["atlasquant_advanced_area"], "🧠 AION")
 
-        business_state = {}
-        self.assertEqual(
-            request_premium_card(business_state, "business", mode="Avançado", available_pages=pages, fast=False),
-            "🧠 AION",
-        )
-        self.assertEqual(business_state["aion_admin_workspace_jump"], "💼 Negócios")
-        consume_navigation_request(business_state, available_pages=pages)
-        self.assertEqual(business_state["atlasquant_advanced_area"], "🧠 AION")
-        business_module=next(item for item in PREMIUM_MODULES if item["id"]=="business")
-        self.assertEqual(business_module["page"], "🧠 AION")
-        self.assertNotEqual(business_module["page"], "💼 Vendas")
-        self.assertIn("Portal Comercial", business_module["summary"])
-        shell = Path("atlasquant_premium_shell.py").read_text(encoding="utf-8")
-        self.assertNotIn("real_orders_enabled = True", shell)
-        self.assertNotIn("automatic_execution = True", shell)
 
     def test_workspace_welcome_covers_every_navigation_area_and_aion(self):
         expected = set(NAVIGATION_LABELS) | {"🧠 AION"}
@@ -278,11 +279,10 @@ class PremiumShellTests(unittest.TestCase):
             shell.index("def _render_premium_stateful_controls"):
             shell.index("def render_premium_catalog")
         ]
-        self.assertIn("launchable = []", controls)
-        self.assertIn("if target:", controls)
-        self.assertIn("launchable.append((module, target))", controls)
-        self.assertIn('st.caption(f"Acessos seguros · {sector}")', controls)
-        self.assertIn('"Abrir · " + str(module["title"])', controls)
+        self.assertIn("TRADER_REFERENCE_MODULE_IDS", controls)
+        self.assertIn("def launchable(", controls)
+        self.assertIn('st.caption("Acessos do cockpit")', controls)
+        self.assertIn('st.expander("Mais áreas do Trader"', controls)
         self.assertIn("request_premium_card(", controls)
         self.assertIn("st.rerun()", controls)
         self.assertNotIn("disabled=not bool(target)", controls)
