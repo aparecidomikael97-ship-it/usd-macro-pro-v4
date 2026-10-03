@@ -221,21 +221,19 @@ class FastStartupTests(unittest.TestCase):
         self.assertIn('st.expander("Dados do snapshot",expanded=False)',shell)
         self.assertEqual(shell.count('key="aq_fast_refresh"'),2)
 
-    def test_fast_home_guidance_is_not_rendered_globally(self):
+    def test_fast_home_uses_reference_cockpit_without_generic_guidance_strips(self):
         from pathlib import Path
         src=Path("atlasquant_fast_startup.py").read_text(encoding="utf-8")
-        chrome=src[src.index("def _render_beginner_chrome"):src.index("def render_beginner_shell")]
-        self.assertNotIn('experience_mode_overview_html("Iniciante")',chrome)
-        self.assertNotIn("mobile_navigation_hint_html()",chrome)
-        home=src.index("_aq_fast_catalog_home=bool(")
-        guard=src.index("if _aq_fast_catalog_home:",home)
-        overview=src.index('experience_mode_overview_html("Iniciante")',guard)
-        hint=src.index("mobile_navigation_hint_html()",overview)
-        catalog=src.index("render_premium_catalog(",hint)
-        self.assertLess(home,guard)
-        self.assertLess(guard,overview)
-        self.assertLess(overview,hint)
-        self.assertLess(hint,catalog)
+        shell=src[src.index("def render_beginner_shell"):]
+        self.assertNotIn('experience_mode_overview_html("Iniciante")',shell)
+        self.assertNotIn("mobile_navigation_hint_html()",shell)
+        self.assertIn("_aq_fast_ticker_items=[]",shell)
+        self.assertIn('"score":_finite(_aq_tick.get("Pontuação_Final",_aq_tick.get("score",50)),50)',shell)
+        catalog=shell.index("render_premium_catalog(")
+        call=shell[catalog:catalog+500]
+        self.assertIn("ticker_items=_aq_fast_ticker_items",call)
+        self.assertIn("cockpit continua sendo a entrada visual principal",shell)
+
 
     def test_fast_beginner_radar_passes_validated_freshness_metadata(self):
         from pathlib import Path
