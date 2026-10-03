@@ -151,7 +151,7 @@ def _mobile(page, failures: list[str], trace: list[dict], stress: bool) -> None:
 
     if stress:
         for route in ("radar", "macro", "master", "academy", "journal", "radar"):
-            locator = page.locator(f'.ref-mobile-card[data-route="{route}"]').first
+            locator = page.locator(f'.cq-main [data-route="{route}"]').first
             if not locator.count():
                 failures.append(f"mobile-stress: cartão ausente: {route}")
                 continue

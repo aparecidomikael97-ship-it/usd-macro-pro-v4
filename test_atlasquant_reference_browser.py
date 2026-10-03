@@ -67,7 +67,11 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
                 after=button.bounding_box()
                 assert all(abs(before[k]-after[k]) < .1 for k in ('x','y','width','height'))
                 assert button.evaluate('(e)=>getComputedStyle(e).transform') == 'none'
+                if area == 'investimentos' and button.get_attribute('data-route') == 'crypto':
+                    page.screenshot(path=str(artifacts/'investimentos-crypto-hover.png'),full_page=True)
                 button.focus()
+                if area == 'investimentos' and button.get_attribute('data-route') == 'crypto':
+                    page.screenshot(path=str(artifacts/'investimentos-crypto-focus.png'),full_page=True)
                 focused=button.bounding_box()
                 assert all(abs(before[k]-focused[k]) < .1 for k in ('x','y','width','height'))
             if area in ('trader','investimentos'):
@@ -169,3 +173,36 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
         (artifacts/"timings.json").write_text(json.dumps(timings,indent=2),encoding="utf-8")
         print(timings)
         b.close()
+
+
+def test_central_and_legacy_cards_keep_exact_hover_and_keyboard_geometry(preview_url):
+    from atlasquant_ecosystem_workspace_ui import WORKSPACE_CSS
+    from atlasquant_premium_shell import PREMIUM_CSS
+    artifacts=Path('visual_review');artifacts.mkdir(exist_ok=True)
+    with sync_playwright() as p:
+        browser=p.chromium.launch(headless=True)
+        page=browser.new_page(viewport={'width':1280,'height':720})
+        page.goto(preview_url)
+        expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible(timeout=30000)
+        for button in page.locator('.ref-hit[data-route^="area:"]').all():
+            button.scroll_into_view_if_needed()
+            before=button.bounding_box();button.hover()
+            after=button.bounding_box()
+            assert all(abs(before[k]-after[k]) < .1 for k in ('x','y','width','height'))
+            page.keyboard.press('Tab');button.focus()
+            assert button.evaluate('(e)=>getComputedStyle(e).outlineStyle')=='none'
+            focused=button.bounding_box()
+            assert all(abs(before[k]-focused[k]) < .1 for k in ('x','y','width','height'))
+        page.screenshot(path=str(artifacts/'central-focus.png'),full_page=True)
+        page.set_content(WORKSPACE_CSS+PREMIUM_CSS+'<main class="stApp" style="display:grid;grid-template-columns:repeat(3,280px);gap:20px;padding:20px"><a href="#" class="aq-ws-card">Módulo</a><a href="#" class="aq-central-reference-card">Ambiente</a><a href="#" class="aq-premium-card">Cartão</a></main>')
+        for button in page.locator('.aq-ws-card,.aq-central-reference-card,.aq-premium-card').all():
+            button.scroll_into_view_if_needed();button.hover()
+            before=button.bounding_box()
+            assert button.evaluate('(e)=>getComputedStyle(e).transform')=='none'
+            page.keyboard.press('Tab');button.focus()
+            focused=button.bounding_box()
+            assert all(abs(before[k]-focused[k]) < .1 for k in ('x','y','width','height'))
+            assert button.evaluate('(e)=>getComputedStyle(e).outlineStyle')=='none'
+            assert button.evaluate('(e)=>getComputedStyle(e).boxShadow')!='none'
+        page.screenshot(path=str(artifacts/'legacy-cards-focus.png'),full_page=True)
+        browser.close()

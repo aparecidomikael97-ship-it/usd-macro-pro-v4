@@ -144,6 +144,9 @@ def hotspot(area, route, label, box, *, visible=False):
     x, y, bw, bh = box
     radius = 16 if area == "central" and route.startswith("area:") else 8
     style = f"left:{x/w*100:.5f}%;top:{y/h*100:.5f}%;width:{bw/w*100:.5f}%;height:{bh/h*100:.5f}%;border-radius:{radius/bw*100:.3f}% / {radius/bh*100:.3f}%"
+    if area == "central" and route.startswith("area:"):
+        accent={"area:trader":"#21b9ff","area:negocios":"#ff9d1c","area:investimentos":"#28eaa7","area:aion":"#b678ff"}[route]
+        style += f";--accent:{accent}"
     return (f'<button class="ref-hit{" ref-mask" if visible else ""}" data-route="{escape(route)}" '
             f'aria-label="{escape(label)}" title="{escape(label)}" style="{style}">'
             f'<span{" class=ref-sr" if not visible else ""}>{escape(label)}</span></button>')

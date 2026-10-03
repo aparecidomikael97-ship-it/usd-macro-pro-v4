@@ -25,6 +25,7 @@ Sem merge ou deploy.
 - Contratos de apresentação: 35 testes passaram.
 - Compilação dos quatro módulos de execução alterados passou.
 - Chromium verifica cliques, setas/teclado do ticker, hover e foco sem alteração do retângulo, Painel Mestre, ausência de ticker em Negócios e overflow em 1280×720, 1024×768, 768×1024 e 390×844.
+- Chromium local: varredura completa das cinco áreas passou em 135,13 s; teste adicional da Central e dos três seletores legados passou em 15,59 s. Hover/focus, rolagem e retorno ao topo foram verificados, incluindo capturas de Criptomoedas.
 - Capturas finais e resultado atualizado de Chromium/CI ficam em `visual_review/` como artefatos locais e nos workflows do Draft PR.
 
 ## Limites reais

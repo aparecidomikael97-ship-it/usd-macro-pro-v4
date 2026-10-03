@@ -81,7 +81,7 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
         for label in (
             "Chat do AION","Histórico","Memória","Tarefas &amp; Execução","Biblioteca AION",
             "Pesquisa &amp; Inteligência","Checkpoint Mestre","Núcleo / Orquestração",
-            "8 Papéis Internos","Auditoria / Guardião","Academy","AION English",
+            "8 Papéis Internos","Auditoria / Guardião","Academia","AION · Inglês",
         ):
             self.assertIn(label,html)
         self.assertIn('data-feature-state="PRÉVIA"',html)

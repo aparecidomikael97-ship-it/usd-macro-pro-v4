@@ -223,7 +223,7 @@ a.aq-premium-card{display:block;color:inherit;text-decoration:none}
   .aq-premium-card:hover{transform:none}
 }
 
-.aq-ws-card,.aq-central-reference-card,.aq-premium-card{box-sizing:border-box;transform:none}
+.aq-ws-card,.aq-central-reference-card,.aq-premium-card{box-sizing:border-box;transform:none;animation:none}
 .aq-ws-card:focus-visible,.aq-central-reference-card:focus-visible,.aq-premium-card:focus-visible{outline:none;outline-offset:0;box-shadow:inset 0 0 0 2px #6ddaff,inset 0 0 20px #168cff22}
 </style>
 
