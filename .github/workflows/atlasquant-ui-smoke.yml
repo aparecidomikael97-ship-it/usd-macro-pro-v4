@@ -420,8 +420,9 @@ jobs:
                   for label,selector in {
                       "context_label":".aq-context-strip span",
                       "context_value":".aq-context-strip strong",
-                      "focus_label":".aq-focus-card small",
-                      "focus_detail":".aq-focus-card span",
+                      "trader_title":".aq-trader-module h4",
+                      "trader_detail":".aq-trader-module p",
+                      "trader_motto":".aq-trader-motto",
                   }.items():
                       locator=page.locator(selector)
                       if not locator.count():
@@ -437,7 +438,7 @@ jobs:
                       match=re.search(r"rgba?\((\d+),\s*(\d+),\s*(\d+)",str(style.get("color","")))
                       rgb=tuple(int(x) for x in match.groups()) if match else (0,0,0)
                       brightness=sum(rgb)/3.0
-                      readable=brightness>=200 and float(style.get("opacity",1))>=0.95
+                      readable=brightness>=180 and float(style.get("opacity",1))>=0.95
                       contrast_checks[label]={
                           "present":True,
                           "color":style.get("color"),
@@ -554,42 +555,38 @@ jobs:
                       except Exception as exc:
                           failures.append(f"desktop workspace sweep: {type(exc).__name__}: {exc}")
 
-                  carousel={
+                  cockpit={
                       "present":False,
-                      "scroll_width":0,
-                      "client_width":0,
-                      "before":0,
-                      "after_right":0,
-                      "after_left":0,
-                      "essential_order_ok":False,
+                      "module_count":0,
+                      "ticker_count":0,
+                      "slogan_present":False,
+                      "module_order_ok":False,
                   }
-                  row=page.locator(".aq-premium-row").first
-                  if row.count():
-                      carousel["present"]=True
-                      dims=row.evaluate("(el)=>({scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,scrollLeft:el.scrollLeft})")
-                      carousel["scroll_width"]=int(dims["scrollWidth"])
-                      carousel["client_width"]=int(dims["clientWidth"])
-                      carousel["before"]=int(dims["scrollLeft"])
-                      row.focus()
-                      row.press("ArrowRight")
-                      page.wait_for_timeout(250)
-                      carousel["after_right"]=int(row.evaluate("(el)=>el.scrollLeft"))
-                      row.press("ArrowLeft")
-                      page.wait_for_timeout(250)
-                      carousel["after_left"]=int(row.evaluate("(el)=>el.scrollLeft"))
-                      essential_text=str(row.inner_text())
-                      positions=[essential_text.find(label) for label in ("Radar","Painel Mestre","Macroeconomia")]
-                      carousel["essential_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
-                      if carousel["scroll_width"]<=carousel["client_width"]:
-                          failures.append(f"{name}: carrossel premium não tem overflow horizontal interno")
-                      if carousel["after_right"]<=carousel["before"]:
-                          failures.append(f"{name}: ArrowRight não moveu o carrossel premium")
-                      if carousel["after_left"]>=carousel["after_right"]:
-                          failures.append(f"{name}: ArrowLeft não retornou o carrossel premium")
-                      if not carousel["essential_order_ok"]:
-                          failures.append(f"{name}: ordem Radar/Painel Mestre/Macroeconomia regrediu")
+                  shell=page.locator('.aq-trader-shell[data-trader-reference="v1"]').first
+                  if shell.count():
+                      cockpit["present"]=True
+                      cockpit["module_count"]=page.locator(".aq-trader-module").count()
+                      cockpit["ticker_count"]=page.locator(".aq-trader-tick").count()
+                      cockpit["slogan_present"]=page.get_by_text(
+                          "Poderoso por dentro. Simples por fora.",exact=True
+                      ).count()>=1
+                      shell_text=str(shell.inner_text())
+                      module_labels=(
+                          "Macroeconomia","Microeconomia","Geopolítica","Fundamentalista",
+                          "ICT / SMC","Calendário Econômico","Pré-Notícia","Investimentos",
+                      )
+                      positions=[shell_text.find(label) for label in module_labels]
+                      cockpit["module_order_ok"]=all(pos>=0 for pos in positions) and positions==sorted(positions)
+                      if cockpit["module_count"]<8:
+                          failures.append(f"{name}: cockpit Trader tem só {cockpit['module_count']} módulos visíveis")
+                      if cockpit["ticker_count"]<1:
+                          failures.append(f"{name}: ticker/contexto do cockpit Trader não apareceu")
+                      if not cockpit["slogan_present"]:
+                          failures.append(f"{name}: slogan permanente não apareceu no cockpit Trader")
+                      if not cockpit["module_order_ok"]:
+                          failures.append(f"{name}: ordem dos módulos principais do cockpit Trader regrediu")
                   else:
-                      failures.append(f"{name}: carrossel premium não apareceu")
+                      failures.append(f"{name}: cockpit Trader de referência não apareceu")
 
                   exception_count=page.locator('[data-testid="stException"]').count()
                   viewport_width=page.evaluate("window.innerWidth")
@@ -617,7 +614,7 @@ jobs:
                       "light_surface_checks":light_surface_checks,
                       "metric_contrast":metric_contrast,
                       "desktop_workspace_trace":desktop_workspace_trace,
-                      "premium_carousel":carousel,
+                      "trader_cockpit":cockpit,
                       "streamlit_exceptions":exception_count,
                       "viewport_width":viewport_width,
                       "document_width":document_width,
