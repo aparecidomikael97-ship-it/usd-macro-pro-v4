@@ -3,9 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
-import shutil
 import threading
-import time
 
 import pytest
 
@@ -406,7 +404,8 @@ def test_same_request_same_idempotency_key_concurrent_writes_are_deduplicated(tm
         )["status"]
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        statuses = sorted([pool.submit(write).result(), pool.submit(write).result()])
+        futures = [pool.submit(write), pool.submit(write)]
+        statuses = sorted(f.result() for f in futures)
 
     assert statuses == ["IDEMPOTENT", "PERSISTED"]
     recovered = UnifiedJournalStore(root).recover(scope=s, request_id="REQ-1")
