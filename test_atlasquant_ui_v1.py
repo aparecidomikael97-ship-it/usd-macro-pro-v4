@@ -538,8 +538,10 @@ class AtlasQuantUiTests(unittest.TestCase):
         self.assertIn("contrast_checks",workflow)
         self.assertIn('"context_label":".aq-context-strip span"',workflow)
         self.assertIn('"context_value":".aq-context-strip strong"',workflow)
-        self.assertIn('"focus_detail":".aq-focus-card span"',workflow)
-        self.assertIn("brightness>=200",workflow)
+        self.assertIn('"trader_title":".aq-trader-module h4"',workflow)
+        self.assertIn('"trader_detail":".aq-trader-module p"',workflow)
+        self.assertIn('"trader_motto":".aq-trader-motto"',workflow)
+        self.assertIn("brightness>=180",workflow)
         self.assertIn("opacity",workflow)
         self.assertIn("texto de cartões com contraste insuficiente",workflow)
 
