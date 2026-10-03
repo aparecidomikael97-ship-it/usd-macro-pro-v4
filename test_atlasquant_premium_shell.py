@@ -203,7 +203,7 @@ class PremiumShellTests(unittest.TestCase):
         self.assertIn('data-trader-reference="v1"', html)
         self.assertIn("ATLASQUANT · TRADER", html)
         self.assertIn("Poderoso por dentro. Simples por fora.", html)
-        self.assertIn("Trader · Mercado &amp; Estratégia", html)
+        self.assertIn("Trader · Mercado & Estratégia", html)
         self.assertIn("RADAR 28FX", html)
         self.assertIn("PIPELINE 7 PARES", html)
         self.assertIn("ORDENS REAIS BLOQUEADAS", html)
