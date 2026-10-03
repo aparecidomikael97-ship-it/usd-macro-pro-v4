@@ -422,9 +422,14 @@ def _svg(kind: str) -> str:
 # quick shell has no equivalent destination.
 PREMIUM_MODULES: tuple[dict[str, str], ...] = (
     {"id":"radar","sector":"Essencial","title":"Radar","motif":"radar","page":"🎯 Radar","fast_page":"🎯 Radar","summary":"Vinte e oito pares Forex, Top 10 dinâmico e rankings separados. O destaque é leitura, não autorização."},
+    {"id":"scanner","sector":"Essencial","title":"Scanner Técnico","motif":"radar","page":"🧭 Painel mestre","fast_page":"","summary":"Reabre o scanner técnico legado já integrado ao Painel Mestre, sem criar um segundo motor."},
     {"id":"master","sector":"Essencial","title":"Painel Mestre","motif":"command","page":"🧭 Painel mestre","fast_page":"","summary":"Central operacional do universo já calculado neste painel. Não é o mesmo recorte dos 28 pares do Radar."},
-    {"id":"macro","sector":"Essencial","title":"Macroeconomia","motif":"macro","page":"🇺🇸 EUA","fast_page":"🎙️ Macro","summary":"Abre a leitura macro que já existe. Juros, surpresas e contexto entram como cenário, não como ordem."},
-    {"id":"news","sector":"Essencial","title":"Pré-Notícia","motif":"news","page":"🎙️ Macro Briefing","fast_page":"🎙️ Macro","summary":"O briefing já montado mostra o que observar antes do evento. Não dispara coleta nova nem operação."},
+    {"id":"macro","sector":"Essencial","title":"Macro · EUA","motif":"macro","page":"🇺🇸 EUA","fast_page":"🎙️ Macro","summary":"Abre a leitura macro dos EUA que já existe. Juros, surpresas e contexto entram como cenário, não como ordem."},
+    {"id":"fed","sector":"Essencial","title":"Fed","motif":"macro","page":"🏦 Fed","fast_page":"","summary":"Reabre a página funcional do Federal Reserve, com narrativa e impacto contextual no USD."},
+    {"id":"news","sector":"Essencial","title":"Pré-Notícia / Macro Briefing","motif":"news","page":"🎙️ Macro Briefing","fast_page":"🎙️ Macro","summary":"O briefing já montado mostra o que observar antes do evento. Não dispara coleta nova nem operação."},
+    {"id":"market_news","sector":"Essencial","title":"Notícias","motif":"news","page":"📰 Notícias","fast_page":"","summary":"Reabre o painel de notícias por moeda e contexto que já existia no Trader."},
+    {"id":"market_map","sector":"Leitura","title":"Market Map","motif":"command","page":"🗺️ Market Map","fast_page":"","summary":"Reabre o mapa intermercado funcional para relações entre ativos e contexto."},
+    {"id":"autopilot","sector":"Operação","title":"Autopilot","motif":"command","page":"🤖 Autopilot","fast_page":"","summary":"Reabre o monitoramento Autopilot legado com estado de runtime e trilha de auditoria."},
     {"id":"micro","sector":"Leitura","title":"Microeconomia","motif":"micro","page":"💱 Moedas","fast_page":"","summary":"Abre Moedas, a comparação de força que já existe. Não cria um modelo microeconômico novo."},
     {"id":"geo","sector":"Leitura","title":"Geopolítica","motif":"geo","page":"📰 Notícias","fast_page":"","summary":"Abre Notícias. Eventos globais aparecem como contexto da leitura atual, sem fonte nova."},
     {"id":"fundamental","sector":"Leitura","title":"Fundamentalista","motif":"fundamental","page":"🔀 Pares","fast_page":"","summary":"Abre Pares, onde a confluência já calculada fica visível. O cartão não recalcula score."},
