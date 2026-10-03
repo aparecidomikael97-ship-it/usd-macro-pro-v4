@@ -85,6 +85,15 @@ def prepare_durable_handoff(
     task = update_step(
         task,
         "runtime-preflight",
+        "RUNNING",
+        result_note="Recording already completed unified preflight state only.",
+        evidence_refs=[verified["head_digest"]],
+        access={"role": "ADMIN"},
+        approved=True,
+    )
+    task = update_step(
+        task,
+        "runtime-preflight",
         "DONE",
         result_note="Unified preflight already completed; state recorded only.",
         evidence_refs=[verified["head_digest"]],
