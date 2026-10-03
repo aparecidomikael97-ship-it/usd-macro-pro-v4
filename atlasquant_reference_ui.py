@@ -195,6 +195,11 @@ def module_panel(area, selected, *, resident=None):
             f'<button data-route="{route}"><strong>{escape(label)}</strong><span>{escape(text)}</span></button>'
             for label,text,route in essentials) + '</div>'
         cards = summary + cards
+    if area == "trader":
+        from atlasquant_interface_final import resident_context_html
+        cards += resident_context_html(selected, resident)
+        if selected == "indexes":
+            cards += '<h2>Criptomoedas · universo separado</h2>' + resident_context_html('crypto', resident)
     if area == "aion" and selected == "roles":
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()

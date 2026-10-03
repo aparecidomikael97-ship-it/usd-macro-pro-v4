@@ -273,11 +273,13 @@ def test_eight_roles_one_shared_aion():
     assert html.count('data-internal-role=')==8
 
 
-def test_no_remote_io_or_heavy_home_load():
+def test_validated_resident_snapshot_precedes_cockpit_without_heavy_loaders():
     source=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
     block=source[source.index("_hold_admin_before_trader_shell()\n"):source.index('st.session_state["_aq_experience_switch_mounted"] = False')]
     assert "render_trader_entry" in block and "st.stop()" in block
-    assert source.index("if render_trader_entry") < source.index("_fast_snapshot = load_home_snapshot(")
+    assert source.index("_fast_snapshot = load_home_snapshot(") < source.index("hydrate_trader_resident_state(st.session_state") < source.index("if render_trader_entry")
+    for heavy in ("carregar_macro_eua()", "carregar_narrativa_fed()", "carregar_dados_moedas()"):
+        assert heavy not in block
     assert source.index("if render_trader_entry") < source.index("# EXECUÇÃO PRINCIPAL")
     with patch("atlasquant_reference_ui.render_reference_workspace",return_value=True) as renderer:
         fake=type("Fake",(),{"session_state":{}})()
