@@ -421,8 +421,11 @@ jobs:
           python -m playwright install --with-deps chromium
           python -m pytest -q \
             test_atlasquant_reference_ui.py \
-            test_atlasquant_reference_browser.py \
+            test_atlasquant_reference_browser.py
+      - name: Run AION chat and unified runtime contracts in isolated process
+        run: |
+          python -m pytest -q -s \
             test_atlasquant_aion_chat_foundation.py \
             test_atlasquant_aion_chat_load.py \
-            test_atlasquant_aion_unified_runtime.py \
-            test_atlasquant_aion_chat_browser.py
+            test_atlasquant_aion_unified_runtime.py
+          python -m pytest -q -s test_atlasquant_aion_chat_browser.py
