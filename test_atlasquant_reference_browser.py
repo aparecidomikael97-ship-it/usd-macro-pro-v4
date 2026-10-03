@@ -93,6 +93,11 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             expect(page.locator(".ref-drawer")).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible()
+            mobile_art=page.locator(".ref-mobile-art").first
+            expect(mobile_art).to_be_visible()
+            assert mobile_art.evaluate("(e)=>getComputedStyle(e).backgroundImage")!="none"
+            workspace=page.locator(".ref-workspace").first
+            assert workspace.evaluate("(e)=>getComputedStyle(e).backgroundSize")=="0px 0px"
             page.mouse.move(0,0)
             page.screenshot(path=str(artifacts/(area+"-mobile.png")),full_page=True)
             expect(page.locator(".ref-detail")).to_have_count(0)
