@@ -3,7 +3,7 @@ name: AION Core Security Gate
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main, integration/aion-unified-core-v2-20261003]
+    branches: [main, integration/aion-unified-core-v2-20261003, integration/aion-core-v21-hardening-adapters-20261003]
 
 permissions:
   contents: read
@@ -45,11 +45,14 @@ jobs:
             atlasquant_aion_unified_runtime.py \
             atlasquant_aion_unified_journal.py \
             atlasquant_aion_unified_durable_bridge.py \
+            atlasquant_aion_unified_journal_store.py \
             atlasquant_aion_role_authority.py \
             atlasquant_aion_truth_mapping.py \
             test_atlasquant_aion_chat_checkpoint_adapter.py \
             test_atlasquant_aion_chat_library_adapter.py \
             test_atlasquant_aion_unified_hardening_v21.py \
+            test_atlasquant_aion_unified_journal_store.py \
+            test_atlasquant_aion_unified_journal_store.py \
             test_atlasquant_aion_security_adversarial.py \
             test_atlasquant_aion_chaos_recovery.py \
             atlasquant_aion_critical_review.py \
@@ -119,6 +122,7 @@ jobs:
             atlasquant_aion_unified_runtime.py \
             atlasquant_aion_unified_journal.py \
             atlasquant_aion_unified_durable_bridge.py \
+            atlasquant_aion_unified_journal_store.py \
             atlasquant_aion_role_authority.py \
             atlasquant_aion_truth_mapping.py
       - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
