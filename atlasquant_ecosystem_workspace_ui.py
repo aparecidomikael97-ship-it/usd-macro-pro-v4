@@ -180,7 +180,8 @@ WORKSPACE_CSS = r"""
 .aq-ws-modules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.aq-ws-card{position:relative;overflow:hidden;display:block;text-decoration:none;color:inherit;min-height:145px;border:1px solid color-mix(in srgb,var(--ws-accent) 22%,rgba(111,169,234,.19));border-radius:15px;padding:11px;background:
  radial-gradient(circle at 100% 0%,var(--ws-glow),transparent 44%),
  linear-gradient(155deg,rgba(12,34,67,.94),rgba(6,18,39,.96));box-shadow:inset 0 1px 0 rgba(255,255,255,.035);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
-.aq-ws-card:hover,.aq-ws-card:focus-visible{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 58%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow);outline:none}
+.aq-ws-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 58%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow)}
+.aq-ws-card:focus-visible{transform:translateY(-5px);border-color:color-mix(in srgb,var(--ws-accent) 58%,transparent);box-shadow:0 16px 34px rgba(0,0,0,.28),0 0 22px var(--ws-glow);outline:2px solid var(--ws-accent);outline-offset:2px}
 .aq-ws-card small{display:block;color:var(--ws-accent);font-size:.54rem;font-weight:950;letter-spacing:.11em}.aq-ws-card h4{margin:.3rem 0 .35rem;color:#fff;font-size:.82rem;line-height:1.25}.aq-ws-card p{margin:0;color:#c8d8eb;font-size:.65rem;line-height:1.38}
 .aq-ws-state{display:inline-flex;margin-top:8px;border:1px solid color-mix(in srgb,var(--ws-accent) 32%,transparent);border-radius:999px;padding:3px 7px;color:#edf7ff;font-size:.53rem;font-weight:900;letter-spacing:.05em;background:rgba(5,18,40,.62)}
 .aq-ws-state[data-state="CONECTADO"]{color:#79efc1;border-color:rgba(90,225,171,.35)}.aq-ws-state[data-state="PLANEJADO"]{color:#ffd98a;border-color:rgba(255,205,95,.34)}
