@@ -1,3 +1,7 @@
+# Estado vigente — PR #554
+
+A revisão consolidada atual está em [atlasquant_final_interface_review.md](atlasquant_final_interface_review.md). A branch `fix/trader-scanner-nav-20261003` preserva **24 funções**, sem Radar Mestre duplicado. Desktop: barra lateral com rolagem; mobile: **Funções do Trader · 24 / Ver todas as funções · inclui avançadas**. Iniciante e Avançado expõem a mesma lista completa. Nenhuma função foi removida. Ranking sem evidência fica aguardando dados validados; o universo monitorado de 28 não implica cobertura técnica nos 28. O texto abaixo registra revisões anteriores e suas contagens históricas.
+
 # AtlasQuant — refinamento compacto sobre a main atual
 
 Base exclusiva: main `f0ce8af00357e09b17d092ea70218258ecdd3426`.

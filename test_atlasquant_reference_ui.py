@@ -168,12 +168,14 @@ def test_master_first_fold_and_radar_truth():
     html=reference_html("trader",selected="master")
     assert "ref-detail-layout" in html
     assert "ref-canvas" not in html
-    assert html.count('class="ref-pair"')==28
-    assert html.count("TOP 10")==10
-    assert "Direção: aguardando dados" in html
+    assert html.count('class="ref-pair final-fx-card')==28
+    assert html.count('data-ranked="false"')==28
+    assert "TOP 10" not in html
+    assert "Ranking aguardando dados validados" in html
+    assert "Sem leitura elegível para ranking" in html
     assert "Compra" not in html and "Venda" not in html
     assert "connected:master" in html
-    assert html.index("<h1>") < html.index('class="ref-radar-grid"')
+    assert html.index("<h1>") < html.index('class="final-fx-board')
     state={}
     apply_event(state,USER,"trader","why:EUR/USD")
     assert state["aq_reference_module"][1]=="why:EUR/USD"
@@ -202,8 +204,12 @@ def test_private_preview_panels_have_workspace_specific_identity(area, selected,
 @pytest.mark.parametrize("area",("negocios","investimentos","aion"))
 def test_mobile_hero_has_environment_identity(area):
     html=reference_html(area)
-    assert f"ref-mobile-header-{area}" in html
-    assert "ECOSSISTEMA ATLASQUANT" in html
+    if area == "aion":
+        assert "final-aion-banner" in html and "Um único AION Core" in html
+        assert html.count("data-internal-role=") == 8
+    else:
+        assert f"ref-mobile-header-{area}" in html
+        assert "ECOSSISTEMA ATLASQUANT" in html
 
 def test_compact_trader_preserves_routes_and_uses_readable_native_labels():
     html=reference_html("trader")
@@ -264,7 +270,7 @@ def test_mobile_v5_v6_css_compacts_and_stops_card_stretching():
 def test_eight_roles_one_shared_aion():
     html=reference_html("aion",selected="roles")
     assert "Não são oito IAs independentes" in html
-    assert html.count('class="ref-pair"')==8
+    assert html.count('data-internal-role=')==8
 
 
 def test_no_remote_io_or_heavy_home_load():

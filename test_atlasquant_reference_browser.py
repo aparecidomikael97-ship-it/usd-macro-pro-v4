@@ -92,7 +92,7 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             routes=[route for route in routes if route != "home"]
             for route in routes:
                 button=page.locator(f'.ref-canvas [data-route="{route}"]').first
-                if route.startswith("extended:"):
+                if route.startswith("extended:") and button.locator('xpath=ancestor::details').count():
                     page.locator(".ref-sidebar details summary").click()
                 button.click()
                 expect(page.locator(".ref-detail")).to_be_visible(timeout=10000)
@@ -136,8 +136,8 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             expect(page.locator(".ref-drawer")).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible()
-            if area == 'trader':
-                mobile_art=page.locator('.cq-card img').first
+            if area in ('trader','aion'):
+                mobile_art=page.locator('.cq-card img' if area == 'trader' else '.final-aion-banner img').first
                 expect(mobile_art).to_be_visible()
                 assert mobile_art.evaluate('(e)=>e.complete && e.naturalWidth>0')
             else:
@@ -145,7 +145,7 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
                 expect(mobile_art).to_be_visible()
                 assert mobile_art.evaluate("(e)=>getComputedStyle(e).backgroundImage")!="none"
             workspace=page.locator(".ref-workspace").first
-            if area == 'trader':
+            if area in ('trader','aion'):
                 assert workspace.evaluate('(e)=>getComputedStyle(e).backgroundImage') == 'none'
             else:
                 assert workspace.evaluate("(e)=>getComputedStyle(e).backgroundSize")=="0px 0px"
@@ -275,6 +275,8 @@ def test_trader_24_functions_discoverable_and_clickable_in_both_modes(preview_ur
                     button.click()
                     if route != 'home':
                         expect(page.locator('.ref-detail')).to_be_visible()
+                        if width == 1280 and mode == 'Avançado' and route in ('radar','scanner','master','macro','market_news','news','lab','paper'):
+                            page.screenshot(path=str(artifacts/f'final-trader-{route}-1280.png'), full_page=True)
                         if width == 390 and mode == 'Iniciante' and route in ('master','ict'):
                             page.screenshot(path=str(artifacts/f'trader-functions-mobile-{route}.png'), full_page=True)
                         page.locator('.ref-detail [data-route="home"]').click()
@@ -286,4 +288,59 @@ def test_trader_24_functions_discoverable_and_clickable_in_both_modes(preview_ur
                     page.locator('.cq-functions summary').scroll_into_view_if_needed()
                     page.screenshot(path=str(artifacts/f'trader-functions-mobile-return-{mode}.png'), full_page=True)
         assert not errors
+        browser.close()
+
+
+def test_login_and_existing_offline_backtest_matrix(preview_url):
+    artifacts = Path('visual_review'); artifacts.mkdir(exist_ok=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(reduced_motion='reduce')
+        for review in ('login','backtest'):
+            page.goto(preview_url + '?review=' + review)
+            expect(page.locator('[data-testid="stForm"]' if review == 'login' else 'h3').first).to_be_visible(timeout=30000)
+            expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+            if review == 'backtest':
+                page.get_by_text('Histórico de Validação AtlasQuant · snapshots locais',exact=False).click()
+                expect(page.get_by_text('Nenhum snapshot',exact=False).first).to_be_visible()
+            for width,height in ((1280,720),(1024,768),(768,1024),(390,844)):
+                page.set_viewport_size({'width':width,'height':height})
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                if review == 'backtest':
+                    page.get_by_text('Histórico de Validação AtlasQuant · snapshots locais',exact=False).scroll_into_view_if_needed()
+                    page.screenshot(path=str(artifacts/f'final-backtest-history-{width}.png'),full_page=True)
+                    page.locator('h3').first.scroll_into_view_if_needed()
+                page.screenshot(path=str(artifacts/f'final-{review}-{width}.png'),full_page=True)
+            if review == 'login':
+                inputs = page.locator('[data-testid="stForm"] input')
+                expect(inputs).to_have_count(2)
+                inputs.nth(0).focus()
+                expect(inputs.nth(0)).to_be_focused()
+                inputs.nth(0).press('Tab')
+                expect(inputs.nth(1)).to_be_focused()
+        browser.close()
+
+
+def test_validated_top_ten_fixture_layout_matrix():
+    from atlasquant_reference_ui import CSS, reference_html
+    from test_atlasquant_reference_population import resident_fixture
+    resident,_ = resident_fixture()
+    artifacts = Path('visual_review'); artifacts.mkdir(exist_ok=True)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(reduced_motion='reduce')
+        page.set_content('<style>'+CSS.read_text(encoding='utf-8')+'</style><p style="color:white;background:#17334a">FIXTURE DE TESTE · SEM DADOS DE MERCADO</p>'+reference_html('trader',selected='master',fx_population=resident))
+        expect(page.locator('.final-featured')).to_have_count(10)
+        expect(page.locator('.final-secondary')).to_have_count(18)
+        for width,height in ((1280,720),(1024,768),(768,1024),(390,844)):
+            page.set_viewport_size({'width':width,'height':height})
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            assert page.locator('.final-top-grid').evaluate('(e)=>getComputedStyle(e).gridTemplateColumns.split(" ").length') == 2
+            for button in page.locator('.final-featured button').all():
+                button.scroll_into_view_if_needed(); before=button.bounding_box()
+                button.hover();button.focus()
+                assert all(abs(before[k]-button.bounding_box()[k]) < .1 for k in before)
+                assert button.evaluate('(e)=>getComputedStyle(e).transform') == 'none'
+            assert page.locator('.final-ring').first.evaluate('(e)=>getComputedStyle(e).animationName') == 'none'
+            page.screenshot(path=str(artifacts/f'final-top10-test-fixture-{width}.png'),full_page=True)
         browser.close()

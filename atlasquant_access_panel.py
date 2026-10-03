@@ -159,6 +159,20 @@ div[data-testid="stFormSubmitButton"] button {
   .aq-login-orb { width:165px; height:165px; margin:1.6rem auto .7rem; }
   .aq-login-title { font-size:2.6rem; }
 }
+/* Presentation-only final polish; actual form and authentication stay intact. */
+*{box-sizing:border-box}
+.block-container{padding-top:1.6rem;padding-bottom:1.6rem}
+.aq-login-hero{min-height:510px;padding:2rem;border-color:#2b7da766;background:radial-gradient(circle at 75% 70%,#126a9833,transparent 55%),linear-gradient(145deg,#0c1833ee,#040917ee)}
+.aq-login-brand{display:flex;align-items:center;gap:12px;margin-bottom:22px;font-size:21px;font-weight:800;color:#eaf6ff;letter-spacing:.06em}
+.aq-login-brand img{width:46px;height:38px;object-fit:contain}.aq-login-brand small{display:block;font-size:9px;letter-spacing:.2em;color:#81dfff}
+.aq-login-title{font-size:clamp(2rem,4vw,3.7rem)}.aq-login-copy{color:#bbcee6;line-height:1.55}.aq-login-orb{width:175px;height:175px;margin:1.6rem auto 1.2rem}
+div[data-testid="stForm"]{border-color:#347aa166;border-radius:20px;background:linear-gradient(145deg,#0c1d35e6,#070f20ee)}
+div[data-testid="stForm"] input{color:#f3faff!important;border-radius:8px}
+div[data-testid="stForm"] input:focus{outline:2px solid #71dfff!important;outline-offset:-2px;box-shadow:inset 0 0 8px #21aeff22}
+div[data-testid="stFormSubmitButton"] button{background:linear-gradient(110deg,#147bb6,#3bbcd9);color:#f8ffff;border:1px solid #6dd4ee}
+div[data-testid="stFormSubmitButton"] button:hover,div[data-testid="stFormSubmitButton"] button:focus-visible{transform:none;outline:0;box-shadow:inset 0 0 0 2px #b5f5ff,0 0 18px #32caff33}
+@media(max-width:760px){.block-container{padding:1rem}.aq-login-hero{padding:1.2rem;min-height:0}.aq-login-brand{font-size:18px;margin-bottom:12px}.aq-login-title{font-size:2rem;margin:.5rem 0}.aq-login-copy{font-size:.8rem;line-height:1.45}.aq-login-tagline{font-size:.85rem;margin-top:.7rem}.aq-login-orb{display:none}.aq-login-pills{margin-top:.8rem}.aq-login-pill{font-size:.65rem;padding:.35rem .55rem}div[data-testid="stForm"]{padding:1rem}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style>
 """
 
@@ -186,7 +200,9 @@ def render_login_reference_shell():
     st.markdown(LOGIN_REFERENCE_CSS,unsafe_allow_html=True)
     hero_col,login_col=st.columns([1.14,.86],gap="large")
     with hero_col:
-        st.markdown(LOGIN_REFERENCE_HERO,unsafe_allow_html=True)
+        from atlasquant_reference_ui import asset_uri
+        brand = '<div class="aq-login-brand"><img src="' + asset_uri("trader-mark.webp") + '" alt="Logo AtlasQuant"><span>ATLASQUANT<small>ECOSSISTEMA</small></span></div>'
+        st.markdown(LOGIN_REFERENCE_HERO.replace('<div class="aq-login-hero">','<div class="aq-login-hero">'+brand),unsafe_allow_html=True)
     return login_col
 
 def session_time_status(session:Any, now:float)->dict[str,Any]:

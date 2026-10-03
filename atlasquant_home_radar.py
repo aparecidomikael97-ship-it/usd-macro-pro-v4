@@ -527,8 +527,13 @@ def render_home_radar(
         "pares sem técnica/proveniência ficam bloqueados. Índices e criptos ficam em rankings separados."
     )
 
-    top_n=min(RADAR_VISIBLE_LIMIT,len(rows))
-    top=highlight_top_fx(rows, top_n)
+    # Share only this already-computed resident presentation with the cockpit.
+    # No provider call, persistence, score calculation or authorization change.
+    st.session_state["atlasquant_reference_fx_population"] = {"rows": rows, "freshness": dict(freshness or {})}
+    from atlasquant_interface_final import eligible_fx_population
+    eligible = eligible_fx_population(st.session_state["atlasquant_reference_fx_population"])["ranked"]
+    top_n=min(RADAR_VISIBLE_LIMIT,len(eligible))
+    top=highlight_top_fx(eligible, top_n)
     if mode=="Iniciante" and top:
         try:
             from atlasquant_premium_shell import beginner_attention_html
@@ -536,12 +541,12 @@ def render_home_radar(
             st.markdown(beginner_attention_html(top[0]), unsafe_allow_html=True)
         except Exception:
             pass
-    st.markdown("### Top 10 em observação")
+    st.markdown("### Top 10 · ranking validado" if top else "### Ranking aguardando dados validados")
     st.caption(
         "O Radar mostra até 10 ativos Forex que merecem atenção no snapshot atual. "
         "O destaque é dinâmico e não significa entrada autorizada."
     )
-    cols=st.columns(min(3,len(top)))
+    cols=st.columns(min(3,len(top))) if top else []
     for idx,row in enumerate(top):
         with cols[idx%len(cols)]:
             st.markdown(_card_html(row),unsafe_allow_html=True)

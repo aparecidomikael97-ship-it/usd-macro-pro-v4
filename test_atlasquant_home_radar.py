@@ -144,8 +144,8 @@ class AtlasQuantHomeRadarTests(unittest.TestCase):
     def test_radar_visible_limit_matches_approved_top_ten(self):
         self.assertEqual(RADAR_VISIBLE_LIMIT,10)
         source=__import__("pathlib").Path("atlasquant_home_radar.py").read_text(encoding="utf-8")
-        self.assertIn("top_n=min(RADAR_VISIBLE_LIMIT,len(rows))",source)
-        self.assertIn("Top 10 em observação",source)
+        self.assertIn("top_n=min(RADAR_VISIBLE_LIMIT,len(eligible))",source)
+        self.assertIn("Ranking aguardando dados validados",source)
         self.assertIn("não significa entrada autorizada",source)
 
     def test_radar_preserves_all_seven_unique_pairs_when_supplied(self):

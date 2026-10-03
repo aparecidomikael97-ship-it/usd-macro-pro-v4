@@ -295,7 +295,7 @@ class PremiumShellTests(unittest.TestCase):
 
         home = Path("atlasquant_home_radar.py").read_text(encoding="utf-8")
         self.assertIn("beginner_attention_html", home)
-        self.assertIn("Top 10 em observação", home)
+        self.assertIn("Ranking aguardando dados validados", home)
         self.assertIn("prefers-reduced-motion", home)
         master = Path("master_panel_v102.py").read_text(encoding="utf-8")
         self.assertIn("master_command_html", master)

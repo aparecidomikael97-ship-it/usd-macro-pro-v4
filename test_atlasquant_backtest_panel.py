@@ -250,7 +250,7 @@ class BacktestPanelTests(unittest.TestCase):
 
     def test_panel_exposes_local_snapshot_history(self):
         source=inspect.getsource(render_operational_backtest_panel)
-        self.assertIn("Histórico local de snapshots",source)
+        self.assertIn("Histórico de Validação AtlasQuant · snapshots locais",source)
         self.assertIn("save_snapshot_local",source)
         self.assertIn("load_snapshot_history",source)
         self.assertIn("Linha do tempo",source)
