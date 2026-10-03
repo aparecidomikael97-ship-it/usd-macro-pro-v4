@@ -1542,6 +1542,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 st.dataframe(pd.DataFrame(passport_rows),width="stretch",hide_index=True)
 
                 evidence_settings={
+                    "execution_timeframe":backtest_timeframe,
                     "pair":default_pair,
                     "max_wait_bars":int(max_wait),
                     "max_hold_bars":int(max_hold),
@@ -1750,7 +1751,7 @@ def render_operational_backtest_panel() -> dict[str, Any]:
                 )
 
 
-    with st.expander("🗂️ Histórico local de snapshots", expanded=False):
+    with st.expander("🗂️ Histórico de Validação AtlasQuant · snapshots locais", expanded=False):
         st.caption(
             "Histórico opcional de pesquisa salvo em .atlasquant_research/backtest_snapshots, "
             "fora de dados/ e sem escrever na branch Runtime. Em hospedagem efêmera, exporte o ZIP "
@@ -1807,8 +1808,18 @@ def render_operational_backtest_panel() -> dict[str, Any]:
             st.dataframe(pd.DataFrame(invalid_history),width="stretch",hide_index=True)
 
         if snapshots_history:
-            timeline=history_timeline_frame(snapshots_history)
+            from atlasquant_interface_final import snapshot_filter_values, filter_snapshot_history
+            st.caption("Histórico institucional do AtlasQuant. Histórico acompanha leituras; Backtest testa regras; Paper/Forward valida simulações prospectivas. Armazenamento local, sem garantia de persistência multiano em hospedagem efêmera.")
+            filter_columns = st.columns(5)
+            selected_filters = {}
+            for column, field in zip(filter_columns, ("Ano", "Mês", "Setup", "Ativo", "Timeframe")):
+                values = sorted({value for snapshot in snapshots_history for value in snapshot_filter_values(snapshot)[field]})
+                with column:
+                    selected_filters[field] = st.selectbox(field, ["Todos"] + values, key="aq_history_filter_" + field)
+            visible_history = filter_snapshot_history(snapshots_history, selected_filters)
+            timeline=history_timeline_frame(visible_history)
             st.markdown("##### Linha do tempo")
+            st.caption(f"{len(visible_history)} de {len(snapshots_history)} snapshots validados no período/filtros selecionados. O ZIP abaixo preserva o histórico completo.")
             st.dataframe(timeline,width="stretch",hide_index=True)
 
             changes=consecutive_history_diffs(snapshots_history)

@@ -32,9 +32,9 @@ class PremiumShellTests(unittest.TestCase):
     def test_catalog_covers_the_requested_sectors_without_new_engines(self):
         titles = [item["title"] for item in PREMIUM_MODULES]
         for expected in (
-            "Radar", "Painel Mestre", "Macroeconomia", "Microeconomia", "Geopolítica",
-            "Fundamentalista", "ICT / SMC", "Calendário Econômico", "Pré-Notícia", "Laboratório / Backtests",
-            "Paper Trading", "Guardião de Risco", "Academia", "Diário", "Investimentos",
+            "Radar", "Scanner Técnico", "Painel Mestre", "Macro · EUA", "Fed", "Microeconomia", "Geopolítica",
+            "Notícias", "Market Map", "Fundamentalista", "ICT / SMC", "Calendário Econômico", "Pré-Notícia / Macro Briefing", "Laboratório / Backtests",
+            "Paper Trading", "Guardião de Risco", "Autopilot", "Performance / Melhorias", "Academia", "Diário", "Investimentos",
             "Negócios", "Vídeo / Conteúdo", "AION / Central Administrativa", "Perfil / Configurações",
         ):
             self.assertIn(expected, titles)
@@ -195,15 +195,15 @@ class PremiumShellTests(unittest.TestCase):
         self.assertIn("dados da imagem ilustrativos", html)
         self.assertNotIn("Negócios", html)
         self.assertNotIn("Investimentos", html)
-        for title in ("Macro", "Micro", "Geopolítica", "ICT / SMC", "Painel Mestre", "Radar Mestre", "Diário"):
+        for title in ("Macro · EUA", "Micro", "Geopolítica", "ICT / SMC", "Painel Mestre", "Scanner Técnico", "Diário"):
             self.assertIn(title, html)
         beginner = trader_cockpit_html(mode="Iniciante", available_pages=pages)
-        self.assertIn("Funções do Trader · 19", beginner)
+        self.assertIn("Funções do Trader · 24", beginner)
         self.assertIn("inclusive avançadas, continuam disponíveis", beginner)
         from atlasquant_reference_ui import NAV, nav_html
         navigation = nav_html("trader", "Iniciante")
-        self.assertEqual(len(NAV["trader"]), 19)
-        self.assertEqual(navigation.count('class="ref-nav-item"'), 19)
+        self.assertEqual(len(NAV["trader"]), 24)
+        self.assertEqual(navigation.count('class="ref-nav-item"'), 24)
         self.assertNotIn('<details>', navigation)
         for route, _ in NAV["trader"]:
             self.assertIn(f'data-route="{route}"', navigation)
@@ -295,7 +295,7 @@ class PremiumShellTests(unittest.TestCase):
 
         home = Path("atlasquant_home_radar.py").read_text(encoding="utf-8")
         self.assertIn("beginner_attention_html", home)
-        self.assertIn("Top 10 em observação", home)
+        self.assertIn("Ranking aguardando dados validados", home)
         self.assertIn("prefers-reduced-motion", home)
         master = Path("master_panel_v102.py").read_text(encoding="utf-8")
         self.assertIn("master_command_html", master)

@@ -147,7 +147,7 @@ class AdvancedBootTests(unittest.TestCase):
         self.assertIn("Ler o que será falado", Path("atlasquant_voice_assistant.py").read_text(encoding="utf-8"))
         self.assertIn("render_top_voice_access", src)
         radar = Path("atlasquant_home_radar.py").read_text(encoding="utf-8")
-        self.assertLess(radar.index("render_contextual_voice_assistant("), radar.index("### Top 10 em observação"))
+        self.assertLess(radar.index("render_contextual_voice_assistant("), radar.index("### Top 10 · ranking validado"))
         self.assertIn("Ranking de criptos", radar)
         self.assertIn("Autopilot/headless sem confirmação saudável", Path("atlasquant_central_brief.py").read_text(encoding="utf-8"))
         self.assertIn("Pipeline institucional completo ainda não cobre este par.", Path("atlasquant_radar_board.py").read_text(encoding="utf-8"))

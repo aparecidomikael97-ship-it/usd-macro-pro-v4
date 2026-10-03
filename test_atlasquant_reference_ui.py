@@ -59,8 +59,9 @@ def test_reference_has_accessible_routes_and_no_duplicate_strip(area):
 
 def test_separation_and_complete_trader_menu():
     nav=dict(NAV["trader"])
-    assert len(nav)==19
-    assert {"radar_master","master","radar","ict","academy","journal","video","profile"}<=nav.keys()
+    assert len(nav)==24
+    assert {"scanner","master","radar","fed","market_news","market_map","autopilot","performance","ict","academy","journal","video","profile"}<=nav.keys()
+    assert "radar_master" not in nav
     assert "Negócios" not in nav.values() and "Investimentos" not in nav.values()
     for area in ("negocios","investimentos"):
         assert not any(v in {"Trader","Negócios","Investimentos"} for v in dict(NAV[area]).values())
@@ -106,6 +107,25 @@ def test_connected_master_uses_existing_navigation_and_no_auth_mutation():
     assert state["atlasquant_access_session"]==before
 
 
+
+@pytest.mark.parametrize(("route","target"), [
+    ("scanner","🧭 Painel mestre"),
+    ("fed","🏦 Fed"),
+    ("market_news","📰 Notícias"),
+    ("market_map","🗺️ Market Map"),
+    ("autopilot","🤖 Autopilot"),
+    ("performance","🛠️ Melhorias"),
+    ("calendar","🇺🇸 EUA"),
+    ("paper","🧪 Backtest"),
+])
+def test_restored_legacy_trader_routes_open_existing_functional_pages(route, target):
+    state={}
+    apply_event(state,ADMIN,"trader",f"connected:{route}")
+    assert state["aq_reference_connected"]
+    assert state["aq_beginner_page"]==target
+    assert state["atlasquant_advanced_area"]==target
+
+
 def test_return_home_resets_legacy_selection_without_changing_auth():
     state={"aq_reference_connected":True,"atlasquant_advanced_area":"master", "atlasquant_access_session":{"username":"same"}}
     apply_event(state,USER,"trader","home")
@@ -117,7 +137,7 @@ def test_return_home_resets_legacy_selection_without_changing_auth():
 def test_mode_preserves_all_functions_and_changes_only_visible_depth():
     advanced=reference_html("trader",mode="Avançado")
     beginner=reference_html("trader",mode="Iniciante")
-    assert "Funções do Trader · 19" in beginner
+    assert "Funções do Trader · 24" in beginner
     assert "inclusive avançadas, continuam disponíveis" in beginner
     for route,_ in NAV["trader"]:
         assert f'data-route="{route}"' in advanced and f'data-route="{route}"' in beginner
@@ -127,9 +147,10 @@ def test_mode_preserves_all_functions_and_changes_only_visible_depth():
 def test_exact_trader_navigation_contract_without_nested_hidden_modules(mode):
     from html.parser import HTMLParser
     from atlasquant_reference_ui import nav_html
-    expected = ('home', 'radar_master', 'radar', 'master', 'macro', 'micro',
-        'geo', 'fundamental', 'ict', 'calendar', 'news', 'lab', 'paper',
-        'guardian', 'academy', 'journal', 'video', 'aion_specialist', 'profile')
+    expected = ('home', 'radar', 'scanner', 'master', 'macro', 'fed', 'micro',
+        'geo', 'market_news', 'fundamental', 'ict', 'calendar', 'news', 'market_map',
+        'lab', 'paper', 'guardian', 'autopilot', 'performance', 'academy', 'journal', 'video',
+        'aion_specialist', 'profile')
     class Routes(HTMLParser):
         def __init__(self):
             super().__init__(); self.routes = []; self.details = 0
@@ -139,7 +160,7 @@ def test_exact_trader_navigation_contract_without_nested_hidden_modules(mode):
     parser = Routes(); parser.feed(nav_html('trader', mode))
     assert tuple(route for route, _ in NAV['trader']) == expected
     assert tuple(parser.routes) == expected
-    assert len(set(parser.routes)) == 19
+    assert len(set(parser.routes)) == 24
     assert parser.details == 0
 
 
@@ -147,12 +168,14 @@ def test_master_first_fold_and_radar_truth():
     html=reference_html("trader",selected="master")
     assert "ref-detail-layout" in html
     assert "ref-canvas" not in html
-    assert html.count('class="ref-pair"')==28
-    assert html.count("TOP 10")==10
-    assert "Direção: aguardando dados" in html
+    assert html.count('class="ref-pair final-fx-card')==28
+    assert html.count('data-ranked="false"')==28
+    assert "TOP 10" not in html
+    assert "Ranking aguardando dados validados" in html
+    assert "Sem leitura elegível para ranking" in html
     assert "Compra" not in html and "Venda" not in html
     assert "connected:master" in html
-    assert html.index("<h1>") < html.index('class="ref-radar-grid"')
+    assert html.index("<h1>") < html.index('class="final-fx-board')
     state={}
     apply_event(state,USER,"trader","why:EUR/USD")
     assert state["aq_reference_module"][1]=="why:EUR/USD"
@@ -181,8 +204,12 @@ def test_private_preview_panels_have_workspace_specific_identity(area, selected,
 @pytest.mark.parametrize("area",("negocios","investimentos","aion"))
 def test_mobile_hero_has_environment_identity(area):
     html=reference_html(area)
-    assert f"ref-mobile-header-{area}" in html
-    assert "ECOSSISTEMA ATLASQUANT" in html
+    if area == "aion":
+        assert "final-aion-banner" in html and "Um único AION Core" in html
+        assert html.count("data-internal-role=") == 8
+    else:
+        assert f"ref-mobile-header-{area}" in html
+        assert "ECOSSISTEMA ATLASQUANT" in html
 
 def test_compact_trader_preserves_routes_and_uses_readable_native_labels():
     html=reference_html("trader")
@@ -243,7 +270,7 @@ def test_mobile_v5_v6_css_compacts_and_stops_card_stretching():
 def test_eight_roles_one_shared_aion():
     html=reference_html("aion",selected="roles")
     assert "Não são oito IAs independentes" in html
-    assert html.count('class="ref-pair"')==8
+    assert html.count('data-internal-role=')==8
 
 
 def test_no_remote_io_or_heavy_home_load():

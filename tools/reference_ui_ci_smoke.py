@@ -95,11 +95,18 @@ def _desktop(page, failures: list[str], trace: list[dict]) -> None:
     pairs = page.locator(".ref-detail .ref-pair").count()
     if pairs != 28:
         failures.append(f"desktop: Painel Mestre exibiu {pairs} pares; esperado=28")
-    top_badges = page.locator(".ref-detail .ref-pair small").filter(has_text="TOP 10").count()
-    if top_badges != 10:
-        failures.append(
-            f"desktop: TOP 10 marcou {top_badges} pares; esperado=10"
-        )
+    board = page.locator('.final-fx-board')
+    expect(board).to_have_count(1)
+    eligible = int(board.get_attribute('data-eligible-count'))
+    featured = page.locator('.final-featured').count()
+    ranked = page.locator('.ref-pair[data-ranked="true"]').count()
+    if not 0 <= eligible <= 28 or featured != min(10, eligible) or ranked != eligible:
+        failures.append(f"desktop: ranking incoerente: elegíveis={eligible}, destaques={featured}, posições={ranked}")
+    if not eligible:
+        expect(board).to_contain_text('Ranking aguardando dados validados')
+        expect(page.locator('.final-position')).to_have_count(0)
+        expect(page.locator('.ref-pair[data-ranked="false"]')).to_have_count(28)
+    expect(page.locator('.ref-pair').filter(has_text='POSIÇÃO A VALIDAR')).to_have_count(0)
     trace.append({"action": "master", "pairs": pairs, "ms": round((time.perf_counter()-start)*1000)})
 
     bridge = page.locator('.ref-detail [data-route="connected:master"]')

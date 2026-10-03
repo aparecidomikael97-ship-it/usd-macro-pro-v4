@@ -14,11 +14,13 @@ SURFACES = {"central": ("central.webp", 768, 512),
             "negocios": ("negocios-body.webp", 768, 434),
             "investimentos": ("investimentos-body.webp", 1048, 665),
             "aion": ("aion-body.webp", 1048, 665)}
-TRADER_NAV = (("home", "Início"), ("radar_master", "Radar Mestre"), ("radar", "Radar"),
-    ("master", "Painel Mestre"), ("macro", "Macro"), ("micro", "Micro"),
-    ("geo", "Geopolítica"), ("fundamental", "Fundamentalista"), ("ict", "ICT / SMC"),
-    ("calendar", "Calendário Econômico"), ("news", "Pré-Notícia"), ("lab", "Laboratório / Backtests"),
-    ("paper", "Paper Trading"), ("guardian", "Guardião de Risco"), ("academy", "Academia"),
+TRADER_NAV = (("home", "Início"), ("radar", "Radar"), ("scanner", "Scanner Técnico"),
+    ("master", "Painel Mestre"), ("macro", "Macro · EUA"), ("fed", "Fed"), ("micro", "Micro"),
+    ("geo", "Geopolítica"), ("market_news", "Notícias"), ("fundamental", "Fundamentalista"),
+    ("ict", "ICT / SMC"), ("calendar", "Calendário Econômico"),
+    ("news", "Pré-Notícia / Macro Briefing"), ("market_map", "Market Map"),
+    ("lab", "Laboratório / Backtests"), ("paper", "Paper Trading"),
+    ("guardian", "Guardião de Risco"), ("autopilot", "Autopilot"), ("performance", "Performance / Melhorias"), ("academy", "Academia"),
     ("journal", "Diário"), ("video", "Vídeos / Conteúdo"), ("aion_specialist", "AION Trader"),
     ("profile", "Perfil / Configurações"))
 NAV = {
@@ -50,7 +52,7 @@ REGIONS = {
    ("fundamental", "Fundamentalista", (560,332,117,123)), ("ict", "ICT / SMC", (679,332,114,123)),
    ("calendar", "Calendário Econômico", (798,332,112,123)), ("news", "Pré-Notícia", (915,332,111,123)),
    ("master", "Painel Mestre", (1031,332,162,123)), ("geo", "Mapa de Risco Global", (163,465,369,133)),
-   ("news", "Notícias em Tempo Real", (163,604,276,111)), ("radar_master", "Radar Mestre", (541,456,252,253)),
+   ("news", "Notícias em Tempo Real", (163,604,276,111)), ("scanner", "Scanner Técnico", (541,456,252,253)),
    ("radar", "Viés Atual do Mercado", (830,463,173,170)), ("calendar", "Calendário Econômico", (1006,464,257,134)),
    ("geo", "Eventos Geopolíticos", (1006,602,257,108)), ("academy", "Academia", (448,640,105,76)),
    ("lab", "Laboratório", (559,638,117,78)), ("paper", "Paper Trading", (681,639,106,77)),
@@ -111,7 +113,7 @@ REGIONS["investimentos"][:5]=[("stocks","Ações Globais",(173,317,162,113)),
     ("crypto","Criptomoedas",(687,317,165,113)),("portfolio","Carteira Global",(862,317,170,113))]
 EXTRA = {"trader": (("indexes","Índices"),("commodities","Commodities"),("stocks","Ações"),("week","Análise da Semana"),("day","Análise do Dia"),("close_day","Fechamento do Dia"),("close_week","Fechamento Semanal")),
  "central": (("profile","Perfil"),("notifications","Notificações"),("settings","Configurações"),("session","Sessão"))}
-BEGINNER = {"home","radar","radar_master","master","macro","news","academy","aion_specialist","profile","week","day","close_day","close_week"}
+BEGINNER = {"home","radar","scanner","master","macro","news","market_news","academy","aion_specialist","profile","week","day","close_day","close_week"}
 CSS = (Path(__file__).parent / "assets" / "ecosystem_reference" / "reference.css")
 
 
@@ -178,27 +180,26 @@ def module_panel(area, selected, *, resident=None):
     # Presentation reads resident context only. No scores, providers or executions.
     cards = ""
     if area == "trader" and selected in {"radar", "radar_master", "master"}:
-        from atlasquant_fx_universe import OFFICIAL_PAIRS
-        cards = '<div class="ref-radar-grid">' + "".join(
-            f'<article class="ref-pair"><small>#{i+1} · {"TOP 10 · " if i < 10 else ""}POSIÇÃO A VALIDAR</small>'
-            f'<strong>{escape(pair)}</strong><span>Direção: aguardando dados</span>'
-            f'<button data-route="why:{escape(pair)}">Ver por quê</button></article>'
-            for i, pair in enumerate(OFFICIAL_PAIRS)) + "</div>"
+        from atlasquant_interface_final import forex_board_html
+        cards = forex_board_html(resident)
+    if area == "trader" and selected == "scanner":
+        cards = ('<div class="ref-master-summary"><button data-route="connected:scanner">'
+                 '<strong>Scanner Técnico existente</strong><span>Abrir no Painel Mestre legado</span></button></div>'
+                 '<p>O scanner reutiliza o motor legado e a cobertura já existente; esta camada não recalcula sinais.</p>')
     if area == "trader" and selected == "master":
-        essentials = (("Radar Mestre", "28 pares · aguardando ranking", "radar_master"),
+        essentials = (("Scanner Técnico", "Scanner legado disponível no painel", "scanner"),
                       ("Contexto Macro", "Dados ainda não validados", "macro"),
                       ("Guardião de Risco", "Consultar leitura de risco", "guardian"),
                       ("AION Trader", "Seu copiloto neste ambiente", "aion_specialist"))
         summary = '<div class="ref-master-summary">' + ''.join(
             f'<button data-route="{route}"><strong>{escape(label)}</strong><span>{escape(text)}</span></button>'
             for label,text,route in essentials) + '</div>'
-        cards = summary + '<details class="ref-master-secondary"><summary>Universo Forex · 28 pares</summary>' + cards + '</details>'
+        cards = summary + cards
     if area == "aion" and selected == "roles":
-        from atlasquant_aion_internal_roles import internal_roles_snapshot
-        cards = '<p>8 papéis internos de um único AION Core. Não são oito IAs independentes.</p><div class="ref-radar-grid">'
-        for role in internal_roles_snapshot()["roles"]:
-            cards += f'<article class="ref-pair"><strong>{escape(role["label"])}</strong><p>{escape(role["purpose"])}</p></article>'
-        cards += "</div>"
+        from atlasquant_interface_final import aion_roles_html
+        cards = aion_roles_html()
+    if area == "trader" and selected in {"lab", "paper", "journal"}:
+        cards = '<div class="ref-preview-grid"><article><strong>Histórico</strong><p>Evolução das leituras; Diário reutiliza o Histórico existente.</p></article><article><strong>Backtest</strong><p>Regras em candles OHLC históricos, CSV TradingView, replay e métricas existentes.</p></article><article><strong>Paper / Forward</strong><p>Simulação prospectiva dentro do Backtest, sem ordem real.</p></article></div><h2>Histórico de Validação AtlasQuant</h2><p>Snapshots, comparação, integridade e backup ZIP no laboratório existente. Filtros de Ano, Mês, Setup, Ativo e Timeframe usam apenas registros disponíveis.</p><p class="ref-state">Armazenamento local: .atlasquant_research/backtest_snapshots. Persistência multiano externa ainda não garantida.</p>'
     if selected == "search":
         cards = '<label>Buscar módulo <input class="ref-search" type="search" placeholder="Radar, Macro, Calendário…" aria-label="Buscar módulo"></label><div class="ref-search-results">' + ''.join(
             f'<button data-route="{route}">{escape(label)}</button>'
@@ -225,12 +226,17 @@ def module_panel(area, selected, *, resident=None):
             f'<article><small>{escape(kicker)}</small><strong>{escape(text)}</strong></article>'
             for kicker, text in preview
         ) + '</div>'
-    notice = ("28 pares Forex · Top 10 em destaque · posições e direção aguardam ranking validado."
-              if cards and area == "trader" else f"Prévia visual de {title}. Dados e conteúdo ainda não conectados nesta apresentação.")
+    notice = ("28 pares monitorados. Ranking publicado somente para leituras elegíveis e validadas; destaque não autoriza execução."
+              if cards and area == "trader" and selected in {"radar","master","radar_master"} else f"Prévia visual de {title}. Abra a análise existente para usar os recursos conectados.")
     connected = ('<button class="ref-primary" data-route="connected:' + escape(selected) + '">Abrir análise existente</button>'
-                 if area == "trader" and selected in {"radar","radar_master","master","macro","micro","geo","fundamental","ict","calendar","news","lab","paper","guardian","academy","journal","video","profile"} else "")
+                 if area == "trader" and selected in {"radar","radar_master","scanner","master","macro","fed","micro","geo","market_news","fundamental","ict","calendar","news","market_map","lab","paper","guardian","autopilot","performance","academy","journal","video","profile"} else "")
     if selected.startswith("why:"):
         notice = "A direção deste par ainda não foi validada. Nenhuma recomendação de compra/venda é apresentada."
+    data_state = "VALIDAÇÃO PENDENTE"
+    if area == "trader" and selected in {"radar", "master", "radar_master"}:
+        from atlasquant_interface_final import eligible_fx_population
+        if eligible_fx_population(resident)["ranked"]:
+            data_state = "LEITURAS VALIDADAS"
     return (f'<main class="ref-detail" data-module="{escape(selected)}">'
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
@@ -240,7 +246,7 @@ def module_panel(area, selected, *, resident=None):
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
         '<span><small>EXECUÇÃO</small><strong>BLOQUEADA</strong></span>'
-        '<span><small>DADOS</small><strong>VALIDAÇÃO PENDENTE</strong></span>'
+        f'<span><small>DADOS</small><strong>{data_state}</strong></span>'
         f'</div>{connected}'
         '<div class="ref-tabs" role="tablist"><button data-local-tab="overview" aria-selected="true">Visão geral</button>'
         '<button data-local-tab="context" aria-selected="false">Contexto</button>'
@@ -250,13 +256,16 @@ def module_panel(area, selected, *, resident=None):
         '<section data-tab-panel="status" hidden><p>Aguardando dados validados.</p></section></main>')
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
         from atlasquant_compact_cockpit import trader_html
         return trader_html(mode=mode,selected=selected,name=name,show_central=show_central,
-            nav_html=nav_html,module_panel=module_panel,uri=asset_uri,market_items=market_items)
+            nav_html=nav_html,module_panel=lambda area,selected: module_panel(area,selected,resident=fx_population),uri=asset_uri,market_items=market_items,fx_population=fx_population)
+    if area == "aion" and not selected:
+        from atlasquant_interface_final import aion_workspace_html
+        return aion_workspace_html(mode=mode,name=name,show_central=show_central,nav_html=nav_html,uri=asset_uri)
     filename = SURFACES[area][0]
     uri = asset_uri(filename)
     w,h = dimensions(area)
@@ -281,7 +290,14 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     detail = module_panel(area,selected) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
-    hits = "".join(hotspot(area,*row) for row in REGIONS[area])
+    hits = ""
+    for route, label, box in REGIONS[area]:
+        hit = hotspot(area, route, label, box)
+        if area == "investimentos" and box[1] > 400:
+            hit = hit.replace('class="ref-hit"', 'class="ref-hit ref-neutral-region"')
+            start = hit.index('<span'); end = hit.index('</button>')
+            hit = hit[:start] + f'<strong>{escape(label)}</strong><b>—</b><small>PRÉVIA · aguardando dados validados</small>' + hit[end:]
+        hits += hit
     if area == "trader":
         # Explicit requested corrections cover the source's cross-environment row/card labels.
         hits += hotspot(area,"master","Painel Mestre",(1031,411,162,43),visible=True)
@@ -317,12 +333,17 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         posx = 100*x/max(1,w-bw)
         posy = 100*y/max(1,h-bh)
         style = f"aspect-ratio:{bw}/{bh};background-size:{scale}%;background-position:{posx}% {posy}%"
+        neutral = area == "investimentos" and y > 400
+        if neutral:
+            style = "background-image:none"
+            kind = "neutral"
+        art_content = '<b>—</b><small>PRÉVIA · aguardando dados</small>' if neutral else ''
         mobile.append(
             f'<button class="ref-mobile-card ref-mobile-card-{escape(route)} '
             f'ref-mobile-card-{escape(kind)}" data-route="{escape(route)}" '
             f'data-mobile-kind="{escape(kind)}" data-mobile-crop="{x},{y},{bw},{bh}" '
             f'aria-label="{escape(label)}">'
-            f'<span class="ref-mobile-art" style="{style}"></span>'
+            f'<span class="ref-mobile-art" style="{style}">{art_content}</span>'
             f'<strong>{escape(label)}</strong></button>'
         )
     # Replace screenshot identity text with the current authenticated identity.
@@ -338,13 +359,19 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     truth = "" if area == "central" else '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; métricas e execução não validadas</p>'
     from atlasquant_compact_cockpit import header_html
     header=header_html(area,name,mode,top,market_items=market_items) if area != "central" else ""
+    shortcuts = ""
+    if not detail and area in {"negocios", "investimentos"}:
+        from atlasquant_ecosystem_workspace_ui import workspace_modules
+        shortcuts = '<section class="final-workspace-shortcuts" aria-label="Capacidades do ambiente">' + ''.join(
+            f'<button data-route="extended:{escape(item["id"])}"><strong>{escape(item["title"])}</strong><small>{escape(item["state"])} · {escape(item["summary"])}</small></button>'
+            for item in workspace_modules(area)) + '</section>'
     return (f'<section class="ref-workspace ref-{escape(area)}" data-workspace="{escape(area)}" style="{settings}">'
         + header + drawer
         + (f'<div class="ref-detail-layout"><nav class="ref-detail-nav">{nav_html(area,mode)}</nav>{detail}</div>' if detail else
            f'<div class="ref-canvas" role="group" aria-label="{escape(area)} · cockpit AtlasQuant">{sidebar}{hits}</div>'
            f'<div class="ref-mobile-header ref-mobile-header-{escape(area)}" style="{hero_style}"><span class="ref-mobile-kicker">ECOSSISTEMA ATLASQUANT</span><h1>ATLASQUANT · {escape(area.upper())}</h1><p>{escape({"trader":"Mercado, contexto e risco em uma única leitura.","negocios":"Operação B2B, crescimento e automação com controle.","investimentos":"Estratégia hoje. Patrimônio amanhã.","aion":"Inteligência que integra todo o ecossistema.","central":"Poderoso por dentro. Simples por fora."}[area])}</p></div>'
            f'<div class="ref-mobile-grid">{"".join(mobile)}</div>')
-        + truth + "</section>")
+        + shortcuts + truth + "</section>")
 
 
 JS = r"""
@@ -506,7 +533,7 @@ def render_reference_workspace(st, access, area, *, mode=None):
     session = access.get("session") or {}
     name = str(access.get("display_name") or session.get("username") or access.get("username") or "Usuário")
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items")),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population")),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()

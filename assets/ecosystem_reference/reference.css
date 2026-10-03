@@ -337,6 +337,38 @@ button:focus-visible,summary:focus-visible{outline:3px solid #6ee7ff;outline-off
 .cq-functions-note{font-size:11px;color:#c1d9e8;margin:8px 12px;line-height:1.4}
 .cq-functions summary:hover,.cq-functions summary:focus-visible{outline:none;transform:none;box-shadow:inset 0 0 0 2px #6ee7ff}
 .cq-functions nav{max-height:58dvh;overflow-y:auto;overscroll-behavior-y:contain}
+.final-fx-board{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(230px,1fr);gap:16px;align-items:start;margin-top:15px}
+.final-fx-board h2{font-size:17px;color:#b2efff;margin:0 0 8px}.final-top-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.final-fx-card{min-width:0;position:relative;gap:6px;padding:12px;border-radius:12px;box-sizing:border-box;transform:none}
+.final-featured{border:1px solid #41d8ff;background:radial-gradient(ellipse at 80% 0,#147cab55,transparent 70%),linear-gradient(150deg,#123b55,#04101d);box-shadow:inset 0 1px 10px #66e9ff22,0 0 10px #12bcff22}
+.final-featured strong{font-size:21px;color:#f4fcff}.final-position{font-size:27px;color:#64e6ff;line-height:1.1}
+.final-ring{position:absolute;top:14px;right:14px;width:20px;height:20px;border:2px solid #5ce6ff;border-radius:50%;box-shadow:0 0 9px #23cbff66;animation:final-pulse 3s ease-in-out infinite}
+@keyframes final-pulse{50%{box-shadow:0 0 12px #23cbff99}}
+.final-fx-card p{font-size:11px;line-height:1.4;margin:0;color:#c0d7e7;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.final-fx-card span,.final-fx-card small{font-size:11px;line-height:1.35}.final-featured button{background:#28d1ee;color:#031323;font-weight:750;padding:7px 10px;border-radius:7px}
+.final-rest-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.final-secondary{background:#0c1926;border:1px solid #264056;box-shadow:none!important;padding:9px;gap:4px}
+.final-secondary strong{font-size:14px;color:#a9ddf1}.final-secondary small{font-size:8px;color:#a8c0d2}.final-secondary span{font-size:10px}.final-secondary button{font-size:10px;padding:5px 6px}
+.final-empty{border:1px solid #29617e;border-radius:12px;padding:22px;background:linear-gradient(140deg,#0b2743,#030c17);font-size:13px;line-height:1.6}
+.final-fx-card:hover,.final-fx-card:focus-within{transform:none}.final-fx-card button:hover,.final-fx-card button:focus-visible{transform:none;outline:none;box-shadow:inset 0 0 0 2px #9cefff,0 0 10px #34d9ff44}
+.final-core{display:flex;flex-wrap:wrap;gap:7px 14px;align-items:center;padding:13px 16px;border:1px solid #486bd066;border-radius:12px;background:linear-gradient(125deg,#102942,#10142e);margin:10px 0}
+.final-core>span{font-size:35px;color:#6ce5ff;text-shadow:0 0 20px #258bff}.final-core h2{font-size:20px;margin:0;color:#d0f8ff}.final-core p{width:100%;font-size:12px;color:#bfdae9;margin:0}
+.final-role-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.final-role-grid article{min-width:0;border:1px solid #456ea466;background:linear-gradient(135deg,#0c2440,#081120);border-radius:10px;padding:12px}
+.final-role-grid strong{display:block;font-size:13px;color:#bcf0ff;line-height:1.4}.final-role-grid small{font-size:9px;color:#9bb8d4;display:block;margin-bottom:6px}.final-role-grid p{font-size:11px;color:#bfd3e2;line-height:1.5;margin:5px 0 0}
+.final-aion-banner{display:flex;align-items:center;gap:10px;overflow:hidden;border:1px solid #245d81;border-radius:12px;background:#06152a;min-width:0;height:160px}
+.final-aion-banner>div{padding:15px;flex:1;min-width:0}.final-aion-banner h1{margin:0;color:#70dcff;font-size:36px}.final-aion-banner p{font-size:12px;color:#c4e1f3;line-height:1.5}
+.final-aion-banner img{width:48%;height:160px;object-fit:cover;object-position:top right}.final-aion-tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}
+.final-workspace-shortcuts{padding:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.final-workspace-shortcuts button{border:1px solid var(--accent);border-radius:9px;padding:12px;text-align:left;background:#061423;color:#dceaf8;transform:none}.final-workspace-shortcuts small{display:block;color:#acc8da;font-size:10px;margin-top:5px}
+.final-workspace-shortcuts button:focus-visible,.final-workspace-shortcuts button:hover{outline:none;box-shadow:inset 0 0 0 2px var(--accent);transform:none}
+@media(max-width:1050px){.final-role-grid,.final-aion-tools,.final-workspace-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.final-fx-board{grid-template-columns:minmax(0,1.7fr) minmax(190px,1fr)}.final-top-grid{gap:7px}.final-featured strong{font-size:17px}}
+@media(max-width:700px){.final-fx-board{grid-template-columns:minmax(0,1fr)}.final-top-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.final-fx-card{padding:9px}.final-featured strong{font-size:17px}.final-position{font-size:23px}.final-rest-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.final-aion-banner{height:140px}.final-aion-banner img{height:140px}.final-aion-banner h1{font-size:26px}.final-aion-banner p{font-size:11px}.final-role-grid article{padding:10px}.final-role-grid strong{font-size:12px}}
 .cq-workspace:has(.ref-detail) .cq-functions summary span{display:none}
 .cq-workspace:has(.ref-detail) .cq-functions summary{padding:8px 12px}
 @media(max-width:700px){.cq-header .cq-brand small{font-size:8px}.cq-header .cq-brand img.cq-mark{width:34px;height:28px}.cq-header .ref-toolbar{gap:5px;padding:4px 8px;min-height:0}.cq-header .cq-header-actions button{min-height:26px;padding:3px 6px;font-size:10px}.cq-header .cq-brand{line-height:1.1}.cq-header-actions{gap:4px}.cq-workspace:has(.ref-detail) .cq-brand small{display:none}}
+
+.final-secondary .final-position{font-size:13px;color:#9ebccd;text-shadow:none}.final-fx-board{font-family:system-ui,sans-serif}
+
+/* Painted reference numbers are covered by honest native preview states. */
+.ref-investimentos .ref-neutral-region,.ref-investimentos .ref-neutral-region:hover,.ref-investimentos .ref-neutral-region:focus-visible{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(145deg,#101e26,#070f18)!important;border:1px solid #b48a3844;padding:10px;font-size:clamp(10px,1.15vw,16px)}
+.ref-neutral-region strong{color:#e9dab0}.ref-neutral-region b{font-size:30px;color:#97bdd1}.ref-neutral-region small{font-size:clamp(9px,.8vw,12px);color:#b1c3d0;line-height:1.5}
+.ref-mobile-card-neutral .ref-mobile-art{background-image:none!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:95px;background:#0b1a28!important;color:#bccee0}.ref-mobile-card-neutral .ref-mobile-art b{font-size:26px}.ref-mobile-card-neutral small{font-size:10px;padding:0 10px}
+.final-aion-banner img{height:500px;align-self:flex-start;object-position:70% top}

@@ -118,6 +118,7 @@ jobs:
             test_atlasquant_advanced_boot.py \
             test_atlasquant_production_admin_flow.py \
             test_atlasquant_reference_ui.py \
+            test_atlasquant_reference_population.py \
             test_atlasquant_reference_browser.py \
             test_atlasquant_aion_workspaces.py \
             test_atlasquant_aion_ecosystem.py \
@@ -421,4 +422,5 @@ jobs:
           python -m playwright install --with-deps chromium
           python -m pytest -q \
             test_atlasquant_reference_ui.py \
+            test_atlasquant_reference_population.py \
             test_atlasquant_reference_browser.py

@@ -4,6 +4,10 @@ on:
     branches: [main]
     paths:
       - "atlasquant_reference_ui.py"
+      - "atlasquant_interface_final.py"
+      - "atlasquant_access_panel.py"
+      - "atlasquant_home_radar.py"
+      - "atlasquant_backtest_panel.py"
       - "atlasquant_compact_cockpit.py"
       - "atlasquant_central_hub_ui.py"
       - "atlasquant_premium_shell.py"
@@ -29,7 +33,7 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Validate reference assets, authenticated navigation and lazy entry
         run: |
-          python -m pytest -q test_atlasquant_reference_ui.py test_atlasquant_central_hub_ui.py test_atlasquant_premium_shell.py test_atlasquant_ecosystem_workspace_ui.py test_atlasquant_fast_startup.py test_atlasquant_production_admin_flow.py test_atlasquant_access_panel.py test_atlasquant_navigation_bridge.py
+          python -m pytest -q test_atlasquant_reference_ui.py test_atlasquant_reference_population.py test_atlasquant_backtest_panel.py test_atlasquant_backtest_snapshot_history.py test_atlasquant_home_radar.py test_atlasquant_central_hub_ui.py test_atlasquant_premium_shell.py test_atlasquant_ecosystem_workspace_ui.py test_atlasquant_fast_startup.py test_atlasquant_production_admin_flow.py test_atlasquant_access_panel.py test_atlasquant_navigation_bridge.py
       - name: Validate actual desktop and mobile clicks in local Chromium
         run: python -m pytest -q -s test_atlasquant_reference_browser.py
       - name: Save visual evidence
