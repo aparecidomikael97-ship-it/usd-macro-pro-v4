@@ -953,14 +953,22 @@ class AtlasQuantAionAdminTests(unittest.TestCase):
         self.assertIn("Publicados confirmados", src)
         self.assertIn("execução ainda não ocorre nesta tela", src)
 
-    def test_business_is_persistent_evidence_based_and_marketplace_guarded(self):
+    def test_business_workspace_uses_current_five_front_scope_and_preserves_checkpoint_guardrails(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
-        self.assertIn("new_product_candidate(", src)
-        self.assertIn("update_business_checkpoint(", src)
-        self.assertIn("trend_assessment(", src)
-        self.assertIn("marketplace_preflight(", src)
-        self.assertIn("Tendências confirmadas", src)
-        self.assertIn("Nenhum produto é chamado de tendência ou mais vendido sem fonte confirmada.", src)
+        start = src.index("def _render_business(")
+        end = src.index("\ndef _render_laboratory(", start)
+        body = src[start:end]
+        self.assertIn("update_business_checkpoint(", body)
+        self.assertIn("Automação empresarial B2B", body)
+        self.assertIn("Revenue Ops", body)
+        self.assertIn("Micro-SaaS", body)
+        self.assertIn("Serviços Internacionais", body)
+        self.assertIn("Produtos Digitais", body)
+        self.assertIn("LGPD / Auditoria", body)
+        self.assertIn("fail-closed", body)
+        self.assertNotIn("marketplace_preflight(", body)
+        self.assertNotIn("Candidato de produto", body)
+        self.assertNotIn("Afiliados/comissões", body)
 
     def test_promotions_workspace_is_persistent_copy_once_and_provider_guarded(self):
         src = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
