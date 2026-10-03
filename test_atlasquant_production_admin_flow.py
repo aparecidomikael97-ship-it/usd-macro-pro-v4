@@ -118,9 +118,9 @@ class ProductionAdminFlowTests(unittest.TestCase):
         at.run(timeout=180)
         self._assert_clean(at)
         door = self._html(at)
-        self.assertIn("CENTRAL PRINCIPAL", door)
-        self.assertIn("Central AtlasQuant", door)
-        self.assertIn("Escolha o ambiente que você quer abrir.", door)
+        self.assertIn("aq-central-topbar", door)
+        self.assertIn("Bem-vindo, <b>Administrador</b>", door)
+        self.assertIn("Escolha uma área para acessar o seu ecossistema.", door)
         self.assertIn("aq-central-reference-grid", door)
         self.assertIn("ACESSAR TRADER", door)
         self.assertIn("ACESSAR NEGÓCIOS", door)
@@ -163,9 +163,10 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn('data-role="ADMIN"', html)
         self.assertIn("aparecidomikael · ADMIN", html)
         self.assertIn("aq-trader-shell", html)
-        self.assertIn("ATLASQUANT · TRADER", html)
+        self.assertIn('data-trader-reference="v3"', html)
+        self.assertIn("ATLASQUANT · ECOSSISTEMA", html)
         self.assertIn("Poderoso por dentro. Simples por fora.", html)
-        self.assertIn("ORDENS REAIS BLOQUEADAS", html)
+        self.assertIn("Mapa de Risco Global", html)
         self.assertEqual(self.snapshot_calls[0], "atlasquant-runtime")
         self.assertEqual(at.session_state["atlasquant_fast_boot_observability"]["mode"], "Iniciante")
         dock = at.button(key="aq_voice_dock_aion")
@@ -257,9 +258,11 @@ class ProductionAdminFlowTests(unittest.TestCase):
         self.assertIn("não trata o cache como coleta ao vivo", html)
         self.assertIn("aparecidomikael · ADMIN", html)
         self.assertNotIn("aq_radar_advanced_error", at.session_state)
-        advanced_surface = dict(
-            at.session_state.get("atlasquant_surface_health", {}) or {}
-        ).get("advanced_radar", {})
+        try:
+            surface_health = at.session_state["atlasquant_surface_health"]
+        except KeyError:
+            surface_health = {}
+        advanced_surface = dict(surface_health or {}).get("advanced_radar", {})
         if isinstance(advanced_surface, dict):
             self.assertNotEqual(
                 str(advanced_surface.get("state") or "").upper(),

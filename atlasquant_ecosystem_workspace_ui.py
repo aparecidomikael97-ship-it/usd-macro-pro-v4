@@ -19,7 +19,10 @@ _WORKSPACES: dict[str, dict[str, Any]] = {
         "summary": "Macro direciona. ICT/SMC localiza. O Guardião de Risco pode vetar.",
         "tone": "cyan",
         "hero": "Mercado global, leitura por camadas e execução bloqueada até os gates permitirem.",
-        "central_bullets": ("Radar", "Macro & Micro", "ICT / SMC", "Risco"),
+        "central_bullets": (
+            "TradingView / Gráficos", "Radar de Mercado", "Análise Macro", "Geopolítica",
+            "Calendário Econômico", "Laboratório de Estratégias", "Salas e Vídeos", "Ferramentas Avançadas",
+        ),
     },
     "negocios": {
         "title": "Negócios",
@@ -27,7 +30,11 @@ _WORKSPACES: dict[str, dict[str, Any]] = {
         "summary": "Automação B2B, Revenue Ops, Micro-SaaS, serviços internacionais e produtos digitais próprios.",
         "tone": "teal",
         "hero": "Operação B2B organizada por receita, capacidade, margem, cliente e governança.",
-        "central_bullets": ("Automação B2B", "Revenue Ops", "Micro-SaaS", "IA Internacional"),
+        "central_bullets": (
+            "Automação Empresarial B2B", "CRM e Gestão de Clientes", "Revenue Ops / Captação",
+            "Atendimento e Suporte", "Integrações de Negócio", "Relatórios e ROI",
+            "Implantação e Acompanhamento", "Portal do Cliente",
+        ),
     },
     "investimentos": {
         "title": "Investimentos",
@@ -35,7 +42,10 @@ _WORKSPACES: dict[str, dict[str, Any]] = {
         "summary": "Comparação, planejamento, risco, renda e crescimento sem execução financeira automática.",
         "tone": "gold",
         "hero": "Visão patrimonial com alocação, liquidez, risco, objetivos e educação financeira.",
-        "central_bullets": ("Renda Fixa", "Carteira", "Risco", "Planejamento"),
+        "central_bullets": (
+            "Renda Fixa", "Renda Variável", "Fundos e Produtos", "Carteira e Alocação",
+            "Análise de Risco", "Relatórios Patrimoniais", "Educação Financeira", "Planejamento",
+        ),
     },
     "aion": {
         "title": "AION",
@@ -43,7 +53,11 @@ _WORKSPACES: dict[str, dict[str, Any]] = {
         "summary": "Um único AION Core com memória, chat, biblioteca, tarefas, pesquisa e papéis internos.",
         "tone": "violet",
         "hero": "Coordenação, memória e inteligência do ecossistema com autoridade controlada por gates.",
-        "central_bullets": ("Chat", "Memória", "Biblioteca", "Checkpoint"),
+        "central_bullets": (
+            "Assistente Inteligente", "Análise e Recomendações", "Automação de Tarefas",
+            "Conexão com todas as áreas", "Memória e Conhecimento", "Suporte à Decisão",
+            "Auditoria / Checkpoint", "Evolução Contínua",
+        ),
     },
 }
 
@@ -152,12 +166,14 @@ WORKSPACE_CSS = r"""
 .aq-ws-state[data-state="CONECTADO"]{color:#79efc1;border-color:rgba(90,225,171,.35)}.aq-ws-state[data-state="PLANEJADO"]{color:#ffd98a;border-color:rgba(255,205,95,.34)}
 .aq-ws-state[data-state="EM CONSTRUÇÃO"],.aq-ws-state[data-state="EM EVOLUÇÃO"]{color:#ffd38c;border-color:rgba(255,190,80,.28)}
 .aq-ws-connected{margin-top:12px;border-top:1px solid rgba(129,175,226,.16);padding-top:12px}.aq-ws-truth{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.aq-ws-truth span{border:1px solid rgba(126,175,230,.2);border-radius:999px;padding:4px 8px;color:#dceafd;font-size:.56rem;font-weight:850;background:rgba(5,18,40,.58)}
-.aq-central-reference-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}.aq-central-reference-card{position:relative;overflow:hidden;min-height:315px;border:1px solid rgba(108,167,235,.22);border-radius:21px;padding:15px;background:linear-gradient(155deg,rgba(10,31,62,.94),rgba(5,16,36,.95));transition:transform .22s ease,box-shadow .22s ease}
-.aq-central-reference-card:hover{transform:translateY(-5px);box-shadow:0 18px 36px rgba(0,0,0,.3)}.aq-central-reference-card[data-area="negocios"]{border-color:rgba(73,230,178,.26)}.aq-central-reference-card[data-area="investimentos"]{border-color:rgba(255,211,106,.26)}.aq-central-reference-card[data-area="aion"]{border-color:rgba(189,140,255,.3)}
-.aq-central-reference-art{display:grid;place-items:center;height:120px;margin:-2px -2px 12px;border:1px solid rgba(126,182,241,.14);border-radius:15px;background:radial-gradient(circle at 50% 38%,rgba(61,135,255,.2),transparent 58%),linear-gradient(145deg,rgba(12,39,78,.75),rgba(7,19,42,.7))}
-.aq-central-reference-card h3{margin:.1rem 0 .35rem;color:#fff;font-size:1rem}.aq-central-reference-card p{margin:0;color:#c6d8ec;font-size:.68rem;line-height:1.4;min-height:3.8em}
-.aq-central-reference-list{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:10px 0}.aq-central-reference-list span{border:1px solid rgba(119,174,232,.13);border-radius:8px;padding:5px 6px;color:#ddecfb;font-size:.56rem;font-weight:780;background:rgba(7,20,43,.58)}
-.aq-central-reference-cta{display:flex;align-items:center;justify-content:center;border:1px solid rgba(95,174,255,.32);border-radius:10px;min-height:34px;color:#fff;font-size:.66rem;font-weight:900;letter-spacing:.03em;background:linear-gradient(90deg,rgba(26,94,164,.76),rgba(70,69,174,.7))}
+.aq-central-reference-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:stretch}.aq-central-reference-card{--card-accent:#28a8ff;--card-glow:rgba(40,168,255,.28);position:relative;overflow:hidden;display:flex;flex-direction:column;min-height:520px;border:1px solid color-mix(in srgb,var(--card-accent) 62%,transparent);border-radius:16px;padding:0 14px 14px;background:linear-gradient(180deg,rgba(5,17,36,.98),rgba(3,10,23,.985));box-shadow:0 16px 38px rgba(0,0,0,.34),inset 0 0 28px rgba(30,104,190,.05);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.aq-central-reference-card[data-area="negocios"]{--card-accent:#34e3a4;--card-glow:rgba(52,227,164,.24)}.aq-central-reference-card[data-area="investimentos"]{--card-accent:#f0bd58;--card-glow:rgba(240,189,88,.24)}.aq-central-reference-card[data-area="aion"]{--card-accent:#c05cff;--card-glow:rgba(192,92,255,.27)}
+.aq-central-reference-card:hover{transform:translateY(-5px);box-shadow:0 22px 46px rgba(0,0,0,.42),0 0 26px var(--card-glow)}
+.aq-central-reference-art{position:relative;display:grid;place-items:center;height:164px;margin:0 -14px 14px;border:0;border-bottom:1px solid color-mix(in srgb,var(--card-accent) 38%,transparent);border-radius:15px 15px 0 0;background:radial-gradient(circle at 50% 55%,var(--card-glow),transparent 52%),linear-gradient(145deg,rgba(11,39,79,.88),rgba(4,14,31,.94))}
+.aq-central-reference-art:after{content:"";position:absolute;inset:auto 0 0;height:48%;background:linear-gradient(180deg,transparent,rgba(1,6,16,.68));pointer-events:none}.aq-central-reference-art .aq-central-art{width:100%;height:100%;object-fit:cover;filter:drop-shadow(0 0 16px var(--card-glow))}
+.aq-central-reference-card h3{margin:.1rem 0 .3rem;color:#fff;font-size:1.22rem;letter-spacing:.01em;text-transform:uppercase}.aq-central-reference-card p{margin:0;color:#aebdd2;font-size:.70rem;line-height:1.42;min-height:3.1em}
+.aq-central-reference-list{display:grid;grid-template-columns:1fr;gap:4px;margin:12px 0 14px;padding-top:10px;border-top:1px solid rgba(130,174,225,.12)}.aq-central-reference-list span{position:relative;border:0;border-radius:0;padding:3px 4px 3px 18px;color:#d9e4f2;font-size:.62rem;font-weight:720;background:transparent}.aq-central-reference-list span:before{content:"◈";position:absolute;left:2px;top:2px;color:var(--card-accent);font-size:.63rem}
+.aq-central-reference-cta{display:flex;align-items:center;justify-content:center;margin-top:auto;border:1px solid color-mix(in srgb,var(--card-accent) 68%,transparent);border-radius:9px;min-height:42px;color:#fff;font-size:.68rem;font-weight:900;letter-spacing:.03em;background:linear-gradient(90deg,color-mix(in srgb,var(--card-accent) 22%,#071426),rgba(6,17,37,.92));box-shadow:0 0 18px var(--card-glow)}
 @keyframes aq-ws-orbit{from{transform:rotate(0) scaleX(.45)}to{transform:rotate(360deg) scaleX(.45)}}
 @media (max-width:1100px){.aq-central-reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:800px){.aq-ws-layout{grid-template-columns:1fr}.aq-ws-side{display:none}.aq-ws-hero{grid-template-columns:1fr}.aq-ws-orb{width:110px;height:110px}.aq-ws-modules{grid-template-columns:repeat(2,minmax(0,1fr))}}
