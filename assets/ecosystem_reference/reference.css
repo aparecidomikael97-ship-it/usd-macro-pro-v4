@@ -174,3 +174,32 @@ button:focus-visible,summary:focus-visible{outline:3px solid #6ee7ff;outline-off
  .ref-preview-grid article{min-height:92px;padding:14px}
  .ref-preview-grid strong{font-size:14px}
 }
+
+
+/* Fidelity polish v5 — production-mobile hotfix from real handset evidence. */
+@media(max-width:700px){
+ .ref-workspace{overflow-x:clip}
+ .ref-toolbar{width:calc(100% - 16px);min-width:0;overflow:hidden}
+ .ref-toolbar-context{
+  flex:1 1 72px;max-width:none!important;min-width:0;margin-left:0!important;
+  justify-content:flex-end;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+ }
+ .ref-mobile-card{contain:paint}
+ .ref-mobile-art{background-color:#061020;background-clip:padding-box}
+ .ref-central .ref-mobile-header{min-height:96px;padding-block:14px}
+ .ref-central .ref-mobile-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 8px 10px}
+ .ref-central .ref-mobile-art{aspect-ratio:4/3!important}
+ .ref-central .ref-mobile-card strong{
+  display:grid;place-items:center;min-height:34px;padding:7px 6px 8px;
+  font-size:10px;line-height:1.2
+ }
+ .ref-trader .ref-mobile-card-news .ref-mobile-art{background-color:#061020}
+ .ref-trader .ref-mobile-card-master .ref-mobile-art{aspect-ratio:2/1!important;background-color:#061020}
+}
+@media(max-width:420px){
+ .ref-toolbar{gap:4px}
+ .ref-toolbar button{padding-inline:7px;font-size:9px}
+ .ref-toolbar-context{flex-basis:58px;font-size:9px!important}
+ .ref-central .ref-mobile-grid{gap:6px;padding-inline:6px}
+ .ref-central .ref-mobile-card strong{font-size:9px}
+}
