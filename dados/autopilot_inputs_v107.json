@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-03T00:28:22.468882+00:00",
+  "generated_at": "2026-10-03T00:53:24.992963+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -55,7 +55,7 @@
       "Score final": 91.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -17.8,
+      "Dif. macro": -17.1,
       "Índice ranking": 82.5
     },
     {
@@ -73,7 +73,7 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -13.1,
+      "Dif. macro": -12.7,
       "Índice ranking": 69.4
     }
   ],
@@ -299,7 +299,7 @@
       "forca": 0.438,
       "titulos": [
         "Traders now see little chance of a Fed rate hike in October after weak jobs report - CNBC",
-        "J.P. Morgan sees Fed rate hikes going out with a bang this year - finance.yahoo.com",
+        "J.P. Morgan sees Fed rate hikes going out with a bang this year - Yahoo Finance",
         "Markets Brace For Two More Fed Rate Hikes In 2026 - Forbes",
         "Which industries are most affected by Fed rate hikes? - Chase Bank",
         "Fed's Barr says more rate hikes likely to be needed to curb inflation - Reuters",
@@ -323,9 +323,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "J.P. Morgan sees Fed rate hikes going out with a bang this year - finance.yahoo.com",
+          "titulo": "J.P. Morgan sees Fed rate hikes going out with a bang this year - Yahoo Finance",
           "corpo": "J.P. Morgan sees Fed rate hikes going out with a bang this year",
-          "fonte": "finance.yahoo.com",
+          "fonte": "Yahoo Finance",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.75,
@@ -439,14 +439,14 @@
         "juros": 3.75,
         "inflacao": 3.35302,
         "pib": 2.19157,
-        "sentimento": 48.148148148148145,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
         "juros": 2.5,
         "inflacao": 3.22645,
         "pib": 1.6603,
-        "sentimento": 50.0,
+        "sentimento": 57.14285714285714,
         "fonte": "FRED + transformação anual"
       },
       "GBP": {
@@ -481,7 +481,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 45.45454545454545,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -540,14 +540,14 @@
         "juros": 3.8,
         "inflacao": 3.4,
         "pib": 2.2,
-        "sentimento": 48.1,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.4,
         "n_juros": 65.816,
         "n_inflacao": 62.67743,
         "n_pib": 73.09578815534078,
-        "n_sentimento": 48.148148148148145,
+        "n_sentimento": 50.0,
         "n_emprego": 44.675,
         "n_atividade": 52.0,
         "Pontuação_Macro": 57.7,
@@ -570,6 +570,41 @@
           "unrounded_final": 59.792077400000004
         },
         "Posição": 2
+      },
+      {
+        "Código": "AUD",
+        "juros": 4.5,
+        "inflacao": 2.7,
+        "pib": 2.1,
+        "sentimento": 50.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Australiano",
+        "juros_reais": 1.8,
+        "n_juros": 41.51392008219665,
+        "n_inflacao": 45.45454545454547,
+        "n_pib": 70.40481809880697,
+        "n_sentimento": 50.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 50.7,
+        "Influência_Fed": -3.5,
+        "Pontuação_Final": 47.1,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 8.30278401643933,
+            "Inflação": 6.81818181818182,
+            "PIB": 10.560722714821045,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 5.0
+          },
+          "fed": -3.5478,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 47.1338885494422
+        },
+        "Posição": 3
       },
       {
         "Código": "GBP",
@@ -603,41 +638,6 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 47.133022465771155
-        },
-        "Posição": 3
-      },
-      {
-        "Código": "AUD",
-        "juros": 4.5,
-        "inflacao": 2.7,
-        "pib": 2.1,
-        "sentimento": 45.5,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Australiano",
-        "juros_reais": 1.8,
-        "n_juros": 41.51392008219665,
-        "n_inflacao": 45.45454545454547,
-        "n_pib": 70.40481809880697,
-        "n_sentimento": 45.45454545454545,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 50.2,
-        "Influência_Fed": -3.5,
-        "Pontuação_Final": 46.7,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 8.30278401643933,
-            "Inflação": 6.81818181818182,
-            "PIB": 10.560722714821045,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 4.545454545454546
-          },
-          "fed": -3.5478,
-          "other": {
-            "Limite da escala 0–100": 7.105427357601002e-15
-          },
-          "unrounded_final": 46.679343094896744
         },
         "Posição": 4
       },
@@ -681,19 +681,19 @@
         "juros": 2.5,
         "inflacao": 3.2,
         "pib": 1.7,
-        "sentimento": 50.0,
+        "sentimento": 57.1,
         "fonte": "FRED + transformação anual",
         "Moeda": "Euro",
         "juros_reais": -0.7,
         "n_juros": 8.102429675099287,
         "n_inflacao": 61.40757575757575,
         "n_pib": 46.58676419956989,
-        "n_sentimento": 50.0,
+        "n_sentimento": 57.14285714285714,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 42.8,
+        "Pontuação_Macro": 43.5,
         "Influência_Fed": -0.8,
-        "Pontuação_Final": 42.0,
+        "Pontuação_Final": 42.7,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 1.6204859350198575,
@@ -701,13 +701,13 @@
             "PIB": 6.988014629935484,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 5.0
+            "Sentimento": 5.714285714285714
           },
           "fed": -0.7884000000000001,
           "other": {
-            "Limite da escala 0–100": 0.0
+            "Limite da escala 0–100": 7.105427357601002e-15
           },
-          "unrounded_final": 42.0312369285917
+          "unrounded_final": 42.74552264287742
         },
         "Posição": 6
       },
