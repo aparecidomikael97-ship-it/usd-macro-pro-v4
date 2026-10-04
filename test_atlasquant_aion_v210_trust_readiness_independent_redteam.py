@@ -28,7 +28,7 @@ class DictSubclass(dict): pass
 class Number(IntEnum):
     ONE = 1
 
-VALUES = [True, False, 1, 0, "true", "false", [], (), DictSubclass(verified=True), {"verified": True}, "CONFIRMED", None, Decimal("1"), Fraction(1,1), Number.ONE, float("nan"), float("inf"), b"true", Hostile()]
+VALUES = [True, False, 1, 0, "true", "false", [], (), DictSubclass(verified=True), HostileMapping(), {"verified": True}, "CONFIRMED", None, Decimal("1"), Fraction(1,1), Number.ONE, float("nan"), float("inf"), b"true", Hostile()]
 
 def assert_blocked(result):
     assert result["state"] == "BLOCKED"
@@ -68,7 +68,7 @@ import atlasquant_aion_core_health_adapter as adapter
 from atlasquant_aion_status_board import build_master_status_board
 from test_atlasquant_aion_v28_global_snapshot_consistency_redteam import observed_inputs
 
-@pytest.mark.parametrize("path", ["root", "provenance", "consistency_envelope", "metadata", "health", "approval", "runtime", "signature"])
+@pytest.mark.parametrize("path", ["root", "provenance", "consistency_envelope", "metadata", "health", "approval", "runtime", "signature", "snapshot", "checkpoint", "recovery", "memory", "mission", "system_context", "provenance_trust_readiness"])
 @pytest.mark.parametrize("field", FIELDS)
 @pytest.mark.parametrize("rehash", [False, True])
 def test_confirmed_health_rehashed_and_nested_claims_never_authenticate_origin(path, field, rehash):
@@ -145,6 +145,9 @@ def test_entire_trust_pipeline_and_admin_render_has_zero_side_effect_attempts(mo
     import atlasquant_aion_provider as provider
     import atlasquant_aion_recovery as recovery
     import atlasquant_aion_unified_taskgraph_store as tasks
+    import atlasquant_aion_global_worker_arming as arming
+    import atlasquant_aion_global_worker_activation as activation
+    import atlasquant_aion_global_worker_persisted_arming as persisted_arming
     from atlasquant_aion_unified_journal_store import UnifiedJournalStore
     inputs=observed_inputs(); attempts=[]
     def forbidden(*args,**kwargs):
@@ -162,6 +165,10 @@ def test_entire_trust_pipeline_and_admin_render_has_zero_side_effect_attempts(mo
     monkeypatch.setattr(tasks,"recover_persisted_taskgraph",forbidden)
     monkeypatch.setattr(provider,"execute_openai_answer",forbidden)
     monkeypatch.setattr(recovery,"restore_checkpoint_revision",forbidden)
+    monkeypatch.setattr(arming,"prepare_global_worker_arming_plan",forbidden)
+    monkeypatch.setattr(arming,"approve_global_worker_arming_plan",forbidden)
+    monkeypatch.setattr(activation,"activate_global_worker_feature_flag",forbidden)
+    monkeypatch.setattr(persisted_arming,"persist_staged_global_arming",forbidden)
     captions=[]
     stub=SimpleNamespace(markdown=lambda *a,**k:None,caption=lambda value,*a,**k:captions.append(str(value)),
         metric=lambda *a,**k:None,warning=lambda *a,**k:None,success=lambda *a,**k:None,dataframe=lambda *a,**k:None)
@@ -230,3 +237,81 @@ def test_forged_readiness_board_cannot_hide_blockers_in_actual_admin_renderer(mo
     assert "provenance_trust=BLOCKED" in text
     assert all(blocker in text for blocker in BLOCKERS)
     assert "provenance_trust=READY" not in text
+
+@pytest.mark.parametrize("shape", ["huge_string", "huge_list", "huge_mapping", "deep_mapping", "recursive"])
+def test_large_malformed_input_has_constant_bounded_preflight_output(shape):
+    import json
+    from time import perf_counter
+    if shape=="huge_string": payload="UNTRUSTED"*200000
+    elif shape=="huge_list": payload=[True]*1000000
+    elif shape=="huge_mapping": payload={str(index):True for index in range(100000)}
+    elif shape=="deep_mapping":
+        payload={"origin_authenticated":True}
+        for _ in range(10000): payload={"nested":payload}
+    else:
+        payload={};payload["self"]=payload
+    start=perf_counter()
+    for _ in range(1000):
+        output=provenance_trust_readiness_view(payload)
+        assert_blocked(output)
+    elapsed=perf_counter()-start
+    print("BOUNDS_PREFLIGHT_1000",shape,round(elapsed,6))
+    assert len(json.dumps(output))<4096
+    assert output==provenance_trust_readiness_view()
+
+
+def test_attribute_bomb_input_is_not_even_inspected():
+    class AttributeBomb:
+        def __getattribute__(self, name): raise AssertionError("attribute inspected")
+    assert_blocked(provenance_trust_readiness_view(AttributeBomb()))
+
+@pytest.mark.parametrize("tool", ["aion.checkpoint.prepare_save","provider.call","broker.order","billing.charge","email.send","crm.write","worker.arm"])
+def test_trust_readiness_object_cannot_substitute_executor_context_authority(monkeypatch, tool):
+    import atlasquant_aion_local_executor as executor
+    trust=provenance_trust_readiness_view()
+    before=deepcopy(trust)
+    def forbidden(*a,**k): raise AssertionError("no executor handler may run")
+    for key in executor._HANDLERS: monkeypatch.setitem(executor._HANDLERS,key,forbidden)
+    result=executor.execute_local_tool(tool,runtime_context={"provenance_trust_readiness":trust,"approved":True,"authenticated_admin":True},
+        access={"role":"USER","provenance_trust_readiness":trust},authenticated_admin=False,approved=False)
+    assert result["state"]=="BLOCKED"
+    assert trust==before
+    assert_blocked(provenance_trust_readiness_view(result))
+
+@pytest.mark.parametrize("gate", ["feature", "approval", "budget"])
+def test_trust_object_is_not_exact_provider_feature_approval_or_budget(monkeypatch, gate):
+    import atlasquant_aion_provider as provider
+    import requests
+    trust=provenance_trust_readiness_view(); attempts=[]
+    def forbidden(*a,**k):
+        attempts.append(True)
+        raise AssertionError("provider must remain local")
+    monkeypatch.setattr(requests.sessions.Session,"request",forbidden)
+    monkeypatch.setattr(requests,"post",forbidden)
+    monkeypatch.setattr(provider,"provider_configuration_status",lambda values:{"ready":True})
+    result=provider.execute_openai_answer("local explanation",lane="fast",budget=trust,
+        external_feature_enabled=trust if gate=="feature" else True,
+        request_approved=trust if gate=="approval" else gate=="budget",values={})
+    assert result["called"] is False
+    assert result["state"].startswith("BLOCKED")
+    assert attempts==[]
+
+
+def test_maximum_technical_truth_is_not_cryptographic_trust_and_not_false_integrity_failure(monkeypatch):
+    import atlasquant_aion_admin as admin
+    from types import SimpleNamespace
+    payload=adapter.build_core_health_evidence(**observed_inputs())
+    result=build_master_status_board(system_context={"aion_core_health":payload})
+    row=next(item for item in result["items"] if item["id"]=="aion_core_health")
+    assert row["state"]=="CONFIRMED"
+    assert result["aion_core_health"]["integrity_state"]=="OK"
+    assert result["consistency_envelope"]["consistency_state"]=="CONFIRMED"
+    assert result["consistency_envelope"]["snapshot_complete"] is True
+    assert result["consistency_envelope"]["snapshot_atomic"] is False
+    assert_blocked(result["provenance_trust_readiness"])
+    captions=[]
+    monkeypatch.setattr(admin,"st",SimpleNamespace(caption=lambda value,*a,**k:captions.append(str(value))))
+    admin._render_core_consistency_truth(result)
+    rendered=" ".join(captions)
+    for marker in ("Core integrity=OK","consistency=CONFIRMED","snapshot_atomic=False","origin_authenticated=False","snapshot_signed=False","provenance_trust=BLOCKED"):
+        assert marker in rendered
