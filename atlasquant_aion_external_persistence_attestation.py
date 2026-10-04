@@ -30,6 +30,9 @@ from atlasquant_aion_core_freeze_preflight import (
     verify_preflight_still_current,
 )
 from atlasquant_aion_memory import (
+    DEFAULT_RUNTIME_REPO,
+    RUNTIME_PATH,
+    SCHEMA as MEMORY_SCHEMA,
     WRITE_RECEIPT_SCHEMA,
     checkpoint_source_digest,
     ensure_operating_checkpoint,
@@ -43,6 +46,9 @@ BINDING_SCHEMA = "ATLASQUANT_AION_CHECKPOINT_RUNTIME_BINDING_V1"
 SIGNING_SCHEMA = "ATLASQUANT_AION_OWNER_SIGNATURE_CHALLENGE_V1"
 NAMESPACE = "aion_core_checkpoint_master_v1"
 MAX_RUNTIME_OBSERVATION_AGE_SECONDS = 300
+EXPECTED_RUNTIME_REPO = DEFAULT_RUNTIME_REPO
+EXPECTED_RUNTIME_BRANCH = "atlasquant-runtime"
+EXPECTED_RUNTIME_PATH = RUNTIME_PATH
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _HEX16_RE = re.compile(r"^[0-9a-f]{16}$")
@@ -273,6 +279,8 @@ def verify_external_checkpoint_persistence(
     runtime = dict(runtime_result or {}) if isinstance(runtime_result, Mapping) else {}
     receipt = dict(write_receipt or {}) if isinstance(write_receipt, Mapping) else {}
 
+    if runtime.get("schema") != MEMORY_SCHEMA:
+        blockers.append("RUNTIME_SCHEMA_INVALID")
     if str(runtime.get("status") or "").upper() != "CONFIRMED":
         blockers.append("RUNTIME_NOT_CONFIRMED")
     runtime_sha = str(runtime.get("sha") or "").strip().lower()
@@ -307,7 +315,13 @@ def verify_external_checkpoint_persistence(
             require_runtime_branch(target_branch)
         except Exception:
             blockers.append("WRITE_RECEIPT_RUNTIME_BRANCH_UNSAFE")
-        expected_source = f"GitHub:{target_branch}:{target_path}"
+        if target_repo != EXPECTED_RUNTIME_REPO:
+            blockers.append("WRITE_RECEIPT_TARGET_MISMATCH:repo")
+        if target_branch != EXPECTED_RUNTIME_BRANCH:
+            blockers.append("WRITE_RECEIPT_TARGET_MISMATCH:branch")
+        if target_path != EXPECTED_RUNTIME_PATH:
+            blockers.append("WRITE_RECEIPT_TARGET_MISMATCH:path")
+        expected_source = f"GitHub:{EXPECTED_RUNTIME_BRANCH}:{EXPECTED_RUNTIME_PATH}"
         if str(runtime.get("source") or "").strip() != expected_source:
             blockers.append("RUNTIME_SOURCE_MISMATCH")
 
@@ -416,6 +430,9 @@ __all__ = [
     "SIGNING_SCHEMA",
     "NAMESPACE",
     "MAX_RUNTIME_OBSERVATION_AGE_SECONDS",
+    "EXPECTED_RUNTIME_REPO",
+    "EXPECTED_RUNTIME_BRANCH",
+    "EXPECTED_RUNTIME_PATH",
     "build_runtime_binding",
     "stage_runtime_persistence_candidate",
     "verify_external_checkpoint_persistence",
