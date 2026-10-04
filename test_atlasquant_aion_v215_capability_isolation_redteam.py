@@ -475,3 +475,44 @@ def test_verified_scope_never_calls_tool_or_expands_permissions(tmp_path):
     assert result["external_action_executed"] is False
     assert result["real_trading_enabled"] is False
     assert result["execution_allowed"] is False
+
+
+def test_child_cannot_switch_to_another_active_trust_root(tmp_path):
+    parent_private, parent_public = keypair()
+    child_private, child_public = keypair()
+    roots = TrustRootRegistry.from_mapping({
+        "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
+        "roots": [
+            {
+                "key_id": "root-1", "key_version": 1, "algorithm": "Ed25519",
+                "public_key_b64": parent_public, "status": "ACTIVE",
+                "not_before": "2026-10-01T00:00:00Z",
+                "not_after": "2027-10-01T00:00:00Z",
+            },
+            {
+                "key_id": "root-2", "key_version": 1, "algorithm": "Ed25519",
+                "public_key_b64": child_public, "status": "ACTIVE",
+                "not_before": "2026-10-01T00:00:00Z",
+                "not_after": "2027-10-01T00:00:00Z",
+            },
+        ],
+        "revoked_key_ids": [],
+    })
+    nonces = PersistentNonceRegistry(tmp_path / "nonces.sqlite3")
+    p = parent_statement()
+    s = scope_grant(key_id="root-2")
+    result = verify_capability_scope(
+        p,
+        parent_signature_b64=sign_parent(parent_private, p),
+        scope_grant=s,
+        scope_signature_b64=sign_scope(child_private, s),
+        trust_roots=roots,
+        nonce_registry=nonces,
+        now_ts=NOW,
+        expected_binding=BINDING,
+        expected_workspace_id=WORKSPACE,
+        actor_role="ADMIN",
+        requested_action="read",
+    )
+    assert result["state"] == "BLOCKED"
+    assert "SCOPE_SIGNER_MISMATCH_PARENT" in result["blockers"]
