@@ -193,6 +193,7 @@ def _review_material(review: Mapping[str, Any]) -> dict[str, Any]:
         "certification_verified": review.get("certification_verified"),
         "canonical_gates_green": review.get("canonical_gates_green"),
         "global_worker_readiness_green": review.get("global_worker_readiness_green"),
+        "owner_review_ready": review.get("owner_review_ready"),
         "blockers": review.get("blockers"),
         "state": review.get("state"),
     }
@@ -236,6 +237,7 @@ def build_core_completion_review(
         "global_worker_readiness_green": verification[
             "global_worker_readiness_green"
         ] is True,
+        "owner_review_ready": ready,
         "blockers": unique,
         "state": "READY_FOR_OWNER_REVIEW" if ready else "BLOCKED",
     }
@@ -243,7 +245,6 @@ def build_core_completion_review(
     return {
         **body,
         "review_digest": review_digest,
-        "owner_review_ready": ready,
         "owner_decision_recorded": False,
         "core_complete": False,
         "core_complete_claim_allowed": False,
@@ -272,6 +273,9 @@ def build_checkpoint_patch_candidate(
         raise ValueError("core completion review digest mismatch")
     if row.get("state") not in {"READY_FOR_OWNER_REVIEW", "BLOCKED"}:
         raise ValueError("core completion review state invalid")
+    expected_ready = row.get("state") == "READY_FOR_OWNER_REVIEW"
+    if row.get("owner_review_ready") is not expected_ready:
+        raise ValueError("owner review readiness mismatch")
     for field in (
         "core_complete",
         "core_complete_claim_allowed",
