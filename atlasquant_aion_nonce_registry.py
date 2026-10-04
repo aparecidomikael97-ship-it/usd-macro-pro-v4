@@ -31,13 +31,15 @@ class PersistentNonceRegistry:
 
     def _connect(self):
         conn = sqlite3.connect(str(self.path), timeout=10.0, isolation_level=None)
-        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=FULL")
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
 
     def _initialize(self):
         with self._connect() as conn:
+            # WAL mode is persistent for the database. Set it once during
+            # initialization instead of on every competing claim connection.
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS nonce_claims (
