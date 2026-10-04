@@ -223,6 +223,13 @@ def build_core_freeze_preflight(
         "worker_armed": False,
         "external_action_executed": False,
         "executes_action": False,
+        "owner_decision": "UNDECIDED",
+        "requires_explicit_human_owner_action": True,
+        "requires_checkpoint_state_match_at_decision_time": True,
+        "requires_fresh_challenge_at_decision_time": True,
+        "approval_is_not_execution_authority": True,
+        "automatic_freeze": False,
+        "automatic_checkpoint_write": False,
         "blockers": unique,
         "state": "READY_FOR_OWNER_DECISION" if ready else "BLOCKED",
     }
@@ -233,13 +240,6 @@ def build_core_freeze_preflight(
         "challenge_digest": challenge_digest,
         "digest_to_sign": challenge_digest if ready else "",
         "owner_decision_ready": ready,
-        "owner_decision": "UNDECIDED",
-        "requires_explicit_human_owner_action": True,
-        "requires_checkpoint_state_match_at_decision_time": True,
-        "requires_fresh_challenge_at_decision_time": True,
-        "approval_is_not_execution_authority": True,
-        "automatic_freeze": False,
-        "automatic_checkpoint_write": False,
     }
 
 
@@ -265,13 +265,6 @@ def verify_preflight_still_current(
             "challenge_digest",
             "digest_to_sign",
             "owner_decision_ready",
-            "owner_decision",
-            "requires_explicit_human_owner_action",
-            "requires_checkpoint_state_match_at_decision_time",
-            "requires_fresh_challenge_at_decision_time",
-            "approval_is_not_execution_authority",
-            "automatic_freeze",
-            "automatic_checkpoint_write",
         }
     }):
         blockers.append("PREFLIGHT_CHALLENGE_DIGEST_MISMATCH")
@@ -300,6 +293,8 @@ def verify_preflight_still_current(
             if reconstructed["revision"] != row.get("checkpoint_revision"):
                 blockers.append("CHECKPOINT_REVISION_CHANGED")
 
+    if row.get("owner_decision") != "UNDECIDED":
+        blockers.append("OWNER_DECISION_MUST_REMAIN_UNDECIDED_IN_PREFLIGHT")
     for field in (
         "owner_decision_recorded",
         "signature_active",
@@ -314,6 +309,8 @@ def verify_preflight_still_current(
         "worker_armed",
         "external_action_executed",
         "executes_action",
+        "automatic_freeze",
+        "automatic_checkpoint_write",
     ):
         if row.get(field) is not False:
             blockers.append(f"UNSAFE_PREFLIGHT_FIELD:{field}")
