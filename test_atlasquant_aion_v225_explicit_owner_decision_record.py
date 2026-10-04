@@ -133,7 +133,7 @@ def test_decision_request_requires_second_signature_and_does_not_record_decision
     assert built["external_action_executed"] is False
 
 
-def test_valid_approve_records_decision_but_never_authorizes_freeze_execution(tmp_path):
+def test_valid_approve_verifies_decision_pending_persistence_and_never_authorizes_freeze_execution(tmp_path):
     secret, roots, evidence, v224_request, v224_signature, built = decision_fixture()
     result = verify_fixture(
         secret=secret,
@@ -145,14 +145,19 @@ def test_valid_approve_records_decision_but_never_authorizes_freeze_execution(tm
         registry=PersistentNonceRegistry(tmp_path / "decision.sqlite3"),
     )
     assert result["schema"] == RESULT_SCHEMA
-    assert result["state"] == "OWNER_DECISION_RECORDED_APPROVE"
+    assert result["state"] == "OWNER_DECISION_VERIFIED_APPROVE_PENDING_PERSISTENCE"
     assert result["owner_identity_signature_verified"] is True
     assert result["owner_decision_signature_verified"] is True
-    assert result["owner_decision_recorded"] is True
+    assert result["owner_decision_verified"] is True
+    assert result["owner_decision_recorded"] is False
+    assert result["decision_record_persisted"] is False
     assert result["owner_decision"] == "APPROVE_CORE_FREEZE"
     assert result["core_freeze_approved"] is True
     assert result["core_freeze_denied"] is False
     assert result["requires_separate_core_freeze_ceremony"] is True
+    assert result["core_freeze_ceremony_eligible"] is False
+    assert result["eligible_for_core_freeze_ceremony_after_persistence"] is True
+    assert result["requires_decision_record_persistence"] is True
     assert result["core_freeze_execution_authorized"] is False
     assert result["core_freeze_authorized"] is False
     assert result["core_frozen"] is False
@@ -166,7 +171,7 @@ def test_valid_approve_records_decision_but_never_authorizes_freeze_execution(tm
     assert result["decision_signature_performed_by_this_module"] is False
 
 
-def test_valid_deny_records_deny_and_never_opens_freeze_path(tmp_path):
+def test_valid_deny_verifies_deny_pending_persistence_and_never_opens_freeze_path(tmp_path):
     secret, roots, evidence, v224_request, v224_signature, built = decision_fixture(
         decision="DENY_CORE_FREEZE"
     )
@@ -179,11 +184,14 @@ def test_valid_deny_records_deny_and_never_opens_freeze_path(tmp_path):
         built=built,
         registry=PersistentNonceRegistry(tmp_path / "decision.sqlite3"),
     )
-    assert result["state"] == "OWNER_DECISION_RECORDED_DENY"
+    assert result["state"] == "OWNER_DECISION_VERIFIED_DENY_PENDING_PERSISTENCE"
     assert result["owner_decision"] == "DENY_CORE_FREEZE"
     assert result["core_freeze_approved"] is False
     assert result["core_freeze_denied"] is True
     assert result["requires_separate_core_freeze_ceremony"] is False
+    assert result["core_freeze_ceremony_eligible"] is False
+    assert result["eligible_for_core_freeze_ceremony_after_persistence"] is False
+    assert result["requires_decision_record_persistence"] is True
     assert result["core_freeze_execution_authorized"] is False
     assert result["core_frozen"] is False
 
@@ -278,7 +286,7 @@ def test_decision_signature_replay_is_blocked_durably(tmp_path):
         registry=registry,
         decision_signature=sig,
     )
-    assert first["state"] == "OWNER_DECISION_RECORDED_APPROVE"
+    assert first["state"] == "OWNER_DECISION_VERIFIED_APPROVE_PENDING_PERSISTENCE"
 
     second = verify_fixture(
         secret=secret,
@@ -474,7 +482,12 @@ def test_checkpoint_patch_candidate_is_generated_atomically_only_after_verificat
     assert candidate["requires_explicit_checkpoint_save"] is True
     assert candidate["automatic_checkpoint_write"] is False
     assert candidate["checkpoint_saved"] is False
+    assert candidate["decision_record_persisted"] is False
+    assert candidate["requires_persistence_attestation"] is True
     record = candidate["patch"]["aion_core_owner_decision"]
+    assert record["owner_decision_verified"] is True
+    assert record["owner_decision_recorded"] is False
+    assert record["decision_record_persisted"] is False
     assert record["owner_decision"] == "APPROVE_CORE_FREEZE"
     assert record["core_freeze_approved"] is True
     assert record["core_freeze_execution_authorized"] is False
