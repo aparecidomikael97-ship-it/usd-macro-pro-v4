@@ -129,8 +129,11 @@ escolhas canônicas.
 
 ## Checkpoint Mestre
 
-Após uma decisão V2.25 válida, o módulo pode gerar somente um **patch candidate**
-lógico:
+Após uma decisão V2.25 válida, a própria verificação criptográfica gera
+atomicamente um **patch candidate** lógico. Não existe API pública que aceite um
+objeto `verified_decision` fornecido pelo caller como autoridade.
+
+O namespace é:
 
 `aion_core_owner_decision`
 
