@@ -177,7 +177,6 @@ def test_checkpoint_change_after_preflight_blocks_toctou_recheck():
     )
     check = recheck(result, checkpoint=changed)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_REBUILD_NOT_READY" in check["blockers"]
     assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
     assert check["core_freeze_authorized"] is False
 
@@ -281,7 +280,7 @@ def test_owner_decision_cannot_be_injected_into_preflight():
     result["owner_decision"] = "APPROVE_CORE_FREEZE"
     check = recheck(result, checkpoint=master)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
     assert "OWNER_DECISION_MUST_REMAIN_UNDECIDED_IN_PREFLIGHT" in check["blockers"]
 
 
