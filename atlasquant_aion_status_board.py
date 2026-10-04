@@ -739,6 +739,7 @@ def build_master_status_board(
             + f" · aprovação={core_count_detail('waiting_approval')}"
             + f" · consistency={core_consistency['consistency_state']}"
             + f" · snapshot_complete={core_consistency['snapshot_complete']} · snapshot_atomic=False"
+            + " · origin_authenticated=False · snapshot_signed=False"
         ),
         source="system_context.aion_core_health -> AION core_health_snapshot",
         next_action=(
