@@ -1723,6 +1723,16 @@ def _contents_url(cfg: RuntimeConfig) -> str:
     return f"https://api.github.com/repos/{cfg.repo}/contents/{cfg.path}"
 
 
+def _strict_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous JSON objects with duplicate keys."""
+    out: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in out:
+            raise ValueError("duplicate JSON key")
+        out[key] = value
+    return out
+
+
 def load_runtime_checkpoint(
     config: RuntimeConfig | None = None,
     *,
@@ -1769,10 +1779,25 @@ def load_runtime_checkpoint(
             }
         response.raise_for_status()
         obj = response.json()
-        raw = base64.b64decode(str(obj.get("content") or "")).decode("utf-8")
-        if len(raw.encode("utf-8")) > MAX_RUNTIME_BYTES:
+        if not isinstance(obj, Mapping):
+            raise ValueError("runtime checkpoint response is not an object")
+        raw_content = obj.get("content")
+        if not isinstance(raw_content, str):
+            raise ValueError("runtime checkpoint content must be a base64 string")
+        encoding = str(obj.get("encoding") or "base64").strip().casefold()
+        if encoding != "base64":
+            raise ValueError("runtime checkpoint encoding must be base64")
+        encoded = "".join(raw_content.split())
+        if not encoded:
+            raise ValueError("runtime checkpoint content missing")
+        max_encoded_chars = 4 * ((MAX_RUNTIME_BYTES + 2) // 3)
+        if len(encoded) > max_encoded_chars:
+            raise ValueError("runtime checkpoint encoded content too large")
+        raw_bytes = base64.b64decode(encoded, validate=True)
+        if len(raw_bytes) > MAX_RUNTIME_BYTES:
             raise ValueError("runtime checkpoint too large")
-        payload = json.loads(raw)
+        raw = raw_bytes.decode("utf-8")
+        payload = json.loads(raw, object_pairs_hook=_strict_json_object)
         if not isinstance(payload, dict):
             raise ValueError("checkpoint is not an object")
         integrity = checkpoint_integrity_report(payload)
