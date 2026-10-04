@@ -1,0 +1,67 @@
+name: AION Owner Decision Persistence Attestation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_nonce_registry.py"
+      - "atlasquant_aion_owner_decision_record.py"
+      - "atlasquant_aion_owner_decision_persistence_attestation.py"
+      - "test_atlasquant_aion_v223_external_persistence_attestation.py"
+      - "test_atlasquant_aion_v224_owner_signature_ceremony.py"
+      - "test_atlasquant_aion_v225_explicit_owner_decision_record.py"
+      - "test_atlasquant_aion_v226_owner_decision_persistence_attestation.py"
+      - "docs/aion/AION_V226_OWNER_DECISION_PERSISTENCE_ATTESTATION.md"
+      - "docs/adr/ADR-0025-owner-decision-persistence-before-freeze-eligibility.md"
+      - ".github/workflows/aion-owner-decision-persistence-attestation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-owner-decision-persistence-attestation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  decision-persistence:
+    name: V2.26 decision-record persistence, attribution and freeze eligibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic persistence dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+
+      - name: Compile V2.23-V2.26 decision persistence chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_owner_decision_record.py \
+            atlasquant_aion_owner_decision_persistence_attestation.py \
+            test_atlasquant_aion_v223_external_persistence_attestation.py \
+            test_atlasquant_aion_v224_owner_signature_ceremony.py \
+            test_atlasquant_aion_v225_explicit_owner_decision_record.py \
+            test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+
+      - name: Run V2.26 decision persistence red-team
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+
+      - name: Re-run V2.25 decision verification
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v225_explicit_owner_decision_record.py
+
+      - name: Re-run V2.24 owner signature ceremony
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v224_owner_signature_ceremony.py
+
+      - name: Re-run V2.23 base persistence attestation
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v223_external_persistence_attestation.py
