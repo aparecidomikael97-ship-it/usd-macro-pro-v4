@@ -57,6 +57,7 @@ A attestation positiva exige:
 
 - runtime CONFIRMED;
 - observação fresca;
+- repo/branch/path exatamente iguais ao runtime oficial;
 - branch runtime permitida;
 - source/target consistentes;
 - binding exato;
