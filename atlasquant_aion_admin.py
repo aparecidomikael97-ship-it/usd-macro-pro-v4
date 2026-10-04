@@ -168,6 +168,7 @@ from atlasquant_entitlement_account_audit import (
     audit_account_entitlements,
     audit_requires_review,
 )
+from atlasquant_aion_core_health_adapter import build_loaded_runtime_health_evidence
 from atlasquant_aion_status_board import (
     build_master_status_board,
     status_rows,
@@ -2305,6 +2306,30 @@ def _render_learning_pulse(checkpoint: Mapping[str, Any]) -> None:
     )
 
 
+def _render_core_consistency_truth(board: Mapping[str, Any]) -> None:
+    """Always expose the distinction between Core health and observation coherence."""
+    envelope=board.get("consistency_envelope")
+    envelope=envelope if isinstance(envelope,Mapping) else {}
+    health=board.get("aion_core_health")
+    health=health if isinstance(health,Mapping) else {}
+    state=envelope.get("consistency_state","UNKNOWN")
+    trust=board.get("provenance_trust_readiness")
+    trust=trust if isinstance(trust,Mapping) else {}
+    trust_state=trust.get("state","BLOCKED")
+    st.caption(
+        f"Core integrity={health.get('integrity_state','UNKNOWN')} · Global snapshot consistency={state} "
+        f"· snapshot_atomic=False · origin_authenticated=False · snapshot_signed=False · provenance_trust={trust_state} · origem não autenticada e atomicidade não comprovada. Saúde e consistência não autorizam execução."
+    )
+    if state in {"PARTIAL","MISMATCH"}:
+        st.caption("Consistency: "+"; ".join(str(reason) for reason in envelope.get("reasons",[])[:8])+" · Reconstruir a observação residente; sem aprovação automática.")
+    blockers=trust.get("blockers") if isinstance(trust.get("blockers"),list) else []
+    if blockers:
+        st.caption("Provenance trust preflight: "+"; ".join(str(item) for item in blockers[:8])+" · nenhuma autenticação é promovida por claims.")
+    window=envelope.get("observation_window")
+    if isinstance(window,Mapping) and window.get("earliest") and window.get("latest"):
+        st.caption(f"Evidências observadas entre {window['earliest']} e {window['latest']}; isso não prova um instante atômico.")
+
+
 def _render_master_status_summary(board: Mapping[str, Any]) -> None:
     """Compact Master Panel that remains visible in Essential mode."""
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
@@ -2314,6 +2339,7 @@ def _render_master_status_summary(board: Mapping[str, Any]) -> None:
         else []
     )
     st.markdown("#### Painel Mestre · resumo essencial")
+    _render_core_consistency_truth(board)
     st.caption(
         "Estado mestre sempre visível. O modo Completo acrescenta a tabela técnica "
         "sem esconder este resumo."
@@ -2351,6 +2377,7 @@ def _render_master_status_summary(board: Mapping[str, Any]) -> None:
 def _render_master_status(board: Mapping[str, Any]) -> None:
     counts = board.get("counts") if isinstance(board.get("counts"), Mapping) else {}
     st.markdown("#### Painel Mestre de Estado")
+    _render_core_consistency_truth(board)
     st.caption(
         "CONFIRMADO exige evidência desta execução. BLOQUEADO é uma proteção/flag. "
         "DEPENDÊNCIA EXTERNA exige conector/prova. DESCONHECIDO não é tratado como pronto."
@@ -11276,6 +11303,8 @@ def render_aion_admin_console(
         })
 
     try:
+        # Canonical resident inputs replace incoming client health claims. No new load.
+        system["aion_core_health"] = build_loaded_runtime_health_evidence(runtime_result)
         status_board = build_master_status_board(
             checkpoint=checkpoint,
             runtime_result=runtime_result,
