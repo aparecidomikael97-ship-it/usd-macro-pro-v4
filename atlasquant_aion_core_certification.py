@@ -97,6 +97,24 @@ def normalize_evidence(dimension: str, raw: Mapping[str, Any] | None) -> dict[st
     if not verified:
         blockers.append("EVIDENCE_NOT_VERIFIED")
 
+    if (
+        key in REQUIRED_DIMENSIONS
+        and source in {"CI", "TEST_SUITE", "DRILL", "AUDIT"}
+        and run_id
+        and _SHA_RE.fullmatch(commit_sha)
+        and test_count is not None
+        and _DIGEST_RE.fullmatch(evidence_digest)
+    ):
+        expected_digest = _digest({
+            "dimension": key,
+            "commit_sha": commit_sha,
+            "run_id": run_id,
+            "test_count": test_count,
+            "source": source,
+        })
+        if evidence_digest != expected_digest:
+            blockers.append("EVIDENCE_DIGEST_MISMATCH")
+
     return {
         "dimension": key,
         "state": state or "UNKNOWN",
@@ -193,7 +211,9 @@ def certify_core(
         **manifest_body,
         "manifest_digest": manifest_digest,
         "certification_candidate": candidate,
-        "core_complete_claim_allowed": candidate,
+        "core_complete_candidate": candidate,
+        "core_complete_claim_allowed": False,
+        "owner_core_complete_review_required": candidate,
         "core_freeze_requested": core_freeze_authorized is True,
         "core_freeze_authorized_by_this_module": False,
         "core_frozen": False,
