@@ -36,7 +36,7 @@ promove automaticamente para `READY`.
 | Claim de rotation/revocation/compromise sem autoridade/registry/política | BLOCKED |
 | Payload fora de ordem / evento duplicado | BLOCKED |
 | Objeto hostil / tipo não canônico / oversized | BLOCKED |
-| TODAS as dimensões `True` + envelope válido | READY (explícito) |
+| TODAS as dimensões `True` + envelope válido | BLOCKED — flags do envelope são claims não verificadas |
 
 ## Matriz de ataques (24 cobertos)
 1 replay da mesma evidência · 2 nonce ausente · 3 nonce duplicado ·
@@ -70,6 +70,9 @@ Para que um envelope chegue a `READY`, uma autoridade confiável PRECISA fornece
 7. Política de versão de chave + conjunto de versões conhecidas.
 8. `execution_allowed=True` somente quando todas as acima + envelope válido.
 Até essas existirem, o estado permanece `BLOCKED` — este módulo só declara a lacuna.
+
+### Hardening de autoridade do coordenador
+Na reconciliação integrada, flags de readiness presentes no próprio envelope são tratadas apenas como claims do chamador. Sem uma autoridade de readiness confiável e separada, `dimensions_verified=False`, `state=BLOCKED` e `execution_allowed=False` permanecem obrigatórios. Nenhum payload pode auto-promover confiança ou autoridade de execução.
 
 ## Limitações
 - Staleness de timestamp exige `replay_window_configured`; sem ela o módulo
