@@ -79,7 +79,8 @@ jobs:
             test_atlasquant_aion_v27_health_attestation_redteam.py \
             test_atlasquant_aion_v28_system_invariants_integration_audit.py \
             test_atlasquant_aion_v28_runtime_persistence_cas_recovery_redteam.py \
-            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py \
+            test_atlasquant_aion_v28_global_snapshot_consistency_redteam.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
@@ -118,7 +119,8 @@ jobs:
             test_atlasquant_aion_v27_health_attestation_redteam.py \
             test_atlasquant_aion_v28_system_invariants_integration_audit.py \
             test_atlasquant_aion_v28_runtime_persistence_cas_recovery_redteam.py \
-            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py \
+            test_atlasquant_aion_v28_global_snapshot_consistency_redteam.py
 
   supply-chain-audit:
     name: Supply-chain audit
