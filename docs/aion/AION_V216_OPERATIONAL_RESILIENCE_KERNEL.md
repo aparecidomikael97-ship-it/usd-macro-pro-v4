@@ -182,3 +182,14 @@ Nenhuma dessas camadas isoladamente implica execução.
 - Quality/Security/Unified permanecem verdes;
 - Release/UI/Mobile permanecem verdes;
 - Global Worker permanece separado de ativação real.
+
+## Coordinator hardening
+
+Além das evidências originais, a postura normal exige explicitamente:
+
+- checkpoint integrity verificada;
+- audit-chain integrity verificada;
+- crash-recovery verification separada de journal recovery.
+
+Esses sinais permanecem independentes de authority, approval e execution.
+Ausência de qualquer um deles degrada a postura e nunca produz `execution_allowed=True`.
