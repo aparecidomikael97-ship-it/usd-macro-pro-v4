@@ -331,7 +331,6 @@ def test_forged_preflight_cannot_bypass_signed_chain_rebuild():
         if key not in {
             "challenge_digest",
             "digest_to_sign",
-            "owner_decision_ready",
         }
     }
     forged["challenge_digest"] = "sha256:" + hashlib.sha256(
