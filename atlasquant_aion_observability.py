@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 import hashlib
 from itertools import islice
 import json
+import math
 import re
 import unicodedata
 
@@ -301,6 +302,10 @@ def _health_status(value:Any)->str:
 
 
 def _health_count(value:Any)->int:
+    if isinstance(value,bool):
+        return 0
+    if isinstance(value,float) and (not math.isfinite(value) or not value.is_integer()):
+        return 0
     try:
         parsed=int(value)
     except Exception:
