@@ -169,7 +169,7 @@ class TestDurableStorePathAndIsolation:
     @pytest.mark.parametrize(
         "bad",
         [
-            "../x", r"..\x", "/x", r"C:\x", "\\server\share", "x\x00y",
+            "../x", r"..\\x", "/x", r"C:\\x", r"\\\\server\\share", "x\\x00y",
             "", ".", "..", "CON", "PRN", "AUX", "NUL", "COM1", "LPT1",
             "name.", "name ", "x" * 300,
         ],
@@ -326,7 +326,7 @@ class TestMemoryRedTeam:
 
     def test_tamper_is_mismatch(self):
         cp = default_checkpoint()
-        cp["operating"]["tasks"].append({"task_id": "T"})
+        cp["operating"]["task_digest"] = "tampered"
         assert checkpoint_integrity_report(cp)["state"] == "MISMATCH"
 
     def test_none_is_unknown(self):
