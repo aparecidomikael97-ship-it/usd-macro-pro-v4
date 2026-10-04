@@ -123,6 +123,8 @@ def test_approval_binding_payload_scope_and_action():
     p=tg.approve_task(p,task["task_id"],approved=True,approved_scope=p["scope"],expected_revision=0,now=NOW)
     assert p["tasks"][0]["approved"] is True
     assert tg.approve_task(p,task["task_id"],approved=True,approved_scope=p["scope"],expected_revision=1)==p
+    # Retry after commit with the original pre-commit revision is a read-only replay.
+    assert tg.approve_task(p,task["task_id"],approved=True,approved_scope=p["scope"],expected_revision=0)==p
     changed=deepcopy(p);changed["tasks"][0]["payload"]={"action":"other"};changed["tasks"][0]["payload_digest"]=tg._digest(changed["tasks"][0]["payload"]);tg._seal(changed)
     with pytest.raises(tg.AionTaskgraphError): tg.validate_taskgraph(changed)
     with pytest.raises(tg.AionTaskgraphError,match="APPROVED_SCOPE"):
@@ -155,9 +157,13 @@ def test_budget_estimates_never_charge(mode,paid,cost,limit,blocked):
 
 def test_handoff_idempotency_and_stop():
     p=ready(plan());tid=p["tasks"][0]["task_id"]
-    first=tg.prepare_guarded_task_handoff(p,tid,expected_revision=p["revision"],now=NOW)
+    original_revision=p["revision"]
+    first=tg.prepare_guarded_task_handoff(p,tid,expected_revision=original_revision,now=NOW)
     repeat=tg.prepare_guarded_task_handoff(first["plan"],tid,expected_revision=first["plan"]["revision"])
+    stale_retry=tg.prepare_guarded_task_handoff(first["plan"],tid,expected_revision=original_revision,now=NOW)
     assert repeat["replay"] is True and repeat["plan"]==first["plan"]
+    assert stale_retry["replay"] is True and stale_retry["plan"]==first["plan"]
+    assert stale_retry["handoff"]==first["handoff"]
     assert repeat["handoff"]==first["handoff"]
     assert first["plan"]["mission_state"]=="READY_FOR_GUARDED_HANDOFF"
     assert first["plan"]["tasks"][0]["state"]=="RUNNABLE"
