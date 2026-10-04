@@ -19,6 +19,7 @@ import copy
 import hashlib
 import json
 from typing import Any, Mapping
+from atlasquant_aion_trusted_readiness_authority import trusted_readiness_authority_view
 
 SCHEMA = "ATLASQUANT_AION_PROVENANCE_TRUST_LIFECYCLE_V1"
 
@@ -257,16 +258,18 @@ def evaluate_provenance_envelope(
 
 
 def _report(env, blockers, now_ts, dims) -> dict[str, Any]:
-    # V2.11 has no trusted readiness authority or trust root. Dimension flags
-    # carried by the evidence envelope are caller claims only and can never
-    # promote readiness or execution authority.
-    unique = sorted(set(blockers) | {"TRUSTED_READINESS_AUTHORITY_UNAVAILABLE"})
+    # V2.12 separates caller-controlled lifecycle claims from canonical
+    # readiness authority. The authority view ignores env and remains blocked
+    # until a real authenticated trust root/binding design exists.
+    authority = trusted_readiness_authority_view(env)
+    unique = sorted(set(blockers) | set(authority["blockers"]))
     return {
         "schema": SCHEMA,
         "state": "BLOCKED",
         "blockers": unique,
         "dimensions": dims,
-        "dimensions_verified": False,
+        "dimensions_verified": authority["authority_verified"],
+        "trusted_readiness_authority": authority,
         "now_ts": _ts_canonical(now_ts) or now_ts,
         "execution_allowed": False,
         "executes_action": False,
