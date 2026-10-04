@@ -135,6 +135,7 @@ def test_request_is_exact_state_bound_and_not_a_decision():
     assert built["request"]["tenant_id"] == EXPECTED_TENANT_ID
     assert built["request"]["signature_purpose"] == SIGNATURE_PURPOSE
     assert built["request"]["signature_mechanism"] == SIGNATURE_MECHANISM
+    assert built["request"]["owner_public_key_fingerprint"].startswith("sha256:")
     assert built["request"]["owner_decision"] == "UNDECIDED"
     assert built["request"]["core_freeze_authorized"] is False
     assert built["request"]["execution_allowed"] is False
@@ -188,7 +189,7 @@ def test_plain_chat_text_never_counts_as_signature(tmp_path):
     nonces = PersistentNonceRegistry(tmp_path / "owner_nonce.sqlite3")
     result = verify(
         built["request"],
-        "vamos-la",
+        "vamos lá",
         owner_roots,
         nonces,
         e=e,
@@ -214,6 +215,21 @@ def test_signature_replay_is_blocked_durably(tmp_path):
     assert second["state"] == "BLOCKED"
     assert "OWNER_SIGNATURE_NONCE_REPLAYED" in second["blockers"]
     assert second["owner_decision_ready"] is False
+
+
+def test_same_key_id_version_with_different_public_key_is_rebuild_blocked(tmp_path):
+    secret, owner_roots = owner_keypair()
+    e, built = request_for(owner_roots)
+    _, swapped_roots = owner_keypair()
+    result = verify(
+        built["request"],
+        sign(secret, built["request"]),
+        swapped_roots,
+        PersistentNonceRegistry(tmp_path / "nonce.sqlite3"),
+        e=e,
+    )
+    assert result["state"] == "BLOCKED"
+    assert "OWNER_SIGNATURE_REQUEST_REBUILD_MISMATCH" in result["blockers"]
 
 
 def test_wrong_signing_key_is_blocked(tmp_path):
