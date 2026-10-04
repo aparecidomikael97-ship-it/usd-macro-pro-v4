@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import sqlite3
 import threading
 from pathlib import Path
 
@@ -375,6 +376,86 @@ def test_nonce_is_scoped_not_globally_colliding(tmp_path):
     registry = PersistentNonceRegistry(tmp_path / "nonce.sqlite3")
     assert registry.claim(scope="tenant-a", nonce="n", expires_at=EXPIRES, now_ts=NOW)
     assert registry.claim(scope="tenant-b", nonce="n", expires_at=EXPIRES, now_ts=NOW)
+
+
+def test_fractional_expiry_is_not_deleted_early(tmp_path):
+    registry = PersistentNonceRegistry(tmp_path / "nonce.sqlite3")
+    assert registry.claim(
+        scope="tenant-a",
+        nonce="fractional",
+        expires_at="2026-10-04T17:45:00.100000Z",
+        now_ts="2026-10-04T17:45:00Z",
+    )
+    assert registry.claim(
+        scope="tenant-a",
+        nonce="trigger-cleanup",
+        expires_at="2026-10-04T17:46:00Z",
+        now_ts="2026-10-04T17:45:00Z",
+    )
+    assert registry.contains(scope="tenant-a", nonce="fractional") is True
+
+    assert registry.claim(
+        scope="tenant-a",
+        nonce="trigger-expiry",
+        expires_at="2026-10-04T17:46:00Z",
+        now_ts="2026-10-04T17:45:00.100000Z",
+    )
+    assert registry.contains(scope="tenant-a", nonce="fractional") is False
+
+
+def test_nonce_registry_migrates_v1_expiry_without_data_loss(tmp_path):
+    path = tmp_path / "nonce.sqlite3"
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE nonce_claims (
+                scope TEXT NOT NULL,
+                nonce TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (scope, nonce)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE nonce_registry_meta (
+                singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                schema_version INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO nonce_registry_meta(singleton, schema_version) VALUES(1, 1)"
+        )
+        conn.execute(
+            """
+            INSERT INTO nonce_claims(scope, nonce, expires_at, created_at)
+            VALUES(?, ?, ?, ?)
+            """,
+            (
+                "tenant-a",
+                "legacy",
+                "2026-10-04T17:45:00.100000Z",
+                "2026-10-04T17:44:00Z",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    registry = PersistentNonceRegistry(path)
+    assert registry.schema_version() == 2
+    assert registry.contains(scope="tenant-a", nonce="legacy") is True
+
+    assert registry.claim(
+        scope="tenant-a",
+        nonce="trigger-cleanup",
+        expires_at="2026-10-04T17:46:00Z",
+        now_ts="2026-10-04T17:45:00Z",
+    )
+    assert registry.contains(scope="tenant-a", nonce="legacy") is True
 
 
 def test_invalid_trust_root_algorithm_rejected():
