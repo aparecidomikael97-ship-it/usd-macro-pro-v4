@@ -54,6 +54,7 @@ V2.24 exige:
 
 - trust root público separado do HUMAN_OWNER;
 - chave ativa e não revogada;
+- fingerprint SHA-256 da chave pública exata preso ao request;
 - assinatura Ed25519 válida;
 - request idêntico ao reconstruído;
 - target/runtime/binding/digests exatos;
