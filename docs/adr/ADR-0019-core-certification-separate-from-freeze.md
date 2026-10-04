@@ -79,7 +79,7 @@ nova certificação.
 
 ## PR/commit relacionado
 
-Branch `integration/aion-v220-core-certification-20261004`.
+Branch de origem preservada: `integration/aion-v220-core-certification-20261004`.\n\nBranch hardened/reconciliada: `integration/aion-v220-core-certification-reconciliation-20261004`.
 
 ## Supersedes
 
@@ -103,4 +103,4 @@ Decisões adicionais:
 - chaves efêmeras de teste provam somente o mecanismo;
 - CI não pode autoemitir Core Complete;
 - certificate candidate continua separado de owner review, Core Freeze, merge, deploy e runtime activation.
-
+- o manifesto liga-se criptograficamente ao conjunto de trust roots públicos efetivamente usado;\n- nomes de dimensões são aceitos apenas na forma canônica exata, sem aliases por case.\n
