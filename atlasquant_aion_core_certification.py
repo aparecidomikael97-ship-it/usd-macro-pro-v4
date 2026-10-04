@@ -40,8 +40,11 @@ REQUIRED_DIMENSIONS = (
     "CONCURRENCY",
     "COST_GOVERNANCE",
     "AUDIT_REPLAY",
+    "CANONICAL_GATES",
+    "GLOBAL_WORKER_READINESS",
 )
 
+_CONTROL_DIMENSIONS = {"CANONICAL_GATES", "GLOBAL_WORKER_READINESS"}
 _ALLOWED_SOURCES = {"CI", "TEST_SUITE", "DRILL", "AUDIT"}
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -152,6 +155,8 @@ def normalize_evidence(dimension: str, raw: Mapping[str, Any] | None) -> dict[st
         blockers.append("EVIDENCE_STATE_NOT_VERIFIED")
     if source not in _ALLOWED_SOURCES:
         blockers.append("EVIDENCE_SOURCE_INVALID")
+    if key in _CONTROL_DIMENSIONS and source != "CI":
+        blockers.append("CONTROL_EVIDENCE_SOURCE_NOT_CI")
     if not run_id:
         blockers.append("EVIDENCE_RUN_ID_REQUIRED")
     if not _SHA_RE.fullmatch(commit_sha):
@@ -396,8 +401,6 @@ def certify_core(
     evidence: Mapping[str, Any],
     *,
     target_commit_sha: str,
-    canonical_gates_green: Any,
-    global_worker_readiness_green: Any,
     certification_trust_roots: TrustRootRegistry,
     now_ts: str,
     core_freeze_authorized: Any = False,
@@ -410,10 +413,6 @@ def certify_core(
     target = _clean(target_commit_sha, 64).lower()
     if not _SHA_RE.fullmatch(target):
         raise ValueError("target_commit_sha must be a 40-char git SHA")
-    if canonical_gates_green is not True and canonical_gates_green is not False:
-        raise ValueError("canonical_gates_green must be exact boolean")
-    if global_worker_readiness_green is not True and global_worker_readiness_green is not False:
-        raise ValueError("global_worker_readiness_green must be exact boolean")
     if core_freeze_authorized is not True and core_freeze_authorized is not False:
         raise ValueError("core_freeze_authorized must be exact boolean")
     if not isinstance(certification_trust_roots, TrustRootRegistry):
@@ -449,10 +448,18 @@ def certify_core(
             blockers.append(f"DIMENSION_COMMIT_MISMATCH:{dimension}")
 
     trust_binding = _trust_root_binding(rows, certification_trust_roots)
+    canonical_gates_green = (
+        rows["CANONICAL_GATES"]["eligible"]
+        and rows["CANONICAL_GATES"]["commit_sha"] == target
+    )
+    global_worker_readiness_green = (
+        rows["GLOBAL_WORKER_READINESS"]["eligible"]
+        and rows["GLOBAL_WORKER_READINESS"]["commit_sha"] == target
+    )
 
-    if canonical_gates_green is not True:
+    if not canonical_gates_green:
         blockers.append("CANONICAL_GATES_NOT_GREEN")
-    if global_worker_readiness_green is not True:
+    if not global_worker_readiness_green:
         blockers.append("GLOBAL_WORKER_READINESS_NOT_GREEN")
 
     total_tests = sum(row["test_count"] for row in rows.values())
@@ -471,8 +478,8 @@ def certify_core(
         "certification_trust_root_key_count": certification_trust_roots.key_count,
         "certification_trust_root_referenced_key_count": trust_binding["referenced_key_count"],
         "certification_trust_root_binding_digest": trust_binding["digest"],
-        "canonical_gates_green": canonical_gates_green is True,
-        "global_worker_readiness_green": global_worker_readiness_green is True,
+        "canonical_gates_green": canonical_gates_green,
+        "global_worker_readiness_green": global_worker_readiness_green,
         "total_evidence_test_count": total_tests,
         "all_evidence_cryptographically_verified": all(
             row["cryptographically_verified"] for row in rows.values()
