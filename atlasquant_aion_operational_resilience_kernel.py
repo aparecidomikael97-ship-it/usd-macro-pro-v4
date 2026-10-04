@@ -393,6 +393,9 @@ def operational_resilience_view(
     backup_verified: Any = False,
     restore_drill_verified: Any = False,
     journal_recovery_verified: Any = False,
+    crash_recovery_verified: Any = False,
+    checkpoint_integrity_verified: Any = False,
+    audit_chain_verified: Any = False,
 ) -> dict[str, Any]:
     """Compose one fail-closed operational posture from explicit evidence."""
     if not isinstance(trace, Mapping) or trace.get("schema") != TRACE_SCHEMA:
@@ -407,6 +410,9 @@ def operational_resilience_view(
     backup_ok = _exact_bool(backup_verified, "backup_verified")
     restore_ok = _exact_bool(restore_drill_verified, "restore_drill_verified")
     journal_ok = _exact_bool(journal_recovery_verified, "journal_recovery_verified")
+    crash_ok = _exact_bool(crash_recovery_verified, "crash_recovery_verified")
+    checkpoint_ok = _exact_bool(checkpoint_integrity_verified, "checkpoint_integrity_verified")
+    audit_ok = _exact_bool(audit_chain_verified, "audit_chain_verified")
 
     circuit = circuit_breaker(
         component,
@@ -459,6 +465,12 @@ def operational_resilience_view(
         blockers.append("RESTORE_DRILL_NOT_VERIFIED")
     if not journal_ok:
         blockers.append("JOURNAL_RECOVERY_NOT_VERIFIED")
+    if not crash_ok:
+        blockers.append("CRASH_RECOVERY_NOT_VERIFIED")
+    if not checkpoint_ok:
+        blockers.append("CHECKPOINT_INTEGRITY_NOT_VERIFIED")
+    if not audit_ok:
+        blockers.append("AUDIT_CHAIN_NOT_VERIFIED")
     if kill:
         blockers.append("GLOBAL_KILL_SWITCH_ENGAGED")
 
@@ -481,7 +493,8 @@ def operational_resilience_view(
     else:
         posture = "NORMAL_MONITORED"
 
-    recovery_ready = backup_ok and restore_ok and journal_ok
+    recovery_ready = backup_ok and restore_ok and journal_ok and crash_ok
+    operational_integrity_ready = checkpoint_ok and audit_ok
     operational_admission_recommended = posture in {
         "NORMAL_MONITORED",
         "DEGRADED_MONITORED",
@@ -504,9 +517,15 @@ def operational_resilience_view(
             "backup_verified": backup_ok,
             "restore_drill_verified": restore_ok,
             "journal_recovery_verified": journal_ok,
+            "crash_recovery_verified": crash_ok,
             "recovery_ready": recovery_ready,
             "automatic_restore": False,
             "automatic_rollback": False,
+        },
+        "integrity_readiness": {
+            "checkpoint_integrity_verified": checkpoint_ok,
+            "audit_chain_verified": audit_ok,
+            "operational_integrity_ready": operational_integrity_ready,
         },
         "immutable_journal_required": True,
         "deterministic_replay_required": True,
