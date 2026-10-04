@@ -2,8 +2,8 @@
 
 ## Objetivo
 
-V2.25 registra uma decisão explícita do HUMAN_OWNER somente depois de duas provas
-criptográficas distintas:
+V2.25 verifica criptograficamente uma decisão explícita do HUMAN_OWNER e prepara
+seu record para persistência somente depois de duas provas distintas:
 
 1. assinatura V2.24 sobre identidade + estado exato;
 2. assinatura V2.25 sobre a escolha exata do proprietário.
@@ -54,14 +54,18 @@ O request é reconstruído do estado atual antes de verificar a assinatura de de
 
 Assinatura válida de `APPROVE_CORE_FREEZE` produz:
 
-`OWNER_DECISION_RECORDED_APPROVE`
+`OWNER_DECISION_VERIFIED_APPROVE_PENDING_PERSISTENCE`
 
-e registra:
+e comprova a escolha, mas ainda não afirma registro durável:
 
-- `owner_decision_recorded=true`;
+- `owner_decision_verified=true`;
+- `owner_decision_recorded=false`;
+- `decision_record_persisted=false`;
 - `owner_decision=APPROVE_CORE_FREEZE`;
 - `core_freeze_approved=true`;
-- `requires_separate_core_freeze_ceremony=true`.
+- `core_freeze_ceremony_eligible=false`;
+- `eligible_for_core_freeze_ceremony_after_persistence=true`;
+- `requires_decision_record_persistence=true`.
 
 Mas continua obrigatoriamente:
 
@@ -80,12 +84,16 @@ Core Freeze. Não executa freeze.
 
 Assinatura válida de `DENY_CORE_FREEZE` produz:
 
-`OWNER_DECISION_RECORDED_DENY`
+`OWNER_DECISION_VERIFIED_DENY_PENDING_PERSISTENCE`
 
-e registra:
+e comprova a escolha, mantendo o record pendente de persistência:
 
+- `owner_decision_verified=true`;
+- `owner_decision_recorded=false`;
+- `decision_record_persisted=false`;
 - `core_freeze_approved=false`;
 - `core_freeze_denied=true`;
+- `core_freeze_ceremony_eligible=false`;
 - `requires_separate_core_freeze_ceremony=false`.
 
 Nenhum caminho de freeze deve prosseguir a partir de DENY.
@@ -137,9 +145,11 @@ O namespace é:
 
 `aion_core_owner_decision`
 
-Esse patch ainda exige persistência explícita posterior.
+Esse patch ainda exige persistência explícita posterior **e attestation da persistência**
+antes que `owner_decision_recorded` possa se tornar verdadeiro ou que uma cerimônia
+de Core Freeze fique elegível.
 
-V2.25 não chama save e não modifica o runtime.
+V2.25 não chama save, não modifica o runtime e não afirma registro durável.
 
 ## Estado real atual
 
@@ -161,7 +171,9 @@ Somente depois de:
 2. assinatura real V2.24;
 3. assinatura real da decisão V2.25;
 4. persistência explícita do decision record;
+5. attestation da persistência do decision record;
 
-uma camada posterior poderá preparar a cerimônia de Core Freeze.
+uma camada posterior poderá tornar o caminho APPROVE elegível para preparar a
+cerimônia de Core Freeze.
 
 Mesmo então, freeze deve continuar separado de merge/deploy e de ativação do Worker.
