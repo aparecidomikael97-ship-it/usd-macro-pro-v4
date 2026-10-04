@@ -1,0 +1,52 @@
+{
+  "schema": "ATLASQUANT_AION_LIBRARY_FOUNDATION_V1_HANDOFF",
+  "generated_at_utc": "2026-10-01T09:43:28.943805+00:00",
+  "issue": 474,
+  "target_branch": "drael/aion-library-foundation-v1",
+  "reference_branch": "integration/aion-core-nightshift-v1-20261001",
+  "reference_sha": "91732c3fd62d50a518296e4c10c159b095cd8c6b",
+  "incoming_wip_zip_sha256": "64aeea47b9da00609dfc206799954b877cbf6587b1f0bdf0f5702f1297797131",
+  "original_wip_manifest_verified": true,
+  "original_wip_zip_testzip_pass": true,
+  "initial_wip_status": "Drael reported 22/27 passing before untested edits; uploaded WIP had a syntactically broken regex",
+  "local_suite_command": "python -m unittest -q test_aion_core_domain_registry test_aion_core_evidence_pack test_aion_core_memory_architecture test_aion_core_provenance test_aion_core_security_audit test_aion_core_trust_engine test_aion_core_library_foundation",
+  "local_unit_test_results": {
+    "original_six": 92,
+    "library": 32,
+    "total": 124,
+    "failures": 0,
+    "errors": 0
+  },
+  "original_six_modules_remote_git_blob_matches": 6,
+  "original_twelve_modules_and_tests_pre_task_snapshot_sha256_matches": 12,
+  "full_1284_file_snapshot_checked_against_remote": false,
+  "limitations": [
+    "approver identity is not authenticated",
+    "catalog does not ingest or index documents",
+    "audit is in-memory and unsigned",
+    "source hash and license are caller-declared and must be verified downstream",
+    "remote GitHub CI not proven by local tests"
+  ],
+  "artifacts": [
+    {
+      "path": "aion_core/library_foundation.py",
+      "size_bytes": 14791,
+      "sha256": "7295c6614b653d3204cc8b7b0ff46a19a4b0bfe5e0790fe3e2031de0e52cb332"
+    },
+    {
+      "path": "test_aion_core_library_foundation.py",
+      "size_bytes": 11069,
+      "sha256": "8b35ff89ae3b18d2bb3cbe3135c33b9e07df875b0bb06fad29da6fa00100b8b3"
+    },
+    {
+      "path": "pre_task_hashes.json",
+      "size_bytes": 149947,
+      "sha256": "3dd48e1f27e1b29f7f3314624b91c6edc028f9b4b65a7f8842507b3008317215"
+    },
+    {
+      "path": "AION_LIBRARY_FOUNDATION_V1_README.md",
+      "size_bytes": 4202,
+      "sha256": "1fb9200c7d6a84478274ce867999a2d613b545cc8411ff206003bd78527ab73f"
+    }
+  ]
+}
