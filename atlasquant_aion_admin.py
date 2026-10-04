@@ -168,7 +168,7 @@ from atlasquant_entitlement_account_audit import (
     audit_account_entitlements,
     audit_requires_review,
 )
-from atlasquant_aion_core_health_adapter import build_loaded_runtime_health_evidence
+from atlasquant_aion_core_health_adapter import build_loaded_runtime_health_evidence, provenance_trust_readiness_view
 from atlasquant_aion_status_board import (
     build_master_status_board,
     status_rows,
@@ -2313,9 +2313,9 @@ def _render_core_consistency_truth(board: Mapping[str, Any]) -> None:
     health=board.get("aion_core_health")
     health=health if isinstance(health,Mapping) else {}
     state=envelope.get("consistency_state","UNKNOWN")
-    trust=board.get("provenance_trust_readiness")
-    trust=trust if isinstance(trust,Mapping) else {}
-    trust_state=trust.get("state","BLOCKED")
+    # Render canonical readiness, never a prebuilt board's authentication claim.
+    trust=provenance_trust_readiness_view(board)
+    trust_state=trust["state"]
     st.caption(
         f"Core integrity={health.get('integrity_state','UNKNOWN')} · Global snapshot consistency={state} "
         f"· snapshot_atomic=False · origin_authenticated=False · snapshot_signed=False · provenance_trust={trust_state} · origem não autenticada e atomicidade não comprovada. Saúde e consistência não autorizam execução."
