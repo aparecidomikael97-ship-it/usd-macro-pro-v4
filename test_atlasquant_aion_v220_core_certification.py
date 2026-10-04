@@ -161,6 +161,7 @@ def test_all_dimensions_produce_candidate_but_never_freeze():
     assert result["core_complete_claim_allowed"] is False
     assert result["owner_core_complete_review_required"] is True
     assert result["total_evidence_test_count"] == 1500
+    assert result["all_evidence_cryptographically_verified"] is True
     assert result["core_frozen"] is False
     assert result["core_freeze_authorized_by_this_module"] is False
     assert result["execution_allowed"] is False
@@ -230,6 +231,106 @@ def test_evidence_digest_must_match_evidence_content():
     assert "DIMENSION_NOT_CERTIFIED:LOAD" in result["blockers"]
     normalized = normalize_evidence("LOAD", rows["LOAD"])
     assert "EVIDENCE_DIGEST_MISMATCH" in normalized["blockers"]
+
+
+def test_unsigned_self_asserted_evidence_cannot_certify():
+    rows = evidence()
+    rows["LOAD"] = synthetic_evidence_row(
+        "LOAD",
+        commit_sha=TARGET,
+        run_id="unsigned-load",
+        test_count=100,
+    )
+    result = certificate(rows)
+    assert result["state"] == "BLOCKED"
+    assert "DIMENSION_NOT_CERTIFIED:LOAD" in result["blockers"]
+    assert result["evidence"]["LOAD"]["cryptographically_verified"] is False
+    assert result["execution_allowed"] is False
+
+
+def test_wrong_signing_key_blocks_dimension():
+    attacker, _ = new_keypair()
+    rows = evidence()
+    rows["LOAD"] = signed_evidence_row(
+        "LOAD",
+        run_id="attacker-load",
+        private_key=attacker,
+    )
+    result = certificate(rows)
+    assert result["state"] == "BLOCKED"
+    assert "DIMENSION_NOT_CERTIFIED:LOAD" in result["blockers"]
+    assert "EVIDENCE_SIGNATURE_INVALID" in result["evidence"]["LOAD"]["blockers"]
+
+
+def test_revoked_certification_key_blocks_all_attestations():
+    revoked = TrustRootRegistry.from_mapping({
+        "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
+        "roots": [{
+            "key_id": KEY_ID,
+            "key_version": 1,
+            "algorithm": "Ed25519",
+            "public_key_b64": PUBLIC_KEY_B64,
+            "status": "ACTIVE",
+            "not_before": "2026-10-01T00:00:00Z",
+            "not_after": "2027-10-01T00:00:00Z",
+        }],
+        "revoked_key_ids": [KEY_ID],
+    })
+    result = certificate(certification_trust_roots=revoked)
+    assert result["state"] == "BLOCKED"
+    assert result["certification_candidate"] is False
+    assert all(
+        row["cryptographically_verified"] is False
+        for row in result["evidence"].values()
+    )
+
+
+def test_expired_certification_evidence_blocks():
+    result = certificate(now_ts="2026-10-04T22:00:00Z")
+    assert result["state"] == "BLOCKED"
+    assert result["certification_candidate"] is False
+    assert all(
+        "EVIDENCE_EXPIRED_OR_INVALID_WINDOW" in row["blockers"]
+        for row in result["evidence"].values()
+    )
+
+
+def test_tamper_after_signature_blocks_even_if_digest_is_recomputed():
+    rows = evidence()
+    row = rows["LOAD"]
+    row["test_count"] = 101
+    body = {
+        "dimension": "LOAD",
+        "commit_sha": row["commit_sha"],
+        "run_id": row["run_id"],
+        "test_count": row["test_count"],
+        "source": row["source"],
+    }
+    import hashlib
+    row["evidence_digest"] = "sha256:" + hashlib.sha256(
+        json.dumps(
+            body,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    result = certificate(rows)
+    assert result["state"] == "BLOCKED"
+    assert "EVIDENCE_SIGNATURE_INVALID" in result["evidence"]["LOAD"]["blockers"]
+
+
+def test_direct_attestation_verifier_requires_trusted_registry():
+    row = signed_evidence_row("LOAD", run_id="direct")
+    result = verify_evidence_attestation(
+        "LOAD",
+        row,
+        certification_trust_roots=None,
+        now_ts=NOW,
+    )
+    assert result["eligible"] is False
+    assert "CERTIFICATION_TRUST_ROOT_INVALID" in result["blockers"]
 
 
 def test_unknown_evidence_dimension_blocks():
