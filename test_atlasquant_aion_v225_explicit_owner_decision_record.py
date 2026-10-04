@@ -12,7 +12,6 @@ from atlasquant_aion_owner_decision_record import (
     DECISIONS,
     REQUEST_SCHEMA,
     RESULT_SCHEMA,
-    build_owner_decision_checkpoint_patch_candidate,
     build_owner_decision_request,
     canonical_owner_decision_bytes,
     verify_owner_decision,
@@ -459,7 +458,7 @@ def test_decision_window_too_long_blocks_build():
     assert "OWNER_DECISION_WINDOW_TOO_LONG" in result["blockers"]
 
 
-def test_checkpoint_patch_candidate_is_logical_only(tmp_path):
+def test_checkpoint_patch_candidate_is_generated_atomically_only_after_verification(tmp_path):
     secret, roots, evidence, v224_request, v224_signature, built = decision_fixture()
     result = verify_fixture(
         secret=secret,
@@ -470,10 +469,7 @@ def test_checkpoint_patch_candidate_is_logical_only(tmp_path):
         built=built,
         registry=PersistentNonceRegistry(tmp_path / "decision.sqlite3"),
     )
-    candidate = build_owner_decision_checkpoint_patch_candidate(
-        result,
-        checkpoint_master=evidence["checkpoint_master"],
-    )
+    candidate = result["checkpoint_patch_candidate"]
     assert candidate["state"] == "PATCH_CANDIDATE"
     assert candidate["requires_explicit_checkpoint_save"] is True
     assert candidate["automatic_checkpoint_write"] is False
@@ -486,15 +482,20 @@ def test_checkpoint_patch_candidate_is_logical_only(tmp_path):
     assert record["execution_allowed"] is False
 
 
-def test_checkpoint_patch_candidate_rejects_unverified_decision():
-    with pytest.raises(ValueError, match="verified owner decision"):
-        build_owner_decision_checkpoint_patch_candidate(
-            {
-                "state": "BLOCKED",
-                "owner_decision_recorded": False,
-            },
-            checkpoint_master={},
-        )
+def test_blocked_decision_never_gets_checkpoint_patch_candidate(tmp_path):
+    secret, roots, evidence, v224_request, v224_signature, built = decision_fixture()
+    result = verify_fixture(
+        secret=secret,
+        owner_roots=roots,
+        evidence=evidence,
+        v224_request=v224_request,
+        v224_signature=v224_signature,
+        built=built,
+        registry=PersistentNonceRegistry(tmp_path / "decision.sqlite3"),
+        decision_signature="vamos lá",
+    )
+    assert result["state"] == "BLOCKED"
+    assert "checkpoint_patch_candidate" not in result
 
 
 def test_owner_decision_source_has_no_save_network_freeze_merge_deploy_or_arming_action():
