@@ -402,6 +402,48 @@ def build_owner_decision_request(
     }
 
 
+def _checkpoint_patch_candidate(
+    verified_decision: Mapping[str, Any],
+    *,
+    checkpoint_master: Mapping[str, Any],
+) -> dict[str, Any]:
+    current = reconstruct_checkpoint(checkpoint_master)
+    record = {
+        "schema": RESULT_SCHEMA,
+        "state": verified_decision["state"],
+        "owner_decision_recorded": True,
+        "owner_decision": verified_decision["owner_decision"],
+        "decision_request_digest": verified_decision["decision_request_digest"],
+        "decision_signature_digest": verified_decision["decision_signature_digest"],
+        "core_freeze_approved": verified_decision["core_freeze_approved"],
+        "core_freeze_denied": verified_decision["core_freeze_denied"],
+        "core_freeze_execution_authorized": False,
+        "core_freeze_authorized": False,
+        "core_frozen": False,
+        "execution_allowed": False,
+        "worker_armed": False,
+        "external_action_executed": False,
+    }
+    event_id = "aion-core-owner-decision-" + hashlib.sha256(
+        canonical_owner_decision_bytes(record)
+    ).hexdigest()[:32]
+    return {
+        "schema": "ATLASQUANT_AION_OWNER_DECISION_CHECKPOINT_PATCH_V1",
+        "state": "PATCH_CANDIDATE",
+        "expected_revision": current["revision"],
+        "recommended_event_id": event_id,
+        "patch": {"aion_core_owner_decision": record},
+        "patch_digest": _digest({"aion_core_owner_decision": record}),
+        "requires_explicit_checkpoint_save": True,
+        "automatic_checkpoint_write": False,
+        "checkpoint_saved": False,
+        "core_freeze_execution_authorized": False,
+        "core_frozen": False,
+        "execution_allowed": False,
+        "external_action_executed": False,
+    }
+
+
 def verify_owner_decision(
     request: Mapping[str, Any] | None,
     *,
@@ -593,7 +635,7 @@ def verify_owner_decision(
     decision = presented["decision"]
     approved = decision == "APPROVE_CORE_FREEZE"
     denied = decision == "DENY_CORE_FREEZE"
-    return {
+    result = {
         "schema": RESULT_SCHEMA,
         "state": (
             "OWNER_DECISION_RECORDED_APPROVE"
@@ -625,67 +667,11 @@ def verify_owner_decision(
         "generic_chat_instruction_accepted_as_decision": False,
         "decision_signature_performed_by_this_module": False,
     }
-
-
-def build_owner_decision_checkpoint_patch_candidate(
-    verified_decision: Mapping[str, Any] | None,
-    *,
-    checkpoint_master: Mapping[str, Any] | None,
-) -> dict[str, Any]:
-    """Build a logical Checkpoint Mestre patch candidate; never persist it."""
-    if not isinstance(verified_decision, Mapping):
-        raise ValueError("verified_decision required")
-    if verified_decision.get("state") not in {
-        "OWNER_DECISION_RECORDED_APPROVE",
-        "OWNER_DECISION_RECORDED_DENY",
-    }:
-        raise ValueError("verified owner decision required")
-    if verified_decision.get("owner_decision_recorded") is not True:
-        raise ValueError("owner decision is not recorded")
-    if verified_decision.get("owner_decision_signature_verified") is not True:
-        raise ValueError("owner decision signature not verified")
-    if verified_decision.get("core_frozen") is not False:
-        raise ValueError("decision record must not freeze core")
-    if verified_decision.get("execution_allowed") is not False:
-        raise ValueError("decision record must not authorize execution")
-    if not isinstance(checkpoint_master, Mapping):
-        raise ValueError("checkpoint_master required")
-
-    current = reconstruct_checkpoint(checkpoint_master)
-    record = {
-        "schema": RESULT_SCHEMA,
-        "state": verified_decision["state"],
-        "owner_decision_recorded": True,
-        "owner_decision": verified_decision["owner_decision"],
-        "decision_request_digest": verified_decision["decision_request_digest"],
-        "decision_signature_digest": verified_decision["decision_signature_digest"],
-        "core_freeze_approved": verified_decision["core_freeze_approved"],
-        "core_freeze_denied": verified_decision["core_freeze_denied"],
-        "core_freeze_execution_authorized": False,
-        "core_freeze_authorized": False,
-        "core_frozen": False,
-        "execution_allowed": False,
-        "worker_armed": False,
-        "external_action_executed": False,
-    }
-    event_id = "aion-core-owner-decision-" + hashlib.sha256(
-        canonical_owner_decision_bytes(record)
-    ).hexdigest()[:32]
-    return {
-        "schema": "ATLASQUANT_AION_OWNER_DECISION_CHECKPOINT_PATCH_V1",
-        "state": "PATCH_CANDIDATE",
-        "expected_revision": current["revision"],
-        "recommended_event_id": event_id,
-        "patch": {"aion_core_owner_decision": record},
-        "patch_digest": _digest({"aion_core_owner_decision": record}),
-        "requires_explicit_checkpoint_save": True,
-        "automatic_checkpoint_write": False,
-        "checkpoint_saved": False,
-        "core_freeze_execution_authorized": False,
-        "core_frozen": False,
-        "execution_allowed": False,
-        "external_action_executed": False,
-    }
+    result["checkpoint_patch_candidate"] = _checkpoint_patch_candidate(
+        result,
+        checkpoint_master=checkpoint_master,
+    )
+    return result
 
 
 __all__ = [
@@ -699,5 +685,4 @@ __all__ = [
     "canonical_owner_decision_bytes",
     "build_owner_decision_request",
     "verify_owner_decision",
-    "build_owner_decision_checkpoint_patch_candidate",
 ]
