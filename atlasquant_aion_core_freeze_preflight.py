@@ -165,6 +165,7 @@ def build_core_freeze_preflight(
     checkpoint_state_digest = ""
     checkpoint_revision = -1
     checkpoint_snapshot: Mapping[str, Any] = {}
+    checkpoint_integrity_valid = False
     if not isinstance(checkpoint_master, Mapping):
         blockers.append("CHECKPOINT_MASTER_REQUIRED")
     else:
@@ -174,10 +175,11 @@ def build_core_freeze_preflight(
             checkpoint_state_digest = reconstructed["state_digest"]
             checkpoint_revision = reconstructed["revision"]
             checkpoint_snapshot = reconstructed["snapshot"]
+            checkpoint_integrity_valid = True
         except Exception:
             blockers.append("CHECKPOINT_MASTER_INTEGRITY_INVALID")
 
-    if checkpoint_snapshot:
+    if checkpoint_integrity_valid:
         blockers.extend(
             _checkpoint_review_blockers(
                 checkpoint_snapshot,
@@ -246,55 +248,56 @@ def build_core_freeze_preflight(
 def verify_preflight_still_current(
     preflight: Mapping[str, Any] | None,
     *,
+    certification_manifest: Mapping[str, Any] | None,
+    certification_trust_roots: TrustRootRegistry,
+    expected_target_commit_sha: str,
     checkpoint_master: Mapping[str, Any] | None,
     now_ts: str,
 ) -> dict[str, Any]:
-    """Read-only TOCTOU guard for a previously prepared challenge."""
+    """Rebuild the signed chain and re-check TOCTOU before any owner decision."""
     blockers: list[str] = []
     row = dict(preflight or {}) if isinstance(preflight, Mapping) else {}
+
     if row.get("schema") != CHALLENGE_SCHEMA:
         blockers.append("PREFLIGHT_SCHEMA_INVALID")
     if row.get("state") != "READY_FOR_OWNER_DECISION":
         blockers.append("PREFLIGHT_NOT_READY")
     if row.get("owner_decision_ready") is not True:
         blockers.append("PREFLIGHT_OWNER_DECISION_NOT_READY")
-    if row.get("challenge_digest") != _digest({
-        key: value
-        for key, value in row.items()
-        if key not in {
-            "challenge_digest",
-            "digest_to_sign",
-            "owner_decision_ready",
-        }
-    }):
-        blockers.append("PREFLIGHT_CHALLENGE_DIGEST_MISMATCH")
-
-    blockers.extend(
-        _validate_window(
-            now_ts=now_ts,
-            issued_at=row.get("issued_at"),
-            expires_at=row.get("expires_at"),
-        )
-    )
-
-    if not isinstance(checkpoint_master, Mapping):
-        blockers.append("CHECKPOINT_MASTER_REQUIRED")
-    else:
-        try:
-            reconstructed = reconstruct_checkpoint(checkpoint_master)
-            current_master_digest = checkpoint_master_digest(checkpoint_master)
-        except Exception:
-            blockers.append("CHECKPOINT_MASTER_INTEGRITY_INVALID")
-        else:
-            if current_master_digest != row.get("checkpoint_master_digest"):
-                blockers.append("CHECKPOINT_MASTER_CHANGED")
-            if reconstructed["state_digest"] != row.get("checkpoint_state_digest"):
-                blockers.append("CHECKPOINT_STATE_CHANGED")
-            if reconstructed["revision"] != row.get("checkpoint_revision"):
-                blockers.append("CHECKPOINT_REVISION_CHANGED")
-
     if row.get("owner_decision") != "UNDECIDED":
         blockers.append("OWNER_DECISION_MUST_REMAIN_UNDECIDED_IN_PREFLIGHT")
+    if row.get("digest_to_sign") != row.get("challenge_digest"):
+        blockers.append("PREFLIGHT_DIGEST_TO_SIGN_MISMATCH")
+
+    rebuilt = None
+    if not blockers:
+        try:
+            rebuilt = build_core_freeze_preflight(
+                certification_manifest,
+                certification_trust_roots=certification_trust_roots,
+                now_ts=now_ts,
+                expected_target_commit_sha=expected_target_commit_sha,
+                checkpoint_master=checkpoint_master,
+                ceremony_id=row.get("ceremony_id"),
+                challenge_nonce=row.get("challenge_nonce"),
+                issued_at=row.get("issued_at"),
+                expires_at=row.get("expires_at"),
+            )
+        except Exception:
+            blockers.append("PREFLIGHT_REBUILD_FAILURE")
+
+    if rebuilt is not None:
+        if rebuilt.get("state") != "READY_FOR_OWNER_DECISION":
+            blockers.append("PREFLIGHT_REBUILD_NOT_READY")
+            blockers.extend(
+                f"REBUILD:{item}"
+                for item in rebuilt.get("blockers", [])
+            )
+        if rebuilt.get("challenge_digest") != row.get("challenge_digest"):
+            blockers.append("PREFLIGHT_CHALLENGE_REBUILD_MISMATCH")
+        if rebuilt.get("digest_to_sign") != row.get("digest_to_sign"):
+            blockers.append("PREFLIGHT_DIGEST_TO_SIGN_MISMATCH")
+
     for field in (
         "owner_decision_recorded",
         "signature_active",
@@ -318,10 +321,11 @@ def verify_preflight_still_current(
     unique = sorted(set(blockers))
     current = not unique
     return {
-        "schema": "ATLASQUANT_AION_CORE_FREEZE_PREFLIGHT_RECHECK_V1",
+        "schema": "ATLASQUANT_AION_CORE_FREEZE_PREFLIGHT_RECHECK_V2",
         "state": "CURRENT" if current else "BLOCKED",
         "blockers": unique,
         "preflight_current": current,
+        "signed_chain_rebuilt": rebuilt is not None,
         "owner_decision_recorded": False,
         "core_freeze_authorized": False,
         "core_frozen": False,
