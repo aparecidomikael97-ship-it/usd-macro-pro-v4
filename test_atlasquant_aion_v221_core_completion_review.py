@@ -213,7 +213,12 @@ def test_review_digest_is_deterministic():
 
 def test_checkpoint_patch_candidate_is_staged_only():
     result = review()
-    candidate = build_checkpoint_patch_candidate(result)
+    candidate = build_checkpoint_patch_candidate(
+        certification_manifest(),
+        certification_trust_roots=TRUST_ROOTS,
+        now_ts=NOW,
+        expected_target_commit_sha=TARGET,
+    )
     assert candidate["requires_explicit_checkpoint_save"] is True
     assert candidate["automatic_checkpoint_write"] is False
     assert candidate["checkpoint_saved"] is False
@@ -228,7 +233,12 @@ def test_checkpoint_patch_candidate_is_staged_only():
 
 def test_checkpoint_patch_can_use_existing_checkpoint_master_explicitly():
     result = review()
-    candidate = build_checkpoint_patch_candidate(result)
+    candidate = build_checkpoint_patch_candidate(
+        certification_manifest(),
+        certification_trust_roots=TRUST_ROOTS,
+        now_ts=NOW,
+        expected_target_commit_sha=TARGET,
+    )
     master = new_checkpoint_master(
         {"system": {"state": "SAFE"}},
         base_revision=0,
@@ -251,25 +261,35 @@ def test_checkpoint_patch_can_use_existing_checkpoint_master_explicitly():
     assert restored["execution_allowed"] is False
 
 
-def test_tampered_review_digest_cannot_build_checkpoint_candidate():
-    result = review()
-    result["review_digest"] = "sha256:" + "f" * 64
-    with pytest.raises(ValueError, match="digest mismatch"):
-        build_checkpoint_patch_candidate(result)
+def test_checkpoint_builder_reverifies_manifest_and_blocks_unsafe_claim():
+    manifest = certification_manifest()
+    manifest["core_frozen"] = True
+    candidate = build_checkpoint_patch_candidate(
+        manifest,
+        certification_trust_roots=TRUST_ROOTS,
+        now_ts=NOW,
+        expected_target_commit_sha=TARGET,
+    )
+    record = candidate["patch"]["aion_core_completion_review"]
+    assert record["state"] == "BLOCKED"
+    assert record["owner_review_ready"] is False
+    assert "UNSAFE_CERTIFICATION_FIELD:core_frozen" in record["blockers"]
+    assert record["core_frozen"] is False
 
 
-def test_checkpoint_candidate_rejects_unsafe_review_field():
-    result = review()
-    result["core_frozen"] = True
-    with pytest.raises(ValueError, match="unsafe review field"):
-        build_checkpoint_patch_candidate(result)
-
-
-def test_owner_review_ready_tamper_breaks_review_digest():
-    result = review()
-    result["owner_review_ready"] = False
-    with pytest.raises(ValueError, match="digest mismatch"):
-        build_checkpoint_patch_candidate(result)
+def test_checkpoint_builder_reverifies_manifest_digest_instead_of_trusting_claims():
+    manifest = certification_manifest()
+    manifest["manifest_digest"] = "sha256:" + "f" * 64
+    candidate = build_checkpoint_patch_candidate(
+        manifest,
+        certification_trust_roots=TRUST_ROOTS,
+        now_ts=NOW,
+        expected_target_commit_sha=TARGET,
+    )
+    record = candidate["patch"]["aion_core_completion_review"]
+    assert record["state"] == "BLOCKED"
+    assert record["owner_review_ready"] is False
+    assert "CERTIFICATION_MANIFEST_DIGEST_MISMATCH" in record["blockers"]
 
 
 def test_review_gate_has_no_network_or_automatic_persistence_paths():
