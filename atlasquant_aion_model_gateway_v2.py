@@ -125,9 +125,13 @@ def endpoint_from_mapping(raw: Mapping[str, Any]) -> ModelEndpoint:
 
 class ProviderNeutralModelRegistry:
     def __init__(self, endpoints: Sequence[ModelEndpoint | Mapping[str, Any]]):
+        if not isinstance(endpoints, (list, tuple)):
+            raise ValueError("endpoints collection required")
         rows: list[ModelEndpoint] = []
         seen = set()
-        for item in list(endpoints or []):
+        for item in endpoints:
+            if not isinstance(item, (ModelEndpoint, Mapping)):
+                raise ValueError("invalid endpoint entry")
             endpoint = item if isinstance(item, ModelEndpoint) else endpoint_from_mapping(item)
             key = (endpoint.provider_id, endpoint.model_id, endpoint.lane)
             if key in seen:
@@ -276,16 +280,24 @@ def route_model_request(
     max_cost = _money(max_request_cost_usd, "max_request_cost_usd")
     preferred = _clean(preferred_provider, 120)
 
-    capabilities = {
-        _clean(x, 120).lower()
-        for x in list(required_capabilities or [])
-        if _clean(x, 120)
-    }
-    excluded = {
-        _clean(x, 120)
-        for x in list(excluded_providers or [])
-        if _clean(x, 120)
-    }
+    if not isinstance(required_capabilities, (list, tuple, set, frozenset)):
+        raise ValueError("required_capabilities collection required")
+    if not isinstance(excluded_providers, (list, tuple, set, frozenset)):
+        raise ValueError("excluded_providers collection required")
+
+    raw_capabilities = [_clean(x, 120).lower() for x in required_capabilities]
+    raw_excluded = [_clean(x, 120) for x in excluded_providers]
+    if any(not x for x in raw_capabilities):
+        raise ValueError("required_capabilities contains empty value")
+    if any(not x for x in raw_excluded):
+        raise ValueError("excluded_providers contains empty value")
+    if len(raw_capabilities) != len(set(raw_capabilities)):
+        raise ValueError("required_capabilities contains duplicates")
+    if len(raw_excluded) != len(set(raw_excluded)):
+        raise ValueError("excluded_providers contains duplicates")
+
+    capabilities = set(raw_capabilities)
+    excluded = set(raw_excluded)
 
     force_local = private or offline or not external_enabled
     target_lane = "LOCAL_DETERMINISTIC" if force_local else _required_lane(task)
