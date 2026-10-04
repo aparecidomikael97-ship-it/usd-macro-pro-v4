@@ -211,6 +211,8 @@ def build_core_freeze_preflight(
         "issued_at": issued_at,
         "expires_at": expires_at,
         "human_owner_required": True,
+        "owner_decision_preflight_ready": ready,
+        "owner_decision_ready": False,
         "owner_decision_recorded": False,
         "signature_mechanism": "FIDO2_OR_PLATFORM_SIGNATURE_FUTURE",
         "signature_active": False,
@@ -219,6 +221,9 @@ def build_core_freeze_preflight(
         "core_freeze_authorized": False,
         "core_frozen": False,
         "checkpoint_saved": False,
+        "checkpoint_external_persistence_verified": False,
+        "requires_external_persistence_attestation": True,
+        "signature_material_ready": False,
         "merge_authorized": False,
         "deploy_authorized": False,
         "execution_allowed": False,
@@ -233,15 +238,14 @@ def build_core_freeze_preflight(
         "automatic_freeze": False,
         "automatic_checkpoint_write": False,
         "blockers": unique,
-        "state": "READY_FOR_OWNER_DECISION" if ready else "BLOCKED",
+        "state": "READY_FOR_OWNER_DECISION_PREFLIGHT" if ready else "BLOCKED",
     }
     challenge_digest = _digest(challenge_body)
 
     return {
         **challenge_body,
         "challenge_digest": challenge_digest,
-        "digest_to_sign": challenge_digest if ready else "",
-        "owner_decision_ready": ready,
+        "digest_to_sign": "",
     }
 
 
@@ -260,14 +264,20 @@ def verify_preflight_still_current(
 
     if row.get("schema") != CHALLENGE_SCHEMA:
         blockers.append("PREFLIGHT_SCHEMA_INVALID")
-    if row.get("state") != "READY_FOR_OWNER_DECISION":
+    if row.get("state") != "READY_FOR_OWNER_DECISION_PREFLIGHT":
         blockers.append("PREFLIGHT_NOT_READY")
-    if row.get("owner_decision_ready") is not True:
-        blockers.append("PREFLIGHT_OWNER_DECISION_NOT_READY")
+    if row.get("owner_decision_preflight_ready") is not True:
+        blockers.append("PREFLIGHT_NOT_READY_FOR_DECISION_PREPARATION")
+    if row.get("owner_decision_ready") is not False:
+        blockers.append("OWNER_DECISION_READY_MUST_REMAIN_FALSE")
     if row.get("owner_decision") != "UNDECIDED":
         blockers.append("OWNER_DECISION_MUST_REMAIN_UNDECIDED_IN_PREFLIGHT")
-    if row.get("digest_to_sign") != row.get("challenge_digest"):
-        blockers.append("PREFLIGHT_DIGEST_TO_SIGN_MISMATCH")
+    if row.get("digest_to_sign") != "":
+        blockers.append("PREFLIGHT_DIGEST_TO_SIGN_MUST_REMAIN_EMPTY")
+    if row.get("checkpoint_external_persistence_verified") is not False:
+        blockers.append("EXTERNAL_PERSISTENCE_MUST_REMAIN_UNVERIFIED")
+    if row.get("signature_material_ready") is not False:
+        blockers.append("SIGNATURE_MATERIAL_MUST_REMAIN_NOT_READY")
 
     presented_body = {
         key: value
@@ -275,7 +285,6 @@ def verify_preflight_still_current(
         if key not in {
             "challenge_digest",
             "digest_to_sign",
-            "owner_decision_ready",
         }
     }
     if row.get("challenge_digest") != _digest(presented_body):
@@ -299,7 +308,7 @@ def verify_preflight_still_current(
             blockers.append("PREFLIGHT_REBUILD_FAILURE")
 
     if rebuilt is not None:
-        if rebuilt.get("state") != "READY_FOR_OWNER_DECISION":
+        if rebuilt.get("state") != "READY_FOR_OWNER_DECISION_PREFLIGHT":
             blockers.append("PREFLIGHT_REBUILD_NOT_READY")
             blockers.extend(
                 f"REBUILD:{item}"
@@ -308,7 +317,7 @@ def verify_preflight_still_current(
         if rebuilt.get("challenge_digest") != row.get("challenge_digest"):
             blockers.append("PREFLIGHT_CHALLENGE_REBUILD_MISMATCH")
         if rebuilt.get("digest_to_sign") != row.get("digest_to_sign"):
-            blockers.append("PREFLIGHT_DIGEST_TO_SIGN_MISMATCH")
+            blockers.append("PREFLIGHT_DIGEST_TO_SIGN_MUST_REMAIN_EMPTY")
 
     for field in (
         "owner_decision_recorded",
@@ -318,6 +327,9 @@ def verify_preflight_still_current(
         "core_freeze_authorized",
         "core_frozen",
         "checkpoint_saved",
+        "checkpoint_external_persistence_verified",
+        "signature_material_ready",
+        "owner_decision_ready",
         "merge_authorized",
         "deploy_authorized",
         "execution_allowed",
