@@ -535,3 +535,13 @@ def test_local_safe_cannot_enter_external_dispatch_state(tmp_path):
             now_ts=NOW,
         )
     assert exc.value.result["error_code"] == "DISPATCH_MODE_BLOCKED"
+
+
+def test_cancel_during_active_lease_is_blocked(tmp_path):
+    store = DurableExecutionStore(tmp_path / "exec.sqlite3")
+    execution_id = prepare(store).record["execution_id"]
+    lease(store, execution_id)
+    with pytest.raises(DurableExecutionError) as exc:
+        store.cancel(execution_id, now_ts=LATER)
+    assert exc.value.result["error_code"] == "CANCEL_ACTIVE_LEASE_BLOCKED"
+    assert store.get(execution_id)["state"] == "LEASED"
