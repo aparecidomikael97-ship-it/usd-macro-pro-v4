@@ -213,6 +213,13 @@ def verify_capability_scope(
     for field in ("authority_id", "subject_id", "tenant_id", "domain", "policy_id"):
         if grant.get(field) != parent.get(field):
             blockers.append(f"SCOPE_PARENT_BINDING_MISMATCH:{field}")
+    # No delegated-signer policy exists yet. A child scope grant must therefore
+    # be signed under the exact same trust-root key/version as its parent.
+    if (
+        grant.get("key_id") != parent.get("key_id")
+        or grant.get("key_version") != parent.get("key_version")
+    ):
+        blockers.append("SCOPE_SIGNER_MISMATCH_PARENT")
 
     workspace = _clean(expected_workspace_id, 128)
     if not workspace or grant.get("workspace_id") != workspace:
