@@ -273,8 +273,10 @@ def _domain(evidence, domain, known, now):
                     # A receipt claim must carry the actual canonical journal it reports.
                     status,logical=_journal(report.get("journal"),known) if type(report.get("journal")) is dict else ("UNKNOWN",{})
                     if status=="VERIFIED":
+                        # Carry the validated journal identity, not optional receipt claims.
+                        report={**report, **{key:logical[key] for key in ("revision","head_digest") if key in logical}}
                         for key in ("revision","head_digest"):
-                            if key in report and (type(report[key]) is not type(logical.get(key)) or report[key]!=logical.get(key)):
+                            if key in value and (type(value[key]) is not type(logical.get(key)) or value[key]!=logical.get(key)):
                                 status="MISMATCH"
                                 break
                 else: status=_bad_status(report.get("status"))
@@ -350,6 +352,14 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
     j=provenance["journal"];a=provenance["audit_chain"]
     if j.get("head_digest") and a.get("head_digest") and (j["head_digest"]!=a["head_digest"] or j.get("revision")!=a.get("revision")):
         payload["audit_chain_status"]="MISMATCH"
+    # Recovery and journal/audit represent the same canonical request lineage.
+    # Memory/checkpoint/taskgraph revisions belong to separate contracts.
+    recovery=provenance["recovery"]
+    for current in (j,a):
+        if recovery.get("head_digest") and current.get("head_digest") and (
+                recovery["head_digest"]!=current["head_digest"]
+                or recovery.get("revision")!=current.get("revision")):
+            payload["recovery_status"]="MISMATCH"
     counts,verified=_mission_counts(mission_evidence,known)
     counts_freshness=_timeliness(mission_evidence,now) if verified else "NOT_EVALUATED"
     verified=verified and counts_freshness not in {"STALE","UNVERIFIED"}
