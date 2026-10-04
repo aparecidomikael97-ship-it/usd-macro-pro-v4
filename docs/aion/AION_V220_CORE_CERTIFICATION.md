@@ -181,3 +181,41 @@ A workflow dedicada também executa explicitamente E2E, load, chaos/recovery,
 recovery traceability, tenant durable persistence, unified journal replay e resource
 bounds no mesmo commit.
 
+## Cryptographic evidence hardening
+
+Cada dimensão de certificação precisa ser uma atestação Ed25519 válida ligada ao
+trust root público de certificação fornecido pelo host confiável.
+
+O campo `verified=True` sozinho não tem autoridade.
+
+A atestação assina, no mínimo:
+- dimension;
+- state;
+- source;
+- run_id;
+- commit_sha;
+- evidence_digest;
+- test_count;
+- key_id / key_version;
+- issued_at / expires_at.
+
+O evidence digest é recalculado a partir do conteúdo canônico. Depois, a assinatura
+é verificada contra o trust root de certificação. Tamper, wrong key, key revocation,
+expiração, digest mismatch ou ausência de assinatura bloqueiam a dimensão.
+
+### Chaves de teste vs certificado real
+
+A suíte V2.20 gera chaves efêmeras apenas em memória para provar o mecanismo
+criptográfico. Essas chaves não são trust roots de produção e não emitem o certificado
+real do núcleo.
+
+Um certificado real exige atestações assinadas fora do payload/LLM por uma chave de
+certificação provisionada fora do repositório. Portanto, CI verde prova o mecanismo e
+a cadeia estrutural; não transforma sozinho o núcleo em `Core Complete` nem em
+`Core Freeze`.
+
+### Saída máxima automática
+
+Mesmo com todas as atestações criptograficamente válidas, o estado máximo automático é
+`CERTIFICATION_CANDIDATE`, seguido de revisão explícita do proprietário.
+
