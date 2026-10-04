@@ -302,6 +302,62 @@ def test_decision_signature_replay_is_blocked_durably(tmp_path):
     assert "OWNER_DECISION_NONCE_REPLAYED" in second["blockers"]
 
 
+def test_nonce_claim_is_bound_to_exact_decision_request_digest(tmp_path):
+    secret, roots, evidence, v224_request, v224_signature, approve = decision_fixture()
+    registry = PersistentNonceRegistry(tmp_path / "decision.sqlite3")
+    first = verify_fixture(
+        secret=secret,
+        owner_roots=roots,
+        evidence=evidence,
+        v224_request=v224_request,
+        v224_signature=v224_signature,
+        built=approve,
+        registry=registry,
+    )
+    assert first["state"] == "OWNER_DECISION_VERIFIED_APPROVE_PENDING_PERSISTENCE"
+
+    deny_built = build_owner_decision_request(
+        v224_request=v224_request,
+        v224_signature_b64=v224_signature,
+        owner_trust_roots=roots,
+        checkpoint_master=evidence["checkpoint_master"],
+        preflight=evidence["preflight"],
+        certification_manifest=evidence["certification_manifest"],
+        certification_trust_roots=evidence["certification_trust_roots"],
+        expected_target_commit_sha=evidence["expected_target_commit_sha"],
+        runtime_result=evidence["runtime_result"],
+        write_receipt=evidence["write_receipt"],
+        now_ts=NOW,
+        decision="DENY_CORE_FREEZE",
+        ceremony_id="owner-decision-ceremony-002",
+        nonce=DECISION_NONCE,
+        issued_at=DECISION_ISSUED,
+        expires_at=DECISION_EXPIRES,
+        key_id=OWNER_KEY_ID,
+        key_version=OWNER_KEY_VERSION,
+    )
+    # Same nonce may be used once for a distinct exact request scope, proving
+    # the registry key includes the request digest rather than only coarse state.
+    second = verify_owner_decision(
+        request=deny_built["request"],
+        decision_signature_b64=sign_decision(secret, deny_built["request"]),
+        v224_request=v224_request,
+        v224_signature_b64=v224_signature,
+        owner_trust_roots=roots,
+        decision_nonce_registry=registry,
+        checkpoint_master=evidence["checkpoint_master"],
+        preflight=evidence["preflight"],
+        certification_manifest=evidence["certification_manifest"],
+        certification_trust_roots=evidence["certification_trust_roots"],
+        expected_target_commit_sha=evidence["expected_target_commit_sha"],
+        runtime_result=evidence["runtime_result"],
+        write_receipt=evidence["write_receipt"],
+        now_ts=NOW,
+    )
+    assert second["state"] == "OWNER_DECISION_VERIFIED_DENY_PENDING_PERSISTENCE"
+    assert registry.count() == 2
+
+
 def test_wrong_decision_signing_key_blocks(tmp_path):
     secret, roots, evidence, v224_request, v224_signature, built = decision_fixture()
     attacker, _ = owner_keypair()
