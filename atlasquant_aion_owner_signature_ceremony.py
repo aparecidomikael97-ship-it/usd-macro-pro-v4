@@ -60,6 +60,11 @@ def _digest(value: Any) -> str:
     return "sha256:" + hashlib.sha256(canonical_owner_signature_bytes(value)).hexdigest()
 
 
+def _owner_public_key_fingerprint(entry: Any) -> str:
+    raw = entry.public_key().public_bytes_raw()
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
 def _parse_ts(value: Any) -> datetime:
     if not isinstance(value, str) or not value.endswith("Z"):
         raise ValueError("timestamp must be RFC3339 UTC")
@@ -192,11 +197,12 @@ def build_owner_signature_request(
         )
     )
 
+    owner_entry = None
     if not isinstance(owner_trust_roots, TrustRootRegistry):
         blockers.append("OWNER_TRUST_ROOT_REGISTRY_INVALID")
     elif not blockers:
         try:
-            _, key_problem = owner_trust_roots.verify_key_available(
+            owner_entry, key_problem = owner_trust_roots.verify_key_available(
                 key_id,
                 key_version,
                 now_ts,
@@ -283,6 +289,7 @@ def build_owner_signature_request(
         "nonce": nonce,
         "key_id": key_id,
         "key_version": key_version,
+        "owner_public_key_fingerprint": _owner_public_key_fingerprint(owner_entry),
         "owner_decision": "UNDECIDED",
         "core_freeze_authorized": False,
         "core_frozen": False,
@@ -358,6 +365,7 @@ def verify_owner_signature(
         "nonce",
         "key_id",
         "key_version",
+        "owner_public_key_fingerprint",
         "owner_decision",
         "core_freeze_authorized",
         "core_frozen",
@@ -448,6 +456,8 @@ def verify_owner_signature(
         return _blocked(f"OWNER_{key_problem}")
     if entry is None:
         return _blocked("OWNER_TRUST_KEY_UNKNOWN")
+    if presented.get("owner_public_key_fingerprint") != _owner_public_key_fingerprint(entry):
+        return _blocked("OWNER_PUBLIC_KEY_FINGERPRINT_MISMATCH")
 
     signature_verified = False
     try:
