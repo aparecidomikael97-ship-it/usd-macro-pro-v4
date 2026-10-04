@@ -63,6 +63,7 @@ O request é reconstruído diretamente da evidência V2.23 e inclui:
 - janela temporal curta;
 - nonce;
 - key id/version;
+- fingerprint SHA-256 da chave pública exata;
 - decisão ainda `UNDECIDED`;
 - flags críticas falsas.
 
