@@ -113,6 +113,23 @@ def _safe_structure(value:Any, *, depth:int=0)->Any:
     raise CheckpointMasterError(f"unsupported checkpoint type: {type(value).__name__}")
 
 
+def _reject_replay_execution_promotion(before:Any,after:Any,path:str="")->None:
+    """Recovery/replay may restore state, never manufacture execution."""
+    if isinstance(before,Mapping) and isinstance(after,Mapping):
+        for key,next_value in after.items():
+            prior=before.get(key)
+            current_path=f"{path}.{key}" if path else str(key)
+            if str(key).casefold() in {"state","status"}:
+                if str(prior or "").upper()=="PLANNED" and str(next_value or "").upper()=="EXECUTED":
+                    raise CheckpointMasterError(
+                        f"replay cannot promote PLANNED to EXECUTED at {current_path}"
+                    )
+            _reject_replay_execution_promotion(prior,next_value,current_path)
+    elif isinstance(before,list) and isinstance(after,list):
+        for index,(prior,next_value) in enumerate(zip(before,after)):
+            _reject_replay_execution_promotion(prior,next_value,f"{path}[{index}]")
+
+
 def _merge_patch(target:Mapping[str,Any],patch:Mapping[str,Any])->dict[str,Any]:
     out=deepcopy(dict(target))
     for key,value in patch.items():
@@ -343,6 +360,7 @@ def append_checkpoint_patch(
     event["event_digest"]=_digest(_event_material(event))
     next_state=_merge_patch(current["snapshot"],checked_patch)
     next_state=_safe_structure(next_state)
+    _reject_replay_execution_promotion(current["snapshot"],next_state)
     if _bytes(next_state)>MAX_BASE_BYTES:
         raise CheckpointMasterError("resulting snapshot exceeds limit")
 
