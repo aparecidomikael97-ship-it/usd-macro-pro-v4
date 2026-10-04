@@ -76,7 +76,8 @@ jobs:
             test_atlasquant_aion_v26_core_health_adapter.py \
             test_atlasquant_aion_v26_evidence_wiring_status_truth.py \
             test_atlasquant_aion_v27_durable_store_crash_isolation_redteam.py \
-            test_atlasquant_aion_v27_health_attestation_redteam.py
+            test_atlasquant_aion_v27_health_attestation_redteam.py \
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
@@ -112,7 +113,8 @@ jobs:
             test_atlasquant_aion_v26_core_health_adapter.py \
             test_atlasquant_aion_v26_evidence_wiring_status_truth.py \
             test_atlasquant_aion_v27_durable_store_crash_isolation_redteam.py \
-            test_atlasquant_aion_v27_health_attestation_redteam.py
+            test_atlasquant_aion_v27_health_attestation_redteam.py \
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py
 
   supply-chain-audit:
     name: Supply-chain audit
