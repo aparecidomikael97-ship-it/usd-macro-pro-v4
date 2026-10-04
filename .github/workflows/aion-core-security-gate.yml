@@ -46,12 +46,15 @@ jobs:
             atlasquant_aion_unified_journal.py \
             atlasquant_aion_unified_durable_bridge.py \
             atlasquant_aion_unified_journal_store.py \
+            atlasquant_aion_unified_mission.py \
             atlasquant_aion_role_authority.py \
             atlasquant_aion_truth_mapping.py \
             test_atlasquant_aion_chat_checkpoint_adapter.py \
             test_atlasquant_aion_chat_library_adapter.py \
             test_atlasquant_aion_unified_hardening_v21.py \
             test_atlasquant_aion_unified_journal_store.py \
+            test_atlasquant_aion_unified_journal_store_governance.py \
+            test_atlasquant_aion_unified_mission.py \
             test_atlasquant_aion_security_adversarial.py \
             test_atlasquant_aion_chaos_recovery.py \
             atlasquant_aion_critical_review.py \
@@ -85,7 +88,9 @@ jobs:
             test_atlasquant_aion_chat_checkpoint_adapter.py \
             test_atlasquant_aion_chat_library_adapter.py \
             test_atlasquant_aion_unified_hardening_v21.py \
-            test_atlasquant_aion_unified_journal_store.py
+            test_atlasquant_aion_unified_journal_store.py \
+            test_atlasquant_aion_unified_journal_store_governance.py \
+            test_atlasquant_aion_unified_mission.py
 
   supply-chain-audit:
     name: Supply-chain audit
@@ -123,6 +128,7 @@ jobs:
             atlasquant_aion_unified_journal.py \
             atlasquant_aion_unified_durable_bridge.py \
             atlasquant_aion_unified_journal_store.py \
+            atlasquant_aion_unified_mission.py \
             atlasquant_aion_role_authority.py \
             atlasquant_aion_truth_mapping.py
       - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
