@@ -118,6 +118,9 @@ jobs:
             test_atlasquant_advanced_boot.py \
             test_atlasquant_production_admin_flow.py \
             test_atlasquant_reference_ui.py \
+            test_atlasquant_reference_resident.py \
+            test_atlasquant_runtime_consistency.py \
+            test_atlasquant_reference_population.py \
             test_atlasquant_reference_browser.py \
             test_atlasquant_aion_workspaces.py \
             test_atlasquant_aion_ecosystem.py \
@@ -421,6 +424,9 @@ jobs:
           python -m playwright install --with-deps chromium
           python -m pytest -q \
             test_atlasquant_reference_ui.py \
+            test_atlasquant_reference_resident.py \
+            test_atlasquant_runtime_consistency.py \
+            test_atlasquant_reference_population.py \
             test_atlasquant_reference_browser.py
       - name: Run AION chat and unified runtime contracts in isolated process
         run: |
@@ -430,6 +436,9 @@ jobs:
             test_atlasquant_aion_unified_runtime.py \
             test_atlasquant_aion_chat_checkpoint_adapter.py \
             test_atlasquant_aion_chat_library_adapter.py \
-            test_atlasquant_aion_unified_hardening_v21.py
+            test_atlasquant_aion_unified_hardening_v21.py \
+            test_atlasquant_aion_unified_journal_store.py \
+            test_atlasquant_aion_unified_journal_store_governance.py \
+            test_atlasquant_aion_unified_mission.py
           python -m pytest -q -s \
             test_atlasquant_aion_chat_browser.py
