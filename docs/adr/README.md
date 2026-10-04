@@ -38,5 +38,12 @@ Cada registro usa o identificador `ADR-NNNN` e as seções: Título, Data, Statu
 | ADR-0008 | ACCEPTED | `docs/adr/ADR-0008-real-trading-fail-closed.md` |
 | ADR-0009 | ACCEPTED | `docs/adr/ADR-0009-release-deploy-merge-gate.md` |
 | ADR-0010 | ACCEPTED | `docs/adr/ADR-0010-quatro-fechamentos-do-aion.md` |
+| ADR-0011 | ACCEPTED | `docs/adr/ADR-0011-control-plane-execution-plane-autoridade-criptografica.md` |
+| ADR-0012 | ACCEPTED | `docs/adr/ADR-0012-core-complete-certificacao-freeze-explicito.md` |
+| ADR-0013 | ACCEPTED | `docs/adr/ADR-0013-external-effect-outcome-unknown-no-auto-retry.md` |
+| ADR-0014 | ACCEPTED | `docs/adr/ADR-0014-capability-signed-intersection-least-privilege.md` |
+| ADR-0015 | ACCEPTED | `docs/adr/ADR-0015-operational-posture-signal-intersection.md` |
+| ADR-0016 | ACCEPTED | `docs/adr/ADR-0016-supervisor-memory-authority-separation.md` |
+| ADR-0017 | ACCEPTED | `docs/adr/ADR-0017-constitution-policy-kernel-non-execution.md` |
 
 Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu estado de produto está na reconciliação `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.

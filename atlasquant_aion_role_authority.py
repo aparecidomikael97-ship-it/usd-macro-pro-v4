@@ -62,8 +62,15 @@ def official_role_authority_matrix() -> dict[str, Any]:
     for role_id in OFFICIAL_ROLE_IDS:
         rows.append({
             "role_id": role_id,
+            "role": role_id,
             "purpose": _PURPOSES[role_id],
             "capabilities": list(_CAPABILITIES[role_id]),
+            "allowed_inputs": ["scoped_request", "scoped_confirmed_evidence", "task_dependencies"],
+            "allowed_outputs": list(_CAPABILITIES[role_id]) + ["local_artifact", "audited_proposal"],
+            "forbidden_actions": list(CRITICAL_ACTIONS),
+            "requires_approval": ["external_intent", "paid_intent", "scope_change"],
+            "escalation_target": "HUMAN_OWNER" if role_id == "guardian" else "guardian",
+            "audit_requirements": ["mission_id", "task_id", "scope_digest", "payload_digest", "transition", "approval_digest"],
             "shared_core": True,
             "independent_ai": False,
             "may_read_scoped_context": True,
