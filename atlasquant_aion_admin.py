@@ -2313,12 +2313,18 @@ def _render_core_consistency_truth(board: Mapping[str, Any]) -> None:
     health=board.get("aion_core_health")
     health=health if isinstance(health,Mapping) else {}
     state=envelope.get("consistency_state","UNKNOWN")
+    trust=board.get("provenance_trust_readiness")
+    trust=trust if isinstance(trust,Mapping) else {}
+    trust_state=trust.get("state","BLOCKED")
     st.caption(
         f"Core integrity={health.get('integrity_state','UNKNOWN')} · Global snapshot consistency={state} "
-        "· snapshot_atomic=False · origin_authenticated=False · snapshot_signed=False · origem não autenticada e atomicidade não comprovada. Saúde e consistência não autorizam execução."
+        f"· snapshot_atomic=False · origin_authenticated=False · snapshot_signed=False · provenance_trust={trust_state} · origem não autenticada e atomicidade não comprovada. Saúde e consistência não autorizam execução."
     )
     if state in {"PARTIAL","MISMATCH"}:
         st.caption("Consistency: "+"; ".join(str(reason) for reason in envelope.get("reasons",[])[:8])+" · Reconstruir a observação residente; sem aprovação automática.")
+    blockers=trust.get("blockers") if isinstance(trust.get("blockers"),list) else []
+    if blockers:
+        st.caption("Provenance trust preflight: "+"; ".join(str(item) for item in blockers[:8])+" · nenhuma autenticação é promovida por claims.")
     window=envelope.get("observation_window")
     if isinstance(window,Mapping) and window.get("earliest") and window.get("latest"):
         st.caption(f"Evidências observadas entre {window['earliest']} e {window['latest']}; isso não prova um instante atômico.")
