@@ -1,3 +1,13 @@
+## Estado vigente pós-#555 — consistência do runtime
+
+Esta atualização substitui os estados antigos PRÉVIA e o contrato de 19 funções descritos nas revisões históricas abaixo. A main atual mantém 24 rotas Trader: todas na barra lateral desktop com rolagem interna, e no acesso mobile Funções do Trader · 24. Iniciante e Avançado preservam todas as funções e o retorno à home.
+
+O TTL de 90 minutos continua bloqueando uso operacional, mas idade isolada agora conserva os sete packs como ÚLTIMA LEITURA · REVALIDAR. Preços, vieses, timestamps, H4/H1/M15 e ciclo do sinal permanecem históricos; seis sinais expirados e um sem sinal não geram Top 10. Painel Mestre legado e home compartilham o contrato de elegibilidade; ranking macro é um mapa de atenção separado. Atualização manual de provider só aparece com flag de manutenção explícita e sessão ADMIN existente.
+
+O market_strip usa apenas closes M15 fechados do cache Scanner existente, com zero chamadas adicionais de provider. Gráficos antigos mostram HISTÓRICO M15 · REVALIDAR. News Global e Nowcast 401, cotação e último preço, força USD macro e DXY spot têm estados distintos. Módulos sem evidência mostram SEM DADOS ou SEM FONTE LIVE CONFIGURADA, sem PRÉVIA indefinida.
+
+Detalhes, dados auditados, testes, evidências e pendências reais estão em [TRADER_RUNTIME_CONSISTENCY_20261003.md](trader/TRADER_RUNTIME_CONSISTENCY_20261003.md). Lacuna de schedule, autenticação externa do Nowcast e ausência de fontes live específicas permanecem explícitas. Nenhuma função foi removida; nenhum layout aprovado foi reconstruído. SEM MERGE e SEM DEPLOY.
+
 # Estado vigente — PR #554
 
 ## Hotfix de runtime — 03/10/2026

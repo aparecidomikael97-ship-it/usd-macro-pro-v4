@@ -556,6 +556,11 @@ def master_overview_state(*, pairs: int, processed: int, scanner_fresh: int) -> 
     return {"label":"COBERTURA PARCIAL","detail":f"Market Map {min(m,p)}/{p} · Scanner atual {min(s,p)}/{p}"}
 
 
+def manual_market_refresh_allowed() -> bool:
+    session=st.session_state.get('atlasquant_access_session') or {}
+    return os.getenv('ATLASQUANT_MANUAL_MARKET_REFRESH','')=='1' and isinstance(session,dict) and session.get('role')=='ADMIN'
+
+
 def _render_executive_market(snapshot: Mapping[str, Any]) -> None:
     forex = dict(snapshot.get("forex", {}) or {})
     alignment = dict(snapshot.get("alignment", {}) or {})
@@ -566,7 +571,7 @@ def _render_executive_market(snapshot: Mapping[str, Any]) -> None:
     st.markdown("### 🛰️ Visão executiva do mercado")
     st.caption(str(snapshot.get("disclaimer") or ""))
     e1, e2, e3, e4 = st.columns(4)
-    e1.metric("Radar Forex", f"{int(forex.get('monitored') or 0)}/28")
+    e1.metric("Universo Forex", f"{int(forex.get('monitored') or 0)}/28 cadastrados")
     e2.metric("Alinhamentos", int(alignment.get("aligned") or 0))
     e3.metric("Divergências", int(alignment.get("divergent") or 0))
     e4.metric(
@@ -576,7 +581,7 @@ def _render_executive_market(snapshot: Mapping[str, Any]) -> None:
 
     left, right = st.columns([1.25, 1])
     with left:
-        st.markdown("#### Forex · TOP 10 da população de 28")
+        st.markdown("#### Forex · TOP 10 validado" if forex.get('top') else "#### Ranking técnico não publicado · nenhuma leitura elegível")
         top_rows = []
         for rank, row in enumerate(list(forex.get("top", []) or []), start=1):
             top_rows.append({
@@ -589,10 +594,10 @@ def _render_executive_market(snapshot: Mapping[str, Any]) -> None:
                 "Estudo": row.get("pipeline", {}).get("ranking", "BLOQUEADO PARA ESTUDO"),
             })
         st.dataframe(pd.DataFrame(top_rows), hide_index=True, width="stretch")
-        st.caption(
-            "O TOP 10 deriva da mesma população dos 28 pares. Pares sem evidência continuam "
-            "visíveis como SEM DADOS e nunca ganham confiança artificial."
-        )
+        st.caption("Ranking exige dados prontos, proveniência confirmada e sinal CONFIRMED com validade futura; universo cadastrado não é cobertura live.")
+        if forex.get('macro_attention'):
+            st.markdown('#### MAPA MACRO DE ATENÇÃO')
+            st.dataframe(pd.DataFrame([{'Par':row['pair'],'Viés macro':row['bias'],'Prioridade macro':row['priority'],'Técnico':'AUSENTE · NÃO OPERAR'} for row in forex['macro_attention']]),hide_index=True,width='stretch')
     with right:
         st.markdown("#### DXY, evento e pré-notícia")
         st.metric(
@@ -692,7 +697,8 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
 
     top1, top2, top3, top4 = st.columns(4)
     top1.metric("Pares", len(pairs))
-    top2.metric("Market Map processado", f"{processed}/{len(pairs)}")
+    map_current=sum(_context_fresh(contexts.get(p),str(_matrix_row(matrix,p).get('Direção','')))[0] for p in pairs)
+    top2.metric("Market Map atual", f"{map_current}/{len(pairs)}",delta=f"Última leitura persistida: {processed}/{len(pairs)}",delta_color='off')
     _scanner_infos_v1022 = {p: _scanner_for_pair(scanner_state, p) for p in pairs}
     _scanner_available_v1022 = sum(bool(v.get("available")) for v in _scanner_infos_v1022.values())
     _scanner_fresh_v1022 = sum(bool(v.get("available")) and bool(v.get("fresh")) for v in _scanner_infos_v1022.values())
@@ -702,7 +708,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         delta=(f"{_scanner_available_v1022}/{len(pairs)} com dados" if _scanner_available_v1022 != _scanner_fresh_v1022 else None),
     )
     top4.metric("Modo", "SELETIVO")
-    overview=master_overview_state(pairs=len(pairs),processed=processed,scanner_fresh=_scanner_fresh_v1022)
+    overview=master_overview_state(pairs=len(pairs),processed=map_current,scanner_fresh=_scanner_fresh_v1022)
     st.markdown(
         f"""<div style="padding:12px 14px;border:1px solid rgba(163,190,222,.38);border-radius:12px;margin:4px 0 13px;background:#10233a;color:#f7fbff">
         <strong style="color:#ffffff">PAINEL MESTRE · {escape(overview['label'])}</strong>
@@ -718,7 +724,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
 
     c1, c2, c3 = st.columns([1.35, 1.2, 2.45])
     with c1:
-        if st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), width="stretch"):
+        if manual_market_refresh_allowed() and st.button("▶️ Atualizar próximo lote (2 pares)", key="v102_master_batch", disabled=(remaining > 0 or not bool(api_key)), width="stretch"):
             candidates = []
             for offset in range(len(pairs)):
                 p = pairs[(cursor + offset) % len(pairs)]
@@ -747,7 +753,9 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         if st.button("🔄 Recarregar painel", key="v102_master_reload", width="stretch"):
             st.rerun()
     with c3:
-        if remaining > 0:
+        if not manual_market_refresh_allowed():
+            st.caption('Atualização automática pelo Autopilot. Recarregar painel apenas lê o estado persistido.')
+        elif remaining > 0:
             st.warning(f"Aguarde ~{remaining}s antes de outro lote para proteger o limite da Twelve Data.")
         elif not api_key:
             st.warning("CHAVE_TWELVE_DATA ausente: atualização W1/D1/liquidez/ADR indisponível.")
@@ -759,12 +767,12 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     # Atualiza somente 2 pares por clique para respeitar o
     # orçamento conservador da Twelve Data.
     # ---------------------------------------------------------
-    st.markdown("#### 🔄 Atualização técnica sem sair do Painel Mestre")
+    st.markdown("#### 🔄 Atualização técnica sem sair do Painel Mestre" if manual_market_refresh_allowed() else "#### Scanner automático · leitura persistida")
     _cooldown_v1022 = max(int(scanner_refresh_remaining or 0), int(remaining or 0))
     _s1_v1022, _s2_v1022, _s3_v1022 = st.columns([1.55, 1.25, 2.2])
 
     with _s1_v1022:
-        if st.button(
+        if manual_market_refresh_allowed() and st.button(
             "🔄 Atualizar scanner técnico (2 pares)",
             key="v1022_master_refresh_scanner",
             disabled=(scanner_refresh_cb is None or _cooldown_v1022 > 0 or not bool(api_key)),
@@ -783,14 +791,16 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
 
     with _s2_v1022:
         if st.button(
-            "🔁 Atualizar leitura",
+            "🔁 Recarregar leitura",
             key="v1022_master_refresh_view",
             width="stretch",
         ):
             st.rerun()
 
     with _s3_v1022:
-        if _cooldown_v1022 > 0:
+        if not manual_market_refresh_allowed():
+            st.caption('Coleta automática pelo Autopilot. Recarregar leitura apenas lê o estado persistido.')
+        elif _cooldown_v1022 > 0:
             st.warning(
                 f"Aguarde ~{_cooldown_v1022}s antes de nova consulta para proteger o limite da Twelve Data."
             )
@@ -820,6 +830,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         master_rows=rows,
         macro_context=macro_context,
         source_status=source_status,
+        fx_resident=st.session_state.get('atlasquant_reference_fx_population'),
     )
     _render_executive_market(executive_snapshot)
 
@@ -833,7 +844,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         "Esta faixa usa exatamente o estado já calculado pelo Painel Mestre. "
         "Ela não altera Gate, Índice Integrado, técnica ou autorização."
     )
-    st.markdown("### 🏆 Melhor contexto consolidado agora")
+    st.markdown("### 🏆 Contexto consolidado persistido · verificar frescor")
     with st.container(border=True):
         b1, b2, b3 = st.columns(3)
         b1.metric("Par", str(best["Par"]))

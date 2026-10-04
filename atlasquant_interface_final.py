@@ -145,7 +145,7 @@ def resident_context_html(selected, resident=None):
             rows += [(key,value[key]) for key in ('tom','forca') if key in value]
             rows += [('Manchete persistida',title) for title in (value.get('titulos') or [])[:5]]
         else:
-            rows += [(key,item) for key,item in value.items() if not key.startswith('_') and isinstance(item,(int,float,str))]
+            rows += [('Índice amplo USD (FRED)' if key=='Índice amplo do dólar' else key,item) for key,item in value.items() if not key.startswith('_') and isinstance(item,(int,float,str))]
             rows += [('Auditoria FRED',str(item.get('Indicador'))+' · '+str(item.get('Última observação'))+' · '+str(item.get('Fonte'))+' · '+str(item.get('Status'))) for item in (value.get('_auditoria') or []) if isinstance(item,dict)]
             rows += [('DXY','Índice amplo FRED não é cotação spot DXY')]
         return fields(rows) if value else ''

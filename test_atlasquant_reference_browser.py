@@ -4,6 +4,9 @@ import socket
 import subprocess
 import sys
 import time
+import json
+import os
+from datetime import timedelta
 from urllib.request import urlopen
 import pytest
 pytest.importorskip("playwright.sync_api")
@@ -164,7 +167,7 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             page.locator('.ref-detail [data-route="home"]').click()
             assert page.locator(".ref-mobile-card").first.evaluate("(e)=>getComputedStyle(e).transitionDuration")=="0s"
             page.locator('.ref-toolbar [data-route="central"]').click()
-            expect(page.locator('[data-workspace="central"]')).to_be_visible()
+            expect(page.locator('[data-workspace="central"]')).to_be_visible(timeout=20000)
             page.screenshot(path=str(artifacts/"central-mobile.png"),full_page=True)
             page.set_viewport_size({"width":1440,"height":1000})
             page.emulate_media(reduced_motion="no-preference")
@@ -388,10 +391,114 @@ def test_resident_sidebar_and_bias_hotfix_at_requested_sizes():
                     page.screenshot(path=str(artifacts/f'hotfix-functions-{width}-{available}.png'),full_page=True)
                     summary.click()
                 if available:
-                    expect(page.locator('.cq-market-state')).to_contain_text('DADOS RESIDENTES VALIDADOS')
+                    expect(page.locator('.cq-market-state')).to_contain_text('DADOS ATUAIS VALIDADOS')
                     expect(page.locator('.cq-engine-bias')).to_have_count(2)
                 else:
-                    expect(page.locator('.cq-market-state')).to_contain_text('PRÉVIA / aguardando dados validados')
+                    expect(page.locator('.cq-market-state')).to_contain_text('SEM DADOS · SEM FONTE LIVE CONFIGURADA')
                     expect(page.locator('.cq-engine-bias')).to_have_count(0)
                 page.screenshot(path=str(artifacts/f'hotfix-trader-{width}-{available}.png'),full_page=True)
+        browser.close()
+
+
+@pytest.fixture(scope='module')
+def runtime_preview_url():
+    from test_atlasquant_runtime_consistency import historical_fixture,scanner_fixture
+    from atlasquant_runtime_presentation import compact_market_strip
+    value,status,now=historical_fixture()
+    value['market_strip']=compact_market_strip(scanner_fixture(now-timedelta(days=1)),now=now)
+    contexts={pack['pair']:{'updated_at':pack['technical_timestamp'],'w1_bias':'NEUTRO','d1_bias':'NEUTRO','readiness_score':0,'readiness_grade':'WAIT'} for pack in value['packs']}
+    scanner={'resultados':{pack['pair']:{'m15_fetched_at':pack['technical_timestamp'],'tecnico':{'disponivel':True,'h4':{'status':'CONFIRMA'},'h1':{'status':'PULLBACK OK'},'m15':{'status':'AGUARDAR'}}} for pack in value['packs']}}
+    artifacts=Path('visual_review');artifacts.mkdir(exist_ok=True)
+    path=(artifacts/'runtime-test-fixture.json').resolve()
+    path.write_text(json.dumps({'snapshot':value,'status':status,'master_state':{'contexts':contexts},'scanner_state':scanner,'label':'QA LOCAL · FIXTURE SINTÉTICA · HISTÓRICO 107 MIN · SEM DADOS LIVE'},ensure_ascii=False),encoding='utf-8')
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
+    env=dict(os.environ,ATLASQUANT_REVIEW_SNAPSHOT=str(path))
+    proc=subprocess.Popen([sys.executable,'-m','streamlit','run','tools/reference_ui_preview.py','--server.address','127.0.0.1','--server.port',str(port),'--server.headless','true','--browser.gatherUsageStats','false'],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    url=f'http://127.0.0.1:{port}'
+    try:
+        for _ in range(100):
+            try: urlopen(url+'/_stcore/health',timeout=.5).read();break
+            except OSError: time.sleep(.1)
+        yield url
+    finally:
+        proc.terminate();proc.wait(timeout=10)
+
+
+def test_all_24_runtime_routes_states_content_console_and_overflow(runtime_preview_url):
+    from atlasquant_reference_ui import TRADER_NAV,action_labels
+    from datetime import timedelta
+    audit=[];artifacts=Path('visual_review')
+    critical={'scanner','master','macro','fed','ict','market_map','autopilot','paper','lab','news'}
+    with sync_playwright() as p:
+        browser=p.chromium.launch(headless=True)
+        page=browser.new_page(reduced_motion='reduce',viewport={'width':1280,'height':720})
+        errors=[]
+        page.on('pageerror',lambda error:errors.append(str(error)))
+        page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
+        page.goto(runtime_preview_url+'?review=runtime')
+        expect(page.locator('.cq-workspace')).to_be_visible(timeout=30000)
+        for width,height in ((1280,720),(1440,900),(1024,768),(390,844)):
+            page.set_viewport_size({'width':width,'height':height})
+            for route,label in TRADER_NAV:
+                if width!=1280 and route not in critical|{'home'}: continue
+                if route!='home':
+                    if width==390:
+                        page.locator('.cq-functions summary').click()
+                        page.locator(f'.cq-functions [data-route="{route}"]').click()
+                    else:
+                        page.locator(f'.cq-nav [data-route="{route}"]').click()
+                    expect(page.locator(f'.ref-detail[data-module="{route}"]')).to_be_visible(timeout=20000)
+                expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+                state=page.locator('.cq-market-state').inner_text() if route=='home' else page.locator('.ref-detail > .ref-state').inner_text()
+                text=page.locator('.cq-workspace').inner_text()
+                assert 'PRÉVIA · sem execução automática' not in text
+                assert 'VALIDAÇÃO PENDENTE' not in text
+                overflow=page.evaluate('document.documentElement.scrollWidth>innerWidth')
+                assert not overflow
+                connected=page.locator(f'.ref-primary[data-route="connected:{route}"]').count()
+                assert connected<=1
+                assert page.locator('[title="Fechar"],[aria-label="Fechar"]').count()==0
+                if route in {'scanner','master','ict','market_map','autopilot','paper','news'}:
+                    assert ('REVALIDAR' in state or 'DEPENDÊNCIA EXTERNA' in state)
+                page.mouse.move(0,0)
+                page.screenshot(path=str(artifacts/f'consistency-{route}-{width}.png'),full_page=True)
+                title=page.locator('.cq-hero h1').inner_text() if route=='home' else page.locator('.ref-detail-head h1').inner_text()
+                used=page.locator('.cq-engine-bias').count()>0 if route=='home' else page.locator('.ref-detail').get_attribute('data-resident-used')=='true'
+                audit.append({'route':route,'title':title,'width':width,'connected_panel':bool(connected),'state':state,'resident_used':used,'hardcoded_preview':'PRÉVIA' in state,'console_errors':list(errors),'overflow':overflow,'duplicate_connected_button':connected>1})
+                if route!='home':
+                    page.locator('.ref-detail-head [data-route="home"]').click()
+                    expect(page.locator('.cq-hero')).to_be_visible(timeout=20000)
+            if width==390:
+                page.locator('.cq-functions summary').click()
+                expect(page.locator('.cq-functions .ref-nav-item')).to_have_count(24)
+                page.screenshot(path=str(artifacts/'consistency-mobile-functions-open.png'),full_page=True)
+                page.locator('.cq-functions summary').click()
+        assert not errors
+        assert len({row['route'] for row in audit if row['width']==1280})==24
+        (artifacts/'trader-route-state-audit.json').write_text(json.dumps(audit,ensure_ascii=False,indent=2),encoding='utf-8')
+        browser.close()
+
+
+def test_legacy_master_is_read_only_without_provider_buttons_at_four_sizes(runtime_preview_url):
+    artifacts=Path('visual_review')
+    with sync_playwright() as p:
+        browser=p.chromium.launch(headless=True)
+        page=browser.new_page(reduced_motion='reduce')
+        page.goto(runtime_preview_url+'?review=legacy')
+        expect(page.get_by_text('Painel Mestre de Oportunidades',exact=False)).to_be_visible(timeout=30000)
+        expect(page.get_by_text('REVISÃO LEGADA CONCLUÍDA · ZERO CHAMADAS PROVIDER',exact=True)).to_be_visible(timeout=30000)
+        expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+        expect(page.get_by_text('Market Map e scanner ainda sem cobertura atual',exact=True)).to_be_visible()
+        for width,height in ((1280,720),(1440,900),(1024,768),(390,844)):
+            page.set_viewport_size({'width':width,'height':height})
+            expect(page.get_by_text('Atualizar próximo lote',exact=False)).to_have_count(0)
+            expect(page.get_by_text('Atualizar scanner técnico',exact=False)).to_have_count(0)
+            expect(page.get_by_text('TOP 10 da população de 28',exact=False)).to_have_count(0)
+            expect(page.get_by_text('Universo Forex',exact=True)).to_be_visible()
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.mouse.move(0,0)
+            page.screenshot(path=str(artifacts/f'consistency-legacy-master-{width}.png'),full_page=True)
+        page.get_by_role('button',name='Voltar à home Trader',exact=True).click()
+        expect(page.locator('.cq-hero')).to_be_visible(timeout=20000)
         browser.close()

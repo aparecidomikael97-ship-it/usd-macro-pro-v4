@@ -2329,6 +2329,7 @@ _hold_admin_before_trader_shell()
 # Read the existing bounded runtime artifact before the reference cockpit stops.
 # Authentication and central area gates have already run; no heavy provider runs here.
 _fast_snapshot = {}
+_fast_runtime_status = {}
 if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE:
     try:
         from atlasquant_fast_startup import load_home_snapshot
@@ -2342,12 +2343,15 @@ if os.getenv("USD_MACRO_AUTOPILOT", "") != "1" and not _ATLASQUANT_OFFLINE_SMOKE
         )
         _fast_token = str(_config_value("GITHUB_TOKEN_HISTORICO") or "").strip()
         _fast_snapshot = load_home_snapshot(_fast_repo, _fast_branch, _fast_token, 4.0)
+        if _fast_snapshot:
+            from atlasquant_fast_startup import load_trader_runtime_status
+            _fast_runtime_status = load_trader_runtime_status(_fast_repo, _fast_branch, _fast_token, 4.0)
     except Exception as _fast_exc:
         st.session_state["atlasquant_fast_startup_error"] = type(_fast_exc).__name__
 
 if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
     from atlasquant_trader_resident import hydrate_trader_resident_state
-    hydrate_trader_resident_state(st.session_state, _fast_snapshot)
+    hydrate_trader_resident_state(st.session_state, _fast_snapshot, _fast_runtime_status)
     from atlasquant_reference_ui import render_trader_entry
     if render_trader_entry(st, _ATLASQUANT_ACCESS):
         st.stop()
@@ -8927,7 +8931,8 @@ if _aq_active_index == 8:
             "As telas reutilizam candles sem novas consultas. Dados antigos continuam bloqueados."
         )
 
-        if st.button("🔄 Atualizar técnica agora", key="v92_refresh_tecnico"):
+        from master_panel_v102 import manual_market_refresh_allowed
+        if manual_market_refresh_allowed() and st.button("🔄 Atualizar técnica agora", key="v92_refresh_tecnico"):
             try:
                 _td_time_series_v92.clear()
             except Exception:

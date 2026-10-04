@@ -112,7 +112,7 @@ def test_master_data_status_matches_resident_evidence():
     from atlasquant_reference_ui import reference_html
     resident,_ = resident_fixture()
     assert 'LEITURAS VALIDADAS' in reference_html('trader',selected='master',fx_population=resident)
-    assert 'VALIDAÇÃO PENDENTE' in reference_html('trader',selected='master')
+    assert 'SEM DADOS' in reference_html('trader',selected='master')
 
 
 def test_investment_reference_numbers_are_covered_by_neutral_native_states():

@@ -42,72 +42,14 @@ def asset_symbol(asset):
 
 
 def normalized_market_items(items):
-    """Read a caller-supplied validated, timestamped resident list; never fetch data.
-
-    Input order is the engine's order. Unverified, stale or malformed values stay
-    absent. The UI never derives a ranking, quote change or price series.
-    """
-    from datetime import datetime, timezone
-    import math
-    accepted=[]
-    if not isinstance(items,(list,tuple)):
-        return accepted
-    for item in items:
-        if not isinstance(item,dict) or item.get('validated') is not True or not item.get('source'):
-            continue
-        asset=item.get('asset')
-        if asset not in set(TRADER_ASSETS+INVESTMENT_ASSETS):
-            continue
-        try:
-            stamp=datetime.fromisoformat(str(item.get('as_of','')).replace('Z','+00:00'))
-            age=(datetime.now(timezone.utc)-stamp).total_seconds()
-            if age < -60 or age > 3600: continue
-        except (ValueError,TypeError):
-            continue
-        result={'asset':asset,'source':str(item['source']),'as_of':stamp.isoformat()}
-        for key in ('price','change_pct','score'):
-            value=item.get(key)
-            if isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and (key!='price' or value>0):
-                result[key]=value
-        if item.get('bias') in ('Compra','Venda','Neutro'):
-            result['bias']=item['bias']
-        if item.get('last_bias') in ('COMPRA','VENDA','NEUTRO','AGUARDAR'):
-            result['last_bias']=item['last_bias']
-            result['temporal_state']=str(item.get('temporal_state') or 'UNVERIFIED')
-        series=item.get('series')
-        if isinstance(series,(list,tuple)) and len(series)>=2 and all(isinstance(x,(int,float)) and not isinstance(x,bool) and math.isfinite(x) for x in series) and max(series)>min(series):
-            result['series']=list(series)[-30:]
-        accepted.append(result)
-    return accepted
+    from atlasquant_runtime_presentation import normalize_market_items
+    return normalize_market_items(items,set(TRADER_ASSETS+INVESTMENT_ASSETS))
 
 
 def ticker_html(area,items=None):
-    if area not in {"trader","investimentos"}:
-        return ""
-    assets=TRADER_ASSETS if area=="trader" else INVESTMENT_ASSETS
-    verified=[row for row in normalized_market_items(items) if row['asset'] in assets]
-    records={row['asset']:row for row in verified}
-    ordered=list(dict.fromkeys([row['asset'] for row in verified]+list(assets)))
-    tiles=[]
-    for asset in ordered:
-        item=records.get(asset,{})
-        price=(f"{item['price']:,.4f}".replace(',','|').replace('.',',').replace('|','.')) if 'price' in item else '—'
-        change=f"{item['change_pct']:+.2f}%".replace('.',',') if 'change_pct' in item else '—'
-        state=item.get('bias') or (f"Força {item['score']:.1f}" if 'score' in item else 'DADOS VALIDADOS' if item else 'PRÉVIA')
-        if 'last_bias' in item:
-            state='Último viés: '+item['last_bias']+' · '+item['temporal_state']+' / REVALIDAR'
-        if asset == 'DXY' and 'score' in item:
-            state=f"Força USD {item['score']:.1f} · macro, sem cotação DXY"
-        state=escape(state)
-        spark=''
-        if 'series' in item:
-            values=item['series'];lo,hi=min(values),max(values)
-            points=' '.join(f"{i*50/(len(values)-1):.1f},{18-(v-lo)/(hi-lo)*16:.1f}" for i,v in enumerate(values))
-            spark=f'<svg class="cq-real-spark" viewBox="0 0 50 20" aria-label="Série validada"><polyline points="{points}" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>'
-        tiles.append(f'<button class="cq-tick" data-route="radar" data-asset="{escape(asset)}" aria-label="{escape(asset)} · {state}"><span class="cq-symbols">{asset_symbol(asset)}</span><span><strong>{escape(asset)}</strong><small>Preço: {price}</small><small>Variação: {change}</small><em>{state}</em></span>{spark}</button>')
-    verified_label='Ordem validada do motor' if verified else 'Ordem de referência'
-    global_state='DADOS RESIDENTES VALIDADOS · cotação indisponível onde não houver fonte confirmada' if verified else 'PRÉVIA / aguardando dados validados'
-    return f'<section class="cq-market" aria-label="Faixa de ativos"><button class="cq-scroll" data-ticker-step="-1" aria-label="Ativos anteriores">‹</button><div class="cq-ticker" tabindex="0" role="region" aria-label="Ativos · rolagem horizontal">{"".join(tiles)}</div><button class="cq-scroll" data-ticker-step="1" aria-label="Mais ativos">›</button></section><div class="cq-market-state">{global_state} <label>Organização <select aria-label="Organização dos ativos"><option>{verified_label}</option><option disabled>Melhor viés · requer lista validada</option></select></label></div>'
+    if area not in {'trader','investimentos'}: return ''
+    from atlasquant_runtime_presentation import market_ticker_html
+    return market_ticker_html(area,items,TRADER_ASSETS if area=='trader' else INVESTMENT_ASSETS,asset_symbol)
 
 
 def header_html(area,name,mode,top,market_items=None):
