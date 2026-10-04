@@ -692,9 +692,12 @@ def build_master_status_board(
 
     aion_core_health=_aion_core_health_snapshot(system)
     core_integrity_state=str(aion_core_health.get("integrity_state") or "UNKNOWN").upper()
+    core_blocked=int(aion_core_health.get("blocked_missions") or 0)
+    core_waiting=int(aion_core_health.get("waiting_approval") or 0)
     core_board_state=(
-        "CONFIRMED" if core_integrity_state=="OK"
-        else "BLOCKED" if core_integrity_state=="DEGRADED"
+        "BLOCKED"
+        if core_integrity_state=="DEGRADED" or core_blocked>0 or core_waiting>0
+        else "CONFIRMED" if core_integrity_state=="OK"
         else "UNKNOWN"
     )
     core_statuses=(
@@ -713,17 +716,21 @@ def build_master_status_board(
             " · ".join(f"{name}={_text(value,80) or 'UNKNOWN'}" for name,value in core_statuses)
             + f" · estado {core_integrity_state}"
             + f" · pendentes={int(aion_core_health.get('pending_missions') or 0)}"
-            + f" · bloqueadas={int(aion_core_health.get('blocked_missions') or 0)}"
-            + f" · aprovação={int(aion_core_health.get('waiting_approval') or 0)}"
+            + f" · bloqueadas={core_blocked}"
+            + f" · aprovação={core_waiting}"
         ),
         source="system_context.aion_core_health -> AION core_health_snapshot",
         next_action=(
             ""
-            if core_integrity_state=="OK"
+            if core_board_state=="CONFIRMED"
             else (
                 "Revisar a evidência local degradada antes de qualquer ação; este painel não repara nem executa."
                 if core_integrity_state=="DEGRADED"
-                else "Fornecer evidência local explícita dos cinco subsistemas do Core; ausência permanece UNKNOWN."
+                else (
+                    "Revisar missões bloqueadas e aprovações pendentes; saúde de integridade não autoriza execução."
+                    if core_blocked>0 or core_waiting>0
+                    else "Fornecer evidência local explícita dos cinco subsistemas do Core; ausência permanece UNKNOWN."
+                )
             )
         ),
     ))
