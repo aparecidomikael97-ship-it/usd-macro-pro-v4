@@ -81,7 +81,9 @@ V2.25 exige:
 
 ## Checkpoint
 
-A camada gera somente patch candidate lógico.
+A camada gera o patch candidate somente dentro do fluxo que acabou de verificar
+criptograficamente a assinatura da decisão. Um caller não pode fornecer um
+dicionário de "verified decision" como autoridade.
 
 Persistência continua separada e explícita.
 
