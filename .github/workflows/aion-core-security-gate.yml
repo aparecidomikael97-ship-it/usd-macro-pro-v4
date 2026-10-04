@@ -63,7 +63,9 @@ jobs:
             test_atlasquant_aion_global_worker_inflight_resolution.py \
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
-            test_atlasquant_aion_supply_chain_pinning.py
+            test_atlasquant_aion_supply_chain_pinning.py \\
+            test_atlasquant_aion_observability.py \\
+            test_atlasquant_aion_core_hardening_v24.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
@@ -130,7 +132,8 @@ jobs:
             atlasquant_aion_unified_journal_store.py \
             atlasquant_aion_unified_mission.py \
             atlasquant_aion_role_authority.py \
-            atlasquant_aion_truth_mapping.py
+            atlasquant_aion_truth_mapping.py \\
+            atlasquant_aion_observability.py
       - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
         run: |
           python -m pip freeze --all > /tmp/aion-resolved-requirements.txt
