@@ -149,6 +149,65 @@ def test_wrong_signing_key_fails(tmp_path):
     assert "AUTHORITY_SIGNATURE_INVALID" in result["blockers"]
 
 
+def test_invalid_trust_root_service_fails_closed(tmp_path):
+    private, _, nonces = verifier_fixture(tmp_path)
+    payload = statement()
+    result = verify_authority_statement(
+        payload,
+        signature_b64=sign(private, payload),
+        trust_roots=None,
+        nonce_registry=nonces,
+        now_ts=NOW,
+        expected_binding=BINDING,
+    )
+    assert result["state"] == "BLOCKED"
+    assert result["blockers"] == ["TRUST_ROOT_REGISTRY_INVALID"]
+    assert result["trust_root_configured"] is False
+    assert result["execution_authority_granted"] is False
+    assert result["execution_allowed"] is False
+
+
+def test_invalid_nonce_registry_service_fails_closed(tmp_path):
+    private, registry, _ = verifier_fixture(tmp_path)
+    payload = statement()
+    result = verify_authority_statement(
+        payload,
+        signature_b64=sign(private, payload),
+        trust_roots=registry,
+        nonce_registry=None,
+        now_ts=NOW,
+        expected_binding=BINDING,
+    )
+    assert result["state"] == "BLOCKED"
+    assert result["blockers"] == ["NONCE_REGISTRY_INVALID"]
+    assert result["execution_authority_granted"] is False
+    assert result["execution_allowed"] is False
+
+
+def test_nonce_registry_runtime_failure_fails_closed(tmp_path, monkeypatch):
+    private, registry, nonces = verifier_fixture(tmp_path)
+    payload = statement()
+
+    def explode(**kwargs):
+        raise OSError("simulated durable-store failure")
+
+    monkeypatch.setattr(nonces, "claim", explode)
+    result = verify_authority_statement(
+        payload,
+        signature_b64=sign(private, payload),
+        trust_roots=registry,
+        nonce_registry=nonces,
+        now_ts=NOW,
+        expected_binding=BINDING,
+    )
+    assert result["state"] == "BLOCKED"
+    assert result["blockers"] == ["NONCE_REGISTRY_FAILURE"]
+    assert result["signature_verified"] is True
+    assert result["binding_verified"] is True
+    assert result["execution_authority_granted"] is False
+    assert result["execution_allowed"] is False
+
+
 @pytest.mark.parametrize("field", ["subject_id", "tenant_id", "domain", "policy_id"])
 def test_binding_mismatch_is_fail_closed(tmp_path, field):
     private, registry, nonces = verifier_fixture(tmp_path)
