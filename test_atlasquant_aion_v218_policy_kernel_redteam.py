@@ -88,6 +88,7 @@ def evaluate(action, **overrides):
         "multiagent_governance": governance(),
         "durable_execution": None,
         "approval": None,
+        "approval_evidence_verified": True,
         "requested_cost_usd": 1.0,
         "budget_remaining_usd": 20.0,
         "kill_switch_engaged": False,
@@ -186,6 +187,21 @@ def test_external_side_effect_requires_owner_approval_and_external_durable_mode(
     assert ok["state"] == "POLICY_PERMITS_PROGRESS"
     assert ok["owner_approval_present"] is True
     assert ok["execution_allowed"] is False
+
+
+def test_bound_owner_approval_without_verified_evidence_is_blocked():
+    result = evaluate(
+        "EXTERNAL_SIDE_EFFECT",
+        durable_execution=durable(),
+        approval=approval("EXTERNAL_SIDE_EFFECT"),
+        approval_evidence_verified=False,
+    )
+    assert result["owner_approval_binding_valid"] is True
+    assert result["owner_approval_evidence_verified"] is False
+    assert result["owner_approval_present"] is False
+    assert "OWNER_APPROVAL_EVIDENCE_NOT_VERIFIED" in result["blockers"]
+    assert result["policy_allows_progress"] is False
+    assert result["execution_allowed"] is False
 
 
 @pytest.mark.parametrize("action", [
@@ -336,10 +352,48 @@ def test_cost_cannot_exceed_remaining_budget():
     ("kill_switch_engaged", "false"),
     ("privacy_review_verified", 1),
     ("real_trading_enabled", None),
+    ("approval_evidence_verified", "true"),
 ])
 def test_security_inputs_are_strict(field, value):
     with pytest.raises(ValueError):
         evaluate("DRAFT", **{field: value})
+
+
+@pytest.mark.parametrize("field,blocker", [
+    ("authority_verification", "AUTHORITY_EVIDENCE_INVALID"),
+    ("capability_scope", "CAPABILITY_SCOPE_EVIDENCE_INVALID"),
+    ("operational_resilience", "OPERATIONAL_RESILIENCE_EVIDENCE_INVALID"),
+    ("multiagent_governance", "MULTIAGENT_GOVERNANCE_EVIDENCE_INVALID"),
+])
+def test_malformed_upstream_evidence_fails_closed(field, blocker):
+    result = evaluate("DRAFT", **{field: "forged"})
+    assert result["state"] == "BLOCKED"
+    assert blocker in result["blockers"]
+    assert result["execution_allowed"] is False
+
+
+@pytest.mark.parametrize("field,evidence,blocker", [
+    (
+        "authority_verification",
+        {"state": "VERIFIED", "authority_verified": True, "execution_allowed": True, "executes_action": False},
+        "AUTHORITY_CONTRACT_INVALID",
+    ),
+    (
+        "capability_scope",
+        {**scope(), "execution_allowed": True},
+        "CAPABILITY_SCOPE_CONTRACT_INVALID",
+    ),
+    (
+        "operational_resilience",
+        {**resilience(), "executes_action": True},
+        "OPERATIONAL_RESILIENCE_CONTRACT_INVALID",
+    ),
+])
+def test_upstream_execution_claims_are_rejected(field, evidence, blocker):
+    result = evaluate("DRAFT", **{field: evidence})
+    assert blocker in result["blockers"]
+    assert result["policy_allows_progress"] is False
+    assert result["execution_allowed"] is False
 
 
 def test_tenant_delete_requires_privacy_review_in_addition_to_approval():
