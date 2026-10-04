@@ -168,6 +168,7 @@ from atlasquant_entitlement_account_audit import (
     audit_account_entitlements,
     audit_requires_review,
 )
+from atlasquant_aion_core_health_adapter import build_loaded_runtime_health_evidence
 from atlasquant_aion_status_board import (
     build_master_status_board,
     status_rows,
@@ -11276,6 +11277,8 @@ def render_aion_admin_console(
         })
 
     try:
+        # Canonical resident inputs replace incoming client health claims. No new load.
+        system["aion_core_health"] = build_loaded_runtime_health_evidence(runtime_result)
         status_board = build_master_status_board(
             checkpoint=checkpoint,
             runtime_result=runtime_result,

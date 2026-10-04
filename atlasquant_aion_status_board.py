@@ -694,10 +694,18 @@ def build_master_status_board(
     core_integrity_state=str(aion_core_health.get("integrity_state") or "UNKNOWN").upper()
     core_blocked=int(aion_core_health.get("blocked_missions") or 0)
     core_waiting=int(aion_core_health.get("waiting_approval") or 0)
+    raw_core=system.get("aion_core_health")
+    core_evidence_complete=(
+        not isinstance(raw_core,Mapping)
+        or (
+            all(raw_core.get(key) is True for key in ("counts_verified","evidence_complete") if key in raw_core)
+            and all(_safe_nonnegative_int(raw_core[key]) is not None for key in ("pending_missions","blocked_missions","waiting_approval","ready_handoffs") if key in raw_core)
+        )
+    )
     core_board_state=(
         "BLOCKED"
         if core_integrity_state=="DEGRADED" or core_blocked>0 or core_waiting>0
-        else "CONFIRMED" if core_integrity_state=="OK"
+        else "CONFIRMED" if core_integrity_state=="OK" and core_evidence_complete
         else "UNKNOWN"
     )
     core_statuses=(
