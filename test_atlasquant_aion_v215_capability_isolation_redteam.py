@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 
 import pytest
+import atlasquant_aion_capability_isolation_gate as isolation_gate
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -474,6 +475,92 @@ def test_verified_scope_never_calls_tool_or_expands_permissions(tmp_path):
     assert result["tool_called"] is False
     assert result["external_action_executed"] is False
     assert result["real_trading_enabled"] is False
+    assert result["execution_allowed"] is False
+
+
+def test_invalid_capability_registry_fails_closed(tmp_path):
+    result = verify(tmp_path, registry=object())
+    assert result["state"] == "BLOCKED"
+    assert "SCOPE_CAPABILITY_REGISTRY_FAILURE" in result["blockers"]
+    assert result["execution_allowed"] is False
+
+
+def test_specialist_router_failure_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        isolation_gate,
+        "route_specialist",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("router unavailable")),
+    )
+    result = verify(tmp_path)
+    assert result["state"] == "BLOCKED"
+    assert "SCOPE_SPECIALIST_ROUTER_FAILURE" in result["blockers"]
+    assert result["execution_allowed"] is False
+
+
+def test_scope_trust_root_runtime_failure_fails_closed(tmp_path, monkeypatch):
+    private, roots, nonces = fixture(tmp_path)
+    p = parent_statement()
+    s = scope_grant()
+
+    original = roots.verify_key_available
+    calls = {"count": 0}
+
+    def fail_on_child(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            raise OSError("trust-root runtime failure")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(roots, "verify_key_available", fail_on_child)
+    result = verify_capability_scope(
+        p,
+        parent_signature_b64=sign_parent(private, p),
+        scope_grant=s,
+        scope_signature_b64=sign_scope(private, s),
+        trust_roots=roots,
+        nonce_registry=nonces,
+        now_ts=NOW,
+        expected_binding=BINDING,
+        expected_workspace_id=WORKSPACE,
+        actor_role="ADMIN",
+        requested_action="read",
+    )
+    assert result["state"] == "BLOCKED"
+    assert "SCOPE_TRUST_ROOT_VERIFICATION_FAILURE" in result["blockers"]
+    assert result["execution_allowed"] is False
+
+
+def test_scope_nonce_registry_runtime_failure_fails_closed(tmp_path, monkeypatch):
+    private, roots, nonces = fixture(tmp_path)
+    p = parent_statement()
+    s = scope_grant()
+
+    original = nonces.claim
+    calls = {"count": 0}
+
+    def fail_on_child(**kwargs):
+        calls["count"] += 1
+        if calls["count"] >= 2:
+            raise OSError("nonce store unavailable")
+        return original(**kwargs)
+
+    monkeypatch.setattr(nonces, "claim", fail_on_child)
+    result = verify_capability_scope(
+        p,
+        parent_signature_b64=sign_parent(private, p),
+        scope_grant=s,
+        scope_signature_b64=sign_scope(private, s),
+        trust_roots=roots,
+        nonce_registry=nonces,
+        now_ts=NOW,
+        expected_binding=BINDING,
+        expected_workspace_id=WORKSPACE,
+        actor_role="ADMIN",
+        requested_action="read",
+    )
+    assert result["state"] == "BLOCKED"
+    assert result["blockers"] == ["SCOPE_NONCE_REGISTRY_FAILURE"]
+    assert result["scope_signature_verified"] is True
     assert result["execution_allowed"] is False
 
 
