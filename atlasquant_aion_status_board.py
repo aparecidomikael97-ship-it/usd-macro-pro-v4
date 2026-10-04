@@ -21,7 +21,7 @@ from atlasquant_aion_durable_tasks import durable_tasks_summary
 from atlasquant_aion_system_health_center import build_system_health_center
 from atlasquant_aion_cost_center import build_cost_center
 from atlasquant_aion_observability import core_health_snapshot
-from atlasquant_aion_core_health_adapter import consistency_envelope_view
+from atlasquant_aion_core_health_adapter import consistency_envelope_view, provenance_trust_readiness_view
 
 SCHEMA="ATLASQUANT_AION_MASTER_STATUS_V1"
 STATES=("CONFIRMED","BLOCKED","EXTERNAL_DEPENDENCY","UNKNOWN")
@@ -697,6 +697,7 @@ def build_master_status_board(
     core_waiting=int(aion_core_health.get("waiting_approval") or 0)
     raw_core=system.get("aion_core_health")
     core_consistency=consistency_envelope_view(raw_core)
+    core_trust_readiness=provenance_trust_readiness_view(raw_core)
     core_evidence_complete=(
         not isinstance(raw_core,Mapping)
         or (
@@ -740,6 +741,7 @@ def build_master_status_board(
             + f" · consistency={core_consistency['consistency_state']}"
             + f" · snapshot_complete={core_consistency['snapshot_complete']} · snapshot_atomic=False"
             + " · origin_authenticated=False · snapshot_signed=False"
+            + f" · provenance_trust={core_trust_readiness['state']}"
         ),
         source="system_context.aion_core_health -> AION core_health_snapshot",
         next_action=(
@@ -891,6 +893,7 @@ def build_master_status_board(
         "items":items,
         "aion_core_health":aion_core_health,
         "consistency_envelope":core_consistency,
+        "provenance_trust_readiness":core_trust_readiness,
         "system_health_center":system_health_center,
         "cost_center":cost_center,
         "counts":counts,
