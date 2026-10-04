@@ -73,6 +73,19 @@ def preflight(*, checkpoint=None, manifest=None, **overrides):
     return build_core_freeze_preflight(**kwargs)
 
 
+def recheck(result, *, checkpoint, now_ts=NOW, manifest=None):
+    return verify_preflight_still_current(
+        result,
+        certification_manifest=(
+            certification_manifest() if manifest is None else manifest
+        ),
+        certification_trust_roots=TRUST_ROOTS,
+        expected_target_commit_sha=TARGET,
+        checkpoint_master=checkpoint,
+        now_ts=now_ts,
+    )
+
+
 def test_valid_preflight_is_ready_for_owner_decision_only():
     result = preflight()
     assert result["state"] == "READY_FOR_OWNER_DECISION"
@@ -105,6 +118,13 @@ def test_missing_persisted_review_blocks_ceremony():
     assert result["state"] == "BLOCKED"
     assert "CHECKPOINT_REVIEW_RECORD_MISSING" in result["blockers"]
     assert result["digest_to_sign"] == ""
+
+
+def test_valid_but_empty_checkpoint_still_blocks_missing_review():
+    empty = new_checkpoint_master({}, created_at=NOW)
+    result = preflight(checkpoint=empty)
+    assert result["state"] == "BLOCKED"
+    assert "CHECKPOINT_REVIEW_RECORD_MISSING" in result["blockers"]
 
 
 def test_forged_checkpoint_review_cannot_replace_reverified_v221_review():
@@ -155,26 +175,17 @@ def test_checkpoint_change_after_preflight_blocks_toctou_recheck():
         created_at=NOW,
         evidence_refs=["post-review"],
     )
-    check = verify_preflight_still_current(
-        result,
-        checkpoint_master=changed,
-        now_ts=NOW,
-    )
+    check = recheck(result, checkpoint=changed)
     assert check["state"] == "BLOCKED"
-    assert "CHECKPOINT_MASTER_CHANGED" in check["blockers"]
-    assert "CHECKPOINT_STATE_CHANGED" in check["blockers"]
-    assert "CHECKPOINT_REVISION_CHANGED" in check["blockers"]
+    assert "PREFLIGHT_REBUILD_NOT_READY" in check["blockers"]
+    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
     assert check["core_freeze_authorized"] is False
 
 
 def test_same_checkpoint_keeps_preflight_current():
     master = staged_checkpoint()
     result = preflight(checkpoint=master)
-    check = verify_preflight_still_current(
-        result,
-        checkpoint_master=master,
-        now_ts=NOW,
-    )
+    check = recheck(result, checkpoint=master)
     assert check["state"] == "CURRENT"
     assert check["preflight_current"] is True
     assert check["core_freeze_authorized"] is False
@@ -183,13 +194,14 @@ def test_same_checkpoint_keeps_preflight_current():
 def test_expired_challenge_blocks_recheck():
     master = staged_checkpoint()
     result = preflight(checkpoint=master)
-    check = verify_preflight_still_current(
+    check = recheck(
         result,
-        checkpoint_master=master,
+        checkpoint=master,
         now_ts="2026-10-04T20:11:00Z",
     )
     assert check["state"] == "BLOCKED"
-    assert "CEREMONY_EXPIRED_OR_INVALID_WINDOW" in check["blockers"]
+    assert "PREFLIGHT_REBUILD_NOT_READY" in check["blockers"]
+    assert "REBUILD:CEREMONY_EXPIRED_OR_INVALID_WINDOW" in check["blockers"]
 
 
 def test_long_ceremony_window_blocks_preflight():
@@ -249,26 +261,27 @@ def test_tampered_preflight_challenge_digest_is_detected():
     master = staged_checkpoint()
     result = preflight(checkpoint=master)
     result["target_commit_sha"] = "d" * 40
-    check = verify_preflight_still_current(
-        result,
-        checkpoint_master=master,
-        now_ts=NOW,
-    )
+    check = recheck(result, checkpoint=master)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
+
+
+def test_digest_to_sign_cannot_diverge_from_challenge_digest():
+    master = staged_checkpoint()
+    result = preflight(checkpoint=master)
+    result["digest_to_sign"] = "sha256:" + "0" * 64
+    check = recheck(result, checkpoint=master)
+    assert check["state"] == "BLOCKED"
+    assert "PREFLIGHT_DIGEST_TO_SIGN_MISMATCH" in check["blockers"]
 
 
 def test_owner_decision_cannot_be_injected_into_preflight():
     master = staged_checkpoint()
     result = preflight(checkpoint=master)
     result["owner_decision"] = "APPROVE_CORE_FREEZE"
-    check = verify_preflight_still_current(
-        result,
-        checkpoint_master=master,
-        now_ts=NOW,
-    )
+    check = recheck(result, checkpoint=master)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
     assert "OWNER_DECISION_MUST_REMAIN_UNDECIDED_IN_PREFLIGHT" in check["blockers"]
 
 
@@ -293,13 +306,23 @@ def test_unsafe_preflight_field_cannot_be_promoted(field):
     master = staged_checkpoint()
     result = preflight(checkpoint=master)
     result[field] = True
-    check = verify_preflight_still_current(
-        result,
-        checkpoint_master=master,
-        now_ts=NOW,
-    )
+    check = recheck(result, checkpoint=master)
     assert check["state"] == "BLOCKED"
     assert f"UNSAFE_PREFLIGHT_FIELD:{field}" in check["blockers"]
+
+
+def test_forged_preflight_cannot_bypass_signed_chain_rebuild():
+    master = staged_checkpoint()
+    result = preflight(checkpoint=master)
+    forged = deepcopy(result)
+    forged["checkpoint_master_digest"] = "sha256:" + "9" * 64
+    # Caller cannot make this authoritative merely by supplying another hash.
+    forged["challenge_digest"] = "sha256:" + "8" * 64
+    forged["digest_to_sign"] = forged["challenge_digest"]
+    check = recheck(forged, checkpoint=master)
+    assert check["state"] == "BLOCKED"
+    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
+    assert check["signed_chain_rebuilt"] is True
 
 
 def test_preflight_source_has_no_signing_network_persistence_or_deploy_action():
