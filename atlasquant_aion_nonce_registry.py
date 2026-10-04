@@ -156,6 +156,30 @@ class PersistentNonceRegistry:
             ).fetchone()
         return row is not None
 
+    def read_claim(self, *, scope: str, nonce: str) -> dict[str, str] | None:
+        """Read exact durable claim metadata without mutating or pruning state."""
+        if not isinstance(scope, str) or not scope or len(scope) > 256:
+            raise ValueError("invalid nonce scope")
+        if not isinstance(nonce, str) or not nonce or len(nonce) > 256:
+            raise ValueError("invalid nonce")
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT expires_at, created_at
+                FROM nonce_claims
+                WHERE scope = ? AND nonce = ?
+                """,
+                (scope, nonce),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "scope": scope,
+            "nonce": nonce,
+            "expires_at": str(row[0]),
+            "created_at": str(row[1]),
+        }
+
     def count(self) -> int:
         with self._connect() as conn:
             row = conn.execute("SELECT COUNT(*) FROM nonce_claims").fetchone()
