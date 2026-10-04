@@ -194,6 +194,19 @@ def _review_material(review: Mapping[str, Any]) -> dict[str, Any]:
         "canonical_gates_green": review.get("canonical_gates_green"),
         "global_worker_readiness_green": review.get("global_worker_readiness_green"),
         "owner_review_ready": review.get("owner_review_ready"),
+        "owner_decision_recorded": review.get("owner_decision_recorded"),
+        "core_complete": review.get("core_complete"),
+        "core_complete_claim_allowed": review.get("core_complete_claim_allowed"),
+        "core_freeze_authorized": review.get("core_freeze_authorized"),
+        "core_frozen": review.get("core_frozen"),
+        "checkpoint_saved": review.get("checkpoint_saved"),
+        "automatic_checkpoint_write": review.get("automatic_checkpoint_write"),
+        "execution_allowed": review.get("execution_allowed"),
+        "worker_armed": review.get("worker_armed"),
+        "merge_authorized": review.get("merge_authorized"),
+        "deploy_authorized": review.get("deploy_authorized"),
+        "external_action_executed": review.get("external_action_executed"),
+        "executes_action": review.get("executes_action"),
         "blockers": review.get("blockers"),
         "state": review.get("state"),
     }
@@ -238,13 +251,6 @@ def build_core_completion_review(
             "global_worker_readiness_green"
         ] is True,
         "owner_review_ready": ready,
-        "blockers": unique,
-        "state": "READY_FOR_OWNER_REVIEW" if ready else "BLOCKED",
-    }
-    review_digest = _digest(body)
-    return {
-        **body,
-        "review_digest": review_digest,
         "owner_decision_recorded": False,
         "core_complete": False,
         "core_complete_claim_allowed": False,
@@ -258,25 +264,40 @@ def build_core_completion_review(
         "deploy_authorized": False,
         "external_action_executed": False,
         "executes_action": False,
+        "blockers": unique,
+        "state": "READY_FOR_OWNER_REVIEW" if ready else "BLOCKED",
+    }
+    review_digest = _digest(body)
+    return {
+        **body,
+        "review_digest": review_digest,
     }
 
 
 def build_checkpoint_patch_candidate(
-    review: Mapping[str, Any] | None,
+    certification_manifest: Mapping[str, Any] | None,
+    *,
+    certification_trust_roots: TrustRootRegistry,
+    now_ts: str,
+    expected_target_commit_sha: str,
 ) -> dict[str, Any]:
-    """Create a Checkpoint Mestre patch candidate; never persist it."""
-    row = dict(review or {}) if isinstance(review, Mapping) else {}
-    if row.get("schema") != SCHEMA:
-        raise ValueError("core completion review schema mismatch")
-    expected_digest = _digest(_review_material(row))
-    if row.get("review_digest") != expected_digest:
-        raise ValueError("core completion review digest mismatch")
-    if row.get("state") not in {"READY_FOR_OWNER_REVIEW", "BLOCKED"}:
-        raise ValueError("core completion review state invalid")
-    expected_ready = row.get("state") == "READY_FOR_OWNER_REVIEW"
-    if row.get("owner_review_ready") is not expected_ready:
-        raise ValueError("owner review readiness mismatch")
+    """Reverify signed V2.20 evidence and build a Checkpoint patch candidate.
+
+    A caller-supplied review object is intentionally not accepted as authority.
+    The review is rebuilt internally from the signed certification manifest on
+    every call.
+    """
+    review = build_core_completion_review(
+        certification_manifest,
+        certification_trust_roots=certification_trust_roots,
+        now_ts=now_ts,
+        expected_target_commit_sha=expected_target_commit_sha,
+    )
+    if review.get("review_digest") != _digest(_review_material(review)):
+        raise ValueError("internal core completion review digest mismatch")
+
     for field in (
+        "owner_decision_recorded",
         "core_complete",
         "core_complete_claim_allowed",
         "core_freeze_authorized",
@@ -290,21 +311,25 @@ def build_checkpoint_patch_candidate(
         "external_action_executed",
         "executes_action",
     ):
-        if row.get(field) is not False:
-            raise ValueError(f"unsafe review field: {field}")
+        if review.get(field) is not False:
+            raise ValueError(f"unsafe internal review field: {field}")
+
+    expected_ready = review.get("state") == "READY_FOR_OWNER_REVIEW"
+    if review.get("owner_review_ready") is not expected_ready:
+        raise ValueError("internal owner review readiness mismatch")
 
     checkpoint_record = {
         "schema": SCHEMA,
         "version": VERSION,
-        "state": row["state"],
-        "target_commit_sha": row["target_commit_sha"],
-        "certification_manifest_digest": row["certification_manifest_digest"],
-        "certification_trust_root_binding_digest": row[
+        "state": review["state"],
+        "target_commit_sha": review["target_commit_sha"],
+        "certification_manifest_digest": review["certification_manifest_digest"],
+        "certification_trust_root_binding_digest": review[
             "certification_trust_root_binding_digest"
         ],
-        "review_digest": row["review_digest"],
-        "blockers": list(row.get("blockers") or []),
-        "owner_review_ready": row.get("owner_review_ready") is True,
+        "review_digest": review["review_digest"],
+        "blockers": list(review.get("blockers") or []),
+        "owner_review_ready": review["owner_review_ready"] is True,
         "owner_decision_recorded": False,
         "core_complete": False,
         "core_frozen": False,
@@ -318,9 +343,9 @@ def build_checkpoint_patch_candidate(
         "patch_digest": _digest(patch),
         "recommended_event_id": (
             "aion-core-completion-review:"
-            + row["target_commit_sha"][:12]
+            + review["target_commit_sha"][:12]
             + ":"
-            + row["review_digest"].split(":", 1)[-1][:16]
+            + review["review_digest"].split(":", 1)[-1][:16]
         ),
         "requires_explicit_checkpoint_save": True,
         "automatic_checkpoint_write": False,
