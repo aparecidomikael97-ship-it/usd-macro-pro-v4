@@ -25,6 +25,14 @@ from atlasquant_aion_truth import normalize_evidence_record, FUTURE_TOLERANCE_SE
 from atlasquant_aion_observability import core_health_snapshot, normalize_events, redact_text
 
 SCHEMA = "ATLASQUANT_AION_CORE_HEALTH_EVIDENCE_V26"
+PROVENANCE_TRUST_READINESS_SCHEMA = "ATLASQUANT_AION_PROVENANCE_TRUST_READINESS_V1"
+_PROVENANCE_TRUST_BLOCKERS = (
+    "TRUST_ROOT_NOT_CONFIGURED",
+    "SIGNATURE_SCHEME_NOT_CONFIGURED",
+    "VERIFIER_POLICY_NOT_CONFIGURED",
+    "REPLAY_PROTECTION_NOT_CONFIGURED",
+    "ROTATION_REVOCATION_POLICY_NOT_CONFIGURED",
+)
 MAX_BYTES = 2_000_000
 MAX_ROWS = 64
 INVARIANTS = {"health_snapshot_is_read_only":True,"external_action_executed":False,
@@ -461,6 +469,29 @@ def consistency_envelope_view(payload):
     except (ValueError,TypeError,KeyError,OverflowError,RecursionError): return unknown
 
 
+
+def provenance_trust_readiness_view(_payload=None):
+    """Fail-closed readiness truth for future authenticated provenance.
+
+    No caller-supplied claim can configure a trust root, signing scheme, verifier,
+    replay defense or rotation/revocation policy. This function performs no I/O
+    and grants no authority.
+    """
+    return {
+        "schema":PROVENANCE_TRUST_READINESS_SCHEMA,
+        "state":"BLOCKED",
+        "origin_authenticated":False,
+        "snapshot_signed":False,
+        "signature_verification_available":False,
+        "trust_root_configured":False,
+        "signing_scheme_configured":False,
+        "verifier_policy_configured":False,
+        "replay_protection_configured":False,
+        "rotation_revocation_policy_configured":False,
+        "execution_allowed":False,
+        "blockers":list(_PROVENANCE_TRUST_BLOCKERS),
+    }
+
 def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None,
         recovery_evidence=None,memory_evidence=None,audit_chain_evidence=None,
         mission_evidence=None,events=(),core_version="",schema_version="",now=None,expected_scope=None):
@@ -517,6 +548,7 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
     payload["origin_authenticated"]=False
     payload["snapshot_signed"]=False
     payload["consistency_envelope"]=_consistency_envelope(payload,known,expected,mission)
+    payload["provenance_trust_readiness"]=provenance_trust_readiness_view(payload)
     return payload
 
 
