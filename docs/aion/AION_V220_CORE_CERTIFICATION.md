@@ -30,6 +30,8 @@ A certificação exige evidência independente para:
 13. CONCURRENCY
 14. COST_GOVERNANCE
 15. AUDIT_REPLAY
+16. CANONICAL_GATES
+17. GLOBAL_WORKER_READINESS
 
 Nenhuma dimensão ausente é tratada como implícita.
 
@@ -46,6 +48,10 @@ Cada dimensão deve carregar:
 - verified = booleano True exato **como claim assinado**; isoladamente ele não tem autoridade.
 
 Todas as dimensões precisam apontar para o mesmo target commit da certificação.
+
+As duas dimensões de controle, `CANONICAL_GATES` e `GLOBAL_WORKER_READINESS`,
+só aceitam `source=CI`. Booleanos fornecidos pelo caller não têm autoridade para
+substituir essas atestações.
 
 ## Volume mínimo
 
@@ -125,7 +131,7 @@ Nem CI verde, nem certification candidate, nem approval genérico autorizam free
 
 ## Relação com Global Worker
 
-Global Worker readiness precisa estar verde como evidência operacional.
+Global Worker readiness precisa estar verde como evidência operacional **assinada**, ligada ao mesmo target commit.
 
 Isso não significa:
 - worker armado;
@@ -187,6 +193,10 @@ Cada dimensão de certificação precisa ser uma atestação Ed25519 válida lig
 trust root público de certificação fornecido pelo host confiável.
 
 O campo `verified=True` sozinho não tem autoridade.
+
+Da mesma forma, `canonical_gates_green=True` ou `global_worker_readiness_green=True`
+não são aceitos como fonte de verdade. Esses estados são derivados das respectivas
+atestações CI assinadas.
 
 A atestação assina, no mínimo:
 - dimension;
