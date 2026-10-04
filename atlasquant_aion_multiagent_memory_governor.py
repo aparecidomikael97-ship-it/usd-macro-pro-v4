@@ -89,10 +89,28 @@ def govern_multiagent_session(
     memory_mb_used: Any = 0,
 ) -> dict[str, Any]:
     """Govern one multi-agent plan before any agent is started."""
-    rows = [dict(x) for x in list(nodes or []) if isinstance(x, Mapping)]
+    malformed: list[str] = []
+    if nodes is None:
+        raw_nodes = []
+    elif isinstance(nodes, (list, tuple)):
+        raw_nodes = list(nodes)
+    else:
+        raw_nodes = []
+        malformed.append("PLAN_NODES_INVALID")
+
+    rows = []
+    for index, item in enumerate(raw_nodes):
+        if not isinstance(item, Mapping):
+            malformed.append(f"PLAN_NODE_NOT_MAPPING:{index}")
+            continue
+        rows.append(dict(item))
+
+    trusted_context_valid = isinstance(trusted_context, Mapping)
+    trusted = dict(trusted_context) if trusted_context_valid else {}
+
     base = govern_agent_plan(
         rows,
-        trusted_context=trusted_context,
+        trusted_context=trusted,
         max_depth=max_depth,
         max_fanout=max_fanout,
         max_nodes=max_nodes,
@@ -105,7 +123,9 @@ def govern_multiagent_session(
         memory_mb_limit=memory_mb_limit,
         memory_mb_used=memory_mb_used,
     )
-    blockers = list(base.get("blockers") or [])
+    blockers = list(malformed) + list(base.get("blockers") or [])
+    if not trusted_context_valid:
+        blockers.append("TRUSTED_CONTEXT_INVALID")
 
     supervisor = _clean(supervisor_id, 120)
     if not supervisor:
@@ -121,11 +141,15 @@ def govern_multiagent_session(
     if now is not None and session_deadline is not None and session_deadline <= now:
         blockers.append("SESSION_DEADLINE_EXCEEDED")
 
-    allowed = {
-        _clean(item, 120).lower()
-        for item in list(allowed_capabilities or [])
-        if _clean(item, 120)
-    }
+    if isinstance(allowed_capabilities, (list, tuple, set, frozenset)):
+        allowed = {
+            _clean(item, 120).lower()
+            for item in allowed_capabilities
+            if _clean(item, 120)
+        }
+    else:
+        allowed = set()
+        blockers.append("ALLOWED_CAPABILITIES_INVALID")
     if not allowed:
         blockers.append("ALLOWED_CAPABILITIES_REQUIRED")
 
@@ -190,8 +214,8 @@ def govern_multiagent_session(
         "state": "WITHIN_GOVERNANCE" if not unique else "BLOCK",
         "blockers": unique,
         "supervisor_id": supervisor,
-        "trusted_tenant_id": _clean((trusted_context or {}).get("tenant_id"), 120),
-        "trusted_workspace_id": _clean((trusted_context or {}).get("workspace_id"), 120),
+        "trusted_tenant_id": _clean(trusted.get("tenant_id"), 120),
+        "trusted_workspace_id": _clean(trusted.get("workspace_id"), 120),
         "allowed_capabilities": sorted(allowed),
         "session_deadline_at": session_deadline_at,
         "cost_limit_usd": round(cost_limit, 6),
@@ -294,8 +318,11 @@ def govern_memory_use(
         blockers.append("EXPIRY_REQUIRED_FOR_BOUNDED_RETENTION")
 
     conflict_refs = record.metadata.get("conflict_refs")
-    if isinstance(conflict_refs, (list, tuple)) and any(_clean(x, 200) for x in conflict_refs):
-        blockers.append("UNRESOLVED_CONFLICT_METADATA")
+    if conflict_refs not in (None, [], ()):
+        if not isinstance(conflict_refs, (list, tuple)):
+            blockers.append("CONFLICT_METADATA_INVALID")
+        elif any(_clean(x, 200) for x in conflict_refs):
+            blockers.append("UNRESOLVED_CONFLICT_METADATA")
 
     if record.retention == "LEGAL_HOLD":
         retention_action = "LEGAL_HOLD"
