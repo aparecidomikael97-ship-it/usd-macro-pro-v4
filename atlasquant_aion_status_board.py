@@ -21,6 +21,7 @@ from atlasquant_aion_durable_tasks import durable_tasks_summary
 from atlasquant_aion_system_health_center import build_system_health_center
 from atlasquant_aion_cost_center import build_cost_center
 from atlasquant_aion_observability import core_health_snapshot
+from atlasquant_aion_core_health_adapter import consistency_envelope_view
 
 SCHEMA="ATLASQUANT_AION_MASTER_STATUS_V1"
 STATES=("CONFIRMED","BLOCKED","EXTERNAL_DEPENDENCY","UNKNOWN")
@@ -695,6 +696,7 @@ def build_master_status_board(
     core_blocked=int(aion_core_health.get("blocked_missions") or 0)
     core_waiting=int(aion_core_health.get("waiting_approval") or 0)
     raw_core=system.get("aion_core_health")
+    core_consistency=consistency_envelope_view(raw_core)
     core_evidence_complete=(
         not isinstance(raw_core,Mapping)
         or (
@@ -735,6 +737,8 @@ def build_master_status_board(
             + f" · pendentes={core_count_detail('pending_missions')}"
             + f" · bloqueadas={core_count_detail('blocked_missions')}"
             + f" · aprovação={core_count_detail('waiting_approval')}"
+            + f" · consistency={core_consistency['consistency_state']}"
+            + f" · snapshot_complete={core_consistency['snapshot_complete']} · snapshot_atomic=False"
         ),
         source="system_context.aion_core_health -> AION core_health_snapshot",
         next_action=(
@@ -759,6 +763,11 @@ def build_master_status_board(
             )
         ),
     ))
+
+    if core_consistency["consistency_state"] in {"PARTIAL","MISMATCH"}:
+        core_item=items[-1]
+        guidance="Consistency: "+"; ".join(core_consistency.get("reasons",[]))+". Reconstruir a observação residente; isso não aprova nem executa ações."
+        core_item["next_action"]=(core_item["next_action"]+" "+guidance).strip()
 
     system_health_center=build_system_health_center(
         _system_health_snapshots(
@@ -880,6 +889,7 @@ def build_master_status_board(
         "states":list(STATES),
         "items":items,
         "aion_core_health":aion_core_health,
+        "consistency_envelope":core_consistency,
         "system_health_center":system_health_center,
         "cost_center":cost_center,
         "counts":counts,
