@@ -102,13 +102,18 @@ Challenge expirado, ainda não válido ou com janela excessiva é bloqueado.
 
 ## Recheck antes da decisão
 
-`verify_preflight_still_current()` compara novamente:
+`verify_preflight_still_current()` não confia no hash fornecido pelo caller. Ela
+reconstrói novamente a cadeia assinada V2.20 -> V2.21 -> Checkpoint -> V2.22 e compara
+o challenge reconstruído com o challenge apresentado.
 
-- challenge digest;
+Ela também verifica:
+
+- `digest_to_sign == challenge_digest`;
 - validade temporal;
 - Checkpoint master digest;
 - state digest;
 - revision;
+- decisão ainda `UNDECIDED`;
 - flags críticas.
 
 Qualquer mudança exige novo preflight.
