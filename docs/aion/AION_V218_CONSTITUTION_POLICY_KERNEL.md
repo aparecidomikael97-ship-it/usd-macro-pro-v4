@@ -172,3 +172,16 @@ Qualquer mudança real exige ADR posterior, revisão e nova certificação.
 - real trading flag separado;
 - policy change review-only;
 - policy progress nunca igual a execution.
+
+## Coordinator hardening
+
+Para ações que exigem owner approval, o binding action/tenant/domain/policy não é mais
+suficiente sozinho. O host precisa fornecer também evidência explícita de que a
+aprovação foi verificada fora do LLM/agente.
+
+Assim:
+- approval mapping válido + evidence não verificada => BLOCKED;
+- evidence upstream com tipo inválido => BLOCKED;
+- authority/capability/resilience que aleguem execução em desacordo com seus contratos => BLOCKED;
+- Policy Kernel continua sem conceder execution authority.
+
