@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import hashlib
+import json
 
 import pytest
 
@@ -177,7 +179,7 @@ def test_checkpoint_change_after_preflight_blocks_toctou_recheck():
     )
     check = recheck(result, checkpoint=changed)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
     assert check["core_freeze_authorized"] is False
 
 
@@ -315,11 +317,30 @@ def test_forged_preflight_cannot_bypass_signed_chain_rebuild():
     result = preflight(checkpoint=master)
     forged = deepcopy(result)
     forged["checkpoint_master_digest"] = "sha256:" + "9" * 64
-    # Caller cannot make this authoritative merely by supplying another hash.
-    forged["challenge_digest"] = "sha256:" + "8" * 64
+
+    presented_body = {
+        key: value
+        for key, value in forged.items()
+        if key not in {
+            "challenge_digest",
+            "digest_to_sign",
+            "owner_decision_ready",
+        }
+    }
+    forged["challenge_digest"] = "sha256:" + hashlib.sha256(
+        json.dumps(
+            presented_body,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
     forged["digest_to_sign"] = forged["challenge_digest"]
+
     check = recheck(forged, checkpoint=master)
     assert check["state"] == "BLOCKED"
+    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" not in check["blockers"]
     assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
     assert check["signed_chain_rebuilt"] is True
 
