@@ -708,7 +708,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         delta=(f"{_scanner_available_v1022}/{len(pairs)} com dados" if _scanner_available_v1022 != _scanner_fresh_v1022 else None),
     )
     top4.metric("Modo", "SELETIVO")
-    overview=master_overview_state(pairs=len(pairs),processed=processed,scanner_fresh=_scanner_fresh_v1022)
+    overview=master_overview_state(pairs=len(pairs),processed=map_current,scanner_fresh=_scanner_fresh_v1022)
     st.markdown(
         f"""<div style="padding:12px 14px;border:1px solid rgba(163,190,222,.38);border-radius:12px;margin:4px 0 13px;background:#10233a;color:#f7fbff">
         <strong style="color:#ffffff">PAINEL MESTRE · {escape(overview['label'])}</strong>
@@ -767,7 +767,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
     # Atualiza somente 2 pares por clique para respeitar o
     # orçamento conservador da Twelve Data.
     # ---------------------------------------------------------
-    st.markdown("#### 🔄 Atualização técnica sem sair do Painel Mestre")
+    st.markdown("#### 🔄 Atualização técnica sem sair do Painel Mestre" if manual_market_refresh_allowed() else "#### Scanner automático · leitura persistida")
     _cooldown_v1022 = max(int(scanner_refresh_remaining or 0), int(remaining or 0))
     _s1_v1022, _s2_v1022, _s3_v1022 = st.columns([1.55, 1.25, 2.2])
 
@@ -791,14 +791,16 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
 
     with _s2_v1022:
         if st.button(
-            "🔁 Atualizar leitura",
+            "🔁 Recarregar leitura",
             key="v1022_master_refresh_view",
             width="stretch",
         ):
             st.rerun()
 
     with _s3_v1022:
-        if _cooldown_v1022 > 0:
+        if not manual_market_refresh_allowed():
+            st.caption('Coleta automática pelo Autopilot. Recarregar leitura apenas lê o estado persistido.')
+        elif _cooldown_v1022 > 0:
             st.warning(
                 f"Aguarde ~{_cooldown_v1022}s antes de nova consulta para proteger o limite da Twelve Data."
             )
@@ -842,7 +844,7 @@ def render_master_panel(matrix: pd.DataFrame, ranking: pd.DataFrame, api_key: st
         "Esta faixa usa exatamente o estado já calculado pelo Painel Mestre. "
         "Ela não altera Gate, Índice Integrado, técnica ou autorização."
     )
-    st.markdown("### 🏆 Melhor contexto consolidado agora")
+    st.markdown("### 🏆 Contexto consolidado persistido · verificar frescor")
     with st.container(border=True):
         b1, b2, b3 = st.columns(3)
         b1.metric("Par", str(best["Par"]))

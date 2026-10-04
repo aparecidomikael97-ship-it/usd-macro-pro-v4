@@ -489,6 +489,7 @@ def test_legacy_master_is_read_only_without_provider_buttons_at_four_sizes(runti
         expect(page.get_by_text('Painel Mestre de Oportunidades',exact=False)).to_be_visible(timeout=30000)
         expect(page.get_by_text('REVISÃO LEGADA CONCLUÍDA · ZERO CHAMADAS PROVIDER',exact=True)).to_be_visible(timeout=30000)
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+        expect(page.get_by_text('Market Map e scanner ainda sem cobertura atual',exact=True)).to_be_visible()
         for width,height in ((1280,720),(1440,900),(1024,768),(390,844)):
             page.set_viewport_size({'width':width,'height':height})
             expect(page.get_by_text('Atualizar próximo lote',exact=False)).to_have_count(0)
