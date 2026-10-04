@@ -162,6 +162,8 @@ def test_all_dimensions_produce_candidate_but_never_freeze():
     assert result["owner_core_complete_review_required"] is True
     assert result["total_evidence_test_count"] == 1500
     assert result["all_evidence_cryptographically_verified"] is True
+    assert result["certification_trust_root_referenced_key_count"] == 1
+    assert result["certification_trust_root_binding_digest"].startswith("sha256:")
     assert result["core_frozen"] is False
     assert result["core_freeze_authorized_by_this_module"] is False
     assert result["execution_allowed"] is False
@@ -343,6 +345,48 @@ def test_unknown_evidence_dimension_blocks():
     )
     result = certificate(rows)
     assert "UNEXPECTED_EVIDENCE_DIMENSION" in result["blockers"]
+
+
+def test_dimension_keys_must_use_exact_canonical_names():
+    rows = evidence()
+    rows["load"] = dict(rows["LOAD"])
+    result = certificate(rows)
+    assert result["state"] == "BLOCKED"
+    assert "UNEXPECTED_EVIDENCE_DIMENSION" in result["blockers"]
+
+
+def test_manifest_binds_exact_public_trust_root_used_for_attestation():
+    first = certificate()
+    other_private, other_public_b64 = new_keypair()
+    other_roots = TrustRootRegistry.from_mapping({
+        "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
+        "roots": [{
+            "key_id": KEY_ID,
+            "key_version": 1,
+            "algorithm": "Ed25519",
+            "public_key_b64": other_public_b64,
+            "status": "ACTIVE",
+            "not_before": "2026-10-01T00:00:00Z",
+            "not_after": "2027-10-01T00:00:00Z",
+        }],
+        "revoked_key_ids": [],
+    })
+    other_rows = {
+        dimension: signed_evidence_row(
+            dimension,
+            commit_sha=TARGET,
+            run_id=f"other-{index:02d}",
+            test_count=100,
+            private_key=other_private,
+        )
+        for index, dimension in enumerate(REQUIRED_DIMENSIONS, 1)
+    }
+    second = certificate(
+        other_rows,
+        certification_trust_roots=other_roots,
+    )
+    assert second["certification_candidate"] is True
+    assert first["certification_trust_root_binding_digest"] != second["certification_trust_root_binding_digest"]
 
 
 def test_canonical_gates_are_required():
