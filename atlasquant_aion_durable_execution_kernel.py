@@ -365,6 +365,8 @@ class DurableExecutionStore:
         now_ts: str,
     ) -> dict[str, Any]:
         row = self.get(execution_id)
+        if row["mode"] != "EXTERNAL_EFFECT":
+            raise DurableExecutionError("DISPATCH_MODE_BLOCKED", row)
         if row["state"] != "LEASED":
             raise DurableExecutionError("DISPATCH_STATE_BLOCKED", row)
         if row["lease_token"] != lease_token or not lease_token:
@@ -566,6 +568,7 @@ class DurableExecutionStore:
             result_digest = evidence
             completed_at = now_ts
             next_attempt = ""
+            dispatch_recorded_at = row["dispatch_recorded_at"]
         else:
             if row["attempt"] >= row["max_attempts"]:
                 state = "DLQ"
@@ -575,15 +578,19 @@ class DurableExecutionStore:
                 next_attempt = now_ts
             result_digest = ""
             completed_at = ""
+            # Authoritative reconciliation proved the prior dispatch caused no
+            # effect, so a future attempt starts a fresh dispatch lifecycle.
+            dispatch_recorded_at = ""
         with self._connect() as conn:
             conn.execute(
                 """
                 UPDATE executions
                 SET state=?, result_digest=?, completed_at=?, next_attempt_at=?,
-                    reconciliation_evidence_digest=?, updated_at=?
+                    dispatch_recorded_at=?, reconciliation_evidence_digest=?, updated_at=?
                 WHERE execution_id=?
                 """,
-                (state, result_digest, completed_at, next_attempt, evidence, now_ts, execution_id),
+                (state, result_digest, completed_at, next_attempt, dispatch_recorded_at,
+                 evidence, now_ts, execution_id),
             )
         return self.get(execution_id)
 
