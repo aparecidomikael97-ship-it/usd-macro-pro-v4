@@ -228,6 +228,54 @@ def _attestation_statement(normalized: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _trust_root_binding(
+    rows: Mapping[str, Mapping[str, Any]],
+    certification_trust_roots: TrustRootRegistry,
+) -> dict[str, Any]:
+    """Bind the manifest to the exact public trust roots referenced by evidence."""
+    bindings: list[dict[str, Any]] = []
+    seen: set[tuple[str, int]] = set()
+    for row in rows.values():
+        key_id = row.get("key_id")
+        key_version = row.get("key_version")
+        if (
+            not isinstance(key_id, str)
+            or not key_id
+            or isinstance(key_version, bool)
+            or not isinstance(key_version, int)
+            or key_version < 1
+        ):
+            continue
+        pair = (key_id, key_version)
+        if pair in seen:
+            continue
+        seen.add(pair)
+        entry = certification_trust_roots.lookup(key_id, key_version)
+        if entry is None:
+            bindings.append({
+                "key_id": key_id,
+                "key_version": key_version,
+                "present": False,
+            })
+            continue
+        bindings.append({
+            "key_id": entry.key_id,
+            "key_version": entry.key_version,
+            "algorithm": entry.algorithm,
+            "public_key_b64": entry.public_key_b64,
+            "status": entry.status,
+            "not_before": entry.not_before,
+            "not_after": entry.not_after,
+            "revoked": certification_trust_roots.is_revoked(entry),
+            "present": True,
+        })
+    bindings.sort(key=lambda item: (item["key_id"], item["key_version"]))
+    return {
+        "referenced_key_count": len(bindings),
+        "digest": _digest(bindings),
+    }
+
+
 def canonical_evidence_attestation_bytes(
     dimension: str,
     raw: Mapping[str, Any],
@@ -378,7 +426,11 @@ def certify_core(
     rows: dict[str, dict[str, Any]] = {}
     blockers: list[str] = []
 
-    unexpected = sorted(set(str(k).upper() for k in raw) - set(REQUIRED_DIMENSIONS))
+    unexpected = sorted(
+        repr(key)
+        for key in raw
+        if not isinstance(key, str) or key not in REQUIRED_DIMENSIONS
+    )
     if unexpected:
         blockers.append("UNEXPECTED_EVIDENCE_DIMENSION")
 
@@ -395,6 +447,8 @@ def certify_core(
             blockers.append(f"DIMENSION_NOT_CERTIFIED:{dimension}")
         elif row["commit_sha"] != target:
             blockers.append(f"DIMENSION_COMMIT_MISMATCH:{dimension}")
+
+    trust_binding = _trust_root_binding(rows, certification_trust_roots)
 
     if canonical_gates_green is not True:
         blockers.append("CANONICAL_GATES_NOT_GREEN")
@@ -415,6 +469,8 @@ def certify_core(
         "required_dimensions": list(REQUIRED_DIMENSIONS),
         "evidence": rows,
         "certification_trust_root_key_count": certification_trust_roots.key_count,
+        "certification_trust_root_referenced_key_count": trust_binding["referenced_key_count"],
+        "certification_trust_root_binding_digest": trust_binding["digest"],
         "canonical_gates_green": canonical_gates_green is True,
         "global_worker_readiness_green": global_worker_readiness_green is True,
         "total_evidence_test_count": total_tests,
