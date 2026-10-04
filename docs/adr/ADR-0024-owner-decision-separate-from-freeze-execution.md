@@ -83,7 +83,7 @@ V2.25 exige:
 - chave ativa/não revogada;
 - fingerprints exatos;
 - janela temporal máxima de 180s;
-- nonce persistente anti-replay;
+- nonce persistente anti-replay preso ao digest exato do request V2.25;
 - request reconstruído idêntico ao apresentado.
 
 ## Checkpoint
