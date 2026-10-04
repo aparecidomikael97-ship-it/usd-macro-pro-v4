@@ -34,6 +34,8 @@ jobs:
             atlasquant_aion_resilience.py \
             atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
@@ -47,6 +49,8 @@ jobs:
             atlasquant_aion_unified_durable_bridge.py \
             atlasquant_aion_unified_journal_store.py \
             atlasquant_aion_unified_mission.py \
+            atlasquant_aion_unified_taskgraph.py \
+            atlasquant_aion_unified_taskgraph_store.py \
             atlasquant_aion_role_authority.py \
             atlasquant_aion_truth_mapping.py \
             test_atlasquant_aion_chat_checkpoint_adapter.py \
@@ -64,6 +68,7 @@ jobs:
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
             test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
             test_atlasquant_aion_observability.py \
             test_atlasquant_aion_core_hardening_v24.py
       - name: Run authority, injection, isolation and recovery tests
@@ -84,6 +89,7 @@ jobs:
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
             test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
             test_atlasquant_aion_observability.py \
             test_atlasquant_aion_core_hardening_v24.py
       - name: Run AION v2.1 scope and quarantine tests
@@ -94,7 +100,8 @@ jobs:
             test_atlasquant_aion_unified_hardening_v21.py \
             test_atlasquant_aion_unified_journal_store.py \
             test_atlasquant_aion_unified_journal_store_governance.py \
-            test_atlasquant_aion_unified_mission.py
+            test_atlasquant_aion_unified_mission.py \
+            test_atlasquant_aion_unified_taskgraph.py
 
   supply-chain-audit:
     name: Supply-chain audit
@@ -120,6 +127,8 @@ jobs:
             atlasquant_aion_resilience.py \
             atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
@@ -133,6 +142,8 @@ jobs:
             atlasquant_aion_unified_durable_bridge.py \
             atlasquant_aion_unified_journal_store.py \
             atlasquant_aion_unified_mission.py \
+            atlasquant_aion_unified_taskgraph.py \
+            atlasquant_aion_unified_taskgraph_store.py \
             atlasquant_aion_role_authority.py \
             atlasquant_aion_truth_mapping.py \
             atlasquant_aion_observability.py
