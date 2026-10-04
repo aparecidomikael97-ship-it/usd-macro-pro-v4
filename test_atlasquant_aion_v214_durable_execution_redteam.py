@@ -522,3 +522,16 @@ def test_no_method_claims_to_execute_external_action(tmp_path):
     leased = lease(store, row["execution_id"])
     assert leased["executes_action"] is False
     assert leased["external_effect_performed"] is False
+
+
+def test_local_safe_cannot_enter_external_dispatch_state(tmp_path):
+    store = DurableExecutionStore(tmp_path / "exec.sqlite3")
+    execution_id = prepare(store).record["execution_id"]
+    lease(store, execution_id)
+    with pytest.raises(DurableExecutionError) as exc:
+        store.record_dispatch_started(
+            execution_id,
+            lease_token="lease-token-a",
+            now_ts=NOW,
+        )
+    assert exc.value.result["error_code"] == "DISPATCH_MODE_BLOCKED"
