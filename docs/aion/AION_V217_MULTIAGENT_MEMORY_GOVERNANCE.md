@@ -152,3 +152,16 @@ A execução real continua posterior e deve compor todas as evidências necessá
 - memória não concede permission/authority;
 - plano multiagente não inicia agente/worker;
 - gates canônicos verdes.
+
+## Coordinator hardening
+
+O governor é fail-closed também para formato estrutural:
+
+- nó não-mapping é blocker e não pode ser silenciosamente descartado;
+- coleção de allowed capabilities deve ter tipo explícito, nunca string escalar;
+- trusted context malformado bloqueia;
+- conflict metadata de memória com tipo inválido bloqueia;
+- conflict refs explícitas continuam bloqueando uso operacional.
+
+O objetivo é impedir que normalização permissiva reduza silenciosamente o plano
+ou esconda evidência conflitante.
