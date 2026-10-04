@@ -20,6 +20,7 @@ from atlasquant_aion_operations import queue_summary
 from atlasquant_aion_durable_tasks import durable_tasks_summary
 from atlasquant_aion_system_health_center import build_system_health_center
 from atlasquant_aion_cost_center import build_cost_center
+from atlasquant_aion_observability import core_health_snapshot
 
 SCHEMA="ATLASQUANT_AION_MASTER_STATUS_V1"
 STATES=("CONFIRMED","BLOCKED","EXTERNAL_DEPENDENCY","UNKNOWN")
@@ -35,6 +36,35 @@ def _safe_nonnegative_int(value:Any)->int|None:
     if not math.isfinite(number) or number<0 or not number.is_integer():
         return None
     return int(number)
+
+
+def _aion_core_health_snapshot(system_context:Mapping[str,Any])->dict[str,Any]:
+    """Normalize only explicitly supplied local Core health evidence.
+
+    Missing evidence remains UNKNOWN. This adapter never probes providers,
+    persists state, repairs subsystems or authorizes execution.
+    """
+    system=dict(system_context or {})
+    raw=system.get("aion_core_health")
+    evidence=dict(raw) if isinstance(raw,Mapping) else {}
+    raw_events=evidence.get("events")
+    events=raw_events if isinstance(raw_events,(list,tuple)) else []
+    return core_health_snapshot(
+        core_version=evidence.get("core_version",""),
+        schema_version=evidence.get("schema_version",""),
+        journal_status=evidence.get("journal_status","UNKNOWN"),
+        checkpoint_status=evidence.get("checkpoint_status","UNKNOWN"),
+        recovery_status=evidence.get("recovery_status","UNKNOWN"),
+        memory_status=evidence.get("memory_status","UNKNOWN"),
+        audit_chain_status=evidence.get("audit_chain_status","UNKNOWN"),
+        pending_missions=evidence.get("pending_missions",0),
+        blocked_missions=evidence.get("blocked_missions",0),
+        waiting_approval=evidence.get("waiting_approval",0),
+        ready_handoffs=evidence.get("ready_handoffs",0),
+        last_recovery=evidence.get("last_recovery",""),
+        last_checkpoint=evidence.get("last_checkpoint",""),
+        events=events,
+    )
 
 
 def _system_health_snapshots(
@@ -660,6 +690,59 @@ def build_master_status_board(
         next_action=commercial_next,
     ))
 
+    aion_core_health=_aion_core_health_snapshot(system)
+    core_integrity_state=str(aion_core_health.get("integrity_state") or "UNKNOWN").upper()
+    core_blocked=int(aion_core_health.get("blocked_missions") or 0)
+    core_waiting=int(aion_core_health.get("waiting_approval") or 0)
+    raw_core=system.get("aion_core_health")
+    core_evidence_complete=(
+        not isinstance(raw_core,Mapping)
+        or (
+            all(raw_core.get(key) is True for key in ("counts_verified","evidence_complete") if key in raw_core)
+            and all(_safe_nonnegative_int(raw_core[key]) is not None for key in ("pending_missions","blocked_missions","waiting_approval","ready_handoffs") if key in raw_core)
+        )
+    )
+    core_board_state=(
+        "BLOCKED"
+        if core_integrity_state=="DEGRADED" or core_blocked>0 or core_waiting>0
+        else "CONFIRMED" if core_integrity_state=="OK" and core_evidence_complete
+        else "UNKNOWN"
+    )
+    core_statuses=(
+        ("journal",aion_core_health.get("journal_status")),
+        ("checkpoint",aion_core_health.get("checkpoint_status")),
+        ("recovery",aion_core_health.get("recovery_status")),
+        ("memory",aion_core_health.get("memory_status")),
+        ("audit",aion_core_health.get("audit_chain_status")),
+    )
+    items.append(_item(
+        "aion_core_health",
+        "Saúde do núcleo AION",
+        area="central",
+        state=core_board_state,
+        detail=(
+            " · ".join(f"{name}={_text(value,80) or 'UNKNOWN'}" for name,value in core_statuses)
+            + f" · estado {core_integrity_state}"
+            + f" · pendentes={int(aion_core_health.get('pending_missions') or 0)}"
+            + f" · bloqueadas={core_blocked}"
+            + f" · aprovação={core_waiting}"
+        ),
+        source="system_context.aion_core_health -> AION core_health_snapshot",
+        next_action=(
+            ""
+            if core_board_state=="CONFIRMED"
+            else (
+                "Revisar a evidência local degradada antes de qualquer ação; este painel não repara nem executa."
+                if core_integrity_state=="DEGRADED"
+                else (
+                    "Revisar missões bloqueadas e aprovações pendentes; saúde de integridade não autoriza execução."
+                    if core_blocked>0 or core_waiting>0
+                    else "Fornecer evidência local explícita dos cinco subsistemas do Core; ausência permanece UNKNOWN."
+                )
+            )
+        ),
+    ))
+
     system_health_center=build_system_health_center(
         _system_health_snapshots(
             checkpoint=cp,
@@ -779,6 +862,7 @@ def build_master_status_board(
         "schema":SCHEMA,
         "states":list(STATES),
         "items":items,
+        "aion_core_health":aion_core_health,
         "system_health_center":system_health_center,
         "cost_center":cost_center,
         "counts":counts,
