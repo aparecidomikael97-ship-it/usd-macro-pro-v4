@@ -23,6 +23,7 @@ MAX_EVENT_BYTES=96_000
 MAX_EVENTS=256
 MAX_MASTER_BYTES=2_000_000
 MAX_DEPTH=24
+MAX_EVENT_ID_CHARS=160
 
 _FORBIDDEN_TRUE_KEYS=frozenset({
     "external_action_executed",
@@ -74,6 +75,21 @@ def _digest(value:Any)->str:
 
 def _clean(value:Any,limit:int=240)->str:
     return " ".join(str(value or "").replace("\x00","").split())[:limit]
+
+
+def _event_id(value:Any)->str:
+    """Return an event id only when its identity is already canonical.
+
+    Idempotency keys must never be silently truncated or normalized because
+    distinct caller identities could otherwise collapse into the same event.
+    """
+    if not isinstance(value,str):
+        raise CheckpointMasterError("event_id must be a string")
+    if not value or len(value)>MAX_EVENT_ID_CHARS:
+        raise CheckpointMasterError("event_id length invalid")
+    if "\x00" in value or _clean(value,MAX_EVENT_ID_CHARS)!=value:
+        raise CheckpointMasterError("event_id must be canonical")
+    return value
 
 
 def _positive_int(value:Any,label:str,minimum:int=0)->int:
@@ -254,9 +270,10 @@ def reconstruct_checkpoint(master:Mapping[str,Any], *, target_revision:Any=None)
         sequence=_positive_int(event.get("sequence"),"sequence",1)
         if sequence!=index:
             raise CheckpointIntegrityError("event sequence mismatch")
-        event_id=_clean(event.get("event_id"),160)
-        if not event_id:
-            raise CheckpointIntegrityError("event_id missing")
+        try:
+            event_id=_event_id(event.get("event_id"))
+        except CheckpointMasterError as exc:
+            raise CheckpointIntegrityError("event_id invalid") from exc
         material=_event_material(event)
         patch=material.get("patch")
         if not isinstance(patch,Mapping):
@@ -327,9 +344,7 @@ def append_checkpoint_patch(
 )->dict[str,Any]:
     current=reconstruct_checkpoint(master)
     expected=_positive_int(expected_revision,"expected_revision",0)
-    eid=_clean(event_id,160)
-    if not eid:
-        raise CheckpointMasterError("event_id required")
+    eid=_event_id(event_id)
     if not isinstance(patch,Mapping):
         raise CheckpointMasterError("patch mapping required")
     checked_patch=_safe_structure(patch)
@@ -340,7 +355,7 @@ def append_checkpoint_patch(
     row=deepcopy(dict(master))
     existing=[
         event for event in row.get("journal",[])
-        if isinstance(event,Mapping) and _clean(event.get("event_id"),160)==eid
+        if isinstance(event,Mapping) and event.get("event_id")==eid
     ]
     if existing:
         if all(event.get("patch_digest")==patch_digest for event in existing):
@@ -458,7 +473,7 @@ def checkpoint_master_digest(master:Mapping[str,Any])->str:
 
 __all__=[
     "SCHEMA","EVENT_SCHEMA","GENESIS","MAX_BASE_BYTES","MAX_EVENT_BYTES",
-    "MAX_EVENTS","MAX_MASTER_BYTES","CheckpointMasterError","CheckpointConflict",
+    "MAX_EVENTS","MAX_MASTER_BYTES","MAX_EVENT_ID_CHARS","CheckpointMasterError","CheckpointConflict",
     "CheckpointIntegrityError","new_checkpoint_master","reconstruct_checkpoint",
     "append_checkpoint_patch","compact_checkpoint","rollback_candidate",
     "future_signature_hook","checkpoint_master_digest",
