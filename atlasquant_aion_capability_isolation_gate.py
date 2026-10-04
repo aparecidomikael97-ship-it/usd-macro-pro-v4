@@ -239,16 +239,29 @@ def verify_capability_scope(
     if cap_id not in set(parent.get("capabilities") or []):
         blockers.append("SCOPE_CAPABILITY_NOT_GRANTED_BY_PARENT")
 
-    reg = registry or default_registry()
-    capability = reg.get(cap_id)
-    if capability is None:
+    try:
+        reg = registry if registry is not None else default_registry()
+        if not isinstance(reg, CapabilityRegistry):
+            raise TypeError("invalid capability registry")
+        capability = reg.get(cap_id)
+    except Exception:
+        capability = None
+        blockers.append("SCOPE_CAPABILITY_REGISTRY_FAILURE")
+    if capability is None and "SCOPE_CAPABILITY_REGISTRY_FAILURE" not in blockers:
         blockers.append("SCOPE_CAPABILITY_NOT_REGISTERED")
 
-    route = route_specialist(domain=parent.get("domain"))
-    if route.get("status") != "SELECTED":
-        blockers.append("SCOPE_DOMAIN_NOT_ROUTABLE")
-    elif cap_id not in set(route.get("capability_ids") or []):
-        blockers.append("SCOPE_CAPABILITY_CROSS_DOMAIN")
+    try:
+        route = route_specialist(domain=parent.get("domain"))
+        if not isinstance(route, Mapping):
+            raise TypeError("invalid specialist route")
+    except Exception:
+        route = {}
+        blockers.append("SCOPE_SPECIALIST_ROUTER_FAILURE")
+    if "SCOPE_SPECIALIST_ROUTER_FAILURE" not in blockers:
+        if route.get("status") != "SELECTED":
+            blockers.append("SCOPE_DOMAIN_NOT_ROUTABLE")
+        elif cap_id not in set(route.get("capability_ids") or []):
+            blockers.append("SCOPE_CAPABILITY_CROSS_DOMAIN")
 
     role = _clean(actor_role, 32).upper()
     if capability is not None and role not in set(capability.allowed_roles):
@@ -299,11 +312,15 @@ def verify_capability_scope(
 
     entry = None
     if not blockers:
-        entry, problem = trust_roots.verify_key_available(
-            grant["key_id"], grant["key_version"], now_ts
-        )
-        if problem:
-            blockers.append(problem)
+        try:
+            entry, problem = trust_roots.verify_key_available(
+                grant["key_id"], grant["key_version"], now_ts
+            )
+        except Exception:
+            blockers.append("SCOPE_TRUST_ROOT_VERIFICATION_FAILURE")
+        else:
+            if problem:
+                blockers.append(problem)
 
     signature_verified = False
     if not blockers and entry is not None:
@@ -328,12 +345,17 @@ def verify_capability_scope(
         grant["domain"],
         grant["capability_id"],
     ))
-    claimed = nonce_registry.claim(
-        scope=scope,
-        nonce=grant["nonce"],
-        expires_at=grant["expires_at"],
-        now_ts=now_ts,
-    )
+    try:
+        claimed = nonce_registry.claim(
+            scope=scope,
+            nonce=grant["nonce"],
+            expires_at=grant["expires_at"],
+            now_ts=now_ts,
+        )
+    except Exception:
+        result = _blocked("SCOPE_NONCE_REGISTRY_FAILURE", parent=parent)
+        result["scope_signature_verified"] = True
+        return result
     if not claimed:
         result = _blocked("SCOPE_NONCE_REPLAYED", parent=parent)
         result["scope_signature_verified"] = True
