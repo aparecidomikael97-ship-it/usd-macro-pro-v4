@@ -433,6 +433,30 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
         self.assertIn("pendentes=2",item["detail"])
         self.assertFalse(board["automatic_external_actions"])
 
+    def test_aion_core_health_integrity_ok_still_blocks_on_pending_approval(self):
+        board=self.base(system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "aion_core_health":{
+                "core_version":"2.4",
+                "schema_version":"V22",
+                "journal_status":"VALID",
+                "checkpoint_status":"VALIDATED",
+                "recovery_status":"RECOVERED",
+                "memory_status":"HEALTHY",
+                "audit_chain_status":"VERIFIED",
+                "blocked_missions":0,
+                "waiting_approval":1,
+            },
+        })
+        snap=board["aion_core_health"]
+        item=self.by_id(board,"aion_core_health")
+        self.assertEqual(snap["integrity_state"],"OK")
+        self.assertEqual(item["state"],"BLOCKED")
+        self.assertIn("aprovações pendentes",item["next_action"])
+        self.assertFalse(snap["execution_allowed"])
+        self.assertFalse(board["automatic_external_actions"])
+
     def test_aion_core_health_tamper_is_blocked_without_repair_or_execution(self):
         board=self.base(system_context={
             "truth_state":"CONFIRMED",
