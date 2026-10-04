@@ -528,6 +528,11 @@ class DurableExecutionStore:
 
     def cancel(self, execution_id: str, *, now_ts: str) -> dict[str, Any]:
         row = self.get(execution_id)
+        if row["state"] == "LEASED":
+            # A live lease means a worker may currently be executing local work
+            # or preparing an external dispatch. Do not mutate ownership from a
+            # tokenless cancellation path; recover/expire the lease first.
+            raise DurableExecutionError("CANCEL_ACTIVE_LEASE_BLOCKED", row)
         if row["state"] in {"DISPATCH_RECORDED", "OUTCOME_UNKNOWN", "COMPLETED"}:
             raise DurableExecutionError("CANCEL_OUTCOME_UNCERTAIN_OR_TERMINAL", row)
         if row["state"] in {"CANCELED", "DLQ"}:
