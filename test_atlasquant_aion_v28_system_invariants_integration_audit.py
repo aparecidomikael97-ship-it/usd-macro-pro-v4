@@ -28,20 +28,20 @@ def sample_split_brain_state():
 # --- Test Cases ---
 
 def test_health_confirmed_not_imply_approval(sample_health_confirmed):
-    # PRODUCTION CONTRACT TEST
+    # MODEL-LEVEL TEST - fixture puro; ainda não prova API de produção.
     health = sample_health_confirmed
     assert health["state"] == "CONFIRMED"
     assert not health["approval"], "Health CONFIRMED should not imply approval"
 
 def test_unknown_state_cannot_improve_certainty():
-    # MODEL-LEVEL TEST - simulação
+    # MODEL-LEVEL TEST - política simulada, não prova API de produção.
     previous_certainty = "UNKNOWN"
-    new_certainty = "CONFIRMED"
-    # regra: UNKNOWN não promove CONFIRMED
-    assert not (previous_certainty == "UNKNOWN" and new_certainty == "CONFIRMED"),         "UNKNOWN must not improve certainty"
+    proposed_certainty = "CONFIRMED"
+    effective_certainty = "UNKNOWN" if previous_certainty == "UNKNOWN" else proposed_certainty
+    assert effective_certainty == "UNKNOWN", "UNKNOWN must not improve certainty"
 
 def test_memory_validation_does_not_grant_authority(sample_memory_validated):
-    # PRODUCTION CONTRACT TEST
+    # MODEL-LEVEL TEST - fixture puro; ainda não prova API de produção.
     memory = sample_memory_validated
     assert memory["validated"] is True
     assert memory["execution_allowed"] is False, "Memory validation must not grant execution authority"
