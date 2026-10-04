@@ -159,3 +159,25 @@ mantém estado BLOCKED.
 - todas as dimensões do manifesto verificadas;
 - zero execução real durante certificação;
 - zero freeze implícito.
+
+## Coordinator hardening
+
+A evidência V2.20 é validada em duas camadas:
+
+- o digest precisa ter formato SHA-256 canônico;
+- o digest precisa ser recalculado e corresponder a dimension/source/run_id/commit_sha/test_count.
+
+Alterar run_id, commit, contagem, source ou dimensão sem recalcular o digest bloqueia a
+evidência com `EVIDENCE_DIGEST_MISMATCH`.
+
+Além disso, um resultado positivo continua sendo apenas candidato técnico:
+
+- `core_complete_candidate=True`;
+- `core_complete_claim_allowed=False`;
+- `owner_core_complete_review_required=True`;
+- `core_frozen=False`.
+
+A workflow dedicada também executa explicitamente E2E, load, chaos/recovery,
+recovery traceability, tenant durable persistence, unified journal replay e resource
+bounds no mesmo commit.
+
