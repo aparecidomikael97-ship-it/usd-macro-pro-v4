@@ -265,7 +265,7 @@ def test_tampered_preflight_challenge_digest_is_detected():
     result["target_commit_sha"] = "d" * 40
     check = recheck(result, checkpoint=master)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
 
 
 def test_digest_to_sign_cannot_diverge_from_challenge_digest():
