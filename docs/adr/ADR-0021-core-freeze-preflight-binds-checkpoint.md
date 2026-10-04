@@ -44,7 +44,8 @@ O preflight:
 - liga a futura decisão ao digest/revision/state digest exatos do Checkpoint;
 - emite challenge curto com nonce e ceremony id;
 - deixa a decisão como `UNDECIDED`;
-- produz apenas material para futura assinatura explícita do HUMAN_OWNER;
+- mantém `owner_decision_ready=false` e `digest_to_sign=""` enquanto não houver prova de persistência externa;
+- produz apenas material de preflight para futura cerimônia explícita do HUMAN_OWNER;
 - revalida o Checkpoint antes de qualquer futura decisão.
 
 ## Consequências
@@ -54,12 +55,13 @@ A sequência passa a ser:
 1. certificação V2.20;
 2. review V2.21;
 3. persistência explícita do review no Checkpoint Mestre;
-4. preflight V2.22;
-5. decisão explícita do HUMAN_OWNER;
-6. eventual registro da decisão;
-7. Core Freeze separado;
-8. merge/deploy separados;
-9. runtime activation separada.
+4. preflight lógico V2.22;
+5. prova/attestation da persistência externa do estado exato;
+6. decisão explícita do HUMAN_OWNER;
+7. eventual registro da decisão;
+8. Core Freeze separado;
+9. merge/deploy separados;
+10. runtime activation separada.
 
 Nenhuma etapa implica automaticamente a próxima.
 
@@ -100,3 +102,13 @@ Nenhum.
 ## Superseded by
 
 Nenhum.
+
+
+## Limite descoberto na auditoria V2.22
+
+O envelope `atlasquant_aion_checkpoint_master` não é, por si só, prova de save no
+runtime oficial de `atlasquant_aion_memory`. O runtime possui receipt/reconciliação
+próprios, mas não há nesta versão uma bridge de persistência entre os dois contratos.
+
+Consequentemente, V2.22 termina em `READY_FOR_OWNER_DECISION_PREFLIGHT`, nunca em
+owner-decision readiness real.
