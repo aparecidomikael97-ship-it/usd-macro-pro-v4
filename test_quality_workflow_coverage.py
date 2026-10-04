@@ -151,5 +151,99 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
 
 
 
+
+class AionLibraryMainGatePreflightTests(unittest.TestCase):
+    """Regression tests for the read-only proposed-workflow gate.
+
+    These fixtures prove the verifier detects missing/unsafe configurations.
+    They do NOT claim the current workflow already supports main-PR E2E.
+    """
+
+    @staticmethod
+    def _sample():
+        from scripts.aion_library_ci_gate_preflight import EXPECTED_FLAGS, EXPECTED_PATHS
+        lines = [
+            "name: Synthetic browser+PG only",
+            "on:",
+            "  workflow_dispatch:",
+            "  pull_request:",
+            "    branches:",
+            "      - main",
+            "      - review/aion-library-joint-reconciliation-v1-20261001",
+            "    paths:",
+        ]
+        lines.extend("      - '" + path + "'" for path in sorted(EXPECTED_PATHS))
+        lines.extend([
+            "permissions:",
+            "  contents: read",
+            "jobs:",
+            "  actual-app-browser-pg-synthetic:",
+            "    env:",
+        ])
+        lines.extend("      " + key + ": '" + value + "'" for key, value in EXPECTED_FLAGS.items())
+        lines.extend([
+            "    services:",
+            "      postgres:",
+            "        image: postgres:16",
+            "    steps:",
+            "      - run: echo localhost:5432/aion_library_sandbox",
+            "      - run: python scripts/test_aion_library_browser_pg_joint.py",
+            "      - run: python -m unittest test_atlasquant_aion_library_server_selection_pg",
+        ])
+        return "\n".join(lines) + "\n"
+
+    def test_read_only_gate_accepts_exact_scoped_synthetic_fixture(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        self.assertEqual(inspect_workflow(self._sample()), [])
+
+    def test_gate_denies_missing_main_trigger(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("      - main\n", "")
+        self.assertTrue(any("missing main" in error for error in inspect_workflow(altered)))
+
+    def test_gate_denies_missing_authorization_path(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("      - 'aion_core/library_*.py'\n", "")
+        self.assertTrue(any("missing exact path" in error for error in inspect_workflow(altered)))
+
+    def test_gate_denies_production_environment(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("ATLASQUANT_ENV: 'SANDBOX'",
+                                         "ATLASQUANT_ENV: 'PRODUCTION'")
+        self.assertTrue(any("ATLASQUANT_ENV" in error for error in inspect_workflow(altered)))
+
+    def test_gate_denies_remote_pg_dsn_even_if_localhost_mentioned_elsewhere(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        local = "postgresql://library_sandbox:synthetic_ci_only_not_for_production@localhost:5432/aion_library_sandbox"
+        altered = self._sample().replace(local, "postgresql://nonlocal-host.example/production")
+        # The run marker still mentions localhost, so validate JOB env specifically.
+        self.assertTrue(any("AION_LIB_TEST_PG_DSN" in e for e in inspect_workflow(altered)))
+
+    def test_gate_denies_non_postgresql_service_image(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("image: postgres:16", "image: redis:7")
+        self.assertTrue(any("PostgreSQL service" in e for e in inspect_workflow(altered)))
+
+    def test_gate_denies_write_permissions(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("contents: read", "contents: write")
+        errors = inspect_workflow(altered)
+        self.assertTrue(any("write permissions" in error for error in errors))
+
+    def test_gate_denies_unbounded_paths_and_new_push_events(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("    paths:", "    paths:\n      - '**/*'")
+        altered = altered.replace("  pull_request:", "  push:\n  pull_request:")
+        errors = inspect_workflow(altered)
+        self.assertTrue(any("unbounded path" in error for error in errors))
+        self.assertTrue(any("only workflow_dispatch" in error for error in errors))
+
+    def test_gate_denies_comment_only_main(self):
+        from scripts.aion_library_ci_gate_preflight import inspect_workflow
+        altered = self._sample().replace("      - main\n", "      # - main\n")
+        self.assertTrue(any("missing main" in error for error in inspect_workflow(altered)))
+
+
+
 if __name__=="__main__":
     unittest.main()
