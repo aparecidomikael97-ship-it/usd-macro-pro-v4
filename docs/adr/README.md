@@ -52,5 +52,6 @@ Cada registro usa o identificador `ADR-NNNN` e as seções: Título, Data, Statu
 | ADR-0022 | ACCEPTED | `docs/adr/ADR-0022-external-checkpoint-persistence-attestation.md` |
 | ADR-0023 | ACCEPTED | `docs/adr/ADR-0023-owner-signature-separate-from-owner-decision.md` |
 | ADR-0024 | ACCEPTED | `docs/adr/ADR-0024-owner-decision-separate-from-freeze-execution.md` |
+| ADR-0025 | ACCEPTED | `docs/adr/ADR-0025-owner-decision-persistence-before-freeze-eligibility.md` |
 
 Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu estado de produto está na reconciliação `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.
