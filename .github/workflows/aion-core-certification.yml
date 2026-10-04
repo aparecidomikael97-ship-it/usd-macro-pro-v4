@@ -1,0 +1,40 @@
+name: AION Core Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-core-certification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-certification:
+    name: V2.20 certification, load, chaos and recovery
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install deterministic certification dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Compile V2.13-V2.20 certification chain
+        run: |
+          python -m py_compile             atlasquant_aion_trust_root.py             atlasquant_aion_nonce_registry.py             atlasquant_aion_authority_verifier.py             atlasquant_aion_trusted_authority_bridge.py             atlasquant_aion_durable_execution_kernel.py             atlasquant_aion_capability_isolation_gate.py             atlasquant_aion_operational_resilience_kernel.py             atlasquant_aion_multiagent_memory_governor.py             atlasquant_aion_policy_kernel.py             atlasquant_aion_model_gateway_v2.py             atlasquant_aion_core_certification.py
+      - name: Run V2.20 certification and synthetic stress
+        run: |
+          python -m pytest -q -s             test_atlasquant_aion_v220_core_certification.py
+      - name: Run V2.13-V2.19 structural red-team chain
+        run: |
+          python -m pytest -q -s             test_atlasquant_aion_v213_real_trust_authority_redteam.py             test_atlasquant_aion_v214_durable_execution_redteam.py             test_atlasquant_aion_v215_capability_isolation_redteam.py             test_atlasquant_aion_v216_operational_resilience_redteam.py             test_atlasquant_aion_v217_multiagent_memory_governance_redteam.py             test_atlasquant_aion_v218_policy_kernel_redteam.py             test_atlasquant_aion_v219_provider_neutral_gateway_redteam.py
+      - name: Run load, chaos, recovery, tenant and durable persistence certification
+        run: |
+          python -m pytest -q -s             test_atlasquant_aion_chat_load.py             test_atlasquant_aion_chaos_recovery.py             test_atlasquant_aion_durable_tasks.py             test_atlasquant_aion_global_worker_recovery_drill.py             test_atlasquant_aion_tenant_privacy.py             test_atlasquant_aion_unified_journal_store.py             test_atlasquant_aion_unified_journal_store_governance.py
