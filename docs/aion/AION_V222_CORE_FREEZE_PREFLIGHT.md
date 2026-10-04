@@ -8,7 +8,11 @@ V2.22 prepara a cerimônia de decisão crítica do proprietário sem tomar a dec
 
 O máximo automático desta camada é:
 
-`READY_FOR_OWNER_DECISION`
+`READY_FOR_OWNER_DECISION_PREFLIGHT`
+
+Esse estado significa somente que o material lógico está consistente. Ele **não**
+significa que a persistência externa oficial foi provada e, portanto, não libera
+assinatura nem decisão do proprietário.
 
 Isso não significa:
 
@@ -43,7 +47,7 @@ válido e uma nova cerimônia é necessária.
 
 ## Checkpoint Mestre obrigatório
 
-Para chegar a `READY_FOR_OWNER_DECISION`, o Checkpoint Mestre fornecido precisa conter
+Para chegar a `READY_FOR_OWNER_DECISION_PREFLIGHT`, o Checkpoint Mestre fornecido precisa conter
 o registro `aion_core_completion_review` correspondente exatamente ao review V2.21.
 
 Isso fecha a cadeia:
@@ -57,11 +61,18 @@ Checkpoint oficial, a cerimônia real deve permanecer bloqueada.
 
 ## Desafio de decisão
 
-Quando todos os pré-requisitos são válidos, a V2.22 produz um
-`challenge_digest` / `digest_to_sign`.
+Quando os pré-requisitos lógicos são válidos, a V2.22 produz um
+`challenge_digest`, mas mantém `digest_to_sign=""`.
+
+O material só poderá se tornar assinável em uma camada posterior que prove a
+persistência externa oficial do estado revisado.
 
 O desafio permanece:
 
+- `owner_decision_preflight_ready=true` apenas para preparação;
+- `owner_decision_ready=false`;
+- `checkpoint_external_persistence_verified=false`;
+- `signature_material_ready=false`;
 - `owner_decision=UNDECIDED`;
 - `owner_decision_recorded=false`;
 - `core_freeze_authorized=false`;
@@ -130,3 +141,15 @@ Isso não significa que:
 - o Core foi congelado.
 
 CI valida somente o contrato.
+
+
+## Limite explícito de persistência
+
+O contrato V2.3 de Checkpoint Mestre é lógico/offline. O runtime oficial usa o fluxo
+de persistência de `atlasquant_aion_memory`, com write receipt e read-after-write.
+Nesta versão ainda não existe uma bridge explícita que prove que um envelope V2.3
+específico foi persistido pelo runtime oficial.
+
+Por isso V2.22 falha fechada semanticamente: ela **não** afirma persistência externa,
+não expõe `digest_to_sign` e não declara a decisão pronta. A próxima camada deverá
+criar essa ponte de evidência sem executar save automaticamente.
