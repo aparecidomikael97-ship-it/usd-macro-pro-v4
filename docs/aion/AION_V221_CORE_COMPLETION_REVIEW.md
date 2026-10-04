@@ -97,7 +97,9 @@ Bloqueiam a revisão:
 
 ## Saída
 
-A saída é um pacote determinístico com `review_digest`.
+A saída é um pacote determinístico com `review_digest`. O digest também cobre o sinal
+`owner_review_ready`, impedindo que readiness seja alterada depois da revisão sem
+invalidar o pacote.
 
 Esse digest pode ser referenciado em um evento explícito do Checkpoint Mestre, mas a
 V2.21 não grava esse evento automaticamente.
