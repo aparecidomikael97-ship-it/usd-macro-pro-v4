@@ -702,6 +702,15 @@ def build_master_status_board(
             and all(_safe_nonnegative_int(raw_core[key]) is not None for key in ("pending_missions","blocked_missions","waiting_approval","ready_handoffs") if key in raw_core)
         )
     )
+    core_counts_proven=(
+        isinstance(raw_core,Mapping)
+        and ("counts_verified" not in raw_core or raw_core.get("counts_verified") is True)
+        and all(_safe_nonnegative_int(raw_core[key]) is not None for key in ("pending_missions","blocked_missions","waiting_approval","ready_handoffs") if key in raw_core)
+    )
+    def core_count_detail(key):
+        value=int(aion_core_health.get(key) or 0)
+        # Positive blockers remain observable even when the complete view is unknown.
+        return str(value) if core_counts_proven or value>0 else "n\u00e3o comprovado"
     core_board_state=(
         "BLOCKED"
         if core_integrity_state=="DEGRADED" or core_blocked>0 or core_waiting>0
@@ -723,9 +732,9 @@ def build_master_status_board(
         detail=(
             " · ".join(f"{name}={_text(value,80) or 'UNKNOWN'}" for name,value in core_statuses)
             + f" · estado {core_integrity_state}"
-            + f" · pendentes={int(aion_core_health.get('pending_missions') or 0)}"
-            + f" · bloqueadas={core_blocked}"
-            + f" · aprovação={core_waiting}"
+            + f" · pendentes={core_count_detail('pending_missions')}"
+            + f" · bloqueadas={core_count_detail('blocked_missions')}"
+            + f" · aprovação={core_count_detail('waiting_approval')}"
         ),
         source="system_context.aion_core_health -> AION core_health_snapshot",
         next_action=(
@@ -737,7 +746,11 @@ def build_master_status_board(
                 else (
                     "Revisar missões bloqueadas e aprovações pendentes; saúde de integridade não autoriza execução."
                     if core_blocked>0 or core_waiting>0
-                    else "Fornecer evidência local explícita dos cinco subsistemas do Core; ausência permanece UNKNOWN."
+                    else (
+                        "Fornecer completude da evid\u00eancia e contadores verificados; integridade OK n\u00e3o comprova a situa\u00e7\u00e3o operacional."
+                        if core_integrity_state=="OK" and not core_evidence_complete
+                        else "Fornecer evidência local explícita dos cinco subsistemas do Core; ausência permanece UNKNOWN."
+                    )
                 )
             )
         ),
