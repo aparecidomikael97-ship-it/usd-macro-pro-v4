@@ -20,6 +20,10 @@ MAX_EVENTS=500
 SEVERITIES=("INFO","NOTICE","WARNING","ERROR","CRITICAL")
 TRUTH_STATES=("CONFIRMED","INFERENCE","HYPOTHESIS","UNKNOWN")
 
+CORE_HEALTH_SCHEMA="ATLASQUANT_AION_CORE_HEALTH_V1"
+_HEALTH_GOOD=frozenset({"OK","HEALTHY","VALID","VALIDATED","VERIFIED","RECOVERED","READY","AVAILABLE","CURRENT","CLEAN","INTACT","CONSISTENT"})
+_HEALTH_BAD_TOKENS=("CORRUPT","MISMATCH","FAIL","ERROR","BLOCK","QUARANTIN","TAMPER","INVALID","UNSAFE")
+
 _SECRET_PATTERNS=(
     re.compile(r"(?i)\bBearer\s+[^\s,;\"']+"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b"),
@@ -288,3 +292,74 @@ def execution_event(
         fallback=fallback,
         confidence=confidence,
     )
+
+
+
+def _health_status(value:Any)->str:
+    text=redact_text(value).strip().upper()[:80]
+    return text or "UNKNOWN"
+
+
+def _health_count(value:Any)->int:
+    try:
+        parsed=int(value)
+    except Exception:
+        return 0
+    return max(0,min(1_000_000,parsed))
+
+
+def core_health_snapshot(
+    *,
+    core_version:Any="",
+    schema_version:Any="",
+    journal_status:Any="UNKNOWN",
+    checkpoint_status:Any="UNKNOWN",
+    recovery_status:Any="UNKNOWN",
+    memory_status:Any="UNKNOWN",
+    audit_chain_status:Any="UNKNOWN",
+    pending_missions:Any=0,
+    blocked_missions:Any=0,
+    waiting_approval:Any=0,
+    ready_handoffs:Any=0,
+    last_recovery:Any="",
+    last_checkpoint:Any="",
+    events:Sequence[Mapping[str,Any]]|None=None,
+)->dict[str,Any]:
+    """Build a bounded, read-only Core health view from explicit local evidence.
+
+    The helper never probes providers and never upgrades UNKNOWN evidence to OK.
+    Integrity is DEGRADED when any supplied subsystem explicitly reports a
+    failure/tamper condition, OK only when every subsystem is explicitly good,
+    and UNKNOWN otherwise.
+    """
+    statuses={
+        "journal_status":_health_status(journal_status),
+        "checkpoint_status":_health_status(checkpoint_status),
+        "recovery_status":_health_status(recovery_status),
+        "memory_status":_health_status(memory_status),
+        "audit_chain_status":_health_status(audit_chain_status),
+    }
+    supplied=list(statuses.values())
+    degraded=any(any(token in value for token in _HEALTH_BAD_TOKENS) for value in supplied)
+    all_good=all(value in _HEALTH_GOOD for value in supplied)
+    integrity_state="DEGRADED" if degraded else "OK" if all_good else "UNKNOWN"
+    return {
+        "schema":CORE_HEALTH_SCHEMA,
+        "core_version":redact_text(core_version).strip()[:80] or "UNKNOWN",
+        "schema_version":redact_text(schema_version).strip()[:80] or "UNKNOWN",
+        **statuses,
+        "pending_missions":_health_count(pending_missions),
+        "blocked_missions":_health_count(blocked_missions),
+        "waiting_approval":_health_count(waiting_approval),
+        "ready_handoffs":_health_count(ready_handoffs),
+        "last_recovery":redact_text(last_recovery).strip()[:160],
+        "last_checkpoint":redact_text(last_checkpoint).strip()[:160],
+        "audit_summary":observability_summary(events),
+        "integrity_state":integrity_state,
+        "health_snapshot_is_read_only":True,
+        "external_action_executed":False,
+        "execution_allowed":False,
+        "executes_provider_call":False,
+        "executes_billing":False,
+        "real_orders_enabled":False,
+    }
