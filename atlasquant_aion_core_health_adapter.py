@@ -29,7 +29,7 @@ MAX_BYTES = 2_000_000
 MAX_ROWS = 64
 INVARIANTS = {"health_snapshot_is_read_only":True,"external_action_executed":False,
     "execution_allowed":False,"executes_provider_call":False,"executes_billing":False,
-    "real_orders_enabled":False,"snapshot_atomic":False}
+    "real_orders_enabled":False,"snapshot_atomic":False,"origin_authenticated":False,"snapshot_signed":False}
 _SCOPE_NAMES = {"owner_id":"owner_id","tenant_id":"tenant_id","workspace_id":"workspace_id",
     "ecosystem":"ecosystem","ecosystem_id":"ecosystem","sector":"sector",
     "sector_id":"sector","project":"project","project_id":"project","request_id":"request_id"}
@@ -418,7 +418,7 @@ def _consistency_envelope(payload, known, expected, mission):
         "consistency_state":state,"lineage_consistency":lineage,"scope_consistency":scope,
         "temporal_consistency":temporal,"integrity_consistency":core_health_snapshot(**{
             name+"_status":payload[name+"_status"] for name in _CONSISTENCY_DOMAINS if name!="mission"})["integrity_state"],
-        "snapshot_complete":complete,"snapshot_atomic":False,"execution_allowed":False,
+        "snapshot_complete":complete,"snapshot_atomic":False,"origin_authenticated":False,"snapshot_signed":False,"execution_allowed":False,
         "temporally_mixed":mixed,"observation_window":{"earliest":stamps[0] if stamps else "","latest":stamps[-1] if stamps else ""},
         "expected_domains":list(_CONSISTENCY_DOMAINS),"present_domains":present,"verified_domains":verified,
         "unknown_domains":unknown,"degraded_domains":degraded,"stale_domains":stale,"mismatch_domains":mismatch,
@@ -435,7 +435,7 @@ def consistency_envelope_view(payload):
     Only build_core_health_evidence validates raw resident domain evidence.
     """
     unknown={"schema":CONSISTENCY_SCHEMA,"consistency_state":"UNKNOWN","snapshot_atomic":False,
-        "snapshot_complete":False,"execution_allowed":False,"reasons":["canonical_envelope_unavailable"]}
+        "snapshot_complete":False,"origin_authenticated":False,"snapshot_signed":False,"execution_allowed":False,"reasons":["canonical_envelope_unavailable"]}
     if type(payload) is not dict: return unknown
     try:
         raw=_checked(payload)
