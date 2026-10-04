@@ -249,6 +249,17 @@ class AtlasQuantAionCoreV23CheckpointTests(unittest.TestCase):
         )
         self.assertEqual(replay,changed)
 
+    def test_idempotent_retry_accepts_original_stale_revision_after_commit(self):
+        master=self.master()
+        changed=append_checkpoint_patch(
+            master,event_id="EV-RETRY",patch={"x":1},expected_revision=0,
+        )
+        replay=append_checkpoint_patch(
+            changed,event_id="EV-RETRY",patch={"x":1},expected_revision=0,
+        )
+        self.assertEqual(replay,changed)
+        self.assertEqual(reconstruct_checkpoint(replay)["revision"],1)
+
     def test_duplicate_same_id_different_payload_is_conflict(self):
         master=self.master()
         changed=append_checkpoint_patch(
@@ -269,6 +280,20 @@ class AtlasQuantAionCoreV23CheckpointTests(unittest.TestCase):
                 expected_revision=0,
             )
         self.assertEqual(reconstruct_checkpoint(master)["snapshot"]["task"]["state"],"PLANNED")
+
+    def test_replay_cannot_introduce_executed_from_missing_or_ready(self):
+        master=self.master()
+        ready=append_checkpoint_patch(
+            master,event_id="EV-READY",patch={"task":{"state":"READY"}},expected_revision=0,
+        )
+        with self.assertRaises(CheckpointMasterError):
+            append_checkpoint_patch(
+                ready,event_id="EV-EXEC2",patch={"task":{"state":"EXECUTED"}},expected_revision=1,
+            )
+        with self.assertRaises(CheckpointMasterError):
+            append_checkpoint_patch(
+                master,event_id="EV-NEWEXEC",patch={"other":{"status":"EXECUTED"}},expected_revision=0,
+            )
 
     def test_execution_flags_cannot_be_enabled_by_patch(self):
         master=self.master()
@@ -327,6 +352,10 @@ class AtlasQuantAionCoreV23CheckpointTests(unittest.TestCase):
         with self.assertRaises(CheckpointIntegrityError):
             reconstruct_checkpoint(two)
 
+    def test_normalized_duplicate_keys_fail_closed(self):
+        with self.assertRaises(CheckpointMasterError):
+            new_checkpoint_master({"a":1,"a ":2})
+
     def test_nonfinite_and_oversized_payloads_fail_closed(self):
         with self.assertRaises(CheckpointMasterError):
             new_checkpoint_master({"x":math.inf})
@@ -337,6 +366,21 @@ class AtlasQuantAionCoreV23CheckpointTests(unittest.TestCase):
                 patch={"blob":"x"*(MAX_EVENT_BYTES+100)},
                 expected_revision=0,
             )
+
+    def test_tampered_top_level_safety_flag_is_detected(self):
+        master=self.master()
+        master["execution_allowed"]=True
+        with self.assertRaises(CheckpointIntegrityError):
+            reconstruct_checkpoint(master)
+
+    def test_unsupported_event_type_is_detected(self):
+        master=self.master()
+        changed=append_checkpoint_patch(
+            master,event_id="EV-TYPE",patch={"x":1},expected_revision=0,
+        )
+        changed["journal"][0]["event_type"]="EXECUTE"
+        with self.assertRaises(CheckpointIntegrityError):
+            reconstruct_checkpoint(changed)
 
     def test_original_snapshot_survives_failed_append(self):
         master=self.master()
