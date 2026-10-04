@@ -17,6 +17,7 @@ from atlasquant_aion_authority_verifier import (
     verify_authority_statement,
 )
 from atlasquant_aion_nonce_registry import PersistentNonceRegistry
+from atlasquant_aion_trusted_authority_bridge import verify_and_build_trusted_authority_view
 from atlasquant_aion_trust_root import TrustRootRegistry
 
 
@@ -404,3 +405,40 @@ def test_verified_result_is_deterministic_except_nonce_side_effect(tmp_path):
     assert first["capabilities"] == ["core.plan", "core.read"]
     assert first["network_called"] is False
     assert first["private_key_used"] is False
+
+
+def test_control_plane_bridge_requires_real_verification(tmp_path):
+    private, registry, nonces = verifier_fixture(tmp_path)
+    payload = statement()
+    view = verify_and_build_trusted_authority_view(
+        payload,
+        signature_b64=sign(private, payload),
+        trust_roots=registry,
+        nonce_registry=nonces,
+        now_ts=NOW,
+        expected_binding=BINDING,
+    )
+    assert view["state"] == "VERIFIED"
+    assert view["authority_verified"] is True
+    assert view["origin_authenticated"] is True
+    assert view["execution_authority_granted"] is True
+    assert view["execution_allowed"] is False
+    assert view["approval_implied"] is False
+
+
+def test_control_plane_bridge_cannot_be_forged_by_payload_boolean(tmp_path):
+    private, registry, nonces = verifier_fixture(tmp_path)
+    payload = statement()
+    payload["execution_allowed"] = True
+    view = verify_and_build_trusted_authority_view(
+        payload,
+        signature_b64="AA",
+        trust_roots=registry,
+        nonce_registry=nonces,
+        now_ts=NOW,
+        expected_binding=BINDING,
+    )
+    assert view["state"] == "BLOCKED"
+    assert view["authority_verified"] is False
+    assert view["execution_authority_granted"] is False
+    assert view["execution_allowed"] is False
