@@ -96,6 +96,8 @@ contra um trust root público de certificação separado e fornecido pelo host c
 
 Decisões adicionais:
 - booleano `verified` não certifica dimensão;
+- booleanos do caller não certificam canonical gates nem Global Worker readiness;
+- canonical gates e Global Worker readiness exigem atestação CI assinada e ligada ao target commit;
 - evidence digest é recalculado;
 - assinatura cobre os campos canônicos da atestação;
 - key rotation/revocation do trust fabric V2.13 aplica-se à certificação;
