@@ -613,15 +613,21 @@ def _record(plan, task, action, previous, now):
 
 
 def approve_task(plan, task_id, *, approved=False, approved_scope=None, expected_revision, now=None):
-    current,task = _mutable(plan,task_id,expected_revision)
+    validate_taskgraph(plan)
     if approved is not True:
         raise AionTaskgraphError("EXACT_APPROVAL_REQUIRED")
-    if approved_scope!=current["scope"]:
+    if approved_scope!=plan["scope"]:
         raise AionTaskgraphError("APPROVED_SCOPE_MISMATCH")
+    task = next((row for row in plan["tasks"] if row["task_id"]==task_id),None)
+    if task is None:
+        raise AionTaskgraphError("TASK_NOT_FOUND")
     if task["state"] in {"COMPLETED","FAILED","CANCELLED","SUPERSEDED"}:
         raise AionTaskgraphError("TERMINAL_TASK_APPROVAL")
-    if _approval_valid(current,task):
-        return current  # Repeat approval cannot change the state or audit.
+    # A committed approval may be retried after the caller lost the response.
+    # Recognize the already-bound receipt before CAS; this path is read-only.
+    if _approval_valid(plan,task):
+        return deepcopy(plan)
+    current,task = _mutable(plan,task_id,expected_revision)
     task.update(approved=True,approved_scope=deepcopy(approved_scope),
                 approval_digest=_digest(_approval_binding(current,task)))
     return _record(current,task,"APPROVAL_BOUND",task["state"],now)
@@ -658,16 +664,22 @@ def transition_task(plan, task_id, target, *, expected_revision, output=None, re
 
 
 def prepare_guarded_task_handoff(plan, task_id, *, expected_revision, now=None):
-    current,task = _mutable(plan,task_id,expected_revision)
-    if task["state"]!="RUNNABLE" or _gate(current,task,now):
+    validate_taskgraph(plan)
+    task = next((row for row in plan["tasks"] if row["task_id"]==task_id),None)
+    if task is None:
+        raise AionTaskgraphError("TASK_NOT_FOUND")
+    if task["state"]!="RUNNABLE" or _gate(plan,task,now):
         raise AionTaskgraphError("HANDOFF_GATES_NOT_SATISFIED")
-    logical_key = _digest({"mission_id":current["mission_id"],"task_id":task["task_id"],
-                           "payload_digest":task["payload_digest"],"scope_digest":current["scope_digest"]})
-    prior = next((h for h in current["handoffs"] if h["task_id"]==task_id),None)
+    logical_key = _digest({"mission_id":plan["mission_id"],"task_id":task["task_id"],
+                           "payload_digest":task["payload_digest"],"scope_digest":plan["scope_digest"]})
+    prior = next((h for h in plan["handoffs"] if h["task_id"]==task_id),None)
     if prior:
         if prior["idempotency_key"]!=logical_key:
             raise AionTaskgraphError("HANDOFF_PAYLOAD_MISMATCH")
-        return {"plan":current,"handoff":deepcopy(prior),"replay":True,**INVARIANTS}
+        # Same committed handoff + same live gates is a safe replay even when
+        # the caller retries with the pre-commit expected revision.
+        return {"plan":deepcopy(plan),"handoff":deepcopy(prior),"replay":True,**INVARIANTS}
+    current,task = _mutable(plan,task_id,expected_revision)
     handoff = {"mission_id":current["mission_id"],"task_id":task_id,"capability":task["capability"],
         "role":task["role"],"payload_digest":task["payload_digest"],"scope_digest":current["scope_digest"],
         "approval_state":"APPROVED_BOUND" if task["approval_required"] else "NOT_REQUIRED",
