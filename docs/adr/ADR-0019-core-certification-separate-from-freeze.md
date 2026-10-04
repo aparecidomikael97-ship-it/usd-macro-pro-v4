@@ -88,3 +88,19 @@ Nenhum.
 ## Superseded by
 
 Nenhum.
+
+## Cryptographic evidence hardening
+
+A evidência de cada dimensão também deve ser criptograficamente atestada com Ed25519
+contra um trust root público de certificação separado e fornecido pelo host confiável.
+
+Decisões adicionais:
+- booleano `verified` não certifica dimensão;
+- evidence digest é recalculado;
+- assinatura cobre os campos canônicos da atestação;
+- key rotation/revocation do trust fabric V2.13 aplica-se à certificação;
+- chave privada real não entra no repositório;
+- chaves efêmeras de teste provam somente o mecanismo;
+- CI não pode autoemitir Core Complete;
+- certificate candidate continua separado de owner review, Core Freeze, merge, deploy e runtime activation.
+
