@@ -34,6 +34,18 @@ jobs:
             atlasquant_aion_resilience.py \
             atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
+            atlasquant_aion_core_health_adapter.py \
+            atlasquant_aion_provenance_trust_lifecycle.py \
+            atlasquant_aion_trusted_readiness_authority.py \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_authority_verifier.py \
+            atlasquant_aion_trusted_authority_bridge.py \
+            atlasquant_aion_durable_execution_kernel.py \
+            atlasquant_aion_capability_isolation_gate.py \
+            atlasquant_aion_resilience_kernel.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
@@ -47,6 +59,8 @@ jobs:
             atlasquant_aion_unified_durable_bridge.py \
             atlasquant_aion_unified_journal_store.py \
             atlasquant_aion_unified_mission.py \
+            atlasquant_aion_unified_taskgraph.py \
+            atlasquant_aion_unified_taskgraph_store.py \
             atlasquant_aion_role_authority.py \
             atlasquant_aion_truth_mapping.py \
             test_atlasquant_aion_chat_checkpoint_adapter.py \
@@ -63,7 +77,28 @@ jobs:
             test_atlasquant_aion_global_worker_inflight_resolution.py \
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
-            test_atlasquant_aion_supply_chain_pinning.py
+            test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
+            test_atlasquant_aion_v26_memory_recovery_redteam.py \
+            test_atlasquant_aion_observability.py \
+            test_atlasquant_aion_core_hardening_v24.py \
+            test_atlasquant_aion_v26_core_health_adapter.py \
+            test_atlasquant_aion_v26_evidence_wiring_status_truth.py \
+            test_atlasquant_aion_v27_durable_store_crash_isolation_redteam.py \
+            test_atlasquant_aion_v27_health_attestation_redteam.py \
+            test_atlasquant_aion_v28_system_invariants_integration_audit.py \
+            test_atlasquant_aion_v28_runtime_persistence_cas_recovery_redteam.py \
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py \
+            test_atlasquant_aion_v28_global_snapshot_consistency_redteam.py \
+            test_atlasquant_aion_v29_provenance_truth_redteam.py \
+            test_atlasquant_aion_v210_trust_root_readiness_redteam.py \
+            test_atlasquant_aion_v210_trust_readiness_independent_redteam.py \
+            test_atlasquant_aion_v211_provenance_trust_lifecycle_redteam.py \
+            test_atlasquant_aion_v212_trusted_readiness_authority_boundary_redteam.py \
+            test_atlasquant_aion_v213_real_trust_authority_redteam.py \
+            test_atlasquant_aion_v214_durable_execution_redteam.py \
+            test_atlasquant_aion_v215_capability_isolation_redteam.py \
+            test_atlasquant_aion_v216_resilience_kernel_redteam.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
@@ -81,7 +116,11 @@ jobs:
             test_atlasquant_aion_global_worker_inflight_resolution.py \
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
-            test_atlasquant_aion_supply_chain_pinning.py
+            test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
+            test_atlasquant_aion_v26_memory_recovery_redteam.py \
+            test_atlasquant_aion_observability.py \
+            test_atlasquant_aion_core_hardening_v24.py
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
@@ -90,7 +129,25 @@ jobs:
             test_atlasquant_aion_unified_hardening_v21.py \
             test_atlasquant_aion_unified_journal_store.py \
             test_atlasquant_aion_unified_journal_store_governance.py \
-            test_atlasquant_aion_unified_mission.py
+            test_atlasquant_aion_unified_mission.py \
+            test_atlasquant_aion_unified_taskgraph.py \
+            test_atlasquant_aion_v26_core_health_adapter.py \
+            test_atlasquant_aion_v26_evidence_wiring_status_truth.py \
+            test_atlasquant_aion_v27_durable_store_crash_isolation_redteam.py \
+            test_atlasquant_aion_v27_health_attestation_redteam.py \
+            test_atlasquant_aion_v28_system_invariants_integration_audit.py \
+            test_atlasquant_aion_v28_runtime_persistence_cas_recovery_redteam.py \
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py \
+            test_atlasquant_aion_v28_global_snapshot_consistency_redteam.py \
+            test_atlasquant_aion_v29_provenance_truth_redteam.py \
+            test_atlasquant_aion_v210_trust_root_readiness_redteam.py \
+            test_atlasquant_aion_v210_trust_readiness_independent_redteam.py \
+            test_atlasquant_aion_v211_provenance_trust_lifecycle_redteam.py \
+            test_atlasquant_aion_v212_trusted_readiness_authority_boundary_redteam.py \
+            test_atlasquant_aion_v213_real_trust_authority_redteam.py \
+            test_atlasquant_aion_v214_durable_execution_redteam.py \
+            test_atlasquant_aion_v215_capability_isolation_redteam.py \
+            test_atlasquant_aion_v216_resilience_kernel_redteam.py
 
   supply-chain-audit:
     name: Supply-chain audit
@@ -116,6 +173,15 @@ jobs:
             atlasquant_aion_resilience.py \
             atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_authority_verifier.py \
+            atlasquant_aion_trusted_authority_bridge.py \
+            atlasquant_aion_durable_execution_kernel.py \
+            atlasquant_aion_capability_isolation_gate.py \
+            atlasquant_aion_resilience_kernel.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
@@ -129,8 +195,11 @@ jobs:
             atlasquant_aion_unified_durable_bridge.py \
             atlasquant_aion_unified_journal_store.py \
             atlasquant_aion_unified_mission.py \
+            atlasquant_aion_unified_taskgraph.py \
+            atlasquant_aion_unified_taskgraph_store.py \
             atlasquant_aion_role_authority.py \
-            atlasquant_aion_truth_mapping.py
+            atlasquant_aion_truth_mapping.py \
+            atlasquant_aion_observability.py
       - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
         run: |
           python -m pip freeze --all > /tmp/aion-resolved-requirements.txt
