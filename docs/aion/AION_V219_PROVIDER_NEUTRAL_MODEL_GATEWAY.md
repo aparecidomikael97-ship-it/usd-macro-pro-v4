@@ -174,3 +174,18 @@ A certificação V2.19 exige que:
 - all-unavailable => BLOCKED;
 - no provider call inside routing;
 - all canonical gates green.
+
+## Coordinator hardening
+
+O gateway passa a ser fail-closed também no formato das coleções:
+
+- registry exige uma coleção explícita de endpoints;
+- item que não seja ModelEndpoint ou mapping válido é rejeitado;
+- required_capabilities não aceita string/mapping escalar;
+- excluded_providers não aceita string/mapping escalar;
+- duplicatas e itens vazios são rejeitados;
+- nenhuma normalização permissiva pode transformar texto em lista de caracteres.
+
+Essas regras evitam roteamento silenciosamente diferente do pedido original e não alteram
+a separação entre planejamento e execução.
+
