@@ -90,10 +90,11 @@ def recheck(result, *, checkpoint, now_ts=NOW, manifest=None):
 
 def test_valid_preflight_is_ready_for_owner_decision_only():
     result = preflight()
-    assert result["state"] == "READY_FOR_OWNER_DECISION"
-    assert result["owner_decision_ready"] is True
+    assert result["state"] == "READY_FOR_OWNER_DECISION_PREFLIGHT"
+    assert result["owner_decision_preflight_ready"] is True
+    assert result["owner_decision_ready"] is False
     assert result["owner_decision"] == "UNDECIDED"
-    assert result["digest_to_sign"] == result["challenge_digest"]
+    assert result["digest_to_sign"] == ""
     assert result["human_owner_required"] is True
     assert result["signature_mechanism"] == "FIDO2_OR_PLATFORM_SIGNATURE_FUTURE"
     assert result["signature_active"] is False
@@ -102,6 +103,9 @@ def test_valid_preflight_is_ready_for_owner_decision_only():
     assert result["core_freeze_authorized"] is False
     assert result["core_frozen"] is False
     assert result["checkpoint_saved"] is False
+    assert result["checkpoint_external_persistence_verified"] is False
+    assert result["requires_external_persistence_attestation"] is True
+    assert result["signature_material_ready"] is False
     assert result["merge_authorized"] is False
     assert result["deploy_authorized"] is False
     assert result["execution_allowed"] is False
@@ -180,7 +184,6 @@ def test_checkpoint_change_after_preflight_blocks_toctou_recheck():
     check = recheck(result, checkpoint=changed)
     assert check["state"] == "BLOCKED"
     assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
-    assert "PREFLIGHT_DIGEST_TO_SIGN_MISMATCH" in check["blockers"]
     assert check["core_freeze_authorized"] is False
 
 
@@ -268,13 +271,13 @@ def test_tampered_preflight_challenge_digest_is_detected():
     assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
 
 
-def test_digest_to_sign_cannot_diverge_from_challenge_digest():
+def test_digest_to_sign_must_remain_empty_until_persistence_attestation():
     master = staged_checkpoint()
     result = preflight(checkpoint=master)
-    result["digest_to_sign"] = "sha256:" + "0" * 64
+    result["digest_to_sign"] = result["challenge_digest"]
     check = recheck(result, checkpoint=master)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_DIGEST_TO_SIGN_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_DIGEST_TO_SIGN_MUST_REMAIN_EMPTY" in check["blockers"]
 
 
 def test_owner_decision_cannot_be_injected_into_preflight():
@@ -295,6 +298,9 @@ def test_owner_decision_cannot_be_injected_into_preflight():
     "core_freeze_authorized",
     "core_frozen",
     "checkpoint_saved",
+    "checkpoint_external_persistence_verified",
+    "signature_material_ready",
+    "owner_decision_ready",
     "merge_authorized",
     "deploy_authorized",
     "execution_allowed",
@@ -337,7 +343,7 @@ def test_forged_preflight_cannot_bypass_signed_chain_rebuild():
             allow_nan=False,
         ).encode("utf-8")
     ).hexdigest()
-    forged["digest_to_sign"] = forged["challenge_digest"]
+    forged["digest_to_sign"] = ""
 
     check = recheck(forged, checkpoint=master)
     assert check["state"] == "BLOCKED"
