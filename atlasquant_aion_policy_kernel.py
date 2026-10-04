@@ -273,6 +273,7 @@ def evaluate_policy_intent(
     multiagent_governance: Mapping[str, Any],
     durable_execution: Mapping[str, Any] | None,
     approval: Mapping[str, Any] | None = None,
+    approval_evidence_verified: Any = False,
     requested_cost_usd: Any = 0.0,
     budget_remaining_usd: Any = 0.0,
     kill_switch_engaged: Any = False,
@@ -308,6 +309,7 @@ def evaluate_policy_intent(
     kill = _exact_bool(kill_switch_engaged, "kill_switch_engaged")
     privacy_ok = _exact_bool(privacy_review_verified, "privacy_review_verified")
     trading_flag = _exact_bool(real_trading_enabled, "real_trading_enabled")
+    approval_verified = _exact_bool(approval_evidence_verified, "approval_evidence_verified")
     requested_cost = _money(requested_cost_usd, "requested_cost_usd")
     budget_remaining = _money(budget_remaining_usd, "budget_remaining_usd")
 
@@ -316,20 +318,47 @@ def evaluate_policy_intent(
     if not domain:
         blockers.append("TRUSTED_DOMAIN_REQUIRED")
 
-    auth = dict(authority_verification or {})
+    if not isinstance(authority_verification, Mapping):
+        auth = {}
+        blockers.append("AUTHORITY_EVIDENCE_INVALID")
+    else:
+        auth = dict(authority_verification)
     if auth.get("state") != "VERIFIED" or auth.get("authority_verified") is not True:
         blockers.append("AUTHORITY_NOT_VERIFIED")
+    if auth and (
+        auth.get("execution_allowed") is not False
+        or auth.get("executes_action") is not False
+    ):
+        blockers.append("AUTHORITY_CONTRACT_INVALID")
 
-    scope = dict(capability_scope or {})
+    if not isinstance(capability_scope, Mapping):
+        scope = {}
+        blockers.append("CAPABILITY_SCOPE_EVIDENCE_INVALID")
+    else:
+        scope = dict(capability_scope)
     if scope.get("state") != "SCOPE_VERIFIED" or scope.get("capability_scope_verified") is not True:
         blockers.append("CAPABILITY_SCOPE_NOT_VERIFIED")
+    if scope and (
+        scope.get("execution_allowed") is not False
+        or scope.get("executes_action") is not False
+    ):
+        blockers.append("CAPABILITY_SCOPE_CONTRACT_INVALID")
     if tenant and _clean(scope.get("tenant_id"), 120) != tenant:
         blockers.append("CAPABILITY_TENANT_MISMATCH")
     if domain and _clean(scope.get("domain"), 80).upper() != domain:
         blockers.append("CAPABILITY_DOMAIN_MISMATCH")
 
-    resilience = dict(operational_resilience or {})
+    if not isinstance(operational_resilience, Mapping):
+        resilience = {}
+        blockers.append("OPERATIONAL_RESILIENCE_EVIDENCE_INVALID")
+    else:
+        resilience = dict(operational_resilience)
     posture = _clean(resilience.get("posture"), 80).upper()
+    if resilience and (
+        resilience.get("execution_allowed") is not False
+        or resilience.get("executes_action") is not False
+    ):
+        blockers.append("OPERATIONAL_RESILIENCE_CONTRACT_INVALID")
     allowed_postures = set(rule["allowed_postures"])
     if posture not in allowed_postures:
         blockers.append("OPERATIONAL_POSTURE_BLOCKED")
@@ -339,7 +368,11 @@ def evaluate_policy_intent(
     if resilience.get("kill_switch_engaged") is True and act != "DIAGNOSTIC_READ":
         blockers.append("GLOBAL_KILL_SWITCH_ENGAGED")
 
-    governance = dict(multiagent_governance or {})
+    if not isinstance(multiagent_governance, Mapping):
+        governance = {}
+        blockers.append("MULTIAGENT_GOVERNANCE_EVIDENCE_INVALID")
+    else:
+        governance = dict(multiagent_governance)
     if governance.get("state") != "WITHIN_GOVERNANCE":
         blockers.append("MULTIAGENT_GOVERNANCE_BLOCKED")
     if governance.get("execution_allowed") is not False:
@@ -358,7 +391,11 @@ def evaluate_policy_intent(
 
     durable_mode = rule["durable_mode"]
     if durable_mode:
-        durable = dict(durable_execution or {})
+        if not isinstance(durable_execution, Mapping):
+            durable = {}
+            blockers.append("DURABLE_EXECUTION_EVIDENCE_INVALID")
+        else:
+            durable = dict(durable_execution)
         if durable.get("state") != "PREPARED":
             blockers.append("DURABLE_EXECUTION_NOT_PREPARED")
         if _clean(durable.get("mode"), 40).upper() != durable_mode:
@@ -366,15 +403,19 @@ def evaluate_policy_intent(
         if durable.get("executes_action") is not False:
             blockers.append("DURABLE_EXECUTION_CONTRACT_INVALID")
 
-    approval_present = _approval_valid(
+    approval_binding_valid = _approval_valid(
         approval,
         action=act,
         tenant_id=tenant,
         domain=domain,
         policy_digest=policy_digest,
     )
-    if rule["owner_approval_required"] and not approval_present:
-        blockers.append("OWNER_APPROVAL_REQUIRED")
+    approval_present = approval_binding_valid and approval_verified
+    if rule["owner_approval_required"]:
+        if not approval_binding_valid:
+            blockers.append("OWNER_APPROVAL_REQUIRED")
+        elif not approval_verified:
+            blockers.append("OWNER_APPROVAL_EVIDENCE_NOT_VERIFIED")
 
     if rule["privacy_review_required"] and not privacy_ok:
         blockers.append("PRIVACY_REVIEW_REQUIRED")
@@ -394,6 +435,8 @@ def evaluate_policy_intent(
         "state": "POLICY_PERMITS_PROGRESS" if progress else "BLOCKED",
         "blockers": unique,
         "owner_approval_required": rule["owner_approval_required"],
+        "owner_approval_binding_valid": approval_binding_valid,
+        "owner_approval_evidence_verified": approval_verified,
         "owner_approval_present": approval_present,
         "privacy_review_required": rule["privacy_review_required"],
         "privacy_review_verified": privacy_ok,
