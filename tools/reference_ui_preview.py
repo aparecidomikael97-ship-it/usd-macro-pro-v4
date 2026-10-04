@@ -4,6 +4,8 @@ streamlit run tools/reference_ui_preview.py --server.address 127.0.0.1
 """
 from pathlib import Path
 import sys
+import os
+import json
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import streamlit as st
 from atlasquant_reference_ui import render_reference_workspace
@@ -11,6 +13,25 @@ st.set_page_config(page_title="AtlasQuant · revisão visual local",layout="wide
 st.markdown("<style>[data-testid='stHeader']{display:none}.stApp{background:#020813}</style>",unsafe_allow_html=True)
 access={"allowed":True,"role":"ADMIN","mode":"PREVIEW","session":{"username":"Mikael · revisão local"}}
 st.session_state.setdefault("atlasquant_experience_mode", "Avançado")
+if st.query_params.get('review') in {'runtime','legacy'}:
+    from atlasquant_trader_resident import hydrate_trader_resident_state
+    review_path=os.getenv('ATLASQUANT_REVIEW_SNAPSHOT','')
+    if not review_path: raise RuntimeError('Runtime review requires an explicit local fixture file.')
+    bundle=json.loads(Path(review_path).read_text(encoding='utf-8'))
+    hydrate_trader_resident_state(st.session_state,bundle['snapshot'],bundle.get('status'))
+    st.caption(bundle.get('label','QA LOCAL · FIXTURE SINTÉTICA · SEM COTAÇÃO VIVA'))
+    st.session_state.setdefault('atlasquant_central_choice','trader')
+    if st.query_params.get('review')=='legacy':
+        import pandas as pd
+        from unittest.mock import patch
+        from master_panel_v102 import render_master_panel
+        matrix=pd.DataFrame([{'Par':pack['pair'],'Direção':pack['direction']+' '+pack['pair'],'Score final':pack.get('priority',0),'Qualidade':pack.get('quality',0)} for pack in bundle['snapshot']['packs']])
+        if st.button('Voltar à home Trader',key='review_legacy_home'):
+            st.query_params['review']='runtime';st.rerun()
+        with patch('master_panel_v102._load_state',return_value=bundle.get('master_state',{'contexts':{}})),patch('master_panel_v102._td_series',side_effect=AssertionError('provider forbidden in offline QA')),patch('requests.get',side_effect=AssertionError('network forbidden in offline QA')):
+            render_master_panel(matrix,pd.DataFrame(bundle['snapshot']['inputs']['fast_boot']['ranking']),'',scanner_state=bundle.get('scanner_state'))
+        st.caption('REVISÃO LEGADA CONCLUÍDA · ZERO CHAMADAS PROVIDER')
+        st.stop()
 # Optional visual QA of the actual login shell; never authenticate test inputs.
 if st.query_params.get("review") == "login":
     from atlasquant_access_panel import render_login_reference_shell

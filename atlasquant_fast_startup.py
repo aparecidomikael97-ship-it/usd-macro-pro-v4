@@ -62,6 +62,30 @@ def snapshot_age_minutes(snapshot:Mapping[str,Any]|None, *, now:datetime|None=No
         return None
 
 
+@st.cache_data(ttl=45,show_spinner=False)
+def load_trader_runtime_status(repo, branch='atlasquant-runtime', token='', timeout=4.0):
+    """Bounded read of persisted health evidence; never a market-provider call."""
+    if not repo or '/' not in repo: return {}
+    try:
+        url=f'https://api.github.com/repos/{repo}/contents/dados/autopilot_status_v107.json'
+        headers={'Accept':'application/vnd.github+json'}
+        if token: headers['Authorization']='Bearer '+token
+        response=requests.get(url,headers=headers,params={'ref':branch},timeout=max(1.0,min(float(timeout),4.0)))
+        response.raise_for_status()
+        body=response.json()
+        state=json.loads(base64.b64decode(body.get('content','')).decode('utf-8'))
+        if not isinstance(state,dict): return {}
+        scalar_keys=('last_run','operational_readiness','forex_market_open','scanner_fresh','scanner_ready','market_map_fresh','market_map_ready','news_updated_at','news_unique_stories','healthy','twelve_calls_this_run','twelve_api_budget_limit','twelve_safe_calls_per_window','twelve_safe_window_seconds')
+        out={key:state[key] for key in scalar_keys if isinstance(state.get(key),(str,int,float,bool))}
+        for key in ('twelve_budget','paper_trading_v112','model_paper_v1','setup_audit_v114','news_nowcast_v1','quota_shadow'):
+            value=state.get(key)
+            if isinstance(value,dict):
+                out[key]={name:item for name,item in value.items() if isinstance(item,(int,float,bool)) or name in ('runtime_state','sample_state')}
+        return out
+    except (requests.RequestException,ValueError,TypeError,KeyError,AttributeError):
+        return {}
+
+
 def validate_home_snapshot(
     snapshot:Mapping[str,Any]|None,
     *,

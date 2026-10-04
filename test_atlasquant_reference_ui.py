@@ -308,7 +308,7 @@ def test_compact_ticker_data_is_verified_before_any_price_or_order_is_used():
     assert ticker_html('negocios') == ''
     assert 'cq-market' not in reference_html('negocios')
     empty=ticker_html('trader')
-    assert 'Preço: —' in empty and 'Variação: —' in empty and 'PRÉVIA' in empty
+    assert 'Preço: —' in empty and 'Variação: —' in empty and 'SEM DADOS' in empty and 'PRÉVIA' not in empty
     assert 'polyline' not in empty and '%' not in empty
     assert 'data-country="US"' in asset_symbol('DXY')
     for pair,country in [('EUR/USD','EU'),('GBP/USD','GB'),('USD/JPY','JP'),('AUD/USD','AU')]:

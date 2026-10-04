@@ -37,7 +37,7 @@ def test_existing_pipeline_freshness_ticker_and_scanner_are_connected_without_io
     assert value == original
     html = ticker_html("trader",list(items.values()))
     status = html.split('class="cq-market-state"')[1]
-    assert "DADOS RESIDENTES VALIDADOS" in status and "PRÉVIA" not in status
+    assert "DADOS ATUAIS VALIDADOS" in status and "PRÉVIA" not in status
     home = reference_html("trader",market_items=list(items.values()),fx_population=population)
     assert 'class="cq-engine-bias">COMPRA' in home
     assert 'class="cq-engine-bias">VENDA' in home
@@ -122,11 +122,19 @@ def test_failed_validation_clears_previous_state_and_never_publishes_rank(invali
     else: value["inputs"]=[]
     state={"atlasquant_reference_fx_population":{"old":True},"atlasquant_validated_market_items":[{"old":True}]}
     hydrate_trader_resident_state(state,value)
+    if invalid=='stale':
+        from atlasquant_interface_final import eligible_fx_population
+        population=state['atlasquant_reference_fx_population']
+        assert population['snapshot_state']=='STALE_HISTORY'
+        assert len(population['history'])==2
+        assert eligible_fx_population(population)['ranked']==[]
+        assert 'ÚLTIMA LEITURA · REVALIDAR' in ticker_html('trader',state['atlasquant_validated_market_items'])
+        return
     assert state == {"atlasquant_reference_fx_population":{},"atlasquant_validated_market_items":[]}
     home=reference_html("trader",fx_population=state["atlasquant_reference_fx_population"])
     assert "Ranking aguardando dados validados" in home
     assert "cq-engine-bias" not in home
-    assert "PRÉVIA / aguardando dados validados" in ticker_html("trader",state["atlasquant_validated_market_items"])
+    assert "SEM DADOS · SEM FONTE LIVE CONFIGURADA" in ticker_html("trader",state["atlasquant_validated_market_items"])
 
 
 def test_macro_only_snapshot_cannot_fabricate_fx_ranking_or_directions():

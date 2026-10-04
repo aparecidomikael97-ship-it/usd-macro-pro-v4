@@ -7,8 +7,8 @@ class ExecutiveMasterMarketTests(unittest.TestCase):
     def test_snapshot_keeps_28_forex_pairs_and_separate_markets(self):
         snapshot = build_executive_market_snapshot()
         self.assertEqual(snapshot["forex"]["monitored"], 28)
-        self.assertEqual(len(snapshot["forex"]["top"]), 10)
-        self.assertEqual(len({row["pair"] for row in snapshot["forex"]["top"]}), 10)
+        self.assertEqual(snapshot["forex"]["top"], [])
+        self.assertEqual(len({row["pair"] for row in snapshot["forex"]["population"]}), 28)
         self.assertTrue(all(row["asset_class"] == "INDEX" for row in snapshot["indices"]))
         self.assertTrue(all(row["asset_class"] == "CRYPTO" for row in snapshot["cryptos"]))
         self.assertEqual(snapshot["dxy"]["symbol"], "DXY")

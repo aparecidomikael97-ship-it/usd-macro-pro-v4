@@ -135,6 +135,9 @@ def action_labels(area):
     labels.update(EXTRA.get(area, ()))
     labels.update({"profile":"Perfil / Configurações", "session":"Sessão", "search":"Buscar", "notifications":"Notificações", "settings":"Configurações"})
     labels.update({route: label for route, label, _ in REGIONS[area]})
+    if area=='trader':
+        labels.update(dict(TRADER_NAV))
+        labels['market_news']='Notícias em Tempo Real'
     if area in {"negocios", "investimentos", "aion"}:
         from atlasquant_ecosystem_workspace_ui import workspace_modules
         labels.update({"extended:" + item["id"]: item["title"] for item in workspace_modules(area)})
@@ -178,18 +181,18 @@ def module_panel(area, selected, *, resident=None):
     if not title:
         return ""
     # Presentation reads resident context only. No scores, providers or executions.
+    from atlasquant_runtime_presentation import module_state
+    model=module_state(selected,resident) if area=='trader' else None
     cards = ""
     if area == "trader" and selected in {"radar", "radar_master", "master"}:
         from atlasquant_interface_final import forex_board_html
         cards = forex_board_html(resident)
     if area == "trader" and selected == "scanner":
-        cards = ('<div class="ref-master-summary"><button data-route="connected:scanner">'
-                 '<strong>Scanner Técnico existente</strong><span>Abrir no Painel Mestre legado</span></button></div>'
-                 '<p>O scanner reutiliza o motor legado e a cobertura já existente; esta camada não recalcula sinais.</p>')
+        cards = '<p>Acompanhamento automático · leitura do estado persistido, sem consulta de provider.</p>'
     if area == "trader" and selected == "master":
-        essentials = (("Scanner Técnico", "Scanner legado disponível no painel", "scanner"),
-                      ("Contexto Macro", "Dados ainda não validados", "macro"),
-                      ("Guardião de Risco", "Consultar leitura de risco", "guardian"),
+        essentials = (("Scanner Técnico", module_state('scanner',resident)['detail'], "scanner"),
+                      ("Contexto Macro", module_state('macro',resident)['detail'], "macro"),
+                      ("Guardião de Risco", module_state('guardian',resident)['state'], "guardian"),
                       ("AION Trader", "Seu copiloto neste ambiente", "aion_specialist"))
         summary = '<div class="ref-master-summary">' + ''.join(
             f'<button data-route="{route}"><strong>{escape(label)}</strong><span>{escape(text)}</span></button>'
@@ -198,13 +201,15 @@ def module_panel(area, selected, *, resident=None):
     if area == "trader":
         from atlasquant_interface_final import resident_context_html
         cards += resident_context_html(selected, resident)
+        from atlasquant_runtime_presentation import module_evidence_html
+        cards += module_evidence_html(selected,resident)
         if selected == "indexes":
             cards += '<h2>Criptomoedas · universo separado</h2>' + resident_context_html('crypto', resident)
     if area == "aion" and selected == "roles":
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
     if area == "trader" and selected in {"lab", "paper", "journal"}:
-        cards = '<div class="ref-preview-grid"><article><strong>Histórico</strong><p>Evolução das leituras; Diário reutiliza o Histórico existente.</p></article><article><strong>Backtest</strong><p>Regras em candles OHLC históricos, CSV TradingView, replay e métricas existentes.</p></article><article><strong>Paper / Forward</strong><p>Simulação prospectiva dentro do Backtest, sem ordem real.</p></article></div><h2>Histórico de Validação AtlasQuant</h2><p>Snapshots, comparação, integridade e backup ZIP no laboratório existente. Filtros de Ano, Mês, Setup, Ativo e Timeframe usam apenas registros disponíveis.</p><p class="ref-state">Armazenamento local: .atlasquant_research/backtest_snapshots. Persistência multiano externa ainda não garantida.</p>'
+        cards += '<div class="ref-preview-grid"><article><strong>Histórico</strong><p>Evolução das leituras; Diário reutiliza o Histórico existente.</p></article><article><strong>Backtest</strong><p>Regras em candles OHLC históricos, CSV TradingView, replay e métricas existentes.</p></article><article><strong>Paper / Forward</strong><p>Simulação prospectiva dentro do Backtest, sem ordem real.</p></article></div><h2>Histórico de Validação AtlasQuant</h2><p>Snapshots, comparação, integridade e backup ZIP no laboratório existente. Filtros de Ano, Mês, Setup, Ativo e Timeframe usam apenas registros disponíveis.</p><p class="ref-state">Armazenamento local: .atlasquant_research/backtest_snapshots. Persistência multiano externa ainda não garantida.</p>'
     if selected == "search":
         cards = '<label>Buscar módulo <input class="ref-search" type="search" placeholder="Radar, Macro, Calendário…" aria-label="Buscar módulo"></label><div class="ref-search-results">' + ''.join(
             f'<button data-route="{route}">{escape(label)}</button>'
@@ -233,20 +238,24 @@ def module_panel(area, selected, *, resident=None):
         ) + '</div>'
     notice = ("28 pares monitorados. Ranking publicado somente para leituras elegíveis e validadas; destaque não autoriza execução."
               if cards and area == "trader" and selected in {"radar","master","radar_master"} else f"Prévia visual de {title}. Abra a análise existente para usar os recursos conectados.")
+    if model:
+        notice=model['detail']
     connected = ('<button class="ref-primary" data-route="connected:' + escape(selected) + '">Abrir análise existente</button>'
                  if area == "trader" and selected in {"radar","radar_master","scanner","master","macro","fed","micro","geo","market_news","fundamental","ict","calendar","news","market_map","lab","paper","guardian","autopilot","performance","academy","journal","video","profile"} else "")
     if selected.startswith("why:"):
         notice = "A direção deste par ainda não foi validada. Nenhuma recomendação de compra/venda é apresentada."
     data_state = "VALIDAÇÃO PENDENTE"
+    if model:
+        data_state=model['state']
     if area == "trader" and selected in {"radar", "master", "radar_master"}:
         from atlasquant_interface_final import eligible_fx_population
         if eligible_fx_population(resident)["ranked"]:
             data_state = "LEITURAS VALIDADAS"
-    return (f'<main class="ref-detail" data-module="{escape(selected)}">'
+    return (f'<main class="ref-detail" data-module="{escape(selected)}" data-resident-used="{str(bool(model and model["resident_used"])).lower()}">'
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        '<p class="ref-state">PRÉVIA · sem execução automática</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else "PRÉVIA · sem execução automática"}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -257,8 +266,8 @@ def module_panel(area, selected, *, resident=None):
         '<button data-local-tab="context" aria-selected="false">Contexto</button>'
         '<button data-local-tab="status" aria-selected="false">Estado</button></div>'
         f'<section data-tab-panel="overview">{cards or "<p>Nenhum dado validado disponível para exibir.</p>"}</section>'
-        '<section data-tab-panel="context" hidden><p>Conteúdo complementar será exibido nesta aba.</p></section>'
-        '<section data-tab-panel="status" hidden><p>Aguardando dados validados.</p></section></main>')
+        f'<section data-tab-panel="context" hidden><p>{escape(model["detail"]) if model else "Conteúdo complementar será exibido nesta aba."}</p></section>'
+        f'<section data-tab-panel="status" hidden><p>{escape(model["state"]) if model else "Aguardando dados validados."}</p></section></main>')
 
 
 def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None):

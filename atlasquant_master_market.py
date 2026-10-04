@@ -106,11 +106,14 @@ def build_executive_market_snapshot(
     master_rows: Sequence[Mapping[str, Any]] | None = None,
     macro_context: Mapping[str, Any] | None = None,
     source_status: Mapping[str, Any] | None = None,
+    fx_resident: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the executive view from known data, preserving absent evidence."""
     fx = compose_fx_board([], ranking)
     fx_rows = list(fx["rows"])
-    top_fx = highlight_top_fx(fx_rows)
+    from atlasquant_interface_final import eligible_fx_population
+    top_fx = eligible_fx_population(dict(fx_resident or {}))['ranked'][:10]
+    macro_attention = highlight_top_fx([row for row in fx_rows if row.get('coverage')=='macro'])
     indexes = index_ranking()
     cryptos = crypto_ranking()
     rows = [dict(row) for row in list(master_rows or []) if isinstance(row, Mapping)]
@@ -178,8 +181,10 @@ def build_executive_market_snapshot(
         "schema": SCHEMA,
         "forex": {
             "monitored": fx["monitored"],
+            "population":fx_rows,
             "top_limit": fx["top_limit"],
             "top": top_fx,
+            "macro_attention":macro_attention,
             "macro_ready": fx["macro_ready"],
             "institutional": fx["institutional"],
             "macro_only": fx["macro_only"],

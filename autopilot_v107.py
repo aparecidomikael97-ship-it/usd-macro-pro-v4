@@ -1324,6 +1324,7 @@ def build_home_snapshot_payload(
     scanner_map=dict(scanner or {}) if isinstance(scanner,Mapping) else {}
     master_map=dict(master or {}) if isinstance(master,Mapping) else {}
     generated=str(src.get("generated_at") or current.isoformat())
+    from atlasquant_runtime_presentation import compact_market_strip
     return {
         "schema":"ATLASQUANT_HOME_SNAPSHOT_V1",
         "generated_at":generated,
@@ -1332,6 +1333,7 @@ def build_home_snapshot_payload(
         "inputs":src,
         "packs":[dict(x) for x in list(packs or []) if isinstance(x,Mapping)],
         "signal_lifecycle":dict(signal_lifecycle or {}),
+        "market_strip":compact_market_strip(scanner_map,now=current.to_pydatetime()),
         "runtime":{
             "market_open":bool(forex_market_likely_open(current)),
             "scanner_pairs":len(dict(scanner_map.get("resultados",{}) or {})),
