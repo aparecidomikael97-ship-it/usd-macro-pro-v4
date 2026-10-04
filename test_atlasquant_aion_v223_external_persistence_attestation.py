@@ -131,6 +131,9 @@ def test_stage_candidate_is_memory_only_and_digest_bound():
     assert candidate[NAMESPACE] == staged["binding"]
     assert staged["expected_runtime_digest"] == checkpoint_source_digest(candidate)
     assert staged["binding"]["checkpoint_master_digest"] == challenge["checkpoint_master_digest"]
+    from atlasquant_aion_memory import ensure_operating_checkpoint
+    normalized_again = ensure_operating_checkpoint(candidate)
+    assert normalized_again[NAMESPACE] == staged["binding"]
 
 
 def test_runtime_binding_is_strict_and_non_self_attesting():
@@ -287,6 +290,31 @@ def test_runtime_sha_mismatch_blocks():
     assert "RUNTIME_WRITE_SHA_MISMATCH" in result["blockers"]
 
 
+@pytest.mark.parametrize("field,value,blocker", [
+    ("repo", "other-owner/other-repo", "WRITE_RECEIPT_TARGET_MISMATCH:repo"),
+    ("branch", "atlasquant-runtime-shadow", "WRITE_RECEIPT_TARGET_MISMATCH:branch"),
+    ("path", "dados/aion/other.json", "WRITE_RECEIPT_TARGET_MISMATCH:path"),
+])
+def test_cross_runtime_receipt_replay_is_blocked(field, value, blocker):
+    master, challenge, staged = staged_runtime()
+    candidate = staged["runtime_checkpoint_candidate"]
+    kwargs = {field: value}
+    receipt = receipt_for(candidate, **kwargs)
+    runtime_source = (
+        f"GitHub:{kwargs.get('branch', 'atlasquant-runtime')}:"
+        f"{kwargs.get('path', 'dados/aion/checkpoint_master.json')}"
+    )
+    result = attest(
+        master,
+        challenge,
+        candidate,
+        receipt=receipt,
+        runtime=runtime_result(candidate, source=runtime_source),
+    )
+    assert result["state"] == "BLOCKED"
+    assert blocker in result["blockers"]
+
+
 def test_wrong_runtime_source_blocks():
     master, challenge, staged = staged_runtime()
     candidate = staged["runtime_checkpoint_candidate"]
@@ -347,6 +375,16 @@ def test_future_runtime_observation_blocks():
     )
     assert result["state"] == "BLOCKED"
     assert "RUNTIME_OBSERVATION_FROM_FUTURE" in result["blockers"]
+
+
+def test_wrong_runtime_schema_blocks():
+    master, challenge, staged = staged_runtime()
+    candidate = staged["runtime_checkpoint_candidate"]
+    runtime = runtime_result(candidate)
+    runtime["schema"] = "OTHER"
+    result = attest(master, challenge, candidate, runtime=runtime)
+    assert result["state"] == "BLOCKED"
+    assert "RUNTIME_SCHEMA_INVALID" in result["blockers"]
 
 
 @pytest.mark.parametrize("status", ["ERROR", "UNAVAILABLE", "NOT_FOUND", ""])
