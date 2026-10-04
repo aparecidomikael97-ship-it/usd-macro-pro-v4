@@ -998,3 +998,803 @@ class UnifiedJournalStore:
             self._atomic_write(
                 final_path,
                 event_record,
+                limit=self.max_event_bytes,
+                immutable=True,
+                fault_stage="AFTER_TEMP_FSYNC",
+            )
+            self._fault(
+                "AFTER_EVENT_COMMIT",
+                {"sequence": sequence, "event_digest": event_record["event_digest"]},
+            )
+
+            index = self._load_index(paths["idempotency"])
+            existing_index = index.get(key_digest)
+            index_entry = {
+                "sequence": sequence,
+                "event_digest": event_record["event_digest"],
+                "idempotency_payload_digest": event_record["idempotency_payload_digest"],
+                "event_file": final_path.name,
+            }
+            if existing_index and existing_index != index_entry:
+                raise JournalStoreConflict("idempotency index conflict")
+            index[key_digest] = index_entry
+            self._write_index(paths["idempotency"], index)
+
+            self._atomic_write(
+                paths["head"],
+                self._head_record(event_record),
+                limit=self.max_metadata_bytes,
+            )
+            self._fault(
+                "AFTER_HEAD_COMMIT",
+                {"sequence": sequence, "event_digest": event_record["event_digest"]},
+            )
+
+            state = DURABLE
+            transitions = [STAGED, JOURNALED, DURABLE]
+            if acknowledge:
+                identity, _ = self._scope_key(scope)
+                _, request_id_safe = self._request_key(request_id)
+                self._ack_locked(
+                    paths,
+                    event_record,
+                    scope_fingerprint=_digest(identity),
+                    request_id_safe=request_id_safe,
+                )
+                state = ACKNOWLEDGED
+                transitions.append(ACKNOWLEDGED)
+
+            return {
+                "schema": STORE_SCHEMA,
+                "status": "PERSISTED",
+                "persistence_state": state,
+                "sequence": sequence,
+                "event_digest": event_record["event_digest"],
+                "idempotency_key_digest": key_digest,
+                "transitions": transitions,
+                "external_action_executed": False,
+                "automatic_checkpoint_write": False,
+                "memory_promoted": False,
+            }
+
+    def persist_journal(
+        self,
+        journal: Mapping[str, Any],
+        *,
+        scope: Scope,
+        request_id: str,
+        idempotency_key: str,
+        acknowledge: bool = False,
+        origin: str = "AION_UNIFIED_JOURNAL",
+    ) -> dict[str, Any]:
+        base_key = _validate_identifier(
+            idempotency_key, "idempotency_key", limit=MAX_IDEMPOTENCY_KEY - 12
+        )
+        verified = verify_request_journal(journal, scope=scope, request_id=request_id)
+        if verified.get("valid") is not True:
+            raise JournalStoreIntegrityError("logical journal integrity mismatch")
+        results = []
+        for event in journal.get("events") or []:
+            sequence = event["sequence"]
+            results.append(
+                self.persist_event(
+                    journal,
+                    scope=scope,
+                    request_id=request_id,
+                    sequence=sequence,
+                    idempotency_key=f"{base_key}:{sequence}",
+                    correlation_id=request_id,
+                    causation_id=event.get("prev_digest") or GENESIS,
+                    origin=origin,
+                    acknowledge=acknowledge,
+                )
+            )
+        return {
+            "schema": STORE_SCHEMA,
+            "status": "PERSISTED",
+            "persistence_state": (
+                ACKNOWLEDGED if results and acknowledge else DURABLE if results else STAGED
+            ),
+            "event_count": len(results),
+            "events": results,
+            "external_action_executed": False,
+            "automatic_checkpoint_write": False,
+            "memory_promoted": False,
+        }
+
+    def _is_acked(self, paths: Mapping[str, Path], event_record: Mapping[str, Any]) -> bool:
+        acks = self._load_acks(paths["acks"])
+        row = acks.get(str(event_record["sequence"]))
+        return bool(
+            isinstance(row, Mapping)
+            and row.get("event_digest") == event_record["event_digest"]
+            and row.get("state") == ACKNOWLEDGED
+        )
+
+    def _ack_locked(
+        self,
+        paths: Mapping[str, Path],
+        event_record: Mapping[str, Any],
+        *,
+        scope_fingerprint: str = "",
+        request_id_safe: str = "",
+    ) -> None:
+        acks = self._load_acks(paths["acks"])
+        key = str(event_record["sequence"])
+        value = {
+            "state": ACKNOWLEDGED,
+            "event_digest": event_record["event_digest"],
+            "acknowledged_at": _now(),
+        }
+        prior = acks.get(key)
+        if prior is not None and prior.get("event_digest") != event_record["event_digest"]:
+            raise JournalStoreConflict("acknowledgement conflict")
+        acks[key] = value
+        self._write_acks(
+            paths["acks"],
+            acks,
+            acked_through_sequence=int(event_record["sequence"]),
+            acked_head_digest=str(event_record["event_digest"]),
+            scope_fingerprint=scope_fingerprint,
+            request_id_safe=request_id_safe,
+        )
+        self._fault(
+            "AFTER_ACK_COMMIT",
+            {
+                "sequence": event_record["sequence"],
+                "event_digest": event_record["event_digest"],
+            },
+        )
+
+    def acknowledge(
+        self,
+        *,
+        scope: Scope,
+        request_id: str,
+        sequence: int,
+        event_digest: str,
+    ) -> dict[str, Any]:
+        request_dir = self._request_dir(scope, request_id, create=False)
+        if not request_dir.exists():
+            raise LookupError("durable request unavailable for scope")
+        paths = self._ensure_layout(request_dir)
+        with _FileLock(paths["lock"], self.lock_timeout):
+            self._reject_if_quarantined(paths)
+            metadata = self._validate_metadata(
+                self._read_json(paths["metadata"], limit=self.max_metadata_bytes),
+                scope=scope,
+                request_id=request_id,
+            )
+            records, reasons = self._scan_valid_records(
+                paths,
+                scope=scope,
+                request_id=request_id,
+                conversation_id=metadata["conversation_id"],
+            )
+            if reasons:
+                raise _scan_failure(reasons)
+            if type(sequence) is not int or sequence < 1:
+                raise JournalStoreRejected("ACK_INVALID", "ack sequence must be a positive integer")
+            if sequence > len(records):
+                raise JournalStoreRejected("ACK_INVALID", "ack references future event")
+            record = records[sequence - 1]
+            if record["event_digest"] != event_digest:
+                raise JournalStoreRejected("ACK_INVALID", "ack event digest mismatch")
+            current = self._acked_through(paths, records)
+            if sequence < current:
+                raise JournalStoreRejected("ACK_INVALID", "ack downgrade rejected")
+            identity, _ = self._scope_key(scope)
+            _, request_id_safe = self._request_key(request_id)
+            self._ack_locked(
+                paths,
+                record,
+                scope_fingerprint=_digest(identity),
+                request_id_safe=request_id_safe,
+            )
+            return {
+                "schema": STORE_SCHEMA,
+                "status": "ACKNOWLEDGED",
+                "persistence_state": ACKNOWLEDGED,
+                "sequence": sequence,
+                "event_digest": event_digest,
+                "acked_through_sequence": max(current, sequence),
+                "external_action_executed": False,
+                "automatic_checkpoint_write": False,
+                "memory_promoted": False,
+            }
+
+    def _acked_through(self, paths: Mapping[str, Path], records: list[dict[str, Any]]) -> int:
+        """Normalized cumulative ACK position (legacy per-sequence format supported)."""
+        try:
+            acks = self._load_acks(paths["acks"])
+        except JournalStoreError:
+            return 0
+        if isinstance(acks.get("acked_through_sequence"), int):
+            return int(acks["acked_through_sequence"])
+        entries = acks.get("entries") if isinstance(acks.get("entries"), dict) else {}
+        if not entries and acks:
+            entries = {k: v for k, v in acks.items() if k.isdigit()}
+        highest = 0
+        for key, row in entries.items():
+            try:
+                seq = int(key)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(row, Mapping) and row.get("state") == ACKNOWLEDGED:
+                highest = max(highest, seq)
+        return highest
+
+    def _quarantine_temp_files(
+        self,
+        paths: Mapping[str, Path],
+        *,
+        scope_fingerprint: str,
+        request_id_safe: str,
+        recovery_attempt_id: str,
+    ) -> list[dict[str, Any]]:
+        quarantined: list[dict[str, Any]] = []
+        for temp in list(paths["events"].glob(".*.tmp")):
+            self._check_file_path(temp)
+            target = paths["quarantine"] / f"orphan-{uuid4().hex}.tmp"
+            self._check_file_path(target)
+            status = "MOVED"
+            try:
+                self._fault("BEFORE_QUARANTINE_FILE_MOVE", {"source": str(temp), "target": str(target)})
+                os.replace(temp, target)
+                _fsync_dir(paths["quarantine"])
+                self._fault("AFTER_QUARANTINE_FILE_MOVE", {"source": str(temp), "target": str(target)})
+            except SimulatedCrash:
+                raise
+            except Exception:
+                status = "PENDING"
+            records = self._load_quarantine_manifest(paths["manifest"])
+            previous = GENESIS if not records else str(records[-1]["manifest_record_digest"])
+            entry = self._append_quarantine_manifest(
+                paths,
+                scope_fingerprint=scope_fingerprint,
+                request_id_safe=request_id_safe,
+                original_relative_path=f"events/{temp.name}",
+                quarantine_relative_path=f"quarantine/{target.name}" if status == "MOVED" else f"events/{temp.name}",
+                quarantine_status=status,
+                reason_code="ORPHAN_TEMP",
+                reason_detail="orphan temp file quarantined",
+                observed_digest="",
+                expected_digest="",
+                sequence=None,
+                event_digest="",
+                detection_phase="RECOVERY_SCAN",
+                recovery_attempt_id=recovery_attempt_id,
+                previous_manifest_digest=previous,
+            )
+            quarantined.append(entry)
+        return quarantined
+
+    def _manifest_path(self, request_dir: Path) -> Path:
+        return request_dir / "quarantine" / "manifest.jsonl"
+
+    def _manifest_record_digest(self, record: Mapping[str, Any]) -> str:
+        body = dict(record)
+        body.pop("manifest_record_digest", None)
+        return _digest(body)
+
+    def _load_quarantine_manifest(self, path: Path) -> list[dict[str, Any]]:
+        if not path.exists():
+            return []
+        records: list[dict[str, Any]] = []
+        previous = GENESIS
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except Exception as exc:
+                raise _integrity_failure("CORRUPT_JSON", "quarantine manifest line is corrupt") from exc
+            if not isinstance(row, dict):
+                raise _integrity_failure("CORRUPT_JSON", "quarantine manifest line must be an object")
+            if row.get("schema") != QUARANTINE_MANIFEST_SCHEMA:
+                raise _integrity_failure("CORRUPT_JSON", "quarantine manifest schema mismatch")
+            if row.get("persistence_version") != PERSISTENCE_VERSION:
+                raise _integrity_failure("PERSISTENCE_VERSION_MISMATCH", "quarantine manifest version mismatch")
+            if row.get("previous_manifest_digest") != previous:
+                raise _integrity_failure("RECORD_DIGEST_MISMATCH", "quarantine manifest chain broken")
+            if row.get("manifest_record_digest") != self._manifest_record_digest(row):
+                raise _integrity_failure("RECORD_DIGEST_MISMATCH", "quarantine manifest digest mismatch")
+            records.append(dict(row))
+            previous = str(row["manifest_record_digest"])
+        return records
+
+    def _append_quarantine_manifest(
+        self,
+        paths: Mapping[str, Path],
+        *,
+        scope_fingerprint: str,
+        request_id_safe: str,
+        original_relative_path: str,
+        quarantine_relative_path: str,
+        quarantine_status: str,
+        reason_code: str,
+        reason_detail: str,
+        observed_digest: str,
+        expected_digest: str,
+        sequence: int | None,
+        event_digest: str,
+        detection_phase: str,
+        recovery_attempt_id: str,
+        previous_manifest_digest: str,
+    ) -> dict[str, Any]:
+        record = {
+            "schema": QUARANTINE_MANIFEST_SCHEMA,
+            "persistence_version": PERSISTENCE_VERSION,
+            "timestamp_utc": _now(),
+            "scope_fingerprint": scope_fingerprint,
+            "request_id_safe": request_id_safe,
+            "original_relative_path": original_relative_path,
+            "quarantine_relative_path": quarantine_relative_path,
+            "quarantine_status": quarantine_status,
+            "reason_code": reason_code,
+            "reason_detail": _reason_detail(reason_detail),
+            "observed_digest": observed_digest or "",
+            "expected_digest": expected_digest or "",
+            "sequence": sequence,
+            "event_digest": event_digest or "",
+            "detection_phase": detection_phase,
+            "recovery_attempt_id": recovery_attempt_id,
+            "previous_manifest_digest": previous_manifest_digest,
+        }
+        record["manifest_record_digest"] = self._manifest_record_digest(record)
+        manifest = paths["manifest"]
+        self._check_file_path(manifest.parent)
+        existing = manifest.read_bytes() if manifest.exists() else b""
+        data = existing + (_canonical(record) + "\n").encode("utf-8")
+        if len(data) > QUARANTINE_MANIFEST_MAX_BYTES:
+            raise _integrity_failure("RECOVERY_LIMIT_EXCEEDED", "quarantine manifest exceeds persistence limit")
+        temp = manifest.parent / f".{manifest.name}.{uuid4().hex}.tmp"
+        self._fault("BEFORE_QUARANTINE_MANIFEST_COMMIT", {"path": str(manifest)})
+        try:
+            fd = os.open(str(temp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp, manifest)
+            _fsync_dir(manifest.parent)
+        finally:
+            temp.unlink(missing_ok=True)
+        self._fault("AFTER_QUARANTINE_MANIFEST_COMMIT", {"path": str(manifest)})
+        return record
+
+    def _quarantine_copy_evidence(
+        self,
+        paths: Mapping[str, Path],
+        source: Path,
+        *,
+        name_prefix: str,
+    ) -> tuple[Path, str]:
+        """Copy evidence into quarantine and verify bytes. Original is preserved."""
+        self._check_file_path(source)
+        target = paths["quarantine"] / f"{name_prefix}-{uuid4().hex}.json"
+        self._check_file_path(target)
+        self._fault("BEFORE_QUARANTINE_FILE_MOVE", {"source": str(source), "target": str(target)})
+        temp = paths["quarantine"] / f".{target.name}.{uuid4().hex}.tmp"
+        try:
+            with open(source, "rb") as src, os.fdopen(os.open(str(temp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as dst:
+                dst.write(src.read())
+                dst.flush()
+                os.fsync(dst.fileno())
+            os.replace(temp, target)
+            _fsync_dir(paths["quarantine"])
+        finally:
+            temp.unlink(missing_ok=True)
+        if target.read_bytes() != source.read_bytes():
+            raise _integrity_failure("RECORD_DIGEST_MISMATCH", "quarantine copy verification failed")
+        self._fault("AFTER_QUARANTINE_FILE_MOVE", {"source": str(source), "target": str(target)})
+        return target, "COPIED"
+
+    def _quarantine_corrupt_event(
+        self,
+        paths: Mapping[str, Path],
+        *,
+        event_path: Path,
+        scope_fingerprint: str,
+        request_id_safe: str,
+        reason_code: str,
+        reason_detail: str,
+        observed_digest: str,
+        expected_digest: str,
+        sequence: int | None,
+        event_digest: str,
+        detection_phase: str,
+        recovery_attempt_id: str,
+    ) -> dict[str, Any]:
+        match = _EVENT_NAME.fullmatch(event_path.name)
+        name_prefix = f"event-{int(match.group('sequence')) if match else 'unknown'}"
+        try:
+            target, status = self._quarantine_copy_evidence(
+                paths,
+                event_path,
+                name_prefix=name_prefix,
+            )
+        except SimulatedCrash:
+            raise
+        except Exception:
+            target = event_path
+            status = "PENDING"
+        try:
+            records = self._load_quarantine_manifest(paths["manifest"])
+            previous = GENESIS if not records else str(records[-1]["manifest_record_digest"])
+        except JournalStoreError:
+            previous = GENESIS
+        try:
+            return self._append_quarantine_manifest(
+            paths,
+            scope_fingerprint=scope_fingerprint,
+            request_id_safe=request_id_safe,
+            original_relative_path=f"events/{event_path.name}",
+            quarantine_relative_path=f"quarantine/{target.name}",
+            quarantine_status=status,
+            reason_code=reason_code,
+            reason_detail=reason_detail,
+            observed_digest=observed_digest,
+            expected_digest=expected_digest,
+            sequence=sequence,
+            event_digest=event_digest,
+            detection_phase=detection_phase,
+            recovery_attempt_id=recovery_attempt_id,
+            previous_manifest_digest=previous,
+        )
+        except JournalStoreError:
+            return {
+                "quarantine_status": status,
+                "quarantine_relative_path": f"quarantine/{Path(target).name}" if status != "PENDING" else f"events/{event_path.name}",
+                "reason_code": reason_code,
+            }
+
+    def recover(
+        self,
+        *,
+        scope: Scope,
+        request_id: str,
+    ) -> dict[str, Any]:
+        request_id = _validate_identifier(request_id, "request_id", limit=256)
+        request_dir = self._request_dir(scope, request_id, create=False)
+        if not request_dir.exists():
+            raise LookupError("durable request unavailable for scope")
+        paths = self._ensure_layout(request_dir)
+        recovery_attempt_id = uuid4().hex
+        with _FileLock(paths["lock"], self.lock_timeout):
+            identity, _ = self._scope_key(scope)
+            scope_fingerprint = _digest(identity)
+            _, request_id_safe = self._request_key(request_id)
+            try:
+                metadata = self._validate_metadata(
+                    self._read_json(paths["manifest"].parent.parent / "metadata.json", limit=self.max_metadata_bytes),
+                    scope=scope,
+                    request_id=request_id,
+                )
+            except JournalStoreIntegrityError as exc:
+                code = getattr(exc, "reason_code", None) or _reason_code(str(exc))
+                return self._recovery_report(
+                    paths, scope_fingerprint=scope_fingerprint, request_id_safe=request_id_safe,
+                    request_id=request_id, conversation_id="", records=[], head_status="EMPTY",
+                    ack_status="NONE", quarantined=[], warnings=[], hard_codes=[code],
+                    logical={"valid": False, "reasons": [code]}, recovery_attempt_id=recovery_attempt_id,
+                    status="QUARANTINED", state=QUARANTINED,
+                    extra={
+                        "scope_valid": code != "SCOPE_MISMATCH",
+                        "request_valid": code not in {"REQUEST_MISMATCH", "SCOPE_MISMATCH"},
+                        "version_accepted": code != "PERSISTENCE_VERSION_MISMATCH",
+                        "chain_valid": False,
+                        "head_consistent": False,
+                        "idempotency_consistent": False,
+                        "ack_consistent": False,
+                        "quarantine_clear": False,
+                        "deterministic_recovery": False,
+                        "safe_to_resume": False,
+                    },
+                )
+            quarantined = self._quarantine_temp_files(
+                paths,
+                scope_fingerprint=scope_fingerprint,
+                request_id_safe=request_id_safe,
+                recovery_attempt_id=recovery_attempt_id,
+            )
+            records, scan_reasons = self._scan_valid_records(
+                paths,
+                scope=scope,
+                request_id=request_id,
+                conversation_id=metadata["conversation_id"],
+            )
+            # Copy corrupted finalized evidence into quarantine (original preserved).
+            if scan_reasons:
+                corrupt_path = None
+                for path in self._event_files(paths["events"]):
+                    match = _EVENT_NAME.fullmatch(path.name)
+                    if match and int(match.group("sequence")) == len(records) + 1:
+                        corrupt_path = path
+                        break
+                if corrupt_path is not None:
+                    try:
+                        self._quarantine_corrupt_event(
+                            paths,
+                            event_path=corrupt_path,
+                            scope_fingerprint=scope_fingerprint,
+                            request_id_safe=request_id_safe,
+                            reason_code=scan_reasons[0],
+                            reason_detail="finalized event failed integrity scan",
+                            observed_digest="",
+                            expected_digest="",
+                            sequence=len(records) + 1,
+                            event_digest="",
+                            detection_phase="RECOVERY_SCAN",
+                            recovery_attempt_id=recovery_attempt_id,
+                        )
+                    except JournalStoreError:
+                        pass  # manifest failure is recorded below via manifest validation
+            warnings: list[dict[str, str]] = []
+            hard_codes: list[str] = []
+            for code in scan_reasons:
+                (hard_codes if code in HARD_FAILURE_CODES else warnings).append({"reason_code": code, "detail": ""})
+
+            idempotency_consistent = True
+            index_error = False
+            index_missing = False
+            try:
+                index = self._load_index(paths["idempotency"])
+            except JournalStoreIntegrityError as exc:
+                index = {}
+                idempotency_consistent = False
+                index_error = True
+                hard_codes.append({"reason_code": getattr(exc, "reason_code", "IDEMPOTENCY_INDEX_MISMATCH"), "detail": ""})
+            if not paths["idempotency"].exists() and records:
+                # Crash window between event commit and index commit: index lagging is expected, not corruption.
+                index_missing = True
+                warnings.append({"reason_code": "IDEMPOTENCY_INDEX_STALE", "detail": "index not yet committed after crash window"})
+            seen_payloads: dict[str, str] = {}
+            for record in records:
+                key = record["idempotency_key_digest"]
+                payload = record["idempotency_payload_digest"]
+                if key in seen_payloads and seen_payloads[key] != payload:
+                    idempotency_consistent = False
+                    hard_codes.append({"reason_code": "IDEMPOTENCY_INDEX_MISMATCH", "detail": "conflicting payloads"})
+                    break
+                seen_payloads[key] = payload
+            if not index_error and not index_missing:
+                for record in records:
+                    row = index.get(record["idempotency_key_digest"])
+                    if row is None or (
+                        row.get("event_digest") != record["event_digest"]
+                        or row.get("idempotency_payload_digest") != record["idempotency_payload_digest"]
+                    ):
+                        idempotency_consistent = False
+                        hard_codes.append({"reason_code": "IDEMPOTENCY_INDEX_MISMATCH", "detail": "index entry diverges from event"})
+                        break
+
+            head_status = "EMPTY"
+            head_consistent = True
+            if records:
+                last = records[-1]
+                if not paths["head"].exists():
+                    head_status = "STALE"
+                    head_consistent = False
+                    warnings.append({"reason_code": "STALE_HEAD", "detail": "head missing after crash window"})
+                else:
+                    try:
+                        head = self._read_json(paths["head"], limit=self.max_metadata_bytes)
+                        if (
+                            head.get("schema") != STORE_SCHEMA
+                            or head.get("kind") != "head"
+                            or head.get("persistence_version") != PERSISTENCE_VERSION
+                            or head.get("record_digest") != _record_digest(head)
+                        ):
+                            raise _integrity_failure("CORRUPT_JSON", "head integrity mismatch")
+                        if head.get("sequence") < last["sequence"]:
+                            head_status = "STALE"
+                            head_consistent = False
+                            warnings.append({"reason_code": "STALE_HEAD", "detail": "events advanced beyond head"})
+                        elif (
+                            head.get("sequence") > last["sequence"]
+                            or head.get("event_digest") != last["event_digest"]
+                        ):
+                            head_status = "INVALID"
+                            head_consistent = False
+                            hard_codes.append({"reason_code": "HEAD_POINTS_TO_MISSING_EVENT", "detail": "head references unknown event"})
+                    except JournalStoreIntegrityError as exc:
+                        head_status = "INVALID"
+                        head_consistent = False
+                        hard_codes.append({"reason_code": getattr(exc, "reason_code", "CORRUPT_JSON"), "detail": ""})
+
+            ack_status = "NONE"
+            ack_consistent = True
+            try:
+                acks = self._load_acks(paths["acks"])
+            except JournalStoreIntegrityError as exc:
+                acks = {}
+                ack_consistent = False
+                hard_codes.append({"reason_code": getattr(exc, "reason_code", "ACK_INVALID"), "detail": ""})
+            if records:
+                last = records[-1]
+                ack = acks.get(str(last["sequence"]))
+                if (
+                    isinstance(ack, Mapping)
+                    and ack.get("event_digest") == last["event_digest"]
+                    and ack.get("state") == ACKNOWLEDGED
+                ):
+                    ack_status = ACKNOWLEDGED
+                else:
+                    ack_status = "PENDING"
+
+            manifest_error = False
+            quarantine_count = 0
+            quarantine_pending_count = 0
+            try:
+                manifest_records = self._load_quarantine_manifest(paths["manifest"])
+                quarantine_count = len(manifest_records)
+                quarantine_pending_count = sum(1 for r in manifest_records if r.get("quarantine_status") == "PENDING")
+            except JournalStoreIntegrityError as exc:
+                manifest_error = True
+                hard_codes.append({"reason_code": getattr(exc, "reason_code", "CORRUPT_JSON"), "detail": "quarantine manifest invalid"})
+            # ORPHAN_TEMP MOVED is a warning (temp outside the logical chain); only PENDING blocks resume.
+            for entry in quarantined:
+                if entry.get("reason_code") == "ORPHAN_TEMP" and entry.get("quarantine_status") == "MOVED":
+                    warnings.append({"reason_code": "ORPHAN_TEMP", "detail": "orphan temp quarantined outside chain"})
+            quarantine_clear = not manifest_error and quarantine_pending_count == 0
+
+            journal = {
+                "schema": JOURNAL_SCHEMA,
+                "owner_id": metadata["owner_id"],
+                "tenant_id": metadata["tenant_id"],
+                "workspace_id": metadata["workspace_id"],
+                "scope_fingerprint": metadata["scope_fingerprint"],
+                "request_id": metadata["request_id"],
+                "conversation_id": metadata["conversation_id"],
+                "revision": len(records),
+                "events": [dict(record["event"]) for record in records],
+                "head_digest": "" if not records else records[-1]["event_digest"],
+                "external_persisted": bool(records),
+                "automatic_checkpoint_write": False,
+                "memory_promoted": False,
+                "external_action_executed": False,
+            }
+            logical = verify_request_journal(journal, scope=scope, request_id=request_id)
+            chain_valid = logical.get("valid") is True
+            if not chain_valid:
+                for reason in logical.get("reasons") or []:
+                    code = _reason_code(str(reason))
+                    hard_codes.append({"reason_code": code, "detail": str(reason)[:240]})
+
+            all_codes = [w["reason_code"] for w in warnings] + [h["reason_code"] for h in hard_codes]
+            reason_codes = list(dict.fromkeys(all_codes))
+            hard_failures = [dict(h) for h in hard_codes]
+            deterministic_recovery = (
+                chain_valid
+                and idempotency_consistent
+                and not manifest_error
+            )
+            safe_to_resume = bool(
+                chain_valid
+                and idempotency_consistent
+                and head_consistent
+                and ack_consistent
+                and quarantine_clear
+                and deterministic_recovery
+                and not hard_failures
+            )
+            if hard_failures or not quarantine_clear:
+                state = QUARANTINED
+                status = "QUARANTINED"
+            elif records and ack_status == ACKNOWLEDGED:
+                state = ACKNOWLEDGED
+                status = "RECOVERED"
+            elif records:
+                state = DURABLE
+                status = "RECOVERED_WITH_STALE_HEAD" if head_status == "STALE" else "RECOVERED"
+            else:
+                state = STAGED
+                status = "RECOVERED"
+            return self._recovery_report(
+                paths, scope_fingerprint=scope_fingerprint, request_id_safe=request_id_safe,
+                request_id=request_id, conversation_id=metadata["conversation_id"], records=records,
+                head_status=head_status, ack_status=ack_status, quarantined=quarantined,
+                warnings=warnings, hard_codes=hard_codes, logical=logical,
+                recovery_attempt_id=recovery_attempt_id, status=status, state=state,
+                manifest_quarantine_count=quarantine_count,
+                manifest_pending_count=quarantine_pending_count,
+                extra={
+                    "journal": journal,
+                    "journal_integrity": logical,
+                    "scope_valid": True,
+                    "request_valid": True,
+                    "version_accepted": True,
+                    "head_consistent": head_consistent,
+                    "idempotency_consistent": idempotency_consistent,
+                    "ack_consistent": ack_consistent,
+                    "quarantine_clear": quarantine_clear,
+                    "deterministic_recovery": deterministic_recovery,
+                    "chain_valid": chain_valid,
+                    "safe_to_resume": safe_to_resume,
+                },
+            )
+
+    def _recovery_report(
+        self,
+        paths: Mapping[str, Path],
+        *,
+        scope_fingerprint: str,
+        request_id_safe: str,
+        request_id: str,
+        conversation_id: str,
+        records: list[dict[str, Any]],
+        head_status: str,
+        ack_status: str,
+        quarantined: list[dict[str, Any]],
+        warnings: list[dict[str, str]],
+        hard_codes: list[dict[str, str]],
+        logical: dict[str, Any],
+        recovery_attempt_id: str,
+        status: str,
+        state: str,
+        extra: dict[str, Any] | None = None,
+        manifest_quarantine_count: int | None = None,
+        manifest_pending_count: int | None = None,
+    ) -> dict[str, Any]:
+        all_codes = [w["reason_code"] for w in warnings] + [h["reason_code"] for h in hard_codes]
+        report = {
+            "schema": STORE_SCHEMA,
+            "persistence_version": PERSISTENCE_VERSION,
+            "status": status,
+            "persistence_state": state,
+            "request_id": request_id,
+            "request_id_safe": request_id_safe,
+            "conversation_id": conversation_id,
+            "scope_fingerprint": scope_fingerprint,
+            "recovery_attempt_id": recovery_attempt_id,
+            "event_count": len(records),
+            "events_scanned": len(records),
+            "last_valid_sequence": records[-1]["sequence"] if records else 0,
+            "recovered_head_digest": records[-1]["event_digest"] if records else "",
+            "head_status": head_status,
+            "ack_status": ack_status,
+            "ack_pending": bool(records and ack_status != ACKNOWLEDGED),
+            "quarantined_files": [q.get("quarantine_relative_path", "") for q in quarantined],
+            "quarantine_count": (
+                manifest_quarantine_count
+                if manifest_quarantine_count is not None
+                else len(quarantined)
+            ),
+            "quarantine_pending_count": (
+                manifest_pending_count
+                if manifest_pending_count is not None
+                else sum(1 for q in quarantined if q.get("quarantine_status") == "PENDING")
+            ),
+            "warnings": [dict(w) for w in warnings],
+            "hard_failures": [dict(h) for h in hard_codes],
+            "reason_codes": list(dict.fromkeys(all_codes)),
+            "reasons": list(dict.fromkeys(all_codes + (["ORPHAN_TEMP_QUARANTINED"] if any(w["reason_code"] == "ORPHAN_TEMP" for w in warnings) else []))),
+            "restores_state_only": True,
+            "automatic_resume_executes": False,
+            "checkpoint_written": False,
+            "external_action_executed": False,
+            "memory_promoted": False,
+        }
+        if extra:
+            report.update(extra)
+        return report
+
+
+__all__ = [
+    "STORE_SCHEMA",
+    "PERSISTENCE_VERSION",
+    "STAGED",
+    "JOURNALED",
+    "DURABLE",
+    "ACKNOWLEDGED",
+    "QUARANTINED",
+    "REJECTED",
+    "PERSISTENCE_STATES",
+    "JournalStoreError",
+    "JournalStoreIntegrityError",
+    "JournalStoreConflict",
+    "JournalStoreLockTimeout",
+    "SimulatedCrash",
+    "UnifiedJournalStore",
+]
