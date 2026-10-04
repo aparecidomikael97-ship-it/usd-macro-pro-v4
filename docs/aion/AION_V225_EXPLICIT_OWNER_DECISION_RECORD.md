@@ -108,7 +108,10 @@ O escopo prende:
 - tenant;
 - target SHA;
 - request V2.24;
+- digest exato do request V2.25;
 - chave da decisão.
+
+Assim, o claim durável identifica o request de decisão exato que consumiu o nonce.
 
 Um nonce de decisão consumido não pode ser reutilizado.
 
