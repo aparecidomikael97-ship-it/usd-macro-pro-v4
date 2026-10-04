@@ -2315,7 +2315,7 @@ def _render_core_consistency_truth(board: Mapping[str, Any]) -> None:
     state=envelope.get("consistency_state","UNKNOWN")
     st.caption(
         f"Core integrity={health.get('integrity_state','UNKNOWN')} · Global snapshot consistency={state} "
-        "· snapshot_atomic=False · atomicidade não comprovada. Saúde e consistência não autorizam execução."
+        "· snapshot_atomic=False · origin_authenticated=False · snapshot_signed=False · origem não autenticada e atomicidade não comprovada. Saúde e consistência não autorizam execução."
     )
     if state in {"PARTIAL","MISMATCH"}:
         st.caption("Consistency: "+"; ".join(str(reason) for reason in envelope.get("reasons",[])[:8])+" · Reconstruir a observação residente; sem aprovação automática.")

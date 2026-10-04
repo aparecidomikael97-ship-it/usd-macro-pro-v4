@@ -418,7 +418,7 @@ def _consistency_envelope(payload, known, expected, mission):
         "consistency_state":state,"lineage_consistency":lineage,"scope_consistency":scope,
         "temporal_consistency":temporal,"integrity_consistency":core_health_snapshot(**{
             name+"_status":payload[name+"_status"] for name in _CONSISTENCY_DOMAINS if name!="mission"})["integrity_state"],
-        "snapshot_complete":complete,"snapshot_atomic":False,"execution_allowed":False,
+        "snapshot_complete":complete,"snapshot_atomic":False,"origin_authenticated":False,"snapshot_signed":False,"execution_allowed":False,
         "temporally_mixed":mixed,"observation_window":{"earliest":stamps[0] if stamps else "","latest":stamps[-1] if stamps else ""},
         "expected_domains":list(_CONSISTENCY_DOMAINS),"present_domains":present,"verified_domains":verified,
         "unknown_domains":unknown,"degraded_domains":degraded,"stale_domains":stale,"mismatch_domains":mismatch,
@@ -435,7 +435,7 @@ def consistency_envelope_view(payload):
     Only build_core_health_evidence validates raw resident domain evidence.
     """
     unknown={"schema":CONSISTENCY_SCHEMA,"consistency_state":"UNKNOWN","snapshot_atomic":False,
-        "snapshot_complete":False,"execution_allowed":False,"reasons":["canonical_envelope_unavailable"]}
+        "snapshot_complete":False,"origin_authenticated":False,"snapshot_signed":False,"execution_allowed":False,"reasons":["canonical_envelope_unavailable"]}
     if type(payload) is not dict: return unknown
     try:
         raw=_checked(payload)
@@ -514,6 +514,8 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
     payload["provenance"]={"schema":SCHEMA,"domains":provenance,"scope":known,
         "as_of":now.isoformat() if now else "","counts_freshness":counts_freshness,"counts_source_ref":redact_text(mission_evidence.source_ref)[:240] if type(mission_evidence) is LoadedEvidence and type(mission_evidence.source_ref) is str else ""}
     payload.update(INVARIANTS)
+    payload["origin_authenticated"]=False
+    payload["snapshot_signed"]=False
     payload["consistency_envelope"]=_consistency_envelope(payload,known,expected,mission)
     return payload
 
