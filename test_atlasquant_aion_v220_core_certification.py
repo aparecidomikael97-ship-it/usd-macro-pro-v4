@@ -1,16 +1,21 @@
 """AION V2.20 Core Certification + synthetic stress/red-team."""
 from __future__ import annotations
 
+import base64
 import json
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from atlasquant_aion_core_certification import (
     REQUIRED_DIMENSIONS,
+    canonical_evidence_attestation_bytes,
     certification_evidence_digest,
     certify_core,
     normalize_evidence,
     synthetic_evidence_row,
+    verify_evidence_attestation,
 )
 from atlasquant_aion_memory_contract import create_memory_record
 from atlasquant_aion_model_gateway_v2 import (
@@ -25,14 +30,76 @@ from atlasquant_aion_multiagent_memory_governor import (
 from atlasquant_aion_operational_resilience_kernel import build_trace_context
 from atlasquant_aion_policy_kernel import evaluate_policy_intent
 from atlasquant_aion_durable_execution_kernel import canonical_execution_id
+from atlasquant_aion_trust_root import TrustRootRegistry
 
 
 TARGET = "a" * 40
+NOW = "2026-10-04T20:00:00Z"
+ISSUED = "2026-10-04T19:00:00Z"
+EXPIRES = "2026-10-04T21:00:00Z"
+KEY_ID = "test-certification-key"
+
+
+def b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def new_keypair():
+    private = Ed25519PrivateKey.generate()
+    public = private.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    return private, b64url(public)
+
+
+PRIVATE_KEY, PUBLIC_KEY_B64 = new_keypair()
+TRUST_ROOTS = TrustRootRegistry.from_mapping({
+    "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
+    "roots": [{
+        "key_id": KEY_ID,
+        "key_version": 1,
+        "algorithm": "Ed25519",
+        "public_key_b64": PUBLIC_KEY_B64,
+        "status": "ACTIVE",
+        "not_before": "2026-10-01T00:00:00Z",
+        "not_after": "2027-10-01T00:00:00Z",
+    }],
+    "revoked_key_ids": [],
+})
+
+
+def signed_evidence_row(
+    dimension,
+    *,
+    commit_sha=TARGET,
+    run_id="run",
+    test_count=100,
+    source="TEST_SUITE",
+    private_key=PRIVATE_KEY,
+    key_id=KEY_ID,
+    issued_at=ISSUED,
+    expires_at=EXPIRES,
+):
+    row = synthetic_evidence_row(
+        dimension,
+        commit_sha=commit_sha,
+        run_id=run_id,
+        test_count=test_count,
+        source=source,
+        key_id=key_id,
+        issued_at=issued_at,
+        expires_at=expires_at,
+    )
+    row["signature_b64"] = b64url(
+        private_key.sign(canonical_evidence_attestation_bytes(dimension, row))
+    )
+    return row
 
 
 def evidence(commit=TARGET, count=100):
     return {
-        dimension: synthetic_evidence_row(
+        dimension: signed_evidence_row(
             dimension,
             commit_sha=commit,
             run_id=f"run-{index:02d}",
@@ -48,6 +115,8 @@ def certificate(rows=None, **overrides):
         "target_commit_sha": TARGET,
         "canonical_gates_green": True,
         "global_worker_readiness_green": True,
+        "certification_trust_roots": TRUST_ROOTS,
+        "now_ts": NOW,
         "core_freeze_authorized": False,
     }
     kwargs.update(overrides)
@@ -121,7 +190,7 @@ def test_each_missing_dimension_blocks_certification(dimension):
 @pytest.mark.parametrize("dimension", REQUIRED_DIMENSIONS)
 def test_each_dimension_must_match_target_commit(dimension):
     rows = evidence()
-    rows[dimension] = synthetic_evidence_row(
+    rows[dimension] = signed_evidence_row(
         dimension,
         commit_sha="b" * 40,
         run_id="other-run",
@@ -141,7 +210,7 @@ def test_each_dimension_must_match_target_commit(dimension):
     ({"verified": 1}, "EVIDENCE_NOT_VERIFIED"),
 ])
 def test_evidence_truth_is_strict(mutation, blocker):
-    row = synthetic_evidence_row(
+    row = signed_evidence_row(
         "LOAD",
         commit_sha=TARGET,
         run_id="run-load",
@@ -212,7 +281,15 @@ def test_certification_manifest_is_deterministic():
 
 def test_evidence_digest_is_deterministic():
     rows = evidence()
-    assert certification_evidence_digest(rows) == certification_evidence_digest(rows)
+    assert certification_evidence_digest(
+        rows,
+        certification_trust_roots=TRUST_ROOTS,
+        now_ts=NOW,
+    ) == certification_evidence_digest(
+        rows,
+        certification_trust_roots=TRUST_ROOTS,
+        now_ts=NOW,
+    )
 
 
 def test_synthetic_evidence_helper_rejects_unknown_dimension():
