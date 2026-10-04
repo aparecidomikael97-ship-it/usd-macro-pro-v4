@@ -104,6 +104,7 @@ def evidence(commit=TARGET, count=100):
             commit_sha=commit,
             run_id=f"run-{index:02d}",
             test_count=count,
+            source="CI" if dimension in {"CANONICAL_GATES", "GLOBAL_WORKER_READINESS"} else "TEST_SUITE",
         )
         for index, dimension in enumerate(REQUIRED_DIMENSIONS, 1)
     }
@@ -113,8 +114,6 @@ def certificate(rows=None, **overrides):
     kwargs = {
         "evidence": rows if rows is not None else evidence(),
         "target_commit_sha": TARGET,
-        "canonical_gates_green": True,
-        "global_worker_readiness_green": True,
         "certification_trust_roots": TRUST_ROOTS,
         "now_ts": NOW,
         "core_freeze_authorized": False,
@@ -160,7 +159,7 @@ def test_all_dimensions_produce_candidate_but_never_freeze():
     assert result["core_complete_candidate"] is True
     assert result["core_complete_claim_allowed"] is False
     assert result["owner_core_complete_review_required"] is True
-    assert result["total_evidence_test_count"] == 1500
+    assert result["total_evidence_test_count"] == 1700
     assert result["all_evidence_cryptographically_verified"] is True
     assert result["certification_trust_root_referenced_key_count"] == 1
     assert result["certification_trust_root_binding_digest"].startswith("sha256:")
@@ -378,6 +377,7 @@ def test_manifest_binds_exact_public_trust_root_used_for_attestation():
             run_id=f"other-{index:02d}",
             test_count=100,
             private_key=other_private,
+            source="CI" if dimension in {"CANONICAL_GATES", "GLOBAL_WORKER_READINESS"} else "TEST_SUITE",
         )
         for index, dimension in enumerate(REQUIRED_DIMENSIONS, 1)
     }
@@ -389,15 +389,34 @@ def test_manifest_binds_exact_public_trust_root_used_for_attestation():
     assert first["certification_trust_root_binding_digest"] != second["certification_trust_root_binding_digest"]
 
 
-def test_canonical_gates_are_required():
-    result = certificate(canonical_gates_green=False)
+def test_canonical_gates_require_signed_ci_evidence():
+    rows = evidence()
+    del rows["CANONICAL_GATES"]
+    result = certificate(rows)
     assert "CANONICAL_GATES_NOT_GREEN" in result["blockers"]
+    assert "DIMENSION_NOT_CERTIFIED:CANONICAL_GATES" in result["blockers"]
 
 
-def test_global_worker_readiness_is_required_but_does_not_arm():
-    result = certificate(global_worker_readiness_green=False)
+def test_global_worker_readiness_requires_signed_ci_evidence_and_does_not_arm():
+    rows = evidence()
+    del rows["GLOBAL_WORKER_READINESS"]
+    result = certificate(rows)
     assert "GLOBAL_WORKER_READINESS_NOT_GREEN" in result["blockers"]
+    assert "DIMENSION_NOT_CERTIFIED:GLOBAL_WORKER_READINESS" in result["blockers"]
     assert result["worker_armed"] is False
+
+
+def test_control_dimensions_reject_non_ci_source_even_when_signed():
+    rows = evidence()
+    rows["GLOBAL_WORKER_READINESS"] = signed_evidence_row(
+        "GLOBAL_WORKER_READINESS",
+        run_id="worker-readiness-not-ci",
+        test_count=1,
+        source="AUDIT",
+    )
+    result = certificate(rows)
+    assert result["state"] == "BLOCKED"
+    assert "CONTROL_EVIDENCE_SOURCE_NOT_CI" in result["evidence"]["GLOBAL_WORKER_READINESS"]["blockers"]
 
 
 def test_minimum_test_volume_is_enforced():
@@ -407,14 +426,9 @@ def test_minimum_test_volume_is_enforced():
     assert "CERTIFICATION_TEST_VOLUME_BELOW_MINIMUM" in result["blockers"]
 
 
-@pytest.mark.parametrize("field,value", [
-    ("canonical_gates_green", 1),
-    ("global_worker_readiness_green", "true"),
-    ("core_freeze_authorized", None),
-])
-def test_certification_security_booleans_are_exact(field, value):
+def test_core_freeze_request_boolean_is_exact():
     with pytest.raises(ValueError):
-        certificate(**{field: value})
+        certificate(core_freeze_authorized=None)
 
 
 def test_certification_manifest_is_deterministic():
