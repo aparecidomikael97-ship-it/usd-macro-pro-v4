@@ -41,6 +41,17 @@ estado. Ele não duplica o Checkpoint Mestre inteiro.
 - não chama rotina de save;
 - não altera runtime real.
 
+## Alvo runtime oficial
+
+A attestation é presa ao alvo exato:
+
+- repo: `aparecidomikael97-ship-it/usd-macro-pro-v4`;
+- branch: `atlasquant-runtime`;
+- path: `dados/aion/checkpoint_master.json`.
+
+Receipt de outro repo, branch ou path é bloqueado, mesmo que o restante do conteúdo
+seja estruturalmente válido.
+
 ## Attestation
 
 `verify_external_checkpoint_persistence()` aceita:
