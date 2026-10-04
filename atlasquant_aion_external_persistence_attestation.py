@@ -9,8 +9,8 @@ It can:
 2. verify, from externally supplied runtime observation + write receipt, that the
    exact binding is currently persisted and write-attributed.
 
-It never calls save_runtime_checkpoint(), never performs network I/O, never
-records an owner decision, never freezes the Core, and never arms the worker.
+It never performs a runtime save, never performs network I/O, never records an
+owner decision, never freezes the Core, and never arms the worker.
 """
 from __future__ import annotations
 
