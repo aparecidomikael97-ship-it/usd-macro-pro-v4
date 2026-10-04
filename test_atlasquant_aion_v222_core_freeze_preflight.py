@@ -179,7 +179,8 @@ def test_checkpoint_change_after_preflight_blocks_toctou_recheck():
     )
     check = recheck(result, checkpoint=changed)
     assert check["state"] == "BLOCKED"
-    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_CHALLENGE_REBUILD_MISMATCH" in check["blockers"]
+    assert "PREFLIGHT_DIGEST_TO_SIGN_MISMATCH" in check["blockers"]
     assert check["core_freeze_authorized"] is False
 
 
