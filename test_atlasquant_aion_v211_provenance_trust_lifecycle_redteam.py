@@ -138,10 +138,12 @@ class StateMachineTests(unittest.TestCase):
         r = p.evaluate_provenance_envelope(e, now_ts=NOW, known_key_versions=[1])
         self.assertEqual(r["state"], "BLOCKED")
         self.assertTrue(any(x.startswith("DIMENSION_NOT_CONFIGURED") for x in r["blockers"]))
-    def test_all_dims_configured_valid_ready(self):
+    def test_all_dims_self_asserted_stays_blocked_without_trusted_authority(self):
         e = base_env(); e.update(all_dims())
         r = p.evaluate_provenance_envelope(e, now_ts=NOW, known_key_versions=[1])
-        self.assertEqual(r["state"], "READY"); self.assertEqual(r["blockers"], [])
+        self.assertEqual(r["state"], "BLOCKED")
+        self.assertIn("TRUSTED_READINESS_AUTHORITY_UNAVAILABLE", r["blockers"])
+        self.assertIs(r["dimensions_verified"], False)
     def test_approval_never_implied(self):
         e = base_env(); e.update(all_dims())
         r = p.evaluate_provenance_envelope(e, now_ts=NOW, known_key_versions=[1])
@@ -150,9 +152,11 @@ class StateMachineTests(unittest.TestCase):
         e = base_env(); e.update(all_dims())
         r = p.evaluate_provenance_envelope(e, now_ts=NOW, known_key_versions=[1])
         self.assertIs(r["executes_action"], False)
-    def test_execution_allowed_only_when_ready_and_dim(self):
+    def test_execution_allowed_never_granted_by_self_asserted_readiness(self):
         e = base_env(); e.update(all_dims())
-        self.assertIs(p.evaluate_provenance_envelope(e, now_ts=NOW, known_key_versions=[1])["execution_allowed"], True)
+        r = p.evaluate_provenance_envelope(e, now_ts=NOW, known_key_versions=[1])
+        self.assertIs(r["execution_allowed"], False)
+        self.assertEqual(r["state"], "BLOCKED")
         e2 = base_env(); e2.update(all_dims()); e2["nonce"] = None
         self.assertIs(p.evaluate_provenance_envelope(e2, now_ts=NOW, known_key_versions=[1])["execution_allowed"], False)
 
