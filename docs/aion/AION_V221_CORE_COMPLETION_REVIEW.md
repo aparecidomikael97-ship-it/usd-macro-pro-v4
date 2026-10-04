@@ -59,6 +59,11 @@ A função de checkpoint produz apenas um **patch candidate** para o namespace:
 O patch contém digest, SHA alvo, digest do certificado, binding do trust root,
 blockers e o estado de revisão.
 
+O construtor do patch **não aceita um review fornecido pelo caller como autoridade**.
+Ele recebe novamente o manifesto V2.20 e o trust root público, reverifica todas as
+evidências assinadas e reconstrói o review internamente antes de produzir o patch.
+Um hash de review autocriado pelo caller, portanto, não consegue pular a certificação.
+
 Persistência externa continua fora desta camada e exige o fluxo explícito já
 definido pelo Checkpoint Mestre.
 
@@ -97,9 +102,9 @@ Bloqueiam a revisão:
 
 ## Saída
 
-A saída é um pacote determinístico com `review_digest`. O digest também cobre o sinal
-`owner_review_ready`, impedindo que readiness seja alterada depois da revisão sem
-invalidar o pacote.
+A saída é um pacote determinístico com `review_digest`. O digest cobre o sinal
+`owner_review_ready` e todos os campos de fronteira de segurança (Core Complete,
+freeze, checkpoint save, execução, worker, merge, deploy e ação externa).
 
 Esse digest pode ser referenciado em um evento explícito do Checkpoint Mestre, mas a
 V2.21 não grava esse evento automaticamente.
