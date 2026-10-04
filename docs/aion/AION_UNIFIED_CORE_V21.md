@@ -226,3 +226,162 @@ Continuam fora desta revisão:
 - ação financeira.
 
 Nada nesta etapa executa ação externa, provider real, trade, merge ou deploy.
+
+
+## AION Core V2.1D — Integrity / Recovery Governance
+
+Escopo desta seção: governança de integridade e recuperação do unified journal store
+(`atlasquant_aion_unified_journal_store.py`). Não executa provider, ação externa, trade,
+merge ou deploy. Recovery é state-only.
+
+### Reason codes estáveis (19)
+
+A API de integridade não depende mais de `str(exc).upper().replace(" ", "_")`.
+Cada falha carrega `reason_code` estruturado e `reason_detail` bounded/redacted:
+
+| Code | Classe | Significado |
+|---|---|---|
+| CORRUPT_JSON | HARD | JSON/estrutura ilegível ou schema inválido |
+| RECORD_DIGEST_MISMATCH | HARD | envelope digest do record diverge (sem causa semântica específica) |
+| EVENT_DIGEST_MISMATCH | HARD | digest do evento lógico diverge |
+| PREV_DIGEST_MISMATCH | HARD | chain prev_digest diverge |
+| SEQUENCE_MISMATCH | HARD | sequence persistida diverge da esperada |
+| SCOPE_MISMATCH | HARD | identidade de scope (owner/tenant/workspace/fingerprint) diverge |
+| REQUEST_MISMATCH | HARD | request_id/conversation diverge |
+| PERSISTENCE_VERSION_MISMATCH | HARD | versão de persistência não aceita |
+| HEAD_POINTS_TO_MISSING_EVENT | HARD | head aponta para evento inexistente |
+| ACK_INVALID | HARD | ACK futuro, digest errado, downgrade ou inválido |
+| IDEMPOTENCY_INDEX_MISMATCH | HARD | índice de idempotência contraditório (hard corruption) |
+| SYMLINK_ESCAPE | HARD | symlink fora do root do store |
+| UNSAFE_PATH | HARD | path escapa do root do store |
+| ORPHAN_TEMP | WARNING/HARD | temp órfão: MOVED = warning; PENDING = bloqueia resume |
+| STALE_HEAD | WARNING | head ausente/antigo (não é corrupção hard) |
+| LOCK_TIMEOUT | HARD | lock excedeu o timeout configurado |
+| RECOVERY_LIMIT_EXCEEDED | HARD | limite de bytes/eventos excedido |
+| IDEMPOTENCY_INDEX_STALE | WARNING | janela de crash conhecida: evento commitado, índice ausente |
+| REQUEST_QUARANTINED | REJECTED | nova operação em request com evidência de quarantine |
+
+### Prioridade causal do diagnóstico
+
+Quando uma adulteração específica também invalida o envelope `record_digest`,
+o code semântico específico tem precedência. Ordem de validação em
+`_validate_event_record` e `_validate_metadata`: estrutura → version → scope →
+request → sequence → prev_digest → event_digest → record_digest (envelope por último).
+
+Exemplos: scope adulterado → SCOPE_MISMATCH; request adulterado → REQUEST_MISMATCH;
+sequence adulterada → SEQUENCE_MISMATCH; event digest adulterado → EVENT_DIGEST_MISMATCH;
+somente envelope adulterado → RECORD_DIGEST_MISMATCH.
+
+O scan (`_scan_valid_records`) preserva reasons estruturados e levanta a exception via
+`_scan_failure(reasons)`, que fixa `reason_code` no primeiro code causal — o scan nunca
+se reduz a `UNSAFE_PATH` por default de classe.
+
+### REJECTED × QUARANTINED
+
+- **QUARANTINED**: evidência persistida com integridade comprometida. Corrupção descoberta
+  em disco é detectada por `recover()`, copiada (COPY+VERIFY), original preservado,
+  registrada no manifest, e o request fica QUARANTINED.
+- **REJECTED**: operação recusada pelo contrato (ACK inválido, idempotency conflict,
+  scope mismatch, request quarantined, unsafe path).
+- **Ciclo quarantine**: corrupção → `recover()` → detecção → COPY+VERIFY → original
+  preservado → manifest → request QUARANTINED → novas operações REJECTED/REQUEST_QUARANTINED.
+- Sem `recover()` anterior, uma nova operação pode encontrar a corrupção diretamente e
+  retornar o integrity reason original (ex.: CORRUPT_JSON).
+- Manifest ilegível/inválido: nova operação → fail closed → REQUEST_QUARANTINED;
+  recovery → reporta a corrupção estrutural real, safe_to_resume=False.
+
+### Quarantine manifest
+
+`quarantine/manifest.jsonl`, schema
+`ATLASQUANT_AION_UNIFIED_JOURNAL_QUARANTINE_MANIFEST_V1`: schema, persistence_version,
+timestamp_utc, scope_fingerprint, request_id_safe, original_relative_path,
+quarantine_relative_path, reason_code, reason_detail (bounded), observed_digest,
+expected_digest, sequence, event_digest, detection_phase, recovery_attempt_id,
+previous_manifest_digest, manifest_record_digest. Encadeamento de digest (GENESIS no
+primeiro record). Sem payload bruto; sem segredo (prova por teste com fixture
+`token="secret-example"`). Append crash-aware: ler último digest → temp → fsync →
+replace → fsync dir. Status: COPIED, MOVED, PENDING.
+
+### ORPHAN_TEMP
+
+- MOVED: warning; não é hard failure; não força QUARANTINED; pending=0.
+- PENDING: quarantine_clear=False; safe_to_resume=False.
+
+### Idempotency
+
+- IDEMPOTENCY_INDEX_STALE: warning de crash window conhecida (evento commitado, índice
+  ausente após crash AFTER_EVENT_COMMIT).
+- IDEMPOTENCY_INDEX_MISMATCH: contradição real no índice persistido → hard failure.
+- Same key + different payload → REJECTED / IDEMPOTENCY_INDEX_MISMATCH.
+
+### ACK cumulativo
+
+`acks.json` persiste aditivamente (mapping legado `entries` preservado):
+
+```json
+{
+  "schema": "...", "kind": "acks", "persistence_version": 2,
+  "acked_through_sequence": 10,
+  "acked_head_digest": "sha256:...",
+  "scope_fingerprint": "...", "request_id_safe": "...",
+  "entries": {"1": {...}, "2": {...}}
+}
+```
+
+- Advance: N=5 → N=8 persiste `acked_through_sequence=8` + `acked_head_digest=digest_8`,
+  sem perder entries anteriores.
+- Igual: idempotente.
+- Downgrade (N < atual): REJECTED / ACK_INVALID, arquivo não alterado.
+- Future (N > head): REJECTED / ACK_INVALID, arquivo não alterado.
+- Bad digest: REJECTED / ACK_INVALID, arquivo não alterado.
+- Cross-scope: LookupError quando o request dir do scope B não existe (dir derivado do
+  scope fingerprint); SCOPE_MISMATCH quando metadata/event de outro scope é apresentado
+  dentro de um request dir válido.
+- Request quarantined: REJECTED / REQUEST_QUARANTINED.
+- Leitura do formato legado: normaliza em memória (`_acked_through`) sem reescrever o
+  arquivo apenas por leitura.
+
+### safe_to_resume
+
+Conjunção explícita: scope_valid ∧ request_valid ∧ chain_valid ∧ version_accepted ∧
+head_consistent ∧ idempotency_consistent ∧ ack_consistent ∧ quarantine_clear ∧
+deterministic_recovery ∧ sem hard failures. Na dúvida (ambíguo/UNKNOWN): False.
+`automatic_resume_executes` sempre False.
+
+### Recovery report
+
+Campos novos: schema, persistence_version, scope_fingerprint, request_id_safe,
+recovery_attempt_id, events_scanned, last_valid_sequence, recovered_head_digest,
+scope_valid, request_valid, chain_valid, version_accepted, head_consistent,
+idempotency_consistent, ack_consistent, quarantine_clear, deterministic_recovery,
+quarantine_count, quarantine_pending_count, warnings, hard_failures, reason_codes,
+safe_to_resume. Compatibilidade legada preservada: status, persistence_state,
+event_count, journal_integrity, head_status, ack_status, quarantined_files, reasons.
+`quarantine_count`/`quarantine_pending_count` vêm do manifest (fonte auditável), não de
+contagem de arquivos.
+
+### State-only invariants
+
+Recovery nunca executa provider, envia ação externa, escreve checkpoint, promove memória
+ou retoma tarefa externa automaticamente:
+
+```
+restores_state_only=True
+automatic_resume_executes=False
+checkpoint_written=False
+external_action_executed=False
+memory_promoted=False
+```
+
+### Crash windows
+
+Fault injection cobre: AFTER_TEMP_FSYNC (ORPHAN_TEMP), AFTER_EVENT_COMMIT
+(IDEMPOTENCY_INDEX_STALE), BEFORE/AFTER_QUARANTINE_FILE_MOVE, BEFORE/AFTER_QUARANTINE_MANIFEST_COMMIT.
+Invariantes: evidência nunca desaparece; manifest nunca declara move concluído se o
+arquivo não está lá; safe_to_resume continua False quando pendência existe.
+
+### Limitações desta versão
+
+- Content Attestation real ainda não existe (declaração ≠ prova).
+- Symlink/hardlink/junction não são comprovados fisicamente além dos checks de path.
+- Executor real ainda não está ligado; todos os campos de execução permanecem False.
