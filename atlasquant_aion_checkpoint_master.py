@@ -103,6 +103,8 @@ def _safe_structure(value:Any, *, depth:int=0)->Any:
             key=_clean(raw_key,160)
             if not key:
                 raise CheckpointMasterError("empty checkpoint key")
+            if key in out:
+                raise CheckpointMasterError(f"normalized duplicate checkpoint key: {key}")
             checked=_safe_structure(raw_value,depth=depth+1)
             if key in _FORBIDDEN_TRUE_KEYS and checked is True:
                 raise CheckpointMasterError(f"unsafe execution flag rejected: {key}")
@@ -114,19 +116,25 @@ def _safe_structure(value:Any, *, depth:int=0)->Any:
 
 
 def _reject_replay_execution_promotion(before:Any,after:Any,path:str="")->None:
-    """Recovery/replay may restore state, never manufacture execution."""
-    if isinstance(before,Mapping) and isinstance(after,Mapping):
+    """Recovery/replay may restore execution evidence, never manufacture it."""
+    if isinstance(after,Mapping):
+        prior_map=before if isinstance(before,Mapping) else {}
         for key,next_value in after.items():
-            prior=before.get(key)
+            prior=prior_map.get(key)
             current_path=f"{path}.{key}" if path else str(key)
             if str(key).casefold() in {"state","status"}:
-                if str(prior or "").upper()=="PLANNED" and str(next_value or "").upper()=="EXECUTED":
+                if (
+                    str(next_value or "").upper()=="EXECUTED"
+                    and str(prior or "").upper()!="EXECUTED"
+                ):
                     raise CheckpointMasterError(
-                        f"replay cannot promote PLANNED to EXECUTED at {current_path}"
+                        f"replay cannot introduce EXECUTED at {current_path}"
                     )
             _reject_replay_execution_promotion(prior,next_value,current_path)
-    elif isinstance(before,list) and isinstance(after,list):
-        for index,(prior,next_value) in enumerate(zip(before,after)):
+    elif isinstance(after,list):
+        prior_list=before if isinstance(before,list) else []
+        for index,next_value in enumerate(after):
+            prior=prior_list[index] if index<len(prior_list) else None
             _reject_replay_execution_promotion(prior,next_value,f"{path}[{index}]")
 
 
@@ -209,6 +217,9 @@ def reconstruct_checkpoint(master:Mapping[str,Any], *, target_revision:Any=None)
     row=dict(master or {})
     if row.get("schema")!=SCHEMA:
         raise CheckpointIntegrityError("checkpoint master schema mismatch")
+    for key in _FORBIDDEN_TRUE_KEYS:
+        if key in row and row.get(key) is not False:
+            raise CheckpointIntegrityError(f"unsafe master flag value: {key}")
     base=row.get("base_snapshot")
     journal=row.get("journal")
     if not isinstance(base,Mapping) or not isinstance(journal,list):
@@ -238,6 +249,8 @@ def reconstruct_checkpoint(master:Mapping[str,Any], *, target_revision:Any=None)
         event=dict(event_raw)
         if event.get("schema")!=EVENT_SCHEMA:
             raise CheckpointIntegrityError("event schema mismatch")
+        if event.get("event_type")!="MERGE_PATCH":
+            raise CheckpointIntegrityError("unsupported checkpoint event type")
         sequence=_positive_int(event.get("sequence"),"sequence",1)
         if sequence!=index:
             raise CheckpointIntegrityError("event sequence mismatch")
@@ -314,8 +327,6 @@ def append_checkpoint_patch(
 )->dict[str,Any]:
     current=reconstruct_checkpoint(master)
     expected=_positive_int(expected_revision,"expected_revision",0)
-    if expected!=current["revision"]:
-        raise CheckpointConflict("REVISION_CONFLICT")
     eid=_clean(event_id,160)
     if not eid:
         raise CheckpointMasterError("event_id required")
@@ -335,6 +346,8 @@ def append_checkpoint_patch(
         if all(event.get("patch_digest")==patch_digest for event in existing):
             return row
         raise CheckpointConflict("IDEMPOTENCY_CONFLICT")
+    if expected!=current["revision"]:
+        raise CheckpointConflict("REVISION_CONFLICT")
     if len(row.get("journal",[]))>=MAX_EVENTS:
         raise CheckpointMasterError("journal capacity reached")
 
