@@ -88,7 +88,9 @@ def test_all_dimensions_produce_candidate_but_never_freeze():
     result = certificate()
     assert result["state"] == "CERTIFICATION_CANDIDATE"
     assert result["certification_candidate"] is True
-    assert result["core_complete_claim_allowed"] is True
+    assert result["core_complete_candidate"] is True
+    assert result["core_complete_claim_allowed"] is False
+    assert result["owner_core_complete_review_required"] is True
     assert result["total_evidence_test_count"] == 1500
     assert result["core_frozen"] is False
     assert result["core_freeze_authorized_by_this_module"] is False
@@ -149,6 +151,16 @@ def test_evidence_truth_is_strict(mutation, blocker):
     normalized = normalize_evidence("LOAD", row)
     assert normalized["eligible"] is False
     assert blocker in normalized["blockers"]
+
+
+def test_evidence_digest_must_match_evidence_content():
+    rows = evidence()
+    rows["LOAD"]["run_id"] = "tampered-run-id"
+    result = certificate(rows)
+    assert result["state"] == "BLOCKED"
+    assert "DIMENSION_NOT_CERTIFIED:LOAD" in result["blockers"]
+    normalized = normalize_evidence("LOAD", rows["LOAD"])
+    assert "EVIDENCE_DIGEST_MISMATCH" in normalized["blockers"]
 
 
 def test_unknown_evidence_dimension_blocks():
@@ -264,6 +276,7 @@ def test_stress_2000_policy_decisions_never_become_execution():
         "state": "VERIFIED",
         "authority_verified": True,
         "execution_allowed": False,
+        "executes_action": False,
     }
     scope = {
         "state": "SCOPE_VERIFIED",
@@ -272,11 +285,13 @@ def test_stress_2000_policy_decisions_never_become_execution():
         "domain": "CORE",
         "max_cost_usd": 1.0,
         "execution_allowed": False,
+        "executes_action": False,
     }
     resilience = {
         "posture": "NORMAL_MONITORED",
         "kill_switch_engaged": False,
         "execution_allowed": False,
+        "executes_action": False,
     }
     governance = {
         "state": "WITHIN_GOVERNANCE",
