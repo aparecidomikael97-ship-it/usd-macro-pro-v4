@@ -95,6 +95,36 @@ def _decode_signature(value: Any) -> bytes:
     return decoded
 
 
+def owner_decision_nonce_scope(
+    request: Mapping[str, Any],
+    *,
+    request_digest: str,
+) -> str:
+    """Return the exact durable replay-protection scope for one V2.25 request."""
+    digest = str(request_digest or "").strip().lower()
+    if not _SHA256_RE.fullmatch(digest):
+        raise ValueError("decision request digest invalid")
+    row = dict(request or {})
+    required = (
+        str(row.get("target_commit_sha") or "").strip().lower(),
+        str(row.get("v224_request_digest") or "").strip().lower(),
+        str(row.get("decision_key_id") or "").strip(),
+        str(row.get("decision_key_version") or "").strip(),
+    )
+    if not all(required):
+        raise ValueError("decision nonce scope fields missing")
+    return "|".join((
+        "OWNER_DECISION",
+        EXPECTED_OWNER_ID,
+        EXPECTED_TENANT_ID,
+        required[0],
+        required[1],
+        digest,
+        required[2],
+        required[3],
+    ))
+
+
 def _window_blockers(*, issued_at: Any, expires_at: Any, now_ts: Any) -> list[str]:
     blockers: list[str] = []
     try:
@@ -615,16 +645,10 @@ def verify_owner_decision(
     except (ValueError, InvalidSignature):
         return _blocked("OWNER_DECISION_SIGNATURE_INVALID")
 
-    scope = "|".join((
-        "OWNER_DECISION",
-        EXPECTED_OWNER_ID,
-        EXPECTED_TENANT_ID,
-        presented["target_commit_sha"],
-        presented["v224_request_digest"],
-        rebuilt["request_digest"],
-        presented["decision_key_id"],
-        str(presented["decision_key_version"]),
-    ))
+    scope = owner_decision_nonce_scope(
+        presented,
+        request_digest=rebuilt["request_digest"],
+    )
     try:
         claimed = decision_nonce_registry.claim(
             scope=scope,
@@ -699,6 +723,7 @@ __all__ = [
     "DECISIONS",
     "MAX_DECISION_WINDOW_SECONDS",
     "canonical_owner_decision_bytes",
+    "owner_decision_nonce_scope",
     "build_owner_decision_request",
     "verify_owner_decision",
 ]
