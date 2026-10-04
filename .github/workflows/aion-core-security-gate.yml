@@ -50,6 +50,7 @@ jobs:
             atlasquant_aion_policy_kernel.py \
             atlasquant_aion_model_gateway_v2.py \
             atlasquant_aion_core_certification.py \
+            atlasquant_aion_core_completion_review.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
@@ -106,7 +107,8 @@ jobs:
             test_atlasquant_aion_v217_multiagent_memory_governance_redteam.py \
             test_atlasquant_aion_v218_policy_kernel_redteam.py \
             test_atlasquant_aion_v219_provider_neutral_gateway_redteam.py \
-            test_atlasquant_aion_v220_core_certification.py
+            test_atlasquant_aion_v220_core_certification.py \
+            test_atlasquant_aion_v221_core_completion_review.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
@@ -159,7 +161,8 @@ jobs:
             test_atlasquant_aion_v217_multiagent_memory_governance_redteam.py \
             test_atlasquant_aion_v218_policy_kernel_redteam.py \
             test_atlasquant_aion_v219_provider_neutral_gateway_redteam.py \
-            test_atlasquant_aion_v220_core_certification.py
+            test_atlasquant_aion_v220_core_certification.py \
+            test_atlasquant_aion_v221_core_completion_review.py
 
   supply-chain-audit:
     name: Supply-chain audit
@@ -198,6 +201,7 @@ jobs:
             atlasquant_aion_policy_kernel.py \
             atlasquant_aion_model_gateway_v2.py \
             atlasquant_aion_core_certification.py \
+            atlasquant_aion_core_completion_review.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
