@@ -197,6 +197,7 @@ def test_each_dimension_must_match_target_commit(dimension):
         commit_sha="b" * 40,
         run_id="other-run",
         test_count=100,
+        source="CI" if dimension in {"CANONICAL_GATES", "GLOBAL_WORKER_READINESS"} else "TEST_SUITE",
     )
     result = certificate(rows)
     assert f"DIMENSION_COMMIT_MISMATCH:{dimension}" in result["blockers"]
@@ -406,14 +407,41 @@ def test_global_worker_readiness_requires_signed_ci_evidence_and_does_not_arm():
     assert result["worker_armed"] is False
 
 
-def test_control_dimensions_reject_non_ci_source_even_when_signed():
+def test_control_dimensions_reject_non_ci_source_even_with_valid_key_signature_bytes():
     rows = evidence()
-    rows["GLOBAL_WORKER_READINESS"] = signed_evidence_row(
+    row = synthetic_evidence_row(
         "GLOBAL_WORKER_READINESS",
+        commit_sha=TARGET,
         run_id="worker-readiness-not-ci",
         test_count=1,
         source="AUDIT",
+        key_id=KEY_ID,
+        issued_at=ISSUED,
+        expires_at=EXPIRES,
     )
+    statement = {
+        "schema": row["schema"],
+        "dimension": "GLOBAL_WORKER_READINESS",
+        "state": row["state"],
+        "source": row["source"],
+        "run_id": row["run_id"],
+        "commit_sha": row["commit_sha"],
+        "evidence_digest": row["evidence_digest"],
+        "test_count": row["test_count"],
+        "verified": row["verified"],
+        "key_id": row["key_id"],
+        "key_version": row["key_version"],
+        "issued_at": row["issued_at"],
+        "expires_at": row["expires_at"],
+    }
+    row["signature_b64"] = b64url(PRIVATE_KEY.sign(json.dumps(
+        statement,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")))
+    rows["GLOBAL_WORKER_READINESS"] = row
     result = certificate(rows)
     assert result["state"] == "BLOCKED"
     assert "CONTROL_EVIDENCE_SOURCE_NOT_CI" in result["evidence"]["GLOBAL_WORKER_READINESS"]["blockers"]
