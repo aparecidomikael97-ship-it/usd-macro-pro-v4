@@ -61,7 +61,8 @@ def _digest(value: Any) -> str:
 
 
 def _owner_public_key_fingerprint(entry: Any) -> str:
-    raw = entry.public_key().public_bytes_raw()
+    encoded = str(entry.public_key_b64 or "").encode("ascii")
+    raw = base64.urlsafe_b64decode(encoded + b"=" * (-len(encoded) % 4))
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
