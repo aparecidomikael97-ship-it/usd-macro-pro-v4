@@ -269,6 +269,18 @@ def verify_preflight_still_current(
     if row.get("digest_to_sign") != row.get("challenge_digest"):
         blockers.append("PREFLIGHT_DIGEST_TO_SIGN_MISMATCH")
 
+    presented_body = {
+        key: value
+        for key, value in row.items()
+        if key not in {
+            "challenge_digest",
+            "digest_to_sign",
+            "owner_decision_ready",
+        }
+    }
+    if row.get("challenge_digest") != _digest(presented_body):
+        blockers.append("PREFLIGHT_CHALLENGE_DIGEST_MISMATCH")
+
     rebuilt = None
     if not blockers:
         try:
