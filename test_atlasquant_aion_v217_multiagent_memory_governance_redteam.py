@@ -136,6 +136,52 @@ def test_valid_multiagent_plan_is_governed_but_not_authorized():
     assert result["executes_action"] is False
 
 
+def test_malformed_plan_node_is_not_silently_dropped():
+    result = govern_multiagent_session(
+        [node("aion-core"), "forged-node"],
+        trusted_context={"tenant_id": "tenant-a", "workspace_id": "workspace-a"},
+        supervisor_id="aion-core",
+        allowed_capabilities=["core.plan", "core.read"],
+        now_ts=NOW,
+        session_deadline_at=SESSION_DEADLINE,
+        cost_limit_usd=5.0,
+    )
+    assert result["state"] == "BLOCK"
+    assert "PLAN_NODE_NOT_MAPPING:1" in result["blockers"]
+    assert result["execution_allowed"] is False
+
+
+@pytest.mark.parametrize("bad", ["core.plan", 123, {"core.plan": True}])
+def test_allowed_capabilities_requires_collection_contract(bad):
+    result = govern_multiagent_session(
+        [node("aion-core")],
+        trusted_context={"tenant_id": "tenant-a", "workspace_id": "workspace-a"},
+        supervisor_id="aion-core",
+        allowed_capabilities=bad,
+        now_ts=NOW,
+        session_deadline_at=SESSION_DEADLINE,
+        cost_limit_usd=5.0,
+    )
+    assert result["state"] == "BLOCK"
+    assert "ALLOWED_CAPABILITIES_INVALID" in result["blockers"]
+    assert result["execution_allowed"] is False
+
+
+def test_invalid_trusted_context_is_fail_closed():
+    result = govern_multiagent_session(
+        [node("aion-core")],
+        trusted_context="tenant-a",
+        supervisor_id="aion-core",
+        allowed_capabilities=["core.plan"],
+        now_ts=NOW,
+        session_deadline_at=SESSION_DEADLINE,
+        cost_limit_usd=5.0,
+    )
+    assert result["state"] == "BLOCK"
+    assert "TRUSTED_CONTEXT_INVALID" in result["blockers"]
+    assert result["execution_allowed"] is False
+
+
 def test_supervisor_must_be_canonical_root():
     result = plan(node("fake-root"), supervisor_id="aion-core")
     assert result["state"] == "BLOCK"
@@ -332,6 +378,56 @@ def test_nonvalidated_memory_states_are_blocked(state, expected):
     record = memory(validation_state=state)
     result = use(record)
     assert expected in result["blockers"]
+
+
+def test_invalid_conflict_metadata_is_fail_closed():
+    record = create_memory_record(
+        namespace="PERSONA",
+        memory_class="TENANT",
+        content="validated operational memory",
+        scope={"tenant_id": "tenant-a", "persona_id": "admin"},
+        provenance_ids=["PROV-1"],
+        evidence_refs=["EVID-1"],
+        validation_state="VALIDATED",
+        retention="PROJECT",
+        sensitivity="RESTRICTED",
+        created_at="2026-10-04T18:00:00Z",
+        metadata={
+            "confidence_pct": "95",
+            "valid_from": "2026-10-04T18:00:00Z",
+            "expires_at": "2026-10-04T20:00:00Z",
+            "conflict_refs": "should-have-been-a-list",
+        },
+    )
+    result = use(record)
+    assert result["state"] == "BLOCKED"
+    assert "CONFLICT_METADATA_INVALID" in result["blockers"]
+    assert result["grants_authority"] is False
+    assert result["execution_allowed"] is False
+
+
+def test_explicit_conflict_metadata_blocks_operational_memory():
+    record = create_memory_record(
+        namespace="PERSONA",
+        memory_class="TENANT",
+        content="validated operational memory",
+        scope={"tenant_id": "tenant-a", "persona_id": "admin"},
+        provenance_ids=["PROV-1"],
+        evidence_refs=["EVID-1"],
+        validation_state="VALIDATED",
+        retention="PROJECT",
+        sensitivity="RESTRICTED",
+        created_at="2026-10-04T18:00:00Z",
+        metadata={
+            "confidence_pct": "95",
+            "valid_from": "2026-10-04T18:00:00Z",
+            "expires_at": "2026-10-04T20:00:00Z",
+            "conflict_refs": ["MEM-CONFLICTING"],
+        },
+    )
+    result = use(record)
+    assert "UNRESOLVED_CONFLICT_METADATA" in result["blockers"]
+    assert result["allowed_for_operational_use"] is False
 
 
 def test_expiry_tombstone_preserves_history_and_versions_forward():
