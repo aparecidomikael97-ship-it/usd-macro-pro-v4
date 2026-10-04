@@ -47,5 +47,6 @@ Cada registro usa o identificador `ADR-NNNN` e as seções: Título, Data, Statu
 | ADR-0017 | ACCEPTED | `docs/adr/ADR-0017-constitution-policy-kernel-non-execution.md` |
 | ADR-0018 | ACCEPTED | `docs/adr/ADR-0018-provider-neutral-local-fallback-required.md` |
 | ADR-0019 | ACCEPTED | `docs/adr/ADR-0019-core-certification-separate-from-freeze.md` |
+| ADR-0020 | ACCEPTED | `docs/adr/ADR-0020-core-completion-review-separate-from-freeze.md` |
 
 Average Daily Range e American Depositary Receipts não têm arquivo aqui. Seu estado de produto está na reconciliação `CHECKPOINT_MESTRE_RECONCILIATION_2026_09_15_TO_2026_09_29`.
