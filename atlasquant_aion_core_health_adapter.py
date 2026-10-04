@@ -29,7 +29,7 @@ MAX_BYTES = 2_000_000
 MAX_ROWS = 64
 INVARIANTS = {"health_snapshot_is_read_only":True,"external_action_executed":False,
     "execution_allowed":False,"executes_provider_call":False,"executes_billing":False,
-    "real_orders_enabled":False,"snapshot_atomic":False,"origin_authenticated":False,"snapshot_signed":False}
+    "real_orders_enabled":False,"snapshot_atomic":False}
 _SCOPE_NAMES = {"owner_id":"owner_id","tenant_id":"tenant_id","workspace_id":"workspace_id",
     "ecosystem":"ecosystem","ecosystem_id":"ecosystem","sector":"sector",
     "sector_id":"sector","project":"project","project_id":"project","request_id":"request_id"}
@@ -514,6 +514,8 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
     payload["provenance"]={"schema":SCHEMA,"domains":provenance,"scope":known,
         "as_of":now.isoformat() if now else "","counts_freshness":counts_freshness,"counts_source_ref":redact_text(mission_evidence.source_ref)[:240] if type(mission_evidence) is LoadedEvidence and type(mission_evidence.source_ref) is str else ""}
     payload.update(INVARIANTS)
+    payload["origin_authenticated"]=False
+    payload["snapshot_signed"]=False
     payload["consistency_envelope"]=_consistency_envelope(payload,known,expected,mission)
     return payload
 
