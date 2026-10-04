@@ -95,6 +95,10 @@ def verify_authority_statement(
     expected_binding: Mapping[str, str],
 ) -> dict[str, Any]:
     blockers: list[str] = []
+    if not isinstance(trust_roots, TrustRootRegistry):
+        return _blocked("TRUST_ROOT_REGISTRY_INVALID", trust_root_configured=False)
+    if not isinstance(nonce_registry, PersistentNonceRegistry):
+        return _blocked("NONCE_REGISTRY_INVALID")
     if not isinstance(statement, Mapping):
         return _blocked("AUTHORITY_STATEMENT_NOT_MAPPING")
     if set(statement) != ALLOWED_FIELDS:
@@ -151,9 +155,12 @@ def verify_authority_statement(
 
     entry = None
     if not blockers:
-        entry, key_problem = trust_roots.verify_key_available(
-            data["key_id"], data["key_version"], now_ts
-        )
+        try:
+            entry, key_problem = trust_roots.verify_key_available(
+                data["key_id"], data["key_version"], now_ts
+            )
+        except Exception:
+            return _blocked("TRUST_ROOT_VERIFICATION_FAILURE")
         if key_problem:
             blockers.append(key_problem)
 
@@ -175,12 +182,18 @@ def verify_authority_statement(
         data["authority_id"], data["subject_id"], data["tenant_id"],
         data["domain"], data["policy_id"],
     ))
-    claimed = nonce_registry.claim(
-        scope=scope,
-        nonce=data["nonce"],
-        expires_at=data["expires_at"],
-        now_ts=now_ts,
-    )
+    try:
+        claimed = nonce_registry.claim(
+            scope=scope,
+            nonce=data["nonce"],
+            expires_at=data["expires_at"],
+            now_ts=now_ts,
+        )
+    except Exception:
+        result = _blocked("NONCE_REGISTRY_FAILURE")
+        result["signature_verified"] = True
+        result["binding_verified"] = True
+        return result
     if not claimed:
         result = _blocked("AUTHORITY_NONCE_REPLAYED")
         result["signature_verified"] = True
