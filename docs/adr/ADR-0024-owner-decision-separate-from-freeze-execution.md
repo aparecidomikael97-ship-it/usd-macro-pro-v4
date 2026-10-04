@@ -42,14 +42,19 @@ V2.25 aceita somente:
 
 A escolha recebe um request próprio e assinatura externa própria.
 
-O request prende a decisão à assinatura V2.24 e ao estado V2.23 atual.
+O request prende a decisão à assinatura V2.24 e ao estado V2.23 atual. Uma assinatura
+válida comprova a escolha, mas o decision record permanece pendente de persistência e
+attestation.
 
 ## Semântica de APPROVE
 
 APPROVE significa somente:
 
-- decisão do proprietário registrada;
-- permissão para preparar uma futura cerimônia separada de Core Freeze.
+- escolha do proprietário criptograficamente verificada;
+- record lógico preparado para persistência.
+
+Enquanto a persistência do decision record não for atestada,
+`owner_decision_recorded=false` e a cerimônia de Core Freeze não fica elegível.
 
 APPROVE não significa:
 
@@ -62,7 +67,9 @@ APPROVE não significa:
 
 ## Semântica de DENY
 
-DENY fecha o caminho de Core Freeze para aquela decisão/state binding.
+DENY comprova a escolha de negar e prepara seu record para persistência. O caminho
+de Core Freeze permanece fechado; persistir/atestar o DENY fornece o registro durável
+da negativa.
 
 Qualquer nova tentativa exige novo estado/cerimônia conforme contratos aplicáveis.
 
@@ -85,7 +92,8 @@ A camada gera o patch candidate somente dentro do fluxo que acabou de verificar
 criptograficamente a assinatura da decisão. Um caller não pode fornecer um
 dicionário de "verified decision" como autoridade.
 
-Persistência continua separada e explícita.
+Persistência e attestation do decision record continuam separadas e explícitas.
+Somente depois delas a decisão pode ser chamada de registrada de forma durável.
 
 ## Compatibilidade
 
