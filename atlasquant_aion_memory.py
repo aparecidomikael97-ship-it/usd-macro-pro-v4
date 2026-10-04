@@ -1784,7 +1784,10 @@ def load_runtime_checkpoint(
         raw_content = obj.get("content")
         if not isinstance(raw_content, str):
             raise ValueError("runtime checkpoint content must be a base64 string")
-        encoding = str(obj.get("encoding") or "base64").strip().casefold()
+        raw_encoding = obj["encoding"] if "encoding" in obj else "base64"
+        if not isinstance(raw_encoding, str):
+            raise ValueError("runtime checkpoint encoding must be a string")
+        encoding = raw_encoding.strip().casefold()
         if encoding != "base64":
             raise ValueError("runtime checkpoint encoding must be base64")
         encoded = "".join(raw_content.split())
