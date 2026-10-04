@@ -621,6 +621,7 @@ def verify_owner_decision(
         EXPECTED_TENANT_ID,
         presented["target_commit_sha"],
         presented["v224_request_digest"],
+        rebuilt["request_digest"],
         presented["decision_key_id"],
         str(presented["decision_key_version"]),
     ))
