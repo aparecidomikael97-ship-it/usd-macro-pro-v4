@@ -265,6 +265,13 @@ def test_checkpoint_candidate_rejects_unsafe_review_field():
         build_checkpoint_patch_candidate(result)
 
 
+def test_owner_review_ready_tamper_breaks_review_digest():
+    result = review()
+    result["owner_review_ready"] = False
+    with pytest.raises(ValueError, match="digest mismatch"):
+        build_checkpoint_patch_candidate(result)
+
+
 def test_review_gate_has_no_network_or_automatic_persistence_paths():
     source = Path("atlasquant_aion_core_completion_review.py").read_text(
         encoding="utf-8"
