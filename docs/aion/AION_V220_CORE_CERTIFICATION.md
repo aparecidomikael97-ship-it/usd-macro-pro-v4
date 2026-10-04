@@ -1,6 +1,6 @@
 # AION V2.20 — Core Certification
 
-**Base:** V2.19 head `a2c6da29cc95a4b22706940906f02bbd6860a727`
+**Base hardened reconciliada:** V2.19 head `b0dd0aa462112e2769fc5865216265f0a19176fc`
 
 ## Objetivo
 
@@ -43,7 +43,7 @@ Cada dimensão deve carregar:
 - commit_sha exato;
 - sha256 evidence digest;
 - test_count positivo;
-- verified = booleano True exato.
+- verified = booleano True exato **como claim assinado**; isoladamente ele não tem autoridade.
 
 Todas as dimensões precisam apontar para o mesmo target commit da certificação.
 
@@ -202,6 +202,14 @@ A atestação assina, no mínimo:
 O evidence digest é recalculado a partir do conteúdo canônico. Depois, a assinatura
 é verificada contra o trust root de certificação. Tamper, wrong key, key revocation,
 expiração, digest mismatch ou ausência de assinatura bloqueiam a dimensão.
+
+O manifesto também grava `certification_trust_root_binding_digest`, derivado das
+chaves públicas exatas (key_id/version/material/status/janela/revogação) realmente
+referenciadas pelas evidências. Assim, duas certificações feitas contra trust roots
+públicos diferentes não produzem o mesmo binding de confiança.
+
+As chaves do mapa de evidências são estritas e canônicas. Alias/case diferente, como
+`load` no lugar de `LOAD`, é tratado como dimensão inesperada e bloqueia a certificação.
 
 ### Chaves de teste vs certificado real
 
