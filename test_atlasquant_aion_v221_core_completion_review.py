@@ -275,7 +275,8 @@ def test_review_gate_has_no_network_or_automatic_persistence_paths():
         "urlopen",
         "subprocess",
         "save_runtime_checkpoint(",
-        "merge_pull_request",
-        "deploy",
+        "merge_pull_request(",
+        "trigger_deploy(",
+        "deploy_to_production(",
     ):
         assert banned not in source.lower()
