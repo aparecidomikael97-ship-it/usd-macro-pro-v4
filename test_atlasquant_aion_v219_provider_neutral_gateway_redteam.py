@@ -138,6 +138,17 @@ def test_external_endpoint_cannot_claim_local_lane():
         )
 
 
+@pytest.mark.parametrize("bad", ["provider-a", {"provider": "x"}, 123, None])
+def test_registry_requires_explicit_endpoint_collection(bad):
+    with pytest.raises(ValueError):
+        ProviderNeutralModelRegistry(bad)
+
+
+def test_registry_rejects_non_endpoint_entries():
+    with pytest.raises(ValueError):
+        ProviderNeutralModelRegistry([object()])
+
+
 def test_duplicate_endpoint_identity_is_rejected():
     row = endpoint(
         "local",
@@ -428,6 +439,28 @@ def test_all_routes_unavailable_blocks_without_calling_provider():
 def test_route_security_inputs_are_strict(field, value):
     with pytest.raises(ValueError):
         route(**{field: value})
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("required_capabilities", "chat"),
+    ("required_capabilities", {"chat": True}),
+    ("excluded_providers", "provider-a"),
+    ("excluded_providers", {"provider-a": True}),
+])
+def test_route_collections_reject_scalar_or_mapping(field, bad):
+    with pytest.raises(ValueError):
+        route(**{field: bad})
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("required_capabilities", ["chat", "chat"]),
+    ("excluded_providers", ["provider-a", "provider-a"]),
+    ("required_capabilities", [""]),
+    ("excluded_providers", [""]),
+])
+def test_route_collections_reject_duplicates_and_empty_items(field, bad):
+    with pytest.raises(ValueError):
+        route(**{field: bad})
 
 
 def test_arbitrary_provider_names_prove_gateway_has_no_single_vendor_identity():
