@@ -749,7 +749,11 @@ def build_master_status_board(
                     else (
                         "Fornecer completude da evid\u00eancia e contadores verificados; integridade OK n\u00e3o comprova a situa\u00e7\u00e3o operacional."
                         if core_integrity_state=="OK" and not core_evidence_complete
-                        else "Fornecer evidência local explícita dos cinco subsistemas do Core; ausência permanece UNKNOWN."
+                        else "Fornecer evidência canônica local de: " + ", ".join(
+                            name for name,value in core_statuses
+                            if core_health_snapshot(**{domain+"_status":value for domain in
+                                ("journal","checkpoint","recovery","memory","audit_chain")})["integrity_state"]!="OK"
+                        ).replace("audit", "audit_chain") + "; ausência permanece UNKNOWN."
                     )
                 )
             )
