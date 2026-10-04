@@ -367,4 +367,5 @@ def core_health_snapshot(
         "executes_provider_call":False,
         "executes_billing":False,
         "real_orders_enabled":False,
+        "snapshot_atomic":False,
     }

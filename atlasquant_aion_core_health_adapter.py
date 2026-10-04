@@ -7,8 +7,9 @@ existing pure validators. This module has no loader, store, worker or executor.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import json
+import hashlib
 import math
 
 from aion_chat.models import Scope
@@ -28,7 +29,7 @@ MAX_BYTES = 2_000_000
 MAX_ROWS = 64
 INVARIANTS = {"health_snapshot_is_read_only":True,"external_action_executed":False,
     "execution_allowed":False,"executes_provider_call":False,"executes_billing":False,
-    "real_orders_enabled":False}
+    "real_orders_enabled":False,"snapshot_atomic":False}
 _SCOPE_NAMES = {"owner_id":"owner_id","tenant_id":"tenant_id","workspace_id":"workspace_id",
     "ecosystem":"ecosystem","ecosystem_id":"ecosystem","sector":"sector",
     "sector_id":"sector","project":"project","project_id":"project","request_id":"request_id"}
@@ -198,7 +199,7 @@ def _memory(records, known):
         return "UNKNOWN",{}
     if len(records)>MAX_ROWS:
         raise HealthEvidenceError("MEMORY_ROWS_BOUND")
-    statuses=[]; revisions=[]
+    statuses=[]; revisions=[]; identities=[]
     for record in records:
         if type(record) is not MemoryContractRecord:
             statuses.append("UNKNOWN")
@@ -208,6 +209,8 @@ def _memory(records, known):
         if type(raw.get("created_at")) is not str or not raw["created_at"].strip():
             statuses.append("UNKNOWN")
             continue
+        if type(raw.get("version")) is not int or raw["version"]<1:
+            return "INVALID",{}
         recreated=create_memory_record(**{k:raw[k] for k in (
             "namespace","memory_class","content","scope","provenance_ids","version",
             "previous_version","evidence_refs","validation_state","retention","sensitivity",
@@ -223,12 +226,15 @@ def _memory(records, known):
         elif decision["allowed_for_operational_use"] is True: statuses.append("VALIDATED")
         else: statuses.append("UNKNOWN")
         revisions.append(record.version)
+        identities.append(_fingerprint(raw))
     failure=next((s for s in statuses if _bad_status(s)!="UNKNOWN"),None)
-    return failure or ("VALIDATED" if all(s=="VALIDATED" for s in statuses) else next(s for s in statuses if s!="VALIDATED")),{"revision":max(revisions) if revisions else 0,"record_states":statuses}
+    return failure or ("VALIDATED" if all(s=="VALIDATED" for s in statuses) else next(s for s in statuses if s!="VALIDATED")),{"revision":max(revisions) if revisions else 0,"record_states":statuses,
+        "identity_digest":_fingerprint(identities),"domain_validated":len(identities)==len(records)}
 
 
 def _domain(evidence, domain, known, now):
-    meta={"source_ref":"","evidence_complete":False,"freshness":"NOT_EVALUATED"}
+    meta={"source_ref":"","evidence_complete":False,"freshness":"NOT_EVALUATED",
+        "domain_validated":False,"identity_digest":"","scope":{},"observed_at":""}
     if type(evidence) is not LoadedEvidence:
         return "UNKNOWN",meta
     if type(evidence.source_ref) is not str or type(evidence.kind) is not str or type(evidence.as_of) is not str:
@@ -238,6 +244,8 @@ def _domain(evidence, domain, known, now):
     if type(evidence.source_ref) is not str or len(evidence.source_ref)>240 or not source:
         return "UNKNOWN",meta
     _bind_scope(known,evidence.scope)
+    meta["scope"]=_scope(evidence.scope)
+    meta.update(_observation(evidence,now))
     if evidence.value is None:
         return "UNKNOWN",meta
     try:
@@ -245,6 +253,7 @@ def _domain(evidence, domain, known, now):
             status,report=_memory(evidence.value,known)
         else:
             value=_checked(evidence.value)
+            meta["identity_digest"]=_fingerprint(value)
             if type(value) is dict:
                 _bind_scope(known,value)
                 if "scope" in value: _bind_scope(known,value["scope"])
@@ -253,6 +262,8 @@ def _domain(evidence, domain, known, now):
             elif domain=="checkpoint" and evidence.kind=="checkpoint_master":
                 if type(value) is not dict or value.get("schema")!=MASTER_SCHEMA:
                     status,report=("UNKNOWN" if type(value) is dict and "schema" not in value else "INVALID"),{}
+                elif any(type(value.get(key)) is not int for key in ("base_revision","revision")):
+                    status,report="INVALID",{}
                 else:
                     report=reconstruct_checkpoint(value)
                     status="VERIFIED" if (report.get("schema")==MASTER_SCHEMA and type(report.get("revision")) is int and report.get("state_digest") and report.get("execution_allowed") is False) else "UNKNOWN"
@@ -283,6 +294,9 @@ def _domain(evidence, domain, known, now):
             else:
                 status,report="UNKNOWN",{}
         meta.update({k:report[k] for k in ("revision","head_digest","state_digest","record_states") if k in report})
+        if domain=="memory":
+            meta.update({k:report[k] for k in ("identity_digest","domain_validated") if k in report})
+        else: meta["domain_validated"]=status=="VERIFIED"
         freshness=_timeliness(evidence,now)
         meta.update(freshness=freshness,evidence_complete=evidence.complete is True)
         if _bad_status(status)=="UNKNOWN":
@@ -331,6 +345,122 @@ def _mission_counts(evidence, known):
     return counts,True
 
 
+CONSISTENCY_SCHEMA = "ATLASQUANT_AION_CONSISTENCY_ENVELOPE_V1"
+_CONSISTENCY_DOMAINS = ("journal","checkpoint","recovery","memory","audit_chain","mission")
+
+
+def _fingerprint(value):
+    """Change detector over bounded plain data; never an origin signature."""
+    encoded=json.dumps(value,sort_keys=True,separators=(",",":"),ensure_ascii=True,allow_nan=False).encode()
+    return "sha256:"+hashlib.sha256(encoded).hexdigest()
+
+
+def _observation(evidence, now):
+    # These are supplied observation labels, not event/record creation times.
+    stamps=[];valid=True
+    temporal=evidence.temporal if type(evidence.temporal) is dict else {}
+    values=[temporal[key] for key in ("timestamp","as_of") if key in temporal]
+    if type(evidence.as_of) is not str or evidence.as_of!="": values.append(evidence.as_of)
+    for value in values:
+        if type(value) is not str or not value or len(value)>80:
+            valid=False;continue
+        try:
+            stamp=datetime.fromisoformat(value.replace("Z","+00:00"))
+            if stamp.tzinfo is None or (now is not None and (stamp-now).total_seconds()>FUTURE_TOLERANCE_SECONDS):
+                valid=False;continue
+            stamps.append(stamp.astimezone(timezone.utc).isoformat())
+        except (TypeError,ValueError,OverflowError): valid=False
+    if len(set(stamps))>1: valid=False
+    return {"observed_at":stamps[0] if valid and stamps else "","observation_valid":valid and bool(stamps)}
+
+
+def _status_integrity(status):
+    # Classification remains exclusively owned by observability.
+    return core_health_snapshot(**{name+"_status":status for name in _CONSISTENCY_DOMAINS if name!="mission"})["integrity_state"]
+
+
+def _consistency_envelope(payload, known, expected, mission):
+    """Subordinate observation envelope; neither atomic snapshot nor permission."""
+    domains={}
+    provenance=payload["provenance"]["domains"]
+    for name in _CONSISTENCY_DOMAINS:
+        meta=mission if name=="mission" else provenance[name]
+        status=meta["status"] if name=="mission" else payload[name+"_status"]
+        domains[name]={"status":status,"domain_validated":meta.get("domain_validated") is True,
+            "complete":meta.get("evidence_complete") is True,"source_ref":meta.get("source_ref",""),
+            "identity_digest":meta.get("identity_digest",""),"scope":meta.get("scope",{}),
+            "revision":meta.get("revision"),"head_digest":meta.get("head_digest",""),
+            "observed_at":meta.get("observed_at",""),"observation_valid":meta.get("observation_valid") is True,
+            "freshness":meta.get("freshness","NOT_EVALUATED")}
+    present=[name for name,row in domains.items() if row["identity_digest"]]
+    verified=[name for name,row in domains.items() if row["domain_validated"] and row["complete"]]
+    unknown=[name for name in _CONSISTENCY_DOMAINS if name not in verified]
+    degraded=[name for name,row in domains.items() if _status_integrity(row["status"])=="DEGRADED"]
+    mismatch=[name for name,row in domains.items() if "MISMATCH" in row["status"]]
+    stale=[name for name,row in domains.items() if row["freshness"]=="STALE"]
+    triad=("journal","audit_chain","recovery")
+    lineage="MISMATCH" if any(name in mismatch for name in triad) else "CONFIRMED" if all(name in verified for name in triad) else "PARTIAL" if any(name in verified for name in triad) else "UNKNOWN"
+    scope_proven=all(expected.get(key) for key in ("owner_id","tenant_id","workspace_id")) and all(
+        all(row["scope"].get(key)==value for key,value in expected.items() if key!="request_id") for row in domains.values())
+    scope="CONFIRMED" if scope_proven else "UNKNOWN"
+    stamps=sorted(row["observed_at"] for row in domains.values() if row["observed_at"])
+    mixed=len(set(stamps))>1
+    temporal="STALE" if stale else "MIXED" if mixed else "CURRENT" if all(
+        row["observation_valid"] and row["freshness"]=="FRESH" for row in domains.values()) else "UNKNOWN"
+    complete=len(verified)==len(_CONSISTENCY_DOMAINS)
+    state="MISMATCH" if mismatch else "CONFIRMED" if complete and lineage==scope=="CONFIRMED" and temporal=="CURRENT" else "PARTIAL" if verified else "UNKNOWN"
+    reasons=[]
+    if mismatch: reasons.append("canonical_mismatch:"+",".join(mismatch))
+    if unknown: reasons.append("missing_canonical_evidence:"+",".join(unknown))
+    if scope!="CONFIRMED": reasons.append("expected_scope_or_binding_unproven")
+    if temporal!="CURRENT": reasons.append("observation_window:"+temporal)
+    envelope={"schema":CONSISTENCY_SCHEMA,"owner":"AION_CORE_HEALTH","authority":"READ_ONLY_DERIVED_EVIDENCE",
+        "consistency_state":state,"lineage_consistency":lineage,"scope_consistency":scope,
+        "temporal_consistency":temporal,"integrity_consistency":core_health_snapshot(**{
+            name+"_status":payload[name+"_status"] for name in _CONSISTENCY_DOMAINS if name!="mission"})["integrity_state"],
+        "snapshot_complete":complete,"snapshot_atomic":False,"execution_allowed":False,
+        "temporally_mixed":mixed,"observation_window":{"earliest":stamps[0] if stamps else "","latest":stamps[-1] if stamps else ""},
+        "expected_domains":list(_CONSISTENCY_DOMAINS),"present_domains":present,"verified_domains":verified,
+        "unknown_domains":unknown,"degraded_domains":degraded,"stale_domains":stale,"mismatch_domains":mismatch,
+        "scope":dict(known),"expected_scope":dict(expected),"domains":domains,"reasons":reasons}
+    envelope["evidence_epoch"]=_fingerprint({"schema":CONSISTENCY_SCHEMA,"scope":known,"expected_scope":expected,"domains":domains})
+    envelope["snapshot_digest"]=_fingerprint(envelope)
+    return envelope
+
+
+def consistency_envelope_view(payload):
+    """Check a trusted normalized envelope for display, never accept it as evidence.
+
+    Digest verification detects damage/reuse within this payload, not authorship.
+    Only build_core_health_evidence validates raw resident domain evidence.
+    """
+    unknown={"schema":CONSISTENCY_SCHEMA,"consistency_state":"UNKNOWN","snapshot_atomic":False,
+        "snapshot_complete":False,"execution_allowed":False,"reasons":["canonical_envelope_unavailable"]}
+    if type(payload) is not dict: return unknown
+    try:
+        raw=_checked(payload)
+        candidate=raw.get("consistency_envelope")
+        if type(candidate) is not dict or candidate.get("schema")!=CONSISTENCY_SCHEMA: return unknown
+        digest=candidate.get("snapshot_digest")
+        if type(digest) is not str or len(digest)!=71 or not digest.startswith("sha256:") or any(c not in "0123456789abcdef" for c in digest[7:]): return unknown
+        if digest!=_fingerprint({key:value for key,value in candidate.items() if key!="snapshot_digest"}): return unknown
+        domains=candidate.get("domains")
+        if type(domains) is not dict or tuple(domains)!=_CONSISTENCY_DOMAINS:
+            # Mapping insertion order is not identity.
+            if type(domains) is not dict or set(domains)!=set(_CONSISTENCY_DOMAINS): return unknown
+        provenance=raw.get("provenance")
+        if type(provenance) is not dict or type(provenance.get("domains")) is not dict: return unknown
+        for name in _CONSISTENCY_DOMAINS:
+            meta=domains[name] if name=="mission" else provenance["domains"].get(name)
+            if type(meta) is not dict or type(meta.get("scope",{})) is not dict: return unknown
+        mission=domains["mission"]
+        mission={**mission,"evidence_complete":mission.get("complete") is True}
+        recomputed=_consistency_envelope(raw,_scope(candidate.get("scope")),_scope(candidate.get("expected_scope")),mission)
+        if recomputed!=candidate: return unknown
+        return recomputed
+    except (ValueError,TypeError,KeyError,OverflowError,RecursionError): return unknown
+
+
 def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None,
         recovery_evidence=None,memory_evidence=None,audit_chain_evidence=None,
         mission_evidence=None,events=(),core_version="",schema_version="",now=None,expected_scope=None):
@@ -341,7 +471,8 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
     """
     if now is not None and (type(now) is not datetime or now.tzinfo is None):
         raise HealthEvidenceError("AWARE_NOW_REQUIRED")
-    known=_scope({} if expected_scope is None else expected_scope)
+    expected=_scope({} if expected_scope is None else expected_scope)
+    known=dict(expected)
     payload={"core_version":redact_text(core_version)[:80] if type(core_version) is str else "",
         "schema_version":redact_text(schema_version)[:80] if type(schema_version) is str else ""}
     provenance={}
@@ -361,7 +492,14 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
                 or recovery.get("revision")!=current.get("revision")):
             payload["recovery_status"]="MISMATCH"
     counts,verified=_mission_counts(mission_evidence,known)
+    mission={"status":"VERIFIED" if verified else "UNKNOWN","domain_validated":verified,
+        "evidence_complete":verified,"identity_digest":"","scope":{},"source_ref":""}
+    if type(mission_evidence) is LoadedEvidence and verified:
+        mission.update(identity_digest=_fingerprint(_checked(mission_evidence.value)),
+            scope=_scope(mission_evidence.scope),source_ref=redact_text(mission_evidence.source_ref)[:240])
+        mission.update(_observation(mission_evidence,now))
     counts_freshness=_timeliness(mission_evidence,now) if verified else "NOT_EVALUATED"
+    mission["freshness"]=counts_freshness
     verified=verified and counts_freshness not in {"STALE","UNVERIFIED"}
     payload.update(counts,counts_verified=verified)
     payload["last_recovery"]=provenance["recovery"].get("as_of","")
@@ -376,6 +514,7 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
     payload["provenance"]={"schema":SCHEMA,"domains":provenance,"scope":known,
         "as_of":now.isoformat() if now else "","counts_freshness":counts_freshness,"counts_source_ref":redact_text(mission_evidence.source_ref)[:240] if type(mission_evidence) is LoadedEvidence and type(mission_evidence.source_ref) is str else ""}
     payload.update(INVARIANTS)
+    payload["consistency_envelope"]=_consistency_envelope(payload,known,expected,mission)
     return payload
 
 
@@ -390,9 +529,11 @@ def build_loaded_runtime_health_evidence(runtime_result):
         payload=build_core_health_evidence(checkpoint_evidence=checkpoint)
         if checkpoint is None and type(runtime.get("status")) is str:
             payload["checkpoint_status"]=_bad_status(runtime["status"])
+            payload["consistency_envelope"]=_consistency_envelope(payload,{}, {}, {"status":"UNKNOWN"})
         return payload
     except HealthEvidenceError as exc:
         payload=build_core_health_evidence()
         payload["checkpoint_status"]="INVALID"
         payload["provenance"]["checkpoint_error"]=str(exc)[:120]
+        payload["consistency_envelope"]=_consistency_envelope(payload,{}, {}, {"status":"UNKNOWN"})
         return payload
