@@ -258,6 +258,20 @@ def test_tampered_preflight_challenge_digest_is_detected():
     assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
 
 
+def test_owner_decision_cannot_be_injected_into_preflight():
+    master = staged_checkpoint()
+    result = preflight(checkpoint=master)
+    result["owner_decision"] = "APPROVE_CORE_FREEZE"
+    check = verify_preflight_still_current(
+        result,
+        checkpoint_master=master,
+        now_ts=NOW,
+    )
+    assert check["state"] == "BLOCKED"
+    assert "PREFLIGHT_CHALLENGE_DIGEST_MISMATCH" in check["blockers"]
+    assert "OWNER_DECISION_MUST_REMAIN_UNDECIDED_IN_PREFLIGHT" in check["blockers"]
+
+
 @pytest.mark.parametrize("field", [
     "owner_decision_recorded",
     "signature_active",
@@ -272,6 +286,8 @@ def test_tampered_preflight_challenge_digest_is_detected():
     "worker_armed",
     "external_action_executed",
     "executes_action",
+    "automatic_freeze",
+    "automatic_checkpoint_write",
 ])
 def test_unsafe_preflight_field_cannot_be_promoted(field):
     master = staged_checkpoint()
