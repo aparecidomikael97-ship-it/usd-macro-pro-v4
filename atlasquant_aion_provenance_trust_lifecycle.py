@@ -257,15 +257,18 @@ def evaluate_provenance_envelope(
 
 
 def _report(env, blockers, now_ts, dims) -> dict[str, Any]:
-    unique = sorted(set(blockers))
-    ready = len(unique) == 0
+    # V2.11 has no trusted readiness authority or trust root. Dimension flags
+    # carried by the evidence envelope are caller claims only and can never
+    # promote readiness or execution authority.
+    unique = sorted(set(blockers) | {"TRUSTED_READINESS_AUTHORITY_UNAVAILABLE"})
     return {
         "schema": SCHEMA,
-        "state": "READY" if ready else "BLOCKED",
+        "state": "BLOCKED",
         "blockers": unique,
         "dimensions": dims,
+        "dimensions_verified": False,
         "now_ts": _ts_canonical(now_ts) or now_ts,
-        "execution_allowed": bool(dims.get("execution_allowed", False)) and ready,
+        "execution_allowed": False,
         "executes_action": False,
         "creates_secret_or_key_material": False,
         "reads_persistent_storage": False,
