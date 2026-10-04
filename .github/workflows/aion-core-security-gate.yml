@@ -34,6 +34,8 @@ jobs:
             atlasquant_aion_resilience.py \
             atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
@@ -63,7 +65,8 @@ jobs:
             test_atlasquant_aion_global_worker_inflight_resolution.py \
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
-            test_atlasquant_aion_supply_chain_pinning.py
+            test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
@@ -81,7 +84,8 @@ jobs:
             test_atlasquant_aion_global_worker_inflight_resolution.py \
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
-            test_atlasquant_aion_supply_chain_pinning.py
+            test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
@@ -116,6 +120,8 @@ jobs:
             atlasquant_aion_resilience.py \
             atlasquant_aion_recovery.py \
             atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
             atlasquant_aion_vault.py \
             atlasquant_aion_tenant.py \
             atlasquant_aion_portable.py \
