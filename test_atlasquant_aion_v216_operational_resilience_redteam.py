@@ -110,6 +110,9 @@ def view(**kwargs):
         "backup_verified": True,
         "restore_drill_verified": True,
         "journal_recovery_verified": True,
+        "crash_recovery_verified": True,
+        "checkpoint_integrity_verified": True,
+        "audit_chain_verified": True,
     }
     data.update(kwargs)
     return operational_resilience_view(**data)
@@ -254,6 +257,7 @@ def test_kill_switch_dominates_all_green_evidence():
     "backup_verified",
     "restore_drill_verified",
     "journal_recovery_verified",
+    "crash_recovery_verified",
 ])
 def test_recovery_evidence_is_required_for_normal_posture(field):
     result = view(**{field: False})
@@ -262,6 +266,32 @@ def test_recovery_evidence_is_required_for_normal_posture(field):
     assert result["operational_admission_recommended"] is False
     assert result["automatic_restore"] is False
     assert result["automatic_rollback"] is False
+
+
+def test_checkpoint_integrity_is_required_for_normal_posture():
+    result = view(checkpoint_integrity_verified=False)
+    assert result["posture"] == "DEGRADED_READ_ONLY"
+    assert "CHECKPOINT_INTEGRITY_NOT_VERIFIED" in result["blockers"]
+    assert result["integrity_readiness"]["operational_integrity_ready"] is False
+    assert result["execution_allowed"] is False
+
+
+def test_audit_chain_integrity_is_required_for_normal_posture():
+    result = view(audit_chain_verified=False)
+    assert result["posture"] == "DEGRADED_READ_ONLY"
+    assert "AUDIT_CHAIN_NOT_VERIFIED" in result["blockers"]
+    assert result["integrity_readiness"]["operational_integrity_ready"] is False
+    assert result["execution_allowed"] is False
+
+
+def test_fully_healthy_view_exposes_integrity_and_crash_recovery_evidence():
+    result = view()
+    assert result["recovery_readiness"]["crash_recovery_verified"] is True
+    assert result["recovery_readiness"]["recovery_ready"] is True
+    assert result["integrity_readiness"]["checkpoint_integrity_verified"] is True
+    assert result["integrity_readiness"]["audit_chain_verified"] is True
+    assert result["integrity_readiness"]["operational_integrity_ready"] is True
+    assert result["execution_allowed"] is False
 
 
 def test_circuit_open_forces_degraded_read_only():
@@ -336,6 +366,9 @@ def test_integrity_or_secret_failure_requests_emergency_stop(kwargs):
     ("secret_exposure", None),
     ("kill_switch_engaged", "false"),
     ("backup_verified", 1),
+    ("crash_recovery_verified", "true"),
+    ("checkpoint_integrity_verified", 1),
+    ("audit_chain_verified", None),
 ])
 def test_security_booleans_are_exact(field, value):
     with pytest.raises(ValueError):
