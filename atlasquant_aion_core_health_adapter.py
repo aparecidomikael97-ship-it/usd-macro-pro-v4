@@ -20,7 +20,7 @@ from atlasquant_aion_memory_contract import (
     MemoryContractRecord, create_memory_record, operational_decision,
 )
 from atlasquant_aion_unified_taskgraph import validate_taskgraph, SCHEMA as TASKGRAPH_SCHEMA
-from atlasquant_aion_truth import normalize_evidence_record
+from atlasquant_aion_truth import normalize_evidence_record, FUTURE_TOLERANCE_SECONDS
 from atlasquant_aion_observability import core_health_snapshot, normalize_events, redact_text
 
 SCHEMA = "ATLASQUANT_AION_CORE_HEALTH_EVIDENCE_V26"
@@ -102,9 +102,11 @@ def _scope(raw):
         raise HealthEvidenceError("SCOPE_INVALID")
     result={}
     for key,name in _SCOPE_NAMES.items():
-        if key not in raw or raw[key] in (None,""):
+        if key not in raw:
             continue
         value=raw[key]
+        if value is None or (type(value) is str and value==""):
+            continue
         if type(value) is not str or len(value)>160 or value!=value.strip():
             raise HealthEvidenceError("SCOPE_INVALID")
         if name in result and result[name]!=value:
@@ -128,6 +130,8 @@ def _bad_status(value):
 
 def _timeliness(evidence, now):
     temporal=_checked(evidence.temporal)
+    if type(temporal) is not dict:
+        raise HealthEvidenceError("TEMPORAL_MAPPING_REQUIRED")
     if not temporal:
         return "NOT_EVALUATED"
     if temporal.get("stale") is True or temporal.get("freshness") in {"STALE","OUTDATED"}:
@@ -135,12 +139,39 @@ def _timeliness(evidence, now):
     # A precomputed claim of FRESH alone is not proof. Use existing truth semantics.
     if now is None:
         return "UNVERIFIED"
-    if temporal.get("expires_at"):
+    # Timestamp and TTL types must not be rescued by coercion or expiry claims.
+    observed=None
+    for key in ("timestamp","as_of"):
+        if key in temporal:
+            value=temporal[key]
+            if type(value) is not str or not value.strip():
+                return "UNVERIFIED"
+            try:
+                stamp=datetime.fromisoformat(value.replace("Z","+00:00"))
+            except ValueError:
+                return "UNVERIFIED"
+            if stamp.tzinfo is None:
+                return "UNVERIFIED"
+            if (stamp-now).total_seconds()>FUTURE_TOLERANCE_SECONDS:
+                return "UNVERIFIED"
+            if observed is not None and observed!=stamp:
+                return "UNVERIFIED"
+            observed=stamp
+    for key in ("ttl","ttl_seconds"):
+        if key in temporal:
+            ttl=temporal[key]
+            if type(ttl) not in (int,float) or not math.isfinite(ttl) or ttl<0:
+                return "UNVERIFIED"
+    if "expires_at" in temporal:
+        if type(temporal["expires_at"]) is not str or not temporal["expires_at"].strip():
+            return "UNVERIFIED"
         try:
             expiry=datetime.fromisoformat(temporal["expires_at"].replace("Z","+00:00"))
             if expiry.tzinfo is None:
                 return "UNVERIFIED"
-            return "STALE" if now>expiry else "FRESH"
+            if observed is not None and expiry<observed:
+                return "UNVERIFIED"
+            return "STALE" if now>=expiry else "FRESH"
         except (TypeError,ValueError):
             return "UNVERIFIED"
     record={**temporal,"source":evidence.source_ref,"truth_state":"CONFIRMED"}
@@ -200,7 +231,7 @@ def _domain(evidence, domain, known, now):
     meta={"source_ref":"","evidence_complete":False,"freshness":"NOT_EVALUATED"}
     if type(evidence) is not LoadedEvidence:
         return "UNKNOWN",meta
-    if type(evidence.source_ref) is not str:
+    if type(evidence.source_ref) is not str or type(evidence.kind) is not str or type(evidence.as_of) is not str:
         return "UNKNOWN",meta
     source=redact_text(evidence.source_ref).strip()[:240]
     meta.update(source_ref=source,as_of=redact_text(evidence.as_of)[:80] if type(evidence.as_of) is str else "")
@@ -239,7 +270,13 @@ def _domain(evidence, domain, known, now):
                 elif any(report.get(k) is False for k in _RECOVERY_FLAGS) or report.get("hard_failures") or report.get("quarantine_pending_count",0):
                     status="UNSAFE"
                 elif report.get("status")=="RECOVERED" and all(report.get(k) is True for k in _RECOVERY_FLAGS) and report.get("restores_state_only") is True and report.get("external_action_executed") is False and report.get("scope_fingerprint") and all(known.get(k) for k in ("owner_id","tenant_id","workspace_id")):
-                    status="VERIFIED"
+                    # A receipt claim must carry the actual canonical journal it reports.
+                    status,logical=_journal(report.get("journal"),known) if type(report.get("journal")) is dict else ("UNKNOWN",{})
+                    if status=="VERIFIED":
+                        for key in ("revision","head_digest"):
+                            if key in report and (type(report[key]) is not type(logical.get(key)) or report[key]!=logical.get(key)):
+                                status="MISMATCH"
+                                break
                 else: status=_bad_status(report.get("status"))
             else:
                 status,report="UNKNOWN",{}
@@ -260,7 +297,10 @@ def _domain(evidence, domain, known, now):
 
 def _mission_counts(evidence, known):
     counts={"pending_missions":0,"blocked_missions":0,"waiting_approval":0,"ready_handoffs":0}
-    if type(evidence) is not LoadedEvidence or evidence.kind!="missions" or evidence.complete is not True or type(evidence.source_ref) is not str or not evidence.source_ref.strip() or len(evidence.source_ref)>240:
+    if type(evidence) is not LoadedEvidence or type(evidence.kind) is not str or evidence.kind!="missions" or evidence.complete is not True or type(evidence.source_ref) is not str or not evidence.source_ref.strip() or len(evidence.source_ref)>240:
+        return counts,False
+    own_scope=_scope(evidence.scope)
+    if not all(own_scope.get(k) for k in ("owner_id","tenant_id","workspace_id")):
         return counts,False
     _bind_scope(known,evidence.scope)
     values=_checked(evidence.value)
@@ -299,7 +339,7 @@ def build_core_health_evidence(*, journal_evidence=None,checkpoint_evidence=None
     """
     if now is not None and (type(now) is not datetime or now.tzinfo is None):
         raise HealthEvidenceError("AWARE_NOW_REQUIRED")
-    known=_scope(expected_scope or {})
+    known=_scope({} if expected_scope is None else expected_scope)
     payload={"core_version":redact_text(core_version)[:80] if type(core_version) is str else "",
         "schema_version":redact_text(schema_version)[:80] if type(schema_version) is str else ""}
     provenance={}

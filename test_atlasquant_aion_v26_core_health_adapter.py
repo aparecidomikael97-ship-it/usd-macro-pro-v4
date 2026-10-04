@@ -31,7 +31,7 @@ def evidence(**overrides):
     memory=create_memory_record(namespace="TENANT",memory_class="TENANT",content="fixture",
         scope={"tenant_id":"t"},validation_state="VALIDATED",evidence_refs=["EV-1"],created_at=NOW.isoformat())
     recovery={"schema":STORE_SCHEMA,"status":"RECOVERED","restores_state_only":True,
-        "scope_fingerprint":j["scope_fingerprint"],"request_id":"r",
+        "scope_fingerprint":j["scope_fingerprint"],"request_id":"r","journal":j,
         "external_action_executed":False,"hard_failures":[],"quarantine_pending_count":0,
         **{flag:True for flag in adapter._RECOVERY_FLAGS}}
     inputs={"journal_evidence":E("resident/journal",j,"journal",SCOPE,True),
