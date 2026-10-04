@@ -426,7 +426,7 @@ def test_explicit_conflict_metadata_blocks_operational_memory():
         },
     )
     result = use(record)
-    assert "UNRESOLVED_CONFLICT_METADATA" in result["blockers"]
+    assert "CONFLICT_METADATA_INVALID" in result["blockers"]
     assert result["allowed_for_operational_use"] is False
 
 
