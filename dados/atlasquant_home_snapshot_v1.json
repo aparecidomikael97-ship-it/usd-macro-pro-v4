@@ -1,11 +1,11 @@
 {
   "schema": "ATLASQUANT_HOME_SNAPSHOT_V1",
-  "generated_at": "2026-10-04T01:29:28.243921+00:00",
-  "runtime_generated_at": "2026-10-04T01:29:55.042030+00:00",
+  "generated_at": "2026-10-04T02:15:46.907497+00:00",
+  "runtime_generated_at": "2026-10-04T02:16:09.977345+00:00",
   "engine_version": "V11.0.8 / AtlasQuant Runtime",
   "inputs": {
     "version": "V10.7_FAST_BOOT_1",
-    "generated_at": "2026-10-04T01:29:28.243921+00:00",
+    "generated_at": "2026-10-04T02:15:46.907497+00:00",
     "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
     "core_evidence": [
       {
@@ -69,7 +69,7 @@
         "Score final": 78.0,
         "Qualidade": 70.0,
         "Confluência": "MODERADA",
-        "Dif. macro": -12.6,
+        "Dif. macro": -15.9,
         "Índice ranking": 75.2
       },
       {
@@ -78,7 +78,7 @@
         "Score final": 55.0,
         "Qualidade": 91.0,
         "Confluência": "BAIXA",
-        "Dif. macro": -12.5,
+        "Dif. macro": -13.5,
         "Índice ranking": 69.4
       }
     ],
@@ -309,12 +309,12 @@
           "Markets Brace For Two More Fed Rate Hikes In 2026 - Forbes",
           "Which industries are most affected by Fed rate hikes? - Chase Bank",
           "Why Markets May Be Pricing in Too Many Fed Rate Hikes - Goldman Sachs",
-          "Goldman Sachs pushes Fed rate hike forecast to December - reuters.com",
+          "Goldman Sachs pushes Fed rate hike forecast to December - Reuters",
           "Minneapolis Federal Reserve President Neel Kashkari sees one more rate hike this year - CNBC",
           "Cooler inflation could buy the Fed, Trump time on another rate hike - Politico",
+          "News | Will the Bank of Canada follow the Federal Reserve and raise rates? Inflation will decide. - CoStar",
           "Federal Reserve Monetary Policy Impact on Markets - Funds Society",
-          "Gold edges up as softer inflation data dents Fed rate-hike bets - reuters.com",
-          "Gold holds steady as firm dollar, yields counter easing Fed rate hike bets - CNBC"
+          "Gold edges up as softer inflation data dents Fed rate-hike bets - Reuters"
         ],
         "analisadas": [
           {
@@ -378,9 +378,9 @@
             "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
           },
           {
-            "titulo": "Goldman Sachs pushes Fed rate hike forecast to December - reuters.com",
+            "titulo": "Goldman Sachs pushes Fed rate hike forecast to December - Reuters",
             "corpo": "Goldman Sachs pushes Fed rate hike forecast to December",
-            "fonte": "reuters.com",
+            "fonte": "Reuters",
             "relevancia_pontos": 6,
             "relevancia": "Alta",
             "impacto": 0.55,
@@ -408,6 +408,16 @@
             "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
           },
           {
+            "titulo": "News | Will the Bank of Canada follow the Federal Reserve and raise rates? Inflation will decide. - CoStar",
+            "corpo": "News | Will the Bank of Canada follow the Federal Reserve and raise rates? Inflation will decide.",
+            "fonte": "CoStar",
+            "relevancia_pontos": 6,
+            "relevancia": "Alta",
+            "impacto": 0.0,
+            "direcao": "⚪ Neutro/indefinido",
+            "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
+          },
+          {
             "titulo": "Federal Reserve Monetary Policy Impact on Markets - Funds Society",
             "corpo": "Federal Reserve Monetary Policy Impact on Markets",
             "fonte": "Funds Society",
@@ -418,19 +428,9 @@
             "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
           },
           {
-            "titulo": "Gold edges up as softer inflation data dents Fed rate-hike bets - reuters.com",
+            "titulo": "Gold edges up as softer inflation data dents Fed rate-hike bets - Reuters",
             "corpo": "Gold edges up as softer inflation data dents Fed rate-hike bets",
-            "fonte": "reuters.com",
-            "relevancia_pontos": 6,
-            "relevancia": "Alta",
-            "impacto": 0.0,
-            "direcao": "⚪ Neutro/indefinido",
-            "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
-          },
-          {
-            "titulo": "Gold holds steady as firm dollar, yields counter easing Fed rate hike bets - CNBC",
-            "corpo": "Gold holds steady as firm dollar, yields counter easing Fed rate hike bets",
-            "fonte": "CNBC",
+            "fonte": "Reuters",
             "relevancia_pontos": 6,
             "relevancia": "Alta",
             "impacto": 0.0,
@@ -444,7 +444,7 @@
           "juros": 3.75,
           "inflacao": 3.35302,
           "pib": 2.19157,
-          "sentimento": 52.17391304347826,
+          "sentimento": 50.0,
           "fonte": "FRED + transformação anual"
         },
         "EUR": {
@@ -458,7 +458,7 @@
           "juros": 4.0,
           "inflacao": 3.2,
           "pib": 1.1,
-          "sentimento": 100.0,
+          "sentimento": 66.66666666666666,
           "fonte": "FRED + transformação anual + fallback parcial"
         },
         "JPY": {
@@ -486,7 +486,7 @@
           "juros": 4.51,
           "inflacao": 2.7,
           "pib": 2.13764,
-          "sentimento": 50.0,
+          "sentimento": 40.0,
           "fonte": "FRED + transformação anual + fallback parcial"
         },
         "NZD": {
@@ -500,7 +500,7 @@
           "juros": 10.75,
           "inflacao": 4.5,
           "pib": 2.4,
-          "sentimento": 83.33333333333333,
+          "sentimento": 71.42857142857143,
           "fonte": "BCB + validação + fallback parcial"
         }
       },
@@ -510,19 +510,19 @@
           "juros": 10.8,
           "inflacao": 4.5,
           "pib": 2.4,
-          "sentimento": 83.3,
+          "sentimento": 71.4,
           "fonte": "BCB + validação + fallback parcial",
           "Moeda": "Real Brasileiro",
           "juros_reais": 6.2,
           "n_juros": 100.0,
           "n_inflacao": 100.0,
           "n_pib": 83.49591589284022,
-          "n_sentimento": 83.33333333333333,
+          "n_sentimento": 71.42857142857143,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 75.9,
+          "Pontuação_Macro": 74.7,
           "Influência_Fed": -4.7,
-          "Pontuação_Final": 71.2,
+          "Pontuação_Final": 70.0,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 20.0,
@@ -530,13 +530,13 @@
               "PIB": 12.524387383926031,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 8.333333333333334
+              "Sentimento": 7.142857142857143
             },
             "fed": -4.668157894736843,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 71.18956282252253
+            "unrounded_final": 69.99908663204634
           },
           "Posição": 1
         },
@@ -545,14 +545,14 @@
           "juros": 3.8,
           "inflacao": 3.4,
           "pib": 2.2,
-          "sentimento": 52.2,
+          "sentimento": 50.0,
           "fonte": "FRED + transformação anual",
           "Moeda": "Dólar Americano",
           "juros_reais": 0.4,
           "n_juros": 65.816,
           "n_inflacao": 62.67743,
           "n_pib": 73.09578815534078,
-          "n_sentimento": 52.17391304347826,
+          "n_sentimento": 50.0,
           "n_emprego": 44.675,
           "n_atividade": 52.0,
           "Pontuação_Macro": 57.7,
@@ -581,19 +581,19 @@
           "juros": 4.5,
           "inflacao": 2.7,
           "pib": 2.1,
-          "sentimento": 50.0,
+          "sentimento": 40.0,
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Dólar Australiano",
           "juros_reais": 1.8,
           "n_juros": 41.51392008219665,
           "n_inflacao": 45.45454545454547,
           "n_pib": 70.40481809880697,
-          "n_sentimento": 50.0,
+          "n_sentimento": 40.0,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 50.7,
+          "Pontuação_Macro": 49.7,
           "Influência_Fed": -3.5,
-          "Pontuação_Final": 47.2,
+          "Pontuação_Final": 46.2,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 8.30278401643933,
@@ -601,13 +601,13 @@
               "PIB": 10.560722714821045,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 5.0
+              "Sentimento": 4.0
             },
             "fed": -3.501118421052632,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 47.18057012838957
+            "unrounded_final": 46.18057012838957
           },
           "Posição": 3
         },
@@ -616,19 +616,19 @@
           "juros": 4.0,
           "inflacao": 3.2,
           "pib": 1.1,
-          "sentimento": 100.0,
+          "sentimento": 66.7,
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Libra Esterlina",
           "juros_reais": 0.8,
           "n_juros": 28.209654154948588,
           "n_inflacao": 60.60606060606061,
           "n_pib": 18.629216959148952,
-          "n_sentimento": 100.0,
+          "n_sentimento": 66.66666666666666,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 47.5,
+          "Pontuação_Macro": 44.2,
           "Influência_Fed": -0.4,
-          "Pontuação_Final": 47.1,
+          "Pontuação_Final": 43.8,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 5.641930830989718,
@@ -636,13 +636,13 @@
               "PIB": 2.794382543872343,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 10.0
+              "Sentimento": 6.666666666666666
             },
             "fed": -0.3890131578947369,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 47.138209307876416
+            "unrounded_final": 43.80487597454308
           },
           "Posição": 4
         },
@@ -1266,7 +1266,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1720 min)"
+        "Técnica desatualizada (1766 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -1278,7 +1278,7 @@
         "Score Mestre forte (91/100)"
       ],
       "executable": false,
-      "technical_age": 1719.8,
+      "technical_age": 1766.1,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -1286,21 +1286,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1719.8,
+            "age_minutes": 1766.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1807.0,
+            "age_minutes": 1853.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1926.6,
+            "age_minutes": 1972.8,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -1328,9 +1328,9 @@
         "H1: 🟢 PULLBACK OK — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1739.8371801833334,
+        "age_minutes": 1786.0998279666667,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1740 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1786 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "EUR",
@@ -1426,7 +1426,7 @@
         "reference_at": "2026-10-02T20:50:02.620100+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.8,
+        "age_minutes": 1766.1,
         "valid_until": "2026-10-02T21:50:02.620100+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -1441,7 +1441,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T19:51:15.219328+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00"
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00"
       }
     },
     {
@@ -1456,7 +1456,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -12.6,
+      "matrix_diff": -15.9,
       "h4": "🟡 PARCIAL",
       "h1": "🔴 CONTRA",
       "m15": "🔴 SEM GATILHO",
@@ -1782,7 +1782,7 @@
         "ADR14 indisponível",
         "Risco de evento desconhecido",
         "H1 está contra o viés",
-        "Técnica desatualizada (1720 min)"
+        "Técnica desatualizada (1766 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -1792,7 +1792,7 @@
       ],
       "positives": [],
       "executable": false,
-      "technical_age": 1719.8,
+      "technical_age": 1766.1,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -1800,21 +1800,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1719.8,
+            "age_minutes": 1766.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1807.1,
+            "age_minutes": 1853.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1926.6,
+            "age_minutes": 1972.9,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -1937,7 +1937,7 @@
         "reference_at": "2026-10-02T20:50:00.792469+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.9,
+        "age_minutes": 1766.1,
         "valid_until": "2026-10-02T21:50:00.792469+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -1951,7 +1951,7 @@
         "generation": 17,
         "observed_at": "2026-10-03T05:29:14.764122+00:00",
         "expired_at": "2026-10-03T05:29:14.764122+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00"
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00"
       }
     },
     {
@@ -1966,7 +1966,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -12.5,
+      "matrix_diff": -13.5,
       "h4": "⚪ MACRO AGUARDAR",
       "h1": "⚪ MACRO AGUARDAR",
       "m15": "⚪ MACRO AGUARDAR",
@@ -2232,7 +2232,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1720 min)"
+        "Técnica desatualizada (1766 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -2244,7 +2244,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1719.8,
+      "technical_age": 1766.0,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -2252,21 +2252,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1719.8,
+            "age_minutes": 1766.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1807.1,
+            "age_minutes": 1853.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1926.5,
+            "age_minutes": 1972.8,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -2291,9 +2291,9 @@
       "scanner_processed_at": 1790974204.6363814,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 1739.8403563,
+        "age_minutes": 1786.10116095,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1740 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1786 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "AUD",
@@ -2389,7 +2389,7 @@
         "reference_at": "2026-10-02T20:50:04.587032+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.8,
+        "age_minutes": 1766.1,
         "valid_until": "2026-10-02T21:50:04.587032+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -2401,7 +2401,7 @@
         "automatic_execution": false,
         "real_orders_enabled": false,
         "generation": 0,
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00"
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00"
       }
     },
     {
@@ -2754,7 +2754,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1720 min)"
+        "Técnica desatualizada (1766 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -2767,7 +2767,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1719.7,
+      "technical_age": 1766.0,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -2775,21 +2775,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1719.7,
+            "age_minutes": 1766.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1807.1,
+            "age_minutes": 1853.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1926.5,
+            "age_minutes": 1972.8,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -2817,9 +2817,9 @@
         "H1: 🟢 PULLBACK OK — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1874.8419458166668,
+        "age_minutes": 1921.1018327833333,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1875 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1921 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "NZD",
@@ -2915,7 +2915,7 @@
         "reference_at": "2026-10-02T20:50:06.230708+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.8,
+        "age_minutes": 1766.0,
         "valid_until": "2026-10-02T21:50:06.230708+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -2930,7 +2930,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T13:26:06.861484+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00"
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00"
       }
     },
     {
@@ -3280,7 +3280,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1719 min)"
+        "Técnica desatualizada (1765 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -3293,7 +3293,7 @@
         "Qualidade alta (84%)"
       ],
       "executable": false,
-      "technical_age": 1718.8,
+      "technical_age": 1765.1,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -3301,21 +3301,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1718.8,
+            "age_minutes": 1765.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1718.8,
+            "age_minutes": 1765.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1807.1,
+            "age_minutes": 1853.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -3343,9 +3343,9 @@
         "H1: 🟢 PULLBACK OK — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 1814.8435308166665,
+        "age_minutes": 1861.10250215,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1815 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1861 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "USD",
@@ -3441,7 +3441,7 @@
         "reference_at": "2026-10-02T20:51:03.037992+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:51 UTC",
-        "age_minutes": 1718.8,
+        "age_minutes": 1765.1,
         "valid_until": "2026-10-02T21:51:03.037992+00:00",
         "valid_until_display": "02/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -3456,7 +3456,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T08:27:04.698792+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00"
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00"
       }
     },
     {
@@ -3808,7 +3808,7 @@
         "Risco de evento desconhecido",
         "H4 está contra o viés",
         "H1 está contra o viés",
-        "Técnica desatualizada (1720 min)"
+        "Técnica desatualizada (1766 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -3821,7 +3821,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1719.7,
+      "technical_age": 1765.9,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -3829,21 +3829,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1719.7,
+            "age_minutes": 1765.9,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1719.7,
+            "age_minutes": 1765.9,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1926.4,
+            "age_minutes": 1972.7,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -3868,9 +3868,9 @@
       "scanner_processed_at": 1790974210.1219885,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 1904.8451228000001,
+        "age_minutes": 1951.1031738333334,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 1905 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 1951 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "USD",
@@ -3966,7 +3966,7 @@
         "reference_at": "2026-10-02T20:50:09.782932+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.7,
+        "age_minutes": 1766.0,
         "valid_until": "2026-10-02T21:50:09.782932+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -3981,7 +3981,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-01T08:27:52.231008+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00"
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00"
       }
     },
     {
@@ -4335,7 +4335,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (1720 min)"
+        "Técnica desatualizada (1766 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -4348,7 +4348,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 1719.7,
+      "technical_age": 1766.0,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -4356,21 +4356,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 1719.7,
+            "age_minutes": 1766.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 1719.7,
+            "age_minutes": 1766.0,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 1926.5,
+            "age_minutes": 1972.7,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -4496,7 +4496,7 @@
         "reference_at": "2026-10-02T20:50:07.763529+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.7,
+        "age_minutes": 1766.0,
         "valid_until": "2026-10-02T21:50:07.763529+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -4511,13 +4511,13 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T16:24:59.398133+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00"
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00"
       }
     }
   ],
   "signal_lifecycle": {
     "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
-    "updated_at": "2026-10-04T01:29:51.102116+00:00",
+    "updated_at": "2026-10-04T02:16:06.456583+00:00",
     "pairs": {
       "EUR/USD": {
         "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
@@ -4528,7 +4528,7 @@
         "reference_at": "2026-10-02T20:50:02.620100+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.8,
+        "age_minutes": 1766.1,
         "valid_until": "2026-10-02T21:50:02.620100+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -4545,7 +4545,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T19:51:15.219328+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00",
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4558,7 +4558,7 @@
         "reference_at": "2026-10-02T20:50:00.792469+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.8,
+        "age_minutes": 1766.1,
         "valid_until": "2026-10-02T21:50:00.792469+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -4575,7 +4575,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-03T05:29:14.764122+00:00",
         "blocked_at": "",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00",
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4588,7 +4588,7 @@
         "reference_at": "2026-10-02T20:50:04.587032+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.8,
+        "age_minutes": 1766.0,
         "valid_until": "2026-10-02T21:50:04.587032+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -4605,7 +4605,7 @@
         "confirmed_at": "",
         "expired_at": "",
         "blocked_at": "",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00",
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00",
         "previous_status_code": "NO_SIGNAL",
         "previous_side": "WAIT"
       },
@@ -4618,7 +4618,7 @@
         "reference_at": "2026-10-02T20:50:06.230708+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.7,
+        "age_minutes": 1766.0,
         "valid_until": "2026-10-02T21:50:06.230708+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -4635,7 +4635,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T13:26:06.861484+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00",
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4648,7 +4648,7 @@
         "reference_at": "2026-10-02T20:51:03.037992+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:51 UTC",
-        "age_minutes": 1718.8,
+        "age_minutes": 1765.1,
         "valid_until": "2026-10-02T21:51:03.037992+00:00",
         "valid_until_display": "02/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4665,7 +4665,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T08:27:04.698792+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00",
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       },
@@ -4678,7 +4678,7 @@
         "reference_at": "2026-10-02T20:50:09.782932+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.7,
+        "age_minutes": 1765.9,
         "valid_until": "2026-10-02T21:50:09.782932+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -4695,7 +4695,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-01T08:27:52.231008+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00",
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       },
@@ -4708,7 +4708,7 @@
         "reference_at": "2026-10-02T20:50:07.763529+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "02/10/2026 20:50 UTC",
-        "age_minutes": 1719.7,
+        "age_minutes": 1766.0,
         "valid_until": "2026-10-02T21:50:07.763529+00:00",
         "valid_until_display": "02/10/2026 21:50 UTC",
         "remaining_minutes": 0.0,
@@ -4725,7 +4725,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-02T22:21:55.448568+00:00",
         "blocked_at": "2026-10-02T16:24:59.398133+00:00",
-        "last_seen_at": "2026-10-04T01:29:51.102116+00:00",
+        "last_seen_at": "2026-10-04T02:16:06.456583+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       }
