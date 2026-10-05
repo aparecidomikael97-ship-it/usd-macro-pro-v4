@@ -9,6 +9,9 @@ on:
       - "test_atlasquant_aion_b2b_pilot_owner_decision.py"
       - "atlasquant_aion_b2b_pilot_owner_review_packet.py"
       - "docs/aion/AION_B2B_PILOT_OWNER_DECISION_V1.md"
+      - "atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_DECISION_PERSISTENCE_PLAN_V1.md"
       - ".github/workflows/aion-b2b-pilot-owner-decision.yml"
 
 permissions:
@@ -32,11 +35,14 @@ jobs:
             atlasquant_aion_nonce_registry.py \
             atlasquant_aion_b2b_pilot_owner_review_packet.py \
             atlasquant_aion_b2b_pilot_owner_decision.py \
-            test_atlasquant_aion_b2b_pilot_owner_decision.py
+            atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py
       - name: Run owner decision tests
         run: |
           python -m unittest -q \
             test_atlasquant_aion_b2b_pilot_owner_decision.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py \
             test_atlasquant_aion_b2b_pilot_owner_review_packet.py
       - name: Assert decision and activation separation
         run: |
@@ -59,4 +65,9 @@ jobs:
               assert marker in source, marker
           assert "APPROVE_CORE_FREEZE" not in source
           assert "DENY_CORE_FREEZE" not in source
+          persist = Path("atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py").read_text(encoding="utf-8")
+          assert "append_checkpoint_patch(" not in persist
+          assert '"automatic_checkpoint_write": False' in persist
+          assert '"decision_record_persisted": False' in persist
+          assert '"pilot_activation_authorized": False' in persist
           PY
