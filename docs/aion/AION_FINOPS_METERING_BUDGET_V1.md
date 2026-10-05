@@ -24,7 +24,7 @@ The contract adds explicit metering by:
 
 ## Admission policy
 
-The gate returns only a decision for a caller to enforce:
+The gate consumes a VERIFIED policy bound to the same owner/tenant/workspace as the ledger. Cost, calls, tokens, recursion depth and per-user ceilings are mandatory; missing or malformed limits fail closed. The gate returns only a decision for a caller to enforce:
 
 - `ALLOW / NORMAL`;
 - `DEGRADE / LOW_COST_MODE`;
