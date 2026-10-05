@@ -328,6 +328,11 @@ def build_chat_turn(
         reason = "CORE_NOT_READY"
         approval_state = "NOT_SUFFICIENT"
 
+    if attachment_budget["overflow"] is True:
+        state = "BLOCKED"
+        reason = "ATTACHMENT_BUDGET_EXCEEDED"
+        approval_state = "NOT_SUFFICIENT"
+
     selected = (
         dict(core.get("selected_capability"))
         if isinstance(core.get("selected_capability"), Mapping)
@@ -437,9 +442,17 @@ def append_chat_history(
     budget is exhausted it fails before mutation so the host can use/reopen
     the durable store instead.
     """
-    rows = [dict(item) for item in list(history or []) if isinstance(item, Mapping)]
+    if history is not None and len(history) > MAX_IN_MEMORY_HISTORY_ENTRIES:
+        raise ValueError(
+            "in-memory history budget exceeded; durable chat store required"
+        )
     answer = _message_text(assistant_text, 16000)
     additions = 1 + (1 if answer.strip() else 0)
+    if history is not None and len(history) + additions > MAX_IN_MEMORY_HISTORY_ENTRIES:
+        raise ValueError(
+            "in-memory history budget exceeded; durable chat store required"
+        )
+    rows = [dict(item) for item in list(history or []) if isinstance(item, Mapping)]
     if len(rows) + additions > MAX_IN_MEMORY_HISTORY_ENTRIES:
         raise ValueError(
             "in-memory history budget exceeded; durable chat store required"
