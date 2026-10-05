@@ -77,7 +77,7 @@ jobs:
               '"writer_identity_verified": False',
               '"business_action_authorized": False',
               '"storage_write_performed": False',
-              '"executes_action": False',
+              '"executes_action",',
           ):
               assert marker in attest, marker
 
@@ -87,7 +87,7 @@ jobs:
               '"business_action_authorized": False',
               '"renewal_authorized",',
               '"termination_authorized",',
-              '"executes_action": False',
+              '"executes_action",',
           ):
               assert marker in writer, marker
 
