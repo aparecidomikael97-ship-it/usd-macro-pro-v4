@@ -87,6 +87,7 @@ class AionB2BPortalReadModelTests(unittest.TestCase):
             evidence_refs=["cycle:v1", "finops:v1", "quota:v1", "support:v1"],
         )
         self.assertEqual(out["state"], "READY")
+        self.assertEqual(out["scope"], SCOPE)
         self.assertEqual(out["health_label"], "SAUDÁVEL")
         self.assertEqual(out["health_score"], 88.0)
         self.assertEqual(out["observed_roi_pct"], 60.0)
