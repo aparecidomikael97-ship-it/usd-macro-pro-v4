@@ -198,6 +198,19 @@ def build_work_unit_economics(
     costed_completed: dict[str, dict[str, Any]] = {}
     by_type: dict[str, dict[str, Any]] = {}
     for work in completed:
+        bucket = by_type.setdefault(
+            work["work_type"],
+            {
+                "completed": 0,
+                "costed_completed": 0,
+                "predicted_cost_usd": 0.0,
+                "actual_cost_usd": 0.0,
+                "actual_cost_complete_count": 0,
+            },
+        )
+        bucket["completed"] += 1
+
+    for work in completed:
         linked = [
             event_by_id[event_id]
             for event_id, wid in event_to_work.items()
@@ -237,17 +250,7 @@ def build_work_unit_economics(
         }
         costed_completed[work["work_id"]] = row
 
-        bucket = by_type.setdefault(
-            work["work_type"],
-            {
-                "completed": 0,
-                "costed_completed": 0,
-                "predicted_cost_usd": 0.0,
-                "actual_cost_usd": 0.0,
-                "actual_cost_complete_count": 0,
-            },
-        )
-        bucket["completed"] += 1
+        bucket = by_type[work["work_type"]]
         bucket["costed_completed"] += 1
         if predicted_total is not None:
             bucket["predicted_cost_usd"] = round(
@@ -258,24 +261,6 @@ def build_work_unit_economics(
                 float(bucket["actual_cost_usd"]) + actual_total, 9
             )
             bucket["actual_cost_complete_count"] += 1
-
-    for work in completed:
-        by_type.setdefault(
-            work["work_type"],
-            {
-                "completed": 0,
-                "costed_completed": 0,
-                "predicted_cost_usd": 0.0,
-                "actual_cost_usd": 0.0,
-                "actual_cost_complete_count": 0,
-            },
-        )
-    for bucket in by_type.values():
-        bucket["completed"] = sum(
-            1 for row in completed if row["work_type"] in by_type and row["work_type"] == next(
-                key for key, value in by_type.items() if value is bucket
-            )
-        )
 
     unallocated_event_ids = sorted(set(event_by_id) - set(event_to_work))
     if unallocated_event_ids:
