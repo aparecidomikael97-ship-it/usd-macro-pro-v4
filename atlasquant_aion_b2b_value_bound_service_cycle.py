@@ -211,6 +211,8 @@ def evaluate_value_bound_service_cycle(
         "source_cycle_digest": _text(cycle.get("evidence_digest"), 180),
         "state": state,
         "decision": decision,
+        "source_value_decision": source.get("source_value_decision"),
+        "source_conversion_decision": source.get("source_conversion_decision"),
     }
 
     return {
@@ -241,6 +243,8 @@ def evaluate_value_bound_service_cycle(
         "customer_visible": False,
         "contains_internal_finops": True,
         "requires_customer_safe_projection": True,
+        "source_value_decision": source.get("source_value_decision"),
+        "source_conversion_decision": source.get("source_conversion_decision"),
         "automatic_renewal": False,
         "automatic_expansion": False,
         "automatic_package_change": False,
