@@ -78,7 +78,7 @@ def _text(value: Any, limit: int = 240) -> str:
 
 
 def _scope(raw: Mapping[str, Any] | None) -> dict[str, str]:
-    item = dict(raw or {})
+    item = dict(raw) if isinstance(raw, Mapping) else {}
     return {
         "owner_id": _text(item.get("owner_id") or item.get("actor_id"), 120),
         "tenant_id": _text(item.get("tenant_id"), 120),
@@ -98,7 +98,7 @@ def _canonical(value: Any) -> str:
 
 def stage_claim_digest(stage: Any, snapshot: Mapping[str, Any] | None) -> str:
     name = _text(stage, 80).lower()
-    body = dict(snapshot or {})
+    body = dict(snapshot) if isinstance(snapshot, Mapping) else {}
     return "sha256:" + sha256(
         _canonical({
             "readiness_schema": SCHEMA,
@@ -136,8 +136,18 @@ def evaluate_post_hardening_readiness(
     if integrity.get("state") != "MATCH":
         blockers.append("VERIFICATION_LEDGER_INTEGRITY_MISMATCH")
 
-    snapshots = dict(stage_snapshots or {})
-    entry_ids = dict(verification_entry_ids or {})
+    if not isinstance(stage_snapshots, Mapping):
+        if stage_snapshots is not None:
+            blockers.append("STAGE_SNAPSHOTS_MAPPING_REQUIRED")
+        snapshots = {}
+    else:
+        snapshots = dict(stage_snapshots)
+    if not isinstance(verification_entry_ids, Mapping):
+        if verification_entry_ids is not None:
+            blockers.append("VERIFICATION_ENTRY_IDS_MAPPING_REQUIRED")
+        entry_ids = {}
+    else:
+        entry_ids = dict(verification_entry_ids)
     rows: dict[str, dict[str, Any]] = {}
 
     for stage in STAGE_RULES:
@@ -189,6 +199,9 @@ def evaluate_post_hardening_readiness(
     unexpected = sorted(set(snapshots) - set(STAGE_RULES))
     if unexpected:
         blockers.append("UNEXPECTED_STAGE_INPUT")
+    unexpected_entry_ids = sorted(set(entry_ids) - set(STAGE_RULES))
+    if unexpected_entry_ids:
+        blockers.append("UNEXPECTED_VERIFICATION_ENTRY_ID")
 
     blockers = list(dict.fromkeys(blockers))
     ready = not blockers and all(row.get("state") == "VERIFIED" for row in rows.values())
@@ -225,7 +238,7 @@ def evaluate_post_hardening_readiness(
 
 
 def post_hardening_review_plan(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
-    data = dict(snapshot or {})
+    data = dict(snapshot) if isinstance(snapshot, Mapping) else {}
     ready = data.get("state") == "READY_FOR_HUMAN_OWNER_REVIEW"
     return {
         "schema": SCHEMA,
