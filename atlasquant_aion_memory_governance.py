@@ -15,6 +15,10 @@ from typing import Any, Callable, Mapping, Sequence
 
 from atlasquant_aion_memory_layers import default_memory_layers, remember
 from atlasquant_aion_observability import redact_text
+from atlasquant_aion_verification_ledger import (
+    find_verified_entry,
+    record_independent_verification,
+)
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_GOVERNANCE_V1"
 STATES = ("PROPOSED", "VERIFIED", "PROMOTED", "REJECTED", "SUPERSEDED")
@@ -226,6 +230,9 @@ def propose_memory(
         "verification_refs": [],
         "verification_kind": "",
         "verification_digest": "",
+        "verification_ledger_entry_id": "",
+        "verification_ledger_entry_hash": "",
+        "verification_mode": "",
         "verified_at": "",
         "verified_by": "",
         "taint_labels": taint,
@@ -321,6 +328,9 @@ def verify_memory_proposal(
         "verifier_id": verifier_name,
         "verification_refs": refs,
     })
+    verified["verification_ledger_entry_id"] = ""
+    verified["verification_ledger_entry_hash"] = ""
+    verified["verification_mode"] = "LEGACY_UNLEDGERED"
     verified["verified_at"] = _aware(now).isoformat()
     verified["verified_by"] = verifier_name
     verified["resolved_taint"] = list(verified.get("taint_labels") or [])
@@ -345,6 +355,116 @@ def verify_memory_proposal(
     }
 
 
+def verify_memory_proposal_independently(
+    governance: Mapping[str, Any] | None,
+    verification_ledger: Mapping[str, Any] | None,
+    proposal_id: Any,
+    *,
+    generator_id: Any,
+    verifier_kind: Any,
+    verifier_id: Any,
+    verification_refs: Sequence[Any] | None,
+    verifier: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    now: Any = None,
+) -> dict[str, Any]:
+    """Verify a memory proposal through the tamper-evident independent ledger."""
+    state = normalize_memory_governance(governance)
+    target = _clean(proposal_id, 120)
+    record = next((row for row in state["proposals"] if row["proposal_id"] == target), None)
+    if record is None:
+        raise LookupError("memory proposal unavailable")
+    if record["state"] != "PROPOSED":
+        raise ValueError("only PROPOSED memory may be independently verified")
+    refs = _refs(verification_refs)
+    verifier_name = _clean(verifier_id, 160)
+    generator = _clean(generator_id, 160)
+    if not generator:
+        raise ValueError("generator_id required")
+    if not refs:
+        raise ValueError("verification refs required")
+    if not callable(verifier):
+        raise TypeError("independent verifier callback required")
+
+    def ledger_verifier(_envelope: Mapping[str, Any]) -> dict[str, Any]:
+        result = dict(verifier(deepcopy(record)) or {})
+        return {
+            "state": _upper(result.get("state"), 40) or "INCONCLUSIVE",
+            "independent": result.get("independent") is True,
+            "verifier_id": _clean(result.get("verifier_id"), 160),
+            "bound_claim_digest": _clean(result.get("content_digest"), 160),
+            "bound_refs": _refs(
+                result.get("bound_refs")
+                if isinstance(result.get("bound_refs"), (list, tuple))
+                else []
+            ),
+            "reason": _clean(result.get("reason"), 800),
+        }
+
+    logged = record_independent_verification(
+        verification_ledger,
+        claim_id=target,
+        claim_kind="MEMORY_PROPOSAL",
+        claim_digest=record["content_digest"],
+        generator_id=generator,
+        verifier_kind=verifier_kind,
+        verifier_id=verifier_name,
+        evidence_refs=refs,
+        trusted_context={
+            "owner_id": record["owner_id"],
+            "tenant_id": record["tenant_id"],
+            "workspace_id": record["workspace_id"],
+        },
+        verifier=ledger_verifier,
+        created_at=now,
+    )
+    if logged["state"] != "VERIFIED":
+        return {
+            "schema": SCHEMA,
+            "state": "BLOCK",
+            "blockers": ["INDEPENDENT_VERIFICATION_NOT_CONFIRMED"],
+            "proposal": deepcopy(record),
+            "governance": state,
+            "verification_ledger": logged["ledger"],
+            "verification_entry": logged["entry"],
+            "executes_action": False,
+        }
+
+    entry = logged["entry"]
+    verified = deepcopy(record)
+    verified["state"] = "VERIFIED"
+    verified["verification_kind"] = _upper(verifier_kind, 40)
+    verified["verification_refs"] = refs
+    verified["verification_digest"] = entry["result_digest"]
+    verified["verification_ledger_entry_id"] = entry["entry_id"]
+    verified["verification_ledger_entry_hash"] = entry["entry_hash"]
+    verified["verification_mode"] = "LEDGER_BOUND_INDEPENDENT"
+    verified["verified_at"] = entry["created_at"]
+    verified["verified_by"] = entry["verifier_id"]
+    verified["resolved_taint"] = list(verified.get("taint_labels") or [])
+    verified["taint_labels"] = []
+    verified["provenance_chain"] = list(dict.fromkeys([
+        *list(record.get("provenance_chain") or []),
+        *refs,
+        "verification-ledger:" + entry["entry_id"],
+    ]))
+    verified["truth_state"] = "CONFIRMED"
+
+    proposals = [
+        verified if row["proposal_id"] == target else row
+        for row in state["proposals"]
+    ]
+    next_state = normalize_memory_governance({"schema": SCHEMA, "proposals": proposals})
+    return {
+        "schema": SCHEMA,
+        "state": "VERIFIED",
+        "proposal": deepcopy(verified),
+        "governance": next_state,
+        "verification_ledger": logged["ledger"],
+        "verification_entry": deepcopy(entry),
+        "executes_action": False,
+    }
+
+
 def promote_verified_memory(
     governance: Mapping[str, Any] | None,
     memory_layers: Mapping[str, Any] | None,
@@ -353,6 +473,7 @@ def promote_verified_memory(
     trusted_context: Mapping[str, Any] | None,
     review_approved: bool,
     reviewed_by: Any,
+    verification_ledger: Mapping[str, Any] | None = None,
     now: Any = None,
 ) -> dict[str, Any]:
     state = normalize_memory_governance(governance)
@@ -376,6 +497,24 @@ def promote_verified_memory(
         blockers.append("TAINT_UNRESOLVED")
     if not record.get("verification_refs") or not record.get("verification_digest"):
         blockers.append("VERIFICATION_PROOF_MISSING")
+    ledger_entry_id = _clean(record.get("verification_ledger_entry_id"), 120)
+    ledger_entry_hash = _clean(record.get("verification_ledger_entry_hash"), 64)
+    if not ledger_entry_id or not ledger_entry_hash:
+        blockers.append("INDEPENDENT_VERIFICATION_LEDGER_REQUIRED")
+    elif not isinstance(verification_ledger, Mapping):
+        blockers.append("INDEPENDENT_VERIFICATION_LEDGER_REQUIRED")
+    else:
+        attestation = find_verified_entry(
+            verification_ledger,
+            ledger_entry_id,
+            claim_id=target,
+            claim_digest=record.get("content_digest"),
+            trusted_context=scope,
+        )
+        if attestation.get("verified") is not True:
+            blockers.append("INDEPENDENT_VERIFICATION_LEDGER_INVALID")
+        elif _clean(attestation.get("entry_hash"), 64) != ledger_entry_hash:
+            blockers.append("INDEPENDENT_VERIFICATION_HASH_MISMATCH")
     if not record.get("provenance_ref") or not record.get("content_digest"):
         blockers.append("PROVENANCE_MISSING")
     if record.get("truth_state") != "CONFIRMED":
@@ -397,6 +536,8 @@ def promote_verified_memory(
         "proposal_id": target,
         "content_digest": record["content_digest"],
         "verification_digest": record["verification_digest"],
+        "verification_ledger_entry_id": record.get("verification_ledger_entry_id"),
+        "verification_ledger_entry_hash": record.get("verification_ledger_entry_hash"),
         "reviewed_by": reviewer,
         "reviewed_at": reviewed_at,
         "scope": scope,
@@ -521,6 +662,7 @@ __all__ = [
     "normalize_memory_governance",
     "propose_memory",
     "verify_memory_proposal",
+    "verify_memory_proposal_independently",
     "promote_verified_memory",
     "supersede_promoted_memory",
     "governed_memory_summary",
