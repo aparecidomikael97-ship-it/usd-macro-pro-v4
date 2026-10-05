@@ -16,8 +16,10 @@ from atlasquant_aion_memory_governance import (
     propose_memory,
     supersede_promoted_memory,
     verify_memory_proposal,
+    verify_memory_proposal_independently,
 )
 from atlasquant_aion_memory_layers import default_memory_layers, recall, remember
+from atlasquant_aion_verification_ledger import default_verification_ledger
 
 
 NOW = datetime(2026, 10, 5, 6, 0, tzinfo=timezone.utc)
@@ -45,6 +47,29 @@ def verifier_for(proposal, *, verifier_id="source-requery-1", independent=True, 
 
 
 class AionMemoryGovernanceTests(unittest.TestCase):
+    def _verify_independently(
+        self,
+        proposed,
+        *,
+        verifier_id="source-requery-1",
+        verifier_kind="SOURCE_REQUERY",
+        generator_id="generator-1",
+        refs=None,
+    ):
+        p = proposed["proposal"]
+        refs = list(refs or ["source:primary:1"])
+        return verify_memory_proposal_independently(
+            proposed["governance"],
+            default_verification_ledger(),
+            p["proposal_id"],
+            generator_id=generator_id,
+            verifier_kind=verifier_kind,
+            verifier_id=verifier_id,
+            verification_refs=refs,
+            verifier=verifier_for(p, verifier_id=verifier_id, refs=refs),
+            now=NOW,
+        )
+
     def _propose(self, governance=None, *, source_type="WEB", content="CPI anual foi 3,1%.",
                  provenance="https://source.example/cpi", refs=None, trusted=None,
                  memory_key="macro:cpi"):
@@ -161,15 +186,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
     def test_verified_state_clears_explicit_taint_but_does_not_promote(self):
         proposed = self._propose()
         p = proposed["proposal"]
-        verified = verify_memory_proposal(
-            proposed["governance"],
-            p["proposal_id"],
-            verifier_kind="SOURCE_REQUERY",
-            verifier_id="source-requery-1",
-            verification_refs=["source:primary:1"],
-            verifier=verifier_for(p),
-            now=NOW,
-        )
+        verified = self._verify_independently(proposed)
         v = verified["proposal"]
         self.assertEqual(v["state"], "VERIFIED")
         self.assertEqual(v["taint_labels"], [])
@@ -180,15 +197,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
     def test_promotion_requires_human_review_and_same_trusted_scope(self):
         proposed = self._propose()
         p = proposed["proposal"]
-        verified = verify_memory_proposal(
-            proposed["governance"],
-            p["proposal_id"],
-            verifier_kind="SOURCE_REQUERY",
-            verifier_id="source-requery-1",
-            verification_refs=["source:primary:1"],
-            verifier=verifier_for(p),
-            now=NOW,
-        )
+        verified = self._verify_independently(proposed)
 
         no_review = promote_verified_memory(
             verified["governance"],
@@ -197,6 +206,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
             trusted_context=scope(),
             review_approved=False,
             reviewed_by="",
+            verification_ledger=verified["verification_ledger"],
             now=NOW,
         )
         self.assertEqual(no_review["state"], "BLOCK")
@@ -209,6 +219,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
             trusted_context=scope(tenant="tenant-b"),
             review_approved=True,
             reviewed_by="mikael",
+            verification_ledger=verified["verification_ledger"],
             now=NOW,
         )
         self.assertEqual(wrong_scope["state"], "BLOCK")
@@ -217,15 +228,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
     def test_full_proposed_verified_promoted_path_marks_only_governed_row_current(self):
         proposed = self._propose()
         p = proposed["proposal"]
-        verified = verify_memory_proposal(
-            proposed["governance"],
-            p["proposal_id"],
-            verifier_kind="SOURCE_REQUERY",
-            verifier_id="source-requery-1",
-            verification_refs=["source:primary:1"],
-            verifier=verifier_for(p),
-            now=NOW,
-        )
+        verified = self._verify_independently(proposed)
         promoted = promote_verified_memory(
             verified["governance"],
             default_memory_layers(),
@@ -233,6 +236,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
             trusted_context=scope(),
             review_approved=True,
             reviewed_by="mikael",
+            verification_ledger=verified["verification_ledger"],
             now=NOW,
         )
         self.assertEqual(promoted["state"], "PROMOTED")
@@ -253,6 +257,42 @@ class AionMemoryGovernanceTests(unittest.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertTrue(hits[0]["promoted"])
         self.assertTrue(hits[0]["used_as_current_fact"])
+
+    def test_legacy_verification_without_ledger_cannot_promote(self):
+        proposed = self._propose()
+        p = proposed["proposal"]
+        legacy_verified = verify_memory_proposal(
+            proposed["governance"],
+            p["proposal_id"],
+            verifier_kind="SOURCE_REQUERY",
+            verifier_id="source-requery-1",
+            verification_refs=["source:primary:1"],
+            verifier=verifier_for(p),
+            now=NOW,
+        )
+        blocked = promote_verified_memory(
+            legacy_verified["governance"],
+            default_memory_layers(),
+            p["proposal_id"],
+            trusted_context=scope(),
+            review_approved=True,
+            reviewed_by="mikael",
+            now=NOW,
+        )
+        self.assertEqual(blocked["state"], "BLOCK")
+        self.assertIn(
+            "INDEPENDENT_VERIFICATION_LEDGER_REQUIRED",
+            blocked["blockers"],
+        )
+
+    def test_ledger_generator_and_verifier_must_be_distinct(self):
+        proposed = self._propose()
+        with self.assertRaisesRegex(ValueError, "independent principals"):
+            self._verify_independently(
+                proposed,
+                generator_id="same-principal",
+                verifier_id="same-principal",
+            )
 
     def test_legacy_direct_remember_is_explicitly_ungoverned(self):
         layers = remember(
@@ -333,14 +373,11 @@ class AionMemoryGovernanceTests(unittest.TestCase):
     def test_supersession_preserves_history_and_requires_successor_reference(self):
         proposed = self._propose()
         p = proposed["proposal"]
-        verified = verify_memory_proposal(
-            proposed["governance"],
-            p["proposal_id"],
-            verifier_kind="HUMAN",
+        verified = self._verify_independently(
+            proposed,
             verifier_id="reviewer-2",
-            verification_refs=["source:primary:1"],
-            verifier=verifier_for(p, verifier_id="reviewer-2"),
-            now=NOW,
+            verifier_kind="HUMAN",
+            generator_id="generator-1",
         )
         promoted = promote_verified_memory(
             verified["governance"],
@@ -349,6 +386,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
             trusted_context=scope(),
             review_approved=True,
             reviewed_by="mikael",
+            verification_ledger=verified["verification_ledger"],
             now=NOW,
         )
         superseded = supersede_promoted_memory(
