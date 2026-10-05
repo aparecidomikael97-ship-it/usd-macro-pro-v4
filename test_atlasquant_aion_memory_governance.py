@@ -84,8 +84,9 @@ class AionMemoryGovernanceTests(unittest.TestCase):
         self.assertIn("MODEL_GENERATED", labels)
 
     def test_secret_like_content_is_rejected_before_proposal(self):
+        synthetic = "api_key=" + "s" + "k-" + "synthetic-secret-value-for-test"
         with self.assertRaisesRegex(ValueError, "secret-like"):
-            self._propose(content="api_key=sk-synthetic-secret-value-for-test")
+            self._propose(content=synthetic)
 
     def test_content_digest_mismatch_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "digest mismatch"):
