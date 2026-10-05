@@ -191,6 +191,7 @@ def render_account_portal(
     *,
     customer_portal_binding:Mapping[str,Any]|None=None,
     customer_read_model:Mapping[str,Any]|None=None,
+    customer_portal_records:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
     summary=account_summary(access)
     visual=account_visual_state(summary)
@@ -227,6 +228,7 @@ def render_account_portal(
             access=access,
             binding=customer_portal_binding,
             read_model=customer_read_model,
+            records=customer_portal_records,
         )
 
     if summary["role"]=="OPEN":
