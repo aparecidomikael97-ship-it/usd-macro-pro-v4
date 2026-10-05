@@ -36,6 +36,13 @@ def _clean(value: Any, limit: int) -> str:
     return " ".join(str(value or "").replace("\x00", "").split())[:limit]
 
 
+def _message_text(value: Any, limit: int) -> str:
+    """Preserve conversational formatting while normalizing line endings/NUL."""
+    text = str(value or "").replace("\x00", "")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text[:limit]
+
+
 def _stable_id(prefix: str, payload: Mapping[str, Any]) -> str:
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
     return prefix + "-" + sha256(raw.encode("utf-8")).hexdigest()[:24].upper()
@@ -157,7 +164,9 @@ def _empty_turn(
             "reason": reason,
         }),
         "message": "",
+        "canonical_message": "",
         "message_digest": "",
+        "canonical_message_digest": "",
         "attachments": [],
         "context": dict(context),
         "selected_capability": {},
@@ -197,8 +206,8 @@ def build_chat_turn(
         index = max(0, int(turn_index))
     except (TypeError, ValueError):
         index = 0
-    text = _clean(message, MAX_MESSAGE_CHARS)
-    if not text:
+    text = _message_text(message, MAX_MESSAGE_CHARS)
+    if not text.strip():
         return _empty_turn(
             context=ctx,
             conversation_id=conv_id,
@@ -207,9 +216,10 @@ def build_chat_turn(
             reason="EMPTY_MESSAGE",
         )
 
+    canonical_text = _clean(text, MAX_MESSAGE_CHARS)
     metadata = normalize_attachment_metadata(attachments)
     core = orchestrate_aion_core(
-        text,
+        canonical_text,
         context={
             "role": ctx["role"],
             "persona": ctx["persona"],
@@ -218,7 +228,7 @@ def build_chat_turn(
         },
         feature_flags=feature_flags,
     )
-    local = orchestrate_local_command(text, execute=False)
+    local = orchestrate_local_command(canonical_text, execute=False)
 
     core_decision = core.get("decision") if isinstance(core.get("decision"), Mapping) else {}
     blockers = [str(item) for item in list(core_decision.get("blockers") or [])]
@@ -299,6 +309,9 @@ def build_chat_turn(
     ]
 
     message_digest = sha256(text.encode("utf-8")).hexdigest()
+    canonical_message_digest = sha256(
+        canonical_text.encode("utf-8")
+    ).hexdigest()
     turn_id = _stable_id("AION-TURN", {
         "conversation_id": conv_id,
         "identity_binding_digest": identity_binding["binding_digest"],
@@ -318,7 +331,9 @@ def build_chat_turn(
         "turn_index": index,
         "turn_id": turn_id,
         "message": text,
+        "canonical_message": canonical_text,
         "message_digest": message_digest,
+        "canonical_message_digest": canonical_message_digest,
         "attachments": [dict(item) for item in metadata],
         "context": ctx,
         "selected_capability": selected,
@@ -360,11 +375,11 @@ def append_chat_history(
         "turn_id": _clean(turn.get("turn_id") or "", 80),
         "conversation_id": _clean(turn.get("conversation_id") or "", 120),
         "identity_binding_digest": _clean(turn.get("identity_binding_digest") or "", 64),
-        "content": _clean(turn.get("message") or "", MAX_MESSAGE_CHARS),
+        "content": _message_text(turn.get("message") or "", MAX_MESSAGE_CHARS),
         "state": _clean(turn.get("state") or "", 40),
     })
-    answer = _clean(assistant_text, 16000)
-    if answer:
+    answer = _message_text(assistant_text, 16000)
+    if answer.strip():
         rows.append({
             "role": "assistant",
             "turn_id": _clean(turn.get("turn_id") or "", 80),

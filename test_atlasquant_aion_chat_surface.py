@@ -142,6 +142,57 @@ class ChatTurnTests(unittest.TestCase):
         )
         self.assertEqual(out["conversation_id"], "aion-main-thread")
 
+    def test_multiline_message_is_preserved_with_separate_canonical_text(self):
+        raw = "status geral\n  segunda linha\n\tbloco indentado"
+        out = build_chat_turn(
+            raw,
+            context=ADMIN_CONTEXT,
+            conversation_id="multiline-thread",
+            turn_index=4,
+        )
+        self.assertEqual(out["message"], raw)
+        self.assertEqual(
+            out["canonical_message"],
+            "status geral segunda linha bloco indentado",
+        )
+        self.assertNotEqual(
+            out["message_digest"],
+            out["canonical_message_digest"],
+        )
+        self.assertIn(
+            out["local_tool_preview"]["state"],
+            {"PLANNED", "PLANNED_MULTI"},
+        )
+
+        history = append_chat_history(
+            None,
+            out,
+            assistant_text="linha A\n  linha B",
+        )
+        self.assertEqual(history["entries"][0]["content"], raw)
+        self.assertEqual(
+            history["entries"][1]["content"],
+            "linha A\n  linha B",
+        )
+
+    def test_line_ending_normalization_is_stable_without_losing_newlines(self):
+        lf = build_chat_turn(
+            "status geral\nlinha dois",
+            context=ADMIN_CONTEXT,
+            conversation_id="line-ending-thread",
+            turn_index=5,
+        )
+        crlf = build_chat_turn(
+            "status geral\r\nlinha dois",
+            context=ADMIN_CONTEXT,
+            conversation_id="line-ending-thread",
+            turn_index=5,
+        )
+        self.assertEqual(lf["message"], "status geral\nlinha dois")
+        self.assertEqual(crlf["message"], lf["message"])
+        self.assertEqual(crlf["message_digest"], lf["message_digest"])
+        self.assertEqual(crlf["turn_id"], lf["turn_id"])
+
     def test_explicit_conversation_id_is_identity_bound(self):
         first = build_chat_turn(
             "status geral",
