@@ -43,9 +43,15 @@ Chromium validation: 1920x1080, 1440x900, 1280x720, 768x1024, 390x844 and 390x48
 
 Labels, role=status/aria-live, keyboard focus, focus-visible, readable contrast, reduced motion and hover/focus geometry are tested. Mobile functions remain reachable through the visible Functions menu. Desktop sidebar keeps existing AION modules, including the eight-roles page.
 
-## Finding on #656 (no contract change)
+## Finding on #656 — reconciled by coordinator
 
-Reproducer: `build_chat_turn('Explique o contexto\nSegunda linha', context={'role':'ADMIN'})` returns normalized message `Explique o contexto Segunda linha`. _clean() collapses whitespace, and append_chat_history repeats normalization. UI preserves raw multiline in session-only display_text, separately from canonical message/digest. This behavior is tested and reported on #658 (comment 5986126481). Coordinator may evaluate whitespace preservation and digest semantics later. No change was made to #656.
+The original Codex finding was valid: the initial Chat Turn V1 flattened multiline whitespace. The coordinator chain now separates representations:
+- `message` preserves normalized line endings, indentation and multiline content;
+- `canonical_message` is whitespace-normalized only for routing/intent;
+- raw and canonical digests are separate;
+- durable history and resume context preserve the conversational representation.
+
+The reconciled UI still keeps `display_text` as a presentation field for compatibility, but it is no longer required to compensate for data loss in the Core contract.
 
 The broad regression detected a new direct Streamlit import in the adapter. Component registration was moved into the existing atlasquant_reference_ui host and injected into the adapter; the original architectural coupling test was preserved unchanged and passed.
 
