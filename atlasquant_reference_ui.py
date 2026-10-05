@@ -639,7 +639,72 @@ def pilot_value_admin_html(selected, raw):
     )
 
 
-def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None):
+def _multi_company_read_model_ready(raw):
+    if not isinstance(raw, dict):
+        return False
+    return (
+        raw.get("schema")
+        == "ATLASQUANT_AION_B2B_MULTI_COMPANY_READ_MODEL_V1"
+        and raw.get("state") == "READY"
+        and raw.get("read_only") is True
+        and raw.get("other_tenant_identity_exposed") is False
+        and raw.get("customer_identity_exposed") is False
+        and raw.get("tenant_creation_control_exposed") is False
+        and raw.get("quota_control_exposed") is False
+        and raw.get("provisioning_control_exposed") is False
+        and raw.get("billing_control_exposed") is False
+        and raw.get("grants_authority") is False
+        and raw.get("executes_action") is False
+    )
+
+
+def multi_company_admission_html(selected, raw):
+    """Render aggregate tenant admission/capacity status only."""
+    if selected != "companies" or not _multi_company_read_model_ready(raw):
+        return ""
+    model = dict(raw)
+
+    def fmt(value, suffix=""):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "—"
+        text = f"{value:.2f}".rstrip("0").rstrip(".")
+        return text + suffix
+
+    def metric(label, value, detail=""):
+        return (
+            '<article><small>' + escape(label) + '</small>'
+            '<strong>' + escape(str(value)) + '</strong>'
+            + ('<p>' + escape(detail) + '</p>' if detail else '')
+            + '</article>'
+        )
+
+    state_label = {
+        "REVIEWABLE": "REVISÃO DE ADMISSÃO",
+        "CAPACITY_HOLD": "HOLD DE CAPACIDADE",
+        "ISOLATION_HOLD": "HOLD DE ISOLAMENTO",
+    }.get(str(model.get("admission_state") or ""), "EM REVISÃO")
+
+    cards = [
+        metric("ADMISSÃO", state_label, "Aprovação humana obrigatória"),
+        metric("TENANT CANDIDATO", model.get("service_tenant_id") or "—", "Sem outras identidades expostas"),
+        metric("PACOTE", model.get("package") or "—", "Recomendação comercial"),
+        metric("TENANTS PROJETADOS", fmt(model.get("projected_active_tenants")), "Após eventual aprovação"),
+        metric("RESERVA MÍN.", fmt(model.get("minimum_portfolio_reserve_pct"), "%"), "Menor reserva entre quotas"),
+        metric("CONCENTRAÇÃO MÁX.", fmt(model.get("maximum_single_tenant_share_pct"), "%"), "Maior share do tenant candidato"),
+        metric("ALERTAS CAPACIDADE", fmt(model.get("capacity_reason_count")), "Sem provisionamento automático"),
+        metric("ALERTAS ISOLAMENTO", fmt(model.get("isolation_reason_count")), "Tenant e cliente devem ser únicos"),
+    ]
+    return (
+        '<section class="aq-multi-company-readmodel" '
+        'data-multi-company-readonly="true">'
+        '<div class="ref-preview-grid">' + "".join(cards) + '</div>'
+        '<p class="ref-state">CAPACIDADE & ADMISSÃO · SOMENTE LEITURA · SEM CRIAÇÃO DE TENANT OU QUOTA</p>'
+        '<p class="ref-truth">Outros clientes não são identificados; provisionamento, cobrança e deploy permanecem bloqueados.</p>'
+        '</section>'
+    )
+
+
+def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -672,7 +737,12 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
     if area == "negocios":
-        if selected == "b2b" and _pilot_planning_ready(pilot_planning_read_model):
+        if selected == "companies" and _multi_company_read_model_ready(multi_company_read_model):
+            cards = multi_company_admission_html(
+                selected,
+                multi_company_read_model,
+            )
+        elif selected == "b2b" and _pilot_planning_ready(pilot_planning_read_model):
             cards = pilot_planning_html(selected, pilot_planning_read_model)
             if _pilot_activation_status_ready(pilot_activation_status_read_model):
                 cards += pilot_activation_status_html(
@@ -743,7 +813,14 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
     proposal_ready = proposal_selected and _proposal_draft_ready(proposal_draft)
     revops_selected = area == "negocios" and selected in {"revenue", "crm", "leads"}
     revops_ready = revops_selected and _revops_read_model_ready(revops_read_model)
-    if pilot_value_ready:
+    multi_company_selected = area == "negocios" and selected == "companies"
+    multi_company_ready = (
+        multi_company_selected
+        and _multi_company_read_model_ready(multi_company_read_model)
+    )
+    if multi_company_ready:
+        data_state = "CAPACIDADE MULTIEMPRESA VALIDADA"
+    elif pilot_value_ready:
         data_state = "VALOR DO PILOTO VALIDADO"
     elif pilot_activation_ready:
         data_state = "GOVERNANÇA DE ATIVAÇÃO VALIDADA"
@@ -763,7 +840,7 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · revisão de valor e retenção" if pilot_value_ready else ("SOMENTE LEITURA · aguardando confirmação humana de execução" if pilot_activation_ready else ("SOMENTE LEITURA · piloto aguardando aprovação" if pilot_ready else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática"))))))}</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · admissão multiempresa em revisão" if multi_company_ready else ("SOMENTE LEITURA · revisão de valor e retenção" if pilot_value_ready else ("SOMENTE LEITURA · aguardando confirmação humana de execução" if pilot_activation_ready else ("SOMENTE LEITURA · piloto aguardando aprovação" if pilot_ready else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")))))))}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -909,7 +986,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -951,6 +1028,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         pilot_planning_read_model=pilot_planning_read_model,
         pilot_activation_status_read_model=pilot_activation_status_read_model,
         pilot_value_read_model=pilot_value_read_model,
+        multi_company_read_model=multi_company_read_model,
     ) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
