@@ -135,7 +135,9 @@ def evaluate_behavioral_change(
     profile: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Evaluate a model/prompt change from explicit offline evidence."""
-    p = dict(profile or default_behavioral_profile())
+    canonical_profile = default_behavioral_profile()
+    p = dict(profile or canonical_profile)
+    profile_content_matches = p == canonical_profile
     scope = dict(trusted_scope or {})
     owner = _text(scope.get("owner_id"), 100)
     tenant = _text(scope.get("tenant_id"), 100)
@@ -155,6 +157,11 @@ def evaluate_behavioral_change(
 
     if _text(p.get("profile_version"), 120) != PROFILE_VERSION:
         blockers.append("PROFILE_VERSION_MISMATCH")
+    if not profile_content_matches:
+        blockers.append("PROFILE_CONTENT_MISMATCH")
+    # Thresholds are always read from canonical versioned policy, never from
+    # caller-supplied mutable values.
+    p = canonical_profile
 
     if not canonical_identity["eval_required"]:
         state = "NOT_REQUIRED" if not blockers else "BLOCK"
