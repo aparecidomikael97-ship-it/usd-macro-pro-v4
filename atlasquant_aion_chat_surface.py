@@ -20,6 +20,7 @@ from atlasquant_aion_orchestrator import orchestrate as orchestrate_aion_core
 
 SCHEMA = "ATLASQUANT_AION_CHAT_TURN_V1"
 HISTORY_SCHEMA = "ATLASQUANT_AION_CHAT_HISTORY_V1"
+IDENTITY_BINDING_SCHEMA = "ATLASQUANT_AION_CHAT_IDENTITY_BINDING_V1"
 MAX_MESSAGE_CHARS = 8000
 MAX_ATTACHMENTS = 16
 MAX_ATTACHMENT_NAME = 240
@@ -50,6 +51,39 @@ def _safe_context(context: Mapping[str, Any] | None) -> dict[str, Any]:
         "tenant_id": _clean(raw.get("tenant_id") or "", 120),
         "workspace_id": _clean(raw.get("workspace_id") or "", 120),
         "actor_id": _clean(raw.get("actor_id") or "", 120),
+    }
+
+
+def conversation_identity_binding(
+    context: Mapping[str, Any] | None,
+    conversation_id: Any,
+) -> dict[str, Any]:
+    """Bind a logical conversation to tenant/workspace/actor without granting authority."""
+    ctx = _safe_context(context)
+    conv_id = _clean(conversation_id, 120)
+    material = {
+        "schema": IDENTITY_BINDING_SCHEMA,
+        "tenant_id": ctx["tenant_id"],
+        "workspace_id": ctx["workspace_id"],
+        "actor_id": ctx["actor_id"],
+        "conversation_id": conv_id,
+    }
+    complete = all(
+        bool(material[key])
+        for key in ("tenant_id", "workspace_id", "actor_id", "conversation_id")
+    )
+    raw = json.dumps(
+        material,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return {
+        **material,
+        "complete": complete,
+        "binding_digest": sha256(raw.encode("utf-8")).hexdigest(),
+        "grants_authority": False,
+        "persists_externally": False,
     }
 
 
@@ -103,6 +137,7 @@ def _empty_turn(
     *,
     context: Mapping[str, Any],
     conversation_id: str,
+    identity_binding: Mapping[str, Any],
     turn_index: int,
     reason: str,
 ) -> dict[str, Any]:
@@ -111,9 +146,13 @@ def _empty_turn(
         "state": "REJECTED",
         "reason": reason,
         "conversation_id": conversation_id,
+        "identity_binding": dict(identity_binding),
+        "identity_binding_digest": _clean(identity_binding.get("binding_digest"), 64),
+        "identity_binding_complete": identity_binding.get("complete") is True,
         "turn_index": turn_index,
         "turn_id": _stable_id("AION-TURN", {
             "conversation_id": conversation_id,
+            "identity_binding_digest": identity_binding.get("binding_digest") or "",
             "turn_index": turn_index,
             "reason": reason,
         }),
@@ -153,6 +192,7 @@ def build_chat_turn(
     """Build a fail-closed chat-turn plan without executing anything."""
     ctx = _safe_context(context)
     conv_id = _conversation_id(ctx, conversation_id)
+    identity_binding = conversation_identity_binding(ctx, conv_id)
     try:
         index = max(0, int(turn_index))
     except (TypeError, ValueError):
@@ -162,6 +202,7 @@ def build_chat_turn(
         return _empty_turn(
             context=ctx,
             conversation_id=conv_id,
+            identity_binding=identity_binding,
             turn_index=index,
             reason="EMPTY_MESSAGE",
         )
@@ -260,6 +301,7 @@ def build_chat_turn(
     message_digest = sha256(text.encode("utf-8")).hexdigest()
     turn_id = _stable_id("AION-TURN", {
         "conversation_id": conv_id,
+        "identity_binding_digest": identity_binding["binding_digest"],
         "turn_index": index,
         "message_digest": message_digest,
         "attachments": metadata,
@@ -270,6 +312,9 @@ def build_chat_turn(
         "state": state,
         "reason": reason,
         "conversation_id": conv_id,
+        "identity_binding": dict(identity_binding),
+        "identity_binding_digest": identity_binding["binding_digest"],
+        "identity_binding_complete": identity_binding["complete"],
         "turn_index": index,
         "turn_id": turn_id,
         "message": text,
@@ -314,6 +359,7 @@ def append_chat_history(
         "role": "user",
         "turn_id": _clean(turn.get("turn_id") or "", 80),
         "conversation_id": _clean(turn.get("conversation_id") or "", 120),
+        "identity_binding_digest": _clean(turn.get("identity_binding_digest") or "", 64),
         "content": _clean(turn.get("message") or "", MAX_MESSAGE_CHARS),
         "state": _clean(turn.get("state") or "", 40),
     })
@@ -323,12 +369,15 @@ def append_chat_history(
             "role": "assistant",
             "turn_id": _clean(turn.get("turn_id") or "", 80),
             "conversation_id": _clean(turn.get("conversation_id") or "", 120),
+            "identity_binding_digest": _clean(turn.get("identity_binding_digest") or "", 64),
             "content": answer,
             "state": "RESPONSE_RECORDED",
         })
     return {
         "schema": HISTORY_SCHEMA,
         "conversation_id": _clean(turn.get("conversation_id") or "", 120),
+        "identity_binding_digest": _clean(turn.get("identity_binding_digest") or "", 64),
+        "identity_binding_complete": turn.get("identity_binding_complete") is True,
         "entries": rows,
         "entry_count": len(rows),
         "persists_externally": False,
@@ -339,9 +388,11 @@ def append_chat_history(
 __all__ = [
     "SCHEMA",
     "HISTORY_SCHEMA",
+    "IDENTITY_BINDING_SCHEMA",
     "MAX_MESSAGE_CHARS",
     "MAX_ATTACHMENTS",
     "normalize_attachment_metadata",
+    "conversation_identity_binding",
     "build_chat_turn",
     "append_chat_history",
 ]
