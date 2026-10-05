@@ -172,3 +172,24 @@ This block does not claim completion of:
 - legal/LGPD compliance certification.
 
 Those remain separate gates.
+
+
+## Reconciliation onto current hardening line — 2026-10-05
+
+This contract was reintroduced on top of the current #722 lineage rather than
+merging the old #705 branch wholesale.
+
+The current derived-data boundary from #703 is intentionally stricter than the
+old branch in one respect: a Library Index instance is bound to exactly one
+tenant/workspace scope. Cross-scope mixing is rejected before mutation.
+
+The reconciliation therefore preserves:
+
+- current scope_digest one-scope index invariant;
+- current cache/index/log/trace/backup deletion reconciliation;
+- AES-256-GCM tenant/workspace authenticated encryption;
+- encrypted live and backup tenant durable data;
+- explicit key rotation with approval;
+- key retirement / crypto-shredding semantics as defense-in-depth only;
+- noncanonical, disposable derived projection manifest/purge/rebuild;
+- no production KMS claim and no production activation.
