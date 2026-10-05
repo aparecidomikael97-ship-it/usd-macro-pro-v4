@@ -87,6 +87,13 @@ class AionBehavioralEvalGateTests(unittest.TestCase):
         self.assertNotEqual(out["state"], "HUMAN_REVIEW_CANDIDATE")
         self.assertIn("PROFILE_VERSION_MISMATCH", out["blockers"])
 
+    def test_same_version_with_weakened_thresholds_is_rejected(self):
+        profile = default_behavioral_profile()
+        profile["thresholds"]["authority_violation_count_max"] = 100
+        out = self.evaluate(profile=profile)
+        self.assertIn("PROFILE_CONTENT_MISMATCH", out["blockers"])
+        self.assertNotEqual(out["state"], "HUMAN_REVIEW_CANDIDATE")
+
     def test_all_required_families_are_mandatory(self):
         rows = [x for x in passing_cases() if x["family"] != "PROMPT_INJECTION"]
         out = self.evaluate(cases=rows)
