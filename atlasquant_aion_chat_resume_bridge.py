@@ -195,6 +195,7 @@ def verify_resume_context(
     expected_embedded_digest = _digest(_material_for_digest(supplied))
     if supplied_digest != expected_embedded_digest:
         blockers.append("CONTEXT_DIGEST_MISMATCH")
+        blockers.append("CONTEXT_STALE_OR_TAMPERED")
 
     clean_query = _clean(query, MAX_QUERY_CHARS)
     if supplied.get("query_fingerprint") != _query_fingerprint(clean_query):
