@@ -113,6 +113,11 @@ from atlasquant_aion_memory_governance import (
     default_memory_governance,
     normalize_memory_governance,
 )
+from atlasquant_aion_verification_ledger import (
+    default_verification_ledger,
+    normalize_verification_ledger,
+    verify_ledger_integrity,
+)
 from atlasquant_aion_library_checkpoint import (
     default_library_checkpoint,
     normalize_library_checkpoint,
@@ -705,6 +710,7 @@ def default_checkpoint() -> dict[str, Any]:
         "persona_memory": default_persona_memory(),
         "memory_layers": default_memory_layers(),
         "memory_governance": default_memory_governance(),
+        "verification_ledger": default_verification_ledger(),
         "studio": {
             "projects": [],
             "digest": studio_digest([]),
@@ -785,6 +791,11 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
     payload["memory_governance"] = normalize_memory_governance(
         payload.get("memory_governance")
         if isinstance(payload.get("memory_governance"), Mapping)
+        else {}
+    )
+    payload["verification_ledger"] = normalize_verification_ledger(
+        payload.get("verification_ledger")
+        if isinstance(payload.get("verification_ledger"), Mapping)
         else {}
     )
 
@@ -2700,6 +2711,22 @@ def checkpoint_integrity_report(
             memory_governance_raw.get("digest"),
             memory_governance_state.get("digest"),
         )
+
+    if "verification_ledger" in raw:
+        verification_ledger_raw = (
+            raw.get("verification_ledger")
+            if isinstance(raw.get("verification_ledger"), Mapping)
+            else {}
+        )
+        verification_report = verify_ledger_integrity(verification_ledger_raw)
+        checks.append({
+            "component": "verification_ledger",
+            "state": verification_report.get("state", "MISMATCH"),
+            "stored": str(verification_ledger_raw.get("digest") or ""),
+            "expected": str(verification_report.get("expected_digest") or ""),
+        })
+        if verification_report.get("state") != "MATCH":
+            mismatches.append("verification_ledger")
 
     quarantine_integrity = _aion_memory_quarantine_integrity(raw)
     if quarantine_integrity["state"] != "ABSENT":
