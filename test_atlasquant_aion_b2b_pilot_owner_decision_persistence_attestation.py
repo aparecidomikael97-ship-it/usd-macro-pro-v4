@@ -167,6 +167,21 @@ class AionB2BPilotOwnerDecisionPersistenceAttestationTests(unittest.TestCase):
         self.assertTrue(out["persistence_attested"])
         self.assertTrue(out["receipt_consistency_verified"])
         self.assertTrue(out["owner_decision_recorded"])
+        self.assertEqual(
+            out["scope"],
+            {
+                "owner_id": "HUMAN_OWNER",
+                "tenant_id": "atlasquant-owner",
+                "workspace_id": "business",
+            },
+        )
+        self.assertEqual(out["candidate_id"], "candidate-001")
+        self.assertEqual(out["proposal_id"], "proposal-001")
+        self.assertEqual(out["packet_digest"], "sha256:" + "a" * 64)
+        self.assertEqual(
+            out["decision_request_digest"],
+            "sha256:" + "b" * 64,
+        )
         self.assertTrue(out["pilot_approved"])
         self.assertFalse(out["pilot_denied"])
         self.assertTrue(out["eligible_for_activation_ceremony"])
