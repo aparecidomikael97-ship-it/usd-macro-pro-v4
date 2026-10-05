@@ -2,7 +2,7 @@
 
 The host must inject:
 - an already authenticated AtlasQuant access decision,
-- a trusted Scope(owner, tenant, workspace),
+- a trusted Scope value carrying owner, tenant and workspace,
 - an existing chat store,
 - and runtime context.
 
