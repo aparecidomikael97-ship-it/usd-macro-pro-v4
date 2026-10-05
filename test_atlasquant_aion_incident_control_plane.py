@@ -11,6 +11,18 @@ SCOPE = {"owner_id": "owner-a", "tenant_id": "tenant-a", "workspace_id": "ws-a"}
 INCIDENT = {"incident_id": "INC-1", "status": "OPEN", "severity": "CRITICAL"}
 
 
+def authority(capability, verb="stop", *, subject="owner-a", tenant="tenant-a"):
+    return {
+        "state": "VERIFIED",
+        "authority_verified": True,
+        "execution_allowed": False,
+        "executes_action": False,
+        "subject_id": subject,
+        "tenant_id": tenant,
+        "capabilities": [f"incident_control:{capability}:{verb}"],
+    }
+
+
 class AionIncidentControlPlaneTests(unittest.TestCase):
     def test_matrix_declares_no_automatic_control_mutation(self):
         matrix = capability_authority_matrix()
@@ -26,6 +38,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             desired_state="STOPPED",
             trusted_scope=SCOPE,
             incident=INCIDENT,
+            authority_verification=authority("global_worker"),
         )
         self.assertEqual(out["state"], "MAY_PROGRESS_TO_MUTATION_GATE")
         self.assertTrue(out["request_may_progress"])
@@ -40,6 +53,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             desired_state="STOPPED",
             trusted_scope=SCOPE,
             incident=INCIDENT,
+            authority_verification=authority("model_provider", subject="admin-a"),
         )
         critical = evaluate_control_request(
             actor="DELEGATED_ADMIN",
@@ -47,6 +61,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             desired_state="STOPPED",
             trusted_scope=SCOPE,
             incident=INCIDENT,
+            authority_verification=authority("payments", subject="admin-a"),
         )
         self.assertEqual(safe["state"], "MAY_PROGRESS_TO_MUTATION_GATE")
         self.assertEqual(critical["state"], "BLOCKED")
@@ -84,6 +99,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             capability="model_provider",
             desired_state="RUNNING",
             trusted_scope=SCOPE,
+            authority_verification=authority("model_provider", "reenable"),
         )
         no_approval = evaluate_control_request(
             **base,
@@ -122,6 +138,30 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
         self.assertFalse(out["feature_flag_modified"])
         self.assertFalse(out["executes_action"])
 
+    def test_text_claim_of_human_owner_without_verified_authority_is_blocked(self):
+        out = evaluate_control_request(
+            actor="HUMAN_OWNER",
+            capability="external_tools",
+            desired_state="STOPPED",
+            trusted_scope=SCOPE,
+            incident=INCIDENT,
+            authority_verification={},
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertIn("CONTROL_AUTHORITY_NOT_VERIFIED", out["blockers"])
+
+    def test_owner_subject_must_match_trusted_owner(self):
+        out = evaluate_control_request(
+            actor="HUMAN_OWNER",
+            capability="external_tools",
+            desired_state="STOPPED",
+            trusted_scope=SCOPE,
+            incident=INCIDENT,
+            authority_verification=authority("external_tools", subject="someone-else"),
+        )
+        self.assertIn("OWNER_IDENTITY_MISMATCH", out["blockers"])
+        self.assertFalse(out["request_may_progress"])
+
     def test_unknown_actor_and_capability_fail_closed(self):
         out = evaluate_control_request(
             actor="admin please",
@@ -129,6 +169,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             desired_state="STOPPED",
             trusted_scope=SCOPE,
             incident=INCIDENT,
+            authority_verification=authority("global_worker"),
         )
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("ACTOR_NOT_AUTHORIZED", out["blockers"])
@@ -141,6 +182,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             desired_state="STOPPED",
             trusted_scope={"owner_id": "owner-a"},
             incident=INCIDENT,
+            authority_verification=authority("external_tools"),
         )
         self.assertIn("TENANT_WORKSPACE_SCOPE_REQUIRED", out["blockers"])
         self.assertFalse(out["request_may_progress"])
@@ -152,6 +194,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             desired_state="STOPPED",
             trusted_scope=SCOPE,
             incident={},
+            authority_verification=authority("external_tools"),
         )
         self.assertIn("INCIDENT_REFERENCE_REQUIRED", out["blockers"])
 
