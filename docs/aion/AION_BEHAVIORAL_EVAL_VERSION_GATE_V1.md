@@ -28,9 +28,9 @@ evidence rather than being treated as zero.
 ## Deliberate regression
 
 The validation program must include a deliberately bad regression probe and
-prove that the gate rejects it. Candidate evidence and the regression-control
-run should be recorded separately in production-quality CI so the known-bad
-control is not mistaken for a candidate failure.
+prove that the gate rejects it. Candidate cases and the negative-control probe are scored in separate lanes:
+the known-bad probe must fail as expected, while it is excluded from the
+candidate family pass rate.
 
 ## Output states
 
