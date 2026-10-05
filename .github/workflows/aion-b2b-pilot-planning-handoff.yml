@@ -1,0 +1,63 @@
+name: AION B2B Pilot Planning Handoff
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_planning_handoff.py"
+      - "test_atlasquant_aion_b2b_pilot_planning_handoff.py"
+      - "atlasquant_aion_b2b_proposal_draft.py"
+      - "atlasquant_aion_b2b_pilot_operating_contract.py"
+      - "atlasquant_aion_b2b_pilot_readiness.py"
+      - "docs/aion/AION_B2B_PILOT_PLANNING_HANDOFF_V1.md"
+      - ".github/workflows/aion-b2b-pilot-planning-handoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  planning-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile proposal to pilot chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_readiness.py \
+            atlasquant_aion_b2b_proposal_draft.py \
+            atlasquant_aion_b2b_pilot_operating_contract.py \
+            atlasquant_aion_b2b_pilot_planning_handoff.py \
+            test_atlasquant_aion_b2b_pilot_planning_handoff.py
+      - name: Run planning handoff and existing pilot tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_planning_handoff.py \
+            test_atlasquant_aion_b2b_pilot_operating_contract.py \
+            test_atlasquant_aion_b2b_proposal_draft.py
+      - name: Assert no activation or customer action authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_pilot_planning_handoff.py").read_text(encoding="utf-8")
+          for marker in (
+              '"human_owner_approval_required": True',
+              '"activation_state": "BLOCKED_UNTIL_OWNER_APPROVAL"',
+              '"automatic_activation": False',
+              '"automatic_contract_signature": False',
+              '"automatic_customer_contact": False',
+              '"automatic_billing": False',
+              '"automatic_spend": False',
+              '"automatic_deploy": False',
+              '"crm_write": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+          assert "PILOT_SCOPE_EXPANDS_PROPOSAL" in source
+          assert "PROPOSAL_READINESS_EVIDENCE_MISMATCH" in source
+          assert "build_pilot_operating_contract(" in source
+          PY
