@@ -231,6 +231,12 @@ def evaluate_pilot_outcome(
     elif monthly_infra > MAX_MONTHLY_INFRA_BRL:
         blockers.append("OBSERVED_MONTHLY_INFRA_CAP_EXCEEDED")
 
+    contract_budget = _number(core.get("max_monthly_infra_brl"))
+    if contract_budget is None or contract_budget < 0:
+        blockers.append("CONTRACT_MONTHLY_INFRA_BUDGET_INVALID")
+    elif monthly_infra is not None and monthly_infra > contract_budget:
+        blockers.append("OBSERVED_CONTRACT_BUDGET_EXCEEDED")
+
     evidence_refs = _refs(data.get("evidence_refs"))
     if len(evidence_refs) < 4:
         blockers.append("OBSERVED_EVIDENCE_INSUFFICIENT")
