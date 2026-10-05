@@ -350,15 +350,59 @@ class GlobalWorkerActivationReadinessTests(unittest.TestCase):
             )
         get.assert_called_once()
         args, kwargs = get.call_args
-        self.assertTrue(str(args[0]).endswith("/actions/runs"))
-        self.assertNotIn("event", kwargs["params"])
+        self.assertTrue(
+            str(args[0]).endswith(
+                "/actions/workflows/autopilot-v107.yml/runs"
+            )
+        )
+        self.assertEqual(kwargs["params"]["event"], "schedule")
         self.assertEqual(kwargs["params"]["branch"], "main")
-        self.assertGreaterEqual(kwargs["params"]["per_page"], 50)
+        self.assertGreaterEqual(kwargs["params"]["per_page"], 5)
+        self.assertLessEqual(kwargs["params"]["per_page"], 10)
         self.assertEqual(result["status"], "CONFIRMED")
         self.assertEqual(len(result["runs"]), 1)
         self.assertEqual(result["runs"][0]["id"], 11)
         self.assertNotIn("secret_field", result["runs"][0])
         self.assertEqual(result["runs"][0]["head_sha"], "a" * 40)
+
+    def test_pulse_api_reader_is_not_vulnerable_to_repository_run_noise(self):
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "workflow_runs": [
+                {
+                    "id": 21,
+                    "name": "AtlasQuant - Automatic Scanner + Autopilot",
+                    "path": ".github/workflows/autopilot-v107.yml",
+                    "event": "schedule",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "created_at": "2026-09-28T13:00:00Z",
+                    "updated_at": "2026-09-28T13:02:00Z",
+                    "head_sha": "c" * 40,
+                }
+            ]
+        }
+        with patch(
+            "atlasquant_aion_global_worker_readiness.requests.get",
+            return_value=response,
+        ) as get:
+            result = fetch_recent_autopilot_pulses(
+                _config(),
+                token="token",
+                per_page=5,
+            )
+        args, kwargs = get.call_args
+        self.assertIn(
+            "/actions/workflows/autopilot-v107.yml/runs",
+            str(args[0]),
+        )
+        self.assertEqual(
+            kwargs["params"],
+            {"branch": "main", "event": "schedule", "per_page": 5},
+        )
+        self.assertEqual(result["status"], "CONFIRMED")
+        self.assertEqual([row["id"] for row in result["runs"]], [21])
 
     def test_pulse_api_reader_fails_closed_when_autopilot_is_absent(self):
         response = Mock()
