@@ -77,6 +77,10 @@ def empty_library_index() -> dict[str, Any]:
         "memory_promoted": False,
         "execution_authorized": False,
         "external_action_executed": False,
+        "projection_only": True,
+        "canonical_source": False,
+        "rebuildable": True,
+        "retrieval_does_not_validate": True,
     }
 
 def index_document(
@@ -149,6 +153,8 @@ def index_document(
         "authority": "NONE",
         "external_persisted": False,
         "executes_action": False,
+        "projection_only": True,
+        "retrieval_does_not_validate": True,
     }
     if existing:
         docs=[doc_entry if x.get("document_id")==row.get("document_id") else x for x in docs]
@@ -193,6 +199,10 @@ def index_document(
         "memory_promoted": False,
         "execution_authorized": False,
         "external_action_executed": False,
+        "projection_only": True,
+        "canonical_source": False,
+        "rebuildable": True,
+        "retrieval_does_not_validate": True,
     }
     return {
         "schema": SCHEMA,
@@ -265,6 +275,9 @@ def search_library_index(
             "provenance_id": row.get("provenance_id"),
             "evidence_refs": list(row.get("evidence_refs") or []),
             "authority": "NONE",
+            "projection_only": True,
+            "retrieval_does_not_validate": True,
+            "ranking_elevates_confidence": False,
         })
     hits.sort(key=lambda x:(-x["score"],str(x["document_id"]),str(x["passage_id"])))
     return {
@@ -279,6 +292,76 @@ def search_library_index(
         "execution_authorized": False,
         "external_action_executed": False,
     }
+def delete_document_projection(
+    index: Mapping[str, Any] | None,
+    document_id: Any,
+    *,
+    trusted_context: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Delete one document and all passages from this disposable projection."""
+    state=dict(index or empty_library_index())
+    ctx=dict(trusted_context or {})
+    tenant=_clean(ctx.get("tenant_id"),120)
+    workspace=_clean(ctx.get("workspace_id"),120)
+    target=_clean(document_id,120)
+    if not tenant or not workspace or not target:
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "blockers":["TRUSTED_SCOPE_OR_DOCUMENT_MISSING"],
+            "index":state,
+            "projection_only":True,
+            "canonical_source":False,
+            "external_action_executed":False,
+        }
+    foreign=[
+        row for row in list(state.get("documents") or [])
+        if isinstance(row,Mapping)
+        and row.get("document_id")==target
+        and (row.get("tenant_id")!=tenant or row.get("workspace_id")!=workspace)
+    ]
+    if foreign:
+        return {
+            "schema":SCHEMA,
+            "status":"BLOCKED",
+            "blockers":["SCOPE_MISMATCH"],
+            "index":state,
+            "projection_only":True,
+            "canonical_source":False,
+            "external_action_executed":False,
+        }
+    docs=[
+        dict(row) for row in list(state.get("documents") or [])
+        if isinstance(row,Mapping) and row.get("document_id")!=target
+    ]
+    passages=[
+        dict(row) for row in list(state.get("passages") or [])
+        if isinstance(row,Mapping) and row.get("document_id")!=target
+    ]
+    return {
+        "schema":SCHEMA,
+        "status":"DELETED_FROM_PROJECTION",
+        "document_id":target,
+        "removed_documents":len(list(state.get("documents") or []))-len(docs),
+        "removed_passages":len(list(state.get("passages") or []))-len(passages),
+        "index":{
+            "schema":SCHEMA,
+            "documents":docs,
+            "passages":passages,
+            "external_persisted":False,
+            "memory_promoted":False,
+            "execution_authorized":False,
+            "external_action_executed":False,
+            "projection_only":True,
+            "canonical_source":False,
+            "rebuildable":True,
+            "retrieval_does_not_validate":True,
+        },
+        "projection_only":True,
+        "canonical_source":False,
+        "external_action_executed":False,
+    }
+
 def classification_snapshot(index: Mapping[str, Any] | None) -> dict[str, Any]:
     state=dict(index or empty_library_index())
     docs=[x for x in list(state.get("documents") or []) if isinstance(x,Mapping)]
@@ -340,5 +423,5 @@ def document_graph_fragment(document: Mapping[str, Any]) -> dict[str, Any]:
 __all__=[
     "SCHEMA","INDEXABLE_STATES","PASSAGE_STATES","IndexedPassage",
     "empty_library_index","index_document","search_library_index",
-    "classification_snapshot","document_graph_fragment",
+    "classification_snapshot","delete_document_projection","document_graph_fragment",
 ]
