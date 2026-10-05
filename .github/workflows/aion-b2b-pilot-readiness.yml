@@ -180,6 +180,12 @@ on:
       - "atlasquant_aion_b2b_owner_renewal_action_command_plan.py"
       - "test_atlasquant_aion_b2b_owner_renewal_action_command_plan.py"
       - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_COMMAND_PLAN_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_adapter_plan.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_adapter_receipt.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_adapter.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_ADAPTER_V1.md"
+      - ".github/workflows/aion-b2b-owner-renewal-action-adapter.yml"
       - "docs/aion/AION_B2B_PILOT_VALUE_REALIZATION_V1.md"
       - "docs/aion/AION_B2B_PILOT_VALUE_READ_MODELS_V1.md"
       - "atlasquant_aion_b2b_multi_company_admission.py"
@@ -277,6 +283,9 @@ jobs:
             atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py \
             atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py \
             atlasquant_aion_b2b_owner_renewal_action_command_plan.py \
+            atlasquant_aion_b2b_owner_renewal_action_adapter_plan.py \
+            atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run.py \
+            atlasquant_aion_b2b_owner_renewal_action_adapter_receipt.py \
             atlasquant_aion_b2b_multi_company_admission.py \
             atlasquant_aion_b2b_multi_company_read_model.py \
             atlasquant_aion_b2b_demo_sandbox.py \
@@ -346,6 +355,7 @@ jobs:
             test_atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py \
             test_atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py \
             test_atlasquant_aion_b2b_owner_renewal_action_command_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_adapter.py \
             test_atlasquant_aion_b2b_multi_company_admission.py \
             test_atlasquant_aion_b2b_multi_company_read_model.py \
             test_atlasquant_aion_b2b_multi_company_ui.py \
