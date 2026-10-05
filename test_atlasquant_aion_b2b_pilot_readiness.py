@@ -74,10 +74,23 @@ class AionB2BPilotReadinessTests(unittest.TestCase):
         )
         self.assertEqual(out["decision"], "PILOT_REVIEW_CANDIDATE")
         self.assertEqual(out["state"], "READY_FOR_OWNER_REVIEW")
+        self.assertEqual(out["candidate_id"], "pilot-001")
+        self.assertEqual(out["scope"], SCOPE)
         self.assertGreaterEqual(out["priority_score"], 75)
         self.assertTrue(out["human_owner_decision_required"])
         self.assertFalse(out["automatic_acceptance"])
         self.assertFalse(out["executes_action"])
+
+    def test_decision_envelope_binds_candidate_identity_and_scope(self):
+        out = assess_b2b_pilot_candidate(
+            trusted_scope=SCOPE,
+            candidate=candidate(candidate_id="candidate-bound-001"),
+            platform_evidence=platform(),
+            hardening_evidence=hardening(),
+        )
+        self.assertEqual(out["candidate_id"], "candidate-bound-001")
+        self.assertEqual(out["scope"], SCOPE)
+        self.assertNotIn("company_label", out)
 
     def test_scope_mismatch_fails_closed(self):
         normalized = normalize_candidate(candidate(tenant_id="tenant-b"), trusted_scope=SCOPE)
