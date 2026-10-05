@@ -22,7 +22,7 @@ def access(
     *,
     username="cliente@empresa.com",
     role="USER",
-    fingerprint="fingerprint-001",
+    fingerprint="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 ):
     return {
         "authenticated": True,
