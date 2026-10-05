@@ -76,6 +76,14 @@ Do not replace this requirement with a Python-only mutex.
 
 ## Remaining risk
 
+> Status update — 2026-10-05 / Draft PR #710: a physical SQLite CAS repository
+> now implements this previously documented persistence requirement in staging.
+> It uses scope-bound rows, canonical payload digests, `BEGIN IMMEDIATE`,
+> revision-conditional UPDATE, real two-process race tests, crash-window tests
+> and a Checkpoint Mestre projection. This update does not activate production
+> persistence or execution. The text below is preserved as the original audit
+> finding that motivated the closure work.
+
 The current in-memory/list `upsert_durable_task` proves the revision semantics,
 but a future multi-process persistent task repository must implement the CAS
 atomically. This is an architectural persistence requirement, not evidence that
