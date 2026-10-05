@@ -430,10 +430,15 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         '.aq-ws-side.ref-sidebar{position:static!important;top:auto!important;left:auto!important;'
         'width:auto!important;height:auto!important;z-index:auto!important;overflow:auto;'
         'border-radius:18px;padding:10px;background:rgba(6,18,39,.78)}'
+        '.ref-negocios:has(.aq-ws-business-canvas){max-width:100%!important;margin-inline:0!important}'
+        '.aq-ws-business-canvas{position:relative!important;width:100%!important;height:auto!important;'
+        'aspect-ratio:auto!important;background:none!important;margin:0!important}'
+        '@media(max-width:700px){.ref-negocios .aq-ws-business-canvas{display:block!important}}'
         '</style>'
         '<section class="ref-workspace ref-negocios" data-workspace="negocios" '
         'data-business-contract="managed-operations-v1">'
         + back
+        + '<div class="ref-canvas aq-ws-business-canvas" role="group" aria-label="Negócios · cockpit AtlasQuant">'
         + '<section class="aq-ws-shell" data-workspace="negocios">'
         '<div class="aq-ws-top">'
         '<div class="aq-ws-brand"><span class="aq-ws-mark">A</span>'
@@ -462,7 +467,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         + '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; '
         'o workspace ativo usa o contrato B2B atual e não executa ações externas automaticamente.</p>'
         f'<p class="ref-truth">Sessão: {escape(name)}</p>'
-        '</main></div></section></section>'
+        '</main></div></section></div></section>'
     )
 
 
