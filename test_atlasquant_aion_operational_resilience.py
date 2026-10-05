@@ -161,6 +161,15 @@ class AionOperationalResilienceTests(unittest.TestCase):
         self.assertIn("BACKUP_KEY_UNAVAILABLE", joined)
         self.assertIn("BACKUP_KEY_REF_REQUIRED", joined)
 
+    def test_drill_cannot_succeed_against_invalid_backup(self):
+        out = evaluate(
+            backups=backups(integrity_state="UNKNOWN"),
+            recovery_drills=drills(),
+        )
+        joined = " ".join(out["blockers"])
+        self.assertIn("BACKUP_REFERENCE_NOT_READY", joined)
+        self.assertEqual(out["successful_drills"], 0)
+
     def test_restore_duration_beyond_rto_blocks(self):
         out = evaluate(recovery_drills=drills(started_at="2026-10-05T11:50:00Z"))
         self.assertTrue(any("RTO_BREACH" in x for x in out["blockers"]))
