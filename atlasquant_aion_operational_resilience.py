@@ -118,7 +118,7 @@ def _refs(value: Any) -> list[str]:
 
 
 def _scope(raw: Mapping[str, Any] | None) -> dict[str, str]:
-    item = dict(raw or {})
+    item = dict(raw) if isinstance(raw, Mapping) else {}
     return {
         "owner_id": _text(item.get("owner_id"), 100),
         "tenant_id": _text(item.get("tenant_id"), 100),
@@ -139,7 +139,7 @@ def normalize_resilience_policy(
     *,
     trusted_scope: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    item = dict(raw or {})
+    item = dict(raw) if isinstance(raw, Mapping) else {}
     trusted = _scope(trusted_scope)
     blockers: list[str] = []
 
@@ -441,7 +441,10 @@ def evaluate_operational_resilience(
 
     services: list[dict[str, Any]] = []
     seen_components: set[str] = set()
-    for raw in list(service_observations or [])[:MAX_COMPONENTS]:
+    service_source = service_observations if isinstance(service_observations, (list, tuple)) else []
+    if service_observations is not None and not isinstance(service_observations, (list, tuple)):
+        blockers.append("SERVICE_OBSERVATIONS_COLLECTION_INVALID")
+    for raw in list(service_source)[:MAX_COMPONENTS]:
         if not isinstance(raw, Mapping):
             blockers.append("SERVICE_OBSERVATION_INVALID")
             continue
@@ -462,7 +465,10 @@ def evaluate_operational_resilience(
 
     backup_rows: list[dict[str, Any]] = []
     backup_by_id: dict[str, dict[str, Any]] = {}
-    for raw in list(backups or [])[:MAX_BACKUPS]:
+    backup_source = backups if isinstance(backups, (list, tuple)) else []
+    if backups is not None and not isinstance(backups, (list, tuple)):
+        blockers.append("BACKUPS_COLLECTION_INVALID")
+    for raw in list(backup_source)[:MAX_BACKUPS]:
         if not isinstance(raw, Mapping):
             blockers.append("BACKUP_EVIDENCE_INVALID")
             continue
@@ -479,7 +485,10 @@ def evaluate_operational_resilience(
 
     drill_rows: list[dict[str, Any]] = []
     seen_drills: set[str] = set()
-    for raw in list(recovery_drills or [])[:MAX_DRILLS]:
+    drill_source = recovery_drills if isinstance(recovery_drills, (list, tuple)) else []
+    if recovery_drills is not None and not isinstance(recovery_drills, (list, tuple)):
+        blockers.append("RECOVERY_DRILLS_COLLECTION_INVALID")
+    for raw in list(drill_source)[:MAX_DRILLS]:
         if not isinstance(raw, Mapping):
             blockers.append("DRILL_EVIDENCE_INVALID")
             continue
@@ -539,7 +548,7 @@ def evaluate_operational_resilience(
 
 
 def disaster_recovery_runbook(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
-    data = dict(snapshot or {})
+    data = dict(snapshot) if isinstance(snapshot, Mapping) else {}
     return {
         "schema": SCHEMA,
         "state": "PLAN_READY" if data.get("state") == "READY_FOR_ADMIN_REVIEW" else "BLOCKED",
