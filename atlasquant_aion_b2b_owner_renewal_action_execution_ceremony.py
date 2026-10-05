@@ -673,9 +673,7 @@ def verify_owner_business_action_execution_decision(
         "execution_record_persisted": False,
         "execution_command_generated": False,
         "execution_command_executed": False,
-        "business_action_authorized": False,
-        "external_action_executed": False,
-        "executes_action": False,
+        **{key: False for key in _AUTHORITY_FIELDS},
     }
 
     return {
