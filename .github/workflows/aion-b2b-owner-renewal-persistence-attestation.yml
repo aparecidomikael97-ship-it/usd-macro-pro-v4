@@ -1,0 +1,65 @@
+name: AION B2B Owner Renewal Persistence Attestation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_owner_renewal_persistence_plan.py"
+      - "atlasquant_aion_b2b_owner_renewal_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_persistence_attestation.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_PERSISTENCE_ATTESTATION_V1.md"
+      - ".github/workflows/aion-b2b-owner-renewal-persistence-attestation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-renewal-persistence-attestation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile persistence attestation
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_owner_renewal_persistence_plan.py \
+            atlasquant_aion_b2b_owner_renewal_persistence_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_persistence_attestation.py
+      - name: Run persistence-attestation tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_owner_renewal_persistence_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_persistence_attestation.py
+      - name: Assert attestation never writes or authorizes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_b2b_owner_renewal_persistence_attestation.py"
+          ).read_text(encoding="utf-8")
+          for marker in (
+              '"writer_identity_verified": False',
+              '"storage_write_performed": False',
+              '"renewal_authorized": False',
+              '"termination_authorized": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "subprocess.",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          PY
