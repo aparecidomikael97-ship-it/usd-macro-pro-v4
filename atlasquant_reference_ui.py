@@ -343,7 +343,95 @@ def revops_read_model_html(selected, raw):
     )
 
 
-def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None):
+def _proposal_draft_ready(raw):
+    if not isinstance(raw, dict):
+        return False
+    return (
+        raw.get("schema") == "ATLASQUANT_AION_B2B_PROPOSAL_DRAFT_V1"
+        and raw.get("state") == "DRAFT_FOR_HUMAN_REVIEW"
+        and raw.get("non_binding") is True
+        and raw.get("owner_review_required") is True
+        and raw.get("customer_send_allowed") is False
+        and raw.get("contract_ready") is False
+        and raw.get("price_commitment") is False
+        and raw.get("automatic_proposal_generation") is False
+        and raw.get("automatic_pricing") is False
+        and raw.get("automatic_customer_contact") is False
+        and raw.get("automatic_contract") is False
+        and raw.get("automatic_billing") is False
+        and raw.get("crm_write") is False
+        and raw.get("executes_action") is False
+        and isinstance(raw.get("proposal"), dict)
+    )
+
+
+def proposal_draft_html(selected, raw):
+    """Render proposal metadata only; never expose an action path."""
+    if selected != "proposals" or not _proposal_draft_ready(raw):
+        return ""
+    proposal = dict(raw.get("proposal") or {})
+    pricing = proposal.get("pricing") if isinstance(proposal.get("pricing"), dict) else {}
+
+    def fmt_money(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "—"
+        return "R$ " + f"{float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def metric(label, value, detail=""):
+        return (
+            '<article><small>' + escape(label) + '</small>'
+            '<strong>' + escape(str(value)) + '</strong>'
+            + ('<p>' + escape(detail) + '</p>' if detail else '')
+            + '</article>'
+        )
+
+    pricing_mode = str(pricing.get("mode") or "TBD").upper()
+    if pricing_mode == "INDICATIVE":
+        price_detail = (
+            "Implantação " + fmt_money(pricing.get("indicative_setup_fee_brl"))
+            + " · mensal " + fmt_money(pricing.get("indicative_monthly_fee_brl"))
+        )
+    else:
+        price_detail = "Preço ainda não definido"
+
+    scope_items = [
+        str(item)
+        for item in list(proposal.get("scope_items") or [])[:16]
+        if str(item).strip()
+    ]
+    phases = [
+        str(item)
+        for item in list(proposal.get("implementation_phases") or [])[:10]
+        if str(item).strip()
+    ]
+
+    cards = [
+        metric("PROPOSTA", proposal.get("proposal_id") or "—", "Draft interno"),
+        metric("PACOTE", proposal.get("package") or "—", "Seleção humana"),
+        metric("PREÇO", pricing_mode, price_detail),
+        metric("VALIDADE", str(proposal.get("validity_days") or "—") + " dias", "Não vinculante"),
+        metric("ESCOPO", len(scope_items), "Itens previstos"),
+        metric("FASES", len(phases), "Implementação prevista"),
+    ]
+
+    scope_html = (
+        '<div class="ref-evidence-notice"><strong>Escopo do draft</strong><ul>'
+        + "".join('<li>' + escape(item) + '</li>' for item in scope_items[:8])
+        + '</ul></div>'
+        if scope_items
+        else ""
+    )
+    return (
+        '<section class="aq-proposal-readmodel" data-proposal-readonly="true">'
+        '<div class="ref-preview-grid">' + "".join(cards) + '</div>'
+        + scope_html
+        + '<p class="ref-state">REVISÃO HUMANA · ENVIO AO CLIENTE BLOQUEADO · NÃO VINCULANTE</p>'
+        + '<p class="ref-truth">Sem assinatura, cobrança, provisionamento ou compromisso automático.</p>'
+        '</section>'
+    )
+
+
+def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -376,7 +464,9 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
     if area == "negocios":
-        if selected in {"revenue", "crm", "leads"} and _revops_read_model_ready(revops_read_model):
+        if selected == "proposals" and _proposal_draft_ready(proposal_draft):
+            cards = proposal_draft_html(selected, proposal_draft)
+        elif selected in {"revenue", "crm", "leads"} and _revops_read_model_ready(revops_read_model):
             cards = revops_read_model_html(selected, revops_read_model)
         else:
             cards = business_read_model_html(selected, business_read_model)
@@ -419,9 +509,13 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
     data_state = "VALIDAÇÃO PENDENTE"
     if model:
         data_state=model['state']
+    proposal_selected = area == "negocios" and selected == "proposals"
+    proposal_ready = proposal_selected and _proposal_draft_ready(proposal_draft)
     revops_selected = area == "negocios" and selected in {"revenue", "crm", "leads"}
     revops_ready = revops_selected and _revops_read_model_ready(revops_read_model)
-    if revops_ready:
+    if proposal_ready:
+        data_state = "DRAFT NÃO VINCULANTE"
+    elif revops_ready:
         data_state = "REVOPS " + ("PARCIAL" if revops_read_model.get("state") == "PARTIAL" else "VALIDADO")
     elif area == "negocios" and _business_read_model_ready(business_read_model):
         data_state = "EVIDÊNCIA VALIDADA"
@@ -433,7 +527,7 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática"))}</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")))}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -579,7 +673,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -617,6 +711,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         selected,
         business_read_model=business_read_model,
         revops_read_model=revops_read_model,
+        proposal_draft=proposal_draft,
     ) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
@@ -915,8 +1010,13 @@ def render_reference_workspace(
         if area == "negocios"
         else None
     )
+    proposal_draft = (
+        st.session_state.get("atlasquant_b2b_proposal_draft")
+        if area == "negocios"
+        else None
+    )
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()
