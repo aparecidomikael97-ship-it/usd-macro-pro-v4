@@ -30,8 +30,10 @@ non-critical.
 
 ## Authority
 
-`HUMAN_OWNER` may request STOP for any listed capability. A
-`DELEGATED_ADMIN` may request STOP only for explicitly non-critical
+`HUMAN_OWNER` may request STOP for any listed capability only when verified
+authority evidence binds the trusted owner identity and exact control capability.
+A `DELEGATED_ADMIN` may request STOP only when an explicit verified capability
+grant exists and only for explicitly non-critical
 operational capabilities. Internal AION roles `guardian` and `sentinel`
 may recommend STOP but never mutate the control.
 
