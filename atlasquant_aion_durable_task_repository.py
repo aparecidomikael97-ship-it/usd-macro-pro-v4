@@ -18,7 +18,9 @@ from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_durable_tasks import (
     MAX_TASKS,
     TERMINAL_TASK_STATES,
+    durable_tasks_digest,
     normalize_durable_task,
+    normalize_durable_tasks,
 )
 
 SCHEMA = "ATLASQUANT_AION_DURABLE_TASK_REPOSITORY_V1"
@@ -381,6 +383,57 @@ class DurableTaskRepository:
             "task": deepcopy(item),
             "revision": item["revision"],
             "task_digest": digest,
+            "executes_action": False,
+            "automatic_resume_executes": False,
+        }
+
+    def checkpoint_projection(self) -> dict[str, Any]:
+        """Build a read-only Checkpoint Mestre projection from physical truth."""
+        tasks = self.list()
+        integrity = self.integrity_report()
+        if integrity["state"] != "MATCH":
+            raise DurableTaskRepositoryIntegrityError("REPOSITORY_INTEGRITY_MISMATCH")
+        return {
+            "records": tasks,
+            "digest": durable_tasks_digest(tasks),
+            "repository_digest": integrity["repository_digest"],
+            "source": "ATOMIC_DURABLE_TASK_REPOSITORY",
+            "authoritative_store": "SQLITE_CAS",
+            "projection_only": True,
+            "executes_action": False,
+            "automatic_resume_executes": False,
+        }
+
+    def verify_checkpoint_projection(
+        self,
+        projection: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        expected = self.checkpoint_projection()
+        raw = dict(projection or {})
+        records = normalize_durable_tasks(
+            raw.get("records") if isinstance(raw.get("records"), (list, tuple)) else []
+        )
+        observed_digest = str(raw.get("digest") or "")
+        observed_repo = str(raw.get("repository_digest") or "")
+        blockers = []
+        if durable_tasks_digest(records) != observed_digest:
+            blockers.append("CHECKPOINT_TASK_DIGEST_INVALID")
+        if observed_digest != expected["digest"]:
+            blockers.append("CHECKPOINT_TASK_DIGEST_STALE")
+        if observed_repo != expected["repository_digest"]:
+            blockers.append("CHECKPOINT_REPOSITORY_DIGEST_STALE")
+        if records != expected["records"]:
+            blockers.append("CHECKPOINT_TASK_PAYLOAD_STALE")
+        return {
+            "schema": SCHEMA,
+            "state": "MATCH" if not blockers else "MISMATCH",
+            "blockers": sorted(set(blockers)),
+            "expected_digest": expected["digest"],
+            "observed_digest": observed_digest,
+            "expected_repository_digest": expected["repository_digest"],
+            "observed_repository_digest": observed_repo,
+            "physical_repository_authoritative": True,
+            "checkpoint_is_projection": True,
             "executes_action": False,
             "automatic_resume_executes": False,
         }
