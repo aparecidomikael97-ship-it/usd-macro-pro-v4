@@ -19,7 +19,6 @@ from atlasquant_aion_fortress import proof_of_safety, source_authority
 from atlasquant_aion_portable import normalize_portable_core
 from atlasquant_aion_tool_supply_chain import (
     enrich_tool_contract,
-    registry_digest_for_tools,
     registry_integrity_report,
     tool_contract_issues,
 )
@@ -250,7 +249,7 @@ def default_tool_hub()->dict[str,Any]:
         "schema":SCHEMA,
         "tools":tools,
         "digest":tool_hub_digest(tools),
-        "registry_digest":registry_digest_for_tools(tools),
+        "registry_digest":registry.get("digest"),
         "registry_integrity":registry,
         "protocols":["NATIVE","API","MCP","FILE","WEBHOOK"],
         "external_activation_automatic":False,
@@ -272,7 +271,7 @@ def normalize_tool_hub(raw:Mapping[str,Any]|None)->dict[str,Any]:
         "schema":SCHEMA,
         "tools":tools,
         "digest":tool_hub_digest(tools),
-        "registry_digest":registry_digest_for_tools(tools),
+        "registry_digest":registry.get("digest"),
         "registry_integrity":registry,
         "protocols":["NATIVE","API","MCP","FILE","WEBHOOK"],
         "external_activation_automatic":False,
