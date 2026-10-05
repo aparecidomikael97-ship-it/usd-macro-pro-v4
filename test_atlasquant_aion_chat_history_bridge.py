@@ -1,6 +1,7 @@
 from pathlib import Path
 import unittest
 
+from aion_chat.attachments import ingest_attachment
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_chat_golden_path import execute_readonly_golden_path
@@ -222,6 +223,102 @@ class ChatHistoryBridgeTests(unittest.TestCase):
                 2,
             )
             inner.close()
+
+    def test_attachment_metadata_is_bound_to_turn_and_persisted(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            store = self._store(root)
+            conv = store.create_conversation(self.scope)
+            attachment = ingest_attachment(
+                store,
+                self.scope,
+                conv.id,
+                root / "attachments",
+                "report.txt",
+                b"safe report",
+            )
+            out = execute_and_persist_readonly(
+                store,
+                self.scope,
+                "status geral",
+                context=ADMIN_CONTEXT,
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN_ACCESS,
+                authenticated_admin=True,
+                attachment_ids=[attachment.id],
+                conversation_id=conv.id,
+                turn_index=11,
+            )
+            self.assertEqual(out["state"], "CONFIRMED_AND_PERSISTED")
+            turn_attachments = out["golden_result"]["turn"]["attachments"]
+            self.assertEqual(len(turn_attachments), 1)
+            self.assertEqual(turn_attachments[0]["name"], "report.txt")
+            self.assertEqual(turn_attachments[0]["sha256"], attachment.digest)
+            rows = store.list_messages(self.scope, conv.id, page_size=20).items
+            self.assertEqual(rows[0].attachments, [attachment.id])
+            store.close()
+
+    def test_unbound_attachment_cannot_be_added_after_execution(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            store = self._store(root)
+            conv = store.create_conversation(self.scope)
+            result = self._golden(conv.id, turn_index=12)
+            attachment = ingest_attachment(
+                store,
+                self.scope,
+                conv.id,
+                root / "attachments",
+                "late.txt",
+                b"late attachment",
+            )
+            with self.assertRaisesRegex(ValueError, "attachment metadata"):
+                persist_verified_read_result(
+                    store,
+                    self.scope,
+                    result,
+                    attachment_ids=[attachment.id],
+                )
+            self.assertEqual(
+                store.get_conversation(self.scope, conv.id).message_count,
+                0,
+            )
+            store.close()
+
+    def test_duplicate_attachment_id_is_rejected_before_execution(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            store = self._store(root)
+            conv = store.create_conversation(self.scope)
+            attachment = ingest_attachment(
+                store,
+                self.scope,
+                conv.id,
+                root / "attachments",
+                "dup.txt",
+                b"dup",
+            )
+            with self.assertRaisesRegex(ValueError, "duplicate attachment"):
+                execute_and_persist_readonly(
+                    store,
+                    self.scope,
+                    "status geral",
+                    context=ADMIN_CONTEXT,
+                    runtime_context={"checkpoint": default_checkpoint()},
+                    access=ADMIN_ACCESS,
+                    authenticated_admin=True,
+                    attachment_ids=[attachment.id, attachment.id],
+                    conversation_id=conv.id,
+                    turn_index=13,
+                )
+            self.assertEqual(
+                store.get_conversation(self.scope, conv.id).message_count,
+                0,
+            )
+            store.close()
 
     def test_blocked_golden_path_is_never_persisted(self):
         import tempfile
