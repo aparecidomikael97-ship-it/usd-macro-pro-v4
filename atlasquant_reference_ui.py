@@ -345,6 +345,8 @@ def module_panel(area, selected, *, resident=None, business_read_model=None):
     data_state = "VALIDAÇÃO PENDENTE"
     if model:
         data_state=model['state']
+    if area == "negocios" and _business_read_model_ready(business_read_model):
+        data_state = "EVIDÊNCIA VALIDADA"
     if area == "trader" and selected in {"radar", "master", "radar_master"}:
         from atlasquant_interface_final import eligible_fx_population
         if eligible_fx_population(resident)["ranked"]:
@@ -353,7 +355,7 @@ def module_panel(area, selected, *, resident=None, business_read_model=None):
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else "PRÉVIA · sem execução automática"}</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
