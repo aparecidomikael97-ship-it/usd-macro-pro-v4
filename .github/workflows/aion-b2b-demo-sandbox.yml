@@ -1,0 +1,122 @@
+name: AION B2B Demo Sandbox
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_demo_sandbox.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox.py"
+      - "atlasquant_aion_b2b_demo_sandbox_read_model.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox_read_model.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox_ui.py"
+      - "atlasquant_reference_ui.py"
+      - "docs/aion/AION_B2B_DEMO_SANDBOX_V1.md"
+      - "docs/aion/AION_B2B_DEMO_SANDBOX_READ_MODEL_V1.md"
+      - ".github/workflows/aion-b2b-demo-sandbox.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  demo-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile demo sandbox chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_demo_sandbox.py \
+            atlasquant_aion_b2b_demo_sandbox_read_model.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_demo_sandbox.py \
+            test_atlasquant_aion_b2b_demo_sandbox_read_model.py \
+            test_atlasquant_aion_b2b_demo_sandbox_ui.py
+
+      - name: Run demo sandbox tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_demo_sandbox.py \
+            test_atlasquant_aion_b2b_demo_sandbox_read_model.py \
+            test_atlasquant_aion_b2b_demo_sandbox_ui.py
+
+      - name: Assert no real sandbox authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("atlasquant_aion_b2b_demo_sandbox.py").read_text(encoding="utf-8")
+
+          required = (
+              '"owner_sandbox_approval_required": True',
+              '"sandbox_creation_authorized": False',
+              '"tenant_creation_authorized": False',
+              '"quota_change_authorized": False',
+              '"credential_use_authorized": False',
+              '"live_integration_authorized": False',
+              '"customer_data_use_authorized": False',
+              '"outbound_contact_authorized": False',
+              '"billing_authorized": False',
+              '"automatic_sandbox_creation": False',
+              '"automatic_billing": False',
+              '"automatic_provisioning": False',
+              '"automatic_customer_contact": False',
+              '"automatic_deploy": False',
+              '"crm_write": False',
+              '"provider_called": False',
+              '"production_mutation": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+
+          banned = (
+              "requests.",
+              "httpx.",
+              "urllib.request",
+              "subprocess.",
+              "socket.",
+              "create_tenant(",
+              "create_sandbox(",
+              "provision(",
+              "deploy_to_production(",
+              "send_email(",
+              "send_whatsapp(",
+          )
+          for marker in banned:
+              assert marker not in source, marker
+
+          model = Path("atlasquant_aion_b2b_demo_sandbox_read_model.py").read_text(encoding="utf-8")
+          for marker in (
+              '"customer_identity_exposed": False',
+              '"evidence_internals_exposed": False',
+              '"credential_details_exposed": False',
+              '"provider_details_exposed": False',
+              '"sandbox_creation_control_exposed": False',
+              '"tenant_creation_control_exposed": False',
+              '"quota_control_exposed": False',
+              '"provisioning_control_exposed": False',
+              '"billing_control_exposed": False',
+              '"customer_contact_control_exposed": False',
+              '"grants_authority": False',
+              '"executes_action": False',
+          ):
+              assert marker in model, marker
+
+          ui = Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+          assert 'data-demo-sandbox-readonly="true"' in ui
+          assert "SEM INTEGRAÇÃO LIVE" in ui
+          for forbidden in (
+              ">Criar sandbox<",
+              ">Ativar sandbox<",
+              ">Provisionar<",
+              ">Cobrar<",
+              ">Contatar cliente<",
+          ):
+              assert forbidden not in ui, forbidden
+          PY

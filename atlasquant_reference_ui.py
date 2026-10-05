@@ -704,7 +704,73 @@ def multi_company_admission_html(selected, raw):
     )
 
 
-def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None):
+def _demo_sandbox_read_model_ready(raw):
+    if not isinstance(raw, dict):
+        return False
+    return (
+        raw.get("schema")
+        == "ATLASQUANT_AION_B2B_DEMO_SANDBOX_READ_MODEL_V1"
+        and raw.get("state") == "READY"
+        and raw.get("sandbox_state") == "REVIEWABLE"
+        and raw.get("sandbox_decision") == "SANDBOX_REVIEW_CANDIDATE"
+        and raw.get("dataset_class") == "SYNTHETIC"
+        and raw.get("read_only") is True
+        and raw.get("synthetic_only") is True
+        and raw.get("customer_identity_exposed") is False
+        and raw.get("evidence_internals_exposed") is False
+        and raw.get("credential_details_exposed") is False
+        and raw.get("provider_details_exposed") is False
+        and raw.get("sandbox_creation_control_exposed") is False
+        and raw.get("tenant_creation_control_exposed") is False
+        and raw.get("quota_control_exposed") is False
+        and raw.get("provisioning_control_exposed") is False
+        and raw.get("billing_control_exposed") is False
+        and raw.get("customer_contact_control_exposed") is False
+        and raw.get("grants_authority") is False
+        and raw.get("executes_action") is False
+    )
+
+
+def demo_sandbox_html(selected, raw):
+    """Render synthetic demo sandbox status without operational controls."""
+    if selected != "sandbox" or not _demo_sandbox_read_model_ready(raw):
+        return ""
+    model = dict(raw)
+
+    def fmt(value):
+        if isinstance(value, bool) or not isinstance(value, int):
+            return "—"
+        return str(value)
+
+    def metric(label, value, detail=""):
+        return (
+            '<article><small>' + escape(label) + '</small>'
+            '<strong>' + escape(str(value)) + '</strong>'
+            + ('<p>' + escape(detail) + '</p>' if detail else '')
+            + '</article>'
+        )
+
+    cards = [
+        metric("SANDBOX", model.get("sandbox_id") or "—", "Candidato sintético"),
+        metric("DADOS", "SINTÉTICOS", "Nenhum dado real de cliente"),
+        metric("PACOTE", model.get("package") or "—", "Somente demonstração"),
+        metric("TENANT DE REFERÊNCIA", model.get("service_tenant_id") or "—", "Sem criação real"),
+        metric("DURAÇÃO", fmt(model.get("duration_hours")) + "h", "Limite da demonstração"),
+        metric("REGISTROS", fmt(model.get("synthetic_records")), "Fixtures sintéticas"),
+        metric("SESSÕES", fmt(model.get("concurrent_sessions")), "Concorrência limitada"),
+        metric("EXECUÇÃO", "BLOQUEADA", "Revisão humana obrigatória"),
+    ]
+    return (
+        '<section class="aq-demo-sandbox-readmodel" '
+        'data-demo-sandbox-readonly="true">'
+        '<div class="ref-preview-grid">' + "".join(cards) + '</div>'
+        '<p class="ref-state">DEMO / SANDBOX · SOMENTE LEITURA · DADOS SINTÉTICOS · SEM INTEGRAÇÃO LIVE</p>'
+        '<p class="ref-truth">Sem cliente real, credenciais, provider, contato externo, cobrança, provisionamento ou deploy.</p>'
+        '</section>'
+    )
+
+
+def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -737,7 +803,12 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
     if area == "negocios":
-        if selected == "companies" and _multi_company_read_model_ready(multi_company_read_model):
+        if selected == "sandbox" and _demo_sandbox_read_model_ready(demo_sandbox_read_model):
+            cards = demo_sandbox_html(
+                selected,
+                demo_sandbox_read_model,
+            )
+        elif selected == "companies" and _multi_company_read_model_ready(multi_company_read_model):
             cards = multi_company_admission_html(
                 selected,
                 multi_company_read_model,
@@ -818,7 +889,14 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         multi_company_selected
         and _multi_company_read_model_ready(multi_company_read_model)
     )
-    if multi_company_ready:
+    sandbox_selected = area == "negocios" and selected == "sandbox"
+    sandbox_ready = (
+        sandbox_selected
+        and _demo_sandbox_read_model_ready(demo_sandbox_read_model)
+    )
+    if sandbox_ready:
+        data_state = "SANDBOX SINTÉTICO VALIDADO"
+    elif multi_company_ready:
         data_state = "CAPACIDADE MULTIEMPRESA VALIDADA"
     elif pilot_value_ready:
         data_state = "VALOR DO PILOTO VALIDADO"
@@ -836,11 +914,32 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         from atlasquant_interface_final import eligible_fx_population
         if eligible_fx_population(resident)["ranked"]:
             data_state = "LEITURAS VALIDADAS"
+    if model:
+        detail_state = str(model["state"])
+    elif sandbox_ready:
+        detail_state = "SOMENTE LEITURA · sandbox sintético em revisão"
+    elif multi_company_ready:
+        detail_state = "SOMENTE LEITURA · admissão multiempresa em revisão"
+    elif pilot_value_ready:
+        detail_state = "SOMENTE LEITURA · revisão de valor e retenção"
+    elif pilot_activation_ready:
+        detail_state = "SOMENTE LEITURA · aguardando confirmação humana de execução"
+    elif pilot_ready:
+        detail_state = "SOMENTE LEITURA · piloto aguardando aprovação"
+    elif proposal_ready:
+        detail_state = "REVISÃO HUMANA · proposta não vinculante"
+    elif revops_ready:
+        detail_state = "SOMENTE LEITURA · RevOps agregado"
+    elif area == "negocios" and _business_read_model_ready(business_read_model):
+        detail_state = "SOMENTE LEITURA · evidência validada"
+    else:
+        detail_state = "PRÉVIA · sem execução automática"
+
     return (f'<main class="ref-detail" data-module="{escape(selected)}" data-resident-used="{str(bool(model and model["resident_used"])).lower()}">'
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · admissão multiempresa em revisão" if multi_company_ready else ("SOMENTE LEITURA · revisão de valor e retenção" if pilot_value_ready else ("SOMENTE LEITURA · aguardando confirmação humana de execução" if pilot_activation_ready else ("SOMENTE LEITURA · piloto aguardando aprovação" if pilot_ready else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")))))))}</p>'
+        f'<p class="ref-state">{escape(detail_state)}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -986,7 +1085,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -1029,6 +1128,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         pilot_activation_status_read_model=pilot_activation_status_read_model,
         pilot_value_read_model=pilot_value_read_model,
         multi_company_read_model=multi_company_read_model,
+        demo_sandbox_read_model=demo_sandbox_read_model,
     ) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
