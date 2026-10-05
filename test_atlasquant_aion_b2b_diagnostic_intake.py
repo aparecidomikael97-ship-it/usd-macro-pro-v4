@@ -6,6 +6,7 @@ from atlasquant_aion_b2b_diagnostic_intake import (
     build_diagnostic_intake,
     build_pilot_scoring_input,
 )
+from atlasquant_aion_b2b_pilot_readiness import assess_b2b_pilot_candidate
 
 SCOPE = {
     "owner_id": "owner-a",
@@ -253,6 +254,50 @@ class AionB2BDiagnosticIntakeTests(unittest.TestCase):
             "executes_action",
         ):
             self.assertFalse(out[key], key)
+
+    def test_diagnostic_flows_into_existing_pilot_readiness_gate(self):
+        diagnostic = build_diagnostic_intake(
+            diagnostic_raw(),
+            trusted_scope=SCOPE,
+        )
+        scoring = build_pilot_scoring_input(
+            diagnostic,
+            human_assessment=human_assessment(),
+        )
+        self.assertEqual(scoring["state"], "READY_FOR_PILOT_READINESS")
+
+        platform = {
+            "state": "PASS",
+            "pilot_recommendation": "HUMAN_REVIEW_CANDIDATE",
+            "total_tasks": 1000,
+            "company_count": 3,
+            "classification_error_count": 0,
+            "unsafe_escape_count": 0,
+            "deny_escape_count": 0,
+            "evidence_digest": "sha256:managed-ops-reference",
+        }
+        hardening = {
+            "tenant_isolation_pass": True,
+            "vault_backend_pass": True,
+            "chaos_campaign_pass": True,
+            "mission_control_ready": True,
+            "approval_gate_ready": True,
+            "audit_receipts_ready": True,
+            "rollback_ready": True,
+            "drift_state": "STABLE",
+            "security_gate_state": "PASS",
+        }
+        decision = assess_b2b_pilot_candidate(
+            trusted_scope=SCOPE,
+            candidate=scoring["candidate"],
+            platform_evidence=platform,
+            hardening_evidence=hardening,
+        )
+        self.assertEqual(decision["decision"], "PILOT_REVIEW_CANDIDATE")
+        self.assertEqual(decision["state"], "READY_FOR_OWNER_REVIEW")
+        self.assertTrue(decision["human_owner_decision_required"])
+        self.assertFalse(decision["automatic_acceptance"])
+        self.assertFalse(decision["executes_action"])
 
     def test_scoring_binding_is_deterministic_for_same_inputs(self):
         diagnostic = build_diagnostic_intake(
