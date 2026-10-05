@@ -281,6 +281,7 @@ def build_customer_portal_read_model(
     return {
         "schema": SCHEMA,
         "state": "READY" if not blockers else "BLOCKED",
+        "scope": dict(trusted),
         "customer_id": customer_id,
         "package": package,
         "service_state": cycle_result.get("state"),
