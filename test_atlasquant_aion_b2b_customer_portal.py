@@ -44,6 +44,58 @@ def binding(current_access=None, **overrides):
     return row
 
 
+def portal_records(**overrides):
+    row = {
+        "schema": "ATLASQUANT_AION_B2B_CUSTOMER_PORTAL_RECORDS_V1",
+        "state": "READY",
+        "scope": {
+            "owner_id": "owner-a",
+            "tenant_id": "service-tenant-001",
+            "workspace_id": "service-workspace-001",
+        },
+        "customer_id": "customer-001",
+        "package": "PROFISSIONAL",
+        "integrations": [
+            {
+                "integration_id": "crm",
+                "name": "CRM",
+                "state": "CONNECTED",
+                "last_checked_at": "2026-10-05T12:10:00-04:00",
+            }
+        ],
+        "crm": {
+            "enabled": True,
+            "contacts": 120,
+            "open_opportunities": 14,
+            "open_tasks": 7,
+            "won_this_cycle": 3,
+        },
+        "documents": [
+            {
+                "document_id": "contract-001",
+                "title": "Contrato de Operação",
+                "type": "CONTRACT",
+                "state": "SIGNED",
+                "issued_at": "2026-10-01",
+                "version": "v1",
+            }
+        ],
+        "billing": {
+            "subscription_state": "ACTIVE",
+            "payment_state": "PAID",
+            "next_due_date": "2026-11-05",
+            "amount_due_brl": 0.0,
+            "currency": "BRL",
+        },
+        "evidence_digest": "sha256:records",
+        "read_only": True,
+        "secret_material_exposed": False,
+        "executes_action": False,
+    }
+    row.update(overrides)
+    return row
+
+
 def read_model(**overrides):
     row = {
         "schema": "ATLASQUANT_AION_B2B_PORTAL_READ_MODEL_V1",
@@ -178,6 +230,64 @@ class AionB2BCustomerPortalTests(unittest.TestCase):
             binding(current, allowed_sections=["overview", "support", "admin", "billing"])
         )
         self.assertEqual(normalized["allowed_sections"], ("overview", "support"))
+
+    def test_valid_records_extend_customer_view_without_internal_scope(self):
+        current = access()
+        bound = binding(
+            current,
+            allowed_sections=[
+                "overview", "value", "usage", "support",
+                "integrations", "crm", "documents", "billing",
+            ],
+        )
+        view = customer_portal_view_model(
+            current,
+            bound,
+            read_model(),
+            portal_records(),
+        )
+        self.assertEqual(view["state"], "READY")
+        self.assertEqual(view["integrations"][0]["state"], "CONNECTED")
+        self.assertEqual(view["crm"]["contacts"], 120)
+        self.assertEqual(view["documents"][0]["state"], "SIGNED")
+        self.assertEqual(view["billing"]["subscription_state"], "ACTIVE")
+        self.assertNotIn("scope", view)
+        self.assertNotIn("owner_id", str(view))
+
+    def test_cross_tenant_records_block_entire_customer_view(self):
+        current = access()
+        bad = portal_records()
+        bad["scope"] = {
+            "owner_id": "owner-a",
+            "tenant_id": "other-tenant",
+            "workspace_id": "service-workspace-001",
+        }
+        view = customer_portal_view_model(
+            current,
+            binding(current),
+            read_model(),
+            bad,
+        )
+        self.assertEqual(view["state"], "BLOCKED")
+        self.assertIn("CUSTOMER_PORTAL_RECORDS_TENANT_MISMATCH", view["blockers"])
+
+    def test_records_html_has_no_payment_or_document_action_controls(self):
+        current = access()
+        bound = binding(
+            current,
+            allowed_sections=["overview", "integrations", "crm", "documents", "billing"],
+        )
+        view = customer_portal_view_model(
+            current,
+            bound,
+            read_model(),
+            portal_records(),
+        )
+        html = customer_portal_html(view)
+        for expected in ("CRM", "CONNECTED", "Contrato de Operação", "SIGNED", "ACTIVE", "PAID"):
+            self.assertIn(expected, html)
+        for forbidden in ("Pagar agora", "Assinar agora", "Conectar agora", "Editar CRM", "Baixar segredo"):
+            self.assertNotIn(forbidden, html)
 
     def test_html_is_read_only_and_hides_internal_cost(self):
         current = access()
