@@ -119,6 +119,19 @@ def local_contract_fingerprint(
             "connector_id": str(item.get("connector_id") or ""),
             "required_scopes": sorted(str(x) for x in list(item.get("required_scopes") or [])),
             "external_side_effects": bool(item.get("external_side_effects", False)),
+            "owner": str(item.get("owner") or ""),
+            "version": str(item.get("version") or ""),
+            "schema_hash": str(item.get("schema_hash") or ""),
+            "contract_hash": str(item.get("contract_hash") or ""),
+            "implementation_ref": str(item.get("implementation_ref") or ""),
+            "sandbox_profile": str(item.get("sandbox_profile") or ""),
+            "credential_ref": str(item.get("credential_ref") or ""),
+            "credential_scopes": sorted(
+                str(x) for x in list(item.get("credential_scopes") or [])
+            ),
+            "egress_allowlist": sorted(
+                str(x) for x in list(item.get("egress_allowlist") or [])
+            ),
         })
     rows.sort(key=lambda item: item["tool_id"])
 
