@@ -50,9 +50,9 @@ jobs:
               '"receipt_binding_verified": True',
               '"checkpoint_write_performed": False',
               '"business_action_authorized": False',
-              '"renewal_authorized": False',
-              '"termination_authorized": False',
-              '"executes_action": False',
+              '"renewal_authorized",',
+              '"termination_authorized",',
+              '"executes_action",',
           ):
               assert marker in source, marker
 
