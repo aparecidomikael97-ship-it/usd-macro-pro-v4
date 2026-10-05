@@ -1,0 +1,70 @@
+name: AION B2B RevOps Foundation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_revops_foundation.py"
+      - "test_atlasquant_aion_b2b_revops_foundation.py"
+      - "docs/aion/AION_B2B_REVOPS_FOUNDATION_V1.md"
+      - "atlasquant_aion_b2b_revops_read_model.py"
+      - "test_atlasquant_aion_b2b_revops_read_model.py"
+      - "test_atlasquant_aion_b2b_revops_ui.py"
+      - "docs/aion/AION_B2B_REVOPS_READ_MODEL_V1.md"
+      - "atlasquant_aion_b2b_revops_cleanup_plan.py"
+      - "test_atlasquant_aion_b2b_revops_cleanup_plan.py"
+      - "docs/aion/AION_B2B_REVOPS_CLEANUP_PLAN_V1.md"
+      - "atlasquant_reference_ui.py"
+      - ".github/workflows/aion-b2b-revops-foundation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  revops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile RevOps foundation
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_revops_foundation.py \
+            atlasquant_aion_b2b_revops_read_model.py \
+            atlasquant_aion_b2b_revops_cleanup_plan.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_revops_foundation.py \
+            test_atlasquant_aion_b2b_revops_read_model.py \
+            test_atlasquant_aion_b2b_revops_cleanup_plan.py \
+            test_atlasquant_aion_b2b_revops_ui.py
+      - name: Run RevOps foundation tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_revops_foundation.py \
+            test_atlasquant_aion_b2b_revops_read_model.py \
+            test_atlasquant_aion_b2b_revops_ui.py
+      - name: Assert non-execution and owner-only boundaries
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_revops_foundation.py").read_text(encoding="utf-8")
+          for marker in (
+              '"legal_contact_permission_certified": False',
+              '"automatic_outreach": False',
+              '"automatic_followup": False',
+              '"automatic_stage_change": False',
+              '"automatic_owner_assignment": False',
+              '"automatic_price_commitment": False',
+              '"automatic_contract_commitment": False',
+              '"destructive_delete_enabled": False',
+              '"crm_write": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+          assert "OWNER_ONLY_CRITICAL_COMMERCIAL_DECISION" in source
+          assert "DESTRUCTIVE_DELETE_NOT_SUPPORTED" in source
+          PY

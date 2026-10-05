@@ -1,0 +1,36 @@
+name: AION B2B Value Bound Service Cycle
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_value_bound_service_cycle.py"
+      - "test_atlasquant_aion_b2b_value_bound_service_cycle.py"
+      - "docs/aion/AION_B2B_VALUE_BOUND_SERVICE_CYCLE_V1.md"
+      - ".github/workflows/aion-b2b-value-bound-service-cycle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  value-bound-service-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile bounded service-cycle bridge
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_managed_service_control.py \
+            atlasquant_aion_b2b_value_bound_managed_service.py \
+            atlasquant_aion_b2b_value_bound_service_cycle.py
+      - name: Run service-cycle bridge tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_managed_service_control.py \
+            test_atlasquant_aion_b2b_value_bound_managed_service.py \
+            test_atlasquant_aion_b2b_value_bound_service_cycle.py

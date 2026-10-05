@@ -93,6 +93,31 @@ and must still condition the Global Worker step on:
 Recent pulse evidence requires at least three successful scheduled runs and a
 recent successful latest run.
 
+### Scheduled-pulse evidence source
+
+The pulse reader queries the exact Autopilot workflow run collection:
+
+`/actions/workflows/autopilot-v107.yml/runs`
+
+with `branch=main` and `event=schedule`.
+
+It must not infer pulse health by reading a generic first page of repository-wide
+Actions runs and filtering afterward. In a busy repository, unrelated PR/CI runs
+can crowd scheduled Autopilot runs out of that bounded page and create a false
+stale-pulse result even while the scheduler is healthy.
+
+The workflow-specific query changes only evidence retrieval. It does not change:
+
+- the 5,400-second maximum pulse age;
+- the minimum of three successful pulses;
+- feature-flag gating;
+- kill-switch behavior;
+- persisted arming requirements;
+- activation blockers.
+
+A second-line workflow name/path/event validation remains required even after the
+API query is scoped.
+
 ## Shadow protocol probe
 
 Every readiness execution performs an entirely in-memory simulation:

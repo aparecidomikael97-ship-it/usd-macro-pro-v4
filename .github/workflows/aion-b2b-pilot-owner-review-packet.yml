@@ -1,0 +1,64 @@
+name: AION B2B Pilot Owner Review Packet
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_owner_review_packet.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_review_packet.py"
+      - "atlasquant_aion_b2b_pilot_planning_handoff.py"
+      - "atlasquant_aion_b2b_proposal_draft.py"
+      - "atlasquant_aion_b2b_pilot_readiness.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_REVIEW_PACKET_V1.md"
+      - ".github/workflows/aion-b2b-pilot-owner-review-packet.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-review-packet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile owner review packet chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_readiness.py \
+            atlasquant_aion_b2b_proposal_draft.py \
+            atlasquant_aion_b2b_pilot_planning_handoff.py \
+            atlasquant_aion_b2b_pilot_owner_review_packet.py \
+            test_atlasquant_aion_b2b_pilot_owner_review_packet.py
+      - name: Run owner review packet tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_owner_review_packet.py \
+            test_atlasquant_aion_b2b_pilot_planning_handoff.py \
+            test_atlasquant_aion_b2b_proposal_draft.py
+      - name: Assert undecided non-authority boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_pilot_owner_review_packet.py").read_text(encoding="utf-8")
+          for marker in (
+              '"owner_decision": "UNDECIDED"',
+              '"owner_decision_recorded": False',
+              '"owner_approval_recorded": False',
+              '"owner_signature_requested": False',
+              '"owner_signature_verified": False',
+              '"decision_mechanism_reused_from_core_freeze": False',
+              '"pilot_activation_authorized": False',
+              '"automatic_activation": False',
+              '"automatic_customer_contact": False',
+              '"automatic_billing": False',
+              '"automatic_deploy": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+          assert "APPROVE_CORE_FREEZE" not in source
+          assert "DENY_CORE_FREEZE" not in source
+          PY

@@ -67,6 +67,9 @@ class AionLibraryIndexTests(unittest.TestCase):
         self.assertFalse(result["external_persisted"])
         self.assertFalse(result["memory_promoted"])
         self.assertFalse(result["execution_authorized"])
+        self.assertFalse(result["canonical_source"])
+        self.assertTrue(result["rebuildable_projection"])
+        self.assertTrue(result["disposable_projection"])
 
     def test_search_returns_provenance_and_no_semantic_claim(self):
         indexed=index_document(
@@ -97,7 +100,10 @@ class AionLibraryIndexTests(unittest.TestCase):
             indexed,"payroll",
             trusted_context=_admin("tenant:b","workspace:b"),
         )
-        self.assertEqual(result["status"],"NO_RESULTS")
+        self.assertEqual(result["status"],"BLOCKED")
+        self.assertIn("INDEX_SCOPE_MISMATCH",result["blockers"])
+        self.assertEqual(result["status"],"BLOCKED")
+        self.assertIn("INDEX_SCOPE_MISMATCH",result["blockers"])
         self.assertEqual(result["hits"],[])
 
     def test_workspace_isolation_applies_with_same_tenant(self):
@@ -111,6 +117,27 @@ class AionLibraryIndexTests(unittest.TestCase):
             trusted_context=_admin("tenant:a","workspace:b"),
         )
         self.assertEqual(result["hits"],[])
+
+    def test_index_refuses_mixing_foreign_tenant_rows(self):
+        first=index_document(
+            empty_library_index(),_validated(),
+            passages=["Payroll tenant A."],
+            trusted_context=_admin(),
+        )["index"]
+        foreign=_validated(
+            tenant="tenant:b",
+            workspace="workspace:b",
+        )
+        result=index_document(
+            first,foreign,
+            passages=["Payroll tenant B."],
+            trusted_context=_admin("tenant:b","workspace:b"),
+        )
+        self.assertEqual(result["status"],"BLOCKED")
+        self.assertTrue(
+            "INDEX_SCOPE_MISMATCH" in result["blockers"]
+            or "INDEX_CONTAINS_FOREIGN_SCOPE" in result["blockers"]
+        )
 
     def test_conflicting_document_keeps_unknown_truth(self):
         doc=_validated("CONFLICTING")

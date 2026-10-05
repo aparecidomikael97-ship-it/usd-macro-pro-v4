@@ -1,0 +1,106 @@
+name: AION B2B Multi-Company Admission
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_conversion_capacity.py"
+      - "atlasquant_aion_b2b_pilot_value_realization.py"
+      - "atlasquant_aion_b2b_multi_company_admission.py"
+      - "test_atlasquant_aion_b2b_multi_company_admission.py"
+      - "atlasquant_aion_b2b_multi_company_read_model.py"
+      - "test_atlasquant_aion_b2b_multi_company_read_model.py"
+      - "test_atlasquant_aion_b2b_multi_company_ui.py"
+      - "atlasquant_reference_ui.py"
+      - "docs/aion/AION_B2B_MULTI_COMPANY_ADMISSION_V1.md"
+      - "docs/aion/AION_B2B_MULTI_COMPANY_READ_MODEL_V1.md"
+      - ".github/workflows/aion-b2b-multi-company-admission.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  multi-company-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile multi-company admission chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_value_realization.py \
+            atlasquant_aion_b2b_conversion_capacity.py \
+            atlasquant_aion_b2b_multi_company_admission.py \
+            atlasquant_aion_b2b_multi_company_read_model.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_multi_company_admission.py \
+            test_atlasquant_aion_b2b_multi_company_read_model.py \
+            test_atlasquant_aion_b2b_multi_company_ui.py
+      - name: Run multi-company admission tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_multi_company_admission.py \
+            test_atlasquant_aion_b2b_multi_company_read_model.py \
+            test_atlasquant_aion_b2b_multi_company_ui.py \
+            test_atlasquant_aion_b2b_conversion_capacity.py \
+            test_atlasquant_aion_b2b_pilot_value_realization.py
+      - name: Assert no tenant or quota mutation authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          gate = Path("atlasquant_aion_b2b_multi_company_admission.py").read_text(encoding="utf-8")
+          for marker in (
+              '"owner_admission_approval_required": True',
+              '"tenant_creation_authorized": False',
+              '"quota_change_authorized": False',
+              '"admission_token_issued": False',
+              '"automatic_tenant_creation": False',
+              '"automatic_quota_change": False',
+              '"automatic_billing": False',
+              '"automatic_provisioning": False',
+              '"automatic_customer_contact": False',
+              '"automatic_deploy": False',
+              '"crm_write": False',
+              '"provider_called": False',
+              '"production_mutation": False',
+              '"executes_action": False',
+          ):
+              assert marker in gate, marker
+          model = Path("atlasquant_aion_b2b_multi_company_read_model.py").read_text(encoding="utf-8")
+          for marker in (
+              '"other_tenant_identity_exposed": False',
+              '"customer_identity_exposed": False',
+              '"tenant_creation_control_exposed": False',
+              '"quota_control_exposed": False',
+              '"provisioning_control_exposed": False',
+              '"billing_control_exposed": False',
+              '"grants_authority": False',
+              '"executes_action": False',
+          ):
+              assert marker in model, marker
+          ui = Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+          assert 'data-multi-company-readonly="true"' in ui
+          assert 'SEM CRIAÇÃO DE TENANT OU QUOTA' in ui
+          for forbidden in (
+              ">Criar tenant<",
+              ">Alterar quota<",
+              ">Aumentar quota<",
+              ">Provisionar<",
+              ">Cobrar<",
+          ):
+              assert forbidden not in ui, forbidden
+          for source in (gate, model):
+              for banned in (
+                  "requests.post(",
+                  "requests.put(",
+                  "subprocess.",
+                  "deploy_to_production(",
+                  "create_tenant(",
+                  "update_quota(",
+              ):
+                  assert banned not in source, banned
+          PY
