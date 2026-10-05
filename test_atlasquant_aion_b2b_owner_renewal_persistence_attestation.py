@@ -188,6 +188,24 @@ class OwnerRenewalPersistenceAttestationTests(unittest.TestCase):
         self.assertTrue(out["persistence_attested"])
         self.assertTrue(out["receipt_consistency_verified"])
         self.assertTrue(out["eligible_for_action_preflight"])
+        self.assertEqual(out["scope"]["owner_id"], "owner-a")
+        self.assertEqual(out["scope"]["tenant_id"], "tenant-a")
+        self.assertEqual(out["scope"]["workspace_id"], "workspace-a")
+        self.assertEqual(out["package"], "PROFISSIONAL")
+        self.assertEqual(out["review_type"], "RENEWAL_REVIEW")
+        self.assertEqual(
+            out["owner_review_packet_digest"],
+            "sha256:owner-review",
+        )
+        self.assertEqual(
+            out["cycle_evidence_digest"],
+            "sha256:cycle",
+        )
+        self.assertEqual(out["contract_digest"], "sha256:contract")
+        self.assertEqual(
+            out["value_bound_conversion_digest"],
+            "sha256:value-bound",
+        )
         self.assertFalse(out["writer_identity_verified"])
         self.assertFalse(out["storage_write_performed"])
         self.assertFalse(out["renewal_authorized"])
