@@ -7,9 +7,9 @@ on:
     paths:
       - "atlasquant_aion_managed_operations_simulation.py"
       - "test_atlasquant_aion_managed_operations_simulation.py"
+      - "docs/aion/AION_MANAGED_OPERATIONS_SIMULATION_V1.md"
       - "atlasquant_aion_b2b_pilot_readiness.py"
       - "test_atlasquant_aion_b2b_pilot_readiness.py"
-      - "docs/aion/AION_MANAGED_OPERATIONS_SIMULATION_V1.md"
       - "docs/aion/AION_B2B_PILOT_READINESS_V1.md"
       - "atlasquant_aion_b2b_pilot_operating_contract.py"
       - "test_atlasquant_aion_b2b_pilot_operating_contract.py"
@@ -26,6 +26,11 @@ on:
       - "atlasquant_aion_b2b_portal_read_model.py"
       - "test_atlasquant_aion_b2b_portal_read_model.py"
       - "docs/aion/AION_B2B_CUSTOMER_PORTAL_READ_MODEL_V1.md"
+      - "atlasquant_aion_b2b_customer_portal.py"
+      - "test_atlasquant_aion_b2b_customer_portal.py"
+      - "docs/aion/AION_B2B_CUSTOMER_PORTAL_V1.md"
+      - "atlasquant_account_portal.py"
+      - "test_atlasquant_account_portal.py"
       - ".github/workflows/aion-b2b-pilot-readiness.yml"
 
 permissions:
@@ -34,23 +39,43 @@ permissions:
 jobs:
   pilot-readiness:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Compile bounded pilot modules
+
+      - name: Compile bounded B2B modules
         run: |
-          python -m py_compile             atlasquant_aion_managed_operations_simulation.py             atlasquant_aion_b2b_pilot_readiness.py             atlasquant_aion_b2b_portal_read_model.py
-      - name: Run Managed Operations and pilot gate tests
+          python -m py_compile \
+            atlasquant_aion_managed_operations_simulation.py \
+            atlasquant_aion_b2b_pilot_readiness.py \
+            atlasquant_aion_b2b_pilot_operating_contract.py \
+            atlasquant_aion_b2b_pilot_outcome_health.py \
+            atlasquant_aion_b2b_conversion_capacity.py \
+            atlasquant_aion_b2b_managed_service_control.py \
+            atlasquant_aion_b2b_portal_read_model.py \
+            atlasquant_aion_b2b_customer_portal.py
+
+      - name: Run complete B2B contract suite
         run: |
-          python -m unittest -q             test_atlasquant_aion_managed_operations_simulation.py             test_atlasquant_aion_b2b_pilot_readiness.py             test_atlasquant_aion_b2b_portal_read_model.py
+          python -m unittest -q \
+            test_atlasquant_aion_managed_operations_simulation.py \
+            test_atlasquant_aion_b2b_pilot_readiness.py \
+            test_atlasquant_aion_b2b_pilot_operating_contract.py \
+            test_atlasquant_aion_b2b_pilot_outcome_health.py \
+            test_atlasquant_aion_b2b_conversion_capacity.py \
+            test_atlasquant_aion_b2b_managed_service_control.py \
+            test_atlasquant_aion_b2b_portal_read_model.py \
+            test_atlasquant_aion_b2b_customer_portal.py
+
       - name: Assert offline safety markers
         run: |
           python - <<'PY'
           from atlasquant_aion_managed_operations_simulation import run_reference_simulation
           from atlasquant_aion_b2b_pilot_readiness import assess_b2b_pilot_candidate
+          from atlasquant_aion_b2b_customer_portal import customer_portal_access
 
           scope = {"owner_id": "owner-a", "tenant_id": "tenant-a", "workspace_id": "ws-a"}
           candidate = {
@@ -97,4 +122,12 @@ jobs:
           assert result["provider_called"] is False
           assert result["production_mutation"] is False
           assert result["executes_action"] is False
+
+          blocked = customer_portal_access({}, {}, {})
+          assert blocked["allowed"] is False
+          assert blocked["read_only"] is True
+          assert blocked["grants_authority"] is False
+          assert blocked["automatic_billing"] is False
+          assert blocked["automatic_renewal"] is False
+          assert blocked["executes_action"] is False
           PY
