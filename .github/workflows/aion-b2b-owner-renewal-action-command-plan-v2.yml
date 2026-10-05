@@ -1,0 +1,63 @@
+name: AION B2B Owner Renewal Action Command Plan V2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_owner_renewal_action_command_plan.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_command_plan.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_COMMAND_PLAN_V2.md"
+      - ".github/workflows/aion-b2b-owner-renewal-action-command-plan-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-renewal-action-command-plan-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned crypto dependency
+        run: python -m pip install --disable-pip-version-check cryptography==50.0.2
+      - name: Compile command-plan hardening
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_owner_renewal_action_command_plan.py \
+            atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_command_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py
+      - name: Run command-plan V1 and V2 tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_owner_renewal_action_command_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py
+      - name: Assert V2 remains non executable
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path(
+              "atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py"
+          ).read_text(encoding="utf-8")
+          assert "trusted_scope:" not in source
+          assert '"PERSISTED_EXECUTION_RECORD"' in source
+          assert '"DERIVED_FROM_ACTION_FAMILY"' in source
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "subprocess.",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+          ):
+              assert banned not in source, banned
+          PY
