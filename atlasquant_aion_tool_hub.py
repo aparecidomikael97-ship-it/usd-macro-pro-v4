@@ -152,26 +152,6 @@ DEFAULT_TOOLS=(
         "external_side_effects":False,
     },
     {
-        "tool_id":"aion.staging.credential_probe",
-        "label":"Probe de credencial/egress somente staging",
-        "workspace_id":"development",
-        "connector_id":"staging-proxy",
-        "kind":"READ",
-        "guardian_action":"read",
-        "state":"DISABLED",
-        "required_scopes":["probe:read"],
-        "external_side_effects":False,
-        "owner":"atlasquant-core",
-        "version":"1.0.0",
-        "credential_ref":"staging-probe-secret",
-        "credential_scopes":["probe:read"],
-        "sandbox_profile":"THIRD_PARTY_EGRESS_PROXY",
-        "egress_allowlist":["api.example.com"],
-        "third_party":True,
-        "eval_profile":"staging-egress-v1",
-        "implementation_ref":"external-adapter:credential_probe",
-    },
-    {
         "tool_id":"aion.checkpoint.prepare_save",
         "label":"Preparar salvamento do Checkpoint",
         "workspace_id":"administration",
@@ -225,7 +205,7 @@ def normalize_tool(raw:Mapping[str,Any])->dict[str,Any]:
     if state not in TOOL_STATES:
         state="DISABLED"
     action=_clean(item.get("guardian_action"),80).lower() or "read"
-    base = {
+    return {
         "tool_id":tool_id,
         "label":_clean(item.get("label"),140) or tool_id,
         "workspace_id":workspace_id,
@@ -244,7 +224,6 @@ def normalize_tool(raw:Mapping[str,Any])->dict[str,Any]:
         "auto_execute":False,
         "real_trading_enabled":False,
     }
-    return enrich_tool_contract(base, item)
 
 
 def normalize_tools(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
@@ -358,13 +337,14 @@ def plan_tool_call(
     reversible:bool=False,
 )->dict[str,Any]:
     """Create an execution preflight. No connector/tool is called."""
-    tool=_find_tool(tool_id,hub)
-    if tool is None:
+    legacy_tool=_find_tool(tool_id,hub)
+    if legacy_tool is None:
         return {
             "schema":SCHEMA,"state":"BLOCK","reason":"TOOL_NOT_REGISTERED",
             "tool_id":_clean(tool_id,96),"executes_action":False,
             "real_trading_enabled":False,
         }
+    tool=enrich_tool_contract(legacy_tool, legacy_tool)
     authority=source_authority(source_kind,authenticated_admin=authenticated_admin is True)
     connector=_connector_readiness(tool["connector_id"],portable_core)
     safety=proof_of_safety(
@@ -430,14 +410,15 @@ def tool_hub_summary(
     state=normalize_tool_hub(hub)
     core=normalize_portable_core(portable_core)
     tools=state["tools"]
+    secured_tools=[enrich_tool_contract(x,x) for x in tools]
     external=[x for x in tools if x["connector_id"]]
     registry = state.get("registry_integrity") or registry_integrity_report()
     return {
         "schema":SCHEMA,
         "tools":len(tools),
         "local_ready":sum(1 for x in tools if x["state"]=="LOCAL_READY" and not x["connector_id"]),
-        "supply_chain_verified":sum(1 for x in tools if x.get("supply_chain_state")=="VERIFIED"),
-        "supply_chain_blocked":sum(1 for x in tools if x.get("supply_chain_state")!="VERIFIED"),
+        "supply_chain_verified":sum(1 for x in secured_tools if x.get("supply_chain_state")=="VERIFIED"),
+        "supply_chain_blocked":sum(1 for x in secured_tools if x.get("supply_chain_state")!="VERIFIED"),
         "registry_state":registry.get("state"),
         "external_tools":len(external),
         "registered_connectors":len(core["connectors"]),
