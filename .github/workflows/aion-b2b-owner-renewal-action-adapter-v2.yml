@@ -1,0 +1,59 @@
+name: AION B2B Controlled Adapter V2 Reconciliation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - business/aion-b2b-controlled-adapter-dry-run-20261005
+    paths:
+      - "atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run_v2.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_adapter_receipt_v2.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_adapter_v2.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_ADAPTER_V2.md"
+      - ".github/workflows/aion-b2b-owner-renewal-action-adapter-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-adapter-v2-reconciliation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing pinned project dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile V1 plus reconciled V2 contracts
+        run: python -m py_compile atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py atlasquant_aion_b2b_owner_renewal_action_adapter_plan.py atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run.py atlasquant_aion_b2b_owner_renewal_action_adapter_receipt.py atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2.py atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run_v2.py atlasquant_aion_b2b_owner_renewal_action_adapter_receipt_v2.py test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py test_atlasquant_aion_b2b_owner_renewal_action_adapter.py test_atlasquant_aion_b2b_owner_renewal_action_adapter_v2.py
+      - name: Run original Codex adapter plus V2 reconciliation
+        run: python -m unittest -q test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py test_atlasquant_aion_b2b_owner_renewal_action_adapter.py test_atlasquant_aion_b2b_owner_renewal_action_adapter_v2.py
+      - name: Assert reconciled V2 has no external execution stack
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          files = (
+              "atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2.py",
+              "atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run_v2.py",
+              "atlasquant_aion_b2b_owner_renewal_action_adapter_receipt_v2.py",
+          )
+          joined = "\n".join(Path(path).read_text(encoding="utf-8") for path in files)
+          assert "trusted_scope" not in joined
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "subprocess.Popen(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "save_runtime_checkpoint(",
+          ):
+              assert banned not in joined, banned
+          PY
