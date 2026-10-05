@@ -14,6 +14,8 @@ from typing import Any, Mapping, Sequence
 import json
 import re
 
+from atlasquant_aion_tool_sandbox import sandbox_contract_issues
+
 SCHEMA = "ATLASQUANT_AION_TOOL_SUPPLY_CHAIN_V1"
 REGISTRY_VERSION = "1.0.0"
 PINNED_REGISTRY_DIGEST = "16c52804014523b126d4ed30377bc86002fe7211d22a2ff8cea3a7c523766486"
@@ -369,6 +371,7 @@ def tool_contract_issues(tool: Mapping[str, Any]) -> list[str]:
         "THIRD_PARTY_EGRESS_PROXY",
     }:
         issues.append("TOOL_SANDBOX_PROFILE_INVALID")
+    issues.extend(sandbox_contract_issues(tool))
 
     expected_hash = PINNED_CONTRACT_HASHES.get(tool_id, "")
     actual_hash = contract_hash(tool)
