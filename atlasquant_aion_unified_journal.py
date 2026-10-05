@@ -38,6 +38,10 @@ EVENT_TYPES = frozenset({
     "RECOVERY_PREPARED",
     "REQUEST_BLOCKED",
     "TASKGRAPH_CHECKPOINT",
+    "VERIFICATION_RECORDED",
+    "MEMORY_PROMOTION_RECORDED",
+    "AUTHORITY_REVALIDATED",
+    "OUTBOX_RECONCILED",
 })
 _SECRET_MARKERS = (
     "secret", "token", "password", "credential", "api_key", "apikey",
