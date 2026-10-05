@@ -22,7 +22,7 @@ from atlasquant_aion_library_index import (
     rebuild_scope_projection,
     search_library_index,
 )
-from atlasquant_aion_tenant import PERSONAL_SCOPE
+from atlasquant_aion_tenant import PERSONAL_SCOPE, tenant_memory_seed
 from atlasquant_aion_tenant_crypto import (
     SCHEMA as CRYPTO_SCHEMA,
     crypto_policy,
@@ -242,20 +242,7 @@ class TenantCryptoDurableStoreTests(unittest.TestCase):
             self.assertNotIn(marker, file_path.read_text(encoding="utf-8"))
 
     def test_deletion_plan_covers_live_backup_projection_cache_and_key_surfaces(self):
-        memory = {
-            "tenant_id": self.paths["tenant_id"],
-            "schema": "ATLASQUANT_AION_TENANT_V1",
-            "namespace": "tenant:" + self.paths["tenant_id"],
-            "created_at": NOW.isoformat(),
-            "updated_at": NOW.isoformat(),
-            "profile": {},
-            "conversation_notes": [],
-            "academy_progress": {},
-            "watchlist": [],
-            "truth_policy": "never_invent",
-            "privacy": {},
-            "permissions": {},
-        }
+        memory = tenant_memory_seed(self.user)
         plan = tenant_deletion_plan(
             memory,
             self.user,
