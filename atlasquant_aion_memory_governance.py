@@ -14,6 +14,7 @@ import json
 from typing import Any, Callable, Mapping, Sequence
 
 from atlasquant_aion_memory_layers import default_memory_layers, remember
+from atlasquant_aion_independent_verifier import validate_verification_receipt
 from atlasquant_aion_observability import redact_text
 
 SCHEMA = "ATLASQUANT_AION_MEMORY_GOVERNANCE_V1"
@@ -226,6 +227,8 @@ def propose_memory(
         "verification_refs": [],
         "verification_kind": "",
         "verification_digest": "",
+        "verification_receipt_digest": "",
+        "verification_receipt_validated": False,
         "verified_at": "",
         "verified_by": "",
         "taint_labels": taint,
@@ -265,6 +268,9 @@ def verify_memory_proposal(
     verifier_id: Any,
     verification_refs: Sequence[Any] | None,
     verifier: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    verification_receipt: Mapping[str, Any] | None = None,
+    verification_request: Mapping[str, Any] | None = None,
+    verification_scope: Mapping[str, Any] | None = None,
     now: Any = None,
 ) -> dict[str, Any]:
     state = normalize_memory_governance(governance)
@@ -300,6 +306,35 @@ def verify_memory_proposal(
         blockers.append("VERIFIER_NOT_INDEPENDENT")
     if _clean(result.get("verifier_id"), 160) != verifier_name:
         blockers.append("VERIFIER_ID_MISMATCH")
+
+    receipt_validated = False
+    receipt_digest = ""
+    receipt_inputs = (
+        isinstance(verification_receipt, Mapping),
+        isinstance(verification_request, Mapping),
+        isinstance(verification_scope, Mapping),
+    )
+    if any(receipt_inputs):
+        if not all(receipt_inputs):
+            blockers.append("VERIFICATION_RECEIPT_BINDING_INCOMPLETE")
+        else:
+            receipt_check = validate_verification_receipt(
+                verification_receipt,
+                request=verification_request,
+                scope=verification_scope,
+                now=now,
+            )
+            if receipt_check.get("valid") is not True:
+                blockers.append("VERIFICATION_RECEIPT_INVALID")
+            elif _clean(verification_receipt.get("verifier_id"), 160) != verifier_name:
+                blockers.append("VERIFICATION_RECEIPT_VERIFIER_MISMATCH")
+            elif _clean(verification_request.get("content_digest"), 160) != record["content_digest"]:
+                blockers.append("VERIFICATION_RECEIPT_CONTENT_MISMATCH")
+            elif sorted(_refs(verification_receipt.get("bound_refs"))) != sorted(refs):
+                blockers.append("VERIFICATION_RECEIPT_REFS_MISMATCH")
+            else:
+                receipt_validated = True
+                receipt_digest = _clean(verification_receipt.get("receipt_digest"), 160)
     if blockers:
         return {
             "schema": SCHEMA,
@@ -320,7 +355,10 @@ def verify_memory_proposal(
         "verifier_kind": kind,
         "verifier_id": verifier_name,
         "verification_refs": refs,
+        "verification_receipt_digest": receipt_digest,
     })
+    verified["verification_receipt_digest"] = receipt_digest
+    verified["verification_receipt_validated"] = receipt_validated
     verified["verified_at"] = _aware(now).isoformat()
     verified["verified_by"] = verifier_name
     verified["resolved_taint"] = list(verified.get("taint_labels") or [])
@@ -376,6 +414,8 @@ def promote_verified_memory(
         blockers.append("TAINT_UNRESOLVED")
     if not record.get("verification_refs") or not record.get("verification_digest"):
         blockers.append("VERIFICATION_PROOF_MISSING")
+    if record.get("verification_receipt_validated") is not True or not record.get("verification_receipt_digest"):
+        blockers.append("VERIFICATION_RECEIPT_REQUIRED")
     if not record.get("provenance_ref") or not record.get("content_digest"):
         blockers.append("PROVENANCE_MISSING")
     if record.get("truth_state") != "CONFIRMED":
@@ -397,6 +437,7 @@ def promote_verified_memory(
         "proposal_id": target,
         "content_digest": record["content_digest"],
         "verification_digest": record["verification_digest"],
+        "verification_receipt_digest": record["verification_receipt_digest"],
         "reviewed_by": reviewer,
         "reviewed_at": reviewed_at,
         "scope": scope,
