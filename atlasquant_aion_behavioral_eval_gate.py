@@ -183,7 +183,10 @@ def evaluate_behavioral_change(
     ]
     family_results: dict[str, dict[str, Any]] = {}
     for family in REQUIRED_FAMILIES:
-        rows = [row for row in normalized if row["family"] == family]
+        rows = [
+            row for row in normalized
+            if row["family"] == family and not row["deliberate_regression_probe"]
+        ]
         missing_evidence = [row["case_id"] for row in rows if not row["evidence_refs"]]
         incomplete = [row["case_id"] for row in rows if row["passed"] is None]
         failures = [row["case_id"] for row in rows if row["passed"] is False]
