@@ -311,6 +311,17 @@ class SQLiteChatStore:
                 raise
             raise StorageUnavailableError("verified SQLite restore failed") from exc
 
+    def _record_database_error(self, exc):
+        text = str(exc or "").lower()
+        if isinstance(exc, sqlite3.OperationalError) and (
+            "locked" in text or "busy" in text
+        ):
+            self._health_state = DEGRADED
+            self._health_reason = "DATABASE_BUSY"
+        else:
+            self._health_state = FAILED
+            self._health_reason = type(exc).__name__
+
     def _scope(self, scope):
         self._require_open()
         if not isinstance(scope, Scope):
@@ -342,8 +353,7 @@ class SQLiteChatStore:
                     (c.id, *self._scope(scope), c.updated_at, c.archived, c.title, dump(c)),
                 )
         except sqlite3.DatabaseError as exc:
-            self._health_state = FAILED
-            self._health_reason = type(exc).__name__
+            self._record_database_error(exc)
             raise
         return c
 
@@ -426,8 +436,7 @@ class SQLiteChatStore:
             except Exception:
                 pass
             if isinstance(exc, sqlite3.DatabaseError) and not isinstance(exc, sqlite3.IntegrityError):
-                self._health_state = FAILED
-                self._health_reason = type(exc).__name__
+                self._record_database_error(exc)
             raise
         return message
 
