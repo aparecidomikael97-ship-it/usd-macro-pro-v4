@@ -19,7 +19,7 @@ SCHEMA = "ATLASQUANT_AION_B2B_CUSTOMER_PORTAL_V1"
 PORTAL_SCOPE = "B2B_CUSTOMER_PORTAL"
 ALLOWED_VIEWER_ROLE = "USER"
 READ_MODEL_SCHEMA = "ATLASQUANT_AION_B2B_PORTAL_READ_MODEL_V1"
-SAFE_SECTIONS = ("overview", "value", "usage", "support", "integrations", "crm", "documents", "billing")
+SAFE_SECTIONS = ("overview", "value", "usage", "support", "integrations", "crm", "documents", "billing", "automations", "tickets")
 _SAFE_TENANT_ID = re.compile(r"^[a-f0-9]{32}$")
 
 
@@ -173,6 +173,7 @@ def customer_portal_view_model(
     binding: Mapping[str, Any] | None,
     read_model: Mapping[str, Any] | None,
     records: Mapping[str, Any] | None = None,
+    operations: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Filter internal service evidence into a customer-safe presentation model."""
     decision = customer_portal_access(access, binding, read_model)
@@ -227,6 +228,47 @@ def customer_portal_view_model(
             }
         safe_records = candidate
 
+    safe_operations = None
+    if operations is not None:
+        candidate = dict(operations) if isinstance(operations, Mapping) else {}
+        operation_blockers: list[str] = []
+        if candidate.get("schema") != "ATLASQUANT_AION_B2B_CUSTOMER_PORTAL_OPERATIONS_V1":
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_SCHEMA_INVALID")
+        if candidate.get("state") != "READY":
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_NOT_READY")
+        if candidate.get("read_only") is not True:
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_NOT_READ_ONLY")
+        if candidate.get("automation_control_exposed") is not False:
+            operation_blockers.append("CUSTOMER_PORTAL_AUTOMATION_CONTROL_UNSAFE")
+        if candidate.get("ticket_write_exposed") is not False:
+            operation_blockers.append("CUSTOMER_PORTAL_TICKET_WRITE_UNSAFE")
+        if candidate.get("message_content_exposed") is not False:
+            operation_blockers.append("CUSTOMER_PORTAL_TICKET_CONTENT_UNSAFE")
+        if candidate.get("executes_action") is not False:
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_EXECUTION_UNSAFE")
+        if not _text(candidate.get("evidence_digest"), 180):
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_EVIDENCE_REQUIRED")
+        candidate_scope = _scope(candidate.get("scope") if isinstance(candidate.get("scope"), Mapping) else {})
+        if candidate_scope["tenant_id"] != decision["service_tenant_id"]:
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_TENANT_MISMATCH")
+        if candidate_scope["workspace_id"] != decision["workspace_id"]:
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_WORKSPACE_MISMATCH")
+        if _text(candidate.get("customer_id"), 120) != decision["customer_id"]:
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_CUSTOMER_MISMATCH")
+        if _text(candidate.get("package"), 40).upper() != decision["package"]:
+            operation_blockers.append("CUSTOMER_PORTAL_OPERATIONS_PACKAGE_MISMATCH")
+        if operation_blockers:
+            return {
+                "schema": SCHEMA,
+                "state": "BLOCKED",
+                "allowed": False,
+                "blockers": list(dict.fromkeys(operation_blockers)),
+                "read_only": True,
+                "grants_authority": False,
+                "executes_action": False,
+            }
+        safe_operations = candidate
+
     view = {
         "schema": SCHEMA,
         "state": "READY",
@@ -256,6 +298,10 @@ def customer_portal_view_model(
         "documents": list(safe_records.get("documents") or [])[:50] if safe_records else [],
         "billing": dict(safe_records.get("billing") or {}) if safe_records else {},
         "records_evidence_digest": _text(safe_records.get("evidence_digest"), 180) if safe_records else "",
+        "automations": list(safe_operations.get("automations") or [])[:50] if safe_operations else [],
+        "tickets": list(safe_operations.get("tickets") or [])[:100] if safe_operations else [],
+        "operation_counts": dict(safe_operations.get("counts") or {}) if safe_operations else {},
+        "operations_evidence_digest": _text(safe_operations.get("evidence_digest"), 180) if safe_operations else "",
         "read_only": True,
         "admin_memory_access": False,
         "other_tenant_access": False,
@@ -357,6 +403,31 @@ def customer_portal_html(view: Mapping[str, Any] | None) -> str:
                 f'<article><small>PAGAMENTO</small><strong>{escape(str(billing.get("payment_state") or "—"))}</strong>'
                 f'<span>R$ {escape(_fmt(amount))}</span></article>',
             ])
+    if "automations" in allowed:
+        for row in list(data.get("automations") or [])[:50]:
+            if not isinstance(row, Mapping):
+                continue
+            cards.append(
+                '<article><small>AUTOMAÇÃO</small>'
+                f'<strong>{escape(str(row.get("name") or "—"))}</strong>'
+                f'<span>{escape(str(row.get("state") or "—"))} · '
+                f'{escape(str(row.get("last_result") or "—"))}</span></article>'
+            )
+    tickets_html = ""
+    if "tickets" in allowed and data.get("tickets"):
+        rows = []
+        for row in list(data.get("tickets") or [])[:100]:
+            if not isinstance(row, Mapping):
+                continue
+            rows.append(
+                '<li><strong>' + escape(str(row.get("title") or "—")) + '</strong> · '
+                + escape(str(row.get("priority") or "—")) + ' · '
+                + escape(str(row.get("state") or "—")) + ' · SLA '
+                + escape(str(row.get("sla_state") or "—")) + '</li>'
+            )
+        if rows:
+            tickets_html = '<section class="aq-customer-portal-tickets"><h3>Chamados</h3><ul>' + "".join(rows) + '</ul></section>'
+
     documents_html = ""
     if "documents" in allowed and data.get("documents"):
         rows = []
@@ -392,6 +463,7 @@ def customer_portal_html(view: Mapping[str, Any] | None) -> str:
         + "".join(cards)
         + "</div>"
         + documents_html
+        + tickets_html
         + notices_html
         + f'<footer>Atualização: {escape(str(data.get("generated_at") or "—"))} · '
         'Nenhuma cobrança, renovação ou alteração operacional pode ser executada por esta tela.</footer>'
@@ -406,9 +478,10 @@ def render_customer_portal(
     binding: Mapping[str, Any] | None,
     read_model: Mapping[str, Any] | None,
     records: Mapping[str, Any] | None = None,
+    operations: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Optional Streamlit host adapter. Rendering only; no mutation path."""
-    view = customer_portal_view_model(access, binding, read_model, records)
+    view = customer_portal_view_model(access, binding, read_model, records, operations)
     st.markdown(customer_portal_html(view), unsafe_allow_html=True)
     return view
 

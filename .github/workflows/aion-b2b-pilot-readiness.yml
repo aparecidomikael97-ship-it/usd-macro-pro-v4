@@ -32,6 +32,9 @@ on:
       - "atlasquant_aion_b2b_customer_portal_records.py"
       - "test_atlasquant_aion_b2b_customer_portal_records.py"
       - "docs/aion/AION_B2B_CUSTOMER_PORTAL_RECORDS_V1.md"
+      - "atlasquant_aion_b2b_customer_portal_operations.py"
+      - "test_atlasquant_aion_b2b_customer_portal_operations.py"
+      - "docs/aion/AION_B2B_CUSTOMER_PORTAL_OPERATIONS_V1.md"
       - "atlasquant_account_portal.py"
       - "test_atlasquant_account_portal.py"
       - ".github/workflows/aion-b2b-pilot-readiness.yml"
@@ -60,7 +63,8 @@ jobs:
             atlasquant_aion_b2b_managed_service_control.py \
             atlasquant_aion_b2b_portal_read_model.py \
             atlasquant_aion_b2b_customer_portal.py \
-            atlasquant_aion_b2b_customer_portal_records.py
+            atlasquant_aion_b2b_customer_portal_records.py \
+            atlasquant_aion_b2b_customer_portal_operations.py
 
       - name: Run complete B2B contract suite
         run: |
@@ -73,7 +77,8 @@ jobs:
             test_atlasquant_aion_b2b_managed_service_control.py \
             test_atlasquant_aion_b2b_portal_read_model.py \
             test_atlasquant_aion_b2b_customer_portal.py \
-            test_atlasquant_aion_b2b_customer_portal_records.py
+            test_atlasquant_aion_b2b_customer_portal_records.py \
+            test_atlasquant_aion_b2b_customer_portal_operations.py
 
       - name: Assert offline safety markers
         run: |

@@ -153,6 +153,7 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         self.assertIn("customer_portal_binding:Mapping[str,Any]|None=None",src)
         self.assertIn("customer_read_model:Mapping[str,Any]|None=None",src)
         self.assertIn("customer_portal_records:Mapping[str,Any]|None=None",src)
+        self.assertIn("customer_portal_operations:Mapping[str,Any]|None=None",src)
         self.assertIn("render_customer_portal(",src)
         self.assertNotIn('session_state.get("atlasquant_b2b_customer_portal_binding")',src)
         self.assertNotIn('query_params',src)
