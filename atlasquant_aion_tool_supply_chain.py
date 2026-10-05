@@ -16,7 +16,7 @@ import re
 
 SCHEMA = "ATLASQUANT_AION_TOOL_SUPPLY_CHAIN_V1"
 REGISTRY_VERSION = "1.0.0"
-PINNED_REGISTRY_DIGEST = "63c36f366d9cce24b2700dd28f81beb8c0f8d7ec7a5555f9c8b80ab803df9fbb"
+PINNED_REGISTRY_DIGEST = "16c52804014523b126d4ed30377bc86002fe7211d22a2ff8cea3a7c523766486"
 _SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$")
 _SAFE_OWNER = re.compile(r"^[a-z0-9][a-z0-9._-]{1,95}$")
 
@@ -210,6 +210,24 @@ DEFAULT_TOOL_CONTRACTS: dict[str, dict[str, Any]] = {
         "egress_allowlist": [],
         "third_party": False,
     },
+    "aion.staging.credential_probe": {
+        "owner": "atlasquant-core",
+        "version": "1.0.0",
+        "input_schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"url": {"type": "string"}},
+            "required": ["url"],
+        },
+        "output_schema": {"type": "object"},
+        "implementation_ref": "external-adapter:credential_probe",
+        "eval_profile": "staging-egress-v1",
+        "credential_ref": "staging-probe-secret",
+        "credential_scopes": ["probe:read"],
+        "sandbox_profile": "THIRD_PARTY_EGRESS_PROXY",
+        "egress_allowlist": ["api.example.com"],
+        "third_party": True,
+    },
     "aion.checkpoint.prepare_save": {
         "owner": "atlasquant-core",
         "version": "1.0.0",
@@ -236,6 +254,7 @@ PINNED_CONTRACT_HASHES = {
     "aion.missions.summary": "0c4c2947351fca249cc645cd86e3546d3dcd0d1b48dbba289e28a762ea41c9ea",
     "aion.secretary.draft_brief": "363583c938e604aa000b68469f7b4dedd4e8eed76e00ff7c14490858a6a6209e",
     "aion.specialists.snapshot": "91fe1a51b20f4a91259e201cf8f215d1421e9d79c8061c94d6d590848da752e6",
+    "aion.staging.credential_probe": "d2bb6b021017e1e6c66390fb289754b55ec4525f37b4ed0af96de1e660dc53d3",
     "aion.status.read": "5dd059893bdb5db407d215e1451bfde15fa454685a3fc4b37d1ed37291603446",
     "aion.tasks.summary": "1df074cb57d79ffd4da62c5e33181f563332c571103aec2a23527a2c1f6279e4",
 }
