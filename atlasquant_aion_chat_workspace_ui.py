@@ -100,6 +100,14 @@ def render_aion_chat_workspace(st, access, *, mode, selected, navigation, compon
     from atlasquant_central_hub_ui import assert_area_access
     if not access or access.get("allowed") is not True: return False
     assert_area_access(access, "aion")
+    # Semantic host marker stays outside the custom component so AppTest,
+    # accessibility tooling and navigation contracts can identify the active
+    # workspace without depending on component internals.
+    st.markdown(
+        '<span id="aq-aion-chat-workspace-host" data-workspace="aion" '
+        'data-module="chat" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     context = trusted_context(access, mode)
     chat = session_chat(st.session_state, context)
     data = view_data(chat)
