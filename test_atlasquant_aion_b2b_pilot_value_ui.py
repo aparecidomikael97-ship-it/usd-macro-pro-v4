@@ -131,9 +131,9 @@ class AionB2BPilotValueUITests(unittest.TestCase):
             ">Contatar cliente<",
             ">Ativar piloto<",
             ">Executar<",
-            "data-action="renew",
-            "data-action="expand",
-            "data-action="bill",
+            'data-action="renew"',
+            'data-action="expand"',
+            'data-action="bill"',
         ):
             self.assertNotIn(forbidden, html)
 

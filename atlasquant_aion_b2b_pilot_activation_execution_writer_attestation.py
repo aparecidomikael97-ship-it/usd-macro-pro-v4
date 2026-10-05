@@ -530,6 +530,8 @@ def verify_execution_writer_attestation(
         "writer_authority_verified": True,
         "receipt_binding_verified": True,
         "nonce_registered": True,
+        "activation_command_generated": False,
+        "activation_command_executed": False,
         "pilot_activation_authorized": False,
         "pilot_activated": False,
         "checkpoint_write_performed": False,
