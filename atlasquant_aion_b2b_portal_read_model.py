@@ -125,6 +125,8 @@ def build_customer_portal_read_model(
         "CAPACITY_REVIEW",
         "INCIDENT_REVIEW",
     }
+    if _scope(cycle_result) != trusted:
+        blockers.append("SERVICE_CYCLE_SCOPE_MISMATCH")
     if cycle_result.get("state") not in allowed_cycle_states:
         blockers.append("SERVICE_CYCLE_STATE_NOT_PRESENTABLE")
     if cycle_result.get("decision") not in allowed_decisions:
