@@ -1,0 +1,73 @@
+name: AION B2B Pilot Owner Decision
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_owner_decision.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_decision.py"
+      - "atlasquant_aion_b2b_pilot_owner_review_packet.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_DECISION_V1.md"
+      - "atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_DECISION_PERSISTENCE_PLAN_V1.md"
+      - ".github/workflows/aion-b2b-pilot-owner-decision.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-owner-decision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install crypto dependency
+        run: python -m pip install --disable-pip-version-check cryptography==50.0.2
+      - name: Compile pilot owner decision chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_b2b_pilot_owner_review_packet.py \
+            atlasquant_aion_b2b_pilot_owner_decision.py \
+            atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py
+      - name: Run owner decision tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_owner_decision.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_owner_review_packet.py
+      - name: Assert decision and activation separation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_pilot_owner_decision.py").read_text(encoding="utf-8")
+          for marker in (
+              'DECISIONS = ("APPROVE_PILOT", "DENY_PILOT")',
+              '"owner_decision_recorded": False',
+              '"decision_record_persisted": False',
+              '"pilot_activation_authorized": False',
+              '"pilot_activated": False',
+              '"customer_contact_authorized": False',
+              '"contract_signature_authorized": False',
+              '"billing_authorized": False',
+              '"deploy_authorized": False',
+              '"executes_action": False',
+              '"generic_chat_instruction_accepted_as_decision": False',
+          ):
+              assert marker in source, marker
+          assert "APPROVE_CORE_FREEZE" not in source
+          assert "DENY_CORE_FREEZE" not in source
+          persist = Path("atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py").read_text(encoding="utf-8")
+          assert "append_checkpoint_patch(" not in persist
+          assert '"automatic_checkpoint_write": False' in persist
+          assert '"decision_record_persisted": False' in persist
+          assert '"pilot_activation_authorized": False' in persist
+          PY
