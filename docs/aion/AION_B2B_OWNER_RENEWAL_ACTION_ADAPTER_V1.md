@@ -151,9 +151,10 @@ AST checks forbid direct provider/executor/HTTP/billing/CRM dependencies. There 
 no production runtime, worker, UI, provider, billing, CRM or deployment wiring.
 
 Dedicated CI: `aion-b2b-owner-renewal-action-adapter.yml`, pinned existing action
-SHAs, Python 3.12, existing `cryptography==50.0.2`, `pandas==3.0.6` and
-`numpy==2.5.3`, contents-read only. The pandas/numpy pins are existing project
-dependencies needed by the unchanged architecture import regression. Aggregate
+SHAs, Python 3.12, existing pinned `requirements.txt` (including
+`cryptography==50.0.2`), contents-read only. The full existing requirements are
+needed by the unchanged architecture specialist import regression, including
+its pandas and Streamlit import chain. No requirements/pins are changed. Aggregate
 B2B readiness and quality gates include the new suite. Exact insertion anchors
 were checked to occur once before editing; no ambiguous replacements or relaxed
 old tests. Final counts/run links belong in the delivery report/PR because run
@@ -171,8 +172,10 @@ execution environment of those gates and must be checked before final delivery.
 The first dedicated Linux run (`37387936658`) executed all 293 cases but failed
 the unchanged specialist import regression because its pandas dependency was
 absent from the minimal new workflow. The fix adds the project's existing
-pandas/numpy pins to test setup; no test is removed or relaxed and no product
-code changes to satisfy CI.
+pandas/numpy pins to test setup. That exposed Streamlit as the next existing
+transitive specialist dependency (`37388119370`), so the dedicated gate now uses
+the existing full pinned requirements. No test is removed or relaxed and no
+product code changes to satisfy CI.
 
 Every successful and blocked boundary result explicitly retains false flags for
 provider/network, secrets/credentials/endpoints/method/headers/executable payload,
