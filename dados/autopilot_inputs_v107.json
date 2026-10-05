@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-05T21:52:02.673698+00:00",
+  "generated_at": "2026-10-05T22:03:27.868852+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -19,7 +19,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 22.5,
+      "Dif. macro": 22.7,
       "Índice ranking": 89.9
     },
     {
@@ -28,7 +28,7 @@
       "Score final": 89.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 30.2,
+      "Dif. macro": 30.5,
       "Índice ranking": 89.9
     },
     {
@@ -37,7 +37,7 @@
       "Score final": 90.0,
       "Qualidade": 84.0,
       "Confluência": "ALTA",
-      "Dif. macro": 29.4,
+      "Dif. macro": 29.6,
       "Índice ranking": 87.2
     },
     {
@@ -46,7 +46,7 @@
       "Score final": 84.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": -16.3,
+      "Dif. macro": -16.1,
       "Índice ranking": 87.1
     },
     {
@@ -55,7 +55,7 @@
       "Score final": 91.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -20.8,
+      "Dif. macro": -21.0,
       "Índice ranking": 82.5
     },
     {
@@ -64,7 +64,7 @@
       "Score final": 78.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -13.2,
+      "Dif. macro": -13.0,
       "Índice ranking": 75.2
     },
     {
@@ -73,12 +73,12 @@
       "Score final": 55.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -17.0,
+      "Dif. macro": -17.2,
       "Índice ranking": 69.4
     }
   ],
   "macro_context": {
-    "usd_score": 59.500578733333334,
+    "usd_score": 59.25594793333333,
     "usd_quality": 90.0,
     "fed_tone": "Restritivo",
     "fed_strength": 0.38333333333333336,
@@ -124,7 +124,7 @@
   "fast_boot": {
     "macro_eua": {
       "Juros do Fed": 3.75,
-      "IPC anual": 3.35302,
+      "IPC anual": 2.9,
       "IPC Núcleo anual": 2.44616,
       "PCE anual": 3.41903,
       "PCE Núcleo anual": 3.0076,
@@ -145,11 +145,11 @@
         },
         {
           "Indicador": "IPC anual",
-          "Valor": 3.353,
-          "Última observação": "01/08/2026",
-          "Idade (dias)": 65,
-          "Status": "🟡 Atenção",
-          "Fonte": "FRED · CPIAUCSL"
+          "Valor": 2.9,
+          "Última observação": "—",
+          "Idade (dias)": "—",
+          "Status": "⚠️ Fallback",
+          "Fonte": "Valor de segurança"
         },
         {
           "Indicador": "IPC Núcleo anual",
@@ -232,9 +232,9 @@
           "serie": "FEDFUNDS"
         },
         "IPC anual": {
-          "valor": 3.35302,
-          "data": "01/08/2026",
-          "idade_dias": 65,
+          "valor": null,
+          "data": null,
+          "idade_dias": null,
           "serie": "CPIAUCSL"
         },
         "IPC Núcleo anual": {
@@ -292,7 +292,7 @@
           "serie": "DTWEXBGS"
         }
       },
-      "_fallbacks": 0
+      "_fallbacks": 1
     },
     "fed": {
       "tom": "Restritivo",
@@ -439,7 +439,7 @@
         "juros": 3.75,
         "inflacao": 3.35302,
         "pib": 2.19157,
-        "sentimento": 47.61904761904762,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -512,12 +512,12 @@
         "n_juros": 100.0,
         "n_inflacao": 100.0,
         "n_pib": 83.49591589284022,
-        "n_sentimento": 15.151515151515152,
+        "n_sentimento": 11.111111111111114,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 69.0,
+        "Pontuação_Macro": 68.6,
         "Influência_Fed": -4.1,
-        "Pontuação_Final": 64.9,
+        "Pontuação_Final": 64.5,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 20.0,
@@ -525,13 +525,13 @@
             "PIB": 12.524387383926031,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.5151515151515154
+            "Sentimento": 1.1111111111111114
           },
           "fed": -4.140000000000001,
           "other": {
             "Limite da escala 0–100": 1.4210854715202004e-14
           },
-          "unrounded_final": 64.89953889907756
+          "unrounded_final": 64.49549849503715
         },
         "Posição": 1
       },
@@ -540,23 +540,23 @@
         "juros": 3.8,
         "inflacao": 3.4,
         "pib": 2.2,
-        "sentimento": 47.6,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.4,
         "n_juros": 66.176,
-        "n_inflacao": 62.67743,
+        "n_inflacao": 61.318369999999994,
         "n_pib": 73.09578815534078,
         "n_sentimento": 0.0,
         "n_emprego": 44.675,
         "n_atividade": 52.0,
-        "Pontuação_Macro": 57.8,
+        "Pontuação_Macro": 57.5,
         "Influência_Fed": 19.2,
-        "Pontuação_Final": 59.5,
+        "Pontuação_Final": 59.3,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 15.88224,
-            "Inflação": 11.2819374,
+            "Inflação": 11.037306599999999,
             "PIB": 0.0,
             "Emprego": 8.0415,
             "Atividade": 6.24,
@@ -567,7 +567,7 @@
             "Índice amplo USD": 4.2215679999999995,
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 59.500578733333334
+          "unrounded_final": 59.25594793333333
         },
         "Posição": 2
       },
@@ -653,12 +653,12 @@
         "n_juros": 28.98896661469615,
         "n_inflacao": 49.66887417218545,
         "n_pib": 70.40481809880697,
-        "n_sentimento": 18.181818181818173,
+        "n_sentimento": 14.285714285714276,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 45.6,
+        "Pontuação_Macro": 45.2,
         "Influência_Fed": -3.1,
-        "Pontuação_Final": 42.5,
+        "Pontuação_Final": 42.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 5.79779332293923,
@@ -666,13 +666,13 @@
             "PIB": 10.560722714821045,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.8181818181818175
+            "Sentimento": 1.4285714285714277
           },
           "fed": -3.1050000000000004,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 42.52202898176991
+          "unrounded_final": 42.132418592159524
         },
         "Posição": 5
       },
@@ -688,12 +688,12 @@
         "n_juros": 5.657886869857563,
         "n_inflacao": 67.10099337748345,
         "n_pib": 46.58676419956989,
-        "n_sentimento": 11.888111888111887,
+        "n_sentimento": 7.6923076923076925,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 39.4,
+        "Pontuação_Macro": 39.0,
         "Influência_Fed": -0.7,
-        "Pontuação_Final": 38.7,
+        "Pontuação_Final": 38.3,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 1.1315773739715127,
@@ -701,13 +701,13 @@
             "PIB": 6.988014629935484,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.1888111888111887
+            "Sentimento": 0.7692307692307693
           },
           "fed": -0.6900000000000001,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 38.6835521993407
+          "unrounded_final": 38.26397177976028
         },
         "Posição": 6
       },
@@ -723,12 +723,12 @@
         "n_juros": 0.8880978333356321,
         "n_inflacao": 0.0,
         "n_pib": 100.0,
-        "n_sentimento": 4.545454545454543,
+        "n_sentimento": 0.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 35.6,
+        "Pontuação_Macro": 35.2,
         "Influência_Fed": 1.4,
-        "Pontuação_Final": 37.0,
+        "Pontuação_Final": 36.6,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 0.17761956666712642,
@@ -736,13 +736,13 @@
             "PIB": 15.0,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 0.45454545454545436
+            "Sentimento": 0.0
           },
           "fed": 1.3800000000000001,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 37.01216502121258
+          "unrounded_final": 36.55761956666713
         },
         "Posição": 7
       },
@@ -758,12 +758,12 @@
         "n_juros": 0.0,
         "n_inflacao": 52.980132450331126,
         "n_pib": 0.0,
-        "n_sentimento": 4.545454545454543,
+        "n_sentimento": 0.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 28.4,
+        "Pontuação_Macro": 27.9,
         "Influência_Fed": 1.7,
-        "Pontuação_Final": 30.1,
+        "Pontuação_Final": 29.7,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 0.0,
@@ -771,13 +771,13 @@
             "PIB": 0.0,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 0.45454545454545436
+            "Sentimento": 0.0
           },
           "fed": 1.725,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 30.126565322095125
+          "unrounded_final": 29.672019867549672
         },
         "Posição": 8
       },
@@ -793,12 +793,12 @@
         "n_juros": 12.15604030703993,
         "n_inflacao": 36.42384105960265,
         "n_pib": 20.021356113187398,
-        "n_sentimento": 4.545454545454543,
+        "n_sentimento": 0.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 31.4,
+        "Pontuação_Macro": 30.9,
         "Influência_Fed": -2.1,
-        "Pontuação_Final": 29.3,
+        "Pontuação_Final": 28.8,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 2.431208061407986,
@@ -806,21 +806,21 @@
             "PIB": 3.0032034169781094,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 0.45454545454545436
+            "Sentimento": 0.0
           },
           "fed": -2.0700000000000003,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 29.282533091871947
+          "unrounded_final": 28.827987637326494
         },
         "Posição": 9
       }
     ],
     "usd_detalhado": {
-      "score": 59.500578733333334,
+      "score": 59.25594793333333,
       "componentes": {
-        "Inflação": 62.67743,
+        "Inflação": 61.318369999999994,
         "Emprego": 44.675,
         "Atividade": 52.0,
         "Juros / Treasury 2Y": 66.176,
