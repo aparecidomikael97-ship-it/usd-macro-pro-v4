@@ -438,6 +438,14 @@ def _component():
     return v2.component("atlasquant_reference_cockpit", css=CSS.read_text(encoding="utf-8"), js=JS)
 
 
+@lru_cache(maxsize=1)
+def _chat_component():
+    """The existing UI host owns framework wiring; the chat adapter imports no UI runtime."""
+    import streamlit.components.v2 as v2
+    assets = Path(__file__).parent / "aion_chat" / "web"
+    return v2.component("atlasquant_aion_chat_command", css=(assets / "command-chat.css").read_text(encoding="utf-8"), js=(assets / "command-chat.js").read_text(encoding="utf-8"))
+
+
 def apply_event(session, access, area, event):
     """UI-only state changes. Existing area gate is always authoritative."""
     from atlasquant_central_hub_ui import assert_area_access, request_central_destination
@@ -544,6 +552,9 @@ def render_reference_workspace(st, access, area, *, mode=None):
     selected = st.session_state.get("aq_reference_module")
     selected = selected[1] if isinstance(selected,(list,tuple)) and len(selected)==2 and selected[0]==area else ""
     mode = mode or st.session_state.get("atlasquant_experience_mode") or "Iniciante"
+    if area == "aion" and selected in {"", "chat"}:
+        from atlasquant_aion_chat_workspace_ui import render_aion_chat_workspace
+        return render_aion_chat_workspace(st, access, mode=mode, selected=selected, navigation=NAV["aion"], component=_chat_component())
     session = access.get("session") or {}
     name = str(access.get("display_name") or session.get("username") or access.get("username") or "Usuário")
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
