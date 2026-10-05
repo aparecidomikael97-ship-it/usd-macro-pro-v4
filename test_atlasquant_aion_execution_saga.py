@@ -665,7 +665,7 @@ class ExecutionSagaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(
                 raw,
-                max_transaction_effects=2,
+                max_transaction_effects=4,
                 max_transaction_risk_points=2,
             )
             critical = self._steps()[:1]
