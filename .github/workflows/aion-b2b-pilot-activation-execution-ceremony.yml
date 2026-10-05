@@ -1,0 +1,85 @@
+name: AION B2B Pilot Activation Execution Ceremony
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_activation_execution_preflight.py"
+      - "atlasquant_aion_b2b_pilot_activation_execution_ceremony.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_ceremony.py"
+      - "atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_CEREMONY_V1.md"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_PERSISTENCE_PLAN_V1.md"
+      - ".github/workflows/aion-b2b-pilot-activation-execution-ceremony.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  activation-execution-ceremony:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned crypto dependency
+        run: python -m pip install --disable-pip-version-check cryptography==50.0.2
+      - name: Compile activation execution ceremony chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_b2b_pilot_activation_execution_preflight.py \
+            atlasquant_aion_b2b_pilot_activation_execution_ceremony.py \
+            atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_ceremony.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py
+      - name: Run activation execution ceremony tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_activation_execution_ceremony.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_preflight.py
+      - name: Assert signed intent is not command execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          ceremony = Path("atlasquant_aion_b2b_pilot_activation_execution_ceremony.py").read_text(encoding="utf-8")
+          for marker in (
+              '"AUTHORIZE_ACTIVATION_EXECUTION"',
+              '"DENY_ACTIVATION_EXECUTION"',
+              '"execution_record_persisted": False',
+              '"activation_command_generated": False',
+              '"activation_command_executed": False',
+              '"pilot_activation_authorized": False',
+              '"pilot_activated": False',
+              '"generic_chat_instruction_accepted_as_execution": False',
+              '"executes_action": False',
+          ):
+              assert marker in ceremony, marker
+          persist = Path("atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py").read_text(encoding="utf-8")
+          assert "append_checkpoint_patch(" not in persist
+          for marker in (
+              '"automatic_checkpoint_write": False',
+              '"execution_record_persisted": False',
+              '"activation_command_generated": False',
+              '"activation_command_executed": False',
+              '"pilot_activation_authorized": False',
+              '"pilot_activated": False',
+              '"executes_action": False',
+          ):
+              assert marker in persist, marker
+          for source in (ceremony, persist):
+              for banned in (
+                  "save_runtime_checkpoint(",
+                  "requests.post(",
+                  "requests.put(",
+                  "subprocess.",
+                  "deploy_to_production(",
+              ):
+                  assert banned not in source, banned
+          PY
