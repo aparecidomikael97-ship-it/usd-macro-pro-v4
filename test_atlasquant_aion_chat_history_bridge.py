@@ -344,6 +344,49 @@ class ChatHistoryBridgeTests(unittest.TestCase):
             )
             store.close()
 
+    def test_multiline_user_message_persists_exact_formatting(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as raw:
+            store = self._store(Path(raw))
+            conv = store.create_conversation(self.scope)
+            message = "status geral\n  segunda linha\n\tbloco indentado"
+            out = execute_and_persist_readonly(
+                store,
+                self.scope,
+                message,
+                context=ADMIN_CONTEXT,
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN_ACCESS,
+                authenticated_admin=True,
+                conversation_id=conv.id,
+                turn_index=21,
+            )
+            self.assertEqual(out["state"], "CONFIRMED_AND_PERSISTED")
+            self.assertEqual(
+                out["golden_result"]["turn"]["message"],
+                message,
+            )
+            self.assertEqual(
+                out["golden_result"]["turn"]["canonical_message"],
+                "status geral segunda linha bloco indentado",
+            )
+            rows = store.list_messages(
+                self.scope,
+                conv.id,
+                page_size=20,
+            ).items
+            self.assertEqual(rows[0].content, message)
+            store.close()
+
+            reopened = self._store(Path(raw))
+            rows = reopened.list_messages(
+                self.scope,
+                conv.id,
+                page_size=20,
+            ).items
+            self.assertEqual(rows[0].content, message)
+            reopened.close()
+
     def test_sensitive_text_is_redacted_by_existing_store(self):
         import tempfile
         with tempfile.TemporaryDirectory() as raw:
