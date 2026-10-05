@@ -17,6 +17,11 @@ from atlasquant_aion_memory_governance import (
     supersede_promoted_memory,
     verify_memory_proposal,
 )
+from atlasquant_aion_independent_verifier import (
+    as_memory_verifier_result,
+    new_verification_request,
+    verify_with_source_requery,
+)
 from atlasquant_aion_memory_layers import default_memory_layers, recall, remember
 
 
@@ -42,6 +47,64 @@ def verifier_for(proposal, *, verifier_id="source-requery-1", independent=True, 
             "content_digest": proposal["content_digest"],
         }
     return verify
+
+
+def governed_receipt_verification(proposed, *, verifier_id="source-requery-1"):
+    proposal = proposed["proposal"]
+    trusted = scope()
+    request = new_verification_request(
+        claim_ref=proposal["proposal_id"],
+        content=proposal["content"],
+        source_type=proposal["source_type"],
+        producer_id="memory-producer",
+        producer_fingerprint="memory-producer-fp",
+        evidence_refs=proposal["evidence_refs"],
+        provenance_refs=[proposal["provenance_ref"]],
+        scope=trusted,
+        policy_version="memory-policy-v1",
+        created_at=NOW,
+    )
+
+    def resolver(refs):
+        return {
+            "state": "VERIFIED",
+            "bound_refs": list(refs),
+            "content_digest": request["content_digest"],
+            "source_snapshots": [
+                {"ref": ref, "digest": "sha256:snapshot-" + str(index)}
+                for index, ref in enumerate(refs)
+            ],
+        }
+
+    receipt = verify_with_source_requery(
+        request,
+        verifier_id=verifier_id,
+        verifier_fingerprint="independent-source-requery-fp",
+        resolver=resolver,
+        now=NOW,
+    )
+
+    def callback(_candidate):
+        return as_memory_verifier_result(
+            receipt,
+            request=request,
+            scope=trusted,
+            now=NOW,
+        )
+
+    verified = verify_memory_proposal(
+        proposed["governance"],
+        proposal["proposal_id"],
+        verifier_kind="SOURCE_REQUERY",
+        verifier_id=verifier_id,
+        verification_refs=proposal["evidence_refs"],
+        verifier=callback,
+        verification_receipt=receipt,
+        verification_request=request,
+        verification_scope=trusted,
+        now=NOW,
+    )
+    return verified, request, receipt
 
 
 class AionMemoryGovernanceTests(unittest.TestCase):
@@ -217,14 +280,11 @@ class AionMemoryGovernanceTests(unittest.TestCase):
     def test_full_proposed_verified_promoted_path_marks_only_governed_row_current(self):
         proposed = self._propose()
         p = proposed["proposal"]
-        verified = verify_memory_proposal(
-            proposed["governance"],
-            p["proposal_id"],
-            verifier_kind="SOURCE_REQUERY",
-            verifier_id="source-requery-1",
-            verification_refs=["source:primary:1"],
-            verifier=verifier_for(p),
-            now=NOW,
+        verified, request, receipt = governed_receipt_verification(proposed)
+        self.assertTrue(verified["proposal"]["verification_receipt_validated"])
+        self.assertEqual(
+            verified["proposal"]["verification_receipt_digest"],
+            receipt["receipt_digest"],
         )
         promoted = promote_verified_memory(
             verified["governance"],
@@ -333,14 +393,9 @@ class AionMemoryGovernanceTests(unittest.TestCase):
     def test_supersession_preserves_history_and_requires_successor_reference(self):
         proposed = self._propose()
         p = proposed["proposal"]
-        verified = verify_memory_proposal(
-            proposed["governance"],
-            p["proposal_id"],
-            verifier_kind="HUMAN",
-            verifier_id="reviewer-2",
-            verification_refs=["source:primary:1"],
-            verifier=verifier_for(p, verifier_id="reviewer-2"),
-            now=NOW,
+        verified, request, receipt = governed_receipt_verification(
+            proposed,
+            verifier_id="source-requery-1",
         )
         promoted = promote_verified_memory(
             verified["governance"],
