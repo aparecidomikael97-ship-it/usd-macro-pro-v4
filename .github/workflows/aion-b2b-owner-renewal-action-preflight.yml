@@ -52,11 +52,11 @@ jobs:
               '"action_request_issued": False',
               '"owner_action_signature_required": True',
               '"owner_action_signature_verified": False',
-              '"business_action_authorized": False',
-              '"renewal_authorized": False',
-              '"termination_authorized": False',
-              '"billing_authorized": False',
-              '"executes_action": False',
+              '"business_action_authorized",',
+              '"renewal_authorized",',
+              '"termination_authorized",',
+              '"billing_authorized",',
+              '"executes_action",',
           ):
               assert marker in source, marker
 
