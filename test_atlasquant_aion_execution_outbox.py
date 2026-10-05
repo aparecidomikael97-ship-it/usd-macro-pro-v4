@@ -474,8 +474,8 @@ class ExecutionOutboxTests(unittest.TestCase):
         self.assertNotIn("import socket", source)
         self.assertNotIn("import subprocess", source)
         self.assertNotIn("os.system", source)
-        self.assertIn("adapter.send", source)
-        self.assertIn("adapter.reconcile", source)
+        self.assertIn('getattr(adapter, "send"', source)
+        self.assertIn('getattr(adapter, "reconcile"', source)
 
 
 if __name__ == "__main__":
