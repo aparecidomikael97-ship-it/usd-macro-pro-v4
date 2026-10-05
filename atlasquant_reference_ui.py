@@ -560,7 +560,86 @@ def pilot_activation_status_html(selected, raw):
     )
 
 
-def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None):
+def _pilot_value_admin_ready(raw):
+    if not isinstance(raw, dict):
+        return False
+    return (
+        raw.get("schema")
+        == "ATLASQUANT_AION_B2B_PILOT_VALUE_READ_MODEL_V1"
+        and raw.get("view") == "ADMIN"
+        and raw.get("state") == "READY"
+        and raw.get("read_only") is True
+        and raw.get("internal_economics_visible") is True
+        and raw.get("customer_safe") is False
+        and raw.get("renewal_control_exposed") is False
+        and raw.get("expansion_control_exposed") is False
+        and raw.get("billing_control_exposed") is False
+        and raw.get("customer_contact_control_exposed") is False
+        and raw.get("grants_authority") is False
+        and raw.get("executes_action") is False
+    )
+
+
+def pilot_value_admin_html(selected, raw):
+    """Render internal pilot value/retention review; no business controls."""
+    if selected != "b2b" or not _pilot_value_admin_ready(raw):
+        return ""
+    model = dict(raw)
+
+    def fmt(value, suffix=""):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "—"
+        text = f"{value:.2f}".rstrip("0").rstrip(".")
+        return text + suffix
+
+    def money(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "—"
+        return "R$ " + f"{value:.2f}"
+
+    recommendation = {
+        "EXPANSION_REVIEW_CANDIDATE": "REVISAR EXPANSÃO",
+        "CONTINUE_REVIEW_CANDIDATE": "REVISAR CONTINUIDADE",
+        "REMEDIATE_REVIEW_CANDIDATE": "REVISAR REMEDIAÇÃO",
+        "EXIT_REVIEW_CANDIDATE": "REVISAR SAÍDA",
+        "STOP_REVIEW": "REVISÃO OBRIGATÓRIA",
+        "VALUE_EVIDENCE_REVIEW": "EVIDÊNCIA PENDENTE",
+    }.get(str(model.get("recommendation") or ""), "EM REVISÃO")
+
+    def metric(label, value, detail=""):
+        return (
+            '<article><small>' + escape(label) + '</small>'
+            '<strong>' + escape(str(value)) + '</strong>'
+            + ('<p>' + escape(detail) + '</p>' if detail else '')
+            + '</article>'
+        )
+
+    cards = [
+        metric("VALOR", model.get("value_state") or "—", recommendation),
+        metric("SAÚDE", fmt(model.get("health_score"), "%"), "Customer Health"),
+        metric("ROI OBSERVADO", fmt(model.get("observed_roi_pct"), "%"), "Evidência do piloto"),
+        metric("ECONOMIA", money(model.get("observed_savings_brl")), "Valor realizado"),
+        metric("QUICK WINS", fmt(model.get("quick_win_achieved_pct"), "%"), "Entregas rápidas comprovadas"),
+        metric("TENDÊNCIA", model.get("value_trend") or "—", "Evolução do valor"),
+        metric("MARGEM", fmt(model.get("provider_gross_margin_pct"), "%"), "Economia interna AtlasQuant"),
+        metric("RETENÇÃO", model.get("retention_risk") or "—", "Risco para revisão humana"),
+    ]
+    alert = (
+        '<p class="ref-state">ALERTA DE VALOR BAIXO · REVISÃO HUMANA OBRIGATÓRIA</p>'
+        if model.get("low_value_alert") is True
+        else '<p class="ref-state">VALOR E ECONOMIA DO PILOTO · SOMENTE LEITURA</p>'
+    )
+    return (
+        '<section class="aq-pilot-value-readmodel" '
+        'data-pilot-value-readonly="true">'
+        '<div class="ref-preview-grid">' + "".join(cards) + '</div>'
+        + alert
+        + '<p class="ref-truth">Margem e risco são internos; renovação, expansão, cobrança e contato permanecem bloqueados.</p>'
+        '</section>'
+    )
+
+
+def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -599,6 +678,11 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
                 cards += pilot_activation_status_html(
                     selected,
                     pilot_activation_status_read_model,
+                )
+            if _pilot_value_admin_ready(pilot_value_read_model):
+                cards += pilot_value_admin_html(
+                    selected,
+                    pilot_value_read_model,
                 )
         elif selected == "proposals" and _proposal_draft_ready(proposal_draft):
             cards = proposal_draft_html(selected, proposal_draft)
@@ -651,11 +735,17 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         pilot_selected
         and _pilot_activation_status_ready(pilot_activation_status_read_model)
     )
+    pilot_value_ready = (
+        pilot_selected
+        and _pilot_value_admin_ready(pilot_value_read_model)
+    )
     proposal_selected = area == "negocios" and selected == "proposals"
     proposal_ready = proposal_selected and _proposal_draft_ready(proposal_draft)
     revops_selected = area == "negocios" and selected in {"revenue", "crm", "leads"}
     revops_ready = revops_selected and _revops_read_model_ready(revops_read_model)
-    if pilot_activation_ready:
+    if pilot_value_ready:
+        data_state = "VALOR DO PILOTO VALIDADO"
+    elif pilot_activation_ready:
         data_state = "GOVERNANÇA DE ATIVAÇÃO VALIDADA"
     elif pilot_ready:
         data_state = "PILOTO PLANEJADO"
@@ -673,7 +763,7 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · aguardando confirmação humana de execução" if pilot_activation_ready else ("SOMENTE LEITURA · piloto aguardando aprovação" if pilot_ready else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")))))}</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · revisão de valor e retenção" if pilot_value_ready else ("SOMENTE LEITURA · aguardando confirmação humana de execução" if pilot_activation_ready else ("SOMENTE LEITURA · piloto aguardando aprovação" if pilot_ready else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática"))))))}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -819,7 +909,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -860,6 +950,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         proposal_draft=proposal_draft,
         pilot_planning_read_model=pilot_planning_read_model,
         pilot_activation_status_read_model=pilot_activation_status_read_model,
+        pilot_value_read_model=pilot_value_read_model,
     ) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
