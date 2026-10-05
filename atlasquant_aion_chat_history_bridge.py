@@ -17,7 +17,10 @@ from typing import Any, Mapping, Sequence
 from aion_chat.models import Message, Scope
 from aion_chat.privacy import redact
 from atlasquant_aion_chat_golden_path import execute_readonly_golden_path
-from atlasquant_aion_chat_surface import conversation_identity_binding
+from atlasquant_aion_chat_surface import (
+    conversation_identity_binding,
+    normalize_attachment_metadata,
+)
 
 SCHEMA = "ATLASQUANT_AION_CHAT_HISTORY_BRIDGE_V1"
 MAX_ASSISTANT_TEXT = 16_000
@@ -195,6 +198,34 @@ def validate_verified_read_result(
     }
 
 
+def _attachment_material(
+    store: Any,
+    scope: Scope,
+    conversation_id: str,
+    attachment_ids: Sequence[Any] | None,
+) -> tuple[list[str], list[dict[str, Any]]]:
+    ids: list[str] = []
+    raw_metadata: list[dict[str, Any]] = []
+    for raw_id in list(attachment_ids or []):
+        attachment_id = _clean(raw_id, 120)
+        if not attachment_id or attachment_id in ids:
+            raise ValueError("invalid or duplicate attachment id")
+        attachment = store.get_attachment(scope, conversation_id, attachment_id)
+        ids.append(attachment_id)
+        raw_metadata.append({
+            "name": attachment.name,
+            "mime_type": attachment.mime_type,
+            "size_bytes": attachment.size,
+            "sha256": attachment.digest,
+            "kind": "FILE",
+        })
+    normalized = [
+        dict(item)
+        for item in normalize_attachment_metadata(raw_metadata)
+    ]
+    return ids, normalized
+
+
 def _message_id(turn_id: str, role: str) -> str:
     token = sha256(f"{turn_id}|{role}".encode("utf-8")).hexdigest()[:24].upper()
     return f"AION-CHAT-{role.upper()}-{token}"
@@ -214,11 +245,14 @@ def _assert_existing(
     content: str,
     turn_id: str,
     binding_digest: str,
+    attachments: Sequence[str] | None = None,
 ) -> None:
     if existing.role != role:
         raise ValueError("idempotency collision: role mismatch")
     if existing.content != redact(content):
         raise ValueError("idempotency collision: content mismatch")
+    if list(existing.attachments or []) != list(attachments or []):
+        raise ValueError("idempotency collision: attachments mismatch")
     metadata = dict(existing.metadata or {})
     if metadata.get("turn_id") != turn_id:
         raise ValueError("idempotency collision: turn mismatch")
@@ -257,13 +291,19 @@ def persist_verified_read_result(
     receipt = _mapping(result.get("receipt"))
     binding_digest = validation["identity_binding_digest"]
     turn_id = validation["turn_id"]
-    attachments = [
-        _clean(item, 120)
-        for item in list(attachment_ids or [])
-        if _clean(item, 120)
+    attachments, stored_attachment_metadata = _attachment_material(
+        store,
+        scope,
+        cid,
+        attachment_ids,
+    )
+    turn_attachment_metadata = [
+        dict(item)
+        for item in list(turn.get("attachments") or [])
+        if isinstance(item, Mapping)
     ]
-    for attachment_id in attachments:
-        store.get_attachment(scope, cid, attachment_id)
+    if turn_attachment_metadata != stored_attachment_metadata:
+        raise ValueError("turn attachment metadata does not match scoped store")
 
     user_text = str(turn.get("message") or "")
     assistant_text = _assistant_text(result)
@@ -311,6 +351,7 @@ def persist_verified_read_result(
             content=user_text,
             turn_id=turn_id,
             binding_digest=binding_digest,
+            attachments=attachments,
         )
     if existing_assistant is not None:
         _assert_existing(
@@ -319,6 +360,7 @@ def persist_verified_read_result(
             content=assistant_text,
             turn_id=turn_id,
             binding_digest=binding_digest,
+            attachments=[],
         )
 
     user_written = False
@@ -440,13 +482,19 @@ def execute_and_persist_readonly(
     trusted = trusted_context_for_scope(scope, context)
     cid = _clean(conversation_id, 120)
     store.get_conversation(scope, cid)
+    attachments, attachment_metadata = _attachment_material(
+        store,
+        scope,
+        cid,
+        attachment_ids,
+    )
 
     result = execute_readonly_golden_path(
         message,
         context=trusted,
         runtime_context=runtime_context,
         access=access,
-        attachments=None,
+        attachments=attachment_metadata,
         conversation_id=cid,
         turn_index=turn_index,
         feature_flags=feature_flags,
@@ -471,7 +519,7 @@ def execute_and_persist_readonly(
         store,
         scope,
         result,
-        attachment_ids=attachment_ids,
+        attachment_ids=attachments,
     )
     return {
         "schema": SCHEMA,
