@@ -123,8 +123,8 @@ class AionB2BMultiCompanyUITests(unittest.TestCase):
             ">Provisionar<",
             ">Cobrar<",
             ">Deploy<",
-            "data-action="tenant",
-            "data-action="quota",
+            'data-action="tenant"',
+            'data-action="quota"',
         ):
             self.assertNotIn(forbidden, html)
 
