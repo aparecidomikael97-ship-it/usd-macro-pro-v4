@@ -38,11 +38,20 @@ ADMIN = {"role": "ADMIN", "username": "mikael"}
 
 
 def staging_probe():
-    hub = default_tool_hub()
-    return next(
-        item for item in hub["tools"]
-        if item["tool_id"] == "aion.staging.credential_probe"
-    )
+    # Reviewed contract fixture only. It is deliberately NOT present in the
+    # persistent/default Tool Hub, so it cannot become runtime authority.
+    base = {
+        "tool_id": "aion.staging.credential_probe",
+        "label": "staging credential probe",
+        "workspace_id": "development",
+        "connector_id": "staging-proxy",
+        "kind": "READ",
+        "guardian_action": "read",
+        "state": "DISABLED",
+        "required_scopes": ["probe:read"],
+        "external_side_effects": False,
+    }
+    return enrich_tool_contract(base, base)
 
 
 def fake_ready_preflight(tool):
@@ -90,23 +99,52 @@ class ClosedToolRegistryTests(unittest.TestCase):
 
         hub = default_tool_hub()
         summary = tool_hub_summary(hub, default_portable_core())
-        self.assertEqual(len(hub["tools"]), 13)
-        self.assertEqual(summary["supply_chain_verified"], 13)
+        self.assertEqual(len(hub["tools"]), 12)
+        self.assertEqual(summary["supply_chain_verified"], 12)
         self.assertEqual(summary["supply_chain_blocked"], 0)
         self.assertEqual(summary["registry_state"], "VERIFIED")
 
-    def test_schema_drift_blocks_before_executor(self):
-        hub = default_tool_hub()
-        mutated = deepcopy(hub)
-        target = next(
-            item for item in mutated["tools"]
+
+    def test_schema_drift_breaks_the_pinned_contract(self):
+        legacy = next(
+            item for item in default_tool_hub()["tools"]
             if item["tool_id"] == "aion.memory.search"
         )
-        target["input_schema"]["properties"]["query"]["maxLength"] = 501
+        secured = enrich_tool_contract(legacy, legacy)
+        self.assertEqual(secured["supply_chain_state"], "VERIFIED")
+        mutated = deepcopy(secured)
+        mutated["input_schema"]["properties"]["query"]["maxLength"] = 501
+        issues = tool_contract_issues(mutated)
+        self.assertIn("TOOL_CONTRACT_DRIFT", issues)
 
+    def test_version_owner_or_scope_drift_is_blocked(self):
+        legacy = next(
+            item for item in default_tool_hub()["tools"]
+            if item["tool_id"] == "aion.memory.search"
+        )
+        secured = enrich_tool_contract(legacy, legacy)
+        for field, value in (
+            ("version", "1.0.1"),
+            ("owner", "unreviewed-owner"),
+        ):
+            with self.subTest(field=field):
+                mutated = deepcopy(secured)
+                mutated[field] = value
+                self.assertIn(
+                    "TOOL_CONTRACT_DRIFT",
+                    tool_contract_issues(mutated),
+                )
+
+        # Authority-relevant legacy fields are also contract-bound at preflight.
+        hub = default_tool_hub()
+        target = next(
+            item for item in hub["tools"]
+            if item["tool_id"] == "aion.memory.search"
+        )
+        target["required_scopes"] = ["memory:read", "secrets:read"]
         plan = plan_tool_call(
             "aion.memory.search",
-            hub=mutated,
+            hub=hub,
             portable_core=default_portable_core(),
             access=ADMIN,
             source_kind="ADMIN",
@@ -118,37 +156,6 @@ class ClosedToolRegistryTests(unittest.TestCase):
         )
         self.assertEqual(plan["state"], "BLOCK")
         self.assertIn("TOOL_CONTRACT_DRIFT", plan["blockers"])
-        self.assertEqual(plan["supply_chain"]["state"], "BLOCK")
-        self.assertFalse(plan["tool_called"])
-
-    def test_version_owner_or_scope_drift_is_blocked(self):
-        for field, value in (
-            ("version", "1.0.1"),
-            ("owner", "unreviewed-owner"),
-            ("required_scopes", ["memory:read", "secrets:read"]),
-        ):
-            with self.subTest(field=field):
-                hub = default_tool_hub()
-                mutated = deepcopy(hub)
-                target = next(
-                    item for item in mutated["tools"]
-                    if item["tool_id"] == "aion.memory.search"
-                )
-                target[field] = value
-                plan = plan_tool_call(
-                    "aion.memory.search",
-                    hub=mutated,
-                    portable_core=default_portable_core(),
-                    access=ADMIN,
-                    source_kind="ADMIN",
-                    authenticated_admin=True,
-                    scope="read only",
-                    uncertainty_pct=0,
-                    impact="LOW",
-                    reversible=True,
-                )
-                self.assertEqual(plan["state"], "BLOCK")
-                self.assertIn("TOOL_CONTRACT_DRIFT", plan["blockers"])
 
     def test_runtime_tool_injection_never_becomes_registered_by_appearing_in_hub(self):
         hub = default_tool_hub()
@@ -162,36 +169,34 @@ class ClosedToolRegistryTests(unittest.TestCase):
             "state": "CONFIGURED",
             "required_scopes": ["repo:read"],
             "external_side_effects": False,
-            "owner": "vendor",
-            "version": "1.0.0",
-            "input_schema": {"type": "object"},
-            "output_schema": {"type": "object"},
-            "sandbox_profile": "THIRD_PARTY_EGRESS_PROXY",
-            "egress_allowlist": ["api.vendor.example"],
-            "credential_ref": "vendor-secret",
-            "credential_scopes": ["repo:read"],
-            "third_party": True,
-            "eval_profile": "vendor-v1",
-            "implementation_ref": "mcp:shadow",
         })
-        normalized = normalize_tool_hub(hub)
-        injected = next(
-            item for item in normalized["tools"]
-            if item["tool_id"] == "third.party.shadow"
+        plan = plan_tool_call(
+            "third.party.shadow",
+            hub=hub,
+            portable_core=default_portable_core(),
+            access=ADMIN,
+            source_kind="ADMIN",
+            authenticated_admin=True,
+            scope="read only",
+            uncertainty_pct=0,
+            impact="LOW",
+            reversible=True,
         )
-        self.assertFalse(injected["registry_approved"])
-        self.assertEqual(injected["supply_chain_state"], "BLOCK")
-        self.assertIn(
-            "TOOL_NOT_IN_CLOSED_REGISTRY",
-            injected["supply_chain_issues"],
-        )
+        self.assertEqual(plan["state"], "BLOCK")
+        self.assertIn("TOOL_NOT_IN_CLOSED_REGISTRY", plan["blockers"])
+        self.assertIn("TOOL_SUPPLY_CHAIN_UNVERIFIED", plan["blockers"])
+        self.assertFalse(plan["tool_called"])
 
-    def test_disabled_staging_probe_is_registered_but_cannot_execute(self):
+    def test_staging_probe_is_reviewed_but_absent_from_runtime_hub(self):
         tool = staging_probe()
         self.assertEqual(tool["supply_chain_state"], "VERIFIED")
         self.assertTrue(tool["registry_approved"])
         self.assertEqual(tool["state"], "DISABLED")
         self.assertEqual(tool["sandbox_profile"], "THIRD_PARTY_EGRESS_PROXY")
+        self.assertNotIn(
+            tool["tool_id"],
+            {item["tool_id"] for item in default_tool_hub()["tools"]},
+        )
         plan = plan_tool_call(
             tool["tool_id"],
             hub=default_tool_hub(),
@@ -205,11 +210,8 @@ class ClosedToolRegistryTests(unittest.TestCase):
             reversible=True,
         )
         self.assertEqual(plan["state"], "BLOCK")
-        self.assertIn("TOOL_DISABLED", plan["blockers"])
-        self.assertIn("CONNECTOR_NOT_ACTIVATED", plan["blockers"])
-        self.assertFalse(plan["connector_called"])
-        self.assertFalse(plan["tool_called"])
-
+        self.assertEqual(plan["reason"], "TOOL_NOT_REGISTERED")
+        self.assertFalse(plan["executes_action"])
     def test_declared_schema_hash_cannot_spoof_real_schema(self):
         tool = staging_probe()
         mutated = deepcopy(tool)
