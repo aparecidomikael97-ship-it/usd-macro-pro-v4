@@ -157,6 +157,7 @@ def render_aion_chat_workspace(
     product_scope=None,
     product_store=None,
     runtime_context=None,
+    product_conversation_id="",
 ):
     from atlasquant_central_hub_ui import assert_area_access
     if not access or access.get("allowed") is not True: return False
@@ -187,6 +188,7 @@ def render_aion_chat_workspace(
             selected=selected,
             navigation=navigation,
             component=component,
+            conversation_id=product_conversation_id,
         )
 
     context = trusted_context(access, mode)
