@@ -470,19 +470,43 @@ class OwnerRenewalActionExecutionPreflightTests(unittest.TestCase):
 
     def test_each_action_family_has_specific_fresh_preconditions(self):
         cases = (
-            ("RENEWAL", "RENEWAL_REVIEW", "HEALTHY"),
-            ("RENEWAL_WITH_CHANGES", "REMEDIATION_REVIEW", "REMEDIATION"),
-            ("NON_RENEWAL", "CAPACITY_REVIEW", "CAPACITY_HOLD"),
-            ("REMEDIATION", "REMEDIATION_REVIEW", "REMEDIATION"),
-            ("CAPACITY_RESCOPE", "CAPACITY_REVIEW", "CAPACITY_HOLD"),
-            ("REPRICING", "CAPACITY_REVIEW", "CAPACITY_HOLD"),
-            ("INCIDENT_REMEDIATION", "INCIDENT_REVIEW", "INCIDENT_REVIEW"),
-            ("SERVICE_PAUSE", "INCIDENT_REVIEW", "INCIDENT_REVIEW"),
-            ("SERVICE_TERMINATION", "INCIDENT_REVIEW", "INCIDENT_REVIEW"),
+            ("RENEW_AS_IS_REVIEW", "RENEWAL", "RENEWAL_REVIEW", "HEALTHY"),
+            (
+                "RENEW_WITH_CHANGES_REVIEW",
+                "RENEWAL_WITH_CHANGES",
+                "REMEDIATION_REVIEW",
+                "REMEDIATION",
+            ),
+            ("NON_RENEWAL_REVIEW", "NON_RENEWAL", "CAPACITY_REVIEW", "CAPACITY_HOLD"),
+            (
+                "REMEDIATION_PLAN_REVIEW",
+                "REMEDIATION",
+                "REMEDIATION_REVIEW",
+                "REMEDIATION",
+            ),
+            (
+                "RESCOPE_CAPACITY_REVIEW",
+                "CAPACITY_RESCOPE",
+                "CAPACITY_REVIEW",
+                "CAPACITY_HOLD",
+            ),
+            ("REPRICE_REVIEW", "REPRICING", "CAPACITY_REVIEW", "CAPACITY_HOLD"),
+            (
+                "INCIDENT_REMEDIATION_REVIEW",
+                "INCIDENT_REMEDIATION",
+                "INCIDENT_REVIEW",
+                "INCIDENT_REVIEW",
+            ),
+            ("PAUSE_SERVICE_REVIEW", "SERVICE_PAUSE", "INCIDENT_REVIEW", "INCIDENT_REVIEW"),
+            (
+                "TERMINATION_REVIEW",
+                "SERVICE_TERMINATION",
+                "INCIDENT_REVIEW",
+                "INCIDENT_REVIEW",
+            ),
         )
-        for family, review_type, service_state in cases:
+        for choice, family, review_type, service_state in cases:
             with self.subTest(family=family):
-                choice = family + "_CHOICE"
                 persisted = persistence(
                     choice=choice,
                     family=family,
@@ -510,6 +534,28 @@ class OwnerRenewalActionExecutionPreflightTests(unittest.TestCase):
                     out["state"],
                     "READY_FOR_BUSINESS_ACTION_EXECUTION_CEREMONY",
                 )
+
+    def test_choice_family_mismatch_blocks(self):
+        out = run(
+            action_persistence_attestation=persistence(
+                choice="REPRICE_REVIEW",
+                family="RENEWAL",
+            ),
+            action_writer_attestation=writer(
+                choice="REPRICE_REVIEW",
+                family="RENEWAL",
+            ),
+            authorization_preflight=authorization_preflight(
+                choice="REPRICE_REVIEW",
+                family="RENEWAL",
+            ),
+            execution_environment=environment(
+                choice="REPRICE_REVIEW",
+                family="RENEWAL",
+            ),
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertIn("ACTION_CHOICE_FAMILY_MISMATCH", out["blockers"])
 
     def test_missing_family_specific_precondition_blocks(self):
         env = environment()
