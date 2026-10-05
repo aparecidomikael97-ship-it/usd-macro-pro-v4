@@ -1,0 +1,73 @@
+name: AION B2B Owner Renewal Action Preflight
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_owner_renewal_persistence_attestation.py"
+      - "atlasquant_aion_b2b_owner_renewal_writer_attestation.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_preflight.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_preflight.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-b2b-owner-renewal-action-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-renewal-action-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile recurring action preflight chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_owner_renewal_persistence_attestation.py \
+            atlasquant_aion_b2b_owner_renewal_writer_attestation.py \
+            atlasquant_aion_b2b_owner_renewal_action_preflight.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_preflight.py
+      - name: Run recurring action preflight tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_owner_renewal_persistence_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_writer_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_preflight.py
+      - name: Assert eligibility is not authorization
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_b2b_owner_renewal_action_preflight.py"
+          ).read_text(encoding="utf-8")
+          for marker in (
+              '"READY_FOR_BUSINESS_ACTION_AUTHORIZATION_CEREMONY"',
+              '"action_request_issued": False',
+              '"owner_action_signature_required": True',
+              '"owner_action_signature_verified": False',
+              '"business_action_authorized": False',
+              '"renewal_authorized": False',
+              '"termination_authorized": False',
+              '"billing_authorized": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+
+          for banned in (
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "subprocess.",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          PY
