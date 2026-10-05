@@ -96,6 +96,56 @@ def portal_records(**overrides):
     return row
 
 
+def portal_operations(**overrides):
+    row = {
+        "schema": "ATLASQUANT_AION_B2B_CUSTOMER_PORTAL_OPERATIONS_V1",
+        "state": "READY",
+        "scope": {
+            "owner_id": "owner-a",
+            "tenant_id": "service-tenant-001",
+            "workspace_id": "service-workspace-001",
+        },
+        "customer_id": "customer-001",
+        "package": "PROFISSIONAL",
+        "automations": [
+            {
+                "automation_id": "followup",
+                "name": "Follow-up comercial",
+                "state": "ACTIVE",
+                "last_result": "SUCCESS",
+                "last_run_at": "2026-10-05T11:55:00-04:00",
+                "next_review_at": "2026-10-06T09:00:00-04:00",
+            }
+        ],
+        "tickets": [
+            {
+                "ticket_id": "ticket-001",
+                "title": "Integração CRM degradada",
+                "state": "IN_PROGRESS",
+                "priority": "HIGH",
+                "sla_state": "AT_RISK",
+                "created_at": "2026-10-05T10:00:00-04:00",
+                "updated_at": "2026-10-05T11:45:00-04:00",
+            }
+        ],
+        "counts": {
+            "automation_total": 1,
+            "automation_degraded": 0,
+            "ticket_open": 1,
+            "ticket_sla_breached": 0,
+            "critical_open": 0,
+        },
+        "evidence_digest": "sha256:operations",
+        "read_only": True,
+        "automation_control_exposed": False,
+        "ticket_write_exposed": False,
+        "message_content_exposed": False,
+        "executes_action": False,
+    }
+    row.update(overrides)
+    return row
+
+
 def read_model(**overrides):
     row = {
         "schema": "ATLASQUANT_AION_B2B_PORTAL_READ_MODEL_V1",
@@ -287,6 +337,63 @@ class AionB2BCustomerPortalTests(unittest.TestCase):
         for expected in ("CRM", "CONNECTED", "Contrato de Operação", "SIGNED", "ACTIVE", "PAID"):
             self.assertIn(expected, html)
         for forbidden in ("Pagar agora", "Assinar agora", "Conectar agora", "Editar CRM", "Baixar segredo"):
+            self.assertNotIn(forbidden, html)
+
+    def test_valid_operations_extend_customer_view_read_only(self):
+        current = access()
+        bound = binding(
+            current,
+            allowed_sections=["overview", "automations", "tickets"],
+        )
+        view = customer_portal_view_model(
+            current,
+            bound,
+            read_model(),
+            None,
+            portal_operations(),
+        )
+        self.assertEqual(view["state"], "READY")
+        self.assertEqual(view["automations"][0]["state"], "ACTIVE")
+        self.assertEqual(view["tickets"][0]["sla_state"], "AT_RISK")
+        self.assertEqual(view["operation_counts"]["ticket_open"], 1)
+        self.assertNotIn("scope", view)
+        self.assertNotIn("owner_id", str(view))
+
+    def test_cross_tenant_operations_block_customer_view(self):
+        current = access()
+        bad = portal_operations()
+        bad["scope"] = {
+            "owner_id": "owner-a",
+            "tenant_id": "other-tenant",
+            "workspace_id": "service-workspace-001",
+        }
+        view = customer_portal_view_model(
+            current,
+            binding(current),
+            read_model(),
+            None,
+            bad,
+        )
+        self.assertEqual(view["state"], "BLOCKED")
+        self.assertIn("CUSTOMER_PORTAL_OPERATIONS_TENANT_MISMATCH", view["blockers"])
+
+    def test_operations_html_has_no_control_or_reply_actions(self):
+        current = access()
+        bound = binding(
+            current,
+            allowed_sections=["overview", "automations", "tickets"],
+        )
+        view = customer_portal_view_model(
+            current,
+            bound,
+            read_model(),
+            None,
+            portal_operations(),
+        )
+        html = customer_portal_html(view)
+        for expected in ("Follow-up comercial", "ACTIVE", "SUCCESS", "Integração CRM degradada", "AT_RISK"):
+            self.assertIn(expected, html)
+        for forbidden in ("Pausar automação", "Iniciar automação", "Responder ticket", "Fechar ticket", "Editar SLA"):
             self.assertNotIn(forbidden, html)
 
     def test_html_is_read_only_and_hides_internal_cost(self):
