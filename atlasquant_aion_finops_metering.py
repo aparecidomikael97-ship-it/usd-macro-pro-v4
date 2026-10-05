@@ -353,6 +353,19 @@ def evaluate_finops_budget(
     if data.get("state") != "READY":
         blockers.append("LEDGER_NOT_READY")
 
+    policy_id = _text(p.get("policy_id"), 120)
+    revision = _nonnegative_int(p.get("revision"))
+    if p.get("state") != "VERIFIED":
+        blockers.append("POLICY_NOT_VERIFIED")
+    if not policy_id:
+        blockers.append("POLICY_ID_REQUIRED")
+    if revision is None or revision < 1:
+        blockers.append("POLICY_REVISION_INVALID")
+    for key in ("owner_id", "tenant_id", "workspace_id"):
+        if _text(p.get(key), 100) != scope[key]:
+            blockers.append("POLICY_SCOPE_MISMATCH")
+            break
+
     request, request_blockers = _request_usage(prospective_request, trusted_scope=scope)
     blockers.extend(request_blockers)
 
@@ -362,8 +375,20 @@ def evaluate_finops_budget(
     max_depth = _limit_int(p, "max_depth")
     max_user_calls = _limit_int(p, "max_user_calls")
     max_user_tokens = _limit_int(p, "max_user_tokens")
-    soft_pct = _positive_limit(p.get("soft_limit_pct", 80.0))
-    noisy_pct = _positive_limit(p.get("noisy_neighbor_share_pct", 70.0))
+    required_limits = {
+        "WINDOW_BUDGET": window_budget,
+        "MAX_CALLS": max_calls,
+        "MAX_TOKENS": max_tokens,
+        "MAX_DEPTH": max_depth,
+        "MAX_USER_CALLS": max_user_calls,
+        "MAX_USER_TOKENS": max_user_tokens,
+    }
+    for name, value in required_limits.items():
+        if value is None:
+            blockers.append(f"POLICY_{name}_INVALID")
+
+    soft_pct = _positive_limit(p.get("soft_limit_pct"))
+    noisy_pct = _positive_limit(p.get("noisy_neighbor_share_pct"))
     if soft_pct is None or soft_pct >= 100:
         blockers.append("SOFT_LIMIT_INVALID")
         soft_pct = 80.0
@@ -452,6 +477,12 @@ def evaluate_finops_budget(
         "blockers": blockers,
         "degrade_reasons": degrade,
         "scope": scope,
+        "policy": {
+            "policy_id": policy_id,
+            "revision": revision,
+            "state": _text(p.get("state"), 40).upper(),
+            "scope_bound": "POLICY_SCOPE_MISMATCH" not in blockers,
+        },
         "request": {
             "user_id": user_id,
             "feature": request.get("feature"),
