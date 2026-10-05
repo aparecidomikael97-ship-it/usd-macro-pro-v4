@@ -17,6 +17,11 @@ import re
 
 from atlasquant_aion_fortress import proof_of_safety, source_authority
 from atlasquant_aion_portable import normalize_portable_core
+from atlasquant_aion_tool_supply_chain import (
+    enrich_tool_contract,
+    registry_integrity_report,
+    tool_contract_issues,
+)
 
 SCHEMA="ATLASQUANT_AION_TOOL_HUB_V1"
 TOOL_STATES=("LOCAL_READY","CONFIGURED","DISABLED","DEGRADED")
@@ -239,10 +244,13 @@ def normalize_tools(rows:Sequence[Mapping[str,Any]]|None)->list[dict[str,Any]]:
 
 def default_tool_hub()->dict[str,Any]:
     tools=normalize_tools(DEFAULT_TOOLS)
+    registry = registry_integrity_report()
     return {
         "schema":SCHEMA,
         "tools":tools,
         "digest":tool_hub_digest(tools),
+        "registry_digest":registry.get("digest"),
+        "registry_integrity":registry,
         "protocols":["NATIVE","API","MCP","FILE","WEBHOOK"],
         "external_activation_automatic":False,
         "tool_output_is_authority":False,
@@ -258,10 +266,13 @@ def normalize_tool_hub(raw:Mapping[str,Any]|None)->dict[str,Any]:
     )
     if not tools:
         tools=normalize_tools(DEFAULT_TOOLS)
+    registry = registry_integrity_report()
     return {
         "schema":SCHEMA,
         "tools":tools,
         "digest":tool_hub_digest(tools),
+        "registry_digest":registry.get("digest"),
+        "registry_integrity":registry,
         "protocols":["NATIVE","API","MCP","FILE","WEBHOOK"],
         "external_activation_automatic":False,
         "tool_output_is_authority":False,
@@ -325,13 +336,14 @@ def plan_tool_call(
     reversible:bool=False,
 )->dict[str,Any]:
     """Create an execution preflight. No connector/tool is called."""
-    tool=_find_tool(tool_id,hub)
-    if tool is None:
+    legacy_tool=_find_tool(tool_id,hub)
+    if legacy_tool is None:
         return {
             "schema":SCHEMA,"state":"BLOCK","reason":"TOOL_NOT_REGISTERED",
             "tool_id":_clean(tool_id,96),"executes_action":False,
             "real_trading_enabled":False,
         }
+    tool=enrich_tool_contract(legacy_tool, legacy_tool)
     authority=source_authority(source_kind,authenticated_admin=authenticated_admin is True)
     connector=_connector_readiness(tool["connector_id"],portable_core)
     safety=proof_of_safety(
@@ -351,6 +363,11 @@ def plan_tool_call(
         external_side_effects=tool["external_side_effects"],
     )
     blockers=[]
+    supply_chain_issues = tool_contract_issues(tool)
+    if supply_chain_issues:
+        blockers.extend(supply_chain_issues)
+    if tool.get("supply_chain_state") != "VERIFIED":
+        blockers.append("TOOL_SUPPLY_CHAIN_UNVERIFIED")
     if tool["state"]=="DISABLED":
         blockers.append("TOOL_DISABLED")
     if tool["connector_id"] and not connector["activated"]:
@@ -366,6 +383,15 @@ def plan_tool_call(
         "state":state,
         "tool":tool,
         "connector":connector,
+        "supply_chain":{
+            "state":tool.get("supply_chain_state"),
+            "contract_hash":tool.get("contract_hash"),
+            "schema_hash":tool.get("schema_hash"),
+            "owner":tool.get("owner"),
+            "version":tool.get("version"),
+            "sandbox_profile":tool.get("sandbox_profile"),
+            "issues":supply_chain_issues,
+        },
         "source_authority":authority,
         "proof_of_safety":safety,
         "blockers":blockers,
@@ -383,11 +409,16 @@ def tool_hub_summary(
     state=normalize_tool_hub(hub)
     core=normalize_portable_core(portable_core)
     tools=state["tools"]
+    secured_tools=[enrich_tool_contract(x,x) for x in tools]
     external=[x for x in tools if x["connector_id"]]
+    registry = state.get("registry_integrity") or registry_integrity_report()
     return {
         "schema":SCHEMA,
         "tools":len(tools),
         "local_ready":sum(1 for x in tools if x["state"]=="LOCAL_READY" and not x["connector_id"]),
+        "supply_chain_verified":sum(1 for x in secured_tools if x.get("supply_chain_state")=="VERIFIED"),
+        "supply_chain_blocked":sum(1 for x in secured_tools if x.get("supply_chain_state")!="VERIFIED"),
+        "registry_state":registry.get("state"),
         "external_tools":len(external),
         "registered_connectors":len(core["connectors"]),
         "active_external_tools":0,
