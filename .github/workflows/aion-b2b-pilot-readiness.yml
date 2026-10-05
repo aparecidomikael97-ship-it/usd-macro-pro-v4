@@ -45,6 +45,9 @@ on:
       - "atlasquant_aion_b2b_revops_cleanup_plan.py"
       - "test_atlasquant_aion_b2b_revops_cleanup_plan.py"
       - "docs/aion/AION_B2B_REVOPS_CLEANUP_PLAN_V1.md"
+      - "atlasquant_aion_b2b_diagnostic_intake.py"
+      - "test_atlasquant_aion_b2b_diagnostic_intake.py"
+      - "docs/aion/AION_B2B_DIAGNOSTIC_INTAKE_V1.md"
       - "atlasquant_reference_ui.py"
       - "atlasquant_account_portal.py"
       - "test_atlasquant_account_portal.py"
@@ -78,7 +81,8 @@ jobs:
             atlasquant_aion_b2b_customer_portal_operations.py \
             atlasquant_aion_b2b_revops_foundation.py \
             atlasquant_aion_b2b_revops_read_model.py \
-            atlasquant_aion_b2b_revops_cleanup_plan.py
+            atlasquant_aion_b2b_revops_cleanup_plan.py \
+            atlasquant_aion_b2b_diagnostic_intake.py
 
       - name: Run complete B2B contract suite
         run: |
@@ -96,6 +100,7 @@ jobs:
             test_atlasquant_aion_b2b_revops_foundation.py \
             test_atlasquant_aion_b2b_revops_read_model.py \
             test_atlasquant_aion_b2b_revops_cleanup_plan.py \
+            test_atlasquant_aion_b2b_diagnostic_intake.py \
             test_atlasquant_aion_b2b_revops_ui.py
 
       - name: Assert offline safety markers
