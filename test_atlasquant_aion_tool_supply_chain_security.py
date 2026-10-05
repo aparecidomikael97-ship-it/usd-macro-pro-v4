@@ -10,6 +10,7 @@ from atlasquant_aion_credential_proxy import (
     CredentialLeakError,
     CredentialProxy,
 )
+from atlasquant_aion_memory import checkpoint_integrity_report, default_checkpoint
 from atlasquant_aion_portable import default_portable_core
 from atlasquant_aion_tool_hub import (
     default_tool_hub,
@@ -90,6 +91,18 @@ def scoped_vault():
 
 
 class ClosedToolRegistryTests(unittest.TestCase):
+    def test_supply_chain_overlay_does_not_change_checkpoint_digest_contract(self):
+        checkpoint = default_checkpoint()
+        report = checkpoint_integrity_report(checkpoint)
+        self.assertEqual(report["state"], "CONFIRMED")
+        self.assertEqual(report["mismatches"], [])
+        self.assertEqual(len(checkpoint["tool_hub"]["tools"]), 12)
+        for tool in checkpoint["tool_hub"]["tools"]:
+            self.assertNotIn("input_schema", tool)
+            self.assertNotIn("contract_hash", tool)
+            self.assertNotIn("credential_ref", tool)
+            self.assertNotIn("egress_allowlist", tool)
+
     def test_registry_pin_is_verified_and_default_hub_is_fully_accounted(self):
         report = registry_integrity_report()
         self.assertEqual(report["state"], "VERIFIED")
