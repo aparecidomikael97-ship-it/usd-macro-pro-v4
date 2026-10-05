@@ -71,3 +71,7 @@ No paid provider, external action, memory promotion, execution, approval grant, 
 - Architectural boundary + new session tests: 21 passed, 15 subtests passed in 22.18 s; original independence inventory unchanged.
 - Measured AION navigation after Central is visible: 265.43–519.89 ms across six dimensions. Selected follow-up sends: 272.84–407.24 ms. These are local observations under concurrent test load, not a production SLA; cold browser/Streamlit/Central startup is recorded separately (3.7–5.4 s).
 - Final broad Core regression: 215 files, 5,280 passed, 5 skipped, 743 subtests passed in 237.99 s. Existing browser regression: 9 passed in 463.01 s (all eight reference-browser matrices plus the old standalone chat browser). The five skips are existing Windows symlink limitations: developer intelligence, journal store, journal governance, V2.13 real trust authority, V2.7 durable crash isolation. No remaining failures.
+
+## CI portability check
+
+First Linux run: 87 related tests passed; browser 7 passed/1 failed. The absolute scroll <100 assertion included Playwright bringing a below-fold summary into view (different Linux font metrics). The test now positions the click target first, captures scroll, performs the real click and verifies the opened Proof list plus scroll stability within 1 px. This is a stricter measurement of the actual no-jump contract, not a relaxed threshold. No product/Core patch was required for this CI finding. Final rerun status is in the delivery report/PR.

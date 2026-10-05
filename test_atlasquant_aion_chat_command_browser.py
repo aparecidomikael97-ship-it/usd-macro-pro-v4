@@ -128,8 +128,15 @@ def test_long_history_pagination_does_not_erase_earliest_turn_and_smart_scroll(p
         capture(page,'aion-chat-long-history.png')
         # Proof expansion does not pull the reader to the bottom.
         page.locator('.aq-chat-history').evaluate('e=>e.scrollTop=0')
-        page.locator('.aq-chat-proof summary').first.click()
-        assert page.locator('.aq-chat-history').evaluate('e=>e.scrollTop')<100
+        summary = page.locator('.aq-chat-proof summary').first
+        # Font metrics differ on Linux; positioning the real click target is
+        # browser preparation, not a scroll caused by opening Proof Mode.
+        summary.scroll_into_view_if_needed()
+        before = page.locator('.aq-chat-history').evaluate('e=>e.scrollTop')
+        summary.click()
+        expect(page.locator('.aq-chat-proof ol').first).to_be_visible()
+        after = page.locator('.aq-chat-history').evaluate('e=>e.scrollTop')
+        assert abs(after-before) <= 1
         send(page,'Continue a conversa','PLANNED')
         expect(page.locator('.aq-chat-count')).to_contain_text('242 mensagens')
         expect(page.locator('.aq-chat-older')).to_be_visible()
