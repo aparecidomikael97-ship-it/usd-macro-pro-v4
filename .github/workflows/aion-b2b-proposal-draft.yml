@@ -10,6 +10,8 @@ on:
       - "atlasquant_aion_b2b_proposal_draft.py"
       - "test_atlasquant_aion_b2b_pilot_readiness.py"
       - "test_atlasquant_aion_b2b_proposal_draft.py"
+      - "test_atlasquant_aion_b2b_proposal_ui.py"
+      - "atlasquant_reference_ui.py"
       - "docs/aion/AION_B2B_PROPOSAL_DRAFT_V1.md"
       - ".github/workflows/aion-b2b-proposal-draft.yml"
 
@@ -32,13 +34,16 @@ jobs:
             atlasquant_aion_b2b_diagnostic_intake.py \
             atlasquant_aion_b2b_proposal_draft.py \
             test_atlasquant_aion_b2b_pilot_readiness.py \
-            test_atlasquant_aion_b2b_proposal_draft.py
+            test_atlasquant_aion_b2b_proposal_draft.py \
+            test_atlasquant_aion_b2b_proposal_ui.py \
+            atlasquant_reference_ui.py
       - name: Run proposal chain tests
         run: |
           python -m unittest -q \
             test_atlasquant_aion_b2b_pilot_readiness.py \
             test_atlasquant_aion_b2b_diagnostic_intake.py \
-            test_atlasquant_aion_b2b_proposal_draft.py
+            test_atlasquant_aion_b2b_proposal_draft.py \
+            test_atlasquant_aion_b2b_proposal_ui.py
       - name: Assert non-binding commercial boundary
         run: |
           python - <<'PY'
