@@ -3,9 +3,12 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import datetime, timezone
-import multiprocessing as mp
+import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -40,50 +43,6 @@ def _task(title="Durable CAS Task"):
         source="TEST",
     )
 
-
-def _process_cas_worker(
-    db_path,
-    owner,
-    tenant,
-    workspace,
-    task_id,
-    target,
-    ready_queue,
-    gate,
-    result_queue,
-):
-    scope = Scope(owner, tenant, workspace)
-    store = SQLiteChatStore(Path(db_path))
-    try:
-        repo = DurableTaskRepository(store, scope)
-        base = repo.load(task_id)
-        if target == "PAUSED":
-            candidate = pause_durable_task(
-                base,
-                expected_revision=base["revision"],
-                changed_at=CHANGED,
-                next_action="resume later",
-            )
-        else:
-            candidate = cancel_durable_task(
-                base,
-                expected_revision=base["revision"],
-                changed_at=CHANGED,
-            )
-        ready_queue.put(("READY", target))
-        if not gate.wait(15):
-            result_queue.put((target, "GATE_TIMEOUT"))
-            return
-        try:
-            result = repo.compare_and_swap(
-                candidate,
-                expected_revision=base["revision"],
-            )
-            result_queue.put((target, result["status"]))
-        except DurableTaskRepositoryError as exc:
-            result_queue.put((target, exc.code))
-    finally:
-        store.close()
 
 
 class DurableTaskAtomicRepositoryTests(unittest.TestCase):
@@ -306,48 +265,88 @@ class DurableTaskAtomicRepositoryTests(unittest.TestCase):
 
     def test_two_separate_processes_race_one_wins_atomic_cas(self):
         with tempfile.TemporaryDirectory() as raw:
-            path = Path(raw) / "chat.sqlite3"
-            seed = SQLiteChatStore(path)
+            root = Path(raw)
+            db_path = root / "chat.sqlite3"
+            seed = SQLiteChatStore(db_path)
             repo = DurableTaskRepository(seed, self.scope)
             base = _task()
             repo.create(base)
             seed.close()
 
-            ctx = mp.get_context("spawn")
-            ready = ctx.Queue()
-            results = ctx.Queue()
-            gate = ctx.Event()
-            args = (
-                str(path),
-                self.scope.owner_id,
-                self.scope.tenant_id,
-                self.scope.workspace_id,
-                base["durable_task_id"],
+            worker = (
+                Path(__file__).resolve().parent
+                / "tools"
+                / "aion_durable_task_cas_process_worker.py"
             )
-            p1 = ctx.Process(
-                target=_process_cas_worker,
-                args=(*args, "PAUSED", ready, gate, results),
+            barrier = root / "go.signal"
+            ready_paths = [root / "paused.ready", root / "canceled.ready"]
+            result_paths = [root / "paused.json", root / "canceled.json"]
+            targets = ["PAUSED", "CANCELED"]
+            processes = []
+            for target, ready_path, result_path in zip(
+                targets,
+                ready_paths,
+                result_paths,
+            ):
+                processes.append(
+                    subprocess.Popen(
+                        [
+                            sys.executable,
+                            str(worker),
+                            str(db_path),
+                            self.scope.owner_id,
+                            self.scope.tenant_id,
+                            self.scope.workspace_id,
+                            base["durable_task_id"],
+                            target,
+                            str(ready_path),
+                            str(barrier),
+                            str(result_path),
+                            CHANGED,
+                        ],
+                        cwd=str(Path(__file__).resolve().parent),
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                )
+
+            deadline = time.monotonic() + 20.0
+            while not all(path.exists() for path in ready_paths):
+                dead = [proc for proc in processes if proc.poll() is not None]
+                if dead:
+                    details = []
+                    for proc in processes:
+                        if proc.poll() is not None:
+                            stdout, stderr = proc.communicate(timeout=2)
+                            details.append(
+                                f"rc={proc.returncode} stdout={stdout!r} stderr={stderr!r}"
+                            )
+                    self.fail("CAS worker exited before barrier: " + " | ".join(details))
+                if time.monotonic() >= deadline:
+                    for proc in processes:
+                        proc.kill()
+                    self.fail("CAS subprocess workers did not reach ready barrier")
+                time.sleep(0.02)
+
+            barrier.write_text("GO", encoding="utf-8")
+            diagnostics = []
+            for proc in processes:
+                stdout, stderr = proc.communicate(timeout=20)
+                diagnostics.append((proc.returncode, stdout, stderr))
+            self.assertEqual(
+                [row[0] for row in diagnostics],
+                [0, 0],
+                diagnostics,
             )
-            p2 = ctx.Process(
-                target=_process_cas_worker,
-                args=(*args, "CANCELED", ready, gate, results),
-            )
-            p1.start()
-            p2.start()
-            self.assertEqual(ready.get(timeout=15)[0], "READY")
-            self.assertEqual(ready.get(timeout=15)[0], "READY")
-            gate.set()
-            rows = [results.get(timeout=15), results.get(timeout=15)]
-            p1.join(timeout=15)
-            p2.join(timeout=15)
-            self.assertFalse(p1.is_alive())
-            self.assertFalse(p2.is_alive())
-            self.assertEqual(p1.exitcode, 0)
-            self.assertEqual(p2.exitcode, 0)
-            statuses = sorted(status for _target, status in rows)
+            rows = [
+                json.loads(path.read_text(encoding="utf-8"))
+                for path in result_paths
+            ]
+            statuses = sorted(row["status"] for row in rows)
             self.assertEqual(statuses, ["REVISION_CONFLICT", "UPDATED"])
 
-            reopened = SQLiteChatStore(path)
+            reopened = SQLiteChatStore(db_path)
             recovered = DurableTaskRepository(reopened, self.scope)
             persisted = recovered.load(base["durable_task_id"])
             self.assertEqual(persisted["revision"], 2)
