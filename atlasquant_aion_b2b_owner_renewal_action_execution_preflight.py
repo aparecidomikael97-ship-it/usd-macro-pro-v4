@@ -42,6 +42,18 @@ REVIEW_SERVICE_STATE = {
     "INCIDENT_REVIEW": "INCIDENT_REVIEW",
 }
 
+ACTION_FAMILY_BY_CHOICE = {
+    "RENEW_AS_IS_REVIEW": "RENEWAL",
+    "RENEW_WITH_CHANGES_REVIEW": "RENEWAL_WITH_CHANGES",
+    "NON_RENEWAL_REVIEW": "NON_RENEWAL",
+    "REMEDIATION_PLAN_REVIEW": "REMEDIATION",
+    "RESCOPE_CAPACITY_REVIEW": "CAPACITY_RESCOPE",
+    "REPRICE_REVIEW": "REPRICING",
+    "INCIDENT_REMEDIATION_REVIEW": "INCIDENT_REMEDIATION",
+    "PAUSE_SERVICE_REVIEW": "SERVICE_PAUSE",
+    "TERMINATION_REVIEW": "SERVICE_TERMINATION",
+}
+
 ACTION_REQUIRED_PRECONDITIONS = {
     "RENEWAL": (
         "renewal_terms_snapshot_ready",
@@ -349,6 +361,8 @@ def evaluate_owner_renewal_action_execution_preflight(
 
     if family not in ACTION_REQUIRED_PRECONDITIONS:
         blockers.append("ACTION_FAMILY_UNSUPPORTED")
+    if ACTION_FAMILY_BY_CHOICE.get(choice) != family:
+        blockers.append("ACTION_CHOICE_FAMILY_MISMATCH")
     expected_service_state = REVIEW_SERVICE_STATE.get(review_type)
     if not expected_service_state:
         blockers.append("ACTION_REVIEW_TYPE_UNSUPPORTED")
@@ -619,6 +633,7 @@ __all__ = [
     "MAX_ENVIRONMENT_AGE_SECONDS",
     "MAX_MONTHLY_INFRA_BRL",
     "REVIEW_SERVICE_STATE",
+    "ACTION_FAMILY_BY_CHOICE",
     "ACTION_REQUIRED_PRECONDITIONS",
     "evaluate_owner_renewal_action_execution_preflight",
 ]
