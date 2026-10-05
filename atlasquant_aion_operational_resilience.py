@@ -357,6 +357,8 @@ def _normalize_drill(
     if backup is None:
         blockers.append("BACKUP_REFERENCE_NOT_FOUND")
     else:
+        if backup.get("ready") is not True:
+            blockers.append("BACKUP_REFERENCE_NOT_READY")
         recovered_revision = _text(raw.get("recovered_revision"), 160)
         recovered_digest = _text(raw.get("recovered_digest"), 80).lower()
         if recovered_revision != backup.get("source_revision"):
