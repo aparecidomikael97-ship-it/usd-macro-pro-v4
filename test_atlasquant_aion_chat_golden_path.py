@@ -58,6 +58,11 @@ class ReadonlyGoldenPathExecutionTests(unittest.TestCase):
         self.assertFalse(out["receipt"]["approval_used"])
         self.assertFalse(out["receipt"]["grants_authority"])
         self.assertFalse(out["receipt"]["semantic_truth_verified"])
+        self.assertTrue(out["identity_binding_complete"])
+        self.assertEqual(
+            out["receipt"]["identity_binding_digest"],
+            out["turn"]["identity_binding_digest"],
+        )
 
         stages = {row["stage"]: row["state"] for row in out["golden_path"]}
         self.assertEqual(stages["EXECUTION"], "CONFIRMED_LOCAL_READ")
@@ -126,6 +131,60 @@ class ReadonlyGoldenPathExecutionTests(unittest.TestCase):
         self.assertEqual(out["reason"], "AUTHENTICATED_ADMIN_REQUIRED_FOR_V1")
         self.assertIn("AUTHENTICATED_ADMIN_REQUIRED", out["blockers"])
         spy.assert_not_called()
+
+    def test_incomplete_identity_binding_never_reaches_executor(self):
+        spy = Mock()
+        original = golden.orchestrate_local_command
+        golden.orchestrate_local_command = spy
+        try:
+            out = execute_readonly_golden_path(
+                "status geral",
+                context={"role": "ADMIN", "tenant_id": "tenant:test"},
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN_ACCESS,
+                authenticated_admin=True,
+                conversation_id="visible-thread",
+            )
+        finally:
+            golden.orchestrate_local_command = original
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertEqual(out["reason"], "IDENTITY_BINDING_INCOMPLETE")
+        self.assertIn(
+            "TENANT_WORKSPACE_ACTOR_BINDING_REQUIRED",
+            out["blockers"],
+        )
+        spy.assert_not_called()
+
+    def test_same_visible_conversation_id_across_tenants_has_distinct_receipt(self):
+        other_context = dict(ADMIN_CONTEXT)
+        other_context["tenant_id"] = "tenant:other"
+        kwargs = dict(
+            runtime_context={"checkpoint": default_checkpoint()},
+            access=ADMIN_ACCESS,
+            authenticated_admin=True,
+            conversation_id="same-visible-thread",
+            turn_index=8,
+        )
+        first = execute_readonly_golden_path(
+            "status geral",
+            context=ADMIN_CONTEXT,
+            **kwargs,
+        )
+        second = execute_readonly_golden_path(
+            "status geral",
+            context=other_context,
+            **kwargs,
+        )
+        self.assertEqual(first["state"], "CONFIRMED_SUCCESS")
+        self.assertEqual(second["state"], "CONFIRMED_SUCCESS")
+        self.assertNotEqual(
+            first["identity_binding_digest"],
+            second["identity_binding_digest"],
+        )
+        self.assertNotEqual(
+            first["receipt"]["receipt_id"],
+            second["receipt"]["receipt_id"],
+        )
 
     def test_draft_tool_is_outside_readonly_path(self):
         spy = Mock()
@@ -268,6 +327,25 @@ class ReadonlyVerificationTests(unittest.TestCase):
         out = verify_readonly_execution(turn, execution)
         self.assertFalse(out["verified"])
         self.assertIn("TOOL_OUTPUT_AUTHORITY_FLAG_NOT_FALSE", out["blockers"])
+
+    def test_context_tamper_breaks_identity_binding(self):
+        turn = self._planned_turn()
+        execution = self._good_execution(turn)
+        turn["context"]["tenant_id"] = "tenant:forged"
+        out = verify_readonly_execution(turn, execution)
+        self.assertFalse(out["verified"])
+        self.assertIn("IDENTITY_BINDING_DIGEST_MISMATCH", out["blockers"])
+
+    def test_replayed_execution_request_id_from_other_turn_fails_closed(self):
+        turn = self._planned_turn()
+        execution = self._good_execution(turn)
+        execution["tool_results"][0]["request_id"] = "AION-TURN-FORGED"
+        out = verify_readonly_execution(turn, execution)
+        self.assertFalse(out["verified"])
+        self.assertIn(
+            "RESULT_1:REQUEST_ID_NOT_BOUND_TO_TURN",
+            out["blockers"],
+        )
 
 
 class SourceBoundaryTests(unittest.TestCase):

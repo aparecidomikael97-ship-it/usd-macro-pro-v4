@@ -15,7 +15,10 @@ from hashlib import sha256
 import json
 from typing import Any, Mapping, Sequence
 
-from atlasquant_aion_chat_surface import build_chat_turn
+from atlasquant_aion_chat_surface import (
+    build_chat_turn,
+    conversation_identity_binding,
+)
 from atlasquant_aion_command_orchestrator import orchestrate_local_command
 from atlasquant_aion_local_traceability import local_contract_fingerprint
 
@@ -93,6 +96,25 @@ def verify_readonly_execution(
     results = _rows(execution.get("tool_results"))
     executed_ids = [_clean(item.get("tool_id"), 96) for item in results]
     expected_contract = local_contract_fingerprint(hub)
+    turn_context = _mapping(turn.get("context"))
+    expected_binding = conversation_identity_binding(
+        turn_context,
+        turn.get("conversation_id"),
+    )
+    actual_binding = _mapping(turn.get("identity_binding"))
+    actual_binding_digest = _clean(turn.get("identity_binding_digest"), 64)
+    turn_id = _clean(turn.get("turn_id"), 80)
+
+    if expected_binding.get("complete") is not True:
+        blockers.append("IDENTITY_BINDING_INCOMPLETE")
+    if turn.get("identity_binding_complete") is not True:
+        blockers.append("TURN_IDENTITY_BINDING_NOT_COMPLETE")
+    if actual_binding.get("complete") is not True:
+        blockers.append("IDENTITY_BINDING_OBJECT_NOT_COMPLETE")
+    if actual_binding_digest != str(expected_binding.get("binding_digest") or ""):
+        blockers.append("IDENTITY_BINDING_DIGEST_MISMATCH")
+    if _clean(actual_binding.get("binding_digest"), 64) != actual_binding_digest:
+        blockers.append("IDENTITY_BINDING_OBJECT_MISMATCH")
 
     if str(turn.get("state") or "") != "PLANNED":
         blockers.append("CHAT_TURN_NOT_PLANNED")
@@ -119,6 +141,12 @@ def verify_readonly_execution(
 
     for index, item in enumerate(results):
         prefix = f"RESULT_{index + 1}:"
+        request_id = _clean(item.get("request_id"), 120)
+        if not turn_id or (
+            request_id != turn_id
+            and not request_id.startswith(turn_id + ":")
+        ):
+            blockers.append(prefix + "REQUEST_ID_NOT_BOUND_TO_TURN")
         if item.get("state") != "SUCCESS":
             blockers.append(prefix + "NOT_SUCCESS")
         if _clean(item.get("kind"), 24).upper() not in SAFE_READ_KINDS:
@@ -167,6 +195,8 @@ def verify_readonly_execution(
         "executed_tool_ids": executed_ids,
         "planned_kinds": planned_kinds,
         "contract_fingerprint": expected_contract,
+        "identity_binding_digest": actual_binding_digest,
+        "identity_binding_complete": expected_binding.get("complete") is True,
         "verification_scope": "STRUCTURAL_LOCAL_READ_EXECUTION",
         "semantic_truth_verified": False,
         "executes_action": False,
@@ -192,6 +222,7 @@ def _receipt(
     material = {
         "schema": RECEIPT_SCHEMA,
         "conversation_id": _clean(turn.get("conversation_id"), 120),
+        "identity_binding_digest": _clean(turn.get("identity_binding_digest"), 64),
         "turn_id": _clean(turn.get("turn_id"), 80),
         "message_digest": _clean(turn.get("message_digest"), 64),
         "tool_ids": list(verification.get("executed_tool_ids") or []),
@@ -267,6 +298,8 @@ def _blocked(
         "state": "BLOCKED" if execution is None else "FAILED_SAFE",
         "reason": reason,
         "conversation_id": _clean(turn.get("conversation_id"), 120),
+        "identity_binding_digest": _clean(turn.get("identity_binding_digest"), 64),
+        "identity_binding_complete": turn.get("identity_binding_complete") is True,
         "turn_id": _clean(turn.get("turn_id"), 80),
         "turn": dict(turn),
         "execution": dict(execution or {}),
@@ -333,6 +366,12 @@ def execute_readonly_golden_path(
             reason="AUTHENTICATED_ADMIN_REQUIRED_FOR_V1",
             blockers=["AUTHENTICATED_ADMIN_REQUIRED"],
         )
+    if turn.get("identity_binding_complete") is not True:
+        return _blocked(
+            turn,
+            reason="IDENTITY_BINDING_INCOMPLETE",
+            blockers=["TENANT_WORKSPACE_ACTOR_BINDING_REQUIRED"],
+        )
 
     preview = _mapping(turn.get("local_tool_preview"))
     tool_ids = _planned_tool_ids(turn)
@@ -378,6 +417,8 @@ def execute_readonly_golden_path(
         "state": "CONFIRMED_SUCCESS",
         "reason": "VERIFIED_LOCAL_READ_COMPLETED",
         "conversation_id": _clean(turn.get("conversation_id"), 120),
+        "identity_binding_digest": _clean(turn.get("identity_binding_digest"), 64),
+        "identity_binding_complete": turn.get("identity_binding_complete") is True,
         "turn_id": _clean(turn.get("turn_id"), 80),
         "turn": dict(turn),
         "execution": dict(execution),
