@@ -79,7 +79,7 @@ class AionDriftMonitorTests(unittest.TestCase):
             reference_snapshot=snapshot(version="baseline"),
             current_snapshot=snapshot(
                 version="candidate",
-                feature_a={"BR": 0.58, "US": 0.42},
+                feature_a={"BR": 0.54, "US": 0.46},
             ),
         )
         self.assertEqual(out["state"], "DEGRADED")
