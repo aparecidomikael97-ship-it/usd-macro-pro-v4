@@ -502,6 +502,47 @@ def verify_owner_renewal_action_persistence(
         "pilot_id": plan["pilot_id"],
         "package": plan["package"],
         "review_type": plan["review_type"],
+        "owner_review_packet_digest": _text(
+            record.get("owner_review_packet_digest"),
+            180,
+        ),
+        "cycle_evidence_digest": _text(
+            record.get("cycle_evidence_digest"),
+            180,
+        ),
+        "contract_digest": _text(record.get("contract_digest"), 180),
+        "value_bound_conversion_digest": _text(
+            record.get("value_bound_conversion_digest"),
+            180,
+        ),
+        "decision_record_digest": _text(
+            record.get("decision_record_digest"),
+            180,
+        ),
+        "prior_persistence_receipt_digest": _text(
+            record.get("persistence_receipt_digest"),
+            180,
+        ),
+        "prior_checkpoint_digest": _text(
+            record.get("checkpoint_digest"),
+            180,
+        ),
+        "prior_writer_request_digest": _text(
+            record.get("writer_request_digest"),
+            180,
+        ),
+        "authorization_environment_digest": _text(
+            record.get("environment_digest"),
+            180,
+        ),
+        "authorization_preflight_digest": _text(
+            record.get("preflight_digest"),
+            180,
+        ),
+        "authorization_request_digest": _text(
+            record.get("authorization_request_digest"),
+            180,
+        ),
         "action_record_digest": plan["action_record_digest"],
         "checkpoint_revision": observed["revision"],
         "checkpoint_state_digest": observed["state_digest"],
