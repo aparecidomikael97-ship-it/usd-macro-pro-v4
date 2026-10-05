@@ -431,7 +431,70 @@ def proposal_draft_html(selected, raw):
     )
 
 
-def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None):
+def _pilot_planning_ready(raw):
+    if not isinstance(raw, dict):
+        return False
+    return (
+        raw.get("schema") == "ATLASQUANT_AION_B2B_PILOT_PLANNING_READ_MODEL_V1"
+        and raw.get("state") == "READY"
+        and raw.get("activation_state") == "BLOCKED_UNTIL_OWNER_APPROVAL"
+        and raw.get("read_only") is True
+        and raw.get("owner_review_required") is True
+        and raw.get("activation_control_exposed") is False
+        and raw.get("raw_evidence_exposed") is False
+        and raw.get("candidate_identity_exposed") is False
+        and raw.get("automatic_activation") is False
+        and raw.get("automatic_customer_contact") is False
+        and raw.get("automatic_billing") is False
+        and raw.get("automatic_deploy") is False
+        and raw.get("crm_write") is False
+        and raw.get("provider_called") is False
+        and raw.get("production_mutation") is False
+        and raw.get("grants_authority") is False
+        and raw.get("executes_action") is False
+    )
+
+
+def pilot_planning_html(selected, raw):
+    """Render aggregate pilot planning metadata; never expose activation controls."""
+    if selected != "b2b" or not _pilot_planning_ready(raw):
+        return ""
+    model = dict(raw)
+
+    def fmt(value, suffix=""):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "—"
+        text = f"{value:.2f}".rstrip("0").rstrip(".") if isinstance(value, float) else str(value)
+        return text + suffix
+
+    def metric(label, value, detail=""):
+        return (
+            '<article><small>' + escape(label) + '</small>'
+            '<strong>' + escape(str(value)) + '</strong>'
+            + ('<p>' + escape(detail) + '</p>' if detail else '')
+            + '</article>'
+        )
+
+    cards = [
+        metric("PILOTO", model.get("pilot_id") or "—", "Planejamento interno"),
+        metric("DURAÇÃO", fmt(model.get("duration_days"), " dias"), "Janela planejada"),
+        metric("INFRA MÁX.", "R$ " + fmt(model.get("max_monthly_infra_brl")), "Teto do piloto"),
+        metric("ESCOPO", fmt(model.get("pilot_scope_item_count")), "Itens dentro da proposta"),
+        metric("KPIs", fmt(model.get("kpi_count")), "Métricas evidenciadas"),
+        metric("STOP CONDITIONS", fmt(model.get("stop_condition_count")), "Condições de revisão"),
+        metric("ROLLBACK", fmt(model.get("rollback_step_count")), "Passos de retorno"),
+        metric("ATIVAÇÃO", "BLOQUEADA", "Até aprovação humana do proprietário"),
+    ]
+    return (
+        '<section class="aq-pilot-planning-readmodel" data-pilot-readonly="true">'
+        '<div class="ref-preview-grid">' + "".join(cards) + '</div>'
+        '<p class="ref-state">PLANEJADO · AGUARDANDO APROVAÇÃO DO PROPRIETÁRIO · SEM ATIVAÇÃO</p>'
+        '<p class="ref-truth">Resumo agregado; sem identidade do candidato, evidência bruta ou controle de execução.</p>'
+        '</section>'
+    )
+
+
+def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -464,7 +527,9 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
     if area == "negocios":
-        if selected == "proposals" and _proposal_draft_ready(proposal_draft):
+        if selected == "b2b" and _pilot_planning_ready(pilot_planning_read_model):
+            cards = pilot_planning_html(selected, pilot_planning_read_model)
+        elif selected == "proposals" and _proposal_draft_ready(proposal_draft):
             cards = proposal_draft_html(selected, proposal_draft)
         elif selected in {"revenue", "crm", "leads"} and _revops_read_model_ready(revops_read_model):
             cards = revops_read_model_html(selected, revops_read_model)
@@ -509,11 +574,15 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
     data_state = "VALIDAÇÃO PENDENTE"
     if model:
         data_state=model['state']
+    pilot_selected = area == "negocios" and selected == "b2b"
+    pilot_ready = pilot_selected and _pilot_planning_ready(pilot_planning_read_model)
     proposal_selected = area == "negocios" and selected == "proposals"
     proposal_ready = proposal_selected and _proposal_draft_ready(proposal_draft)
     revops_selected = area == "negocios" and selected in {"revenue", "crm", "leads"}
     revops_ready = revops_selected and _revops_read_model_ready(revops_read_model)
-    if proposal_ready:
+    if pilot_ready:
+        data_state = "PILOTO PLANEJADO"
+    elif proposal_ready:
         data_state = "DRAFT NÃO VINCULANTE"
     elif revops_ready:
         data_state = "REVOPS " + ("PARCIAL" if revops_read_model.get("state") == "PARTIAL" else "VALIDADO")
@@ -527,7 +596,7 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")))}</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · piloto aguardando aprovação" if pilot_ready else ("REVISÃO HUMANA · proposta não vinculante" if proposal_ready else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática"))))}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -673,7 +742,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -712,6 +781,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         business_read_model=business_read_model,
         revops_read_model=revops_read_model,
         proposal_draft=proposal_draft,
+        pilot_planning_read_model=pilot_planning_read_model,
     ) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
@@ -1015,8 +1085,13 @@ def render_reference_workspace(
         if area == "negocios"
         else None
     )
+    pilot_planning_read_model = (
+        st.session_state.get("atlasquant_b2b_pilot_planning_read_model")
+        if area == "negocios"
+        else None
+    )
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft,pilot_planning_read_model=pilot_planning_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()

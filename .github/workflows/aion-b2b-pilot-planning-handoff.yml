@@ -11,6 +11,11 @@ on:
       - "atlasquant_aion_b2b_pilot_operating_contract.py"
       - "atlasquant_aion_b2b_pilot_readiness.py"
       - "docs/aion/AION_B2B_PILOT_PLANNING_HANDOFF_V1.md"
+      - "atlasquant_aion_b2b_pilot_planning_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_planning_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_planning_ui.py"
+      - "docs/aion/AION_B2B_PILOT_PLANNING_READ_MODEL_V1.md"
+      - "atlasquant_reference_ui.py"
       - ".github/workflows/aion-b2b-pilot-planning-handoff.yml"
 
 permissions:
@@ -32,11 +37,17 @@ jobs:
             atlasquant_aion_b2b_proposal_draft.py \
             atlasquant_aion_b2b_pilot_operating_contract.py \
             atlasquant_aion_b2b_pilot_planning_handoff.py \
-            test_atlasquant_aion_b2b_pilot_planning_handoff.py
+            atlasquant_aion_b2b_pilot_planning_read_model.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_pilot_planning_handoff.py \
+            test_atlasquant_aion_b2b_pilot_planning_read_model.py \
+            test_atlasquant_aion_b2b_pilot_planning_ui.py
       - name: Run planning handoff and existing pilot tests
         run: |
           python -m unittest -q \
             test_atlasquant_aion_b2b_pilot_planning_handoff.py \
+            test_atlasquant_aion_b2b_pilot_planning_read_model.py \
+            test_atlasquant_aion_b2b_pilot_planning_ui.py \
             test_atlasquant_aion_b2b_pilot_operating_contract.py \
             test_atlasquant_aion_b2b_proposal_draft.py
       - name: Assert no activation or customer action authority
