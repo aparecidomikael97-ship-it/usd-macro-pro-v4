@@ -20,10 +20,13 @@ def test_real_contract_status_rendered_without_false_success(message,state):
     assert "core_preflight" not in str(data)
 
 
-def test_multiline_preserved_as_display_without_changing_contract():
+def test_multiline_preserved_in_contract_and_canonicalized_only_for_routing():
     c=chat();text="Explique o contexto\nSegunda linha";ui.submit_turn(c,event(c,text),CONTEXT)
     assert c["entries"][0]["display_text"]==text
-    assert next(iter(c["turns"].values()))["message"]=="Explique o contexto Segunda linha"
+    turn=next(iter(c["turns"].values()))
+    assert turn["message"]==text
+    assert turn["canonical_message"]=="Explique o contexto Segunda linha"
+    assert c["entries"][0]["content"]==text
 
 
 def test_metadata_only_omits_bytes_and_untrusted_hash():
