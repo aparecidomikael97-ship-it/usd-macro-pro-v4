@@ -438,6 +438,14 @@ def _component():
     return v2.component("atlasquant_reference_cockpit", css=CSS.read_text(encoding="utf-8"), js=JS)
 
 
+@lru_cache(maxsize=1)
+def _chat_component():
+    """The existing UI host owns framework wiring; the chat adapter imports no UI runtime."""
+    import streamlit.components.v2 as v2
+    assets = Path(__file__).parent / "aion_chat" / "web"
+    return v2.component("atlasquant_aion_chat_command", css=(assets / "command-chat.css").read_text(encoding="utf-8"), js=(assets / "command-chat.js").read_text(encoding="utf-8"))
+
+
 def apply_event(session, access, area, event):
     """UI-only state changes. Existing area gate is always authoritative."""
     from atlasquant_central_hub_ui import assert_area_access, request_central_destination
@@ -507,7 +515,14 @@ def apply_event(session, access, area, event):
         raise ValueError("unknown workspace action")
 
 
-def render_reference_workspace(st, access, area, *, mode=None):
+def render_reference_workspace(
+    st,
+    access,
+    area,
+    *,
+    mode=None,
+    aion_chat_binding=None,
+):
     if not access or access.get("allowed") is not True:
         return False
     from atlasquant_central_hub_ui import assert_area_access
@@ -544,6 +559,34 @@ def render_reference_workspace(st, access, area, *, mode=None):
     selected = st.session_state.get("aq_reference_module")
     selected = selected[1] if isinstance(selected,(list,tuple)) and len(selected)==2 and selected[0]==area else ""
     mode = mode or st.session_state.get("atlasquant_experience_mode") or "Iniciante"
+    if area == "aion" and selected in {"", "chat"}:
+        from atlasquant_aion_chat_workspace_ui import render_aion_chat_workspace
+        product_kwargs = {}
+        if aion_chat_binding is not None:
+            if not isinstance(aion_chat_binding, dict):
+                raise TypeError("aion_chat_binding mapping required")
+            required = ("scope", "store", "runtime_context")
+            if any(aion_chat_binding.get(key) is None for key in required):
+                raise ValueError(
+                    "aion_chat_binding requires scope + store + runtime_context"
+                )
+            product_kwargs = {
+                "product_scope": aion_chat_binding["scope"],
+                "product_store": aion_chat_binding["store"],
+                "runtime_context": aion_chat_binding["runtime_context"],
+                "product_conversation_id": aion_chat_binding.get(
+                    "conversation_id", ""
+                ),
+            }
+        return render_aion_chat_workspace(
+            st,
+            access,
+            mode=mode,
+            selected=selected,
+            navigation=NAV["aion"],
+            component=_chat_component(),
+            **product_kwargs,
+        )
     session = access.get("session") or {}
     name = str(access.get("display_name") or session.get("username") or access.get("username") or "Usuário")
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
