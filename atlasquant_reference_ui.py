@@ -612,135 +612,163 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
 
 
 def business_reference_home_html(*, mode="Avançado", name="Usuário", show_central=True, business_read_model=None):
-    """Interactive Negócios home using the current B2B operating model.
+    """Render the approved Negócios artwork as the active desktop cockpit.
 
-    The legacy market-research raster remains versioned as provenance, but it is
-    not used as the active Business workspace because its labels conflict with
-    the current B2B/managed-operations contract.
+    The approved raster is the visual source of truth. Transparent accessible
+    hotspots bridge its painted sidebar/cards into the current B2B routes.
+    Additional managed-operations functions remain available in a collapsed
+    functional menu instead of replacing the approved cockpit.
     """
-    from atlasquant_ecosystem_workspace_ui import WORKSPACE_CSS, workspace_modules, workspace_spec
+    filename = SURFACES["negocios"][0]
+    uri = asset_uri(filename)
+    w, h = dimensions("negocios")
+    settings = (
+        f"background-image:url({uri});--ref-aspect:{w/h};--ref-ratio:{w}/{h};"
+        "--ref-size:100% 100%;--ref-position:left center;"
+        f"--ref-icon-image:url({asset_uri('negocios_nav.webp')})"
+    )
 
-    spec = workspace_spec("negocios")
-    module_routes = {
-        "b2b": "b2b",
-        "revenue": "revenue",
-        "saas": "saas",
-        "international": "international",
-        "digital": "digital",
-        "finops": "finops",
-        "success": "success",
-        "sla": "sla",
-        "integrations": "integrations",
-        "privacy": "privacy",
-        "team": "team",
-        "sandbox": "sandbox",
-        "aion-business": "aion_specialist",
-    }
-    nav = "".join(
-        f'<button class="ref-nav-item aq-ws-nav-button" data-route="{escape(route)}" '
-        f'aria-label="{escape(label)}">{escape(label)}</button>'
-        for route, label in NAV["negocios"]
+    # Coordinates are measured against the approved 768 x 434 body artwork.
+    # Painted legacy labels route to the nearest current managed-operations
+    # capability while the artwork itself remains unchanged.
+    approved_regions = (
+        ("overview", "Visão Geral", (9, 7, 154, 31)),
+        ("leads", "Oportunidades", (9, 38, 154, 29)),
+        ("revenue", "Setores", (9, 67, 154, 29)),
+        ("companies", "Empresas", (9, 96, 154, 29)),
+        ("proposals", "M&A", (9, 125, 154, 29)),
+        ("international", "Mercado Global", (9, 154, 154, 29)),
+        ("followup", "Notícias Corporativas", (9, 183, 154, 29)),
+        ("followup", "Calendário de Resultados", (9, 212, 154, 29)),
+        ("finops", "Fluxo Institucional", (9, 241, 154, 29)),
+        ("revenue", "Análise de Setores", (9, 270, 154, 29)),
+        ("crm", "Watchlist", (9, 299, 154, 29)),
+        ("success", "Relatórios", (9, 328, 154, 32)),
+        ("b2b", "Negócios · Operação B2B", (176, 0, 577, 106)),
+        ("leads", "Oportunidades", (176, 113, 184, 85)),
+        ("revenue", "Setores", (367, 113, 190, 85)),
+        ("companies", "Empresas", (563, 113, 190, 85)),
+        ("proposals", "M&A", (176, 200, 184, 85)),
+        ("international", "Mercado Global", (367, 200, 190, 85)),
+        ("followup", "Notícias Corporativas", (563, 200, 190, 85)),
+        ("followup", "Próximos Eventos", (176, 294, 577, 80)),
     )
-    cards = []
-    for item in workspace_modules("negocios"):
-        route = module_routes.get(item["id"], item["id"])
-        cards.append(
-            f'<button class="aq-ws-card aq-ws-card-button" data-route="{escape(route)}" '
-            f'aria-label="{escape(item["title"])}" data-module="{escape(item["id"])}" '
-            f'data-feature-state="{escape(item["state"])}">'
-            f'<small>{escape(item["group"])}</small>'
-            f'<h4>{escape(item["title"])}</h4>'
-            f'<p>{escape(item["summary"])}</p>'
-            f'<span class="aq-ws-state" data-state="{escape(item["state"])}">{escape(item["state"])}</span>'
-            '</button>'
-        )
-    mobile_cards = []
-    for item in workspace_modules("negocios"):
-        route = module_routes.get(item["id"], item["id"])
-        mobile_cards.append(
-            f'<button class="ref-mobile-card ref-mobile-card-{escape(route)}" '
-            f'data-route="{escape(route)}" aria-label="{escape(item["title"])}">'
-            '<span class="ref-mobile-art" aria-hidden="true" '
-            'style="min-height:108px;background-image:'
-            'radial-gradient(circle at 72% 28%,rgba(52,226,190,.26),transparent 34%),'
-            'linear-gradient(145deg,#07172b,#0c2340 55%,#07111e)"></span>'
-            f'<strong>{escape(item["title"])}</strong></button>'
-        )
-    back = (
-        '<div class="ref-toolbar aq-ws-toolbar">'
-        '<button data-route="central" aria-label="Voltar à Central">← Central</button>'
-        '<span>NEGÓCIOS · OPERAÇÃO B2B</span></div>'
+    hits = "".join(
+        hotspot("negocios", route, label, box)
+        for route, label, box in approved_regions
+    )
+
+    top = (
+        '<button data-route="central" class="ref-return">← Central</button>'
         if show_central
-        else '<div class="ref-toolbar aq-ws-toolbar"><span>NEGÓCIOS · OPERAÇÃO B2B</span></div>'
+        else ""
     )
-    mode_label = str(mode or "").strip() or "SESSÃO ATUAL"
+    toolbar = (
+        '<div class="ref-toolbar ref-business-fidelity-toolbar">'
+        + top
+        + '<button data-route="b2b" aria-label="Abrir Operação B2B">Operação B2B</button>'
+        + '<span class="ref-toolbar-context">NEGÓCIOS · ARTE APROVADA</span></div>'
+    )
     drawer = (
         '<details class="ref-drawer"><summary>Menu · Negócios</summary><nav>'
         + nav_html("negocios", mode)
-        + ('<button data-route="central" class="ref-return">← Central</button>' if show_central else '')
+        + (
+            '<button data-route="central" class="ref-return">← Central</button>'
+            if show_central
+            else ""
+        )
         + '</nav></details>'
     )
-    return (
-        WORKSPACE_CSS
-        + '<style>'
-        '.aq-ws-nav-button{width:100%;text-align:left;background:transparent;border:1px solid transparent;'
-        'border-radius:9px;padding:6px 8px;color:#cfe0f3;font:inherit;cursor:pointer}'
-        '.aq-ws-nav-button:hover,.aq-ws-nav-button:focus-visible{border-color:rgba(73,230,178,.34);'
-        'background:rgba(73,230,178,.08);outline:none}'
-        '.aq-ws-card-button{width:100%;text-align:left;cursor:pointer;color:inherit;font:inherit}'
-        '.aq-ws-back{position:static;margin:0 0 8px;display:inline-flex}'
-        '.aq-ws-side.ref-sidebar{position:static!important;top:auto!important;left:auto!important;'
-        'width:auto!important;height:auto!important;z-index:auto!important;overflow:auto;'
-        'border-radius:18px;padding:10px;background:rgba(6,18,39,.78)}'
-        '.ref-negocios:has(.aq-ws-business-canvas){max-width:100%!important;margin-inline:0!important}'
-        '.aq-ws-business-canvas{position:relative!important;width:100%!important;height:auto!important;'
-        'aspect-ratio:auto!important;background:none!important;margin:0!important}'
-        '.ref-negocios .ref-mobile-art{background-size:cover!important;background-position:center!important}'
-        '@media(max-width:700px){.ref-negocios .aq-ws-business-canvas{display:none!important}'
-        '.ref-negocios .ref-mobile-grid{display:grid!important}.ref-negocios .ref-mobile-header{display:block!important}}'
-        '</style>'
-        '<section class="ref-workspace ref-negocios" data-workspace="negocios" '
-        'data-business-contract="managed-operations-v1">'
-        + back
-        + drawer
-        + '<div class="ref-canvas aq-ws-business-canvas" role="group" aria-label="Negócios · cockpit AtlasQuant">'
-        + '<section class="aq-ws-shell" data-workspace="negocios">'
-        '<div class="aq-ws-top">'
-        '<div class="aq-ws-brand"><span class="aq-ws-mark">A</span>'
-        '<span>ATLASQUANT · NEGÓCIOS</span></div>'
-        '<div class="aq-ws-motto">Poderoso por dentro. Simples por fora.</div></div>'
-        '<div class="aq-ws-layout">'
-        '<aside class="aq-ws-side ref-sidebar ref-negocios"><div class="aq-ws-side-kicker">NEGÓCIOS</div>'
-        f'<div class="aq-ws-nav">{nav}</div></aside>'
-        '<main class="aq-ws-main">'
-        '<section class="aq-ws-hero"><div>'
-        f'<div class="aq-ws-kicker">{escape(spec["kicker"])}</div>'
-        f'<h2>{escape(spec["title"])}</h2><p>{escape(spec["hero"])}</p>'
-        '<div class="aq-ws-truth">'
-        f'<span>MODO {escape(mode_label.upper())}</span>'
-        '<span>SEM EXECUÇÃO AUTOMÁTICA</span><span>TENANT ISOLADO</span>'
-        '<span>APROVAÇÃO HUMANA PARA AÇÕES CRÍTICAS</span></div></div>'
-        '<div class="aq-ws-orb" aria-hidden="true"><b>N</b></div></section>'
-        '<div class="aq-ws-section-head"><h3>Operação & gestão</h3>'
-        '<span>B2B, receita, cliente, capacidade e governança.</span></div>'
-        f'<div class="aq-ws-modules">{"".join(cards)}</div>'
-        + (
-            business_read_model_html("overview", business_read_model)
-            if _business_read_model_ready(business_read_model)
-            else '<p class="ref-state">CLIENTE · aguardando evidência validada para métricas de saúde, ROI, SLA e quotas</p>'
+
+    # Mobile has no separately approved reference. It derives its seven primary
+    # cards from crops of the same approved artwork and exposes all current B2B
+    # functions through the drawer.
+    mobile_regions = approved_regions[13:]
+    mobile = []
+    for route, label, box in mobile_regions:
+        x, y, bw, bh = box
+        scale = 100 * w / bw
+        posx = 100 * x / max(1, w - bw)
+        posy = 100 * y / max(1, h - bh)
+        style = (
+            f"aspect-ratio:{bw}/{bh};background-size:{scale}%;"
+            f"background-position:{posx}% {posy}%"
         )
-        + '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; '
-        'o workspace ativo usa o contrato B2B atual e não executa ações externas automaticamente.</p>'
-        f'<p class="ref-truth">Sessão: {escape(name)}</p>'
-        '</main></div></section></div>'
-        '<div class="ref-mobile-header ref-mobile-header-negocios">'
-        '<span class="ref-mobile-kicker">ECOSSISTEMA ATLASQUANT</span>'
-        '<h1>ATLASQUANT · NEGÓCIOS</h1>'
-        '<p>Operação B2B, crescimento e automação com controle.</p></div>'
-        f'<div class="ref-mobile-grid">{"".join(mobile_cards)}</div>'
-        '</section>'
+        mobile.append(
+            f'<button class="ref-mobile-card ref-mobile-card-{escape(route)}" '
+            f'data-route="{escape(route)}" data-mobile-crop="{x},{y},{bw},{bh}" '
+            f'aria-label="{escape(label)}">'
+            f'<span class="ref-mobile-art" style="{style}"></span>'
+            f'<strong>{escape(label)}</strong></button>'
+        )
+
+    hx, hy, hw, hh = (176, 0, 577, 106)
+    hero_style = (
+        f"background-size:{100*w/hw}%;"
+        f"background-position:{100*hx/max(1,w-hw)}% {100*hy/max(1,h-hh)}%"
     )
 
+    status = ""
+    if _business_read_model_ready(business_read_model):
+        status = (
+            '<details class="ref-business-operational-status">'
+            '<summary>Estado operacional B2B validado</summary>'
+            + business_read_model_html("overview", business_read_model)
+            + '</details>'
+        )
+
+    extended = (
+        '<details class="ref-business-extended"><summary>Mais funções B2B</summary>'
+        '<nav aria-label="Funções B2B atuais">'
+        + nav_html("negocios", mode)
+        + '</nav></details>'
+    )
+
+    return (
+        '<style>'
+        '.ref-negocios.ref-business-approved{--accent:#ff9d1c}'
+        '.ref-business-approved .ref-canvas{background-size:100% 100%!important;'
+        'background-position:left center!important}'
+        '.ref-business-approved .ref-business-extended,'
+        '.ref-business-approved .ref-business-operational-status{margin:8px 10px;'
+        'border:1px solid #9d562f66;border-radius:10px;background:#0c0908d9;color:#ffd9c1}'
+        '.ref-business-approved .ref-business-extended>summary,'
+        '.ref-business-approved .ref-business-operational-status>summary{padding:9px 12px;'
+        'cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.04em;color:#ffbd81}'
+        '.ref-business-approved .ref-business-extended nav{display:grid;'
+        'grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:8px}'
+        '.ref-business-approved .ref-business-extended .ref-nav-item{min-height:34px;'
+        'border:1px solid #8b4a2b55;border-radius:7px;background:#160c08;color:#ffe7d5}'
+        '.ref-business-approved .ref-business-operational-status .ref-business-read-model{'
+        'padding:8px}'
+        '@media(max-width:700px){'
+        '.ref-business-approved .ref-business-extended{display:none}'
+        '.ref-business-approved .ref-business-operational-status{margin:8px}'
+        '.ref-business-approved .ref-mobile-card{border-color:#b8663999!important;'
+        'background:#120a07!important}'
+        '.ref-business-approved .ref-mobile-card strong{color:#ffd6c0!important}'
+        '}'
+        '</style>'
+        f'<section class="ref-workspace ref-negocios ref-business-approved" '
+        f'data-workspace="negocios" data-business-contract="managed-operations-v1" '
+        f'data-approved-art-active="true" style="{settings}">'
+        + toolbar
+        + drawer
+        + f'<div class="ref-canvas" role="group" '
+        f'aria-label="Negócios · cockpit aprovado AtlasQuant">{hits}</div>'
+        + f'<div class="ref-mobile-header ref-mobile-header-negocios" '
+        f'style="{hero_style}"><span class="ref-mobile-kicker">ECOSSISTEMA ATLASQUANT</span>'
+        '<h1>ATLASQUANT · NEGÓCIOS</h1>'
+        '<p>Operação B2B, crescimento e automação com controle.</p></div>'
+        + f'<div class="ref-mobile-grid">{"".join(mobile)}</div>'
+        + extended
+        + status
+        + '<p class="ref-truth">Arte aprovada ativa · dados pintados na imagem são '
+        'ilustrativos; as rotas funcionais usam o contrato B2B atual e permanecem '
+        'sem execução automática.</p>'
+        + f'<p class="ref-truth">Sessão: {escape(name)}</p>'
+        + '</section>'
+    )
 
 def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None):
     if area not in SURFACES:
