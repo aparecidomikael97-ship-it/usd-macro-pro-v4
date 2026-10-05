@@ -60,7 +60,9 @@ def budget(**overrides):
         "transaction_id":"tx-1",
         "authority_budget_ref":"budget-1",
         "policy_digest":"budget-policy-digest",
+        "scope":dict(SCOPE),
         "grants_authority":False,
+        "execution_allowed_by_this_component":False,
         "executes_action":False,
     }
     row.update(overrides)
@@ -75,6 +77,17 @@ def review(cand, reviewer_id="guardian", reviewer_kind="GUARDIAN", **overrides):
         "decision":"SUPPORT",
         "independent":True,
         "candidate_digest":candidate_digest(cand),
+    }
+    row.update(overrides)
+    return row
+
+
+def trusted_reviewers(**overrides):
+    row = {
+        "guardian":"GUARDIAN",
+        "shadow":"SHADOW",
+        "sentinel":"SENTINEL",
+        "reviewer-human":"HUMAN_REVIEWER",
     }
     row.update(overrides)
     return row
@@ -102,7 +115,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertEqual(out["state"], "READY_FOR_DOWNSTREAM_EXECUTION_GATE")
         self.assertEqual(out["valid_reviewer_count"], 1)
         self.assertFalse(out["execution_authorized"])
@@ -121,7 +134,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=reviews,
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("HUMAN_OWNER_APPROVAL_REQUIRED", out["blockers"])
         self.assertTrue(out["quorum_never_replaces_human_owner"])
@@ -138,7 +151,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
                 review(cand, "shadow", "SHADOW"),
             ],
             human_owner_approval=owner_approval(cand),
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertEqual(out["state"], "READY_FOR_DOWNSTREAM_EXECUTION_GATE")
         self.assertTrue(out["human_owner_approval_valid"])
         self.assertFalse(out["execution_authorized"])
@@ -152,7 +165,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertIn("HUMAN_OWNER_APPROVAL_REQUIRED", out["blockers"])
         self.assertTrue(out["requires_specialized_execution_gate"])
 
@@ -169,7 +182,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
                 review(cand, "shadow", "SHADOW"),
             ],
             human_owner_approval=fake,
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         joined = " ".join(out["blockers"])
         self.assertIn("HUMAN_OWNER_AUTHORITY_CLASS_REQUIRED", joined)
         self.assertIn("HUMAN_OWNER_ID_MISMATCH", joined)
@@ -188,7 +201,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             authority_budget_guard=budget(),
             reviews=rows,
             human_owner_approval=owner_approval(cand),
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertEqual(out["valid_reviewer_count"], 1)
         self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
 
@@ -201,7 +214,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=[bad],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertEqual(out["valid_reviewer_count"], 0)
         self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
 
@@ -217,7 +230,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
                 policy_digest="other",
             ),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         joined = " ".join(out["blockers"])
         self.assertIn("AUTHORITY_BUDGET_BLOCKED", joined)
         self.assertIn("AUTHORITY_BUDGET_TRANSACTION_MISMATCH", joined)
@@ -231,7 +244,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(grants_authority=True, executes_action=True),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         joined = " ".join(out["blockers"])
         self.assertIn("AUTHORITY_BUDGET_MUST_NOT_GRANT_AUTHORITY", joined)
         self.assertIn("AUTHORITY_BUDGET_MUST_NOT_EXECUTE", joined)
@@ -247,7 +260,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         joined = " ".join(out["blockers"])
         self.assertIn("CROSS_TENANT_BLAST_RADIUS_FORBIDDEN", joined)
         self.assertIn("CROSS_WORKSPACE_BLAST_RADIUS_FORBIDDEN", joined)
@@ -260,7 +273,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         joined = " ".join(out["blockers"])
         self.assertIn("RECORD_BLAST_RADIUS_LIMIT", joined)
         self.assertIn("EXTERNAL_TARGET_BLAST_RADIUS_LIMIT", joined)
@@ -278,7 +291,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
                 review(cand, "shadow", "SHADOW"),
             ],
             human_owner_approval=owner_approval(cand),
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertIn("HIGH_RISK_MUST_BE_REVERSIBLE", out["blockers"])
 
     def test_string_booleans_do_not_pass(self):
@@ -289,7 +302,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         joined = " ".join(out["blockers"])
         self.assertIn("EXTERNAL_SIDE_EFFECT_BOOL_REQUIRED", joined)
         self.assertIn("REVERSIBLE_BOOL_REQUIRED", joined)
@@ -305,7 +318,7 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=changed,
             authority_budget_guard=budget(),
             reviews=[signed_review],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
 
     def test_policy_requires_critical_human_owner(self):
@@ -317,8 +330,120 @@ class AionBlastRadiusQuorumTests(unittest.TestCase):
             candidate=cand,
             authority_budget_guard=budget(),
             reviews=[review(cand)],
-        )
+            trusted_reviewer_assignments=trusted_reviewers(),
         self.assertIn("CRITICAL_MUST_REQUIRE_HUMAN_OWNER", out["blockers"])
+
+    def test_reviewer_must_exist_in_trusted_assignments(self):
+        cand = candidate()
+        out = evaluate_blast_radius(
+            trusted_scope=SCOPE,
+            policy=policy(),
+            candidate=cand,
+            authority_budget_guard=budget(),
+            reviews=[review(cand, "invented-reviewer", "GUARDIAN")],
+            trusted_reviewer_assignments=trusted_reviewers(),
+        )
+        self.assertEqual(out["valid_reviewer_count"], 0)
+        joined = " ".join(
+            reason
+            for row in out["reviews"]
+            for reason in row["blockers"]
+        )
+        self.assertIn("REVIEWER_NOT_IN_TRUSTED_ASSIGNMENTS", joined)
+        self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
+
+    def test_trusted_reviewer_kind_must_match_exactly(self):
+        cand = candidate()
+        out = evaluate_blast_radius(
+            trusted_scope=SCOPE,
+            policy=policy(),
+            candidate=cand,
+            authority_budget_guard=budget(),
+            reviews=[review(cand, "guardian", "SHADOW")],
+            trusted_reviewer_assignments=trusted_reviewers(),
+        )
+        self.assertEqual(out["valid_reviewer_count"], 0)
+        joined = " ".join(
+            reason
+            for row in out["reviews"]
+            for reason in row["blockers"]
+        )
+        self.assertIn("REVIEWER_TRUSTED_KIND_MISMATCH", joined)
+
+    def test_budget_guard_is_bound_to_same_scope(self):
+        cand = candidate()
+        foreign = budget(scope={**SCOPE, "tenant_id":"tenant-b"})
+        out = evaluate_blast_radius(
+            trusted_scope=SCOPE,
+            policy=policy(),
+            candidate=cand,
+            authority_budget_guard=foreign,
+            reviews=[review(cand)],
+            trusted_reviewer_assignments=trusted_reviewers(),
+        )
+        self.assertIn("AUTHORITY_BUDGET_SCOPE_MISMATCH", out["blockers"])
+
+    def test_budget_guard_cannot_authorize_execution_itself(self):
+        cand = candidate()
+        out = evaluate_blast_radius(
+            trusted_scope=SCOPE,
+            policy=policy(),
+            candidate=cand,
+            authority_budget_guard=budget(execution_allowed_by_this_component=True),
+            reviews=[review(cand)],
+            trusted_reviewer_assignments=trusted_reviewers(),
+        )
+        self.assertIn("AUTHORITY_BUDGET_MUST_NOT_AUTHORIZE_EXECUTION", out["blockers"])
+
+    def test_sensitive_action_cannot_understate_risk_to_low(self):
+        cand = candidate(
+            action="CHARGE_CUSTOMER",
+            risk_level="LOW",
+            external_side_effect=False,
+            external_targets=0,
+            financial_value_minor=0,
+        )
+        out = evaluate_blast_radius(
+            trusted_scope=SCOPE,
+            policy=policy(),
+            candidate=cand,
+            authority_budget_guard=budget(),
+            reviews=[],
+            human_owner_approval=owner_approval(cand),
+            trusted_reviewer_assignments=trusted_reviewers(),
+        )
+        self.assertIn("RISK_LEVEL_UNDERSTATED", out["blockers"])
+
+    def test_financial_impact_cannot_understate_risk_or_skip_budget(self):
+        cand = candidate(
+            risk_level="LOW",
+            external_side_effect=False,
+            external_targets=0,
+            financial_value_minor=1,
+        )
+        out = evaluate_blast_radius(
+            trusted_scope=SCOPE,
+            policy=policy(),
+            candidate=cand,
+            authority_budget_guard={},
+            reviews=[],
+            trusted_reviewer_assignments=trusted_reviewers(),
+        )
+        joined = " ".join(out["blockers"])
+        self.assertIn("RISK_LEVEL_UNDERSTATED", joined)
+        self.assertIn("AUTHORITY_BUDGET_SCHEMA_INVALID", joined)
+
+    def test_unknown_candidate_fields_are_blocked_before_digest_review(self):
+        cand = candidate(hidden_execution_payload={"do":"something"})
+        out = evaluate_blast_radius(
+            trusted_scope=SCOPE,
+            policy=policy(),
+            candidate=cand,
+            authority_budget_guard=budget(),
+            reviews=[review(cand)],
+            trusted_reviewer_assignments=trusted_reviewers(),
+        )
+        self.assertIn("CANDIDATE_UNKNOWN_FIELDS", out["blockers"])
 
     def test_contract_is_non_authoritative(self):
         contract = blast_radius_policy_contract()
