@@ -26,6 +26,7 @@ from atlasquant_aion_tenant import PERSONAL_SCOPE, tenant_memory_seed
 from atlasquant_aion_tenant_crypto import (
     SCHEMA as CRYPTO_SCHEMA,
     crypto_policy,
+    encrypt_tenant_envelope,
 )
 from atlasquant_aion_tenant_durable_store import (
     DurableTenantStore,
@@ -267,27 +268,33 @@ class TenantCryptoDurableStoreTests(unittest.TestCase):
         self.assertFalse(plan["deletion_executed"])
         self.assertFalse(plan["executes_action"])
 
-    def test_same_plaintext_rewrite_uses_fresh_nonce_and_ciphertext(self):
-        store = self.store()
-        first = store.write(
-            self.user,
-            [self.entitlement],
-            {"profile": {"display_name": "Same"}},
-            approved=True,
-            now=NOW,
+    def test_same_exact_inner_envelope_uses_fresh_nonce_and_ciphertext(self):
+        inner = {
+            "schema": "FIXED-INNER-TEST",
+            "tenant_id": self.paths["tenant_id"],
+            "workspace_id": "default",
+            "revision": "sha256:" + ("1" * 64),
+            "payload_digest": "sha256:" + ("2" * 64),
+            "memory": {"profile": {"display_name": "Same exact plaintext"}},
+        }
+        one = encrypt_tenant_envelope(
+            inner,
+            tenant_id=self.paths["tenant_id"],
+            workspace_id="default",
+            key_ref="tenant-memory-key",
+            key_version="v1",
+            key_resolver=self.ring,
         )
-        one = json.loads(Path(self.paths["memory"]).read_text(encoding="utf-8"))
-        second = store.write(
-            self.user,
-            [self.entitlement],
-            {"profile": {"display_name": "Same"}},
-            approved=True,
-            expected_revision=first["revision"],
-            now=NOW,
+        two = encrypt_tenant_envelope(
+            inner,
+            tenant_id=self.paths["tenant_id"],
+            workspace_id="default",
+            key_ref="tenant-memory-key",
+            key_version="v1",
+            key_resolver=self.ring,
         )
-        self.assertTrue(second["stored"])
-        two = json.loads(Path(self.paths["memory"]).read_text(encoding="utf-8"))
-        self.assertEqual(first["revision"], second["revision"])
+        self.assertEqual(one["revision"], two["revision"])
+        self.assertEqual(one["payload_digest"], two["payload_digest"])
         self.assertNotEqual(one["nonce"], two["nonce"])
         self.assertNotEqual(one["ciphertext"], two["ciphertext"])
 
