@@ -378,6 +378,13 @@ def _result_summary(tool_id: str, execution: Mapping[str, Any]) -> str:
     return "Consulta local executada sem efeito externo."
 
 
+
+def execute_local_tool(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Lazy compatibility proxy; imports the executor only on explicit execution."""
+    from atlasquant_aion_local_executor import execute_local_tool as _execute_local_tool
+
+    return _execute_local_tool(*args, **kwargs)
+
 def _execute_one(
     tool_id: str,
     question: Any,
@@ -391,11 +398,8 @@ def _execute_one(
     authenticated_admin: bool,
     request_id: Any,
 ) -> dict[str, Any]:
-    # The executor (and its larger runtime/memory closure) is intentionally
-    # imported only when execution is explicitly requested. Pure chat planning
-    # therefore cannot pull that side-effect-capable closure into its import path.
-    from atlasquant_aion_local_executor import execute_local_tool
-
+    # The compatibility proxy above imports the real executor only here, after
+    # the execute=True branch has been selected.
     return execute_local_tool(
         tool_id,
         arguments=_arguments_for(tool_id, question, runtime),
