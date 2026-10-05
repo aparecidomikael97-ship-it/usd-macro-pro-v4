@@ -157,6 +157,10 @@ def _receipt_blockers(
 
     if row.get("writer_identity_verified") is not False:
         blockers.append("EXECUTION_RECEIPT_PREVERIFIED_WRITER_FORBIDDEN")
+    if row.get("activation_command_generated") is not False:
+        blockers.append("EXECUTION_RECEIPT_COMMAND_GENERATED_UNSAFE")
+    if row.get("activation_command_executed") is not False:
+        blockers.append("EXECUTION_RECEIPT_COMMAND_EXECUTED_UNSAFE")
     if row.get("pilot_activation_authorized") is not False:
         blockers.append("EXECUTION_RECEIPT_AUTHORITY_UNSAFE")
     if row.get("pilot_activated") is not False:
@@ -359,7 +363,7 @@ def verify_execution_writer_attestation(
     nonce_registry: PersistentNonceRegistry,
     now_ts: str,
 ) -> dict[str, Any]:
-    """Verify writer key control and exact activation receipt binding."""
+    """Verify writer key control and exact execution receipt binding."""
     if not isinstance(request, Mapping):
         return _blocked("EXECUTION_WRITER_REQUEST_REQUIRED")
     if not isinstance(writer_trust_roots, TrustRootRegistry):
@@ -422,6 +426,8 @@ def verify_execution_writer_attestation(
     )
     for key in (
         "writer_identity_verified",
+        "activation_command_generated",
+        "activation_command_executed",
         "pilot_activation_authorized",
         "pilot_activated",
         "external_action_executed",
