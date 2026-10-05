@@ -883,6 +883,7 @@ def render_central_hub(
     timezone_name: str | None = None,
     home_claims: Mapping[str, Any] | None = None,
     defer_aion_home: bool = False,
+    aion_chat_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Mount same-session clickable reference UI after the unchanged area gate."""
     import streamlit as st
@@ -899,7 +900,15 @@ def render_central_hub(
     area = "central" if resolved.get("root") else resolved["area"]
     if area != "trader":
         from atlasquant_reference_ui import render_reference_workspace
-        render_reference_workspace(st, access, area)
+        if area == "aion" and aion_chat_binding is not None:
+            render_reference_workspace(
+                st,
+                access,
+                area,
+                aion_chat_binding=dict(aion_chat_binding),
+            )
+        else:
+            render_reference_workspace(st, access, area)
         resolved["shell"] = True
     return resolved
 

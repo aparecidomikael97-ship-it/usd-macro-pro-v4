@@ -1,0 +1,63 @@
+name: AION Core Completion Review
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_core_certification.py"
+      - "atlasquant_aion_core_completion_review.py"
+      - "atlasquant_aion_checkpoint_master.py"
+      - "atlasquant_aion_trust_root.py"
+      - "test_atlasquant_aion_v220_core_certification.py"
+      - "test_atlasquant_aion_v221_core_completion_review.py"
+      - "docs/aion/AION_V221_CORE_COMPLETION_REVIEW.md"
+      - "docs/adr/ADR-0020-core-completion-review-separate-from-freeze.md"
+      - ".github/workflows/aion-core-completion-review.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-core-completion-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  completion-review:
+    name: V2.21 certification reverification and checkpoint staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic review dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+
+      - name: Compile V2.20-V2.21 review chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_checkpoint_master.py \
+            atlasquant_aion_core_certification.py \
+            atlasquant_aion_core_completion_review.py \
+            test_atlasquant_aion_v220_core_certification.py \
+            test_atlasquant_aion_v221_core_completion_review.py
+
+      - name: Run V2.21 completion review red-team
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v221_core_completion_review.py
+
+      - name: Re-run V2.20 certification contract
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v220_core_certification.py
+
+      - name: Re-run Checkpoint Mestre safety contracts
+        run: |
+          python -m pytest -q -s \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
+            test_atlasquant_aion_core_checkpoint_bridge.py
