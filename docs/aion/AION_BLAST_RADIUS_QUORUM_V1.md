@@ -42,11 +42,39 @@ The budget itself must explicitly grant no authority and execute no action.
 
 Reviews bind the exact candidate digest plus owner/tenant/workspace.
 
+## Trusted reviewer assignments
+
+A review does not count merely because it declares `independent=true`.
+The caller must inject a trusted assignment table mapping reviewer principal id
+to reviewer kind. The review's id and kind must match that external assignment
+exactly. Self-review, duplicate principals, invented ids and role mismatch do
+not count toward quorum.
+
 Accepted reviewers are distinct and may be Guardian, Shadow, Sentinel or a
 human reviewer. A proposer cannot count its own review. Duplicate reviewer IDs
 do not increase quorum.
 
 **Quorum is advisory evidence only. It never replaces HUMAN_OWNER approval.**
+
+## Deterministic risk floor
+
+Candidate-declared risk cannot lower the minimum implied by impact:
+
+- any external side effect / external target => at least MEDIUM;
+- any non-zero financial value => at least HIGH;
+- any sensitive action => CRITICAL.
+
+Understated risk blocks the candidate rather than silently upgrading it.
+
+The candidate schema is closed. Unknown fields are blocked before review so an
+unreviewed execution payload cannot be smuggled outside the candidate digest.
+
+## Authority-budget scope binding
+
+When the cumulative authority budget is required, its result must be bound to
+the same owner/tenant/workspace, transaction id, budget ref and policy digest.
+The budget result must explicitly state that it grants no authority, authorizes
+no execution and executes no action.
 
 ## HUMAN_OWNER
 
