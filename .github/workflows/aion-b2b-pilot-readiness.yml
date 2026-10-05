@@ -102,6 +102,9 @@ on:
       - "atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py"
       - "test_atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py"
       - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_PERSISTENCE_PLAN_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_PERSISTENCE_ATTESTATION_V1.md"
       - "atlasquant_reference_ui.py"
       - "atlasquant_account_portal.py"
       - "test_atlasquant_account_portal.py"
@@ -156,7 +159,8 @@ jobs:
             atlasquant_aion_b2b_pilot_activation_execution_preflight.py \
             atlasquant_aion_b2b_pilot_activation_status_read_model.py \
             atlasquant_aion_b2b_pilot_activation_execution_ceremony.py \
-            atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py
+            atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py \
+            atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py
 
       - name: Run complete B2B contract suite
         run: |
@@ -194,6 +198,7 @@ jobs:
             test_atlasquant_aion_b2b_pilot_activation_status_ui.py \
             test_atlasquant_aion_b2b_pilot_activation_execution_ceremony.py \
             test_atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py \
             test_atlasquant_aion_b2b_pilot_planning_ui.py \
             test_atlasquant_aion_b2b_revops_ui.py
 
