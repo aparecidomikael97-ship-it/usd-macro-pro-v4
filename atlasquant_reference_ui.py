@@ -418,6 +418,12 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         if show_central else ""
     )
     mode_label = str(mode or "").strip() or "SESSÃO ATUAL"
+    drawer = (
+        '<details class="ref-drawer"><summary>Menu · Negócios</summary><nav>'
+        + nav_html("negocios", mode)
+        + ('<button data-route="central" class="ref-return">← Central</button>' if show_central else '')
+        + '</nav></details>'
+    )
     return (
         WORKSPACE_CSS
         + '<style>'
@@ -438,6 +444,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         '<section class="ref-workspace ref-negocios" data-workspace="negocios" '
         'data-business-contract="managed-operations-v1">'
         + back
+        + drawer
         + '<div class="ref-canvas aq-ws-business-canvas" role="group" aria-label="Negócios · cockpit AtlasQuant">'
         + '<section class="aq-ws-shell" data-workspace="negocios">'
         '<div class="aq-ws-top">'
