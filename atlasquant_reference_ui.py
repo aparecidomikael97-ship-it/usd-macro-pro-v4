@@ -25,10 +25,14 @@ TRADER_NAV = (("home", "Início"), ("radar", "Radar"), ("scanner", "Scanner Téc
     ("profile", "Perfil / Configurações"))
 NAV = {
  "trader": TRADER_NAV,
- "negocios": (("home", "Visão Geral"), ("opportunities", "Oportunidades"), ("sectors", "Setores"),
-    ("companies", "Empresas"), ("ma", "M&A"), ("global", "Mercado Global"), ("corporate", "Notícias Corporativas"),
-    ("results", "Calendário de Resultados"), ("flow", "Fluxo Institucional"), ("watchlist", "Lista de acompanhamento"),
-    ("reports", "Relatórios"), ("aion_specialist", "AION Negócios"), ("profile", "Configurações")),
+ "negocios": (("home", "Início"), ("overview", "Visão Geral"), ("companies", "Empresas / Clientes"),
+    ("b2b", "Automação B2B"), ("leads", "Leads"), ("revenue", "Revenue Ops"), ("crm", "CRM"),
+    ("proposals", "Propostas"), ("followup", "Follow-up"), ("saas", "Micro-SaaS"),
+    ("international", "Serviços Internacionais"), ("digital", "Produtos Digitais"),
+    ("integrations", "Integrações"), ("finops", "Financeiro / FinOps"), ("roi", "ROI"),
+    ("success", "Saúde do Cliente"), ("sla", "SLA / Suporte"), ("privacy", "Auditoria / LGPD"),
+    ("team", "Equipe & Acessos"), ("sandbox", "Demo / Sandbox"),
+    ("aion_specialist", "AION Negócios"), ("profile", "Configurações")),
  "investimentos": (("home", "Visão Geral"), ("radar", "Radar"), ("week", "Análise da Semana"),
     ("indexes", "Índices"), ("commodities", "Commodities"), ("stocks", "Ações Globais"),
     ("fixed", "Renda Fixa"), ("crypto", "Criptomoedas"), ("funds", "Fundos e ETFs"),
@@ -57,10 +61,7 @@ REGIONS = {
    ("geo", "Eventos Geopolíticos", (1006,602,257,108)), ("academy", "Academia", (448,640,105,76)),
    ("lab", "Laboratório", (559,638,117,78)), ("paper", "Paper Trading", (681,639,106,77)),
    ("guardian", "Guardião de Risco", (793,639,111,77)), ("journal", "Diário", (908,639,96,77))],
- "negocios": [("opportunities", "Oportunidades", (177,192,185,78)), ("sectors", "Setores", (368,192,190,78)),
-   ("companies", "Empresas", (564,192,190,78)), ("ma", "M&A", (177,278,185,85)),
-   ("global", "Mercado Global", (368,278,190,85)), ("corporate", "Notícias Corporativas", (564,278,190,85)),
-   ("results", "Próximos Eventos", (177,373,577,78))],
+ "negocios": [],
  "investimentos": [("stocks", "Ações Globais", (173,400,163,112)), ("fixed", "Renda Fixa", (344,400,151,112)),
    ("funds", "Fundos e ETFs", (501,400,165,112)), ("crypto", "Criptomoedas", (672,400,165,112)),
    ("portfolio", "Carteira Global", (844,400,173,112)), ("radar", "Mercados em Destaque", (173,525,282,208)),
@@ -270,6 +271,94 @@ def module_panel(area, selected, *, resident=None):
         f'<section data-tab-panel="status" hidden><p>{escape(model["state"]) if model else "Aguardando dados validados."}</p></section></main>')
 
 
+def business_reference_home_html(*, mode="Avançado", name="Usuário", show_central=True):
+    """Interactive Negócios home using the current B2B operating model.
+
+    The legacy market-research raster remains versioned as provenance, but it is
+    not used as the active Business workspace because its labels conflict with
+    the current B2B/managed-operations contract.
+    """
+    from atlasquant_ecosystem_workspace_ui import WORKSPACE_CSS, workspace_modules, workspace_spec
+
+    spec = workspace_spec("negocios")
+    module_routes = {
+        "b2b": "b2b",
+        "revenue": "revenue",
+        "saas": "saas",
+        "international": "international",
+        "digital": "digital",
+        "finops": "finops",
+        "success": "success",
+        "sla": "sla",
+        "integrations": "integrations",
+        "privacy": "privacy",
+        "team": "team",
+        "sandbox": "sandbox",
+        "aion-business": "aion_specialist",
+    }
+    nav = "".join(
+        f'<button class="ref-nav-item aq-ws-nav-button" data-route="{escape(route)}" '
+        f'aria-label="{escape(label)}">{escape(label)}</button>'
+        for route, label in NAV["negocios"]
+    )
+    cards = []
+    for item in workspace_modules("negocios"):
+        route = module_routes.get(item["id"], item["id"])
+        cards.append(
+            f'<button class="aq-ws-card aq-ws-card-button" data-route="{escape(route)}" '
+            f'aria-label="{escape(item["title"])}" data-module="{escape(item["id"])}" '
+            f'data-feature-state="{escape(item["state"])}">'
+            f'<small>{escape(item["group"])}</small>'
+            f'<h4>{escape(item["title"])}</h4>'
+            f'<p>{escape(item["summary"])}</p>'
+            f'<span class="aq-ws-state" data-state="{escape(item["state"])}">{escape(item["state"])}</span>'
+            '</button>'
+        )
+    back = (
+        '<button data-route="central" class="ref-return aq-ws-back" aria-label="Voltar à Central">← Central</button>'
+        if show_central else ""
+    )
+    mode_label = str(mode or "").strip() or "SESSÃO ATUAL"
+    return (
+        WORKSPACE_CSS
+        + '<style>'
+        '.aq-ws-nav-button{width:100%;text-align:left;background:transparent;border:1px solid transparent;'
+        'border-radius:9px;padding:6px 8px;color:#cfe0f3;font:inherit;cursor:pointer}'
+        '.aq-ws-nav-button:hover,.aq-ws-nav-button:focus-visible{border-color:rgba(73,230,178,.34);'
+        'background:rgba(73,230,178,.08);outline:none}'
+        '.aq-ws-card-button{width:100%;text-align:left;cursor:pointer;color:inherit;font:inherit}'
+        '.aq-ws-back{position:static;margin:0 0 8px;display:inline-flex}'
+        '</style>'
+        '<section class="ref-workspace ref-negocios" data-workspace="negocios" '
+        'data-business-contract="managed-operations-v1">'
+        + back
+        + '<section class="aq-ws-shell" data-workspace="negocios">'
+        '<div class="aq-ws-top">'
+        '<div class="aq-ws-brand"><span class="aq-ws-mark">A</span>'
+        '<span>ATLASQUANT · NEGÓCIOS</span></div>'
+        '<div class="aq-ws-motto">Poderoso por dentro. Simples por fora.</div></div>'
+        '<div class="aq-ws-layout">'
+        '<aside class="aq-ws-side"><div class="aq-ws-side-kicker">NEGÓCIOS</div>'
+        f'<div class="aq-ws-nav">{nav}</div></aside>'
+        '<main class="aq-ws-main">'
+        '<section class="aq-ws-hero"><div>'
+        f'<div class="aq-ws-kicker">{escape(spec["kicker"])}</div>'
+        f'<h2>{escape(spec["title"])}</h2><p>{escape(spec["hero"])}</p>'
+        '<div class="aq-ws-truth">'
+        f'<span>MODO {escape(mode_label.upper())}</span>'
+        '<span>SEM EXECUÇÃO AUTOMÁTICA</span><span>TENANT ISOLADO</span>'
+        '<span>APROVAÇÃO HUMANA PARA AÇÕES CRÍTICAS</span></div></div>'
+        '<div class="aq-ws-orb" aria-hidden="true"><b>N</b></div></section>'
+        '<div class="aq-ws-section-head"><h3>Operação & gestão</h3>'
+        '<span>B2B, receita, cliente, capacidade e governança.</span></div>'
+        f'<div class="aq-ws-modules">{"".join(cards)}</div>'
+        '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; '
+        'o workspace ativo usa o contrato B2B atual e não executa ações externas automaticamente.</p>'
+        f'<p class="ref-truth">Sessão: {escape(name)}</p>'
+        '</main></div></section></section>'
+    )
+
+
 def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
@@ -280,6 +369,8 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     if area == "aion" and not selected:
         from atlasquant_interface_final import aion_workspace_html
         return aion_workspace_html(mode=mode,name=name,show_central=show_central,nav_html=nav_html,uri=asset_uri)
+    if area == "negocios" and not selected:
+        return business_reference_home_html(mode=mode, name=name, show_central=show_central)
     filename = SURFACES[area][0]
     uri = asset_uri(filename)
     w,h = dimensions(area)
