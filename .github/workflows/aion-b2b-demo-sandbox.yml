@@ -7,7 +7,12 @@ on:
     paths:
       - "atlasquant_aion_b2b_demo_sandbox.py"
       - "test_atlasquant_aion_b2b_demo_sandbox.py"
+      - "atlasquant_aion_b2b_demo_sandbox_read_model.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox_read_model.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox_ui.py"
+      - "atlasquant_reference_ui.py"
       - "docs/aion/AION_B2B_DEMO_SANDBOX_V1.md"
+      - "docs/aion/AION_B2B_DEMO_SANDBOX_READ_MODEL_V1.md"
       - ".github/workflows/aion-b2b-demo-sandbox.yml"
 
 permissions:
@@ -23,11 +28,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile demo sandbox gate
-        run: python -m py_compile atlasquant_aion_b2b_demo_sandbox.py test_atlasquant_aion_b2b_demo_sandbox.py
+      - name: Compile demo sandbox chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_demo_sandbox.py \
+            atlasquant_aion_b2b_demo_sandbox_read_model.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_demo_sandbox.py \
+            test_atlasquant_aion_b2b_demo_sandbox_read_model.py \
+            test_atlasquant_aion_b2b_demo_sandbox_ui.py
 
       - name: Run demo sandbox tests
-        run: python -m unittest -q test_atlasquant_aion_b2b_demo_sandbox.py
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_demo_sandbox.py \
+            test_atlasquant_aion_b2b_demo_sandbox_read_model.py \
+            test_atlasquant_aion_b2b_demo_sandbox_ui.py
 
       - name: Assert no real sandbox authority
         run: |
@@ -74,4 +90,33 @@ jobs:
           )
           for marker in banned:
               assert marker not in source, marker
+
+          model = Path("atlasquant_aion_b2b_demo_sandbox_read_model.py").read_text(encoding="utf-8")
+          for marker in (
+              '"customer_identity_exposed": False',
+              '"evidence_internals_exposed": False',
+              '"credential_details_exposed": False',
+              '"provider_details_exposed": False',
+              '"sandbox_creation_control_exposed": False',
+              '"tenant_creation_control_exposed": False',
+              '"quota_control_exposed": False',
+              '"provisioning_control_exposed": False',
+              '"billing_control_exposed": False',
+              '"customer_contact_control_exposed": False',
+              '"grants_authority": False',
+              '"executes_action": False',
+          ):
+              assert marker in model, marker
+
+          ui = Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+          assert 'data-demo-sandbox-readonly="true"' in ui
+          assert "SEM INTEGRAÇÃO LIVE" in ui
+          for forbidden in (
+              ">Criar sandbox<",
+              ">Ativar sandbox<",
+              ">Provisionar<",
+              ">Cobrar<",
+              ">Contatar cliente<",
+          ):
+              assert forbidden not in ui, forbidden
           PY
