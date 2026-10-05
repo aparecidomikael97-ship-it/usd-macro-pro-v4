@@ -22,7 +22,10 @@ from typing import Any, Mapping, Sequence
 from aion_chat.models import Scope
 from aion_chat.privacy import redact
 from aion_chat.store import SQLiteChatStore
-from atlasquant_aion_cumulative_authority_budget import CumulativeAuthorityBudget
+from atlasquant_aion_cumulative_authority_budget import (
+    CAPABILITY_CLASSES,
+    CumulativeAuthorityBudget,
+)
 from atlasquant_aion_execution_outbox import ExecutionOutbox
 
 SCHEMA = "ATLASQUANT_AION_EXECUTION_SAGA_V1"
@@ -320,6 +323,8 @@ class ExecutionSagaCoordinator:
             risk = raw.get("risk_points")
             if isinstance(risk, bool) or not isinstance(risk, int) or not 1 <= risk <= 100:
                 raise ValueError("invalid saga risk_points")
+            if capability not in CAPABILITY_CLASSES:
+                raise ValueError("invalid capability_class")
             if capability == "CRITICAL":
                 raise ValueError("critical capability requires separate human-owned flow")
             reversible = raw.get("reversible") is True
@@ -355,13 +360,19 @@ class ExecutionSagaCoordinator:
             forward_risk += risk
             worst_case_risk += risk + compensation_risk
 
+        reversible_count = sum(1 for row in normalized if row["reversible"])
+        worst_case_effects = len(rows) + reversible_count
         if len(rows) > self.authority_budget.max_transaction_effects:
             raise ValueError("saga forward effect count exceeds transaction budget")
         if forward_risk > self.authority_budget.max_transaction_risk_points:
             raise ValueError("saga forward risk exceeds transaction budget")
-        # Compensation is independently re-approved, but the worst-case shape is
-        # surfaced before execution so operators can see whether rollback itself
-        # may require escalation.
+        if worst_case_effects > self.authority_budget.max_transaction_effects:
+            raise ValueError("saga rollback effect reserve exceeds transaction budget")
+        if worst_case_risk > self.authority_budget.max_transaction_risk_points:
+            raise ValueError("saga rollback risk reserve exceeds transaction budget")
+        # Compensation is independently re-approved and consumes the same budget.
+        # Reserving worst-case shape prevents starting a saga that is known to be
+        # impossible to compensate within its declared transaction envelope.
         plan = {
             "schema": SCHEMA,
             "saga_id": sid,
@@ -371,6 +382,7 @@ class ExecutionSagaCoordinator:
             "steps": normalized,
             "forward_risk_points": forward_risk,
             "worst_case_risk_points": worst_case_risk,
+            "worst_case_effects": worst_case_effects,
         }
         plan_digest = _digest(plan)
         if existing is not None:
@@ -427,6 +439,7 @@ class ExecutionSagaCoordinator:
                     "plan_digest": plan_digest,
                     "forward_risk_points": forward_risk,
                     "worst_case_risk_points": worst_case_risk,
+                    "worst_case_effects": worst_case_effects,
                 },
                 created_at=created,
             )
