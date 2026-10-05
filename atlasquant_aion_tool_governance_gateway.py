@@ -187,7 +187,9 @@ def tool_governance_gateway(
 
     if preflight.get("state") == "BLOCK":
         blockers.extend(str(x) for x in list(preflight.get("blockers") or [])[:100])
-    if preflight.get("state") not in {"READY_FOR_EXECUTOR", "REVIEW"}:
+    if preflight.get("state") == "REVIEW":
+        blockers.append("TOOL_HUB_HUMAN_REVIEW_REQUIRED")
+    elif preflight.get("state") != "READY_FOR_EXECUTOR":
         blockers.append("TOOL_HUB_PREFLIGHT_NOT_READY")
 
     tool = (
