@@ -245,6 +245,28 @@ class AionOperationalResilienceTests(unittest.TestCase):
         )
         self.assertIn("SUCCESSFUL_DRILL_COUNT_INSUFFICIENT", out["blockers"])
 
+    def test_malformed_collections_and_scope_fail_closed_without_exception(self):
+        out = evaluate_operational_resilience(
+            trusted_scope=["not", "a", "mapping"],
+            policy="not-a-policy",
+            service_observations="not-a-list",
+            backups=123,
+            recovery_drills={"not": "a-list"},
+            checked_at=CHECKED,
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertIn("TRUSTED_SCOPE_REQUIRED", out["blockers"])
+
+    def test_malformed_evidence_collections_are_explicitly_blocked(self):
+        out = evaluate(
+            service_observations="bad",
+            backups="bad",
+            recovery_drills="bad",
+        )
+        self.assertIn("SERVICE_OBSERVATIONS_COLLECTION_INVALID", out["blockers"])
+        self.assertIn("BACKUPS_COLLECTION_INVALID", out["blockers"])
+        self.assertIn("RECOVERY_DRILLS_COLLECTION_INVALID", out["blockers"])
+
     def test_runbook_is_plan_only(self):
         ready = evaluate()
         plan = disaster_recovery_runbook(ready)
