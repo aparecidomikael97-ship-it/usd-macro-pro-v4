@@ -16,7 +16,6 @@ import re
 import unicodedata
 from typing import Any, Mapping
 
-from atlasquant_aion_local_executor import execute_local_tool, local_allowlist
 from atlasquant_aion_local_synthesis import synthesize_local_tool_results
 from atlasquant_aion_local_response import compose_local_executive_response
 from atlasquant_aion_local_traceability import build_local_traceability
@@ -117,7 +116,27 @@ def _sensitive_action_requested(text: str) -> bool:
 
 
 def _catalog_map() -> dict[str, dict[str, str]]:
-    return {row["tool_id"]: dict(row) for row in local_allowlist()}
+    """Build the planning catalog without importing the executor closure."""
+    out: dict[str, dict[str, str]] = {}
+    for raw in list(default_tool_hub().get("tools") or []):
+        if not isinstance(raw, Mapping):
+            continue
+        tool_id = str(raw.get("tool_id") or "")
+        kind = str(raw.get("kind") or "")
+        if (
+            not tool_id
+            or kind not in SAFE_KINDS
+            or str(raw.get("state") or "") != "LOCAL_READY"
+            or str(raw.get("connector_id") or "")
+            or raw.get("external_side_effects") is True
+        ):
+            continue
+        out[tool_id] = {
+            "tool_id": tool_id,
+            "kind": kind,
+            "label": str(raw.get("label") or tool_id),
+        }
+    return out
 
 
 def command_catalog() -> tuple[dict[str, str], ...]:
@@ -359,6 +378,13 @@ def _result_summary(tool_id: str, execution: Mapping[str, Any]) -> str:
     return "Consulta local executada sem efeito externo."
 
 
+
+def execute_local_tool(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Lazy compatibility proxy; imports the executor only on explicit execution."""
+    from atlasquant_aion_local_executor import execute_local_tool as _execute_local_tool
+
+    return _execute_local_tool(*args, **kwargs)
+
 def _execute_one(
     tool_id: str,
     question: Any,
@@ -372,6 +398,8 @@ def _execute_one(
     authenticated_admin: bool,
     request_id: Any,
 ) -> dict[str, Any]:
+    # The compatibility proxy above imports the real executor only here, after
+    # the execute=True branch has been selected.
     return execute_local_tool(
         tool_id,
         arguments=_arguments_for(tool_id, question, runtime),

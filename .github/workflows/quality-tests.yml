@@ -126,6 +126,8 @@ jobs:
             test_atlasquant_aion_ecosystem.py \
             test_atlasquant_aion_persona_memory.py \
             test_atlasquant_aion_memory_layers.py \
+            test_atlasquant_aion_memory_governance.py \
+            test_atlasquant_aion_projection_cache_governance.py \
             test_atlasquant_content_pipeline.py \
             test_atlasquant_sales_visibility.py \
             test_atlasquant_lab_matrix.py \
@@ -254,6 +256,19 @@ jobs:
             test_atlasquant_aion_specialist_certification.py \
             test_atlasquant_aion_local_executor.py \
             test_atlasquant_aion_command_orchestrator.py \
+            test_atlasquant_aion_chat_surface.py \
+            test_atlasquant_aion_chat_resource_boundaries.py \
+            test_atlasquant_aion_chat_surface_redteam.py \
+            test_atlasquant_aion_chat_golden_path.py \
+            test_atlasquant_aion_chat_history_bridge.py \
+            test_atlasquant_aion_chat_resume_bridge.py \
+            test_atlasquant_aion_chat_product_bridge.py \
+            test_atlasquant_aion_chat_product_ui_staged.py \
+            test_atlasquant_aion_chat_host_staging.py \
+            test_atlasquant_aion_chat_staged_runtime_resilience.py \
+            test_atlasquant_aion_execution_outbox.py \
+            test_atlasquant_aion_chat_command_browser.py \
+            test_atlasquant_aion_chat_workspace_ui.py \
             test_atlasquant_aion_local_synthesis.py \
             test_atlasquant_aion_local_response.py \
             test_atlasquant_aion_local_traceability.py \
@@ -261,11 +276,14 @@ jobs:
             test_atlasquant_aion_contract_auditor.py \
             test_atlasquant_aion_durable_tasks.py \
             test_atlasquant_aion_hardening.py \
+            test_atlasquant_aion_core_hardening_v24.py \
+            test_atlasquant_aion_v26_core_health_adapter.py \
             test_atlasquant_aion_resource_bounds.py \
             test_atlasquant_aion_resource_bounds_residual.py \
             test_atlasquant_aion_convergence.py \
             test_atlasquant_aion_post_audit.py \
             test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_tool_supply_chain_security.py \
             test_atlasquant_aion_knowledge_graph.py \
             test_atlasquant_aion_evaluation_lab.py \
             test_atlasquant_aion_digital_twin.py \
@@ -302,6 +320,8 @@ jobs:
             test_atlasquant_aion_release_confidence.py \
             test_atlasquant_aion_release_layers.py \
             test_atlasquant_aion_memory.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
+            test_atlasquant_aion_v26_memory_recovery_redteam.py \
             test_atlasquant_aion_memory_reliability.py \
             test_atlasquant_aion_data_decision_fabric.py \
             test_atlasquant_aion_runtime_bootstrap.py \
@@ -427,7 +447,8 @@ jobs:
             test_atlasquant_reference_resident.py \
             test_atlasquant_runtime_consistency.py \
             test_atlasquant_reference_population.py \
-            test_atlasquant_reference_browser.py
+            test_atlasquant_reference_browser.py \
+            test_atlasquant_aion_chat_product_ui_browser_staged.py
       - name: Run AION chat and unified runtime contracts in isolated process
         run: |
           python -m pytest -q -s \
@@ -439,6 +460,33 @@ jobs:
             test_atlasquant_aion_unified_hardening_v21.py \
             test_atlasquant_aion_unified_journal_store.py \
             test_atlasquant_aion_unified_journal_store_governance.py \
-            test_atlasquant_aion_unified_mission.py
+            test_atlasquant_aion_unified_mission.py \
+            test_atlasquant_aion_unified_taskgraph.py \
+            test_atlasquant_aion_v26_evidence_wiring_status_truth.py \
+            test_atlasquant_aion_v27_durable_store_crash_isolation_redteam.py \
+            test_atlasquant_aion_v27_health_attestation_redteam.py \
+            test_atlasquant_aion_v28_system_invariants_integration_audit.py \
+            test_atlasquant_aion_v28_runtime_persistence_cas_recovery_redteam.py \
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py \
+            test_atlasquant_aion_v28_global_snapshot_consistency_redteam.py \
+            test_atlasquant_aion_v29_provenance_truth_redteam.py \
+            test_atlasquant_aion_v210_trust_root_readiness_redteam.py \
+            test_atlasquant_aion_v210_trust_readiness_independent_redteam.py \
+            test_atlasquant_aion_v211_provenance_trust_lifecycle_redteam.py \
+            test_atlasquant_aion_v212_trusted_readiness_authority_boundary_redteam.py \
+            test_atlasquant_aion_v213_real_trust_authority_redteam.py \
+            test_atlasquant_aion_v214_durable_execution_redteam.py \
+            test_atlasquant_aion_v215_capability_isolation_redteam.py \
+            test_atlasquant_aion_v216_operational_resilience_redteam.py \
+            test_atlasquant_aion_v217_multiagent_memory_governance_redteam.py \
+            test_atlasquant_aion_v218_policy_kernel_redteam.py \
+            test_atlasquant_aion_v219_provider_neutral_gateway_redteam.py \
+            test_atlasquant_aion_v220_core_certification.py \
+            test_atlasquant_aion_v221_core_completion_review.py \
+            test_atlasquant_aion_v222_core_freeze_preflight.py \
+            test_atlasquant_aion_v223_external_persistence_attestation.py \
+            test_atlasquant_aion_v224_owner_signature_ceremony.py \
+            test_atlasquant_aion_v225_explicit_owner_decision_record.py \
+            test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
           python -m pytest -q -s \
             test_atlasquant_aion_chat_browser.py
