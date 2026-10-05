@@ -265,6 +265,39 @@ def build_work_unit_economics(
     unallocated_event_ids = sorted(set(event_by_id) - set(event_to_work))
     if unallocated_event_ids:
         warnings.append("METER_EVENTS_UNALLOCATED")
+    if in_progress:
+        warnings.append("IN_PROGRESS_WORK_PRESENT")
+
+    allocated_events = [
+        event_by_id[event_id]
+        for event_id in event_to_work
+    ]
+    operating_predicted_values = [
+        _money(row.get("predicted_cost_usd")) for row in allocated_events
+    ]
+    operating_actual_values = [
+        _money(row.get("actual_cost_usd")) for row in allocated_events
+    ]
+    operating_predicted_complete = all(
+        value is not None for value in operating_predicted_values
+    )
+    operating_actual_complete = all(
+        value is not None for value in operating_actual_values
+    )
+    operating_predicted_total = (
+        round(sum(value or 0.0 for value in operating_predicted_values), 9)
+        if operating_predicted_complete
+        else None
+    )
+    operating_actual_total = (
+        round(sum(value or 0.0 for value in operating_actual_values), 9)
+        if operating_actual_complete
+        else None
+    )
+    if allocated_events and not operating_predicted_complete:
+        warnings.append("OPERATING_PREDICTED_COST_INCOMPLETE")
+    if allocated_events and not operating_actual_complete:
+        warnings.append("OPERATING_ACTUAL_COST_INCOMPLETE")
 
     allocated_completed_events = [
         event_id
@@ -324,11 +357,15 @@ def build_work_unit_economics(
         and costed_completed_count == completed_count
         and len(predicted_complete_rows) == completed_count
         and len(actual_complete_rows) == completed_count
+        and len(event_to_work) == len(event_by_id)
+        and operating_predicted_complete
+        and operating_actual_complete
+        and not in_progress
         and not unallocated_event_ids
     )
     confirmed_actual_cost_per_completed = (
-        round(actual_cost_total / completed_count, 9)
-        if fully_covered
+        round(float(operating_actual_total) / completed_count, 9)
+        if fully_covered and operating_actual_total is not None
         else None
     )
 
@@ -381,11 +418,13 @@ def build_work_unit_economics(
             "fully_covered": fully_covered,
         },
         "economics": {
-            "observed_predicted_cost_usd": predicted_cost_total,
-            "observed_actual_cost_usd": actual_cost_total,
+            "observed_completed_predicted_cost_usd": predicted_cost_total,
+            "observed_completed_actual_cost_usd": actual_cost_total,
             "observed_predicted_cost_per_costed_completed_work_usd": observed_predicted_per_costed,
             "observed_actual_cost_per_costed_completed_work_usd": observed_actual_per_costed,
-            "confirmed_actual_cost_per_completed_work_usd": confirmed_actual_cost_per_completed,
+            "observed_operating_predicted_cost_usd": operating_predicted_total,
+            "observed_operating_actual_cost_usd": operating_actual_total,
+            "confirmed_fully_loaded_actual_cost_per_completed_work_usd": confirmed_actual_cost_per_completed,
         },
         "completed_work": list(costed_completed.values()),
         "by_work_type": by_type,
