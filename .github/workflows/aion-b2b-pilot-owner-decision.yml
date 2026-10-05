@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install crypto dependency
-        run: python -m pip install --disable-pip-version-check cryptography
+        run: python -m pip install --disable-pip-version-check cryptography==50.0.2
       - name: Compile pilot owner decision chain
         run: |
           python -m py_compile \
