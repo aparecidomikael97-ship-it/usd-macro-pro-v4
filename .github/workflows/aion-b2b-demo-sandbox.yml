@@ -1,0 +1,77 @@
+name: AION B2B Demo Sandbox
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_demo_sandbox.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox.py"
+      - "docs/aion/AION_B2B_DEMO_SANDBOX_V1.md"
+      - ".github/workflows/aion-b2b-demo-sandbox.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  demo-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile demo sandbox gate
+        run: python -m py_compile atlasquant_aion_b2b_demo_sandbox.py test_atlasquant_aion_b2b_demo_sandbox.py
+
+      - name: Run demo sandbox tests
+        run: python -m unittest -q test_atlasquant_aion_b2b_demo_sandbox.py
+
+      - name: Assert no real sandbox authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("atlasquant_aion_b2b_demo_sandbox.py").read_text(encoding="utf-8")
+
+          required = (
+              '"owner_sandbox_approval_required": True',
+              '"sandbox_creation_authorized": False',
+              '"tenant_creation_authorized": False',
+              '"quota_change_authorized": False',
+              '"credential_use_authorized": False',
+              '"live_integration_authorized": False',
+              '"customer_data_use_authorized": False',
+              '"outbound_contact_authorized": False',
+              '"billing_authorized": False',
+              '"automatic_sandbox_creation": False',
+              '"automatic_billing": False',
+              '"automatic_provisioning": False',
+              '"automatic_customer_contact": False',
+              '"automatic_deploy": False',
+              '"crm_write": False',
+              '"provider_called": False',
+              '"production_mutation": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+
+          banned = (
+              "requests.",
+              "httpx.",
+              "urllib.request",
+              "subprocess.",
+              "socket.",
+              "create_tenant(",
+              "create_sandbox(",
+              "provision(",
+              "deploy_to_production(",
+              "send_email(",
+              "send_whatsapp(",
+          )
+          for marker in banned:
+              assert marker not in source, marker
+          PY
