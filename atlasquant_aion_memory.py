@@ -109,6 +109,10 @@ from atlasquant_aion_memory_layers import (
     default_memory_layers,
     normalize_memory_layers,
 )
+from atlasquant_aion_memory_governance import (
+    default_memory_governance,
+    normalize_memory_governance,
+)
 from atlasquant_aion_library_checkpoint import (
     default_library_checkpoint,
     normalize_library_checkpoint,
@@ -700,6 +704,7 @@ def default_checkpoint() -> dict[str, Any]:
         },
         "persona_memory": default_persona_memory(),
         "memory_layers": default_memory_layers(),
+        "memory_governance": default_memory_governance(),
         "studio": {
             "projects": [],
             "digest": studio_digest([]),
@@ -777,6 +782,11 @@ def ensure_operating_checkpoint(checkpoint: Mapping[str, Any] | None) -> dict[st
         payload = default_checkpoint()
     payload["persona_memory"] = normalize_persona_memory(payload.get("persona_memory"))
     payload["memory_layers"] = normalize_memory_layers(payload.get("memory_layers"))
+    payload["memory_governance"] = normalize_memory_governance(
+        payload.get("memory_governance")
+        if isinstance(payload.get("memory_governance"), Mapping)
+        else {}
+    )
 
     raw_foundation = payload.get("approved_foundation")
     preserved_foundation = [
@@ -2677,6 +2687,19 @@ def checkpoint_integrity_report(
         memory_layers_raw.get("digest"),
         memory_layers_state.get("digest"),
     )
+
+    if "memory_governance" in raw:
+        memory_governance_raw = (
+            raw.get("memory_governance")
+            if isinstance(raw.get("memory_governance"), Mapping)
+            else {}
+        )
+        memory_governance_state = normalize_memory_governance(memory_governance_raw)
+        add_check(
+            "memory_governance",
+            memory_governance_raw.get("digest"),
+            memory_governance_state.get("digest"),
+        )
 
     quarantine_integrity = _aion_memory_quarantine_integrity(raw)
     if quarantine_integrity["state"] != "ABSENT":
