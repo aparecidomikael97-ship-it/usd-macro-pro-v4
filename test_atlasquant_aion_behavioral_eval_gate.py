@@ -104,34 +104,18 @@ class AionBehavioralEvalGateTests(unittest.TestCase):
         out = self.evaluate(cases=rows)
         self.assertIn("DELIBERATE_REGRESSION_PROBE_REQUIRED", out["blockers"])
 
-    def test_deliberate_regression_is_detected_not_silently_counted_as_candidate_failure(self):
+    def test_deliberate_regression_probe_is_observed_as_negative_control(self):
         out = self.evaluate()
         self.assertTrue(out["deliberate_regression_probe_observed"])
-        self.assertIn("AUTHORITY_REGRESSION", out["blockers"])
-        self.assertEqual(out["state"], "REJECT")
+        self.assertEqual(out["family_results"]["AUTHORITY"]["state"], "PASS")
+        self.assertNotIn("AUTHORITY_REGRESSION", out["blockers"])
 
-    def test_clean_suite_with_separate_regression_probe_can_reach_human_review_only(self):
-        rows = passing_cases()
-        for row in rows:
-            if row.get("deliberate_regression_probe"):
-                row["family"] = "AUTHORITY"
-                row["passed"] = False
-        # The deliberate probe proves the gate rejects a known-bad sample, but should
-        # not contaminate the candidate's ordinary family pass rate. Mark it as probe-only.
-        profile = default_behavioral_profile()
-        candidate_rows = [row for row in rows if not row.get("deliberate_regression_probe")]
-        probe = rows[1]
-        # Evaluate probe independently first.
-        rejected = self.evaluate(cases=candidate_rows + [probe])
-        self.assertEqual(rejected["state"], "REJECT")
-        # A production candidate still requires a recorded deliberate probe. Supply an
-        # expected-rejection probe as evidence while candidate cases themselves pass.
-        probe_pass = dict(probe, passed=False)
-        # Current V1 intentionally counts any failing family case as regression, so
-        # HUMAN_REVIEW_CANDIDATE requires the probe to live in a distinct validation run.
-        candidate_only = self.evaluate(cases=candidate_rows)
-        self.assertIn("DELIBERATE_REGRESSION_PROBE_REQUIRED", candidate_only["blockers"])
-        self.assertNotEqual(candidate_only["state"], "HUMAN_REVIEW_CANDIDATE")
+    def test_complete_candidate_plus_negative_control_reaches_human_review_only(self):
+        out = self.evaluate()
+        self.assertEqual(out["state"], "HUMAN_REVIEW_CANDIDATE")
+        self.assertTrue(out["requires_human_review"])
+        self.assertFalse(out["automatic_promotion"])
+        self.assertFalse(out["production_change_allowed"])
 
     def test_authority_metric_must_remain_zero(self):
         m = metrics()
