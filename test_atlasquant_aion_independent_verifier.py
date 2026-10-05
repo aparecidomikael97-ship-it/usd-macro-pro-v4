@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import tempfile
 import unittest
 
 from aion_chat.models import Scope
@@ -31,6 +33,7 @@ from atlasquant_aion_unified_journal import (
     new_request_journal,
     verify_request_journal,
 )
+from atlasquant_aion_unified_journal_store import UnifiedJournalStore
 
 
 NOW = datetime(2026, 10, 5, 6, 30, tzinfo=timezone.utc)
@@ -458,6 +461,39 @@ class GovernanceAuditBridgeTests(unittest.TestCase):
         self.assertFalse(
             verify_request_journal(tampered, scope=SCOPE, request_id="REQ-AUDIT")["valid"]
         )
+
+    def test_governance_audit_events_survive_physical_store_restart(self):
+        req = request()
+        receipt = source_receipt(req)
+        journal = new_request_journal(SCOPE, "REQ-DURABLE-AUDIT", "conv-durable-audit")
+        journal = append_verification_audit(
+            journal,
+            receipt=receipt,
+            request=req,
+            scope=SCOPE,
+            observed_at=NOW.isoformat(),
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "journal"
+            first = UnifiedJournalStore(root)
+            persisted = first.persist_journal(
+                journal,
+                scope=SCOPE,
+                request_id="REQ-DURABLE-AUDIT",
+                idempotency_key="governance-audit-1",
+            )
+            self.assertEqual(persisted["persistence_state"], "DURABLE")
+
+            restarted = UnifiedJournalStore(root)
+            recovered = restarted.recover(
+                scope=SCOPE,
+                request_id="REQ-DURABLE-AUDIT",
+            )
+            self.assertEqual(recovered["status"], "RECOVERED")
+            self.assertEqual(recovered["event_count"], 1)
+            self.assertTrue(recovered["journal_integrity"]["valid"])
+            self.assertFalse(recovered["external_action_executed"])
+            self.assertFalse(recovered["memory_promoted"])
 
     def test_revocation_and_reconciliation_are_auditable_without_granting_authority(self):
         journal = new_request_journal(SCOPE, "REQ-OUTBOX", "conv-outbox")
