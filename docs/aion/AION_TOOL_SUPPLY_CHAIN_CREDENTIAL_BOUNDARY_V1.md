@@ -40,13 +40,20 @@ Runtime insertion of an unknown tool produces
 The registry includes one deliberately **DISABLED** staging-only external
 contract, `aion.staging.credential_probe`.
 
-It exists to exercise supply-chain, Vault, proxy and SSRF tests. The default
-Tool Hub cannot execute it:
+It exists only to exercise supply-chain, Vault, proxy and SSRF tests. It is
+**not persisted in the default Tool Hub at all**. That preserves historical
+Checkpoint Mestre digests and also means the normal AION runtime cannot discover
+or plan this probe as a tool.
 
-- state = `DISABLED`;
-- connector is not activated;
+- its reviewed fixture state is `DISABLED`;
+- it is absent from the default runtime Tool Hub;
+- no connector is activated;
 - no handler is added to the local executor;
 - no network client exists in the proxy/sandbox modules.
+
+Supply-chain metadata is a security overlay derived during preflight. The
+persisted Tool Hub keeps its compact legacy shape, so older checkpoint digests
+remain valid while execution still sees owner/version/schema/hash/sandbox pins.
 
 ## Vault least privilege
 
