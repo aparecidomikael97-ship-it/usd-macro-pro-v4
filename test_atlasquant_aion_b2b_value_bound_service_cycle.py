@@ -48,6 +48,8 @@ def service(**overrides):
         "pilot_id": "pilot-a",
         "package": "PROFISSIONAL",
         "value_bound_conversion_digest": "sha256:value-bound",
+        "source_value_decision": "EXPANSION_REVIEW_CANDIDATE",
+        "source_conversion_decision": "EXPANSION_COMMERCIAL_REVIEW_CANDIDATE",
         "automatic_activation": False,
         "automatic_contract_signature": False,
         "automatic_billing": False,
@@ -177,6 +179,14 @@ class ValueBoundServiceCycleTests(unittest.TestCase):
         self.assertTrue(out["requires_customer_safe_projection"])
         self.assertFalse(out["automatic_renewal"])
         self.assertFalse(out["automatic_expansion"])
+        self.assertEqual(
+            out["source_conversion_decision"],
+            "EXPANSION_COMMERCIAL_REVIEW_CANDIDATE",
+        )
+        self.assertEqual(
+            out["source_value_decision"],
+            "EXPANSION_REVIEW_CANDIDATE",
+        )
 
     def test_quota_overage_is_capacity_review_not_auto_increase(self):
         out = evaluate(
