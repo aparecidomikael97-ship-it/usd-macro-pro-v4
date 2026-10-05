@@ -188,7 +188,7 @@ def test_master_first_fold_and_radar_truth():
 @pytest.mark.parametrize(
     ("area","selected","expected"),
     [
-        ("negocios","opportunities",("ESCOPO B2B","Workspace isolado por empresa","AÇÃO EXTERNA")),
+        ("negocios","companies",("ESCOPO B2B","Workspace isolado por empresa","AÇÃO EXTERNA")),
         ("investimentos","stocks",("ESCOPO","Leitura e comparação de investimentos","EXECUÇÃO")),
         ("aion","models",("NÚCLEO","Um único AION Core compartilhado","AUTORIDADE")),
     ],
@@ -207,9 +207,38 @@ def test_mobile_hero_has_environment_identity(area):
     if area == "aion":
         assert "final-aion-banner" in html and "Um único AION Core" in html
         assert html.count("data-internal-role=") == 8
+    elif area == "negocios":
+        assert 'class="aq-ws-shell"' in html
+        assert 'data-business-contract="managed-operations-v1"' in html
+        assert "ATLASQUANT · NEGÓCIOS" in html
+        assert "Poderoso por dentro. Simples por fora." in html
     else:
         assert f"ref-mobile-header-{area}" in html
         assert "ECOSSISTEMA ATLASQUANT" in html
+
+def test_business_reference_home_uses_current_b2b_contract_and_no_legacy_market_scope():
+    html=reference_html("negocios",mode="Avançado",name="Admin")
+    expected=(
+        "Empresas / Clientes","Automação B2B","Leads","Revenue Ops","CRM","Propostas","Follow-up",
+        "Micro-SaaS","Serviços Internacionais","Produtos Digitais","Integrações",
+        "Financeiro / FinOps","ROI","Saúde do Cliente","SLA / Suporte","Auditoria / LGPD",
+        "Equipe &amp; Acessos","Demo / Sandbox","AION Negócios",
+    )
+    for label in expected:
+        assert label in html
+    for legacy in (
+        "Oportunidades","Setores","M&amp;A","Mercado Global","Notícias Corporativas",
+        "Fluxo Institucional","Calendário de Resultados",
+    ):
+        assert legacy not in html
+    routes=dict(NAV["negocios"])
+    assert "b2b" in routes and "finops" in routes and "success" in routes and "sla" in routes
+    assert "ma" not in routes and "sectors" not in routes and "global" not in routes
+    assert 'data-route="b2b"' in html
+    assert 'data-route="finops"' in html
+    assert 'data-route="success"' in html
+    assert 'data-route="sla"' in html
+
 
 def test_compact_trader_preserves_routes_and_uses_readable_native_labels():
     html=reference_html("trader")
