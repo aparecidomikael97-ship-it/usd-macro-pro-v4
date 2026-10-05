@@ -169,6 +169,8 @@ def _validate_outcome(
         blockers.append("OUTCOME_HEALTH_OWNER_REVIEW_BOUNDARY_MISSING")
     if row.get("blockers"):
         blockers.append("OUTCOME_HEALTH_HAS_BLOCKERS")
+    if not _text(row.get("evidence_digest"), 180):
+        blockers.append("OUTCOME_HEALTH_EVIDENCE_DIGEST_REQUIRED")
 
     for key in (
         "automatic_renewal",
@@ -225,6 +227,10 @@ def _quick_win_progress(
             blockers.append("QUICK_WIN_ID_INVALID_OR_DUPLICATE")
             continue
         supplied[quick_win] = raw
+
+    for supplied_quick_win in supplied:
+        if supplied_quick_win not in expected:
+            blockers.append("QUICK_WIN_NOT_IN_CONTRACT:" + supplied_quick_win)
 
     progress: list[dict[str, Any]] = []
     valid = 0
@@ -298,6 +304,7 @@ def _value_trend(
             blockers.append("VALUE_CHECKPOINT_INVALID")
             continue
         period_id = _text(raw.get("period_id"), 100)
+        sequence = raw.get("sequence")
         source_ref = _text(raw.get("source_ref"), 320)
         savings = _number(raw.get("observed_savings_brl"))
         roi = _number(raw.get("observed_roi_pct"))
@@ -305,6 +312,9 @@ def _value_trend(
         if (
             not period_id
             or period_id in seen
+            or isinstance(sequence, bool)
+            or not isinstance(sequence, int)
+            or sequence < 1
             or not source_ref
             or savings is None
             or roi is None
@@ -312,16 +322,22 @@ def _value_trend(
         ):
             blockers.append("VALUE_CHECKPOINT_INVALID")
             continue
+        if any(item["sequence"] == sequence for item in rows):
+            blockers.append("VALUE_CHECKPOINT_SEQUENCE_DUPLICATE")
+            continue
         seen.add(period_id)
         rows.append(
             {
                 "period_id": period_id,
+                "sequence": sequence,
                 "observed_savings_brl": round(savings, 2),
                 "observed_roi_pct": round(roi, 2),
                 "health_score": round(health, 2),
                 "source_ref": source_ref,
             }
         )
+
+    rows.sort(key=lambda item: item["sequence"])
 
     if len(rows) < MIN_VALUE_CHECKPOINTS:
         return "INSUFFICIENT", rows, list(dict.fromkeys(blockers))
