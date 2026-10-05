@@ -504,6 +504,18 @@ def verify_pilot_owner_decision_persistence(
 
     attestation_material = {
         "decision": decision,
+        "scope": {
+            "owner_id": _text(persisted_record.get("owner_id"), 120),
+            "tenant_id": _text(persisted_record.get("tenant_id"), 120),
+            "workspace_id": _text(persisted_record.get("workspace_id"), 120),
+        },
+        "candidate_id": _text(persisted_record.get("candidate_id"), 120),
+        "proposal_id": _text(persisted_record.get("proposal_id"), 120),
+        "packet_digest": _text(persisted_record.get("packet_digest"), 180),
+        "decision_request_digest": _text(
+            persisted_record.get("decision_request_digest"),
+            180,
+        ),
         "pilot_id": plan["pilot_id"],
         "decision_record_digest": plan["decision_record_digest"],
         "patch_digest": patch["patch_digest"],
@@ -524,6 +536,18 @@ def verify_pilot_owner_decision_persistence(
         ),
         "blockers": [],
         "decision": decision,
+        "scope": {
+            "owner_id": _text(persisted_record.get("owner_id"), 120),
+            "tenant_id": _text(persisted_record.get("tenant_id"), 120),
+            "workspace_id": _text(persisted_record.get("workspace_id"), 120),
+        },
+        "candidate_id": _text(persisted_record.get("candidate_id"), 120),
+        "proposal_id": _text(persisted_record.get("proposal_id"), 120),
+        "packet_digest": _text(persisted_record.get("packet_digest"), 180),
+        "decision_request_digest": _text(
+            persisted_record.get("decision_request_digest"),
+            180,
+        ),
         "pilot_id": plan["pilot_id"],
         "decision_record_digest": plan["decision_record_digest"],
         "checkpoint_revision": observed["revision"],
