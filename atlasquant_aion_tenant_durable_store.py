@@ -9,7 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 import hashlib
 import json
 import os
@@ -17,6 +17,12 @@ import re
 import tempfile
 
 from atlasquant_aion_tenant import tenant_namespace
+from atlasquant_aion_tenant_crypto import (
+    TenantCryptoError,
+    decrypt_tenant_envelope,
+    encrypt_tenant_envelope,
+    is_encrypted_envelope,
+)
 from atlasquant_aion_tenant_store import (
     MAX_TENANT_MEMORY_BYTES,
     accept_loaded_memory,
@@ -29,7 +35,7 @@ SCHEMA = "ATLASQUANT_AION_TENANT_DURABLE_STORE_V1"
 ENVELOPE_SCHEMA = "ATLASQUANT_AION_TENANT_DURABLE_ENVELOPE_V1"
 ACL_SCHEMA = "ATLASQUANT_AION_TENANT_ACL_V1"
 IDENTITY_SCHEMA = "ATLASQUANT_AION_TENANT_IDENTITY_V1"
-MAX_ENVELOPE_BYTES = MAX_TENANT_MEMORY_BYTES + 64_000
+MAX_ENVELOPE_BYTES = (MAX_TENANT_MEMORY_BYTES * 2) + 128_000
 _WORKSPACE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
@@ -244,11 +250,72 @@ def _verify_envelope(
 
 
 class DurableTenantStore:
-    def __init__(self, root: str | os.PathLike[str]):
+    def __init__(
+        self,
+        root: str | os.PathLike[str],
+        *,
+        key_resolver: Callable[[Mapping[str, str]], Mapping[str, Any]] | None = None,
+        key_ref: Any = "",
+        key_version: Any = "",
+        require_encryption: bool = False,
+    ):
         self.root = _safe_root(root)
+        self.key_resolver = key_resolver
+        self.key_ref = str(key_ref or "").strip()
+        self.key_version = str(key_version or "").strip()
+        self.require_encryption = require_encryption is True
+        if self.require_encryption and not callable(self.key_resolver):
+            raise ValueError("encryption-required store needs injected key resolver")
+        if callable(self.key_resolver) and (not self.key_ref or not self.key_version):
+            raise ValueError("encrypted store needs opaque key_ref and key_version")
+
+    @property
+    def encryption_enabled(self) -> bool:
+        return callable(self.key_resolver)
 
     def _paths(self, access: Mapping[str, Any] | None, workspace_id: Any) -> dict[str, Any]:
         return tenant_workspace_paths(access, self.root, workspace_id=workspace_id)
+
+    def _decode_storage_envelope(
+        self,
+        raw: Mapping[str, Any],
+        paths: Mapping[str, Any],
+    ) -> tuple[dict[str, Any] | None, str, bool]:
+        if is_encrypted_envelope(raw):
+            if not callable(self.key_resolver):
+                return None, "KEY_RESOLVER_REQUIRED", True
+            try:
+                inner = decrypt_tenant_envelope(
+                    raw,
+                    tenant_id=paths["tenant_id"],
+                    workspace_id=paths["workspace_id"],
+                    key_resolver=self.key_resolver,
+                )
+            except TenantCryptoError as exc:
+                return None, exc.reason, True
+            return inner, "OK", True
+        if self.require_encryption:
+            return None, "ENCRYPTION_REQUIRED", False
+        return dict(raw), "OK", False
+
+    def _encode_storage_envelope(
+        self,
+        inner: Mapping[str, Any],
+        paths: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], bool]:
+        if not self.encryption_enabled:
+            if self.require_encryption:
+                raise TenantCryptoError("KEY_RESOLVER_REQUIRED")
+            return dict(inner), False
+        encrypted = encrypt_tenant_envelope(
+            inner,
+            tenant_id=paths["tenant_id"],
+            workspace_id=paths["workspace_id"],
+            key_ref=self.key_ref,
+            key_version=self.key_version,
+            key_resolver=self.key_resolver,
+        )
+        return encrypted, True
 
     def _ensure_identity_acl(
         self,
@@ -320,7 +387,13 @@ class DurableTenantStore:
         memory_path = Path(paths["memory"])
         current_revision = ""
         if memory_path.exists():
-            current = _load_json(memory_path)
+            stored_current = _load_json(memory_path)
+            current, crypto_reason, _ = self._decode_storage_envelope(
+                stored_current,
+                paths,
+            )
+            if current is None:
+                return {"stored": False, "reason": crypto_reason, "revision": ""}
             valid, verify_reason = _verify_envelope(
                 current,
                 tenant_id=paths["tenant_id"],
@@ -347,7 +420,11 @@ class DurableTenantStore:
             tenant_id=paths["tenant_id"],
             workspace_id=paths["workspace_id"],
         )
-        _atomic_json_write(memory_path, envelope)
+        try:
+            stored_envelope, encrypted = self._encode_storage_envelope(envelope, paths)
+        except TenantCryptoError as exc:
+            return {"stored": False, "reason": exc.reason, "revision": ""}
+        _atomic_json_write(memory_path, stored_envelope)
         _append_audit(Path(paths["audit"]), {
             "schema": SCHEMA,
             "event": "WRITE",
@@ -357,6 +434,9 @@ class DurableTenantStore:
             "principal_id": _principal_id(access),
             "revision": envelope["revision"],
             "payload_digest": envelope["payload_digest"],
+            "encrypted_at_rest": encrypted,
+            "key_ref": self.key_ref if encrypted else "",
+            "key_version": self.key_version if encrypted else "",
         })
         return {
             "stored": True,
@@ -365,6 +445,10 @@ class DurableTenantStore:
             "payload_digest": envelope["payload_digest"],
             "tenant_id": paths["tenant_id"],
             "workspace_id": paths["workspace_id"],
+            "encrypted_at_rest": encrypted,
+            "key_ref": self.key_ref if encrypted else "",
+            "key_version": self.key_version if encrypted else "",
+            "key_material_serialized": False,
             "network_io": False,
             "production_activated": False,
         }
@@ -395,7 +479,13 @@ class DurableTenantStore:
             action="READ",
         ):
             return {"loaded": False, "reason": "ACL_READ_DENIED", "memory": None}
-        envelope = _load_json(memory_path)
+        stored_envelope = _load_json(memory_path)
+        envelope, crypto_reason, encrypted = self._decode_storage_envelope(
+            stored_envelope,
+            paths,
+        )
+        if envelope is None:
+            return {"loaded": False, "reason": crypto_reason, "memory": None}
         valid, verify_reason = _verify_envelope(
             envelope,
             tenant_id=paths["tenant_id"],
@@ -419,6 +509,10 @@ class DurableTenantStore:
             "payload_digest": envelope["payload_digest"],
             "tenant_id": paths["tenant_id"],
             "workspace_id": paths["workspace_id"],
+            "encrypted_at_rest": encrypted,
+            "key_ref": str(stored_envelope.get("key_ref") or "") if encrypted else "",
+            "key_version": str(stored_envelope.get("key_version") or "") if encrypted else "",
+            "key_material_serialized": False,
             "network_io": False,
         }
 
@@ -451,11 +545,24 @@ class DurableTenantStore:
             action="BACKUP",
         ):
             return {"backed_up": False, "reason": "ACL_BACKUP_DENIED"}
-        envelope = _load_json(Path(paths["memory"]))
+        stored_envelope = _load_json(Path(paths["memory"]))
+        envelope, crypto_reason, encrypted = self._decode_storage_envelope(
+            stored_envelope,
+            paths,
+        )
+        if envelope is None:
+            return {"backed_up": False, "reason": crypto_reason}
+        valid, verify_reason = _verify_envelope(
+            envelope,
+            tenant_id=paths["tenant_id"],
+            workspace_id=paths["workspace_id"],
+        )
+        if not valid:
+            return {"backed_up": False, "reason": verify_reason}
         backup_path = Path(paths["backups"]) / (
             loaded["revision"].replace("sha256:", "") + ".json"
         )
-        _atomic_json_write(backup_path, envelope)
+        _atomic_json_write(backup_path, stored_envelope)
         _append_audit(Path(paths["audit"]), {
             "schema": SCHEMA,
             "event": "BACKUP",
@@ -464,12 +571,19 @@ class DurableTenantStore:
             "workspace_id": paths["workspace_id"],
             "principal_id": _principal_id(access),
             "revision": loaded["revision"],
+            "encrypted_at_rest": encrypted,
+            "key_ref": str(stored_envelope.get("key_ref") or "") if encrypted else "",
+            "key_version": str(stored_envelope.get("key_version") or "") if encrypted else "",
         })
         return {
             "backed_up": True,
             "reason": "BACKUP_CREATED",
             "revision": loaded["revision"],
             "backup_path": str(backup_path),
+            "encrypted_at_rest": encrypted,
+            "key_ref": str(stored_envelope.get("key_ref") or "") if encrypted else "",
+            "key_version": str(stored_envelope.get("key_version") or "") if encrypted else "",
+            "key_material_serialized": False,
             "network_io": False,
         }
 
@@ -507,7 +621,13 @@ class DurableTenantStore:
         )
         if not backup_path.exists():
             return {"restored": False, "reason": "BACKUP_NOT_FOUND"}
-        envelope = _load_json(backup_path)
+        stored_backup = _load_json(backup_path)
+        envelope, crypto_reason, backup_encrypted = self._decode_storage_envelope(
+            stored_backup,
+            paths,
+        )
+        if envelope is None:
+            return {"restored": False, "reason": crypto_reason}
         valid, verify_reason = _verify_envelope(
             envelope,
             tenant_id=paths["tenant_id"],
@@ -547,7 +667,92 @@ class DurableTenantStore:
             "reason": "RESTORED",
             "revision": result["revision"],
             "source_backup_revision": revision,
+            "source_backup_encrypted": backup_encrypted,
+            "encrypted_at_rest": result.get("encrypted_at_rest") is True,
+            "key_ref": result.get("key_ref", ""),
+            "key_version": result.get("key_version", ""),
             "network_io": False,
+        }
+
+    def rotate_encryption_key(
+        self,
+        access: Mapping[str, Any] | None,
+        entitlements: Sequence[Mapping[str, Any]] | None,
+        *,
+        workspace_id: Any = "default",
+        approved: bool = False,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if approved is not True:
+            return {"rotated": False, "reason": "EXPLICIT_KEY_ROTATION_APPROVAL_REQUIRED"}
+        if not self.encryption_enabled:
+            return {"rotated": False, "reason": "KEY_RESOLVER_REQUIRED"}
+        loaded = self.read(
+            access,
+            entitlements,
+            workspace_id=workspace_id,
+            now=now,
+        )
+        if not loaded.get("loaded"):
+            return {"rotated": False, "reason": loaded.get("reason", "LOAD_FAILED")}
+        paths = self._paths(access, workspace_id)
+        stored = _load_json(Path(paths["memory"]))
+        if not is_encrypted_envelope(stored):
+            if self.require_encryption:
+                return {"rotated": False, "reason": "ENCRYPTION_REQUIRED"}
+            prior_ref = ""
+            prior_version = ""
+        else:
+            prior_ref = str(stored.get("key_ref") or "")
+            prior_version = str(stored.get("key_version") or "")
+        if prior_ref == self.key_ref and prior_version == self.key_version:
+            return {
+                "rotated": False,
+                "reason": "KEY_ALREADY_CURRENT",
+                "revision": loaded["revision"],
+                "key_ref": self.key_ref,
+                "key_version": self.key_version,
+            }
+        result = self.write(
+            access,
+            entitlements,
+            loaded["memory"],
+            workspace_id=workspace_id,
+            approved=True,
+            expected_revision=loaded["revision"],
+            now=now,
+        )
+        if not result.get("stored"):
+            return {
+                "rotated": False,
+                "reason": result.get("reason", "WRITE_FAILED"),
+                "revision": result.get("revision", ""),
+            }
+        _append_audit(Path(paths["audit"]), {
+            "schema": SCHEMA,
+            "event": "KEY_ROTATION",
+            "at": _now(),
+            "tenant_id": paths["tenant_id"],
+            "workspace_id": paths["workspace_id"],
+            "principal_id": _principal_id(access),
+            "revision": result["revision"],
+            "previous_key_ref": prior_ref,
+            "previous_key_version": prior_version,
+            "key_ref": self.key_ref,
+            "key_version": self.key_version,
+            "key_material_serialized": False,
+        })
+        return {
+            "rotated": True,
+            "reason": "KEY_ROTATED",
+            "revision": result["revision"],
+            "previous_key_ref": prior_ref,
+            "previous_key_version": prior_version,
+            "key_ref": self.key_ref,
+            "key_version": self.key_version,
+            "key_material_serialized": False,
+            "network_io": False,
+            "production_activated": False,
         }
 
 
@@ -562,6 +767,12 @@ def durable_store_policy() -> dict[str, Any]:
         "optimistic_concurrency": True,
         "backup_restore_implemented": True,
         "audit_log_implemented": True,
+        "aes256_gcm_supported": True,
+        "tenant_workspace_aad_binding": True,
+        "key_material_serialized": False,
+        "encryption_required_for_production": True,
+        "legacy_plaintext_compatibility_default": True,
+        "automatic_key_deletion": False,
         "cross_tenant_default": "DENY",
         "explicit_write_approval_required": True,
         "explicit_backup_restore_approval_required": True,

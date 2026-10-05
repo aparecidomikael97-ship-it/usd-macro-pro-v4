@@ -395,6 +395,92 @@ class AtlasQuantAionMasterStatusBoardTests(unittest.TestCase):
 
 
 
+    def test_aion_core_health_stays_unknown_without_explicit_evidence(self):
+        board=self.base()
+        snap=board["aion_core_health"]
+        item=self.by_id(board,"aion_core_health")
+        self.assertEqual(snap["integrity_state"],"UNKNOWN")
+        self.assertEqual(item["state"],"UNKNOWN")
+        self.assertFalse(snap["external_action_executed"])
+        self.assertFalse(snap["execution_allowed"])
+        self.assertFalse(snap["executes_provider_call"])
+        self.assertFalse(snap["executes_billing"])
+        self.assertFalse(snap["real_orders_enabled"])
+
+    def test_aion_core_health_confirms_only_from_explicit_good_subsystems(self):
+        board=self.base(system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "aion_core_health":{
+                "core_version":"2.4",
+                "schema_version":"V22",
+                "journal_status":"VALID",
+                "checkpoint_status":"VALIDATED",
+                "recovery_status":"RECOVERED",
+                "memory_status":"HEALTHY",
+                "audit_chain_status":"VERIFIED",
+                "pending_missions":2,
+                "blocked_missions":0,
+                "waiting_approval":0,
+                "ready_handoffs":1,
+            },
+        })
+        snap=board["aion_core_health"]
+        item=self.by_id(board,"aion_core_health")
+        self.assertEqual(snap["integrity_state"],"OK")
+        self.assertEqual(item["state"],"CONFIRMED")
+        self.assertIn("journal=VALID",item["detail"])
+        self.assertIn("pendentes=2",item["detail"])
+        self.assertFalse(board["automatic_external_actions"])
+
+    def test_aion_core_health_integrity_ok_still_blocks_on_pending_approval(self):
+        board=self.base(system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "aion_core_health":{
+                "core_version":"2.4",
+                "schema_version":"V22",
+                "journal_status":"VALID",
+                "checkpoint_status":"VALIDATED",
+                "recovery_status":"RECOVERED",
+                "memory_status":"HEALTHY",
+                "audit_chain_status":"VERIFIED",
+                "blocked_missions":0,
+                "waiting_approval":1,
+            },
+        })
+        snap=board["aion_core_health"]
+        item=self.by_id(board,"aion_core_health")
+        self.assertEqual(snap["integrity_state"],"OK")
+        self.assertEqual(item["state"],"BLOCKED")
+        self.assertIn("aprovações pendentes",item["next_action"])
+        self.assertFalse(snap["execution_allowed"])
+        self.assertFalse(board["automatic_external_actions"])
+
+    def test_aion_core_health_tamper_is_blocked_without_repair_or_execution(self):
+        board=self.base(system_context={
+            "truth_state":"CONFIRMED",
+            "source_build":"abc123",
+            "aion_core_health":{
+                "core_version":"2.4",
+                "schema_version":"V22",
+                "journal_status":"TAMPER_DETECTED",
+                "checkpoint_status":"VALID",
+                "recovery_status":"RECOVERED",
+                "memory_status":"VALIDATED",
+                "audit_chain_status":"MISMATCH",
+                "blocked_missions":1,
+            },
+        })
+        snap=board["aion_core_health"]
+        item=self.by_id(board,"aion_core_health")
+        self.assertEqual(snap["integrity_state"],"DEGRADED")
+        self.assertEqual(item["state"],"BLOCKED")
+        self.assertIn("não repara nem executa",item["next_action"])
+        self.assertFalse(snap["external_action_executed"])
+        self.assertFalse(snap["execution_allowed"])
+        self.assertFalse(board["real_orders_enabled"])
+
     def test_cost_center_is_unknown_without_explicit_cost_evidence(self):
         board=self.base()
         center=board["cost_center"]

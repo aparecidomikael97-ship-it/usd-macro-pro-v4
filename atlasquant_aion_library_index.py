@@ -126,7 +126,12 @@ def index_document(
         }
 
     docs=[dict(x) for x in list(base.get("documents") or []) if isinstance(x,Mapping)]
-    existing=[x for x in docs if x.get("document_id")==row.get("document_id")]
+    existing=[
+        x for x in docs
+        if x.get("document_id")==row.get("document_id")
+        and x.get("tenant_id")==tenant
+        and x.get("workspace_id")==workspace
+    ]
     doc_entry={
         "document_id": row.get("document_id"),
         "tenant_id": tenant,
@@ -151,13 +156,27 @@ def index_document(
         "executes_action": False,
     }
     if existing:
-        docs=[doc_entry if x.get("document_id")==row.get("document_id") else x for x in docs]
+        docs=[
+            doc_entry
+            if (
+                x.get("document_id")==row.get("document_id")
+                and x.get("tenant_id")==tenant
+                and x.get("workspace_id")==workspace
+            )
+            else x
+            for x in docs
+        ]
     elif len(docs)<MAX_DOCUMENTS:
         docs.append(doc_entry)
 
     current_passages=[
         dict(x) for x in list(base.get("passages") or [])
-        if isinstance(x,Mapping) and x.get("document_id") != row.get("document_id")
+        if isinstance(x,Mapping)
+        and not (
+            x.get("document_id") == row.get("document_id")
+            and x.get("tenant_id") == tenant
+            and x.get("workspace_id") == workspace
+        )
     ]
     created=[]
     for ordinal, raw in enumerate(list(passages or [])[:500], start=1):
@@ -205,6 +224,232 @@ def index_document(
         "execution_authorized": False,
         "external_action_executed": False,
     }
+def projection_manifest(index: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Describe the index as a disposable derived projection, never source of truth."""
+    state=dict(index or empty_library_index())
+    docs=[dict(x) for x in list(state.get("documents") or []) if isinstance(x,Mapping)]
+    passages=[dict(x) for x in list(state.get("passages") or []) if isinstance(x,Mapping)]
+    identity=[
+        {
+            "tenant_id":x.get("tenant_id"),
+            "workspace_id":x.get("workspace_id"),
+            "document_id":x.get("document_id"),
+            "checksum":x.get("checksum"),
+            "provenance_id":x.get("provenance_id"),
+        }
+        for x in docs
+    ]
+    passage_identity=[
+        {
+            "tenant_id":x.get("tenant_id"),
+            "workspace_id":x.get("workspace_id"),
+            "document_id":x.get("document_id"),
+            "passage_id":x.get("passage_id"),
+        }
+        for x in passages
+    ]
+    return {
+        "schema": SCHEMA,
+        "documents": len(docs),
+        "passages": len(passages),
+        "projection_digest": "sha256:" + sha256(
+            json.dumps(
+                {"documents":identity,"passages":passage_identity},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",",":"),
+                default=str,
+            ).encode("utf-8")
+        ).hexdigest(),
+        "source_of_truth": False,
+        "disposable": True,
+        "rebuild_requires_source_documents": True,
+        "memory_promoted": False,
+        "execution_authorized": False,
+        "external_persisted": False,
+    }
+
+
+def purge_document_projection(
+    index: Mapping[str, Any] | None,
+    document_id: Any,
+    *,
+    trusted_context: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Remove only one tenant/workspace document projection and its passages."""
+    state=dict(index or empty_library_index())
+    ctx=dict(trusted_context or {})
+    tenant=_clean(ctx.get("tenant_id"),120)
+    workspace=_clean(ctx.get("workspace_id"),120)
+    target=_clean(document_id,120)
+    if not tenant or not workspace or not target:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED",
+            "blockers":["TRUSTED_SCOPE_OR_DOCUMENT_MISSING"],
+            "index":state,"removed_documents":0,"removed_passages":0,
+            "source_of_truth":False,"executes_action":False,
+        }
+    docs=[dict(x) for x in list(state.get("documents") or []) if isinstance(x,Mapping)]
+    passages=[dict(x) for x in list(state.get("passages") or []) if isinstance(x,Mapping)]
+    all_targets=[x for x in docs if x.get("document_id")==target]
+    scoped=[
+        x for x in all_targets
+        if x.get("tenant_id")==tenant and x.get("workspace_id")==workspace
+    ]
+    if all_targets and not scoped:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED",
+            "blockers":["CROSS_SCOPE_DOCUMENT_PURGE_DENIED"],
+            "index":state,"removed_documents":0,"removed_passages":0,
+            "source_of_truth":False,"executes_action":False,
+        }
+    next_docs=[
+        x for x in docs
+        if not (
+            x.get("document_id")==target
+            and x.get("tenant_id")==tenant
+            and x.get("workspace_id")==workspace
+        )
+    ]
+    removed_passages=[
+        x for x in passages
+        if (
+            x.get("document_id")==target
+            and x.get("tenant_id")==tenant
+            and x.get("workspace_id")==workspace
+        )
+    ]
+    next_passages=[
+        x for x in passages
+        if not (
+            x.get("document_id")==target
+            and x.get("tenant_id")==tenant
+            and x.get("workspace_id")==workspace
+        )
+    ]
+    updated={
+        "schema":SCHEMA,
+        "documents":next_docs,
+        "passages":next_passages,
+        "external_persisted":False,
+        "memory_promoted":False,
+        "execution_authorized":False,
+        "external_action_executed":False,
+    }
+    return {
+        "schema":SCHEMA,
+        "status":"PURGED" if scoped else "NOOP",
+        "index":updated,
+        "removed_documents":len(docs)-len(next_docs),
+        "removed_passages":len(removed_passages),
+        "tenant_id":tenant,
+        "workspace_id":workspace,
+        "document_id":target,
+        "source_of_truth":False,
+        "disposable_projection":True,
+        "executes_action":False,
+    }
+
+
+def purge_scope_projection(
+    index: Mapping[str, Any] | None,
+    *,
+    trusted_context: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Delete derived projection rows for exactly one trusted tenant/workspace."""
+    state=dict(index or empty_library_index())
+    ctx=dict(trusted_context or {})
+    tenant=_clean(ctx.get("tenant_id"),120)
+    workspace=_clean(ctx.get("workspace_id"),120)
+    if not tenant or not workspace:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED",
+            "blockers":["TRUSTED_SCOPE_MISSING"],"index":state,
+            "removed_documents":0,"removed_passages":0,
+            "executes_action":False,
+        }
+    docs=[dict(x) for x in list(state.get("documents") or []) if isinstance(x,Mapping)]
+    passages=[dict(x) for x in list(state.get("passages") or []) if isinstance(x,Mapping)]
+    next_docs=[
+        x for x in docs
+        if not (x.get("tenant_id")==tenant and x.get("workspace_id")==workspace)
+    ]
+    next_passages=[
+        x for x in passages
+        if not (x.get("tenant_id")==tenant and x.get("workspace_id")==workspace)
+    ]
+    updated={
+        "schema":SCHEMA,
+        "documents":next_docs,
+        "passages":next_passages,
+        "external_persisted":False,
+        "memory_promoted":False,
+        "execution_authorized":False,
+        "external_action_executed":False,
+    }
+    return {
+        "schema":SCHEMA,"status":"PURGED",
+        "index":updated,
+        "removed_documents":len(docs)-len(next_docs),
+        "removed_passages":len(passages)-len(next_passages),
+        "tenant_id":tenant,"workspace_id":workspace,
+        "source_of_truth":False,"disposable_projection":True,
+        "executes_action":False,
+    }
+
+
+def rebuild_scope_projection(
+    documents: Sequence[Mapping[str, Any]] | None,
+    passage_map: Mapping[str, Sequence[Any]] | None,
+    *,
+    trusted_context: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Rebuild a disposable scope projection only from supplied reviewed sources."""
+    ctx=dict(trusted_context or {})
+    tenant=_clean(ctx.get("tenant_id"),120)
+    workspace=_clean(ctx.get("workspace_id"),120)
+    if not tenant or not workspace:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED",
+            "blockers":["TRUSTED_SCOPE_MISSING"],
+            "index":empty_library_index(),"executes_action":False,
+        }
+    source_docs=[dict(x) for x in list(documents or []) if isinstance(x,Mapping)]
+    if any(
+        row.get("tenant_id")!=tenant or row.get("workspace_id")!=workspace
+        for row in source_docs
+    ):
+        return {
+            "schema":SCHEMA,"status":"BLOCKED",
+            "blockers":["CROSS_SCOPE_REBUILD_SOURCE_DENIED"],
+            "index":empty_library_index(),"executes_action":False,
+        }
+    state=empty_library_index()
+    mapping=dict(passage_map or {})
+    for row in source_docs:
+        result=index_document(
+            state,
+            row,
+            passages=mapping.get(str(row.get("document_id") or ""), []),
+            trusted_context=ctx,
+        )
+        if result.get("status")!="INDEXED":
+            return {
+                "schema":SCHEMA,"status":"BLOCKED",
+                "blockers":list(result.get("blockers") or ["REBUILD_SOURCE_REJECTED"]),
+                "index":empty_library_index(),"executes_action":False,
+            }
+        state=result["index"]
+    return {
+        "schema":SCHEMA,"status":"REBUILT",
+        "index":state,
+        "manifest":projection_manifest(state),
+        "source_of_truth":False,
+        "rebuild_source_count":len(source_docs),
+        "executes_action":False,
+    }
+
+
 def search_library_index(
     index: Mapping[str, Any] | None,
     query: Any,
@@ -340,5 +585,6 @@ def document_graph_fragment(document: Mapping[str, Any]) -> dict[str, Any]:
 __all__=[
     "SCHEMA","INDEXABLE_STATES","PASSAGE_STATES","IndexedPassage",
     "empty_library_index","index_document","search_library_index",
-    "classification_snapshot","document_graph_fragment",
+    "projection_manifest","purge_document_projection","purge_scope_projection",
+    "rebuild_scope_projection","classification_snapshot","document_graph_fragment",
 ]

@@ -1,0 +1,63 @@
+name: AION Owner Signature Ceremony
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_trust_root.py"
+      - "atlasquant_aion_nonce_registry.py"
+      - "atlasquant_aion_external_persistence_attestation.py"
+      - "atlasquant_aion_owner_signature_ceremony.py"
+      - "test_atlasquant_aion_v213_real_trust_authority_redteam.py"
+      - "test_atlasquant_aion_v223_external_persistence_attestation.py"
+      - "test_atlasquant_aion_v224_owner_signature_ceremony.py"
+      - "docs/aion/AION_V224_OWNER_SIGNATURE_CEREMONY.md"
+      - "docs/adr/ADR-0023-owner-signature-separate-from-owner-decision.md"
+      - ".github/workflows/aion-owner-signature-ceremony.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-owner-signature-ceremony-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  owner-signature:
+    name: V2.24 owner signature verification and replay protection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic signature dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+
+      - name: Compile V2.23-V2.24 signature chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_external_persistence_attestation.py \
+            atlasquant_aion_owner_signature_ceremony.py \
+            test_atlasquant_aion_v213_real_trust_authority_redteam.py \
+            test_atlasquant_aion_v223_external_persistence_attestation.py \
+            test_atlasquant_aion_v224_owner_signature_ceremony.py
+
+      - name: Run V2.24 owner signature red-team
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v224_owner_signature_ceremony.py
+
+      - name: Re-run V2.23 persistence attestation
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v223_external_persistence_attestation.py
+
+      - name: Re-run real trust root and nonce protections
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v213_real_trust_authority_redteam.py
