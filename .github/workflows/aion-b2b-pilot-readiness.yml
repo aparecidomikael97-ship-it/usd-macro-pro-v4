@@ -1,0 +1,398 @@
+name: AION B2B Pilot Readiness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_managed_operations_simulation.py"
+      - "test_atlasquant_aion_managed_operations_simulation.py"
+      - "docs/aion/AION_MANAGED_OPERATIONS_SIMULATION_V1.md"
+      - "atlasquant_aion_b2b_pilot_readiness.py"
+      - "test_atlasquant_aion_b2b_pilot_readiness.py"
+      - "docs/aion/AION_B2B_PILOT_READINESS_V1.md"
+      - "atlasquant_aion_b2b_pilot_operating_contract.py"
+      - "test_atlasquant_aion_b2b_pilot_operating_contract.py"
+      - "docs/aion/AION_B2B_PILOT_OPERATING_CONTRACT_V1.md"
+      - "atlasquant_aion_b2b_pilot_outcome_health.py"
+      - "test_atlasquant_aion_b2b_pilot_outcome_health.py"
+      - "docs/aion/AION_B2B_PILOT_OUTCOME_HEALTH_V1.md"
+      - "atlasquant_aion_b2b_conversion_capacity.py"
+      - "test_atlasquant_aion_b2b_conversion_capacity.py"
+      - "docs/aion/AION_B2B_CONVERSION_CAPACITY_V1.md"
+      - "atlasquant_aion_b2b_managed_service_control.py"
+      - "test_atlasquant_aion_b2b_managed_service_control.py"
+      - "docs/aion/AION_B2B_MANAGED_SERVICE_CONTROL_V1.md"
+      - "atlasquant_aion_b2b_portal_read_model.py"
+      - "test_atlasquant_aion_b2b_portal_read_model.py"
+      - "docs/aion/AION_B2B_CUSTOMER_PORTAL_READ_MODEL_V1.md"
+      - "atlasquant_aion_b2b_customer_portal.py"
+      - "test_atlasquant_aion_b2b_customer_portal.py"
+      - "docs/aion/AION_B2B_CUSTOMER_PORTAL_V1.md"
+      - "atlasquant_aion_b2b_customer_portal_records.py"
+      - "test_atlasquant_aion_b2b_customer_portal_records.py"
+      - "docs/aion/AION_B2B_CUSTOMER_PORTAL_RECORDS_V1.md"
+      - "atlasquant_aion_b2b_customer_portal_operations.py"
+      - "test_atlasquant_aion_b2b_customer_portal_operations.py"
+      - "docs/aion/AION_B2B_CUSTOMER_PORTAL_OPERATIONS_V1.md"
+      - "atlasquant_aion_b2b_revops_foundation.py"
+      - "test_atlasquant_aion_b2b_revops_foundation.py"
+      - "docs/aion/AION_B2B_REVOPS_FOUNDATION_V1.md"
+      - "atlasquant_aion_b2b_revops_read_model.py"
+      - "test_atlasquant_aion_b2b_revops_read_model.py"
+      - "test_atlasquant_aion_b2b_revops_ui.py"
+      - "docs/aion/AION_B2B_REVOPS_READ_MODEL_V1.md"
+      - "atlasquant_aion_b2b_revops_cleanup_plan.py"
+      - "test_atlasquant_aion_b2b_revops_cleanup_plan.py"
+      - "docs/aion/AION_B2B_REVOPS_CLEANUP_PLAN_V1.md"
+      - "atlasquant_aion_b2b_diagnostic_intake.py"
+      - "test_atlasquant_aion_b2b_diagnostic_intake.py"
+      - "docs/aion/AION_B2B_DIAGNOSTIC_INTAKE_V1.md"
+      - "atlasquant_aion_b2b_proposal_draft.py"
+      - "test_atlasquant_aion_b2b_proposal_draft.py"
+      - "test_atlasquant_aion_b2b_proposal_ui.py"
+      - "docs/aion/AION_B2B_PROPOSAL_DRAFT_V1.md"
+      - "atlasquant_aion_b2b_pilot_planning_handoff.py"
+      - "test_atlasquant_aion_b2b_pilot_planning_handoff.py"
+      - "docs/aion/AION_B2B_PILOT_PLANNING_HANDOFF_V1.md"
+      - "atlasquant_aion_b2b_pilot_planning_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_planning_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_planning_ui.py"
+      - "docs/aion/AION_B2B_PILOT_PLANNING_READ_MODEL_V1.md"
+      - "atlasquant_aion_b2b_pilot_owner_review_packet.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_review_packet.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_REVIEW_PACKET_V1.md"
+      - "atlasquant_aion_b2b_pilot_owner_decision.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_decision.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_DECISION_V1.md"
+      - "atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_DECISION_PERSISTENCE_PLAN_V1.md"
+      - "atlasquant_aion_b2b_pilot_owner_decision_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_pilot_owner_decision_persistence_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_OWNER_DECISION_PERSISTENCE_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_pilot_checkpoint_writer_attestation.py"
+      - "test_atlasquant_aion_b2b_pilot_checkpoint_writer_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_CHECKPOINT_WRITER_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_preflight.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_preflight.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_PREFLIGHT_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_ceremony.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_ceremony.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_CEREMONY_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_persistence_plan.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_PERSISTENCE_PLAN_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_persistence_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_PERSISTENCE_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_writer_attestation.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_writer_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_WRITER_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_execution_preflight.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_preflight.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_PREFLIGHT_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_status_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_status_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_status_ui.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_STATUS_READ_MODEL_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_execution_ceremony.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_ceremony.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_CEREMONY_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_PERSISTENCE_PLAN_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_PERSISTENCE_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_pilot_activation_execution_writer_attestation.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_execution_writer_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_EXECUTION_WRITER_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_pilot_value_realization.py"
+      - "test_atlasquant_aion_b2b_pilot_value_realization.py"
+      - "atlasquant_aion_b2b_pilot_value_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_value_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_value_ui.py"
+      - "atlasquant_aion_b2b_pilot_customer_value_binding.py"
+      - "test_atlasquant_aion_b2b_pilot_customer_value_binding.py"
+      - "test_atlasquant_aion_b2b_customer_portal_pilot_value.py"
+      - "docs/aion/AION_B2B_PILOT_CUSTOMER_VALUE_BINDING_V1.md"
+      - "atlasquant_aion_b2b_value_bound_conversion.py"
+      - "test_atlasquant_aion_b2b_value_bound_conversion.py"
+      - "docs/aion/AION_B2B_VALUE_BOUND_CONVERSION_V1.md"
+      - "atlasquant_aion_b2b_value_bound_managed_service.py"
+      - "test_atlasquant_aion_b2b_value_bound_managed_service.py"
+      - "docs/aion/AION_B2B_VALUE_BOUND_MANAGED_SERVICE_HANDOFF_V1.md"
+      - "atlasquant_aion_b2b_value_bound_service_cycle.py"
+      - "test_atlasquant_aion_b2b_value_bound_service_cycle.py"
+      - "docs/aion/AION_B2B_VALUE_BOUND_SERVICE_CYCLE_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_review.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_review.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_REVIEW_V1.md"
+      - "atlasquant_aion_b2b_recurring_customer_projection.py"
+      - "test_atlasquant_aion_b2b_recurring_customer_projection.py"
+      - "docs/aion/AION_B2B_RECURRING_CUSTOMER_SAFE_PROJECTION_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_decision_request.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_decision_request.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_DECISION_REQUEST_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_signature.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_signature.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_SIGNATURE_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_persistence_plan.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_PERSISTENCE_PLAN_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_persistence_attestation.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_PERSISTENCE_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_writer_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_writer_attestation.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_WRITER_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_preflight.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_preflight.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_PREFLIGHT_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_ceremony.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_ceremony.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_CEREMONY_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_PERSISTENCE_PLAN_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_PERSISTENCE_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_writer_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_writer_attestation.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_WRITER_ATTESTATION_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_execution_preflight.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_execution_preflight.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_EXECUTION_PREFLIGHT_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_execution_ceremony.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_execution_ceremony.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_EXECUTION_CEREMONY_V1.md"
+      - "docs/aion/AION_B2B_PILOT_VALUE_REALIZATION_V1.md"
+      - "docs/aion/AION_B2B_PILOT_VALUE_READ_MODELS_V1.md"
+      - "atlasquant_aion_b2b_multi_company_admission.py"
+      - "test_atlasquant_aion_b2b_multi_company_admission.py"
+      - "atlasquant_aion_b2b_multi_company_read_model.py"
+      - "test_atlasquant_aion_b2b_multi_company_read_model.py"
+      - "test_atlasquant_aion_b2b_multi_company_ui.py"
+      - "docs/aion/AION_B2B_MULTI_COMPANY_ADMISSION_V1.md"
+      - "docs/aion/AION_B2B_MULTI_COMPANY_READ_MODEL_V1.md"
+      - "atlasquant_aion_b2b_demo_sandbox.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox.py"
+      - "atlasquant_aion_b2b_demo_sandbox_read_model.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox_read_model.py"
+      - "test_atlasquant_aion_b2b_demo_sandbox_ui.py"
+      - "docs/aion/AION_B2B_DEMO_SANDBOX_V1.md"
+      - "docs/aion/AION_B2B_DEMO_SANDBOX_READ_MODEL_V1.md"
+      - "atlasquant_reference_ui.py"
+      - "atlasquant_account_portal.py"
+      - "test_atlasquant_account_portal.py"
+      - ".github/workflows/aion-b2b-pilot-readiness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install B2B test dependencies
+        run: python -m pip install --disable-pip-version-check cryptography==50.0.2
+
+      - name: Compile bounded B2B modules
+        run: |
+          python -m py_compile \
+            atlasquant_aion_managed_operations_simulation.py \
+            atlasquant_aion_b2b_pilot_readiness.py \
+            atlasquant_aion_b2b_pilot_operating_contract.py \
+            atlasquant_aion_b2b_pilot_outcome_health.py \
+            atlasquant_aion_b2b_conversion_capacity.py \
+            atlasquant_aion_b2b_managed_service_control.py \
+            atlasquant_aion_b2b_portal_read_model.py \
+            atlasquant_aion_b2b_customer_portal.py \
+            atlasquant_aion_b2b_customer_portal_records.py \
+            atlasquant_aion_b2b_customer_portal_operations.py \
+            atlasquant_aion_b2b_revops_foundation.py \
+            atlasquant_aion_b2b_revops_read_model.py \
+            atlasquant_aion_b2b_revops_cleanup_plan.py \
+            atlasquant_aion_b2b_diagnostic_intake.py \
+            atlasquant_aion_b2b_proposal_draft.py \
+            atlasquant_aion_b2b_pilot_planning_handoff.py \
+            atlasquant_aion_b2b_pilot_planning_read_model.py \
+            atlasquant_aion_b2b_pilot_owner_review_packet.py \
+            atlasquant_aion_b2b_pilot_owner_decision.py \
+            atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py \
+            atlasquant_aion_b2b_pilot_owner_decision_persistence_attestation.py \
+            atlasquant_aion_b2b_pilot_checkpoint_writer_attestation.py \
+            atlasquant_aion_b2b_pilot_activation_preflight.py \
+            atlasquant_aion_b2b_pilot_activation_ceremony.py \
+            atlasquant_aion_b2b_pilot_activation_persistence_plan.py \
+            atlasquant_aion_b2b_pilot_activation_persistence_attestation.py \
+            atlasquant_aion_b2b_pilot_activation_writer_attestation.py \
+            atlasquant_aion_b2b_pilot_activation_execution_preflight.py \
+            atlasquant_aion_b2b_pilot_activation_status_read_model.py \
+            atlasquant_aion_b2b_pilot_activation_execution_ceremony.py \
+            atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py \
+            atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py \
+            atlasquant_aion_b2b_pilot_activation_execution_writer_attestation.py \
+            atlasquant_aion_b2b_pilot_value_realization.py \
+            atlasquant_aion_b2b_pilot_value_read_model.py \
+            atlasquant_aion_b2b_pilot_customer_value_binding.py \
+            atlasquant_aion_b2b_value_bound_conversion.py \
+            atlasquant_aion_b2b_value_bound_managed_service.py \
+            atlasquant_aion_b2b_value_bound_service_cycle.py \
+            atlasquant_aion_b2b_owner_renewal_review.py \
+            atlasquant_aion_b2b_recurring_customer_projection.py \
+            atlasquant_aion_b2b_owner_renewal_decision_request.py \
+            atlasquant_aion_b2b_owner_renewal_signature.py \
+            atlasquant_aion_b2b_owner_renewal_persistence_plan.py \
+            atlasquant_aion_b2b_owner_renewal_persistence_attestation.py \
+            atlasquant_aion_b2b_owner_renewal_writer_attestation.py \
+            atlasquant_aion_b2b_owner_renewal_action_preflight.py \
+            atlasquant_aion_b2b_owner_renewal_action_ceremony.py \
+            atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py \
+            atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py \
+            atlasquant_aion_b2b_owner_renewal_action_writer_attestation.py \
+            atlasquant_aion_b2b_owner_renewal_action_execution_preflight.py \
+            atlasquant_aion_b2b_owner_renewal_action_execution_ceremony.py \
+            atlasquant_aion_b2b_multi_company_admission.py \
+            atlasquant_aion_b2b_multi_company_read_model.py \
+            atlasquant_aion_b2b_demo_sandbox.py \
+            atlasquant_aion_b2b_demo_sandbox_read_model.py
+
+      - name: Run complete B2B contract suite
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_managed_operations_simulation.py \
+            test_atlasquant_aion_b2b_pilot_readiness.py \
+            test_atlasquant_aion_b2b_pilot_operating_contract.py \
+            test_atlasquant_aion_b2b_pilot_outcome_health.py \
+            test_atlasquant_aion_b2b_conversion_capacity.py \
+            test_atlasquant_aion_b2b_managed_service_control.py \
+            test_atlasquant_aion_b2b_portal_read_model.py \
+            test_atlasquant_aion_b2b_customer_portal.py \
+            test_atlasquant_aion_b2b_customer_portal_records.py \
+            test_atlasquant_aion_b2b_customer_portal_operations.py \
+            test_atlasquant_aion_b2b_revops_foundation.py \
+            test_atlasquant_aion_b2b_revops_read_model.py \
+            test_atlasquant_aion_b2b_revops_cleanup_plan.py \
+            test_atlasquant_aion_b2b_diagnostic_intake.py \
+            test_atlasquant_aion_b2b_proposal_draft.py \
+            test_atlasquant_aion_b2b_proposal_ui.py \
+            test_atlasquant_aion_b2b_pilot_planning_handoff.py \
+            test_atlasquant_aion_b2b_pilot_planning_read_model.py \
+            test_atlasquant_aion_b2b_pilot_owner_review_packet.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_owner_decision_persistence_attestation.py \
+            test_atlasquant_aion_b2b_pilot_checkpoint_writer_attestation.py \
+            test_atlasquant_aion_b2b_pilot_activation_preflight.py \
+            test_atlasquant_aion_b2b_pilot_activation_ceremony.py \
+            test_atlasquant_aion_b2b_pilot_activation_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_activation_persistence_attestation.py \
+            test_atlasquant_aion_b2b_pilot_activation_writer_attestation.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_preflight.py \
+            test_atlasquant_aion_b2b_pilot_activation_status_read_model.py \
+            test_atlasquant_aion_b2b_pilot_activation_status_ui.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_ceremony.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_persistence_plan.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_persistence_attestation.py \
+            test_atlasquant_aion_b2b_pilot_activation_execution_writer_attestation.py \
+            test_atlasquant_aion_b2b_pilot_value_realization.py \
+            test_atlasquant_aion_b2b_pilot_value_read_model.py \
+            test_atlasquant_aion_b2b_pilot_value_ui.py \
+            test_atlasquant_aion_b2b_pilot_customer_value_binding.py \
+            test_atlasquant_aion_b2b_customer_portal_pilot_value.py \
+            test_atlasquant_aion_b2b_value_bound_conversion.py \
+            test_atlasquant_aion_b2b_value_bound_managed_service.py \
+            test_atlasquant_aion_b2b_value_bound_service_cycle.py \
+            test_atlasquant_aion_b2b_owner_renewal_review.py \
+            test_atlasquant_aion_b2b_recurring_customer_projection.py \
+            test_atlasquant_aion_b2b_owner_renewal_decision_request.py \
+            test_atlasquant_aion_b2b_owner_renewal_signature.py \
+            test_atlasquant_aion_b2b_owner_renewal_persistence_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_persistence_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_writer_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_preflight.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_ceremony.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_writer_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_preflight.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_ceremony.py \
+            test_atlasquant_aion_b2b_multi_company_admission.py \
+            test_atlasquant_aion_b2b_multi_company_read_model.py \
+            test_atlasquant_aion_b2b_multi_company_ui.py \
+            test_atlasquant_aion_b2b_demo_sandbox.py \
+            test_atlasquant_aion_b2b_demo_sandbox_read_model.py \
+            test_atlasquant_aion_b2b_demo_sandbox_ui.py \
+            test_atlasquant_aion_b2b_pilot_planning_ui.py \
+            test_atlasquant_aion_b2b_revops_ui.py
+
+      - name: Assert offline safety markers
+        run: |
+          python - <<'PY'
+          from atlasquant_aion_managed_operations_simulation import run_reference_simulation
+          from atlasquant_aion_b2b_pilot_readiness import assess_b2b_pilot_candidate
+          from atlasquant_aion_b2b_customer_portal import customer_portal_access
+
+          scope = {"owner_id": "owner-a", "tenant_id": "tenant-a", "workspace_id": "ws-a"}
+          candidate = {
+              **scope,
+              "candidate_id": "ci-pilot",
+              "company_label": "CI Synthetic Candidate",
+              "problem_fit": 5,
+              "process_repeatability": 4,
+              "data_readiness": 4,
+              "owner_sponsorship": 5,
+              "integration_feasibility": 4,
+              "expected_value": 5,
+              "scope_clarity": 5,
+              "privacy_risk": 1,
+              "operational_risk": 1,
+              "planned_monthly_infra_brl": 120,
+              "pilot_duration_days": 14,
+              "evidence_refs": ["ci:diagnostic", "ci:process", "ci:value"],
+          }
+          managed = run_reference_simulation()
+          hardening = {
+              "tenant_isolation_pass": True,
+              "vault_backend_pass": True,
+              "chaos_campaign_pass": True,
+              "mission_control_ready": True,
+              "approval_gate_ready": True,
+              "audit_receipts_ready": True,
+              "rollback_ready": True,
+              "drift_state": "STABLE",
+              "security_gate_state": "PASS",
+          }
+          result = assess_b2b_pilot_candidate(
+              trusted_scope=scope,
+              candidate=candidate,
+              platform_evidence=managed,
+              hardening_evidence=hardening,
+          )
+          assert managed["provider_called"] is False
+          assert managed["production_mutation"] is False
+          assert result["decision"] == "PILOT_REVIEW_CANDIDATE"
+          assert result["human_owner_decision_required"] is True
+          assert result["automatic_acceptance"] is False
+          assert result["automatic_deploy"] is False
+          assert result["provider_called"] is False
+          assert result["production_mutation"] is False
+          assert result["executes_action"] is False
+
+          blocked = customer_portal_access({}, {}, {})
+          assert blocked["allowed"] is False
+          assert blocked["read_only"] is True
+          assert blocked["grants_authority"] is False
+          assert blocked["automatic_billing"] is False
+          assert blocked["automatic_renewal"] is False
+          assert blocked["executes_action"] is False
+          PY

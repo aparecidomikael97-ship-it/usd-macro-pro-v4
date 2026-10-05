@@ -286,6 +286,14 @@ def current_session()->dict[str,Any]|None:
     return dict(raw) if isinstance(raw,dict) else None
 
 def clear_session()->None:
+    # Staging chat handles are authentication-scoped resources. Close them before
+    # dropping the login session so a logout/user switch cannot retain an old DB handle.
+    try:
+        from atlasquant_aion_chat_host_staging import close_all_staged_host_stores
+        close_all_staged_host_stores(st.session_state)
+    except Exception:
+        # Logout itself must remain available even if optional staging cleanup fails.
+        pass
     st.session_state.pop(SESSION_KEY,None)
     try:
         from atlasquant_central_hub_ui import clear_login_greeting

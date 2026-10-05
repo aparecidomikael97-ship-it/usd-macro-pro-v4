@@ -188,7 +188,7 @@ def test_master_first_fold_and_radar_truth():
 @pytest.mark.parametrize(
     ("area","selected","expected"),
     [
-        ("negocios","opportunities",("ESCOPO B2B","Workspace isolado por empresa","AÇÃO EXTERNA")),
+        ("negocios","companies",("ESCOPO B2B","Workspace isolado por empresa","AÇÃO EXTERNA")),
         ("investimentos","stocks",("ESCOPO","Leitura e comparação de investimentos","EXECUÇÃO")),
         ("aion","models",("NÚCLEO","Um único AION Core compartilhado","AUTORIDADE")),
     ],
@@ -207,9 +207,104 @@ def test_mobile_hero_has_environment_identity(area):
     if area == "aion":
         assert "final-aion-banner" in html and "Um único AION Core" in html
         assert html.count("data-internal-role=") == 8
+    elif area == "negocios":
+        assert 'class="aq-ws-shell"' in html
+        assert 'data-business-contract="managed-operations-v1"' in html
+        assert "ATLASQUANT · NEGÓCIOS" in html
+        assert "Poderoso por dentro. Simples por fora." in html
     else:
         assert f"ref-mobile-header-{area}" in html
         assert "ECOSSISTEMA ATLASQUANT" in html
+
+def _ready_business_read_model():
+    return {
+        "schema": "ATLASQUANT_AION_B2B_PORTAL_READ_MODEL_V1",
+        "state": "READY",
+        "customer_id": "customer-001",
+        "package": "PROFISSIONAL",
+        "service_state": "HEALTHY",
+        "service_decision": "RENEWAL_REVIEW_CANDIDATE",
+        "health_label": "SAUDÁVEL",
+        "health_score": 88.0,
+        "observed_roi_pct": 60.0,
+        "actual_service_cost_brl": 2200.0,
+        "usage": {
+            "capacity": {"used": 40, "limit": 60, "utilization_pct": 66.67},
+            "calls": {"used": 700, "limit": 1000, "utilization_pct": 70.0},
+            "tokens": {"used": 700000, "limit": 1000000, "utilization_pct": 70.0},
+            "support_tickets": {"used": 20, "limit": 40, "utilization_pct": 50.0},
+        },
+        "support": {
+            "avg_first_response_hours": 2.0,
+            "avg_resolution_hours": 12.0,
+            "critical_open_tickets": 0,
+            "first_response_sla_met": True,
+            "resolution_sla_met": True,
+        },
+        "review_reasons": [],
+        "incident_reasons": [],
+        "generated_at": "2026-10-05T12:00:00-04:00",
+        "read_only": True,
+        "grants_authority": False,
+        "executes_action": False,
+    }
+
+
+def test_business_home_displays_only_validated_read_model_metrics():
+    html=reference_html("negocios",business_read_model=_ready_business_read_model())
+    for expected in ("88%","60%","customer-001","PROFISSIONAL","EVIDÊNCIA VALIDADA","SOMENTE LEITURA"):
+        assert expected in html
+    assert "RENEWAL_REVIEW_CANDIDATE" in html
+    assert "automatic_renewal" not in html
+
+
+def test_business_modules_render_evidence_specific_views_without_action_controls():
+    model=_ready_business_read_model()
+    roi=reference_html("negocios",selected="roi",business_read_model=model)
+    sla=reference_html("negocios",selected="sla",business_read_model=model)
+    finops=reference_html("negocios",selected="finops",business_read_model=model)
+    assert "ROI OBSERVADO" in roi and "60%" in roi
+    assert "1ª RESPOSTA" in sla and "2h" in sla and "SLA cumprido" in sla
+    assert "CUSTO OBSERVADO" in finops and "R$ 2200" in finops
+    for html in (roi,sla,finops):
+        assert 'data-read-model="ready"' in html
+        assert "EXECUÇÃO</small><strong>BLOQUEADA" in html
+        assert "Cobrar agora" not in html
+        assert "Renovar agora" not in html
+
+
+def test_business_invalid_or_untrusted_read_model_never_publishes_metrics():
+    invalid=_ready_business_read_model()
+    invalid["grants_authority"]=True
+    html=reference_html("negocios",business_read_model=invalid)
+    assert "88%" not in html
+    assert "60%" not in html
+    assert "aguardando evidência validada" in html
+
+
+def test_business_reference_home_uses_current_b2b_contract_and_no_legacy_market_scope():
+    html=reference_html("negocios",mode="Avançado",name="Admin")
+    expected=(
+        "Empresas / Clientes","Automação B2B","Leads","Revenue Ops","CRM","Propostas","Follow-up",
+        "Micro-SaaS","Serviços Internacionais","Produtos Digitais","Integrações",
+        "Financeiro / FinOps","ROI","Saúde do Cliente","SLA / Suporte","Auditoria / LGPD",
+        "Equipe &amp; Acessos","Demo / Sandbox","AION Negócios",
+    )
+    for label in expected:
+        assert label in html
+    for legacy in (
+        "Oportunidades","Setores","M&amp;A","Mercado Global","Notícias Corporativas",
+        "Fluxo Institucional","Calendário de Resultados",
+    ):
+        assert legacy not in html
+    routes=dict(NAV["negocios"])
+    assert "b2b" in routes and "finops" in routes and "success" in routes and "sla" in routes
+    assert "ma" not in routes and "sectors" not in routes and "global" not in routes
+    assert 'data-route="b2b"' in html
+    assert 'data-route="finops"' in html
+    assert 'data-route="success"' in html
+    assert 'data-route="sla"' in html
+
 
 def test_compact_trader_preserves_routes_and_uses_readable_native_labels():
     html=reference_html("trader")

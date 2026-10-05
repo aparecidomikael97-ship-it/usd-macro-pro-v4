@@ -1,0 +1,30 @@
+name: AION B2B Value Bound Conversion
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_value_bound_conversion.py"
+      - "test_atlasquant_aion_b2b_value_bound_conversion.py"
+      - "docs/aion/AION_B2B_VALUE_BOUND_CONVERSION_V1.md"
+      - ".github/workflows/aion-b2b-value-bound-conversion.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  value-bound-conversion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile bounded conversion gate
+        run: |
+          python -m py_compile atlasquant_aion_b2b_value_bound_conversion.py
+      - name: Run value-bound conversion tests
+        run: |
+          python -m unittest -q test_atlasquant_aion_b2b_value_bound_conversion.py

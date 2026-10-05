@@ -412,6 +412,12 @@ def prepare_aion_mission(
     return mission
 
 
+def prepare_aion_orchestration(request: AionRequest, **options: Any) -> dict[str, Any]:
+    """V2.4 opt-in task graph, composed from this existing mission API."""
+    from atlasquant_aion_unified_taskgraph import prepare_taskgraph
+    return prepare_taskgraph(request, **options)
+
+
 def validate_aion_mission(mission: Mapping[str, Any]) -> dict[str, Any]:
     """Recompute the canonical mission digest; detect tampering without executing."""
     if not isinstance(mission, Mapping):
