@@ -471,7 +471,15 @@ def fetch_recent_autopilot_pulses(
     """Read recent scheduled workflow runs. Never dispatches or reruns anything."""
     if not config.repo:
         return {"status": "UNAVAILABLE", "runs": [], "reason": "repo missing"}
-    url = "https://api.github.com/repos/" + config.repo + "/actions/runs"
+    # Query the exact workflow instead of listing generic repository runs.
+    # A busy repository can easily produce >100 PR/CI runs between scheduled
+    # pulses; filtering a generic first page after the fact can therefore
+    # manufacture a stale pulse even while the scheduler is healthy.
+    url = (
+        "https://api.github.com/repos/"
+        + config.repo
+        + "/actions/workflows/autopilot-v107.yml/runs"
+    )
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -484,7 +492,8 @@ def fetch_recent_autopilot_pulses(
             headers=headers,
             params={
                 "branch": "main",
-                "per_page": max(50, min(int(per_page) * 20, 100)),
+                "event": "schedule",
+                "per_page": max(5, min(int(per_page), 10)),
             },
             timeout=timeout,
         )
@@ -502,6 +511,8 @@ def fetch_recent_autopilot_pulses(
                 name == "AtlasQuant - Automatic Scanner + Autopilot"
                 or path.endswith("/autopilot-v107.yml")
             )
+            # Keep an explicit second-line validation even though the API
+            # endpoint and event query are already scoped.
             if not is_autopilot or event != "schedule":
                 continue
             safe_rows.append({

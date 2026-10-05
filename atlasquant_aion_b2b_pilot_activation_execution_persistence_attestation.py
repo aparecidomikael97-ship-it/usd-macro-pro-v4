@@ -1,0 +1,596 @@
+"""AION B2B Pilot Activation Execution Record Persistence Attestation V1.
+
+Pure/offline verifier for a persisted activation-execution authorization/denial
+record in Checkpoint Master.
+
+The module never writes storage. It validates the previously prepared execution
+persistence plan, computes the exact expected post-write checkpoint in memory,
+compares it with an externally observed checkpoint, and validates an external
+consistency receipt.
+
+Even an attested AUTHORIZE execution record does not generate or execute an
+activation command and does not activate the pilot.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from hashlib import sha256
+from typing import Any, Mapping
+import json
+import re
+
+from atlasquant_aion_checkpoint_master import (
+    append_checkpoint_patch,
+    checkpoint_master_digest,
+    reconstruct_checkpoint,
+)
+
+SCHEMA = "ATLASQUANT_AION_B2B_PILOT_ACTIVATION_EXECUTION_PERSISTENCE_ATTESTATION_V1"
+PLAN_SCHEMA = "ATLASQUANT_AION_B2B_PILOT_ACTIVATION_EXECUTION_PERSISTENCE_PLAN_V1"
+PATCH_SCHEMA = "ATLASQUANT_AION_B2B_PILOT_ACTIVATION_EXECUTION_CHECKPOINT_PATCH_V1"
+EXECUTION_SCHEMA = "ATLASQUANT_AION_B2B_PILOT_ACTIVATION_EXECUTION_VERIFICATION_V1"
+RECEIPT_SCHEMA = "ATLASQUANT_AION_B2B_PILOT_ACTIVATION_EXECUTION_CHECKPOINT_RECEIPT_V1"
+NAMESPACE = "aion_b2b_pilot_activation_execution_authorization"
+MAX_RECEIPT_AGE_SECONDS = 180
+
+_SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+def _canonical(value: Any) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+        default=str,
+    )
+
+
+def _digest(value: Any) -> str:
+    return "sha256:" + sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _text(value: Any, limit: int = 320) -> str:
+    if not isinstance(value, str):
+        return ""
+    return " ".join(value.replace("\x00", "").split())[:limit]
+
+
+def _parse_ts(value: Any) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("timestamp required")
+    raw = value.strip()
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except Exception as exc:
+        raise ValueError("invalid timestamp") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("timezone required")
+    return parsed.astimezone(timezone.utc)
+
+
+def _blocked(*items: str) -> dict[str, Any]:
+    return {
+        "schema": SCHEMA,
+        "state": "BLOCKED",
+        "blockers": sorted(set(items)),
+        "execution_record_persisted": False,
+        "persistence_attested": False,
+        "receipt_consistency_verified": False,
+        "writer_identity_verified": False,
+        "activation_command_generated": False,
+        "activation_command_executed": False,
+        "pilot_activation_authorized": False,
+        "pilot_activated": False,
+        "customer_contact_authorized": False,
+        "billing_authorized": False,
+        "provisioning_authorized": False,
+        "deploy_authorized": False,
+        "production_mutation_authorized": False,
+        "storage_write_performed": False,
+        "external_action_executed": False,
+        "network_called": False,
+        "executes_action": False,
+    }
+
+
+def build_execution_checkpoint_write_receipt_body(
+    *,
+    persistence_plan: Mapping[str, Any] | None,
+    prior_checkpoint_master: Mapping[str, Any] | None,
+    observed_checkpoint_master: Mapping[str, Any] | None,
+    persisted_at: str,
+    writer_ref: str,
+) -> dict[str, Any]:
+    """Build deterministic receipt material only; never writes or attests it."""
+    plan = (
+        dict(persistence_plan)
+        if isinstance(persistence_plan, Mapping)
+        else {}
+    )
+    patch = (
+        dict(plan.get("patch_candidate"))
+        if isinstance(plan.get("patch_candidate"), Mapping)
+        else {}
+    )
+    prior = reconstruct_checkpoint(prior_checkpoint_master or {})
+    observed = reconstruct_checkpoint(observed_checkpoint_master or {})
+
+    body = {
+        "schema": RECEIPT_SCHEMA,
+        "status": "CONFIRMED",
+        "storage_target": "CHECKPOINT_MASTER",
+        "write_mode": "EXPLICIT_AUTHORIZED_APPEND",
+        "namespace": NAMESPACE,
+        "event_id": _text(patch.get("recommended_event_id"), 160),
+        "base_revision": prior["revision"],
+        "revision": observed["revision"],
+        "patch_digest": _text(patch.get("patch_digest"), 180),
+        "before_checkpoint_digest": checkpoint_master_digest(
+            prior_checkpoint_master or {}
+        ),
+        "after_checkpoint_digest": checkpoint_master_digest(
+            observed_checkpoint_master or {}
+        ),
+        "execution_record_digest": _text(
+            plan.get("execution_record_digest"),
+            180,
+        ),
+        "pilot_id": _text(plan.get("pilot_id"), 120),
+        "persisted_at": _text(persisted_at, 80),
+        "writer_ref": _text(writer_ref, 240),
+        "writer_identity_verified": False,
+        "activation_command_generated": False,
+        "activation_command_executed": False,
+        "pilot_activation_authorized": False,
+        "pilot_activated": False,
+        "external_action_executed": False,
+    }
+    return {
+        **body,
+        "receipt_digest": _digest(body),
+    }
+
+
+def _plan_blockers(
+    persistence_plan: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any], list[str]]:
+    plan = (
+        dict(persistence_plan)
+        if isinstance(persistence_plan, Mapping)
+        else {}
+    )
+    blockers: list[str] = []
+
+    if plan.get("schema") != PLAN_SCHEMA:
+        blockers.append("EXECUTION_PERSISTENCE_PLAN_SCHEMA_INVALID")
+    if (
+        plan.get("state")
+        != "READY_FOR_EXPLICIT_EXECUTION_RECORD_PERSISTENCE"
+    ):
+        blockers.append("EXECUTION_PERSISTENCE_PLAN_NOT_READY")
+    if plan.get("execution_record_persisted") is not False:
+        blockers.append("EXECUTION_PLAN_ALREADY_PERSISTED")
+    if plan.get("checkpoint_saved") is not False:
+        blockers.append("EXECUTION_PLAN_ALREADY_SAVED")
+    if plan.get("automatic_checkpoint_write") is not False:
+        blockers.append("EXECUTION_PLAN_AUTO_WRITE_UNSAFE")
+    if plan.get("activation_command_generated") is not False:
+        blockers.append("EXECUTION_PLAN_COMMAND_ALREADY_GENERATED")
+    if plan.get("activation_command_executed") is not False:
+        blockers.append("EXECUTION_PLAN_COMMAND_ALREADY_EXECUTED")
+    if plan.get("pilot_activation_authorized") is not False:
+        blockers.append("EXECUTION_PLAN_AUTHORITY_UNSAFE")
+    if plan.get("pilot_activated") is not False:
+        blockers.append("EXECUTION_PLAN_ALREADY_ACTIVE")
+    if plan.get("requires_explicit_checkpoint_save") is not True:
+        blockers.append("EXECUTION_PLAN_EXPLICIT_SAVE_BOUNDARY_MISSING")
+    if plan.get("requires_persistence_attestation") is not True:
+        blockers.append("EXECUTION_PLAN_ATTESTATION_BOUNDARY_MISSING")
+    if plan.get("external_action_executed") is not False:
+        blockers.append("EXECUTION_PLAN_EXTERNAL_ACTION_UNSAFE")
+    if plan.get("network_called") is not False:
+        blockers.append("EXECUTION_PLAN_NETWORK_UNSAFE")
+    if plan.get("executes_action") is not False:
+        blockers.append("EXECUTION_PLAN_EXECUTION_UNSAFE")
+
+    decision = _text(plan.get("execution_decision"), 80)
+    if decision not in {
+        "AUTHORIZE_ACTIVATION_EXECUTION",
+        "DENY_ACTIVATION_EXECUTION",
+    }:
+        blockers.append("EXECUTION_PLAN_DECISION_INVALID")
+
+    record_digest = _text(plan.get("execution_record_digest"), 180)
+    if not _SHA256_RE.fullmatch(record_digest):
+        blockers.append("EXECUTION_RECORD_DIGEST_INVALID")
+
+    patch = (
+        dict(plan.get("patch_candidate"))
+        if isinstance(plan.get("patch_candidate"), Mapping)
+        else {}
+    )
+    if patch.get("schema") != PATCH_SCHEMA:
+        blockers.append("EXECUTION_PATCH_SCHEMA_INVALID")
+    if patch.get("state") != "PATCH_CANDIDATE":
+        blockers.append("EXECUTION_PATCH_STATE_INVALID")
+    if patch.get("requires_explicit_checkpoint_save") is not True:
+        blockers.append("EXECUTION_PATCH_EXPLICIT_SAVE_BOUNDARY_MISSING")
+    if patch.get("requires_persistence_attestation") is not True:
+        blockers.append("EXECUTION_PATCH_ATTESTATION_BOUNDARY_MISSING")
+    if patch.get("automatic_checkpoint_write") is not False:
+        blockers.append("EXECUTION_PATCH_AUTO_WRITE_UNSAFE")
+    if patch.get("checkpoint_saved") is not False:
+        blockers.append("EXECUTION_PATCH_ALREADY_SAVED")
+    if patch.get("execution_record_persisted") is not False:
+        blockers.append("EXECUTION_PATCH_ALREADY_PERSISTED")
+    if patch.get("activation_command_generated") is not False:
+        blockers.append("EXECUTION_PATCH_COMMAND_GENERATED_UNSAFE")
+    if patch.get("activation_command_executed") is not False:
+        blockers.append("EXECUTION_PATCH_COMMAND_EXECUTED_UNSAFE")
+    if patch.get("pilot_activation_authorized") is not False:
+        blockers.append("EXECUTION_PATCH_AUTHORITY_UNSAFE")
+    if patch.get("pilot_activated") is not False:
+        blockers.append("EXECUTION_PATCH_ACTIVE_UNSAFE")
+    if patch.get("external_action_executed") is not False:
+        blockers.append("EXECUTION_PATCH_EXTERNAL_ACTION_UNSAFE")
+    if patch.get("executes_action") is not False:
+        blockers.append("EXECUTION_PATCH_EXECUTION_UNSAFE")
+
+    expected_revision = patch.get("expected_revision")
+    if (
+        isinstance(expected_revision, bool)
+        or not isinstance(expected_revision, int)
+        or expected_revision < 0
+    ):
+        blockers.append("EXECUTION_PATCH_EXPECTED_REVISION_INVALID")
+
+    event_id = _text(patch.get("recommended_event_id"), 160)
+    if not event_id:
+        blockers.append("EXECUTION_PATCH_EVENT_ID_REQUIRED")
+
+    patch_body = (
+        dict(patch.get("patch"))
+        if isinstance(patch.get("patch"), Mapping)
+        else {}
+    )
+    if set(patch_body) != {NAMESPACE}:
+        blockers.append("EXECUTION_PATCH_NAMESPACE_INVALID")
+
+    record = (
+        dict(patch_body.get(NAMESPACE))
+        if isinstance(patch_body.get(NAMESPACE), Mapping)
+        else {}
+    )
+    if record.get("schema") != EXECUTION_SCHEMA:
+        blockers.append("EXECUTION_PATCH_RECORD_SCHEMA_INVALID")
+    if record.get("decision") != decision:
+        blockers.append("EXECUTION_PATCH_DECISION_MISMATCH")
+    if record.get("execution_record_digest") != record_digest:
+        blockers.append("EXECUTION_PATCH_RECORD_DIGEST_MISMATCH")
+    if record.get("execution_decision_verified") is not True:
+        blockers.append("EXECUTION_PATCH_DECISION_NOT_VERIFIED")
+    if record.get("execution_record_persisted") is not False:
+        blockers.append("EXECUTION_PATCH_RECORD_ALREADY_PERSISTED")
+    if record.get("activation_command_generated") is not False:
+        blockers.append("EXECUTION_PATCH_RECORD_COMMAND_UNSAFE")
+    if record.get("activation_command_executed") is not False:
+        blockers.append("EXECUTION_PATCH_RECORD_EXECUTED_UNSAFE")
+    if record.get("pilot_activation_authorized") is not False:
+        blockers.append("EXECUTION_PATCH_RECORD_AUTHORITY_UNSAFE")
+    if record.get("pilot_activated") is not False:
+        blockers.append("EXECUTION_PATCH_RECORD_ACTIVE_UNSAFE")
+
+    supplied_patch_digest = _text(patch.get("patch_digest"), 180)
+    if not _SHA256_RE.fullmatch(supplied_patch_digest):
+        blockers.append("EXECUTION_PATCH_DIGEST_INVALID")
+    elif patch_body and supplied_patch_digest != _digest(patch_body):
+        blockers.append("EXECUTION_PATCH_DIGEST_MISMATCH")
+
+    pilot_id = _text(plan.get("pilot_id"), 120)
+    if not pilot_id:
+        blockers.append("EXECUTION_PLAN_PILOT_ID_REQUIRED")
+    if record and _text(record.get("pilot_id"), 120) != pilot_id:
+        blockers.append("EXECUTION_PATCH_PILOT_ID_MISMATCH")
+
+    return plan, patch, list(dict.fromkeys(blockers))
+
+
+def _receipt_blockers(
+    receipt: Mapping[str, Any] | None,
+    *,
+    plan: Mapping[str, Any],
+    patch: Mapping[str, Any],
+    prior_master: Mapping[str, Any],
+    observed_master: Mapping[str, Any],
+    now_ts: str,
+) -> list[str]:
+    row = dict(receipt) if isinstance(receipt, Mapping) else {}
+    blockers: list[str] = []
+
+    if row.get("schema") != RECEIPT_SCHEMA:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_SCHEMA_INVALID")
+    if row.get("status") != "CONFIRMED":
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_NOT_CONFIRMED")
+    if row.get("storage_target") != "CHECKPOINT_MASTER":
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_TARGET_INVALID")
+    if row.get("write_mode") != "EXPLICIT_AUTHORIZED_APPEND":
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_WRITE_MODE_INVALID")
+    if row.get("namespace") != NAMESPACE:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_NAMESPACE_INVALID")
+    if row.get("event_id") != patch.get("recommended_event_id"):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_EVENT_ID_MISMATCH")
+    if row.get("base_revision") != patch.get("expected_revision"):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_BASE_REVISION_MISMATCH")
+    if row.get("revision") != patch.get("expected_revision") + 1:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_REVISION_MISMATCH")
+    if row.get("patch_digest") != patch.get("patch_digest"):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_PATCH_DIGEST_MISMATCH")
+    if (
+        row.get("execution_record_digest")
+        != plan.get("execution_record_digest")
+    ):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_RECORD_DIGEST_MISMATCH")
+    if row.get("pilot_id") != plan.get("pilot_id"):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_PILOT_ID_MISMATCH")
+
+    if (
+        row.get("before_checkpoint_digest")
+        != checkpoint_master_digest(prior_master)
+    ):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_BEFORE_DIGEST_MISMATCH")
+    if (
+        row.get("after_checkpoint_digest")
+        != checkpoint_master_digest(observed_master)
+    ):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_AFTER_DIGEST_MISMATCH")
+
+    if not _text(row.get("writer_ref"), 240):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_WRITER_REF_REQUIRED")
+    if row.get("writer_identity_verified") is not False:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_WRITER_IDENTITY_UNSUPPORTED")
+    if row.get("activation_command_generated") is not False:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_COMMAND_UNSAFE")
+    if row.get("activation_command_executed") is not False:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_EXECUTED_UNSAFE")
+    if row.get("pilot_activation_authorized") is not False:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_AUTHORITY_UNSAFE")
+    if row.get("pilot_activated") is not False:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_ACTIVE_UNSAFE")
+    if row.get("external_action_executed") is not False:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_EXTERNAL_ACTION_UNSAFE")
+
+    supplied = _text(row.get("receipt_digest"), 180)
+    body = {key: value for key, value in row.items() if key != "receipt_digest"}
+    if not _SHA256_RE.fullmatch(supplied):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_DIGEST_INVALID")
+    elif supplied != _digest(body):
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_DIGEST_MISMATCH")
+
+    try:
+        persisted = _parse_ts(row.get("persisted_at"))
+        now = _parse_ts(now_ts)
+    except ValueError:
+        blockers.append("EXECUTION_CHECKPOINT_RECEIPT_TIME_INVALID")
+    else:
+        age = (now - persisted).total_seconds()
+        if age < -5:
+            blockers.append("EXECUTION_CHECKPOINT_RECEIPT_FROM_FUTURE")
+        elif age > MAX_RECEIPT_AGE_SECONDS:
+            blockers.append("EXECUTION_CHECKPOINT_RECEIPT_TOO_OLD")
+
+    return list(dict.fromkeys(blockers))
+
+
+def verify_activation_execution_record_persistence(
+    *,
+    persistence_plan: Mapping[str, Any] | None,
+    prior_checkpoint_master: Mapping[str, Any] | None,
+    observed_checkpoint_master: Mapping[str, Any] | None,
+    checkpoint_write_receipt: Mapping[str, Any] | None,
+    now_ts: str,
+) -> dict[str, Any]:
+    """Attest exact execution-record persistence without storage I/O."""
+    plan, patch, blockers = _plan_blockers(persistence_plan)
+
+    prior_master = (
+        dict(prior_checkpoint_master)
+        if isinstance(prior_checkpoint_master, Mapping)
+        else {}
+    )
+    observed_master = (
+        dict(observed_checkpoint_master)
+        if isinstance(observed_checkpoint_master, Mapping)
+        else {}
+    )
+
+    try:
+        prior = reconstruct_checkpoint(prior_master)
+    except Exception:
+        blockers.append("PRIOR_CHECKPOINT_MASTER_INVALID")
+        prior = None
+
+    try:
+        observed = reconstruct_checkpoint(observed_master)
+    except Exception:
+        blockers.append("OBSERVED_CHECKPOINT_MASTER_INVALID")
+        observed = None
+
+    if prior is not None and patch:
+        if prior["revision"] != patch.get("expected_revision"):
+            blockers.append("PRIOR_CHECKPOINT_REVISION_MISMATCH")
+
+    expected_master = None
+    expected = None
+    if not blockers and prior is not None:
+        try:
+            expected_master = append_checkpoint_patch(
+                prior_master,
+                event_id=patch["recommended_event_id"],
+                patch=patch["patch"],
+                expected_revision=patch["expected_revision"],
+                created_at="1970-01-01T00:00:00+00:00",
+                evidence_refs=[
+                    _text(plan.get("execution_record_digest"), 180),
+                    _text(plan.get("pilot_id"), 120),
+                ],
+            )
+            expected = reconstruct_checkpoint(expected_master)
+        except Exception:
+            blockers.append("EXPECTED_EXECUTION_CHECKPOINT_SIMULATION_FAILED")
+
+    if expected is not None and observed is not None:
+        if observed["revision"] != expected["revision"]:
+            blockers.append("OBSERVED_CHECKPOINT_REVISION_MISMATCH")
+        if observed["snapshot"] != expected["snapshot"]:
+            blockers.append("OBSERVED_CHECKPOINT_SNAPSHOT_MISMATCH")
+
+        expected_event = dict(expected_master.get("journal", [])[-1])
+        observed_journal = list(observed_master.get("journal", []))
+        if not observed_journal:
+            blockers.append("OBSERVED_CHECKPOINT_EVENT_MISSING")
+        else:
+            actual_event = dict(observed_journal[-1])
+            for key in (
+                "event_id",
+                "base_revision",
+                "revision",
+                "event_type",
+                "patch",
+                "patch_digest",
+                "evidence_refs",
+            ):
+                if actual_event.get(key) != expected_event.get(key):
+                    blockers.append("OBSERVED_CHECKPOINT_EVENT_MISMATCH:" + key)
+
+    if (
+        prior is not None
+        and observed is not None
+        and isinstance(checkpoint_write_receipt, Mapping)
+    ):
+        blockers.extend(
+            _receipt_blockers(
+                checkpoint_write_receipt,
+                plan=plan,
+                patch=patch,
+                prior_master=prior_master,
+                observed_master=observed_master,
+                now_ts=now_ts,
+            )
+        )
+    elif not isinstance(checkpoint_write_receipt, Mapping):
+        blockers.append("EXECUTION_CHECKPOINT_WRITE_RECEIPT_REQUIRED")
+
+    blockers = list(dict.fromkeys(blockers))
+    if blockers or observed is None:
+        return _blocked(*blockers)
+
+    snapshot = dict(observed["snapshot"])
+    persisted_record = (
+        dict(snapshot.get(NAMESPACE))
+        if isinstance(snapshot.get(NAMESPACE), Mapping)
+        else {}
+    )
+    expected_record = dict(patch["patch"][NAMESPACE])
+    if persisted_record != expected_record:
+        return _blocked("PERSISTED_EXECUTION_RECORD_MISMATCH")
+
+    decision = _text(plan.get("execution_decision"), 80)
+    authorize = decision == "AUTHORIZE_ACTIVATION_EXECUTION"
+    deny = decision == "DENY_ACTIVATION_EXECUTION"
+
+    attestation_material = {
+        "decision": decision,
+        "scope": {
+            "owner_id": _text(persisted_record.get("owner_id"), 120),
+            "tenant_id": _text(persisted_record.get("tenant_id"), 120),
+            "workspace_id": _text(persisted_record.get("workspace_id"), 120),
+        },
+        "candidate_id": _text(persisted_record.get("candidate_id"), 120),
+        "proposal_id": _text(persisted_record.get("proposal_id"), 120),
+        "pilot_id": plan["pilot_id"],
+        "execution_environment_digest": _text(
+            persisted_record.get("execution_environment_digest"),
+            180,
+        ),
+        "execution_preflight_digest": _text(
+            persisted_record.get("execution_preflight_digest"),
+            180,
+        ),
+        "execution_request_digest": _text(
+            persisted_record.get("execution_request_digest"),
+            180,
+        ),
+        "execution_record_digest": plan["execution_record_digest"],
+        "patch_digest": patch["patch_digest"],
+        "checkpoint_revision": observed["revision"],
+        "checkpoint_state_digest": observed["state_digest"],
+        "checkpoint_master_digest": checkpoint_master_digest(observed_master),
+        "receipt_digest": checkpoint_write_receipt["receipt_digest"],
+    }
+
+    return {
+        "schema": SCHEMA,
+        "state": (
+            "EXECUTION_RECORD_PERSISTENCE_ATTESTED_AUTHORIZE"
+            if authorize
+            else "EXECUTION_RECORD_PERSISTENCE_ATTESTED_DENY"
+        ),
+        "blockers": [],
+        "decision": decision,
+        "scope": attestation_material["scope"],
+        "candidate_id": attestation_material["candidate_id"],
+        "proposal_id": attestation_material["proposal_id"],
+        "pilot_id": plan["pilot_id"],
+        "execution_environment_digest": attestation_material[
+            "execution_environment_digest"
+        ],
+        "execution_preflight_digest": attestation_material[
+            "execution_preflight_digest"
+        ],
+        "execution_request_digest": attestation_material[
+            "execution_request_digest"
+        ],
+        "execution_record_digest": plan["execution_record_digest"],
+        "checkpoint_revision": observed["revision"],
+        "checkpoint_state_digest": observed["state_digest"],
+        "checkpoint_master_digest": checkpoint_master_digest(observed_master),
+        "receipt_digest": checkpoint_write_receipt["receipt_digest"],
+        "attestation_digest": _digest(attestation_material),
+        "execution_record_persisted": True,
+        "persistence_attested": True,
+        "receipt_consistency_verified": True,
+        "writer_identity_verified": False,
+        "execution_authorization_intent": authorize,
+        "execution_denial_intent": deny,
+        "eligible_for_activation_command_planning": bool(authorize),
+        "activation_command_generated": False,
+        "activation_command_executed": False,
+        "pilot_activation_authorized": False,
+        "pilot_activated": False,
+        "customer_contact_authorized": False,
+        "billing_authorized": False,
+        "provisioning_authorized": False,
+        "deploy_authorized": False,
+        "production_mutation_authorized": False,
+        "storage_write_performed": False,
+        "external_action_executed": False,
+        "network_called": False,
+        "executes_action": False,
+    }
+
+
+__all__ = [
+    "SCHEMA",
+    "PLAN_SCHEMA",
+    "PATCH_SCHEMA",
+    "EXECUTION_SCHEMA",
+    "RECEIPT_SCHEMA",
+    "NAMESPACE",
+    "MAX_RECEIPT_AGE_SECONDS",
+    "build_execution_checkpoint_write_receipt_body",
+    "verify_activation_execution_record_persistence",
+]

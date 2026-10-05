@@ -37,6 +37,7 @@ EVENT_TYPES = frozenset({
     "DURABLE_HANDOFF_PREPARED",
     "RECOVERY_PREPARED",
     "REQUEST_BLOCKED",
+    "TASKGRAPH_CHECKPOINT",
 })
 _SECRET_MARKERS = (
     "secret", "token", "password", "credential", "api_key", "apikey",
