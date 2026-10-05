@@ -518,52 +518,55 @@ class DerivedProjectionIsolationTests(unittest.TestCase):
         self.doc_a = reviewed_document(
             tenant="tenant:a",
             workspace="workspace:a",
-            title="Shared Id A",
-            checksum="shared-a",
+            title="Scope A",
+            checksum="scope-a",
         )
         self.doc_b = reviewed_document(
             tenant="tenant:b",
             workspace="workspace:b",
-            title="Shared Id B",
-            checksum="shared-b",
+            title="Scope B",
+            checksum="scope-b",
         )
         self.doc_b["document_id"] = self.doc_a["document_id"]
 
-    def combined_index(self):
-        first = index_document(
+    def index_a(self):
+        return index_document(
             empty_library_index(),
             self.doc_a,
             passages=["alpha payroll projection"],
             trusted_context=self.a,
         )["index"]
-        return index_document(
-            first,
+
+    def test_stricter_current_index_rejects_cross_scope_mixing(self):
+        state = self.index_a()
+        denied = index_document(
+            state,
             self.doc_b,
             passages=["beta payroll projection"],
             trusted_context=self.b,
-        )["index"]
+        )
+        self.assertEqual(denied["status"], "BLOCKED")
+        self.assertIn("INDEX_SCOPE_MISMATCH", denied["blockers"])
+        self.assertEqual(denied["index"], state)
 
-    def test_same_document_id_can_coexist_across_scopes_without_reindex_clobber(self):
-        state = self.combined_index()
-        self.assertEqual(len(state["documents"]), 2)
-        self.assertEqual(len(state["passages"]), 2)
-        hit_a = search_library_index(
+    def test_same_document_id_reindex_within_scope_replaces_only_that_projection(self):
+        state = self.index_a()
+        changed = dict(self.doc_a)
+        changed["title"] = "Scope A refreshed"
+        changed["checksum"] = "scope-a-refreshed"
+        result = index_document(
             state,
-            "alpha payroll",
+            changed,
+            passages=["alpha refreshed payroll"],
             trusted_context=self.a,
         )
-        hit_b = search_library_index(
-            state,
-            "beta payroll",
-            trusted_context=self.b,
-        )
-        self.assertEqual(len(hit_a["hits"]), 1)
-        self.assertEqual(len(hit_b["hits"]), 1)
-        self.assertIn("alpha", hit_a["hits"][0]["text"])
-        self.assertIn("beta", hit_b["hits"][0]["text"])
+        self.assertEqual(result["status"], "INDEXED")
+        self.assertEqual(len(result["index"]["documents"]), 1)
+        self.assertEqual(len(result["index"]["passages"]), 1)
+        self.assertIn("refreshed", result["index"]["passages"][0]["text"])
 
-    def test_document_purge_removes_only_exact_scope_projection(self):
-        state = self.combined_index()
+    def test_document_purge_removes_exact_scope_projection(self):
+        state = self.index_a()
         purged = purge_document_projection(
             state,
             self.doc_a["document_id"],
@@ -580,58 +583,37 @@ class DerivedProjectionIsolationTests(unittest.TestCase):
             )["hits"],
             [],
         )
-        self.assertEqual(
-            len(search_library_index(
-                purged["index"],
-                "beta payroll",
-                trusted_context=self.b,
-            )["hits"]),
-            1,
-        )
 
-    def test_foreign_scope_cannot_purge_document_projection(self):
-        only_a = index_document(
-            empty_library_index(),
-            self.doc_a,
-            passages=["alpha payroll projection"],
-            trusted_context=self.a,
-        )["index"]
+    def test_foreign_scope_cannot_purge_scope_bound_index(self):
+        state = self.index_a()
         denied = purge_document_projection(
-            only_a,
+            state,
             self.doc_a["document_id"],
             trusted_context=self.b,
         )
         self.assertEqual(denied["status"], "BLOCKED")
-        self.assertIn("CROSS_SCOPE_DOCUMENT_PURGE_DENIED", denied["blockers"])
-        self.assertEqual(denied["index"], only_a)
+        self.assertIn("INDEX_SCOPE_MISMATCH", denied["blockers"])
+        self.assertEqual(denied["index"], state)
 
-    def test_scope_purge_preserves_other_tenant_and_projection_is_disposable(self):
-        state = self.combined_index()
+    def test_scope_purge_keeps_projection_noncanonical_and_scope_bound(self):
+        state = self.index_a()
         manifest = projection_manifest(state)
         self.assertFalse(manifest["source_of_truth"])
+        self.assertFalse(manifest["canonical_source"])
         self.assertTrue(manifest["disposable"])
         self.assertTrue(manifest["rebuild_requires_source_documents"])
         self.assertTrue(manifest["projection_digest"].startswith("sha256:"))
 
         purged = purge_scope_projection(state, trusted_context=self.a)
+        self.assertEqual(purged["status"], "PURGED")
         self.assertEqual(purged["removed_documents"], 1)
         self.assertEqual(purged["removed_passages"], 1)
-        self.assertEqual(
-            search_library_index(
-                purged["index"],
-                "alpha payroll",
-                trusted_context=self.a,
-            )["hits"],
-            [],
-        )
-        self.assertEqual(
-            len(search_library_index(
-                purged["index"],
-                "beta payroll",
-                trusted_context=self.b,
-            )["hits"]),
-            1,
-        )
+        self.assertEqual(purged["index"]["documents"], [])
+        self.assertEqual(purged["index"]["passages"], [])
+
+        foreign = purge_scope_projection(state, trusted_context=self.b)
+        self.assertEqual(foreign["status"], "BLOCKED")
+        self.assertIn("INDEX_SCOPE_MISMATCH", foreign["blockers"])
 
     def test_rebuild_requires_exact_scope_sources(self):
         rebuilt = rebuild_scope_projection(
@@ -658,6 +640,7 @@ class DerivedProjectionIsolationTests(unittest.TestCase):
         )
         self.assertEqual(denied["status"], "BLOCKED")
         self.assertIn("CROSS_SCOPE_REBUILD_SOURCE_DENIED", denied["blockers"])
+
 
 
 if __name__ == "__main__":
