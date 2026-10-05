@@ -211,6 +211,11 @@ class CumulativeAuthorityBudget:
                 "reason": "AUTHORITY_BUDGET_BINDING_INVALID:" + type(exc).__name__,
                 "authority_budget_ref": self.authority_budget_ref,
                 "transaction_id": _clean((decision or {}).get("transaction_id"), 128),
+                "scope": {
+                    "owner_id": self.scope.owner_id,
+                    "tenant_id": self.scope.tenant_id,
+                    "workspace_id": self.scope.workspace_id,
+                },
                 "grants_authority": False,
                 "executes_action": False,
             }
@@ -253,6 +258,11 @@ class CumulativeAuthorityBudget:
             "transaction_id": bound["transaction_id"],
             "policy_version": self.policy_version,
             "policy_digest": self.policy_digest,
+            "scope": {
+                "owner_id": self.scope.owner_id,
+                "tenant_id": self.scope.tenant_id,
+                "workspace_id": self.scope.workspace_id,
+            },
             "before": before,
             "projected_after": after,
             "grants_authority": False,
@@ -352,6 +362,11 @@ class CumulativeAuthorityBudget:
             "policy_version": self.policy_version,
             "policy_digest": self.policy_digest,
             "transaction_id": tx,
+            "scope": {
+                "owner_id": self.scope.owner_id,
+                "tenant_id": self.scope.tenant_id,
+                "workspace_id": self.scope.workspace_id,
+            },
             **data,
             "grants_authority": False,
             "executes_action": False,
