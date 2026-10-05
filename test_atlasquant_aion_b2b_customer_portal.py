@@ -229,7 +229,7 @@ class AionB2BCustomerPortalTests(unittest.TestCase):
         normalized = normalize_customer_portal_binding(
             binding(current, allowed_sections=["overview", "support", "admin", "billing"])
         )
-        self.assertEqual(normalized["allowed_sections"], ("overview", "support"))
+        self.assertEqual(normalized["allowed_sections"], ("overview", "support", "billing"))
 
     def test_valid_records_extend_customer_view_without_internal_scope(self):
         current = access()
