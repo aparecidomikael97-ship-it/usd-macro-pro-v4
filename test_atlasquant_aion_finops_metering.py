@@ -48,6 +48,27 @@ def request(*, user="u1", calls=1, tokens=100, cost=0.1, depth=1):
     }
 
 
+def policy(**overrides):
+    row = {
+        "state": "VERIFIED",
+        "policy_id": "finops-default",
+        "revision": 1,
+        **SCOPE,
+        "window_budget_usd": 10.0,
+        "max_calls": 100,
+        "max_tokens": 100000,
+        "max_depth": 4,
+        "max_user_calls": 50,
+        "max_user_tokens": 50000,
+        "soft_limit_pct": 80,
+        "noisy_neighbor_share_pct": 70,
+        "reconciliation_threshold_pct": 20,
+        "block_on_cost_divergence": False,
+    }
+    row.update(overrides)
+    return row
+
+
 class AionFinOpsMeteringTests(unittest.TestCase):
     def test_scope_mismatch_is_rejected_and_not_counted(self):
         ledger = build_metering_ledger(
@@ -95,7 +116,7 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         )
         decision = evaluate_finops_budget(
             ledger,
-            policy={"window_budget_usd": 1.0, "soft_limit_pct": 80},
+            policy=policy(window_budget_usd=1.0, soft_limit_pct=80),
             prospective_request=request(cost=0.25),
         )
         self.assertEqual(decision["state"], "BLOCK")
@@ -122,12 +143,12 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         ledger = build_metering_ledger([], trusted_scope=SCOPE)
         decision = evaluate_finops_budget(
             ledger,
-            policy={
-                "max_calls": 3,
-                "max_tokens": 200,
-                "max_depth": 2,
-                "window_budget_usd": 10,
-            },
+            policy=policy(
+                max_calls=3,
+                max_tokens=200,
+                max_depth=2,
+                window_budget_usd=10,
+            ),
             prospective_request=request(calls=4, tokens=250, cost=0.1, depth=3),
         )
         self.assertEqual(decision["state"], "BLOCK")
@@ -145,12 +166,12 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         )
         offender = evaluate_finops_budget(
             ledger,
-            policy={
-                "window_budget_usd": 10,
-                "noisy_neighbor_share_pct": 70,
-                "max_user_calls": 100,
-                "max_user_tokens": 100000,
-            },
+            policy=policy(
+                window_budget_usd=10,
+                noisy_neighbor_share_pct=70,
+                max_user_calls=100,
+                max_user_tokens=100000,
+            ),
             prospective_request=request(user="u1", cost=0.20),
         )
         other = evaluate_finops_budget(
@@ -213,20 +234,20 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         )
         degraded = evaluate_finops_budget(
             ledger,
-            policy={
-                "window_budget_usd": 10,
-                "reconciliation_threshold_pct": 20,
-                "block_on_cost_divergence": False,
-            },
+            policy=policy(
+                window_budget_usd=10,
+                reconciliation_threshold_pct=20,
+                block_on_cost_divergence=False,
+            ),
             prospective_request=request(cost=0.1),
         )
         blocked = evaluate_finops_budget(
             ledger,
-            policy={
-                "window_budget_usd": 10,
-                "reconciliation_threshold_pct": 20,
-                "block_on_cost_divergence": True,
-            },
+            policy=policy(
+                window_budget_usd=10,
+                reconciliation_threshold_pct=20,
+                block_on_cost_divergence=True,
+            ),
             prospective_request=request(cost=0.1),
         )
         self.assertEqual(degraded["state"], "DEGRADE")
@@ -234,11 +255,48 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         self.assertEqual(blocked["state"], "BLOCK")
         self.assertIn("COST_RECONCILIATION_REQUIRED", blocked["blockers"])
 
+    def test_missing_or_invalid_required_limit_fails_closed(self):
+        ledger = build_metering_ledger([], trusted_scope=SCOPE)
+        missing = policy()
+        missing.pop("max_depth")
+        invalid = policy(max_tokens="unlimited")
+        out_missing = evaluate_finops_budget(
+            ledger,
+            policy=missing,
+            prospective_request=request(cost=0.1),
+        )
+        out_invalid = evaluate_finops_budget(
+            ledger,
+            policy=invalid,
+            prospective_request=request(cost=0.1),
+        )
+        self.assertIn("POLICY_MAX_DEPTH_INVALID", out_missing["blockers"])
+        self.assertIn("POLICY_MAX_TOKENS_INVALID", out_invalid["blockers"])
+        self.assertEqual(out_missing["state"], "BLOCK")
+        self.assertEqual(out_invalid["state"], "BLOCK")
+
+    def test_policy_scope_and_verified_state_are_mandatory(self):
+        ledger = build_metering_ledger([], trusted_scope=SCOPE)
+        unverified = policy(state="DRAFT")
+        crossed = policy(tenant_id="tenant-b")
+        out_unverified = evaluate_finops_budget(
+            ledger,
+            policy=unverified,
+            prospective_request=request(cost=0.1),
+        )
+        out_crossed = evaluate_finops_budget(
+            ledger,
+            policy=crossed,
+            prospective_request=request(cost=0.1),
+        )
+        self.assertIn("POLICY_NOT_VERIFIED", out_unverified["blockers"])
+        self.assertIn("POLICY_SCOPE_MISMATCH", out_crossed["blockers"])
+
     def test_request_never_grants_authority_or_executes(self):
         ledger = build_metering_ledger([], trusted_scope=SCOPE)
         decision = evaluate_finops_budget(
             ledger,
-            policy={"window_budget_usd": 10},
+            policy=policy(window_budget_usd=10),
             prospective_request=request(cost=0.1),
         )
         self.assertFalse(decision["grants_authority"])
