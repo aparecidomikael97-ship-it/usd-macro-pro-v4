@@ -228,15 +228,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
     def test_full_proposed_verified_promoted_path_marks_only_governed_row_current(self):
         proposed = self._propose()
         p = proposed["proposal"]
-        verified = verify_memory_proposal(
-            proposed["governance"],
-            p["proposal_id"],
-            verifier_kind="SOURCE_REQUERY",
-            verifier_id="source-requery-1",
-            verification_refs=["source:primary:1"],
-            verifier=verifier_for(p),
-            now=NOW,
-        )
+        verified = self._verify_independently(proposed)
         promoted = promote_verified_memory(
             verified["governance"],
             default_memory_layers(),
@@ -244,6 +236,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
             trusted_context=scope(),
             review_approved=True,
             reviewed_by="mikael",
+            verification_ledger=verified["verification_ledger"],
             now=NOW,
         )
         self.assertEqual(promoted["state"], "PROMOTED")
@@ -393,6 +386,7 @@ class AionMemoryGovernanceTests(unittest.TestCase):
             trusted_context=scope(),
             review_approved=True,
             reviewed_by="mikael",
+            verification_ledger=verified["verification_ledger"],
             now=NOW,
         )
         superseded = supersede_promoted_memory(
