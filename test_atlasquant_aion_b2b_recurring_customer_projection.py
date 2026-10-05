@@ -20,7 +20,7 @@ from atlasquant_aion_tenant import tenant_namespace
 
 def access(
     *,
-    username="cliente@empresa.com",
+    username="cliente_empresa",
     role="USER",
     fingerprint="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 ):
