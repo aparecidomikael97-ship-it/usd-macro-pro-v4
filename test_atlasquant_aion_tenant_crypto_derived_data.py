@@ -32,6 +32,7 @@ from atlasquant_aion_tenant_durable_store import (
     durable_store_policy,
     tenant_workspace_paths,
 )
+from atlasquant_aion_tenant_privacy import tenant_deletion_plan
 
 
 NOW = datetime(2026, 10, 5, 7, 0, tzinfo=timezone.utc)
@@ -217,6 +218,67 @@ class TenantCryptoDurableStoreTests(unittest.TestCase):
         backup_text = Path(backup["backup_path"]).read_text(encoding="utf-8")
         self.assertNotIn(marker, backup_text)
         self.assertEqual(json.loads(backup_text)["schema"], CRYPTO_SCHEMA)
+
+    def test_audit_metadata_does_not_repeat_encrypted_payload_plaintext(self):
+        store = self.store()
+        marker = "PRIVATE-MEMORY-MARKER-NOT-FOR-AUDIT"
+        self.assertTrue(store.write(
+            self.user,
+            [self.entitlement],
+            {"profile": {"display_name": marker}},
+            approved=True,
+            now=NOW,
+        )["stored"])
+        self.assertTrue(store.backup(
+            self.user,
+            [self.entitlement],
+            approved=True,
+            now=NOW,
+        )["backed_up"])
+        audit_text = Path(self.paths["audit"]).read_text(encoding="utf-8")
+        self.assertNotIn(marker, audit_text)
+        self.assertNotIn("key_bytes", audit_text)
+        for file_path in Path(self.paths["folder"]).rglob("*.json"):
+            self.assertNotIn(marker, file_path.read_text(encoding="utf-8"))
+
+    def test_deletion_plan_covers_live_backup_projection_cache_and_key_surfaces(self):
+        memory = {
+            "tenant_id": self.paths["tenant_id"],
+            "schema": "ATLASQUANT_AION_TENANT_V1",
+            "namespace": "tenant:" + self.paths["tenant_id"],
+            "created_at": NOW.isoformat(),
+            "updated_at": NOW.isoformat(),
+            "profile": {},
+            "conversation_notes": [],
+            "academy_progress": {},
+            "watchlist": [],
+            "truth_policy": "never_invent",
+            "privacy": {},
+            "permissions": {},
+        }
+        plan = tenant_deletion_plan(
+            memory,
+            self.user,
+            explicit_request=True,
+        )
+        self.assertEqual(plan["status"], "PLAN_READY")
+        self.assertEqual(
+            set(plan["surfaces"]),
+            {
+                "LIVE_TENANT_STORE",
+                "TENANT_BACKUPS",
+                "DERIVED_INDEXES",
+                "CACHES",
+                "TENANT_DATA_KEY",
+                "MINIMAL_AUDIT_METADATA",
+            },
+        )
+        self.assertTrue(plan["derived_projection_purge_required"])
+        self.assertTrue(plan["backup_reconciliation_required"])
+        self.assertTrue(plan["tenant_key_retirement_review_required"])
+        self.assertTrue(plan["crypto_shredding_is_not_sole_deletion_proof"])
+        self.assertFalse(plan["deletion_executed"])
+        self.assertFalse(plan["executes_action"])
 
     def test_same_plaintext_rewrite_uses_fresh_nonce_and_ciphertext(self):
         store = self.store()
