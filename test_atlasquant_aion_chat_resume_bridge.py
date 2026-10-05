@@ -84,6 +84,34 @@ class ResumeContextTests(unittest.TestCase):
             self.assertEqual(out["identity_binding_digest"], again["identity_binding_digest"])
             reopened.close()
 
+    def test_resume_context_preserves_multiline_history(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store = self._store(raw)
+            conv = store.create_conversation(self.scope)
+            message = "status geral\n  segunda linha\n\tbloco indentado"
+            persisted = execute_and_persist_readonly(
+                store,
+                self.scope,
+                message,
+                context=ADMIN_CONTEXT,
+                runtime_context={"checkpoint": default_checkpoint()},
+                access=ADMIN_ACCESS,
+                authenticated_admin=True,
+                conversation_id=conv.id,
+                turn_index=22,
+            )
+            self.assertEqual(
+                persisted["state"],
+                "CONFIRMED_AND_PERSISTED",
+            )
+            out = prepare_resume_context(store, self.scope, conv.id)
+            self.assertEqual(out["state"], "READY")
+            self.assertEqual(
+                out["context"]["recent"][0]["content"],
+                message,
+            )
+            store.close()
+
     def test_prepare_is_read_only_and_does_not_create_checkpoint(self):
         with tempfile.TemporaryDirectory() as raw:
             store = self._store(raw)
