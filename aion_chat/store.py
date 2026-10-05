@@ -32,15 +32,27 @@ def dump(value):
     return json.dumps(redact(asdict(value)), ensure_ascii=False, separators=(",", ":"))
 
 
+class StorageUnavailableError(RuntimeError):
+    """Raised when local durable chat storage cannot be trusted safely."""
+
+
 class SQLiteChatStore:
+    BUSY_TIMEOUT_MS = 30_000
+    CHECKPOINT_MODES = {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}
+
     def __init__(self, path):
-        path = Path(path)
+        path = Path(path).expanduser().resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(str(path), timeout=30)
-        self.db.row_factory = sqlite3.Row
-        self.db.executescript("""
+        self.path = path
+        self._health_state = "recovering"
+        try:
+            self.db = sqlite3.connect(str(path), timeout=self.BUSY_TIMEOUT_MS / 1000)
+            self.db.row_factory = sqlite3.Row
+            self.db.executescript(f"""
         PRAGMA foreign_keys=ON;
         PRAGMA journal_mode=WAL;
+        PRAGMA synchronous=FULL;
+        PRAGMA busy_timeout={self.BUSY_TIMEOUT_MS};
         CREATE TABLE IF NOT EXISTS conversations(id TEXT PRIMARY KEY, owner TEXT NOT NULL,
             tenant TEXT NOT NULL, workspace TEXT NOT NULL, updated TEXT NOT NULL,
             archived INTEGER NOT NULL, title TEXT NOT NULL, data TEXT NOT NULL);
@@ -52,9 +64,104 @@ class SQLiteChatStore:
             kind TEXT NOT NULL,seq INTEGER NOT NULL,data TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS record_history ON records(cid,kind,seq,id);
         """)
+            status = self.health()
+            if status["state"] != "healthy":
+                raise StorageUnavailableError(f"storage integrity check failed: {status['detail']}")
+        except sqlite3.DatabaseError as exc:
+            self._health_state = "failed"
+            db = getattr(self, "db", None)
+            if db is not None:
+                db.close()
+            raise StorageUnavailableError("storage open/integrity failed") from exc
 
     def close(self):
         self.db.close()
+
+    def health(self):
+        try:
+            rows = self.db.execute("PRAGMA quick_check").fetchall()
+        except sqlite3.DatabaseError as exc:
+            self._health_state = "failed"
+            return {"state": "failed", "detail": str(exc)}
+        details = [str(row[0]) for row in rows]
+        if details == ["ok"]:
+            self._health_state = "healthy"
+            return {"state": "healthy", "detail": "ok"}
+        self._health_state = "degraded"
+        return {"state": "degraded", "detail": "; ".join(details)}
+
+    def checkpoint(self, mode="PASSIVE"):
+        mode = str(mode).upper()
+        if mode not in self.CHECKPOINT_MODES:
+            raise ValueError("invalid WAL checkpoint mode")
+        if self._health_state == "failed":
+            raise StorageUnavailableError("storage is failed")
+        try:
+            row = self.db.execute(f"PRAGMA wal_checkpoint({mode})").fetchone()
+        except sqlite3.DatabaseError as exc:
+            self._health_state = "failed"
+            raise StorageUnavailableError("WAL checkpoint failed") from exc
+        busy, log_frames, checkpointed_frames = (int(row[0]), int(row[1]), int(row[2]))
+        if busy:
+            self._health_state = "degraded"
+        return {
+            "mode": mode,
+            "busy": busy,
+            "log_frames": log_frames,
+            "checkpointed_frames": checkpointed_frames,
+        }
+
+    def backup_to(self, destination):
+        destination = Path(destination).expanduser().resolve()
+        if destination == self.path:
+            raise ValueError("backup destination must differ from source")
+        if self.health()["state"] != "healthy":
+            raise StorageUnavailableError("refusing backup from unhealthy storage")
+        checkpoint = self.checkpoint("FULL")
+        if checkpoint["busy"]:
+            raise StorageUnavailableError("refusing backup while WAL checkpoint is busy")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        target = sqlite3.connect(str(destination))
+        try:
+            self.db.backup(target)
+            result = target.execute("PRAGMA quick_check").fetchall()
+            if [str(row[0]) for row in result] != ["ok"]:
+                raise StorageUnavailableError("backup integrity check failed")
+            target.commit()
+        finally:
+            target.close()
+        return destination
+
+    @staticmethod
+    def restore_backup(source, destination, *, replace=False):
+        source = Path(source).expanduser().resolve()
+        destination = Path(destination).expanduser().resolve()
+        if not source.is_file():
+            raise FileNotFoundError(source)
+        if destination.exists() and not replace:
+            raise FileExistsError(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source_db = sqlite3.connect(str(source))
+        target_db = None
+        try:
+            source_check = source_db.execute("PRAGMA quick_check").fetchall()
+            if [str(row[0]) for row in source_check] != ["ok"]:
+                raise StorageUnavailableError("backup source integrity check failed")
+            if replace and destination.exists():
+                destination.unlink()
+            target_db = sqlite3.connect(str(destination))
+            source_db.backup(target_db)
+            target_check = target_db.execute("PRAGMA quick_check").fetchall()
+            if [str(row[0]) for row in target_check] != ["ok"]:
+                raise StorageUnavailableError("restored database integrity check failed")
+            target_db.commit()
+        except sqlite3.DatabaseError as exc:
+            raise StorageUnavailableError("backup restore failed") from exc
+        finally:
+            source_db.close()
+            if target_db is not None:
+                target_db.close()
+        return destination
 
     def _scope(self, scope):
         if not isinstance(scope, Scope):
