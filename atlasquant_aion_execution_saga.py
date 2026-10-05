@@ -20,6 +20,7 @@ import re
 from typing import Any, Mapping, Sequence
 
 from aion_chat.models import Scope
+from aion_chat.privacy import redact
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_cumulative_authority_budget import CumulativeAuthorityBudget
 from atlasquant_aion_execution_outbox import ExecutionOutbox
@@ -322,7 +323,7 @@ class ExecutionSagaCoordinator:
             if capability == "CRITICAL":
                 raise ValueError("critical capability requires separate human-owned flow")
             reversible = raw.get("reversible") is True
-            if raw.get("reversible") not in {True, False}:
+            if raw.get("reversible") is not True and raw.get("reversible") is not False:
                 raise ValueError("reversible must be exact boolean")
             compensation_action = _clean(raw.get("compensation_action"), 128)
             compensation_risk = raw.get("compensation_risk_points", risk if reversible else 0)
@@ -337,8 +338,8 @@ class ExecutionSagaCoordinator:
             else:
                 compensation_action = ""
                 compensation_risk = 0
-            payload = dict(raw.get("payload") or {})
-            compensation_payload = dict(raw.get("compensation_payload") or {})
+            payload = redact(dict(raw.get("payload") or {}))
+            compensation_payload = redact(dict(raw.get("compensation_payload") or {}))
             normalized.append({
                 "ordinal": ordinal,
                 "step_key": key,
