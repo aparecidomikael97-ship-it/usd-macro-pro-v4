@@ -413,9 +413,24 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
             f'<span class="aq-ws-state" data-state="{escape(item["state"])}">{escape(item["state"])}</span>'
             '</button>'
         )
+    mobile_cards = []
+    for item in workspace_modules("negocios"):
+        route = module_routes.get(item["id"], item["id"])
+        mobile_cards.append(
+            f'<button class="ref-mobile-card ref-mobile-card-{escape(route)}" '
+            f'data-route="{escape(route)}" aria-label="{escape(item["title"])}">'
+            '<span class="ref-mobile-art" aria-hidden="true" '
+            'style="min-height:108px;background-image:'
+            'radial-gradient(circle at 72% 28%,rgba(52,226,190,.26),transparent 34%),'
+            'linear-gradient(145deg,#07172b,#0c2340 55%,#07111e)"></span>'
+            f'<strong>{escape(item["title"])}</strong></button>'
+        )
     back = (
-        '<button data-route="central" class="ref-return aq-ws-back" aria-label="Voltar à Central">← Central</button>'
-        if show_central else ""
+        '<div class="ref-toolbar aq-ws-toolbar">'
+        '<button data-route="central" aria-label="Voltar à Central">← Central</button>'
+        '<span>NEGÓCIOS · OPERAÇÃO B2B</span></div>'
+        if show_central
+        else '<div class="ref-toolbar aq-ws-toolbar"><span>NEGÓCIOS · OPERAÇÃO B2B</span></div>'
     )
     mode_label = str(mode or "").strip() or "SESSÃO ATUAL"
     drawer = (
@@ -439,7 +454,9 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         '.ref-negocios:has(.aq-ws-business-canvas){max-width:100%!important;margin-inline:0!important}'
         '.aq-ws-business-canvas{position:relative!important;width:100%!important;height:auto!important;'
         'aspect-ratio:auto!important;background:none!important;margin:0!important}'
-        '@media(max-width:700px){.ref-negocios .aq-ws-business-canvas{display:block!important}}'
+        '.ref-negocios .ref-mobile-art{background-size:cover!important;background-position:center!important}'
+        '@media(max-width:700px){.ref-negocios .aq-ws-business-canvas{display:none!important}'
+        '.ref-negocios .ref-mobile-grid{display:grid!important}.ref-negocios .ref-mobile-header{display:block!important}}'
         '</style>'
         '<section class="ref-workspace ref-negocios" data-workspace="negocios" '
         'data-business-contract="managed-operations-v1">'
@@ -474,7 +491,13 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         + '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; '
         'o workspace ativo usa o contrato B2B atual e não executa ações externas automaticamente.</p>'
         f'<p class="ref-truth">Sessão: {escape(name)}</p>'
-        '</main></div></section></div></section>'
+        '</main></div></section></div>'
+        '<div class="ref-mobile-header ref-mobile-header-negocios">'
+        '<span class="ref-mobile-kicker">ECOSSISTEMA ATLASQUANT</span>'
+        '<h1>ATLASQUANT · NEGÓCIOS</h1>'
+        '<p>Operação B2B, crescimento e automação com controle.</p></div>'
+        f'<div class="ref-mobile-grid">{"".join(mobile_cards)}</div>'
+        '</section>'
     )
 
 
