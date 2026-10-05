@@ -33,6 +33,7 @@ def contract(**overrides):
 
 def cycle(**overrides):
     row = {
+        **SCOPE,
         "state": "HEALTHY",
         "decision": "RENEWAL_REVIEW_CANDIDATE",
         "customer_id": "customer-001",
@@ -108,6 +109,19 @@ class AionB2BPortalReadModelTests(unittest.TestCase):
         )
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("USAGE_SCOPE_MISMATCH", out["blockers"])
+
+    def test_cross_tenant_cycle_evidence_is_rejected(self):
+        out = build_customer_portal_read_model(
+            trusted_scope=SCOPE,
+            contract_result=contract(),
+            cycle_result=cycle(tenant_id="tenant-b"),
+            usage_evidence=usage(),
+            support_evidence=support(),
+            generated_at="2026-10-05T12:00:00-04:00",
+            evidence_refs=["a", "b", "c", "d"],
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertIn("SERVICE_CYCLE_SCOPE_MISMATCH", out["blockers"])
 
     def test_blocked_service_cycle_is_not_presentable(self):
         out = build_customer_portal_read_model(
