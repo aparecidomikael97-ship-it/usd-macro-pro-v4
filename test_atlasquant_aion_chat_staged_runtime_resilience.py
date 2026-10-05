@@ -281,8 +281,7 @@ class StagedHostIdentityLifecycleTests(unittest.TestCase):
                 environment="STAGING",
             )
             self.assertIsNot(first["store"], second["store"])
-            with self.assertRaises(sqlite3.ProgrammingError):
-                first["store"].db.execute("SELECT 1")
+            self.assertEqual(first["store"].storage_health()["state"], "failed")
             self.assertNotEqual(
                 first["session_binding_digest"],
                 second["session_binding_digest"],
@@ -313,8 +312,7 @@ class StagedHostIdentityLifecycleTests(unittest.TestCase):
                 environment="STAGING",
             )
             self.assertNotEqual(first_path, second["staging_store_path"])
-            with self.assertRaises(sqlite3.ProgrammingError):
-                first["store"].db.execute("SELECT 1")
+            self.assertEqual(first["store"].storage_health()["state"], "failed")
             self.assertEqual(second["scope"].owner_id, "other-admin")
             self.assertEqual(second["storage_health"]["state"], HEALTHY)
             close_all_staged_host_stores(session)
@@ -330,8 +328,7 @@ class StagedHostIdentityLifecycleTests(unittest.TestCase):
             )
             self.assertEqual(close_all_staged_host_stores(session), 1)
             self.assertEqual(close_all_staged_host_stores(session), 0)
-            with self.assertRaises(sqlite3.ProgrammingError):
-                binding["store"].db.execute("SELECT 1")
+            self.assertEqual(binding["store"].storage_health()["state"], "failed")
 
     def test_access_panel_logout_contains_staged_handle_cleanup_hook(self):
         source = Path("atlasquant_access_panel.py").read_text(encoding="utf-8")
