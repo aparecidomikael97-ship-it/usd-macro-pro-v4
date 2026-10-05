@@ -146,7 +146,19 @@ def view_data(chat):
     }
 
 
-def render_aion_chat_workspace(st, access, *, mode, selected, navigation, component):
+def render_aion_chat_workspace(
+    st,
+    access,
+    *,
+    mode,
+    selected,
+    navigation,
+    component,
+    product_scope=None,
+    product_store=None,
+    runtime_context=None,
+    product_conversation_id="",
+):
     from atlasquant_central_hub_ui import assert_area_access
     if not access or access.get("allowed") is not True: return False
     assert_area_access(access, "aion")
@@ -158,6 +170,27 @@ def render_aion_chat_workspace(st, access, *, mode, selected, navigation, compon
         'data-module="chat" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+    injected = (product_scope, product_store, runtime_context)
+    if any(item is not None for item in injected):
+        if any(item is None for item in injected):
+            raise ValueError(
+                "staged product mode requires Scope + store + runtime_context"
+            )
+        from atlasquant_aion_chat_product_ui import (
+            render_product_chat_workspace,
+        )
+        return render_product_chat_workspace(
+            st,
+            access,
+            scope=product_scope,
+            store=product_store,
+            runtime_context=runtime_context,
+            selected=selected,
+            navigation=navigation,
+            component=component,
+            conversation_id=product_conversation_id,
+        )
+
     context = trusted_context(access, mode)
     chat = session_chat(st.session_state, context)
     data = view_data(chat)

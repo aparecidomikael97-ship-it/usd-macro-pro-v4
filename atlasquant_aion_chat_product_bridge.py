@@ -21,6 +21,8 @@ SCHEMA = "ATLASQUANT_AION_CHAT_PRODUCT_BINDING_V1"
 CREATE_SCHEMA = "ATLASQUANT_AION_CHAT_PRODUCT_CREATE_V1"
 TURN_SCHEMA = "ATLASQUANT_AION_CHAT_PRODUCT_TURN_V1"
 RESUME_SCHEMA = "ATLASQUANT_AION_CHAT_PRODUCT_RESUME_V1"
+HISTORY_SCHEMA = "ATLASQUANT_AION_CHAT_PRODUCT_HISTORY_V1"
+CONTINUE_SCHEMA = "ATLASQUANT_AION_CHAT_PRODUCT_CONTINUE_V1"
 
 _REQUIRED_PERMISSIONS = frozenset({"app:read", "aion:admin"})
 
@@ -254,13 +256,194 @@ def resume_product_conversation(
     }
 
 
+def read_product_history_page(
+    store: Any,
+    scope: Scope,
+    access: Mapping[str, Any],
+    conversation_id: Any,
+    *,
+    cursor: Any = None,
+    page_size: int = 40,
+    newest_first: bool = True,
+) -> dict[str, Any]:
+    """Read one scoped durable-history page for presentation only."""
+    binding = _require_binding(access, scope)
+    cid = _clean(conversation_id, 120)
+    if not cid:
+        raise ValueError("conversation_id required")
+    conversation = store.get_conversation(scope, cid)
+    page = store.list_messages(
+        scope,
+        cid,
+        cursor=cursor,
+        page_size=page_size,
+        newest_first=bool(newest_first),
+    )
+    messages = list(page.items)
+    if newest_first:
+        messages.reverse()
+
+    entries: list[dict[str, Any]] = []
+    public_turns: dict[str, dict[str, Any]] = {}
+    for message in messages:
+        metadata = _mapping(getattr(message, "metadata", None))
+        turn_id = _clean(metadata.get("turn_id"), 80) or _clean(
+            getattr(message, "id", ""), 120
+        )
+        role = _clean(getattr(message, "role", ""), 24).lower()
+        entry = {
+            "role": role,
+            "turn_id": turn_id,
+            "content": str(getattr(message, "content", "") or ""),
+            "display_text": str(getattr(message, "content", "") or ""),
+            "attachments": list(getattr(message, "attachments", None) or []),
+            "sequence": int(getattr(message, "sequence", 0) or 0),
+        }
+        entries.append(entry)
+        if role == "assistant":
+            receipt_id = _clean(metadata.get("receipt_id"), 120)
+            receipt_digest = _clean(metadata.get("receipt_digest"), 64)
+            verification_state = _clean(
+                metadata.get("verification_state"), 60
+            ).upper()
+            public_turns[turn_id] = {
+                "state": "CONFIRMED_SUCCESS",
+                "reason": "",
+                "capability": "Leitura local verificada",
+                "policy_state": "READ_ONLY",
+                "blockers": [],
+                "approval": {
+                    "required": False,
+                    "granted": False,
+                    "state": "NOT_APPLICABLE",
+                },
+                "stages": [
+                    {
+                        "stage": "VERIFICATION",
+                        "state": verification_state or "CONFIRMED",
+                    },
+                    {
+                        "stage": "PERSISTENCE",
+                        "state": "CONFIRMED",
+                    },
+                ],
+                "evidence": (
+                    "Histórico local durável · escopo autenticado e "
+                    "identidade verificada."
+                ),
+                "receipt": (
+                    "Receipt verificado · " + receipt_id
+                    if receipt_id
+                    else "Receipt verificado · identificador não exposto."
+                ),
+                "receipt_digest_present": bool(receipt_digest),
+            }
+
+    return {
+        "schema": HISTORY_SCHEMA,
+        "state": "READY",
+        "binding": binding,
+        "conversation_id": cid,
+        "total": int(conversation.message_count),
+        "entries": entries,
+        "turns": public_turns,
+        "next_cursor": page.next_cursor,
+        "newest_first": bool(newest_first),
+        "provider_called": False,
+        "network_called": False,
+        "tool_executed": False,
+        "external_action_executed": False,
+        "automatic_checkpoint_write": False,
+        "memory_promoted": False,
+        "grants_authority": False,
+    }
+
+
+def continue_product_read_turn(
+    store: Any,
+    scope: Scope,
+    access: Mapping[str, Any],
+    message: Any,
+    *,
+    conversation_id: Any,
+    runtime_context: Mapping[str, Any],
+    attachment_ids: list[Any] | tuple[Any, ...] | None = None,
+    feature_flags: Mapping[str, Any] | None = None,
+    hub: Mapping[str, Any] | None = None,
+    portable_core: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Resume durable state first, then append the next verified read-only turn."""
+    binding = _require_binding(access, scope)
+    if not isinstance(runtime_context, Mapping):
+        raise TypeError("runtime_context mapping required")
+    cid = _clean(conversation_id, 120)
+    before = resume_product_conversation(
+        store,
+        scope,
+        access,
+        cid,
+    )
+    if before.get("state") != "READY":
+        return {
+            "schema": CONTINUE_SCHEMA,
+            "state": "NOT_CONTINUED",
+            "reason": "RESUME_CONTEXT_NOT_READY",
+            "binding": binding,
+            "resume": before,
+            "provider_called": False,
+            "network_called": False,
+            "external_action_executed": False,
+            "core_checkpoint_write": False,
+            "memory_promoted": False,
+            "grants_authority": False,
+        }
+    prior_count = int(before["resume"].get("message_count") or 0)
+    turn = execute_product_read_turn(
+        store,
+        scope,
+        access,
+        message,
+        conversation_id=cid,
+        runtime_context=runtime_context,
+        turn_index=prior_count,
+        attachment_ids=attachment_ids,
+        feature_flags=feature_flags,
+        hub=hub,
+        portable_core=portable_core,
+    )
+    after_count = int(store.get_conversation(scope, cid).message_count)
+    return {
+        "schema": CONTINUE_SCHEMA,
+        "state": str(turn.get("state") or "FAILED_SAFE"),
+        "binding": binding,
+        "conversation_id": cid,
+        "resume_context_digest": str(
+            before["resume"].get("context_digest") or ""
+        ),
+        "prior_message_count": prior_count,
+        "current_message_count": after_count,
+        "continued_from_durable_history": True,
+        "turn": turn,
+        "provider_called": False,
+        "network_called": False,
+        "external_action_executed": False,
+        "core_checkpoint_write": False,
+        "memory_promoted": False,
+        "grants_authority": False,
+    }
+
+
 __all__ = [
     "SCHEMA",
     "CREATE_SCHEMA",
     "TURN_SCHEMA",
     "RESUME_SCHEMA",
+    "HISTORY_SCHEMA",
+    "CONTINUE_SCHEMA",
     "validate_product_binding",
     "create_product_conversation",
     "execute_product_read_turn",
     "resume_product_conversation",
+    "read_product_history_page",
+    "continue_product_read_turn",
 ]
