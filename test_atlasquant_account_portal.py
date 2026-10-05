@@ -147,6 +147,16 @@ class AtlasQuantAccountPortalTests(unittest.TestCase):
         self.assertNotIn("real_orders=True",src)
         self.assertIn('"Trading real","DESATIVADO"',src)
 
+    def test_customer_portal_host_is_opt_in_and_not_session_discovered(self):
+        from pathlib import Path
+        src=Path("atlasquant_account_portal.py").read_text(encoding="utf-8")
+        self.assertIn("customer_portal_binding:Mapping[str,Any]|None=None",src)
+        self.assertIn("customer_read_model:Mapping[str,Any]|None=None",src)
+        self.assertIn("render_customer_portal(",src)
+        self.assertNotIn('session_state.get("atlasquant_b2b_customer_portal_binding")',src)
+        self.assertNotIn('query_params',src)
+        self.assertNotIn('os.environ',src)
+
     def test_invalid_provisioning_inputs_are_rejected(self):
         cases=[
             ("ab","USER","SenhaSegura#2026"),
