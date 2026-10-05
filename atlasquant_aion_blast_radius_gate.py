@@ -20,6 +20,14 @@ SENSITIVE_ACTIONS = frozenset({
     "REAL_TRADING", "DELETE_DATA", "CHANGE_POLICY", "ENABLE_WORKER",
     "RESTORE_PRODUCTION", "EXTERNAL_BROADCAST",
 })
+CANDIDATE_FIELDS = frozenset({
+    "owner_id", "tenant_id", "workspace_id", "action_id", "transaction_id",
+    "action", "proposer_id", "risk_level", "affected_tenant_ids",
+    "affected_workspace_ids", "affected_records", "external_targets",
+    "financial_value_minor", "external_side_effect", "reversible",
+    "rollback_ref", "authority_budget_ref", "authority_budget_policy_digest",
+})
+_RISK_RANK = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 
 
 def _text(value: Any, limit: int = 240) -> str:
@@ -163,6 +171,9 @@ def _candidate(
 ) -> tuple[dict[str, Any], list[str]]:
     item = dict(raw) if isinstance(raw, Mapping) else {}
     blockers: list[str] = []
+    unknown = sorted(str(key) for key in item if key not in CANDIDATE_FIELDS)
+    if unknown:
+        blockers.append("CANDIDATE_UNKNOWN_FIELDS")
     for key in trusted:
         if _text(item.get(key), 120) != trusted[key]:
             blockers.append("CANDIDATE_SCOPE_MISMATCH")
@@ -267,6 +278,7 @@ def evaluate_blast_radius(
     authority_budget_guard: Mapping[str, Any] | None,
     reviews: Sequence[Mapping[str, Any]] | None,
     human_owner_approval: Mapping[str, Any] | None = None,
+    trusted_reviewer_assignments: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     trusted = _scope(trusted_scope)
     blockers: list[str] = []
@@ -293,8 +305,26 @@ def evaluate_blast_radius(
         if cand["financial_value_minor"] is not None and cand["financial_value_minor"] > int(normalized_policy["max_financial_value_minor"]):
             blockers.append("FINANCIAL_BLAST_RADIUS_LIMIT")
 
+    # Candidate-declared risk cannot lower a deterministic minimum implied by impact.
+    declared_risk = cand.get("risk_level") if cand.get("risk_level") in RISK_LEVELS else "CRITICAL"
+    minimum_risk = "LOW"
+    if cand.get("external_side_effect") is True or (cand.get("external_targets") or 0) > 0:
+        minimum_risk = "MEDIUM"
+    if (cand.get("financial_value_minor") or 0) > 0:
+        minimum_risk = "HIGH"
+    if cand.get("action") in SENSITIVE_ACTIONS:
+        minimum_risk = "CRITICAL"
+    if _RISK_RANK.get(declared_risk, 3) < _RISK_RANK[minimum_risk]:
+        blockers.append("RISK_LEVEL_UNDERSTATED")
+
     budget = dict(authority_budget_guard) if isinstance(authority_budget_guard, Mapping) else {}
-    budget_required = cand.get("external_side_effect") is True or cand.get("risk_level") in {"MEDIUM", "HIGH", "CRITICAL"}
+    budget_required = (
+        cand.get("external_side_effect") is True
+        or (cand.get("external_targets") or 0) > 0
+        or (cand.get("financial_value_minor") or 0) > 0
+        or cand.get("action") in SENSITIVE_ACTIONS
+        or declared_risk in {"MEDIUM", "HIGH", "CRITICAL"}
+    )
     if budget_required:
         if budget.get("schema") != BUDGET_SCHEMA:
             blockers.append("AUTHORITY_BUDGET_SCHEMA_INVALID")
@@ -306,14 +336,27 @@ def evaluate_blast_radius(
             blockers.append("AUTHORITY_BUDGET_REF_MISMATCH")
         if _text(budget.get("policy_digest"), 160) != cand.get("authority_budget_policy_digest"):
             blockers.append("AUTHORITY_BUDGET_POLICY_MISMATCH")
+        budget_scope = budget.get("scope") if isinstance(budget.get("scope"), Mapping) else {}
+        if any(_text(budget_scope.get(key), 120) != trusted[key] for key in trusted):
+            blockers.append("AUTHORITY_BUDGET_SCOPE_MISMATCH")
         if budget.get("grants_authority") is not False:
             blockers.append("AUTHORITY_BUDGET_MUST_NOT_GRANT_AUTHORITY")
         if budget.get("executes_action") is not False:
             blockers.append("AUTHORITY_BUDGET_MUST_NOT_EXECUTE")
+        if budget.get("execution_allowed_by_this_component") is not False:
+            blockers.append("AUTHORITY_BUDGET_MUST_NOT_AUTHORIZE_EXECUTION")
 
     required_quorum = 0
     if normalized_policy["state"] == "VERIFIED" and cand.get("risk_level") in RISK_LEVELS:
         required_quorum = int(normalized_policy["quorum_by_risk"][cand["risk_level"]])
+
+    assignments = (
+        dict(trusted_reviewer_assignments)
+        if isinstance(trusted_reviewer_assignments, Mapping)
+        else {}
+    )
+    if required_quorum > 0 and not assignments:
+        blockers.append("TRUSTED_REVIEWER_ASSIGNMENTS_REQUIRED")
 
     valid_reviewers: list[str] = []
     review_rows: list[dict[str, Any]] = []
@@ -330,6 +373,11 @@ def evaluate_blast_radius(
             row_blockers.append("REVIEWER_ID_REQUIRED")
         if reviewer_kind not in REVIEWER_KINDS:
             row_blockers.append("REVIEWER_KIND_INVALID")
+        trusted_kind = _text(assignments.get(reviewer_id), 60).upper()
+        if not trusted_kind:
+            row_blockers.append("REVIEWER_NOT_IN_TRUSTED_ASSIGNMENTS")
+        elif trusted_kind != reviewer_kind:
+            row_blockers.append("REVIEWER_TRUSTED_KIND_MISMATCH")
         if reviewer_id == cand.get("proposer_id"):
             row_blockers.append("SELF_REVIEW_FORBIDDEN")
         if row.get("decision") != "SUPPORT":
@@ -395,6 +443,7 @@ def evaluate_blast_radius(
         "required_quorum": required_quorum,
         "valid_reviewer_count": len(valid_reviewers),
         "valid_reviewer_ids": valid_reviewers,
+        "trusted_reviewer_assignment_count": len(assignments),
         "reviews": review_rows,
         "human_owner_required": owner_required,
         "human_owner_approval_valid": owner_valid,
