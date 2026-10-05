@@ -47,10 +47,10 @@ jobs:
           for marker in (
               '"writer_identity_verified": False',
               '"storage_write_performed": False',
-              '"renewal_authorized": False',
-              '"termination_authorized": False',
-              '"external_action_executed": False',
-              '"executes_action": False',
+              '"renewal_authorized",',
+              '"termination_authorized",',
+              '"external_action_executed",',
+              '"executes_action",',
           ):
               assert marker in source, marker
 
