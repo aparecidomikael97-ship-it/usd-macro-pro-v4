@@ -62,6 +62,31 @@ class CumulativeAuthorityBudgetTests(unittest.TestCase):
             self.assertFalse(out["executes_action"])
             store.close()
 
+    def test_guard_and_snapshot_expose_exact_trusted_scope(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, budget = self._components(raw)
+            out = budget.guard(decision(self.scope), now=NOW)
+            self.assertEqual(out["scope"], {
+                "owner_id": self.scope.owner_id,
+                "tenant_id": self.scope.tenant_id,
+                "workspace_id": self.scope.workspace_id,
+            })
+            snap = budget.snapshot("tx-1", now=NOW)
+            self.assertEqual(snap["scope"], out["scope"])
+            store.close()
+
+    def test_invalid_candidate_still_reports_budget_scope_without_authorizing(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, budget = self._components(raw)
+            bad = decision(self.scope)
+            bad["tenant_id"] = "tenant-b"
+            out = budget.guard(bad, now=NOW)
+            self.assertFalse(out["allowed"])
+            self.assertEqual(out["scope"]["tenant_id"], self.scope.tenant_id)
+            self.assertFalse(out["grants_authority"])
+            self.assertFalse(out["executes_action"])
+            store.close()
+
     def test_confirmed_effect_is_recorded_idempotently(self):
         with tempfile.TemporaryDirectory() as raw:
             store, budget = self._components(raw)
