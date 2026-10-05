@@ -237,6 +237,30 @@ class AionPostHardeningReadinessTests(unittest.TestCase):
         )
         self.assertIn("UNEXPECTED_STAGE_INPUT", out["blockers"])
 
+    def test_malformed_top_level_inputs_fail_closed_without_exception(self):
+        out = evaluate_post_hardening_readiness(
+            trusted_scope=["bad"],
+            stage_snapshots="bad",
+            verification_ledger={},
+            verification_entry_ids="bad",
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertIn("TRUSTED_SCOPE_REQUIRED", out["blockers"])
+        self.assertIn("STAGE_SNAPSHOTS_MAPPING_REQUIRED", out["blockers"])
+        self.assertIn("VERIFICATION_ENTRY_IDS_MAPPING_REQUIRED", out["blockers"])
+
+    def test_unexpected_verification_entry_id_is_not_silently_ignored(self):
+        rows = snapshots()
+        ledger, ids = verified_ledger(rows)
+        ids["mystery"] = "VFY-UNKNOWN"
+        out = evaluate_post_hardening_readiness(
+            trusted_scope=SCOPE,
+            stage_snapshots=rows,
+            verification_ledger=ledger,
+            verification_entry_ids=ids,
+        )
+        self.assertIn("UNEXPECTED_VERIFICATION_ENTRY_ID", out["blockers"])
+
     def test_review_plan_is_non_executing(self):
         rows = snapshots()
         ledger, ids = verified_ledger(rows)
