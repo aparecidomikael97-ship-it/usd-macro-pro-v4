@@ -9,6 +9,7 @@ from atlasquant_aion_incident_control_plane import (
     capability_authority_matrix,
 )
 from atlasquant_aion_operational_resilience import SCHEMA as OPS_SCHEMA
+from atlasquant_aion_tenant_crypto import crypto_policy
 from atlasquant_aion_post_hardening_readiness import (
     evaluate_post_hardening_readiness,
     post_hardening_review_plan,
@@ -24,6 +25,7 @@ SCOPE = {"owner_id": "owner-a", "tenant_id": "tenant-a", "workspace_id": "ws-a"}
 
 def snapshots():
     return {
+        "tenant_crypto": crypto_policy(),
         "durable_cas": {
             "schema": "ATLASQUANT_AION_DURABLE_TASK_REPOSITORY_V1",
             "state": "MATCH",
@@ -121,6 +123,32 @@ class AionPostHardeningReadinessTests(unittest.TestCase):
         self.assertFalse(out["deploy_authorized"])
         self.assertFalse(out["worker_arming_authorized"])
         self.assertFalse(out["executes_action"])
+
+    def test_tenant_crypto_is_mandatory_and_exact(self):
+        rows = snapshots()
+        ledger, ids = verified_ledger(rows)
+        missing = deepcopy(rows)
+        missing.pop("tenant_crypto")
+        out_missing = evaluate_post_hardening_readiness(
+            trusted_scope=SCOPE,
+            stage_snapshots=missing,
+            verification_ledger=ledger,
+            verification_entry_ids=ids,
+        )
+        self.assertIn("STAGE_MISSING:tenant_crypto", out_missing["blockers"])
+
+        weakened = deepcopy(rows)
+        weakened["tenant_crypto"]["production_kms_connected"] = True
+        weakened["tenant_crypto"]["homegrown_crypto"] = True
+        out_weakened = evaluate_post_hardening_readiness(
+            trusted_scope=SCOPE,
+            stage_snapshots=weakened,
+            verification_ledger=ledger,
+            verification_entry_ids=ids,
+        )
+        joined = " ".join(out_weakened["blockers"])
+        self.assertIn("tenant_crypto:STAGE_CONTRACT_MISMATCH:production_kms_connected", joined)
+        self.assertIn("tenant_crypto:STAGE_CONTRACT_MISMATCH:homegrown_crypto", joined)
 
     def test_pass_string_without_independent_ledger_entry_is_not_evidence(self):
         rows = snapshots()
