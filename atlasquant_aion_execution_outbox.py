@@ -246,6 +246,10 @@ class ExecutionOutbox:
         created_at: Any | None = None,
         requires_reauth: bool = False,
         reauth_ref: Any = "",
+        transaction_id: Any = "",
+        authority_budget_ref: Any = "",
+        risk_points: Any = 0,
+        capability_class: Any = "",
     ) -> dict[str, Any]:
         self.store.require_healthy()
         owner, tenant, workspace = self._scope_args()
@@ -263,6 +267,17 @@ class ExecutionOutbox:
         reauth = _clean(reauth_ref, 160)
         if requires_reauth and not reauth:
             raise ValueError("transaction reauthentication reference required")
+        transaction = _clean(transaction_id, 128)
+        budget_ref = _clean(authority_budget_ref, 128)
+        capability = _clean(capability_class, 80).upper()
+        if isinstance(risk_points, bool) or not isinstance(risk_points, int) or not 0 <= risk_points <= 100:
+            raise ValueError("risk_points must be an integer from 0 to 100")
+        if transaction or budget_ref or risk_points or capability:
+            if not transaction or not budget_ref or risk_points < 1 or not capability:
+                raise ValueError("transaction authority budget binding incomplete")
+            _token(transaction, "transaction_id")
+            _token(budget_ref, "authority_budget_ref")
+            _token(capability, "capability_class")
 
         safe_payload = redact(dict(payload or {}))
         payload_digest = _digest(safe_payload)
@@ -272,6 +287,10 @@ class ExecutionOutbox:
             "action": action_name,
             "aggregate_key": aggregate,
             "payload_digest": payload_digest,
+            "transaction_id": transaction,
+            "authority_budget_ref": budget_ref,
+            "risk_points": risk_points,
+            "capability_class": capability,
         }
         idempotency_key = _digest(key_material)
         decision_id = "DEC-" + idempotency_key[:24].upper()
@@ -318,6 +337,10 @@ class ExecutionOutbox:
                 "created_at": _iso(created_dt),
                 "requires_reauth": requires_reauth is True,
                 "reauth_ref": reauth,
+                "transaction_id": transaction,
+                "authority_budget_ref": budget_ref,
+                "risk_points": risk_points,
+                "capability_class": capability,
                 "idempotency_key": idempotency_key,
                 "grants_authority": False,
             }
@@ -548,6 +571,7 @@ class ExecutionOutbox:
         worker_id: Any,
         authorize: Callable[[Mapping[str, Any]], Mapping[str, Any]],
         adapter: Any,
+        cumulative_authority_guard: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
         now: Any | None = None,
     ) -> dict[str, Any]:
         """Dispatch one claimed intent; uncertain outcomes require reconciliation."""
@@ -565,6 +589,42 @@ class ExecutionOutbox:
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
         if not allowed:
             return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+
+        decision = _mapping(intent.get("decision"))
+        budget_ref = _clean(decision.get("authority_budget_ref"), 128)
+        if budget_ref:
+            if not callable(cumulative_authority_guard):
+                return self._set_blocked(
+                    key,
+                    "BLOCKED_REAPPROVAL",
+                    "CUMULATIVE_AUTHORITY_GUARD_REQUIRED",
+                )
+            try:
+                budget = _mapping(cumulative_authority_guard(dict(decision)))
+            except Exception:
+                return self._set_blocked(
+                    key,
+                    "BLOCKED_REAPPROVAL",
+                    "CUMULATIVE_AUTHORITY_GUARD_FAILED",
+                )
+            if budget.get("allowed") is not True:
+                return self._set_blocked(
+                    key,
+                    "BLOCKED_REAPPROVAL",
+                    _clean(budget.get("reason") or "CUMULATIVE_AUTHORITY_BUDGET_EXCEEDED", 240),
+                )
+            if _clean(budget.get("authority_budget_ref"), 128) != budget_ref:
+                return self._set_blocked(
+                    key,
+                    "BLOCKED_REAPPROVAL",
+                    "CUMULATIVE_AUTHORITY_BUDGET_REF_MISMATCH",
+                )
+            if _clean(budget.get("transaction_id"), 128) != _clean(decision.get("transaction_id"), 128):
+                return self._set_blocked(
+                    key,
+                    "BLOCKED_REAPPROVAL",
+                    "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
+                )
 
         send = getattr(adapter, "send", None)
         if not callable(send):
