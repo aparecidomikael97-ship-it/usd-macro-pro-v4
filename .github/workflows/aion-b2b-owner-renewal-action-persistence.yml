@@ -9,6 +9,9 @@ on:
       - "atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py"
       - "test_atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py"
       - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_PERSISTENCE_PLAN_V1.md"
+      - "atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_PERSISTENCE_ATTESTATION_V1.md"
       - ".github/workflows/aion-b2b-owner-renewal-action-persistence.yml"
 
 permissions:
@@ -28,12 +31,15 @@ jobs:
           python -m py_compile \
             atlasquant_aion_b2b_owner_renewal_action_ceremony.py \
             atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py \
-            test_atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py
+            atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py
       - name: Run recurring action persistence tests
         run: |
           python -m unittest -q \
             test_atlasquant_aion_b2b_owner_renewal_action_ceremony.py \
-            test_atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py
+            test_atlasquant_aion_b2b_owner_renewal_action_persistence_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_persistence_attestation.py
       - name: Assert persistence planning is not action execution
         run: |
           python - <<'PY'
