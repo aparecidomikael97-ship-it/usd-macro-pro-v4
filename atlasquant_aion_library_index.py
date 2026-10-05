@@ -199,6 +199,10 @@ def index_document(
         "memory_promoted": False,
         "execution_authorized": False,
         "external_action_executed": False,
+        "projection_only": True,
+        "canonical_source": False,
+        "rebuildable": True,
+        "retrieval_does_not_validate": True,
     }
     return {
         "schema": SCHEMA,
