@@ -245,6 +245,7 @@ class CredentialProxy:
         *,
         url: Any,
         resolved_ips: Sequence[Any] | None,
+        preflight: Mapping[str, Any] | None,
         callback: Callable[[str, Mapping[str, Any]], Any],
         now: Any | None = None,
     ) -> dict[str, Any]:
@@ -252,6 +253,28 @@ class CredentialProxy:
         if not callable(callback):
             raise TypeError("adapter callback required")
         key, lease, item = self._active_lease(handle, tool, now=now)
+        gate = dict(preflight or {})
+        gate_tool = (
+            dict(gate.get("tool"))
+            if isinstance(gate.get("tool"), Mapping)
+            else {}
+        )
+        gate_connector = (
+            dict(gate.get("connector"))
+            if isinstance(gate.get("connector"), Mapping)
+            else {}
+        )
+        if gate.get("state") != "READY_FOR_EXECUTOR":
+            raise PermissionError("Tool Hub preflight is not READY_FOR_EXECUTOR")
+        if _clean(gate_tool.get("tool_id"), 96) != lease["tool_id"]:
+            raise PermissionError("preflight is bound to another tool")
+        if _clean(gate_tool.get("contract_hash"), 64) != lease["contract_hash"]:
+            raise PermissionError("preflight tool contract does not match credential handle")
+        if gate_tool.get("supply_chain_state") != "VERIFIED":
+            raise PermissionError("preflight supply chain is not verified")
+        if gate_connector.get("required") is True and gate_connector.get("activated") is not True:
+            raise PermissionError("preflight connector is not activated")
+
         egress = validate_egress_request(item, url, resolved_ips)
 
         # From this point on the one-shot lease is consumed even if resolution or
