@@ -71,6 +71,17 @@ def _safe_id(value: Any) -> str:
     return text
 
 
+def _refs(values: Sequence[Any] | None, *, limit: int = 40) -> list[str]:
+    out: list[str] = []
+    for raw in list(values or [])[: max(0, limit * 2)]:
+        text = _clean(raw, 120)
+        if text and text not in out:
+            out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _forbidden_hits(value: Any, path: str = "$") -> list[str]:
     hits: list[str] = []
     if isinstance(value, Mapping):
@@ -116,6 +127,8 @@ def new_vault_entry(
     content_digest: Any = "",
     version: Any = "1",
     metadata: Mapping[str, Any] | None = None,
+    allowed_tool_ids: Sequence[Any] | None = None,
+    credential_scopes: Sequence[Any] | None = None,
     created_by: Any = "ADMIN",
     created_at: str | None = None,
 ) -> dict[str, Any]:
@@ -147,6 +160,8 @@ def new_vault_entry(
         if suspicious.startswith(("sk-", "ghp_", "github_pat_", "bearer ")) or "-----begin private key-----" in suspicious:
             raise ValueError("secret value detected where a reference was expected")
 
+    allowed_tools = _refs(allowed_tool_ids)
+    scopes = _refs(credential_scopes)
     created = str(created_at or _now())
     return {
         "entry_id": eid,
@@ -158,6 +173,11 @@ def new_vault_entry(
         "content_digest": _clean(content_digest, 128),
         "version": _clean(version, 80) or "1",
         "metadata": meta,
+        "allowed_tool_ids": allowed_tools,
+        "credential_scopes": scopes,
+        "least_privilege_scoped": bool(
+            kind_norm != "SECRET_REF" or (allowed_tools and scopes)
+        ),
         "created_by": _clean(created_by, 120) or "ADMIN",
         "created_at": created,
         "updated_at": created,
@@ -179,6 +199,12 @@ def normalize_vault_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
         content_digest=item.get("content_digest"),
         version=item.get("version"),
         metadata=item.get("metadata") if isinstance(item.get("metadata"), Mapping) else {},
+        allowed_tool_ids=item.get("allowed_tool_ids")
+        if isinstance(item.get("allowed_tool_ids"), (list, tuple))
+        else [],
+        credential_scopes=item.get("credential_scopes")
+        if isinstance(item.get("credential_scopes"), (list, tuple))
+        else [],
         created_by=item.get("created_by") or "ADMIN",
         created_at=str(item.get("created_at") or _now()),
     )
@@ -283,6 +309,18 @@ def vault_summary(raw: Mapping[str, Any] | None) -> dict[str, Any]:
         "entries": len(entries),
         "active": sum(1 for x in entries if x["state"] == "ACTIVE"),
         "by_kind": by_kind,
+        "scoped_secret_refs": sum(
+            1
+            for x in entries
+            if x["kind"] == "SECRET_REF"
+            and x.get("least_privilege_scoped") is True
+        ),
+        "unscoped_secret_refs": sum(
+            1
+            for x in entries
+            if x["kind"] == "SECRET_REF"
+            and x.get("least_privilege_scoped") is not True
+        ),
         "backend_connected": bool(state["backend_connected"]),
         "backend_state": state["backend_state"],
         "plaintext_secrets_present": bool(state["plaintext_secrets_present"]),
@@ -311,6 +349,9 @@ def vault_export_manifest(raw: Mapping[str, Any] | None) -> dict[str, Any]:
                 "content_digest": x["content_digest"],
                 "version": x["version"],
                 "metadata": x["metadata"],
+                "allowed_tool_ids": x.get("allowed_tool_ids") or [],
+                "credential_scopes": x.get("credential_scopes") or [],
+                "least_privilege_scoped": x.get("least_privilege_scoped") is True,
                 "created_at": x["created_at"],
                 "contains_plaintext_secret": False,
             }

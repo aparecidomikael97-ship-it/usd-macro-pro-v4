@@ -37,6 +37,14 @@ def _stable(value: Any, length: int = 24) -> str:
     raw = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     return sha256(raw.encode("utf-8")).hexdigest()[:length]
 
+
+def _scope_digest(tenant_id: Any, workspace_id: Any) -> str:
+    tenant = _clean(tenant_id, 120)
+    workspace = _clean(workspace_id, 120)
+    if not tenant or not workspace:
+        return ""
+    return sha256((tenant + "|" + workspace).encode("utf-8")).hexdigest()[:24]
+
 def _terms(value: Any) -> list[str]:
     seen=[]
     for token in _TOKEN_RE.findall(_fold(value)):
@@ -71,8 +79,12 @@ class IndexedPassage:
 def empty_library_index() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
+        "scope_digest": "",
         "documents": [],
         "passages": [],
+        "canonical_source": False,
+        "rebuildable_projection": True,
+        "disposable_projection": True,
         "external_persisted": False,
         "memory_promoted": False,
         "execution_authorized": False,
@@ -93,6 +105,22 @@ def index_document(
     tenant=_clean(ctx.get("tenant_id"),120)
     workspace=_clean(ctx.get("workspace_id"),120)
     blockers=[]
+    expected_scope=_scope_digest(tenant,workspace)
+    existing_scope=_clean(base.get("scope_digest"),64)
+    if existing_scope and existing_scope != expected_scope:
+        blockers.append("INDEX_SCOPE_MISMATCH")
+    foreign_rows=[
+        item for item in (
+            list(base.get("documents") or []) + list(base.get("passages") or [])
+        )
+        if isinstance(item,Mapping)
+        and (
+            item.get("tenant_id") != tenant
+            or item.get("workspace_id") != workspace
+        )
+    ]
+    if foreign_rows:
+        blockers.append("INDEX_CONTAINS_FOREIGN_SCOPE")
 
     if row.get("tenant_id") != tenant or row.get("workspace_id") != workspace:
         blockers.append("SCOPE_MISMATCH")
@@ -119,6 +147,9 @@ def index_document(
             "blockers": list(dict.fromkeys(blockers)),
             "index": base,
             "indexed_passages": 0,
+            "canonical_source": False,
+            "rebuildable_projection": True,
+            "disposable_projection": True,
             "external_persisted": False,
             "memory_promoted": False,
             "execution_authorized": False,
@@ -187,8 +218,12 @@ def index_document(
 
     updated={
         "schema": SCHEMA,
+        "scope_digest": expected_scope,
         "documents": docs[-MAX_DOCUMENTS:],
         "passages": (current_passages+created)[-MAX_PASSAGES:],
+        "canonical_source": False,
+        "rebuildable_projection": True,
+        "disposable_projection": True,
         "external_persisted": False,
         "memory_promoted": False,
         "execution_authorized": False,
@@ -200,6 +235,9 @@ def index_document(
         "index": updated,
         "indexed_passages": len(created),
         "document_id": row.get("document_id"),
+        "canonical_source": False,
+        "rebuildable_projection": True,
+        "disposable_projection": True,
         "external_persisted": False,
         "memory_promoted": False,
         "execution_authorized": False,
@@ -220,6 +258,22 @@ def search_library_index(
     query_text=_clean(query,500)
     qterms=set(_terms(query_text))
     cap=max(1,min(int(limit or 20),100))
+    expected_scope=_scope_digest(tenant,workspace)
+    existing_scope=_clean(state.get("scope_digest"),64)
+
+    if existing_scope and existing_scope != expected_scope:
+        return {
+            "schema": SCHEMA,
+            "query": query_text,
+            "hits": [],
+            "status": "BLOCKED",
+            "blockers": ["INDEX_SCOPE_MISMATCH"],
+            "semantic_search": False,
+            "canonical_source": False,
+            "rebuildable_projection": True,
+            "external_persisted": False,
+            "execution_authorized": False,
+        }
 
     if not tenant or not workspace or not qterms:
         return {
@@ -273,6 +327,9 @@ def search_library_index(
         "hits": hits[:cap],
         "status": "RESULTS" if hits else "NO_RESULTS",
         "semantic_search": False,
+        "canonical_source": False,
+        "rebuildable_projection": True,
+        "disposable_projection": True,
         "provider_called": False,
         "web_research_executed": False,
         "external_persisted": False,
@@ -292,6 +349,10 @@ def classification_snapshot(index: Mapping[str, Any] | None) -> dict[str, Any]:
         "documents": len(docs),
         "passages": len([x for x in list(state.get("passages") or []) if isinstance(x,Mapping)]),
         "by_state": by_state,
+        "scope_digest": _clean(state.get("scope_digest"),64),
+        "canonical_source": False,
+        "rebuildable_projection": True,
+        "disposable_projection": True,
         "external_persisted": False,
         "execution_authorized": False,
     }
