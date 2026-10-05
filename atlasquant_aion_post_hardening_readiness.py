@@ -16,9 +16,25 @@ from atlasquant_aion_verification_ledger import (
     verify_ledger_integrity,
 )
 
-SCHEMA = "ATLASQUANT_AION_POST_HARDENING_READINESS_V1"
+SCHEMA = "ATLASQUANT_AION_POST_HARDENING_READINESS_V2"
 
 STAGE_RULES = {
+    "tenant_crypto": {
+        "schema": "ATLASQUANT_AION_TENANT_CRYPTO_ENVELOPE_V1",
+        "required": {
+            "algorithm": "AES-256-GCM",
+            "key_bytes": 32,
+            "nonce_bytes": 12,
+            "key_material_serialized": False,
+            "key_resolver_injected": True,
+            "tenant_workspace_bound_aad": True,
+            "encryption_required_for_production": True,
+            "homegrown_crypto": False,
+            "production_kms_connected": False,
+            "automatic_key_deletion": False,
+            "executes_action": False,
+        },
+    },
     "durable_cas": {
         "schema": "ATLASQUANT_AION_DURABLE_TASK_REPOSITORY_V1",
         "required": {
