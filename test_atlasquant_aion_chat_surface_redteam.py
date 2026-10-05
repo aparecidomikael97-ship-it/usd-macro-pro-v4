@@ -41,15 +41,15 @@ class PurePlanningImportBoundaryTests(unittest.TestCase):
         ]
         self.assertEqual(top_level_executor_imports, [])
 
-        execute_one = next(
+        lazy_proxy = next(
             node
             for node in tree.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == "_execute_one"
+            and node.name == "execute_local_tool"
         )
         lazy_executor_imports = [
             node
-            for node in ast.walk(execute_one)
+            for node in ast.walk(lazy_proxy)
             if isinstance(node, ast.ImportFrom)
             and node.module == "atlasquant_aion_local_executor"
         ]
