@@ -15,10 +15,14 @@ import re
 from typing import Any, Mapping
 
 from aion_chat.models import Scope
-from aion_chat.store import SQLiteChatStore
+from aion_chat.store import HEALTHY, SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_chat_product_bridge import validate_product_binding
+from atlasquant_aion_chat_storage_resilience import (
+    STAGING_RPO_SECONDS,
+    STAGING_RTO_SECONDS,
+)
 
-SCHEMA = "ATLASQUANT_AION_CHAT_STAGED_HOST_V1"
+SCHEMA = "ATLASQUANT_AION_CHAT_STAGED_HOST_V2"
 FLAG = "ATLASQUANT_AION_CHAT_STAGED_PRODUCT"
 TENANT_KEY = "ATLASQUANT_AION_CHAT_STAGED_TENANT_ID"
 WORKSPACE_KEY = "ATLASQUANT_AION_CHAT_STAGED_WORKSPACE_ID"
@@ -27,6 +31,8 @@ _ALLOWED_ENVIRONMENTS = frozenset(
     {"LOCAL", "DEVELOPMENT", "DEV", "STAGING", "TEST", "QA"}
 )
 _SAFE_SCOPE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$")
+_STORE_PREFIX = "aq_aion_chat_staged_store_"
+_ACTIVE_SCOPE_KEY = "aq_aion_chat_staged_active_scope"
 
 
 def _clean(value: Any, limit: int = 240) -> str:
@@ -87,6 +93,30 @@ def _authenticated_scope(
     return scope
 
 
+def _session_binding_digest(
+    access: Mapping[str, Any] | None,
+    scope: Scope,
+) -> str:
+    raw = dict(access or {})
+    session = (
+        dict(raw.get("session"))
+        if isinstance(raw.get("session"), Mapping)
+        else {}
+    )
+    fingerprint = _clean(session.get("credential_fingerprint"), 240)
+    if not fingerprint:
+        raise PermissionError("credential fingerprint required for staged binding")
+    material = "|".join(
+        [
+            scope.owner_id,
+            scope.tenant_id,
+            scope.workspace_id,
+            fingerprint,
+        ]
+    ).encode("utf-8")
+    return sha256(material).hexdigest()
+
+
 def _staging_directory(config: Mapping[str, Any]) -> Path:
     raw = _config_value(config, DIRECTORY_KEY)
     if not raw:
@@ -107,41 +137,93 @@ def _scope_digest(scope: Scope) -> str:
 
 
 def _holder_key(scope: Scope) -> str:
-    return "aq_aion_chat_staged_store_" + _scope_digest(scope)
+    return _STORE_PREFIX + _scope_digest(scope)
 
 
 def _store_path(scope: Scope, root: Path) -> Path:
     return root / ("aion-chat-" + _scope_digest(scope) + ".sqlite3")
 
 
+def close_all_staged_host_stores(session_state: Any) -> int:
+    """Close every staged SQLite handle in the current UI session."""
+    closed = 0
+    keys = [
+        key
+        for key in list(session_state.keys())
+        if str(key).startswith(_STORE_PREFIX)
+    ]
+    for key in keys:
+        holder = session_state.pop(key, None)
+        if not isinstance(holder, Mapping):
+            continue
+        store = holder.get("store")
+        if isinstance(store, SQLiteChatStore):
+            try:
+                store.close()
+            finally:
+                closed += 1
+    session_state.pop(_ACTIVE_SCOPE_KEY, None)
+    return closed
+
+
+def _validate_live_store(store: SQLiteChatStore) -> dict[str, Any]:
+    health = store.storage_health(deep=True)
+    if health.get("state") != HEALTHY:
+        try:
+            store.close()
+        finally:
+            raise StorageUnavailableError(
+                "staged host refused unhealthy local store: "
+                + str(health.get("reason") or "UNKNOWN")
+            )
+    return health
+
+
 def get_or_create_staged_store(
     session_state: Any,
     scope: Scope,
     root: Path,
+    *,
+    session_binding_digest: str = "",
 ) -> SQLiteChatStore:
-    """Keep one local staging handle per trusted scope in the Streamlit session."""
+    """Keep one healthy local staging handle for the active authenticated scope."""
     key = _holder_key(scope)
     expected = str(_store_path(scope, root))
+    expected_binding = _clean(session_binding_digest, 64)
+
+    active = _clean(session_state.get(_ACTIVE_SCOPE_KEY), 160)
+    if active and active != key:
+        close_all_staged_host_stores(session_state)
+
     holder = session_state.get(key)
     if isinstance(holder, Mapping):
         existing = holder.get("store")
         existing_path = str(holder.get("path") or "")
+        existing_binding = _clean(holder.get("session_binding_digest"), 64)
         if (
             existing_path == expected
+            and existing_binding == expected_binding
             and isinstance(existing, SQLiteChatStore)
         ):
+            _validate_live_store(existing)
+            session_state[_ACTIVE_SCOPE_KEY] = key
             return existing
         if isinstance(existing, SQLiteChatStore):
             try:
                 existing.close()
             except Exception:
                 pass
+        session_state.pop(key, None)
+
     store = SQLiteChatStore(expected)
+    _validate_live_store(store)
     session_state[key] = {
         "schema": SCHEMA,
         "path": expected,
         "store": store,
+        "session_binding_digest": expected_binding,
     }
+    session_state[_ACTIVE_SCOPE_KEY] = key
     return store
 
 
@@ -157,6 +239,8 @@ def close_staged_host_store(
     store = holder.get("store")
     if isinstance(store, SQLiteChatStore):
         store.close()
+        if session_state.get(_ACTIVE_SCOPE_KEY) == key:
+            session_state.pop(_ACTIVE_SCOPE_KEY, None)
         return True
     return False
 
@@ -194,13 +278,20 @@ def build_staged_host_binding(
         )
 
     scope = _authenticated_scope(access, cfg)
+    session_binding = _session_binding_digest(access, scope)
     root = _staging_directory(cfg)
     runtime = (
         dict(runtime_context)
         if isinstance(runtime_context, Mapping)
         else build_staged_runtime_context()
     )
-    store = get_or_create_staged_store(session_state, scope, root)
+    store = get_or_create_staged_store(
+        session_state,
+        scope,
+        root,
+        session_binding_digest=session_binding,
+    )
+    health = _validate_live_store(store)
 
     return {
         "schema": SCHEMA,
@@ -213,6 +304,10 @@ def build_staged_host_binding(
         "feature_enabled": True,
         "environment": env,
         "staging_store_path": str(_store_path(scope, root)),
+        "storage_health": health,
+        "staging_rpo_seconds": STAGING_RPO_SECONDS,
+        "staging_rto_seconds": STAGING_RTO_SECONDS,
+        "session_binding_digest": session_binding,
         "local_sqlite_only": True,
         "production_store_activated": False,
         "provider_called": False,
@@ -260,6 +355,7 @@ __all__ = [
     "staged_feature_enabled",
     "get_or_create_staged_store",
     "close_staged_host_store",
+    "close_all_staged_host_stores",
     "build_staged_runtime_context",
     "build_staged_host_binding",
     "streamlit_staged_config",
