@@ -64,7 +64,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual({item["kind"] for item in catalog}, set(ALLOWED_KINDS))
         self.assertFalse({item["kind"] for item in catalog} & FORBIDDEN_KINDS)
         hub = {item["tool_id"]: item for item in default_tool_hub()["tools"]}
-        self.assertEqual(len(hub), 12)
+        self.assertEqual(len(hub), 13)\n        self.assertEqual(hub["aion.staging.credential_probe"]["state"], "DISABLED")\n        self.assertNotIn("aion.staging.credential_probe", LOCAL_IDS)
         for item in catalog:
             tool = hub[item["tool_id"]]
             self.assertEqual(tool["kind"], item["kind"])
