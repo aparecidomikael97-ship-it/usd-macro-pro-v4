@@ -416,6 +416,43 @@ class DurableTaskAtomicRepositoryTests(unittest.TestCase):
                 repo.load(task["durable_task_id"])
             store.close()
 
+    def test_checkpoint_projection_matches_physical_repository_and_detects_stale_copy(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, repo = self._repo(raw)
+            task = _task()
+            repo.create(task)
+            projection = repo.checkpoint_projection()
+            self.assertEqual(
+                repo.verify_checkpoint_projection(projection)["state"],
+                "MATCH",
+            )
+            candidate = pause_durable_task(
+                task,
+                expected_revision=1,
+                changed_at=CHANGED,
+            )
+            repo.compare_and_swap(candidate, expected_revision=1)
+            stale = repo.verify_checkpoint_projection(projection)
+            self.assertEqual(stale["state"], "MISMATCH")
+            self.assertIn("CHECKPOINT_TASK_DIGEST_STALE", stale["blockers"])
+            self.assertTrue(stale["physical_repository_authoritative"])
+            self.assertTrue(stale["checkpoint_is_projection"])
+            store.close()
+
+    def test_forged_checkpoint_projection_digest_does_not_override_physical_state(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, repo = self._repo(raw)
+            task = _task()
+            repo.create(task)
+            projection = repo.checkpoint_projection()
+            forged = deepcopy(projection)
+            forged["records"][0]["state"] = "DONE"
+            forged["digest"] = "forged"
+            report = repo.verify_checkpoint_projection(forged)
+            self.assertEqual(report["state"], "MISMATCH")
+            self.assertEqual(repo.load(task["durable_task_id"])["state"], "PLANNED")
+            store.close()
+
     def test_repository_operations_have_no_network_subprocess_or_automatic_resume(self):
         with tempfile.TemporaryDirectory() as raw:
             with patch("socket.socket", side_effect=AssertionError("socket forbidden")), patch(
