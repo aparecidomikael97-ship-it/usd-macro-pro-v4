@@ -19,6 +19,7 @@ SCHEMA = "ATLASQUANT_AION_B2B_CUSTOMER_PORTAL_V1"
 PORTAL_SCOPE = "B2B_CUSTOMER_PORTAL"
 ALLOWED_VIEWER_ROLE = "USER"
 READ_MODEL_SCHEMA = "ATLASQUANT_AION_B2B_PORTAL_READ_MODEL_V1"
+PILOT_VALUE_BINDING_SCHEMA = "ATLASQUANT_AION_B2B_PILOT_CUSTOMER_VALUE_BINDING_V1"
 SAFE_SECTIONS = ("overview", "value", "usage", "support", "integrations", "crm", "documents", "billing", "automations", "tickets")
 _SAFE_TENANT_ID = re.compile(r"^[a-f0-9]{32}$")
 
@@ -174,6 +175,7 @@ def customer_portal_view_model(
     read_model: Mapping[str, Any] | None,
     records: Mapping[str, Any] | None = None,
     operations: Mapping[str, Any] | None = None,
+    pilot_value_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Filter internal service evidence into a customer-safe presentation model."""
     decision = customer_portal_access(access, binding, read_model)
@@ -269,6 +271,119 @@ def customer_portal_view_model(
             }
         safe_operations = candidate
 
+    safe_pilot_value = None
+    if pilot_value_binding is not None:
+        candidate = (
+            dict(pilot_value_binding)
+            if isinstance(pilot_value_binding, Mapping)
+            else {}
+        )
+        pilot_blockers: list[str] = []
+        if candidate.get("schema") != PILOT_VALUE_BINDING_SCHEMA:
+            pilot_blockers.append("PILOT_VALUE_BINDING_SCHEMA_INVALID")
+        if candidate.get("state") != "READY":
+            pilot_blockers.append("PILOT_VALUE_BINDING_NOT_READY")
+        if candidate.get("allowed") is not True:
+            pilot_blockers.append("PILOT_VALUE_BINDING_NOT_ALLOWED")
+        if candidate.get("read_only") is not True:
+            pilot_blockers.append("PILOT_VALUE_BINDING_NOT_READ_ONLY")
+        if candidate.get("customer_safe") is not True:
+            pilot_blockers.append("PILOT_VALUE_BINDING_NOT_CUSTOMER_SAFE")
+        if candidate.get("internal_economics_exposed") is not False:
+            pilot_blockers.append("PILOT_VALUE_BINDING_INTERNAL_ECONOMICS_UNSAFE")
+        if candidate.get("retention_risk_exposed") is not False:
+            pilot_blockers.append("PILOT_VALUE_BINDING_RETENTION_RISK_UNSAFE")
+        if candidate.get("internal_recommendation_exposed") is not False:
+            pilot_blockers.append("PILOT_VALUE_BINDING_RECOMMENDATION_UNSAFE")
+        if candidate.get("other_tenant_access") is not False:
+            pilot_blockers.append("PILOT_VALUE_BINDING_CROSS_TENANT_UNSAFE")
+        if candidate.get("admin_memory_access") is not False:
+            pilot_blockers.append("PILOT_VALUE_BINDING_ADMIN_MEMORY_UNSAFE")
+        if candidate.get("grants_authority") is not False:
+            pilot_blockers.append("PILOT_VALUE_BINDING_AUTHORITY_UNSAFE")
+        if candidate.get("executes_action") is not False:
+            pilot_blockers.append("PILOT_VALUE_BINDING_EXECUTION_UNSAFE")
+        if _text(candidate.get("customer_id"), 120) != decision["customer_id"]:
+            pilot_blockers.append("PILOT_VALUE_BINDING_CUSTOMER_MISMATCH")
+        if _text(candidate.get("service_tenant_id"), 120) != decision["service_tenant_id"]:
+            pilot_blockers.append("PILOT_VALUE_BINDING_TENANT_MISMATCH")
+        if _text(candidate.get("workspace_id"), 120) != decision["workspace_id"]:
+            pilot_blockers.append("PILOT_VALUE_BINDING_WORKSPACE_MISMATCH")
+        if not _text(candidate.get("pilot_id"), 120):
+            pilot_blockers.append("PILOT_VALUE_BINDING_PILOT_ID_REQUIRED")
+        if not _text(candidate.get("evidence_digest"), 180):
+            pilot_blockers.append("PILOT_VALUE_BINDING_EVIDENCE_REQUIRED")
+
+        raw_value = (
+            dict(candidate.get("pilot_value"))
+            if isinstance(candidate.get("pilot_value"), Mapping)
+            else {}
+        )
+        forbidden = (
+            "provider_delivery_cost_brl",
+            "provider_gross_margin_brl",
+            "provider_gross_margin_pct",
+            "retention_risk",
+            "retention_risk_score",
+            "recommendation",
+            "review_reasons",
+            "low_value_reasons",
+            "evidence_refs",
+        )
+        for key in forbidden:
+            if key in raw_value:
+                pilot_blockers.append(
+                    "PILOT_VALUE_BINDING_FORBIDDEN_FIELD:" + key
+                )
+
+        if pilot_blockers:
+            return {
+                "schema": SCHEMA,
+                "state": "BLOCKED",
+                "allowed": False,
+                "blockers": list(dict.fromkeys(pilot_blockers)),
+                "read_only": True,
+                "grants_authority": False,
+                "executes_action": False,
+            }
+
+        quick_wins: list[dict[str, Any]] = []
+        for raw in list(raw_value.get("quick_wins") or [])[:5]:
+            if not isinstance(raw, Mapping):
+                continue
+            quick_wins.append(
+                {
+                    "quick_win": _text(raw.get("quick_win"), 240),
+                    "state": _text(raw.get("state"), 40),
+                    "achieved": raw.get("achieved") is True,
+                }
+            )
+        safe_pilot_value = {
+            "pilot_id": _text(candidate.get("pilot_id"), 120),
+            "value_state": _text(raw_value.get("value_state"), 80),
+            "health_score": raw_value.get("health_score"),
+            "value_trend": _text(raw_value.get("value_trend"), 40),
+            "quick_win_completion_pct": raw_value.get("quick_win_completion_pct"),
+            "quick_win_achieved_pct": raw_value.get("quick_win_achieved_pct"),
+            "quick_wins": quick_wins,
+            "observed_savings_brl": raw_value.get("observed_savings_brl"),
+            "observed_roi_pct": raw_value.get("observed_roi_pct"),
+            "customer_fee_brl": raw_value.get("customer_fee_brl"),
+            "customer_value_to_fee_ratio": raw_value.get(
+                "customer_value_to_fee_ratio"
+            ),
+            "customer_net_value_brl": raw_value.get(
+                "customer_net_value_brl"
+            ),
+            "customer_payback_covered": (
+                raw_value.get("customer_payback_covered") is True
+            ),
+            "evidence_digest": _text(
+                raw_value.get("evidence_digest"),
+                180,
+            ),
+        }
+
     view = {
         "schema": SCHEMA,
         "state": "READY",
@@ -302,6 +417,15 @@ def customer_portal_view_model(
         "tickets": list(safe_operations.get("tickets") or [])[:100] if safe_operations else [],
         "operation_counts": dict(safe_operations.get("counts") or {}) if safe_operations else {},
         "operations_evidence_digest": _text(safe_operations.get("evidence_digest"), 180) if safe_operations else "",
+        "pilot_value": safe_pilot_value or {},
+        "pilot_value_evidence_digest": (
+            _text(pilot_value_binding.get("evidence_digest"), 180)
+            if safe_pilot_value and isinstance(pilot_value_binding, Mapping)
+            else ""
+        ),
+        "pilot_value_internal_economics_exposed": False,
+        "pilot_value_retention_risk_exposed": False,
+        "pilot_value_internal_recommendation_exposed": False,
         "read_only": True,
         "admin_memory_access": False,
         "other_tenant_access": False,
@@ -355,6 +479,24 @@ def customer_portal_html(view: Mapping[str, Any] | None) -> str:
             f'<article><small>ROI OBSERVADO</small><strong>{escape(_fmt(data.get("observed_roi_pct"), "%"))}</strong>'
             '<span>Baseado em evidência validada do serviço</span></article>'
         )
+        pilot_value = (
+            data.get("pilot_value")
+            if isinstance(data.get("pilot_value"), Mapping)
+            else {}
+        )
+        if pilot_value:
+            cards.extend([
+                f'<article><small>VALOR DO PILOTO</small><strong>{escape(str(pilot_value.get("value_state") or "—"))}</strong>'
+                f'<span>{escape(str(pilot_value.get("value_trend") or "—"))}</span></article>',
+                f'<article><small>ROI DO PILOTO</small><strong>{escape(_fmt(pilot_value.get("observed_roi_pct"), "%"))}</strong>'
+                '<span>Evidência vinculada ao piloto deste cliente</span></article>',
+                f'<article><small>ECONOMIA OBSERVADA</small><strong>R$ {escape(_fmt(pilot_value.get("observed_savings_brl")))}</strong>'
+                '<span>Valor observado; não é promessa futura</span></article>',
+                f'<article><small>QUICK WINS</small><strong>{escape(_fmt(pilot_value.get("quick_win_achieved_pct"), "%"))}</strong>'
+                '<span>Entregas rápidas comprovadas</span></article>',
+                f'<article><small>PAYBACK</small><strong>{"COBERTO" if pilot_value.get("customer_payback_covered") is True else "EM REVISÃO"}</strong>'
+                '<span>Comparação entre valor observado e fee</span></article>',
+            ])
     if "usage" in allowed:
         usage = data.get("usage") if isinstance(data.get("usage"), Mapping) else {}
         for key, label in (
@@ -479,9 +621,17 @@ def render_customer_portal(
     read_model: Mapping[str, Any] | None,
     records: Mapping[str, Any] | None = None,
     operations: Mapping[str, Any] | None = None,
+    pilot_value_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Optional Streamlit host adapter. Rendering only; no mutation path."""
-    view = customer_portal_view_model(access, binding, read_model, records, operations)
+    view = customer_portal_view_model(
+        access,
+        binding,
+        read_model,
+        records,
+        operations,
+        pilot_value_binding,
+    )
     st.markdown(customer_portal_html(view), unsafe_allow_html=True)
     return view
 
