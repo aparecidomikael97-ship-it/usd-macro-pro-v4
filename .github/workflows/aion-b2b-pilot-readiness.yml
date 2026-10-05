@@ -23,6 +23,9 @@ on:
       - "atlasquant_aion_b2b_managed_service_control.py"
       - "test_atlasquant_aion_b2b_managed_service_control.py"
       - "docs/aion/AION_B2B_MANAGED_SERVICE_CONTROL_V1.md"
+      - "atlasquant_aion_b2b_portal_read_model.py"
+      - "test_atlasquant_aion_b2b_portal_read_model.py"
+      - "docs/aion/AION_B2B_CUSTOMER_PORTAL_READ_MODEL_V1.md"
       - ".github/workflows/aion-b2b-pilot-readiness.yml"
 
 permissions:
@@ -39,10 +42,10 @@ jobs:
           python-version: "3.12"
       - name: Compile bounded pilot modules
         run: |
-          python -m py_compile             atlasquant_aion_managed_operations_simulation.py             atlasquant_aion_b2b_pilot_readiness.py
+          python -m py_compile             atlasquant_aion_managed_operations_simulation.py             atlasquant_aion_b2b_pilot_readiness.py             atlasquant_aion_b2b_portal_read_model.py
       - name: Run Managed Operations and pilot gate tests
         run: |
-          python -m unittest -q             test_atlasquant_aion_managed_operations_simulation.py             test_atlasquant_aion_b2b_pilot_readiness.py
+          python -m unittest -q             test_atlasquant_aion_managed_operations_simulation.py             test_atlasquant_aion_b2b_pilot_readiness.py             test_atlasquant_aion_b2b_portal_read_model.py
       - name: Assert offline safety markers
         run: |
           python - <<'PY'

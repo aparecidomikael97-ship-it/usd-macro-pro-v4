@@ -177,7 +177,102 @@ def nav_html(area, mode):
     return "".join(essential) + ('<details><summary>Todas as funções · Avançado</summary>' + "".join(secondary) + "</details>" if secondary else "")
 
 
-def module_panel(area, selected, *, resident=None):
+def _business_read_model_ready(raw):
+    if not isinstance(raw, dict):
+        return False
+    return (
+        raw.get("schema") == "ATLASQUANT_AION_B2B_PORTAL_READ_MODEL_V1"
+        and raw.get("state") == "READY"
+        and raw.get("read_only") is True
+        and raw.get("grants_authority") is False
+        and raw.get("executes_action") is False
+    )
+
+
+def business_read_model_html(selected, raw):
+    """Read-only Negócios metrics. Invalid/missing evidence renders no claims."""
+    if not _business_read_model_ready(raw):
+        return ""
+    model = dict(raw)
+    usage = model.get("usage") if isinstance(model.get("usage"), dict) else {}
+    support = model.get("support") if isinstance(model.get("support"), dict) else {}
+
+    def fmt_number(value, suffix=""):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "—"
+        if isinstance(value, float):
+            text = f"{value:.2f}".rstrip("0").rstrip(".")
+        else:
+            text = str(value)
+        return text + suffix
+
+    def metric(label, value, detail=""):
+        return (
+            '<article><small>' + escape(label) + '</small>'
+            '<strong>' + escape(value) + '</strong>'
+            + ('<p>' + escape(detail) + '</p>' if detail else '')
+            + '</article>'
+        )
+
+    cards = []
+    if selected in {"overview", "companies", "b2b", "success"}:
+        cards.extend((
+            metric("CLIENTE", str(model.get("customer_id") or "—"), str(model.get("package") or "—")),
+            metric("SAÚDE", fmt_number(model.get("health_score"), "%"), str(model.get("health_label") or "—")),
+            metric("ROI OBSERVADO", fmt_number(model.get("observed_roi_pct"), "%"), "Somente evidência observada"),
+            metric("ESTADO", str(model.get("service_state") or "—"), str(model.get("service_decision") or "—")),
+        ))
+    elif selected in {"finops", "roi"}:
+        cards.extend((
+            metric("CUSTO OBSERVADO", "R$ " + fmt_number(model.get("actual_service_cost_brl")), "Ciclo atual"),
+            metric("ROI OBSERVADO", fmt_number(model.get("observed_roi_pct"), "%"), "Sem herdar ROI sintético"),
+            metric("SAÚDE", fmt_number(model.get("health_score"), "%"), str(model.get("health_label") or "—")),
+        ))
+    elif selected == "sla":
+        cards.extend((
+            metric("1ª RESPOSTA", fmt_number(support.get("avg_first_response_hours"), "h"),
+                   "SLA cumprido" if support.get("first_response_sla_met") is True else "SLA em revisão"),
+            metric("RESOLUÇÃO", fmt_number(support.get("avg_resolution_hours"), "h"),
+                   "SLA cumprido" if support.get("resolution_sla_met") is True else "SLA em revisão"),
+            metric("CRÍTICOS ABERTOS", fmt_number(support.get("critical_open_tickets")), "Chamados críticos"),
+        ))
+    elif selected in {"team", "integrations", "sandbox"}:
+        cards.append(metric("AUTORIDADE", "SOMENTE LEITURA", "Alterações exigem gate e aprovação humana"))
+    else:
+        for key, label in (
+            ("capacity", "CAPACIDADE"),
+            ("calls", "CHAMADAS"),
+            ("tokens", "TOKENS"),
+            ("support_tickets", "SUPORTE"),
+        ):
+            row = usage.get(key) if isinstance(usage.get(key), dict) else {}
+            cards.append(metric(
+                label,
+                fmt_number(row.get("utilization_pct"), "%"),
+                f'{fmt_number(row.get("used"))} / {fmt_number(row.get("limit"))}',
+            ))
+
+    notices = []
+    for reason in list(model.get("review_reasons") or [])[:4]:
+        notices.append('<li>' + escape(str(reason)) + '</li>')
+    for reason in list(model.get("incident_reasons") or [])[:4]:
+        notices.append('<li>' + escape(str(reason)) + '</li>')
+    notice_html = (
+        '<div class="ref-evidence-notice"><strong>Revisões abertas</strong><ul>'
+        + "".join(notices) + '</ul></div>'
+        if notices else
+        '<p class="ref-state">EVIDÊNCIA VALIDADA · SOMENTE LEITURA · sem autoridade de execução</p>'
+    )
+    return (
+        '<section class="ref-business-read-model" data-read-model="ready">'
+        '<div class="ref-preview-grid">' + "".join(cards) + '</div>'
+        + notice_html
+        + '<p class="ref-truth">Atualização: ' + escape(str(model.get("generated_at") or "—")) + '</p>'
+        '</section>'
+    )
+
+
+def module_panel(area, selected, *, resident=None, business_read_model=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -209,6 +304,8 @@ def module_panel(area, selected, *, resident=None):
     if area == "aion" and selected == "roles":
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
+    if area == "negocios":
+        cards = business_read_model_html(selected, business_read_model)
     if area == "trader" and selected in {"lab", "paper", "journal"}:
         cards += '<div class="ref-preview-grid"><article><strong>Histórico</strong><p>Evolução das leituras; Diário reutiliza o Histórico existente.</p></article><article><strong>Backtest</strong><p>Regras em candles OHLC históricos, CSV TradingView, replay e métricas existentes.</p></article><article><strong>Paper / Forward</strong><p>Simulação prospectiva dentro do Backtest, sem ordem real.</p></article></div><h2>Histórico de Validação AtlasQuant</h2><p>Snapshots, comparação, integridade e backup ZIP no laboratório existente. Filtros de Ano, Mês, Setup, Ativo e Timeframe usam apenas registros disponíveis.</p><p class="ref-state">Armazenamento local: .atlasquant_research/backtest_snapshots. Persistência multiano externa ainda não garantida.</p>'
     if selected == "search":
@@ -248,6 +345,8 @@ def module_panel(area, selected, *, resident=None):
     data_state = "VALIDAÇÃO PENDENTE"
     if model:
         data_state=model['state']
+    if area == "negocios" and _business_read_model_ready(business_read_model):
+        data_state = "EVIDÊNCIA VALIDADA"
     if area == "trader" and selected in {"radar", "master", "radar_master"}:
         from atlasquant_interface_final import eligible_fx_population
         if eligible_fx_population(resident)["ranked"]:
@@ -256,7 +355,7 @@ def module_panel(area, selected, *, resident=None):
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else "PRÉVIA · sem execução automática"}</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -271,7 +370,7 @@ def module_panel(area, selected, *, resident=None):
         f'<section data-tab-panel="status" hidden><p>{escape(model["state"]) if model else "Aguardando dados validados."}</p></section></main>')
 
 
-def business_reference_home_html(*, mode="Avançado", name="Usuário", show_central=True):
+def business_reference_home_html(*, mode="Avançado", name="Usuário", show_central=True, business_read_model=None):
     """Interactive Negócios home using the current B2B operating model.
 
     The legacy market-research raster remains versioned as provenance, but it is
@@ -384,7 +483,12 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         '<div class="aq-ws-section-head"><h3>Operação & gestão</h3>'
         '<span>B2B, receita, cliente, capacidade e governança.</span></div>'
         f'<div class="aq-ws-modules">{"".join(cards)}</div>'
-        '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; '
+        + (
+            business_read_model_html("overview", business_read_model)
+            if _business_read_model_ready(business_read_model)
+            else '<p class="ref-state">CLIENTE · aguardando evidência validada para métricas de saúde, ROI, SLA e quotas</p>'
+        )
+        + '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; '
         'o workspace ativo usa o contrato B2B atual e não executa ações externas automaticamente.</p>'
         f'<p class="ref-truth">Sessão: {escape(name)}</p>'
         '</main></div></section></div>'
@@ -397,7 +501,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -408,7 +512,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         from atlasquant_interface_final import aion_workspace_html
         return aion_workspace_html(mode=mode,name=name,show_central=show_central,nav_html=nav_html,uri=asset_uri)
     if area == "negocios" and not selected:
-        return business_reference_home_html(mode=mode, name=name, show_central=show_central)
+        return business_reference_home_html(mode=mode, name=name, show_central=show_central, business_read_model=business_read_model)
     filename = SURFACES[area][0]
     uri = asset_uri(filename)
     w,h = dimensions(area)
@@ -430,7 +534,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     top = ('<button data-route="central" class="ref-return">← Central</button>' if show_central and area != "central" else "")
     mode_html = ('<button data-route="mode" class="ref-mode">Modo ' + escape(mode) + "</button>" if area != "central" else "")
     drawer = '<details class="ref-drawer"><summary>Menu · ' + escape(area.title()) + '</summary><nav>' + nav_html(area,mode) + top + "</nav></details>"
-    detail = module_panel(area,selected) if selected else ""
+    detail = module_panel(area,selected,business_read_model=business_read_model) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
     hits = ""
@@ -718,8 +822,13 @@ def render_reference_workspace(
         )
     session = access.get("session") or {}
     name = str(access.get("display_name") or session.get("username") or access.get("username") or "Usuário")
+    business_read_model = (
+        st.session_state.get("atlasquant_b2b_customer_read_model")
+        if area == "negocios"
+        else None
+    )
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population")),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()

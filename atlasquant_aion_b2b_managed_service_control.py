@@ -434,6 +434,7 @@ def evaluate_managed_service_cycle(
         "schema": SCHEMA,
         "state": state,
         "decision": decision,
+        **scope,
         "customer_id": customer_id,
         "package": package,
         "actual_service_cost_brl": actual_service_cost,
