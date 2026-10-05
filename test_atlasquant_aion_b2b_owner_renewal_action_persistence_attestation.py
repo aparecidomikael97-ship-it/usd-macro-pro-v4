@@ -216,6 +216,26 @@ class OwnerRenewalActionPersistenceAttestationTests(unittest.TestCase):
         self.assertTrue(out["persistence_attested"])
         self.assertTrue(out["receipt_consistency_verified"])
         self.assertTrue(out["eligible_for_action_execution_preflight"])
+        self.assertEqual(out["owner_review_packet_digest"], h("1"))
+        self.assertEqual(out["cycle_evidence_digest"], h("2"))
+        self.assertEqual(out["contract_digest"], h("3"))
+        self.assertEqual(out["value_bound_conversion_digest"], h("4"))
+        self.assertEqual(out["decision_record_digest"], h("5"))
+        self.assertEqual(
+            out["prior_persistence_receipt_digest"],
+            h("6"),
+        )
+        self.assertEqual(out["prior_checkpoint_digest"], h("7"))
+        self.assertEqual(out["prior_writer_request_digest"], h("8"))
+        self.assertEqual(
+            out["authorization_environment_digest"],
+            h("9"),
+        )
+        self.assertEqual(
+            out["authorization_preflight_digest"],
+            h("a"),
+        )
+        self.assertEqual(out["authorization_request_digest"], h("b"))
         self.assertFalse(out["writer_identity_verified"])
         self.assertFalse(out["business_action_authorized"])
         self.assertFalse(out["renewal_authorized"])
