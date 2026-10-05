@@ -34,19 +34,26 @@ SUBJECT_FILES = {
     "DURABLE_STORE": (
         "atlasquant_aion_tenant_durable_store.py",
         "atlasquant_aion_tenant_store.py",
+        "atlasquant_aion_tenant_crypto.py",
     ),
     "TENANT_E2E": (
         "atlasquant_aion_tenant_durable_store.py",
+        "atlasquant_aion_tenant_crypto.py",
         "test_atlasquant_aion_tenant_durable_store.py",
+        "test_atlasquant_aion_tenant_crypto_derived_data.py",
     ),
     "BACKUP_RESTORE": (
         "atlasquant_aion_tenant_durable_store.py",
+        "atlasquant_aion_tenant_crypto.py",
         "test_atlasquant_aion_tenant_durable_store.py",
+        "test_atlasquant_aion_tenant_crypto_derived_data.py",
     ),
     "REVOCATION_REPLAY": (
         "atlasquant_aion_entitlements.py",
         "atlasquant_aion_tenant_durable_store.py",
+        "atlasquant_aion_tenant_crypto.py",
         "test_atlasquant_aion_tenant_durable_store.py",
+        "test_atlasquant_aion_tenant_crypto_derived_data.py",
     ),
 }
 
