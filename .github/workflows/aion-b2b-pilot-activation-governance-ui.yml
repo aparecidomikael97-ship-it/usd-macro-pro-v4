@@ -1,0 +1,65 @@
+name: AION B2B Pilot Activation Governance UI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_activation_status_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_status_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_status_ui.py"
+      - "atlasquant_reference_ui.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_STATUS_READ_MODEL_V1.md"
+      - ".github/workflows/aion-b2b-pilot-activation-governance-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  activation-governance-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile read model and reference UI
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_activation_status_read_model.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_pilot_activation_status_read_model.py \
+            test_atlasquant_aion_b2b_pilot_activation_status_ui.py
+      - name: Run activation governance UI tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_activation_status_read_model.py \
+            test_atlasquant_aion_b2b_pilot_activation_status_ui.py \
+            test_atlasquant_aion_b2b_pilot_planning_ui.py
+      - name: Assert read-only UI boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          ui = Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+          model = Path("atlasquant_aion_b2b_pilot_activation_status_read_model.py").read_text(encoding="utf-8")
+          assert 'data-pilot-activation-readonly="true"' in ui
+          assert 'GOVERNANÇA VALIDADA · AGUARDANDO CONFIRMAÇÃO HUMANA · SEM COMANDO DE ATIVAÇÃO' in ui
+          for marker in (
+              '"activation_control_exposed": False',
+              '"activation_command_exposed": False',
+              '"candidate_identity_exposed": False',
+              '"cryptographic_digest_exposed": False',
+              '"writer_identity_exposed": False',
+              '"grants_authority": False',
+              '"executes_action": False',
+          ):
+              assert marker in model, marker
+          for forbidden in (
+              "Ativar piloto",
+              "Executar ativação",
+              "Confirmar execução",
+              "Autorizar execução",
+          ):
+              assert forbidden not in ui, forbidden
+          PY

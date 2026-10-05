@@ -53,4 +53,15 @@ if st.query_params.get("review") == "backtest":
     st.stop()
 area=st.session_state.get("atlasquant_central_choice","central_root")
 area="central" if area=="central_root" else area
+if st.query_params.get("review") == "chat-history":
+    # Explicit local QA fixture only: seed via the same session presentation adapter.
+    from atlasquant_aion_chat_workspace_ui import session_chat, trusted_context, submit_turn
+    context = trusted_context(access, "Avançado")
+    chat = session_chat(st.session_state, context)
+    if not chat["entries"]:
+        for index in range(120):
+            submit_turn(chat, {"conversation_id": chat["conversation_id"], "request_id": f"qa-{index}",
+                               "message": f"Como está o sistema? Histórico QA {index}", "attachments": []}, context)
+    st.session_state["atlasquant_central_choice"] = "aion"
+    area = "aion"
 render_reference_workspace(st,access,area,mode=st.session_state.get("atlasquant_experience_mode") or "Avançado")

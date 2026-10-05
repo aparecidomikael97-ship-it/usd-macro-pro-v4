@@ -21,6 +21,7 @@ LAYERS = (
 )
 STATUSES = ("ACTIVE", "SUPERSEDED", "EXPIRED", "REJECTED")
 TRUTH_STATES = ("CONFIRMED", "INFERENCE", "HYPOTHESIS", "UNKNOWN")
+PROMOTION_STATES = ("UNGOVERNED", "PROPOSED", "VERIFIED", "PROMOTED")
 MEMORY_DOMAINS = ("TRADER", "BUSINESS", "INVESTMENTS", "CORE")
 MAX_ENTRIES = 2000
 
@@ -48,6 +49,8 @@ def default_memory_layers() -> dict[str, Any]:
         "recovery": {"state": "CLEAN", "rejected": 0},
         "automatic_cross_persona_access": False,
         "automatic_cross_domain_access": False,
+        "promoted": sum(row.get("promotion_state") == "PROMOTED" for row in entries),
+        "ungoverned": sum(row.get("promotion_state") == "UNGOVERNED" for row in entries),
     }
 
 
@@ -85,9 +88,39 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
     if domain:
         key_payload["domain"] = domain
     memory_key = _clean(item.get("memory_key"), 180) or _digest(key_payload, 20)
+    promotion_state = _clean(item.get("promotion_state") or "UNGOVERNED", 30).upper()
+    if promotion_state not in PROMOTION_STATES:
+        promotion_state = "UNGOVERNED"
+    governance_ref = _clean(item.get("governance_ref"), 120)
+    taint_labels = []
+    for value in list(item.get("taint_labels") or [])[:30]:
+        token = _clean(value, 80).upper()
+        if token and token not in taint_labels:
+            taint_labels.append(token)
+    provenance_chain = [
+        _clean(x, 300)
+        for x in list(item.get("provenance_chain") or [])[:40]
+        if _clean(x, 300)
+    ]
+    verification_refs = [
+        _clean(x, 300)
+        for x in list(item.get("verification_refs") or [])[:40]
+        if _clean(x, 300)
+    ]
+    promotion_proof_digest = _clean(item.get("promotion_proof_digest"), 160)
+    if promotion_state == "PROMOTED":
+        if (
+            truth != "CONFIRMED"
+            or not governance_ref
+            or taint_labels
+            or not verification_refs
+            or not promotion_proof_digest
+        ):
+            raise ValueError("promoted memory requires confirmed governed proof with resolved taint")
     fingerprint_payload = {
         "layer": layer, "content": content, "origin": origin, "category": category,
-        "persona": persona, "version": version,
+        "persona": persona, "version": version, "promotion_state": promotion_state,
+        "governance_ref": governance_ref,
     }
     if domain:
         fingerprint_payload["domain"] = domain
@@ -110,6 +143,12 @@ def normalize_memory_entry(raw: Mapping[str, Any]) -> dict[str, Any]:
         "persona": persona,
         "domain": domain,
         "source_refs": [_clean(x, 300) for x in list(item.get("source_refs") or [])[:30] if _clean(x, 300)],
+        "promotion_state": promotion_state,
+        "governance_ref": governance_ref,
+        "taint_labels": taint_labels,
+        "provenance_chain": provenance_chain,
+        "verification_refs": verification_refs,
+        "promotion_proof_digest": promotion_proof_digest,
         "fingerprint": fingerprint,
     }
 
@@ -162,6 +201,12 @@ def remember(
     domain: Any = "",
     source_refs: Sequence[Any] | None = None,
     memory_key: Any = "",
+    promotion_state: Any = "UNGOVERNED",
+    governance_ref: Any = "",
+    taint_labels: Sequence[Any] | None = None,
+    provenance_chain: Sequence[Any] | None = None,
+    verification_refs: Sequence[Any] | None = None,
+    promotion_proof_digest: Any = "",
 ) -> dict[str, Any]:
     state = normalize_memory_layers(memory)
     candidate = normalize_memory_entry({
@@ -169,6 +214,11 @@ def remember(
         "confidence": confidence, "truth_state": truth_state, "valid_until": valid_until,
         "version": version, "tags": list(tags or []), "persona": persona, "domain": domain,
         "source_refs": list(source_refs or []), "memory_key": memory_key,
+        "promotion_state": promotion_state, "governance_ref": governance_ref,
+        "taint_labels": list(taint_labels or []),
+        "provenance_chain": list(provenance_chain or []),
+        "verification_refs": list(verification_refs or []),
+        "promotion_proof_digest": promotion_proof_digest,
     })
     entries = deepcopy(state["entries"])
     if any(row["fingerprint"] == candidate["fingerprint"] for row in entries):
@@ -253,8 +303,12 @@ def recall(
             continue
         item = dict(row)
         item["automatic_cross_domain_access"] = False
-        item["used_as_current_fact"] = False
-        item["promoted"] = False
+        item["used_as_current_fact"] = bool(
+            item.get("promotion_state") == "PROMOTED"
+            and item.get("truth_state") == "CONFIRMED"
+            and not item.get("taint_labels")
+        )
+        item["promoted"] = item["used_as_current_fact"]
         if cross_domain:
             item["explicit_cross_domain"] = True
         if expired:
@@ -283,7 +337,7 @@ def memory_layer_summary(memory: Mapping[str, Any] | None) -> dict[str, Any]:
 
 
 __all__ = [
-    "SCHEMA", "VERSION", "LAYERS", "STATUSES", "default_memory_layers",
+    "SCHEMA", "VERSION", "LAYERS", "STATUSES", "PROMOTION_STATES", "default_memory_layers",
     "normalize_memory_entry", "normalize_memory_layers", "remember", "recall",
     "memory_layer_summary",
 ]

@@ -91,7 +91,8 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
                 page.screenshot(path=str(artifacts/(area+f'-{width}.png')),full_page=True)
             page.set_viewport_size({'width':1440,'height':1000})
             # Every visual card/tab/panel region opens a detail at the first fold.
-            routes=list(dict.fromkeys(page.locator(".ref-canvas [data-route]").evaluate_all("els=>els.map(e=>e.dataset.route)")))
+            region_selector = '.ref-canvas [data-route]:visible' if area == 'aion' else '.ref-canvas [data-route]'
+            routes=list(dict.fromkeys(page.locator(region_selector).evaluate_all("els=>els.map(e=>e.dataset.route)")))
             routes=[route for route in routes if route != "home"]
             for route in routes:
                 button=page.locator(f'.ref-canvas [data-route="{route}"]').first
@@ -139,8 +140,15 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             expect(page.locator(".ref-drawer")).to_be_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible()
-            if area in ('trader','aion'):
-                mobile_art=page.locator('.cq-card img' if area == 'trader' else '.final-aion-banner img').first
+            if area == 'aion':
+                # #659 replaces the illustration-led home with the real chat.
+                expect(page.locator('.aq-chat-root')).to_be_visible()
+                expect(page.locator('#aq-chat-message')).to_be_enabled()
+                expect(page.locator('.aq-chat-send')).to_be_visible()
+                composer = page.locator('.aq-chat-composer').bounding_box()
+                assert composer['y'] + composer['height'] <= 844
+            elif area == 'trader':
+                mobile_art=page.locator('.cq-card img').first
                 expect(mobile_art).to_be_visible()
                 assert mobile_art.evaluate('(e)=>e.complete && e.naturalWidth>0')
             else:
@@ -148,7 +156,9 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
                 expect(mobile_art).to_be_visible()
                 assert mobile_art.evaluate("(e)=>getComputedStyle(e).backgroundImage")!="none"
             workspace=page.locator(".ref-workspace").first
-            if area in ('trader','aion'):
+            if area == 'aion':
+                expect(page.locator('.aq-chat-live')).to_contain_text('sem execução')
+            elif area == 'trader':
                 assert workspace.evaluate('(e)=>getComputedStyle(e).backgroundImage') == 'none'
             else:
                 assert workspace.evaluate("(e)=>getComputedStyle(e).backgroundSize")=="0px 0px"
@@ -165,7 +175,8 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
             expect(page.locator(".ref-detail")).to_be_visible()
             assert page.locator(".ref-detail h1").bounding_box()["y"] < 300
             page.locator('.ref-detail [data-route="home"]').click()
-            assert page.locator(".ref-mobile-card").first.evaluate("(e)=>getComputedStyle(e).transitionDuration")=="0s"
+            motion_target = '.aq-chat-send' if area == 'aion' else '.ref-mobile-card'
+            assert page.locator(motion_target).first.evaluate("(e)=>getComputedStyle(e).transitionDuration")=="0s"
             page.locator('.ref-toolbar [data-route="central"]').click()
             expect(page.locator('[data-workspace="central"]')).to_be_visible(timeout=20000)
             page.screenshot(path=str(artifacts/"central-mobile.png"),full_page=True)
