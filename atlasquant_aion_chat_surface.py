@@ -145,7 +145,13 @@ def normalize_attachment_metadata(
         )
         digest_text = digest_text.lower()
         digest_invalid = bool(digest_text) and not _SHA256_RE.fullmatch(digest_text)
-        digest = digest_text if not digest_invalid and len(digest_text) == 64 else ""
+        digest = (
+            digest_text
+            if not digest_invalid
+            and not digest_truncated
+            and len(digest_text) == 64
+            else ""
+        )
         if not digest_text:
             digest_invalid = False
 
