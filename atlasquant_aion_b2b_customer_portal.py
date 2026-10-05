@@ -20,6 +20,7 @@ PORTAL_SCOPE = "B2B_CUSTOMER_PORTAL"
 ALLOWED_VIEWER_ROLE = "USER"
 READ_MODEL_SCHEMA = "ATLASQUANT_AION_B2B_PORTAL_READ_MODEL_V1"
 PILOT_VALUE_BINDING_SCHEMA = "ATLASQUANT_AION_B2B_PILOT_CUSTOMER_VALUE_BINDING_V1"
+RECURRING_PROJECTION_SCHEMA = "ATLASQUANT_AION_B2B_RECURRING_CUSTOMER_PROJECTION_V1"
 SAFE_SECTIONS = ("overview", "value", "usage", "support", "integrations", "crm", "documents", "billing", "automations", "tickets")
 _SAFE_TENANT_ID = re.compile(r"^[a-f0-9]{32}$")
 
@@ -176,6 +177,7 @@ def customer_portal_view_model(
     records: Mapping[str, Any] | None = None,
     operations: Mapping[str, Any] | None = None,
     pilot_value_binding: Mapping[str, Any] | None = None,
+    recurring_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Filter internal service evidence into a customer-safe presentation model."""
     decision = customer_portal_access(access, binding, read_model)
@@ -384,29 +386,170 @@ def customer_portal_view_model(
             ),
         }
 
+    safe_recurring = None
+    if recurring_projection is not None:
+        candidate = (
+            dict(recurring_projection)
+            if isinstance(recurring_projection, Mapping)
+            else {}
+        )
+        recurring_blockers: list[str] = []
+        if candidate.get("schema") != RECURRING_PROJECTION_SCHEMA:
+            recurring_blockers.append("RECURRING_PROJECTION_SCHEMA_INVALID")
+        if candidate.get("state") != "READY":
+            recurring_blockers.append("RECURRING_PROJECTION_NOT_READY")
+        if candidate.get("allowed") is not True:
+            recurring_blockers.append("RECURRING_PROJECTION_NOT_ALLOWED")
+        if candidate.get("read_only") is not True:
+            recurring_blockers.append("RECURRING_PROJECTION_NOT_READ_ONLY")
+        if candidate.get("customer_safe") is not True:
+            recurring_blockers.append("RECURRING_PROJECTION_NOT_CUSTOMER_SAFE")
+        for key in (
+            "internal_service_cost_exposed",
+            "provider_margin_exposed",
+            "retention_risk_exposed",
+            "internal_recommendation_exposed",
+            "internal_review_reasons_exposed",
+            "other_tenant_access",
+            "admin_memory_access",
+            "grants_authority",
+            "automatic_billing",
+            "automatic_renewal",
+            "automatic_expansion",
+            "automatic_customer_contact",
+            "automatic_deploy",
+            "production_mutation",
+            "executes_action",
+        ):
+            if candidate.get(key) is not False:
+                recurring_blockers.append(
+                    "RECURRING_PROJECTION_UNSAFE_FIELD:" + key
+                )
+        if _text(candidate.get("customer_id"), 120) != decision["customer_id"]:
+            recurring_blockers.append("RECURRING_PROJECTION_CUSTOMER_MISMATCH")
+        if (
+            _text(candidate.get("service_tenant_id"), 120)
+            != decision["service_tenant_id"]
+        ):
+            recurring_blockers.append("RECURRING_PROJECTION_TENANT_MISMATCH")
+        if _text(candidate.get("workspace_id"), 120) != decision["workspace_id"]:
+            recurring_blockers.append("RECURRING_PROJECTION_WORKSPACE_MISMATCH")
+        if _text(candidate.get("package"), 40).upper() != decision["package"]:
+            recurring_blockers.append("RECURRING_PROJECTION_PACKAGE_MISMATCH")
+        if not _text(candidate.get("pilot_id"), 120):
+            recurring_blockers.append("RECURRING_PROJECTION_PILOT_ID_REQUIRED")
+        if not _text(candidate.get("evidence_digest"), 180):
+            recurring_blockers.append("RECURRING_PROJECTION_EVIDENCE_REQUIRED")
+
+        forbidden = (
+            "actual_service_cost_brl",
+            "provider_delivery_cost_brl",
+            "provider_gross_margin_brl",
+            "provider_gross_margin_pct",
+            "retention_risk",
+            "retention_risk_score",
+            "recommendation",
+            "service_decision",
+            "review_reasons",
+            "incident_reasons",
+            "allowed_owner_choices",
+            "source_value_decision",
+            "source_conversion_decision",
+        )
+        for key in forbidden:
+            if key in candidate:
+                recurring_blockers.append(
+                    "RECURRING_PROJECTION_FORBIDDEN_FIELD:" + key
+                )
+
+        if recurring_blockers:
+            return {
+                "schema": SCHEMA,
+                "state": "BLOCKED",
+                "allowed": False,
+                "blockers": list(dict.fromkeys(recurring_blockers)),
+                "read_only": True,
+                "grants_authority": False,
+                "executes_action": False,
+            }
+        safe_recurring = candidate
+
+    effective_support = (
+        safe_recurring.get("support")
+        if safe_recurring and isinstance(safe_recurring.get("support"), Mapping)
+        else support
+    )
+    effective_usage = (
+        safe_recurring.get("usage")
+        if safe_recurring and isinstance(safe_recurring.get("usage"), Mapping)
+        else model.get("usage")
+    )
+    effective_service_state = _text(
+        safe_recurring.get("service_status")
+        if safe_recurring
+        else model.get("service_state"),
+        80,
+    )
+    effective_health_label = _text(
+        safe_recurring.get("health_label")
+        if safe_recurring
+        else model.get("health_label"),
+        80,
+    )
+    effective_health_score = (
+        safe_recurring.get("health_score")
+        if safe_recurring
+        else model.get("health_score")
+    )
+    effective_roi = (
+        safe_recurring.get("observed_roi_pct")
+        if safe_recurring
+        else model.get("observed_roi_pct")
+    )
+    effective_generated_at = _text(
+        safe_recurring.get("generated_at")
+        if safe_recurring
+        else model.get("generated_at"),
+        96,
+    )
+    effective_evidence_digest = _text(
+        safe_recurring.get("evidence_digest")
+        if safe_recurring
+        else model.get("evidence_digest"),
+        180,
+    )
+
     view = {
         "schema": SCHEMA,
         "state": "READY",
         "allowed": True,
         "customer_id": decision["customer_id"],
         "package": decision["package"],
-        "service_state": _text(model.get("service_state"), 80),
-        "service_decision": _text(model.get("service_decision"), 120),
-        "health_label": _text(model.get("health_label"), 80),
-        "health_score": model.get("health_score"),
-        "observed_roi_pct": model.get("observed_roi_pct"),
-        "usage": _copy_usage(model.get("usage")),
+        "service_state": effective_service_state,
+        "service_decision": (
+            "" if safe_recurring else _text(model.get("service_decision"), 120)
+        ),
+        "health_label": effective_health_label,
+        "health_score": effective_health_score,
+        "observed_roi_pct": effective_roi,
+        "usage": _copy_usage(effective_usage),
         "support": {
-            "avg_first_response_hours": support.get("avg_first_response_hours"),
-            "avg_resolution_hours": support.get("avg_resolution_hours"),
-            "critical_open_tickets": support.get("critical_open_tickets"),
-            "first_response_sla_met": support.get("first_response_sla_met") is True,
-            "resolution_sla_met": support.get("resolution_sla_met") is True,
+            "avg_first_response_hours": effective_support.get("avg_first_response_hours"),
+            "avg_resolution_hours": effective_support.get("avg_resolution_hours"),
+            "critical_open_tickets": effective_support.get("critical_open_tickets"),
+            "first_response_sla_met": effective_support.get("first_response_sla_met") is True,
+            "resolution_sla_met": effective_support.get("resolution_sla_met") is True,
         },
-        "review_reasons": [str(x)[:180] for x in list(model.get("review_reasons") or [])[:8]],
-        "incident_reasons": [str(x)[:180] for x in list(model.get("incident_reasons") or [])[:8]],
-        "generated_at": _text(model.get("generated_at"), 96),
-        "evidence_digest": _text(model.get("evidence_digest"), 180),
+        "review_reasons": (
+            [] if safe_recurring
+            else [str(x)[:180] for x in list(model.get("review_reasons") or [])[:8]]
+        ),
+        "incident_reasons": (
+            [] if safe_recurring
+            else [str(x)[:180] for x in list(model.get("incident_reasons") or [])[:8]]
+        ),
+        "generated_at": effective_generated_at,
+        "evidence_digest": effective_evidence_digest,
         "allowed_sections": list(decision["allowed_sections"]),
         "integrations": list(safe_records.get("integrations") or [])[:20] if safe_records else [],
         "crm": dict(safe_records.get("crm") or {}) if safe_records else {"enabled": False},
@@ -426,6 +569,17 @@ def customer_portal_view_model(
         "pilot_value_internal_economics_exposed": False,
         "pilot_value_retention_risk_exposed": False,
         "pilot_value_internal_recommendation_exposed": False,
+        "recurring_projection": dict(safe_recurring) if safe_recurring else {},
+        "recurring_projection_evidence_digest": (
+            _text(safe_recurring.get("evidence_digest"), 180)
+            if safe_recurring
+            else ""
+        ),
+        "recurring_internal_service_cost_exposed": False,
+        "recurring_provider_margin_exposed": False,
+        "recurring_retention_risk_exposed": False,
+        "recurring_internal_recommendation_exposed": False,
+        "recurring_internal_review_reasons_exposed": False,
         "read_only": True,
         "admin_memory_access": False,
         "other_tenant_access": False,
@@ -622,6 +776,7 @@ def render_customer_portal(
     records: Mapping[str, Any] | None = None,
     operations: Mapping[str, Any] | None = None,
     pilot_value_binding: Mapping[str, Any] | None = None,
+    recurring_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Optional Streamlit host adapter. Rendering only; no mutation path."""
     view = customer_portal_view_model(
@@ -631,6 +786,7 @@ def render_customer_portal(
         records,
         operations,
         pilot_value_binding,
+        recurring_projection,
     )
     st.markdown(customer_portal_html(view), unsafe_allow_html=True)
     return view
