@@ -131,7 +131,7 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         )
         decision = evaluate_finops_budget(
             ledger,
-            policy={"window_budget_usd": 1.0, "soft_limit_pct": 80},
+            policy=policy(window_budget_usd=1.0, soft_limit_pct=80),
             prospective_request=request(cost=0.12),
         )
         self.assertEqual(decision["state"], "DEGRADE")
@@ -176,12 +176,12 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         )
         other = evaluate_finops_budget(
             ledger,
-            policy={
-                "window_budget_usd": 10,
-                "noisy_neighbor_share_pct": 70,
-                "max_user_calls": 100,
-                "max_user_tokens": 100000,
-            },
+            policy=policy(
+                window_budget_usd=10,
+                noisy_neighbor_share_pct=70,
+                max_user_calls=100,
+                max_user_tokens=100000,
+            ),
             prospective_request=request(user="u2", cost=0.20),
         )
         self.assertEqual(offender["state"], "BLOCK")
@@ -198,14 +198,14 @@ class AionFinOpsMeteringTests(unittest.TestCase):
         )
         offender = evaluate_finops_budget(
             ledger,
-            policy={
-                "window_budget_usd": 100,
-                "max_calls": 100,
-                "max_tokens": 100000,
-                "max_user_calls": 4,
-                "max_user_tokens": 100000,
-                "noisy_neighbor_share_pct": 100,
-            },
+            policy=policy(
+                window_budget_usd=100,
+                max_calls=100,
+                max_tokens=100000,
+                max_user_calls=4,
+                max_user_tokens=100000,
+                noisy_neighbor_share_pct=100,
+            ),
             prospective_request=request(user="u1", calls=1, cost=0.01),
         )
         self.assertIn("USER_CALL_LIMIT", offender["blockers"])
