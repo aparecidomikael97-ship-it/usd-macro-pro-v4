@@ -574,6 +574,9 @@ def render_reference_workspace(
                 "product_scope": aion_chat_binding["scope"],
                 "product_store": aion_chat_binding["store"],
                 "runtime_context": aion_chat_binding["runtime_context"],
+                "product_conversation_id": aion_chat_binding.get(
+                    "conversation_id", ""
+                ),
             }
         return render_aion_chat_workspace(
             st,
