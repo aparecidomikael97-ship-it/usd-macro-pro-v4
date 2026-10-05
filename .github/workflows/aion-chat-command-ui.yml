@@ -1,0 +1,40 @@
+name: AION Chat Command UI
+on:
+  pull_request:
+    branches: [integration/aion-chat-command-surface-v1-20261004]
+    paths:
+      - "atlasquant_aion_chat_workspace_ui.py"
+      - "atlasquant_reference_ui.py"
+      - "aion_chat/web/command-chat.*"
+      - "tools/reference_ui_preview.py"
+      - "test_atlasquant_aion_chat_command_browser.py"
+      - "test_atlasquant_aion_chat_workspace_ui.py"
+      - ".github/workflows/aion-chat-command-ui.yml"
+permissions:
+  contents: read
+jobs:
+  chat-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AION_CHAT_659_ARTIFACTS: aion-chat-evidence
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install UI test dependencies
+        run: |
+          python -m pip install -r requirements.txt pytest==9.1.1 playwright==1.63.0
+          python -m playwright install --with-deps chromium
+      - name: Session boundary, rendering and unmodified Chat Turn V1
+        run: python -m pytest -q test_atlasquant_aion_chat_workspace_ui.py test_atlasquant_aion_chat_surface.py test_atlasquant_reference_ui.py test_atlasquant_ecosystem_workspace_ui.py test_atlasquant_finalization_audit.py
+      - name: Real AION tab Chromium E2E and responsive evidence
+        run: python -m pytest -q -s test_atlasquant_aion_chat_command_browser.py
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: aion-chat-command-ui-evidence
+          path: aion-chat-evidence/
+          if-no-files-found: warn
