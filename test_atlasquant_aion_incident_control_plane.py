@@ -132,6 +132,7 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
             incident={"incident_id": "INC-1", "status": "CLOSED", "severity": "HIGH"},
             recovery_evidence_verified=True,
             explicit_owner_approval=True,
+            authority_verification=authority("model_provider", "reenable"),
         )
         self.assertEqual(out["state"], "MAY_PROGRESS_TO_MUTATION_GATE")
         self.assertTrue(out["request_may_progress"])
@@ -149,6 +150,18 @@ class AionIncidentControlPlaneTests(unittest.TestCase):
         )
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("CONTROL_AUTHORITY_NOT_VERIFIED", out["blockers"])
+
+    def test_verified_authority_must_bind_exact_control_capability(self):
+        out = evaluate_control_request(
+            actor="HUMAN_OWNER",
+            capability="external_tools",
+            desired_state="STOPPED",
+            trusted_scope=SCOPE,
+            incident=INCIDENT,
+            authority_verification=authority("model_provider"),
+        )
+        self.assertIn("CONTROL_AUTHORITY_NOT_VERIFIED", out["blockers"])
+        self.assertFalse(out["request_may_progress"])
 
     def test_owner_subject_must_match_trusted_owner(self):
         out = evaluate_control_request(
