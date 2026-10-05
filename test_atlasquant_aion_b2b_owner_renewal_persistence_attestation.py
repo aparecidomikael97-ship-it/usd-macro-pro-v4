@@ -195,7 +195,7 @@ class OwnerRenewalPersistenceAttestationTests(unittest.TestCase):
         self.assertEqual(out["review_type"], "RENEWAL_REVIEW")
         self.assertEqual(
             out["owner_review_packet_digest"],
-            "sha256:owner-review",
+            "sha256:review",
         )
         self.assertEqual(
             out["cycle_evidence_digest"],

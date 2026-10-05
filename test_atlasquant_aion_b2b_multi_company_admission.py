@@ -332,7 +332,7 @@ class AionB2BMultiCompanyAdmissionTests(unittest.TestCase):
 
     def test_active_tenant_limit_is_enforced(self):
         tenants = [
-            active_tenant(f"tenant-{i:03d}-x", f"customer-{i:03d}")
+            active_tenant(f"tenant-{i:03d}-x", f"existing-{i:03d}")
             for i in range(10)
         ]
         out = evaluate(

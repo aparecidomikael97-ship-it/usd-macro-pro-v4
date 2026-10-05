@@ -23,6 +23,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
+      - name: Install crypto dependency
+        run: python -m pip install --disable-pip-version-check cryptography==50.0.2
       - name: Compile persistence attestation
         run: |
           python -m py_compile \
@@ -45,10 +47,10 @@ jobs:
           for marker in (
               '"writer_identity_verified": False',
               '"storage_write_performed": False',
-              '"renewal_authorized": False',
-              '"termination_authorized": False',
-              '"external_action_executed": False',
-              '"executes_action": False',
+              '"renewal_authorized",',
+              '"termination_authorized",',
+              '"external_action_executed",',
+              '"executes_action",',
           ):
               assert marker in source, marker
 

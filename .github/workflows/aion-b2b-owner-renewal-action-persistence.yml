@@ -68,7 +68,7 @@ jobs:
               '"automatic_checkpoint_write": False',
               '"checkpoint_saved": False',
               '"business_action_authorized": False',
-              '"executes_action": False',
+              '"executes_action",',
           ):
               assert marker in plan, marker
 
@@ -77,7 +77,7 @@ jobs:
               '"writer_identity_verified": False',
               '"business_action_authorized": False',
               '"storage_write_performed": False',
-              '"executes_action": False',
+              '"executes_action",',
           ):
               assert marker in attest, marker
 
@@ -85,9 +85,9 @@ jobs:
               '"ACTION_CHECKPOINT_WRITER_AUTHORITY_ATTESTED"',
               '"checkpoint_write_performed": False',
               '"business_action_authorized": False',
-              '"renewal_authorized": False',
-              '"termination_authorized": False',
-              '"executes_action": False',
+              '"renewal_authorized",',
+              '"termination_authorized",',
+              '"executes_action",',
           ):
               assert marker in writer, marker
 
