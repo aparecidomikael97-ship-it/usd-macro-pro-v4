@@ -6,6 +6,10 @@ from pathlib import Path
 import sys
 import time
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_durable_task_repository import (
