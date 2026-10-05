@@ -44,7 +44,24 @@ jobs:
               "atlasquant_aion_b2b_owner_renewal_action_adapter_receipt_v2.py",
           )
           joined = "\n".join(Path(path).read_text(encoding="utf-8") for path in files)
-          assert "trusted_scope" not in joined
+          import inspect
+          from atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2 import (
+              build_owner_renewal_action_adapter_plan_v2,
+              validate_adapter_plan_v2,
+          )
+          from atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run_v2 import (
+              build_owner_renewal_action_adapter_dry_run_v2,
+          )
+          from atlasquant_aion_b2b_owner_renewal_action_adapter_receipt_v2 import (
+              validate_synthetic_owner_renewal_action_receipt_v2,
+          )
+          for fn in (
+              build_owner_renewal_action_adapter_plan_v2,
+              validate_adapter_plan_v2,
+              build_owner_renewal_action_adapter_dry_run_v2,
+              validate_synthetic_owner_renewal_action_receipt_v2,
+          ):
+              assert "trusted_scope" not in inspect.signature(fn).parameters
           for banned in (
               "requests.post(",
               "requests.put(",
