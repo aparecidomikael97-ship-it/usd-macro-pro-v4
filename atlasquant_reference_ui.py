@@ -272,7 +272,78 @@ def business_read_model_html(selected, raw):
     )
 
 
-def module_panel(area, selected, *, resident=None, business_read_model=None):
+def _revops_read_model_ready(raw):
+    if not isinstance(raw, dict):
+        return False
+    return (
+        raw.get("schema") == "ATLASQUANT_AION_B2B_REVOPS_READ_MODEL_V1"
+        and raw.get("state") in {"READY", "PARTIAL"}
+        and raw.get("read_only") is True
+        and raw.get("raw_records_exposed") is False
+        and raw.get("contact_data_exposed") is False
+        and raw.get("grants_authority") is False
+        and raw.get("executes_action") is False
+    )
+
+
+def revops_read_model_html(selected, raw):
+    """Aggregate RevOps metrics only. Record-level CRM data is never rendered."""
+    if selected not in {"revenue", "crm", "leads"} or not _revops_read_model_ready(raw):
+        return ""
+    model = dict(raw)
+    metrics = model.get("metrics") if isinstance(model.get("metrics"), dict) else {}
+    stages = model.get("stage_counts") if isinstance(model.get("stage_counts"), dict) else {}
+
+    def fmt(value, suffix=""):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "—"
+        if isinstance(value, float):
+            text = f"{value:.2f}".rstrip("0").rstrip(".")
+        else:
+            text = str(value)
+        return text + suffix
+
+    def metric(label, value, detail=""):
+        return (
+            '<article><small>' + escape(label) + '</small>'
+            '<strong>' + escape(value) + '</strong>'
+            + ('<p>' + escape(detail) + '</p>' if detail else '')
+            + '</article>'
+        )
+
+    cards = [
+        metric("LEADS VÁLIDOS", fmt(metrics.get("accepted_records")), "Registros aceitos no snapshot"),
+        metric("EMPRESAS", fmt(metrics.get("company_count")), "Chaves de empresa distintas"),
+        metric("PRÓXIMAS AÇÕES VENCIDAS", fmt(metrics.get("due_next_action_count")), "Somente sinal operacional"),
+        metric("REGISTROS STALE", fmt(metrics.get("stale_record_count")), "Revisão de dados recomendada"),
+        metric("OWNER COBERTO", fmt(metrics.get("owner_coverage_pct"), "%"), "Cobertura de responsável"),
+        metric("PRÓXIMO PASSO", fmt(metrics.get("next_action_coverage_pct"), "%"), "Cobertura de próxima ação"),
+        metric("EVIDÊNCIA DE CONTATO", fmt(metrics.get("contact_evidence_coverage_pct"), "%"), "Não certifica permissão legal"),
+        metric("DO NOT CONTACT", fmt(metrics.get("do_not_contact_count")), "Preservado e sem outreach automático"),
+    ]
+    if selected in {"revenue", "leads"}:
+        cards.extend((
+            metric("LEAD", fmt(stages.get("LEAD")), "Topo do funil"),
+            metric("DIAGNÓSTICO", fmt(stages.get("DIAGNOSTIC")), "Diagnóstico em andamento"),
+            metric("DEMO", fmt(stages.get("DEMO")), "Demonstrações"),
+            metric("PROPOSTA", fmt(stages.get("PROPOSAL")), "Propostas"),
+        ))
+    if selected in {"revenue", "crm"}:
+        cards.extend((
+            metric("CONTRATO", fmt(stages.get("CONTRACT")), "Aguardando/validando contrato"),
+            metric("IMPLANTAÇÃO", fmt(stages.get("IMPLEMENTATION")), "Implantação"),
+            metric("FOLLOW-UP", fmt(stages.get("FOLLOWUP")), "Acompanhamento"),
+            metric("SERVIÇO ATIVO", fmt(stages.get("ACTIVE_SERVICE")), "Operação recorrente"),
+        ))
+    return (
+        '<section class="aq-revops-readmodel" data-revops-readonly="true">'
+        '<div class="ref-preview-grid">' + "".join(cards) + '</div>'
+        '<p class="ref-truth">RevOps agregado · nenhum registro bruto de lead/contato é exibido.</p>'
+        '</section>'
+    )
+
+
+def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -305,7 +376,10 @@ def module_panel(area, selected, *, resident=None, business_read_model=None):
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
     if area == "negocios":
-        cards = business_read_model_html(selected, business_read_model)
+        if selected in {"revenue", "crm", "leads"} and _revops_read_model_ready(revops_read_model):
+            cards = revops_read_model_html(selected, revops_read_model)
+        else:
+            cards = business_read_model_html(selected, business_read_model)
     if area == "trader" and selected in {"lab", "paper", "journal"}:
         cards += '<div class="ref-preview-grid"><article><strong>Histórico</strong><p>Evolução das leituras; Diário reutiliza o Histórico existente.</p></article><article><strong>Backtest</strong><p>Regras em candles OHLC históricos, CSV TradingView, replay e métricas existentes.</p></article><article><strong>Paper / Forward</strong><p>Simulação prospectiva dentro do Backtest, sem ordem real.</p></article></div><h2>Histórico de Validação AtlasQuant</h2><p>Snapshots, comparação, integridade e backup ZIP no laboratório existente. Filtros de Ano, Mês, Setup, Ativo e Timeframe usam apenas registros disponíveis.</p><p class="ref-state">Armazenamento local: .atlasquant_research/backtest_snapshots. Persistência multiano externa ainda não garantida.</p>'
     if selected == "search":
@@ -345,7 +419,11 @@ def module_panel(area, selected, *, resident=None, business_read_model=None):
     data_state = "VALIDAÇÃO PENDENTE"
     if model:
         data_state=model['state']
-    if area == "negocios" and _business_read_model_ready(business_read_model):
+    revops_selected = area == "negocios" and selected in {"revenue", "crm", "leads"}
+    revops_ready = revops_selected and _revops_read_model_ready(revops_read_model)
+    if revops_ready:
+        data_state = "REVOPS " + ("PARCIAL" if revops_read_model.get("state") == "PARTIAL" else "VALIDADO")
+    elif area == "negocios" and _business_read_model_ready(business_read_model):
         data_state = "EVIDÊNCIA VALIDADA"
     if area == "trader" and selected in {"radar", "master", "radar_master"}:
         from atlasquant_interface_final import eligible_fx_population
@@ -355,7 +433,7 @@ def module_panel(area, selected, *, resident=None, business_read_model=None):
         f'<div class="ref-detail-kicker">ATLASQUANT · {escape(area.upper())}</div>'
         '<div class="ref-detail-head">'
         f'<h1>{escape(title)}</h1><button data-route="home">Voltar à visão geral</button></div>'
-        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática")}</p>'
+        f'<p class="ref-state">{escape(model["state"]) if model else ("SOMENTE LEITURA · RevOps agregado" if revops_ready else ("SOMENTE LEITURA · evidência validada" if area == "negocios" and _business_read_model_ready(business_read_model) else "PRÉVIA · sem execução automática"))}</p>'
         f'<p class="ref-detail-lede">{notice}</p>'
         '<div class="ref-detail-status">'
         f'<span><small>AMBIENTE</small><strong>{escape(area.upper())}</strong></span>'
@@ -501,7 +579,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -534,7 +612,12 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     top = ('<button data-route="central" class="ref-return">← Central</button>' if show_central and area != "central" else "")
     mode_html = ('<button data-route="mode" class="ref-mode">Modo ' + escape(mode) + "</button>" if area != "central" else "")
     drawer = '<details class="ref-drawer"><summary>Menu · ' + escape(area.title()) + '</summary><nav>' + nav_html(area,mode) + top + "</nav></details>"
-    detail = module_panel(area,selected,business_read_model=business_read_model) if selected else ""
+    detail = module_panel(
+        area,
+        selected,
+        business_read_model=business_read_model,
+        revops_read_model=revops_read_model,
+    ) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
     hits = ""
@@ -827,8 +910,13 @@ def render_reference_workspace(
         if area == "negocios"
         else None
     )
+    revops_read_model = (
+        st.session_state.get("atlasquant_b2b_revops_read_model")
+        if area == "negocios"
+        else None
+    )
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()

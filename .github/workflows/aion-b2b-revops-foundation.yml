@@ -8,6 +8,11 @@ on:
       - "atlasquant_aion_b2b_revops_foundation.py"
       - "test_atlasquant_aion_b2b_revops_foundation.py"
       - "docs/aion/AION_B2B_REVOPS_FOUNDATION_V1.md"
+      - "atlasquant_aion_b2b_revops_read_model.py"
+      - "test_atlasquant_aion_b2b_revops_read_model.py"
+      - "test_atlasquant_aion_b2b_revops_ui.py"
+      - "docs/aion/AION_B2B_REVOPS_READ_MODEL_V1.md"
+      - "atlasquant_reference_ui.py"
       - ".github/workflows/aion-b2b-revops-foundation.yml"
 
 permissions:
@@ -26,10 +31,17 @@ jobs:
         run: |
           python -m py_compile \
             atlasquant_aion_b2b_revops_foundation.py \
-            test_atlasquant_aion_b2b_revops_foundation.py
+            atlasquant_aion_b2b_revops_read_model.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_revops_foundation.py \
+            test_atlasquant_aion_b2b_revops_read_model.py \
+            test_atlasquant_aion_b2b_revops_ui.py
       - name: Run RevOps foundation tests
         run: |
-          python -m unittest -q test_atlasquant_aion_b2b_revops_foundation.py
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_revops_foundation.py \
+            test_atlasquant_aion_b2b_revops_read_model.py \
+            test_atlasquant_aion_b2b_revops_ui.py
       - name: Assert non-execution and owner-only boundaries
         run: |
           python - <<'PY'
