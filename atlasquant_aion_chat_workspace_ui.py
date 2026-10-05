@@ -35,21 +35,47 @@ def session_chat(session, context):
 
 
 def attachment_metadata(items):
-    """Whitelist metadata. Client hashes have no trusted ingest provenance; omit them."""
-    from atlasquant_aion_chat_surface import MAX_ATTACHMENTS
+    """Whitelist metadata without silently truncating browser-supplied fields."""
+    from atlasquant_aion_chat_surface import (
+        MAX_ATTACHMENTS,
+        MAX_ATTACHMENT_MIME,
+        MAX_ATTACHMENT_NAME,
+        MAX_ATTACHMENT_SIZE_BYTES,
+    )
     result = []
     for item in items if isinstance(items, list) else []:
-        if not isinstance(item, dict): continue
-        if len(result) >= MAX_ATTACHMENTS: raise ValueError("Até 16 anexos por turno.")
+        if not isinstance(item, dict):
+            continue
+        if len(result) >= MAX_ATTACHMENTS:
+            raise ValueError("Até 16 anexos por turno.")
         size = item.get("size_bytes", 0)
-        if type(size) is not int or size < 0: raise ValueError("Tamanho de anexo inválido.")
-        result.append({"filename": str(item.get("filename") or "arquivo")[:240], "mime_type": str(item.get("mime_type") or "application/octet-stream")[:120], "size_bytes": size, "kind": "IMAGE" if str(item.get("mime_type") or "").startswith("image/") else "FILE"})
+        if type(size) is not int or size < 0 or size > MAX_ATTACHMENT_SIZE_BYTES:
+            raise ValueError("Tamanho de anexo inválido.")
+        filename = str(item.get("filename") or "arquivo").replace("\x00", "")
+        mime_type = str(
+            item.get("mime_type") or "application/octet-stream"
+        ).replace("\x00", "")
+        if len(" ".join(filename.split())) > MAX_ATTACHMENT_NAME:
+            raise ValueError("Nome de anexo excede o orçamento técnico.")
+        if len(" ".join(mime_type.split())) > MAX_ATTACHMENT_MIME:
+            raise ValueError("Tipo MIME excede o orçamento técnico.")
+        result.append({
+            "filename": filename,
+            "mime_type": mime_type,
+            "size_bytes": size,
+            "kind": "IMAGE" if mime_type.startswith("image/") else "FILE",
+        })
     return result
 
 
 def submit_turn(chat, event, context):
     """Only UI history mutation. All planning/policy decisions belong to #656."""
-    from atlasquant_aion_chat_surface import build_chat_turn, append_chat_history, MAX_MESSAGE_CHARS
+    from atlasquant_aion_chat_surface import (
+        MAX_IN_MEMORY_HISTORY_ENTRIES,
+        MAX_MESSAGE_CHARS,
+        append_chat_history,
+        build_chat_turn,
+    )
     if not isinstance(event, dict) or event.get("conversation_id") != chat["conversation_id"]:
         raise ValueError("Conversa da sessão não corresponde.")
     request_id = event.get("request_id")
@@ -58,6 +84,11 @@ def submit_turn(chat, event, context):
     text = event.get("message")
     if not isinstance(text, str) or len(text) > MAX_MESSAGE_CHARS: raise ValueError("Mensagem excede o orçamento técnico de 8.000 caracteres.")
     files = attachment_metadata(event.get("attachments"))
+    if len(chat["entries"]) + 2 > MAX_IN_MEMORY_HISTORY_ENTRIES:
+        raise ValueError(
+            "A sessão atingiu o orçamento técnico de memória; "
+            "reabra pelo histórico durável."
+        )
     turn = build_chat_turn(text, context=context, attachments=files, conversation_id=chat["conversation_id"], turn_index=len(chat["turns"]))
     state = turn.get("state", "BLOCKED")
     _, answer = LABELS.get(state, LABELS["BLOCKED"])
@@ -92,8 +123,27 @@ def view_data(chat):
             "stages": [{"stage": item.get("stage"), "state": item.get("state")} for item in turn.get("golden_path", [])],
             "evidence": "Planejada · evidência ainda não coletada", "receipt": "Não criado · execução não iniciada",
         }
-    return {"conversation_id": chat["conversation_id"], "entries": entries, "turns": public_turns, "total": len(chat["entries"]),
-            "page": chat["page"], "has_older": start > 0, "has_newer": chat["page"] > 0, "ack": chat["ack"], "notice": chat["notice"]}
+    from atlasquant_aion_chat_surface import MAX_IN_MEMORY_HISTORY_ENTRIES
+    return {
+        "conversation_id": chat["conversation_id"],
+        "entries": entries,
+        "turns": public_turns,
+        "total": len(chat["entries"]),
+        "page": chat["page"],
+        "has_older": start > 0,
+        "has_newer": chat["page"] > 0,
+        "ack": chat["ack"],
+        "notice": chat["notice"],
+        "session_budget": {
+            "max_entries": MAX_IN_MEMORY_HISTORY_ENTRIES,
+            "used_entries": len(chat["entries"]),
+            "remaining_entries": max(
+                0, MAX_IN_MEMORY_HISTORY_ENTRIES - len(chat["entries"])
+            ),
+            "durable_history_is_product_source": True,
+            "rows_dropped": 0,
+        },
+    }
 
 
 def render_aion_chat_workspace(st, access, *, mode, selected, navigation, component):
