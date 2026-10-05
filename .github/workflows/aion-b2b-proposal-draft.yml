@@ -1,0 +1,62 @@
+name: AION B2B Proposal Draft
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_readiness.py"
+      - "atlasquant_aion_b2b_diagnostic_intake.py"
+      - "atlasquant_aion_b2b_proposal_draft.py"
+      - "test_atlasquant_aion_b2b_pilot_readiness.py"
+      - "test_atlasquant_aion_b2b_proposal_draft.py"
+      - "docs/aion/AION_B2B_PROPOSAL_DRAFT_V1.md"
+      - ".github/workflows/aion-b2b-proposal-draft.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  proposal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile proposal chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_readiness.py \
+            atlasquant_aion_b2b_diagnostic_intake.py \
+            atlasquant_aion_b2b_proposal_draft.py \
+            test_atlasquant_aion_b2b_pilot_readiness.py \
+            test_atlasquant_aion_b2b_proposal_draft.py
+      - name: Run proposal chain tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_readiness.py \
+            test_atlasquant_aion_b2b_diagnostic_intake.py \
+            test_atlasquant_aion_b2b_proposal_draft.py
+      - name: Assert non-binding commercial boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_proposal_draft.py").read_text(encoding="utf-8")
+          for marker in (
+              '"customer_send_allowed": False',
+              '"contract_ready": False',
+              '"price_commitment": False',
+              '"automatic_pricing": False',
+              '"automatic_customer_contact": False',
+              '"automatic_contract": False',
+              '"automatic_billing": False',
+              '"crm_write": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+          assert "READINESS_CANDIDATE_MISMATCH" in source
+          assert "READINESS_SCOPE_MISMATCH" in source
+          assert "EXPLICIT_HUMAN_COMMERCIAL_TERMS_REQUIRED" in source
+          PY

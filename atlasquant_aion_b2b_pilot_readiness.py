@@ -250,6 +250,12 @@ def assess_b2b_pilot_candidate(
         "schema": SCHEMA,
         "state": "READY_FOR_OWNER_REVIEW" if decision == "PILOT_REVIEW_CANDIDATE" else decision,
         "decision": decision,
+        "candidate_id": normalized["candidate_id"],
+        "scope": {
+            "owner_id": normalized["owner_id"],
+            "tenant_id": normalized["tenant_id"],
+            "workspace_id": normalized["workspace_id"],
+        },
         "acceptance_score": acceptance_score,
         "risk_score": risk_score,
         "priority_score": priority_score,
