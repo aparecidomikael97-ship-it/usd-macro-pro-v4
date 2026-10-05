@@ -24,7 +24,10 @@ IDENTITY_BINDING_SCHEMA = "ATLASQUANT_AION_CHAT_IDENTITY_BINDING_V1"
 MAX_MESSAGE_CHARS = 8000
 MAX_ATTACHMENTS = 16
 MAX_ATTACHMENT_NAME = 240
+MAX_ATTACHMENT_MIME = 120
+MAX_ATTACHMENT_KIND = 40
 MAX_ATTACHMENT_SIZE_BYTES = 512 * 1024 * 1024
+MAX_IN_MEMORY_HISTORY_ENTRIES = 2000
 
 _CONTENT_KEYS = frozenset({
     "content", "bytes", "data", "payload", "base64", "text", "body",
@@ -32,8 +35,13 @@ _CONTENT_KEYS = frozenset({
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
+def _clean_with_truncation(value: Any, limit: int) -> tuple[str, bool]:
+    normalized = " ".join(str(value or "").replace("\x00", "").split())
+    return normalized[:limit], len(normalized) > limit
+
+
 def _clean(value: Any, limit: int) -> str:
-    return " ".join(str(value or "").replace("\x00", "").split())[:limit]
+    return _clean_with_truncation(value, limit)[0]
 
 
 def _message_text(value: Any, limit: int) -> str:
@@ -97,31 +105,73 @@ def conversation_identity_binding(
 def normalize_attachment_metadata(
     attachments: Sequence[Mapping[str, Any]] | None,
 ) -> tuple[dict[str, Any], ...]:
-    """Keep metadata only. File bodies are never accepted by this contract."""
+    """Keep bounded metadata only and make every technical truncation explicit."""
+    raw_items = list(attachments or [])
     normalized: list[dict[str, Any]] = []
-    for raw in list(attachments or [])[:MAX_ATTACHMENTS]:
+    for raw in raw_items[:MAX_ATTACHMENTS]:
         if not isinstance(raw, Mapping):
             continue
-        name = _clean(raw.get("name") or raw.get("filename") or "attachment", MAX_ATTACHMENT_NAME)
-        mime_type = _clean(raw.get("mime_type") or raw.get("content_type") or "", 120).lower()
-        kind = _clean(raw.get("kind") or "FILE", 40).upper() or "FILE"
+
+        name, name_truncated = _clean_with_truncation(
+            raw.get("name") or raw.get("filename") or "attachment",
+            MAX_ATTACHMENT_NAME,
+        )
+        mime_type, mime_type_truncated = _clean_with_truncation(
+            raw.get("mime_type") or raw.get("content_type") or "",
+            MAX_ATTACHMENT_MIME,
+        )
+        mime_type = mime_type.lower()
+        kind, kind_truncated = _clean_with_truncation(
+            raw.get("kind") or "FILE",
+            MAX_ATTACHMENT_KIND,
+        )
+        kind = kind.upper() or "FILE"
+
+        raw_size = raw.get("size_bytes")
+        if raw_size in (None, ""):
+            raw_size = raw.get("size") or 0
+        size_invalid = isinstance(raw_size, bool)
         try:
-            size = int(raw.get("size_bytes") or raw.get("size") or 0)
+            parsed_size = 0 if size_invalid else int(raw_size)
         except (TypeError, ValueError):
-            size = 0
-        size = max(0, min(size, MAX_ATTACHMENT_SIZE_BYTES))
-        digest = _clean(raw.get("sha256") or "", 64).lower()
-        digest = digest if _SHA256_RE.fullmatch(digest) else ""
+            parsed_size = 0
+            size_invalid = True
+        size = max(0, min(parsed_size, MAX_ATTACHMENT_SIZE_BYTES))
+        size_clamped = size_invalid or size != parsed_size
+
+        digest_text, digest_truncated = _clean_with_truncation(
+            raw.get("sha256") or "",
+            64,
+        )
+        digest_text = digest_text.lower()
+        digest_invalid = bool(digest_text) and not _SHA256_RE.fullmatch(digest_text)
+        digest = digest_text if not digest_invalid and len(digest_text) == 64 else ""
+        if not digest_text:
+            digest_invalid = False
+
         content_supplied = any(
             key in raw and raw.get(key) not in (None, "", b"")
             for key in _CONTENT_KEYS
         )
+        metadata_truncated = any((
+            name_truncated,
+            mime_type_truncated,
+            kind_truncated,
+            digest_truncated,
+            size_clamped,
+        ))
         normalized.append({
             "name": name,
             "mime_type": mime_type,
             "kind": kind,
             "size_bytes": size,
             "sha256": digest,
+            "name_truncated": name_truncated,
+            "mime_type_truncated": mime_type_truncated,
+            "kind_truncated": kind_truncated,
+            "size_clamped": size_clamped,
+            "sha256_invalid": digest_invalid or digest_truncated,
+            "metadata_truncated": metadata_truncated,
             "content_supplied_but_not_accepted": content_supplied,
             "content_accepted": False,
         })
@@ -217,7 +267,21 @@ def build_chat_turn(
         )
 
     canonical_text = _clean(text, MAX_MESSAGE_CHARS)
-    metadata = normalize_attachment_metadata(attachments)
+    raw_attachments = list(attachments or [])
+    metadata = normalize_attachment_metadata(raw_attachments)
+    attachment_budget = {
+        "received_count": len(raw_attachments),
+        "accepted_count": len(metadata),
+        "max_count": MAX_ATTACHMENTS,
+        "overflow": len(raw_attachments) > MAX_ATTACHMENTS,
+        "metadata_truncated": any(
+            item.get("metadata_truncated") is True for item in metadata
+        ),
+        "content_rejected": any(
+            item.get("content_supplied_but_not_accepted") is True
+            for item in metadata
+        ),
+    }
     core = orchestrate_aion_core(
         canonical_text,
         context={
@@ -335,6 +399,7 @@ def build_chat_turn(
         "message_digest": message_digest,
         "canonical_message_digest": canonical_message_digest,
         "attachments": [dict(item) for item in metadata],
+        "attachment_budget": attachment_budget,
         "context": ctx,
         "selected_capability": selected,
         "local_tool_ids": local_tool_ids,
@@ -364,12 +429,22 @@ def append_chat_history(
     *,
     assistant_text: Any = "",
 ) -> dict[str, Any]:
-    """Append a turn without truncating prior conversation history.
+    """Append one logical pair to the bounded in-memory helper.
 
-    This is an in-memory structure only; durable persistence belongs to a later
-    explicitly approved persistence adapter.
+    This helper is not the durable product history. The durable scoped chat
+    store remains the source for long-lived/unbounded product continuity.
+    The in-memory helper never silently drops old rows: when its technical
+    budget is exhausted it fails before mutation so the host can use/reopen
+    the durable store instead.
     """
     rows = [dict(item) for item in list(history or []) if isinstance(item, Mapping)]
+    answer = _message_text(assistant_text, 16000)
+    additions = 1 + (1 if answer.strip() else 0)
+    if len(rows) + additions > MAX_IN_MEMORY_HISTORY_ENTRIES:
+        raise ValueError(
+            "in-memory history budget exceeded; durable chat store required"
+        )
+
     rows.append({
         "role": "user",
         "turn_id": _clean(turn.get("turn_id") or "", 80),
@@ -378,7 +453,6 @@ def append_chat_history(
         "content": _message_text(turn.get("message") or "", MAX_MESSAGE_CHARS),
         "state": _clean(turn.get("state") or "", 40),
     })
-    answer = _message_text(assistant_text, 16000)
     if answer.strip():
         rows.append({
             "role": "assistant",
@@ -395,6 +469,14 @@ def append_chat_history(
         "identity_binding_complete": turn.get("identity_binding_complete") is True,
         "entries": rows,
         "entry_count": len(rows),
+        "history_budget": {
+            "kind": "IN_MEMORY_HELPER_ONLY",
+            "max_entries": MAX_IN_MEMORY_HISTORY_ENTRIES,
+            "used_entries": len(rows),
+            "remaining_entries": MAX_IN_MEMORY_HISTORY_ENTRIES - len(rows),
+            "durable_store_required_at_limit": True,
+            "rows_dropped": 0,
+        },
         "persists_externally": False,
         "automatic_memory_write": False,
     }
@@ -406,6 +488,11 @@ __all__ = [
     "IDENTITY_BINDING_SCHEMA",
     "MAX_MESSAGE_CHARS",
     "MAX_ATTACHMENTS",
+    "MAX_ATTACHMENT_NAME",
+    "MAX_ATTACHMENT_MIME",
+    "MAX_ATTACHMENT_KIND",
+    "MAX_ATTACHMENT_SIZE_BYTES",
+    "MAX_IN_MEMORY_HISTORY_ENTRIES",
     "normalize_attachment_metadata",
     "conversation_identity_binding",
     "build_chat_turn",
