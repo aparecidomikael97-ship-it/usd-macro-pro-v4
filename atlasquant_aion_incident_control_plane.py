@@ -99,6 +99,7 @@ def evaluate_control_request(
     incident: Mapping[str, Any] | None = None,
     recovery_evidence_verified: Any = False,
     explicit_owner_approval: Any = False,
+    authority_verification: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return whether a control request may progress to a downstream mutation gate."""
     actor_id = _text(actor, 80)
@@ -132,6 +133,29 @@ def evaluate_control_request(
 
     owner_approval = explicit_owner_approval is True
     recovery_ok = recovery_evidence_verified is True
+
+    authority = dict(authority_verification or {})
+    control_verb = "reenable" if desired == "RUNNING" else "stop"
+    required_capability = f"incident_control:{cap}:{control_verb}"
+    authority_caps = authority.get("capabilities")
+    authority_caps = set(authority_caps) if isinstance(authority_caps, (list, tuple, set, frozenset)) else set()
+    authority_subject = _text(authority.get("subject_id"), 100)
+    authority_tenant = _text(authority.get("tenant_id"), 100)
+    authority_valid = bool(
+        authority.get("state") == "VERIFIED"
+        and authority.get("authority_verified") is True
+        and authority.get("execution_allowed") is False
+        and authority.get("executes_action") is False
+        and authority_subject
+        and required_capability in authority_caps
+    )
+    if actor_id in {"HUMAN_OWNER", "DELEGATED_ADMIN"}:
+        if not authority_valid:
+            blockers.append("CONTROL_AUTHORITY_NOT_VERIFIED")
+        if actor_id == "HUMAN_OWNER" and authority_subject and authority_subject != owner_id:
+            blockers.append("OWNER_IDENTITY_MISMATCH")
+        if config["scope"] == "TENANT" and authority_tenant != tenant_id:
+            blockers.append("AUTHORITY_TENANT_MISMATCH")
 
     recommendation_only = actor_id in INTERNAL_RECOMMEND
     request_allowed = False
@@ -196,6 +220,9 @@ def evaluate_control_request(
         "incident_severity": incident_severity,
         "recovery_evidence_verified": recovery_ok,
         "explicit_owner_approval": owner_approval,
+        "authority_subject_id": authority_subject,
+        "required_control_capability": required_capability,
+        "control_authority_verified": authority_valid,
     }
     return {
         "schema": SCHEMA,
