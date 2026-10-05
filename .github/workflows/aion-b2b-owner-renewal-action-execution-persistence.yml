@@ -1,0 +1,93 @@
+name: AION B2B Owner Renewal Action Execution Persistence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_owner_renewal_action_execution_ceremony.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_execution_persistence_plan.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_execution_persistence_plan.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py"
+      - "atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_EXECUTION_PERSISTENCE_PLAN_V1.md"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_EXECUTION_PERSISTENCE_ATTESTATION_V1.md"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_EXECUTION_WRITER_ATTESTATION_V1.md"
+      - ".github/workflows/aion-b2b-owner-renewal-action-execution-persistence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-renewal-action-execution-persistence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned crypto dependency
+        run: python -m pip install --disable-pip-version-check cryptography==50.0.2
+      - name: Compile recurring execution persistence chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_owner_renewal_action_execution_ceremony.py \
+            atlasquant_aion_b2b_owner_renewal_action_execution_persistence_plan.py \
+            atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py \
+            atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_persistence_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py
+      - name: Run recurring execution persistence tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_ceremony.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_persistence_plan.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py \
+            test_atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py
+      - name: Assert persistence proof is not command execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          plan = Path(
+              "atlasquant_aion_b2b_owner_renewal_action_execution_persistence_plan.py"
+          ).read_text(encoding="utf-8")
+          attest = Path(
+              "atlasquant_aion_b2b_owner_renewal_action_execution_persistence_attestation.py"
+          ).read_text(encoding="utf-8")
+          writer = Path(
+              "atlasquant_aion_b2b_owner_renewal_action_execution_writer_attestation.py"
+          ).read_text(encoding="utf-8")
+
+          for source in (plan, attest, writer):
+              for marker in (
+                  '"execution_command_generated": False',
+                  '"execution_command_executed": False',
+              ):
+                  assert marker in source, marker
+              for banned in (
+                  "save_runtime_checkpoint(",
+                  "requests.post(",
+                  "requests.put(",
+                  "httpx.post(",
+                  "subprocess.",
+                  "send_whatsapp(",
+                  "send_email(",
+                  "deploy_to_production(",
+              ):
+                  assert banned not in source, banned
+
+          assert '"automatic_checkpoint_write": False' in plan
+          assert '"storage_write_performed": False' in attest
+          assert '"checkpoint_write_performed": False' in writer
+          for marker in (
+              '"business_action_authorized",',
+              '"termination_authorized",',
+              '"executes_action",',
+          ):
+              assert marker in writer, marker
+          PY
