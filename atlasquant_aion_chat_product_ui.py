@@ -16,6 +16,7 @@ from atlasquant_aion_chat_product_bridge import (
     continue_product_read_turn,
     create_product_conversation,
     read_product_history_page,
+    resume_product_conversation,
     validate_product_binding,
 )
 
@@ -122,6 +123,45 @@ def staged_product_session(
         state["cursor_stack"] = []
     return state
 
+
+
+def bind_product_conversation(
+    state: dict[str, Any],
+    access: Mapping[str, Any],
+    scope: Scope,
+    store: Any,
+    runtime_context: Mapping[str, Any],
+    conversation_id: Any,
+) -> dict[str, Any]:
+    """Explicitly rebind UI-only state to an existing scoped conversation."""
+    validate_product_ui_injection(access, scope, store, runtime_context)
+    cid = _clean(conversation_id, 120)
+    if not cid:
+        raise ValueError("conversation_id required for reopen")
+    resumed = resume_product_conversation(
+        store,
+        scope,
+        access,
+        cid,
+    )
+    if resumed.get("state") not in {"READY", "REHYDRATION_REQUIRED"}:
+        raise ValueError("durable conversation cannot be reopened")
+    state["conversation_id"] = cid
+    state["cursor"] = None
+    state["cursor_stack"] = []
+    state["next_cursor"] = None
+    state["notice"] = ""
+    return {
+        "schema": SCHEMA,
+        "state": "REOPENED",
+        "conversation_id": cid,
+        "resume": resumed,
+        "provider_called": False,
+        "network_called": False,
+        "external_action_executed": False,
+        "production_store_activated": False,
+        "grants_authority": False,
+    }
 
 def view_product_data(
     state: dict[str, Any],
@@ -297,10 +337,23 @@ def render_product_chat_workspace(
     selected: str,
     navigation: list[tuple[str, str]] | tuple[tuple[str, str], ...],
     component: Any,
+    conversation_id: Any = "",
 ) -> bool:
     """Mount the staged durable product path using only injected host objects."""
     validate_product_ui_injection(access, scope, store, runtime_context)
     state = staged_product_session(st.session_state, access, scope)
+    injected_cid = _clean(conversation_id, 120)
+    if injected_cid and injected_cid != _clean(
+        state.get("conversation_id"), 120
+    ):
+        bind_product_conversation(
+            state,
+            access,
+            scope,
+            store,
+            runtime_context,
+            injected_cid,
+        )
     data = view_product_data(
         state,
         access,
@@ -359,6 +412,7 @@ __all__ = [
     "SCHEMA",
     "validate_product_ui_injection",
     "staged_product_session",
+    "bind_product_conversation",
     "view_product_data",
     "submit_product_turn",
     "change_product_page",
