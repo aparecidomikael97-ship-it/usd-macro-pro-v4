@@ -138,7 +138,7 @@ class ControlledHandoffTests(unittest.TestCase):
         out = self.make(authority_statement=payload, authority_signature_b64=signature, capability="DEPLOY_PRODUCTION")
         self.assertEqual(out["state"], BLOCKED)
 
-    def test_non_delegable_capability_is_blocked(self):
+    def test_non_delegable_capability_is_blocked_without_burning_nonce(self):
         payload = statement(capabilities=["DEPLOY_PRODUCTION"])
         out = self.make(
             authority_statement=payload,
@@ -147,6 +147,7 @@ class ControlledHandoffTests(unittest.TestCase):
         )
         self.assertEqual(out["state"], BLOCKED)
         self.assertIn("NON_DELEGABLE_CAPABILITY", out["blockers"])
+        self.assertEqual(self.nonces.count(), 0)
 
     def test_external_ai_direct_tool_control_is_blocked(self):
         out = self.make(orchestration={
@@ -155,6 +156,23 @@ class ControlledHandoffTests(unittest.TestCase):
         })
         self.assertEqual(out["state"], BLOCKED)
         self.assertIn("EXTERNAL_AI_DIRECT_TOOL_CONTROL_FORBIDDEN", out["blockers"])
+        self.assertEqual(self.nonces.count(), 0)
+
+    def test_wrong_capability_does_not_burn_signed_authority_nonce(self):
+        payload = statement(capabilities=["LOCAL_READ"])
+        out = self.make(
+            authority_statement=payload,
+            authority_signature_b64=sign(self.private, payload),
+            capability="WRITE_CODE_SANDBOX",
+        )
+        self.assertEqual(out["state"], BLOCKED)
+        self.assertIn("CAPABILITY_NOT_REQUESTED_IN_AUTHORITY_STATEMENT", out["blockers"])
+        self.assertEqual(self.nonces.count(), 0)
+
+    def test_invalid_input_digest_does_not_burn_nonce(self):
+        out = self.make(expected_input_digest="sha256:not-a-real-digest")
+        self.assertEqual(out["state"], BLOCKED)
+        self.assertEqual(self.nonces.count(), 0)
 
     def test_success_receipt_requires_output_and_tests(self):
         h = self.make()
