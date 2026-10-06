@@ -770,7 +770,7 @@ def demo_sandbox_html(selected, raw):
     )
 
 
-def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None):
+def module_panel(area, selected, *, resident=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None):
     title = action_labels(area).get(selected)
     if not title:
         return ""
@@ -802,8 +802,71 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
     if area == "aion" and selected == "roles":
         from atlasquant_interface_final import aion_roles_html
         cards = aion_roles_html()
+    terminal_certificate_panel_selected = (
+        area == "negocios"
+        and selected == "privacy"
+        and terminal_certificate_panel_view_model is not None
+    )
+    terminal_certificate_panel_ready = False
+    terminal_certificate_panel_state = ""
     if area == "negocios":
-        if selected == "sandbox" and _demo_sandbox_read_model_ready(demo_sandbox_read_model):
+        if terminal_certificate_panel_selected:
+            from atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1 import (
+                render_terminal_certificate_panel_offline,
+            )
+            terminal_panel = render_terminal_certificate_panel_offline(
+                panel_view_model=terminal_certificate_panel_view_model,
+            )
+            terminal_certificate_panel_ready = (
+                terminal_panel.get("html_rendered") is True
+                and terminal_panel.get("static_only") is True
+                and terminal_panel.get("read_only") is True
+                and terminal_panel.get("observational_only") is True
+                and terminal_panel.get("executes_action") is False
+            )
+            terminal_certificate_panel_state = str(
+                terminal_panel.get("state") or "MISMATCH"
+            )
+            if terminal_certificate_panel_ready:
+                cards = (
+                    '<style>'
+                    '.ref-detail .aq-terminal-certificate-panel{display:block;margin:8px 0 0;'
+                    'padding:18px;border:1px solid rgba(68,214,190,.22);border-radius:18px;'
+                    'background:linear-gradient(145deg,rgba(6,20,38,.97),rgba(7,30,48,.94));'
+                    'color:#dcecf8;box-shadow:0 18px 48px rgba(0,0,0,.18)}'
+                    '.ref-detail .aq-tc-header{display:flex;justify-content:space-between;gap:16px;'
+                    'align-items:flex-start;flex-wrap:wrap}.ref-detail .aq-tc-header h2{margin:.15rem 0 0}'
+                    '.ref-detail .aq-tc-badge{display:grid;gap:3px;max-width:360px;padding:10px 12px;'
+                    'border-radius:12px;border:1px solid rgba(255,255,255,.12);font-size:.82rem}'
+                    '.ref-detail .aq-tc-badge-verified{border-color:rgba(51,225,169,.36)}'
+                    '.ref-detail .aq-tc-badge-mismatch{border-color:rgba(255,104,104,.4)}'
+                    '.ref-detail .aq-tc-badge-unavailable,.ref-detail .aq-tc-badge-stale{'
+                    'border-color:rgba(255,190,74,.36)}'
+                    '.ref-detail .aq-tc-boundary{margin:12px 0;color:#99adc1;font-size:.82rem}'
+                    '.ref-detail .aq-tc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));'
+                    'gap:10px}.ref-detail .aq-tc-section{min-width:0;padding:12px;border-radius:12px;'
+                    'background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}'
+                    '.ref-detail .aq-tc-section h3{margin:0 0 9px;font-size:.86rem;color:#9fd8d1}'
+                    '.ref-detail .aq-tc-fields{display:grid;gap:7px}.ref-detail .aq-tc-field{'
+                    'display:grid;gap:2px;min-width:0}.ref-detail .aq-tc-field small{color:#7992aa}'
+                    '.ref-detail .aq-tc-field span,.ref-detail .aq-tc-field code{overflow-wrap:anywhere;'
+                    'word-break:break-word;color:#e7f3fb;font-size:.78rem}'
+                    '@media(max-width:760px){.ref-detail .aq-tc-grid{grid-template-columns:1fr}}'
+                    '</style>'
+                    '<div class="aq-terminal-certificate-reference-draft" '
+                    'data-terminal-certificate-reference="draft-only">'
+                    + terminal_panel["html"]
+                    + '</div>'
+                )
+            else:
+                cards = (
+                    '<section class="ref-evidence-notice" '
+                    'data-terminal-certificate-reference="fail-closed">'
+                    '<strong>Certificado terminal indisponível</strong>'
+                    '<p>A evidência não passou pelo renderer seguro; nenhuma afirmação '
+                    'de verificação foi publicada.</p></section>'
+                )
+        elif selected == "sandbox" and _demo_sandbox_read_model_ready(demo_sandbox_read_model):
             cards = demo_sandbox_html(
                 selected,
                 demo_sandbox_read_model,
@@ -863,6 +926,13 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
               if cards and area == "trader" and selected in {"radar","master","radar_master"} else f"Prévia visual de {title}. Abra a análise existente para usar os recursos conectados.")
     if model:
         notice=model['detail']
+    if terminal_certificate_panel_selected:
+        notice = (
+            "Certificado terminal projetado como evidência somente leitura; "
+            "nenhum badge ou digest concede autoridade operacional."
+            if terminal_certificate_panel_ready
+            else "Certificado terminal em fail-closed; evidência segura indisponível."
+        )
     connected = ('<button class="ref-primary" data-route="connected:' + escape(selected) + '">Abrir análise existente</button>'
                  if area == "trader" and selected in {"radar","radar_master","scanner","master","macro","fed","micro","geo","market_news","fundamental","ict","calendar","news","market_map","lab","paper","guardian","autopilot","performance","academy","journal","video","profile"} else "")
     if selected.startswith("why:"):
@@ -894,7 +964,11 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         sandbox_selected
         and _demo_sandbox_read_model_ready(demo_sandbox_read_model)
     )
-    if sandbox_ready:
+    if terminal_certificate_panel_selected and terminal_certificate_panel_ready:
+        data_state = "CERTIFICADO " + terminal_certificate_panel_state
+    elif terminal_certificate_panel_selected:
+        data_state = "CERTIFICADO FAIL-CLOSED"
+    elif sandbox_ready:
         data_state = "SANDBOX SINTÉTICO VALIDADO"
     elif multi_company_ready:
         data_state = "CAPACIDADE MULTIEMPRESA VALIDADA"
@@ -916,6 +990,10 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
             data_state = "LEITURAS VALIDADAS"
     if model:
         detail_state = str(model["state"])
+    elif terminal_certificate_panel_selected and terminal_certificate_panel_ready:
+        detail_state = "SOMENTE LEITURA · certificado terminal " + terminal_certificate_panel_state
+    elif terminal_certificate_panel_selected:
+        detail_state = "SOMENTE LEITURA · certificado terminal fail-closed"
     elif sandbox_ready:
         detail_state = "SOMENTE LEITURA · sandbox sintético em revisão"
     elif multi_company_ready:
@@ -1085,7 +1163,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -1129,6 +1207,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         pilot_value_read_model=pilot_value_read_model,
         multi_company_read_model=multi_company_read_model,
         demo_sandbox_read_model=demo_sandbox_read_model,
+        terminal_certificate_panel_view_model=terminal_certificate_panel_view_model,
     ) if selected else ""
     if selected.startswith("why:"):
         detail = f'<main class="ref-detail"><h1>{escape(labels[selected])}</h1><p>Direção aguardando ranking validado. Nenhuma compra/venda foi inferida.</p><button data-route="radar">Voltar ao Radar</button></main>'
