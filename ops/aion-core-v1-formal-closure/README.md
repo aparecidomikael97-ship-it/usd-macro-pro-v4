@@ -1,176 +1,77 @@
 # AION Core V1 — Formal Closure OPS Packet
 
-This directory is **operations-only** support for Issue #953. It must not be interpreted as a Core code change or as authority to freeze, merge, deploy, arm the Global Worker, or execute external actions.
+This directory supports Issue #953 and Draft PR #954. It is **operations-only**. It is not Core logic, not the freeze target, and grants no merge/deploy/worker authority.
 
 ## Immutable formal target
 
 - Technical candidate PR: **#951**
-- Formal target commit: `662eab4dc4f5bb009fa1ca89f87530df74d30ddf`
+- Formal/freeze target: `662eab4dc4f5bb009fa1ca89f87530df74d30ddf`
 - Technical state: `TECHNICAL_CLOSURE_CANDIDATE`
-- Current runtime CAS SHA observed read-only: `020facc9991c5d2d4ce457e0840b04c875f8cfae`
+- Last read-only runtime CAS SHA: `020facc9991c5d2d4ce457e0840b04c875f8cfae`
 
-The OPS branch is not the freeze target. Any commits in this directory are operational preparation only.
+The #954 OPS HEAD must never replace the formal target above.
 
-## What is already prepared
+## Unsigned V2.20 evidence packet
 
-`unsigned_v220_evidence_packet.json` contains 17 **unsigned claims** for the real V2.20 certification contract.
+`unsigned_v220_evidence_packet.json` contains all 17 required dimensions, explicitly labeled and bound to the immutable formal target.
 
-The claims were derived from exact-head GitHub evidence:
+Evidence sources include:
 
-- AION Core Certification run `37495769399`
-  - V2.20 certification/synthetic stress: 67 passed
-  - V2.13–V2.19 structural red-team: 320 passed
-  - E2E + bounded load: 7 passed
-  - chaos/recovery/traceability: 52 passed
-  - durable persistence/tenant isolation/audit replay: 132 passed + 9 subtests
-  - resource bounds/concurrency: 24 passed + 6 subtests
-- PR #951 exact-head matrix: 91/91 workflows green
-- Global Worker readiness run `37495769278`
-  - PASS / READY_FOR_ADMIN_ARMING
-  - 5 successful pulses observed
-  - runtime unmodified
-  - worker unarmed
+- AION Core Certification run `37495769399`: 67 V2.20/synthetic-stress tests, 320 V2.13–V2.19 structural tests, 7 E2E/load tests, 52 chaos/recovery tests, 132 durable/tenant/audit tests + 9 subtests, and 24 resource/concurrency tests + 6 subtests.
+- #951 exact-head matrix: 91/91 workflows green.
+- Global Worker readiness run `37495769278`: PASS / READY_FOR_ADMIN_ARMING, five successful pulses, runtime unmodified, worker unarmed.
 
-Contract test-count sum in the unsigned packet: **2729**.
-Required minimum: **1000**.
+Contract test-count sum: **2729**. Minimum required: **1000**.
 
-This count is the V2.20 per-row contract sum. Some multi-domain suites legitimately support more than one certification dimension; the signer must still independently confirm that each signed claim is supported by its referenced evidence.
+Current reproducible unsigned packet digest:
 
-## Important: this is not a certificate
+`sha256:14ca8f5231465136826518d9133092420c9f19f0f0de53e4c27634017419a72d`
 
-The packet deliberately has no:
+Digest rule:
 
-- production `key_id`
-- production `key_version`
-- signing window
-- Ed25519 signature
+`sha256(canonical-json(packet-without-unsigned_packet_digest))`
 
-Therefore it is not eligible evidence and must not be fed into the real certification as if it were signed.
+## This is not a certificate
 
-The external signer must independently verify every claim before signing it.
+The packet intentionally contains no production key id/version, signing window, signature, or private key.
 
-## Authority bootstrap
+The private V2.20 certification key and the HUMAN_OWNER private key must remain outside the repository, runtime JSON, CI logs, issues/PRs and LLM prompts. Use separate public trust roots for certification authority and HUMAN_OWNER authority.
 
-The real V2.20 chain requires a production certification trust root with this public shape:
+## OPS tooling
 
-```json
-{
-  "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
-  "roots": [
-    {
-      "key_id": "<production-certification-key-id>",
-      "key_version": 1,
-      "algorithm": "Ed25519",
-      "public_key_b64": "<base64url-raw-32-byte-public-key>",
-      "status": "ACTIVE",
-      "not_before": "<RFC3339 UTC>",
-      "not_after": "<RFC3339 UTC>"
-    }
-  ],
-  "revoked_key_ids": []
-}
-```
+The helpers live in `ops/aion_core_v1_formal_closure/`.
 
-Only the **public key** belongs in a trust-root payload. The private Ed25519 key must remain outside:
+- `validate_unsigned_v220_packet.py`: verifies 17 dimensions, exact target, row digests, packet digest and 2729 test-count sum; no network/sign/write.
+- `export_v220_signing_bundle.py`: exports canonical V2.20 bytes for external signing; never loads a private key.
+- `apply_v220_signatures.py`: attaches externally returned signatures; real V2.20 later performs cryptographic verification.
+- `prepare_v220_v222.py`: verifies V2.20, builds V2.21, logical Checkpoint Mestre and fresh V2.22; no network/runtime mutation.
+- `perform_v223_runtime_write.py`: dry-run by default; writes only with `--execute-v223-write`; enforces CAS, `allow_global_arming_transition=False`, read-after-write and no automatic retry.
+- `prepare_v224_owner_signature.py`: creates the short-lived HUMAN_OWNER acknowledgement request; no nonce consumption and no signing.
+- `verify_v224_prepare_v225.py`: prebuilds V2.25, verifies V2.24, durably claims the V2.24 nonce, and prepares only `APPROVE_CORE_FREEZE` or `DENY_CORE_FREEZE`.
+- `perform_v225_v226.py`: dry-run cryptographically prechecks V2.25 without consuming its nonce; only `--execute-v226-write` consumes the decision nonce and attempts the V2.26 CAS write/attestation.
 
-- this repository;
-- GitHub issue/PR comments;
-- ChatGPT/LLM prompts;
-- runtime checkpoint JSON;
-- CI logs.
+## Durable nonce registry
 
-The certification key should also remain logically separate from the HUMAN_OWNER V2.24/V2.25 owner-signing key.
+V2.24/V2.25 replay protection uses `PersistentNonceRegistry` (SQLite/WAL/FULL synchronous). The registry path must be **outside the repository working tree**.
 
-## Exact signed V2.20 statement
+Suggested Windows location:
 
-For each dimension, the external signer must sign the canonical JSON bytes produced by the existing production function:
+`$env:LOCALAPPDATA\AtlasQuantAION\formal-closure\nonce_registry.sqlite3`
 
-`atlasquant_aion_core_certification.canonical_evidence_attestation_bytes(dimension, row)`
+Do not delete or recreate the registry during an active ceremony.
 
-The signed statement contains:
+## Tight timing boundary
 
-- schema
-- dimension
-- state
-- source
-- run_id
-- commit_sha
-- evidence_digest
-- test_count
-- verified
-- key_id
-- key_version
-- issued_at
-- expires_at
+V2.24 and V2.25 request windows are at most 180 seconds. Generate them only when the external signer is ready. If a window expires, rebuild with a fresh ceremony id/nonce. Never reuse a consumed nonce.
 
-The existing V2.20 verifier rejects unknown keys, wrong key material, revoked/expired roots, invalid windows, tampering, digest mismatch and missing signatures.
+## Final authority boundary
 
-## Real closure chain after signing
+A positively attested V2.26 APPROVE may only produce `core_freeze_ceremony_eligible=true`.
 
-1. Attach valid production key metadata + signing window + Ed25519 signature to all 17 claims.
-2. Load the public certification trust root with `TrustRootRegistry.from_mapping()`.
-3. Run `certify_core(...)` against the immutable target commit.
-4. Require exactly `CERTIFICATION_CANDIDATE`.
-5. Run V2.21 `build_core_completion_review()`.
-6. Require exactly `READY_FOR_OWNER_REVIEW`.
-7. Build the V2.21 checkpoint patch with `build_checkpoint_patch_candidate()`.
-8. Create the logical Checkpoint Mestre for the formal ceremony and append the exact V2.21 review patch.
-9. Generate a fresh V2.22 challenge with:
-   - fresh ceremony id;
-   - fresh nonce;
-   - short validity window;
-   - exact target commit;
-   - exact V2.20/V2.21/checkpoint binding.
-10. Require `READY_FOR_OWNER_DECISION_PREFLIGHT`.
-11. Load the current official runtime again and re-check its CAS SHA.
-12. Stage the V2.23 runtime candidate with `stage_runtime_persistence_candidate()`.
-13. Persist only through the existing official writer:
-    `save_runtime_checkpoint(candidate, approved=True, expected_sha=<fresh runtime sha>, allow_global_arming_transition=False)`
-14. Require:
-    - `status=CONFIRMED`
-    - `saved=true`
-    - `verified=true`
-    - exact write receipt
-    - read-after-write SHA equality
-    - exact checkpoint digest equality
-15. Run V2.23 `verify_external_checkpoint_persistence()`.
-16. Only `READY_FOR_OWNER_SIGNATURE_CEREMONY` may proceed to V2.24.
-17. V2.24 uses a separate HUMAN_OWNER identity/state signature.
-18. V2.25 uses a second signature over only `APPROVE_CORE_FREEZE` or `DENY_CORE_FREEZE`.
-19. V2.26 persists/attests that decision record.
-20. Even a positively attested APPROVE only yields `core_freeze_ceremony_eligible=true`.
-21. Core Freeze execution remains a separate ceremony.
-22. Merge, deploy and Global Worker activation remain separate decisions.
+It still keeps `core_freeze_execution_authorized=false`, `core_frozen=false`, `merge_authorized=false`, `deploy_authorized=false`, and `worker_armed=false`.
 
-## Fail-closed rules
+Core Freeze, merge, deploy and Global Worker activation remain separate owner-controlled ceremonies.
 
-Abort and rebuild the ceremony if any of these occur:
+## Current real state
 
-- target commit changes;
-- runtime CAS SHA changes before write;
-- evidence run no longer supports its claim;
-- production trust root is absent, inactive, revoked or expired;
-- signing window expires;
-- any signature is invalid;
-- V2.21 review differs from the V2.20 manifest;
-- logical Checkpoint Mestre changes after V2.22;
-- write result is ambiguous;
-- receipt cannot be uniquely attributed;
-- read-after-write differs;
-- runtime observation becomes stale;
-- any step attempts implicit Core Freeze, merge, deploy or Worker arming.
-
-Never automatically retry an ambiguous runtime write.
-
-## Current blocker
-
-The authorized Windows execution device is offline. Therefore:
-
-- no production private-key operation was performed;
-- no production trust root was provisioned;
-- no real V2.20 attestation was signed;
-- no nonce was consumed;
-- no runtime write was attempted;
-- no owner signature or decision was created.
-
-This is the correct fail-closed state.
+The authorized Windows device remains offline. No private-key operation, production trust-root provisioning, real V2.20 signature, nonce consumption, runtime write, owner signature, owner decision or freeze has been performed.
