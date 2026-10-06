@@ -1,0 +1,81 @@
+name: AION B2B Terminal Certificate Panel Component Offline V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - integration/aion-b2b-terminal-certificate-read-model-ui-runtime-binding-offline-v1-20261006
+    paths:
+      - "atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py"
+      - "test_atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py"
+      - "atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py"
+      - "docs/aion/AION_B2B_TERMINAL_CERTIFICATE_PANEL_COMPONENT_OFFLINE_V1.md"
+      - ".github/workflows/aion-b2b-terminal-certificate-panel-component-offline-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-certificate-panel-component-offline-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check pytest==9.1.1
+      - name: Compile panel component chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py \
+            atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py
+      - name: Run panel component offline tests
+        run: |
+          python -m pytest -q \
+            test_atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py
+      - name: Assert static non-interactive component
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          text = Path(
+              "atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py"
+          ).read_text(encoding="utf-8")
+
+          for banned in (
+              "DurableExecutionStore",
+              "sqlite3.connect(",
+              "requests.get(",
+              "requests.post(",
+              "httpx.request(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "os.system(",
+              "st.button(",
+              "st.form(",
+              "deploy_to_production(",
+              "send_whatsapp(",
+              "send_email(",
+          ):
+              assert banned not in text, banned
+
+          for marker in (
+              'MODE = "OFFLINE_STATIC_READ_ONLY_TERMINAL_CERTIFICATE_PANEL_COMPONENT"',
+              '"<button"',
+              '"<form"',
+              '"<script"',
+              '"controls"',
+              '"executes_action"',
+              "from html import escape",
+              "def render_terminal_certificate_panel_offline",
+          ):
+              assert marker in text, marker
+          PY
