@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-10-06T01:23:17.890545+00:00",
+    "ran_at": "2026-10-06T01:50:03.685610+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -33,7 +33,7 @@
         "hard_blocks": [],
         "soft_blocks": [
           "ADR14 em 90%: espaço reduzido",
-          "ICT incompleto (54/100)",
+          "ICT incompleto (42/100)",
           "Fluxo institucional incompleto (61/100)",
           "M15 ainda não confirmou gatilho"
         ],
@@ -48,7 +48,7 @@
         ],
         "soft_blocks": [
           "ADR14 em 118%: evitar perseguir preço",
-          "ICT incompleto (43/100)",
+          "ICT incompleto (40/100)",
           "Fluxo institucional incompleto (61/100)",
           "M15 ainda não confirmou gatilho"
         ],
@@ -57,12 +57,14 @@
       "USD/JPY": {
         "side": "BUY",
         "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "H1 está contra o viés"
+        ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (64/100)",
-          "Fluxo institucional incompleto (64/100)",
+          "ICT incompleto (43/100)",
+          "Fluxo institucional incompleto (53/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -74,8 +76,8 @@
         "hard_blocks": [],
         "soft_blocks": [
           "ADR14 em 86%: espaço reduzido",
-          "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (50/100)",
+          "ICT incompleto (42/100)",
+          "Fluxo institucional incompleto (45/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -85,12 +87,13 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
-          "ADR14 muito esticado (132%)"
+          "ADR14 muito esticado (146%)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ADR14 em 132%: evitar perseguir preço",
-          "ICT incompleto (40/100)",
+          "ADR14 em 146%: evitar perseguir preço",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (67/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -103,7 +106,8 @@
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ADR14 em 87%: espaço reduzido",
-          "ICT incompleto (60/100)",
+          "ICT incompleto (54/100)",
+          "Fluxo institucional incompleto (58/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
