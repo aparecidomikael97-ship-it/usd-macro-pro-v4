@@ -27,7 +27,7 @@ Set-StrictMode -Version Latest
 
 function Fail-ClosureLauncher {
     param([string]$Message)
-    Write-Error $Message
+    [Console]::Error.WriteLine($Message)
     exit 2
 }
 
@@ -95,9 +95,10 @@ if ($CiMode) {
     $argsList += "--allow-non-windows-ci"
 }
 
+$Mode = if ($CiMode) { "CI structural validation" } else { "AUTHORIZED WINDOWS PREFLIGHT" }
 Write-Host "AION Core V1 formal closure launcher"
 Write-Host "Formal target: 662eab4dc4f5bb009fa1ca89f87530df74d30ddf"
-Write-Host "Mode: $([string]::Join('', $(if ($CiMode) { 'CI structural validation' } else { 'AUTHORIZED WINDOWS PREFLIGHT' })))"
+Write-Host "Mode: $Mode"
 Write-Host "This launcher performs no signature, nonce claim, runtime write, merge, deploy, Worker arming or Core Freeze."
 
 $raw = & $PythonCommand @argsList
