@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   validate-ops-packet:
-    name: Validate unsigned packet and no-authority tooling
+    name: Validate formal closure and no-authority boundaries
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -35,9 +35,9 @@ jobs:
 
       - name: Compile OPS ceremony tooling
         run: |
-          python -m py_compile             ops/aion_core_v1_formal_closure/validate_unsigned_v220_packet.py             ops/aion_core_v1_formal_closure/export_v220_signing_bundle.py             ops/aion_core_v1_formal_closure/apply_v220_signatures.py             ops/aion_core_v1_formal_closure/prepare_v220_v222.py             ops/aion_core_v1_formal_closure/perform_v223_runtime_write.py             ops/aion_core_v1_formal_closure/prepare_v224_owner_signature.py             ops/aion_core_v1_formal_closure/verify_v224_prepare_v225.py             ops/aion_core_v1_formal_closure/perform_v225_v226.py             ops/aion_core_v1_formal_closure/smoke_check.py
+          python -m py_compile             ops/aion_core_v1_formal_closure/validate_unsigned_v220_packet.py             ops/aion_core_v1_formal_closure/export_v220_signing_bundle.py             ops/aion_core_v1_formal_closure/apply_v220_signatures.py             ops/aion_core_v1_formal_closure/prepare_v220_v222.py             ops/aion_core_v1_formal_closure/perform_v223_runtime_write.py             ops/aion_core_v1_formal_closure/prepare_v224_owner_signature.py             ops/aion_core_v1_formal_closure/verify_v224_prepare_v225.py             ops/aion_core_v1_formal_closure/perform_v225_v226.py             ops/aion_core_v1_formal_closure/core_freeze_ceremony.py             ops/aion_core_v1_formal_closure/prepare_core_freeze.py             ops/aion_core_v1_formal_closure/perform_core_freeze.py             ops/aion_core_v1_formal_closure/validate_post_freeze_boundary.py             ops/aion_core_v1_formal_closure/smoke_check.py
 
-      - name: Validate unsigned V2.20 packet and authority boundaries
+      - name: Validate packet and authority boundaries
         run: |
           python ops/aion_core_v1_formal_closure/smoke_check.py
 
@@ -58,5 +58,5 @@ jobs:
           assert bundle["network_called"] is False
           assert bundle["executes_action"] is False
           assert all(not entry["row_to_sign"]["signature_b64"] for entry in bundle["entries"])
-          print("OPS boundary PASS: 17 canonical messages, zero private-key/sign/write action")
+          print("OPS boundary PASS: V2.20->V2.26+Freeze prepared, zero private-key/sign/write action")
           PY
