@@ -52,6 +52,17 @@ def _digest(value: Any) -> str:
     return "sha256:" + sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
+def _sha256_token(value: Any) -> bool:
+    text = _text(value, 160)
+    if len(text) != 71 or not text.startswith("sha256:"):
+        return False
+    try:
+        int(text[7:], 16)
+    except ValueError:
+        return False
+    return True
+
+
 def _refs(value: Any) -> list[str]:
     if not isinstance(value, (list, tuple)):
         return []
@@ -64,7 +75,9 @@ def _refs(value: Any) -> list[str]:
 
 
 def _trusted_scope(raw: Mapping[str, Any] | None) -> tuple[dict[str, str], list[str]]:
-    source = dict(raw or {})
+    if not isinstance(raw, Mapping):
+        return {field: "" for field in TRUSTED_SCOPE_FIELDS}, ["TRUSTED_SCOPE_NOT_MAPPING"]
+    source = dict(raw)
     out = {field: _text(source.get(field), 160) for field in TRUSTED_SCOPE_FIELDS}
     blockers = [f"TRUSTED_SCOPE_REQUIRED:{field}" for field, value in out.items() if not value]
     return out, blockers
@@ -143,8 +156,10 @@ def build_controlled_handoff(
     evidence_refs: Sequence[Any] | None = None,
     expected_input_digest: str = "",
 ) -> dict[str, Any]:
-    orch = dict(orchestration or {})
+    orch = dict(orchestration) if isinstance(orchestration, Mapping) else {}
     scope, blockers = _trusted_scope(trusted_scope)
+    if not isinstance(orchestration, Mapping):
+        blockers.append("ORCHESTRATION_NOT_MAPPING")
     cap = _text(capability, 120).upper()
     klass = _text(execution_class, 80).upper()
     executor = _text(executor_id, 160)
@@ -161,7 +176,7 @@ def build_controlled_handoff(
     if not refs:
         blockers.append("EVIDENCE_REFS_REQUIRED")
     expected_digest = _text(expected_input_digest, 160)
-    if not expected_digest.startswith("sha256:"):
+    if not _sha256_token(expected_digest):
         blockers.append("EXPECTED_INPUT_DIGEST_REQUIRED")
 
     if orch.get("external_action_executed") is not False:
@@ -173,9 +188,22 @@ def build_controlled_handoff(
     if orch.get("external_ai_direct_tool_control") is True:
         blockers.append("EXTERNAL_AI_DIRECT_TOOL_CONTROL_FORBIDDEN")
 
+    if not isinstance(authority_statement, Mapping):
+        blockers.append("AUTHORITY_STATEMENT_NOT_MAPPING")
+    else:
+        signed_caps = authority_statement.get("capabilities")
+        if (
+            not isinstance(signed_caps, list)
+            or cap not in {str(x).upper() for x in signed_caps if isinstance(x, str)}
+        ):
+            blockers.append("CAPABILITY_NOT_REQUESTED_IN_AUTHORITY_STATEMENT")
+
     authority_view: dict[str, Any]
-    if blockers and any(x.startswith("TRUSTED_SCOPE_REQUIRED:") for x in blockers):
-        authority_view = {"state": "BLOCKED", "blockers": ["TRUSTED_SCOPE_INVALID"]}
+    if blockers:
+        authority_view = {
+            "state": "BLOCKED",
+            "blockers": ["AUTHORITY_NOT_CONSUMED_DUE_TO_PREFLIGHT"],
+        }
     else:
         try:
             authority_view = verify_and_build_trusted_authority_view(
@@ -188,7 +216,7 @@ def build_controlled_handoff(
             )
         except Exception:
             authority_view = {"state": "BLOCKED", "blockers": ["AUTHORITY_VERIFICATION_EXCEPTION"]}
-    blockers.extend(_authority_view_is_exact(authority_view, scope=scope, capability=cap))
+        blockers.extend(_authority_view_is_exact(authority_view, scope=scope, capability=cap))
 
     verification = authority_view.get("verification")
     verification = dict(verification) if isinstance(verification, Mapping) else {}
@@ -249,10 +277,10 @@ def verify_executor_receipt(
         blockers.append("RECEIPT_STATE_INVALID")
     if row.get("attributed") is not True:
         blockers.append("RECEIPT_ATTRIBUTION_REQUIRED")
-    if not _text(row.get("receipt_digest"), 160).startswith("sha256:"):
+    if not _sha256_token(row.get("receipt_digest")):
         blockers.append("RECEIPT_DIGEST_REQUIRED")
     if outcome == "CONFIRMED_SUCCESS":
-        if not _text(row.get("output_digest"), 160).startswith("sha256:"):
+        if not _sha256_token(row.get("output_digest")):
             blockers.append("SUCCESS_OUTPUT_DIGEST_REQUIRED")
         if handoff.get("execution_class") in {"SANDBOX_CODE", "SANDBOX_TEST"}:
             if row.get("tests_verified") is not True:
