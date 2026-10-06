@@ -978,3 +978,77 @@ verde nos gates relevantes.
 
 Nenhuma autorização histórica pode ser reutilizada.
 "vamos lá" não constitui assinatura nem autorização de execução.
+
+
+---
+
+## 29. Rollback/Compensation + Fresh Owner Authorization — atualização
+
+### 29.1 Rollback + Compensation Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #894.
+- CI-only final #896.
+- HEAD validado: `0bbd6889cf61cc8c4cc98bcb163a5a4d0e9cd53a`.
+- 63/63 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security e demais gates verdes.
+- A #895 é snapshot anterior e não é a evidência final.
+
+Correção registrada:
+o primeiro run falhou somente por assert estático do workflow procurando um
+marcador Python com aspas; 9/9 testes funcionais já estavam verdes. A correção
+alterou apenas o assert do CI.
+
+Estado máximo:
+`READY_FOR_ROLLBACK_COMPENSATION_DESIGN_REVIEW`
+
+Próximo passo permitido:
+`DESIGN_FRESH_OWNER_EXECUTION_AUTHORIZATION_CONTRACT_ONLY`
+
+Regra permanente:
+rollback sintético/pre-execução NÃO prova rollback/compensação de produção.
+`production_rollback_proven=False` e
+`production_compensation_proven=False`.
+
+### 29.2 Fresh Owner Execution Authorization Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #897.
+- CI-only Draft #898.
+- HEAD atual: `0a5e59d8fb11cbaba48b518189c34b1e0e66f170`.
+- Workflow específico já passou na branch empilhada.
+- CI completa contra main ainda deve fechar antes de avançar.
+
+A camada REUTILIZA, sem duplicar, a cerimônia existente:
+`atlasquant_aion_b2b_owner_renewal_action_execution_ceremony`
+
+Contrato de autorização fresca:
+- decisão explícita `AUTHORIZE_BUSINESS_ACTION_EXECUTION`;
+- Ed25519 externo do Owner;
+- trust root ativo;
+- owner public-key fingerprint;
+- nonce fresco e persistente;
+- replay rejection;
+- janela máxima de 120 segundos;
+- exact request/state rebuild;
+- execution record persistence obrigatória;
+- persistence attestation obrigatória;
+- writer attestation obrigatória;
+- single-use authorization;
+- generic chat rejeitado como execução.
+
+Estado máximo planejado:
+`READY_FOR_FRESH_OWNER_EXECUTION_AUTHORIZATION_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_RUNTIME_EXECUTION_GUARDS_CONTRACT_ONLY`
+
+A própria camada não emite request real, não verifica assinatura, não faz nonce
+claim, não persiste autorização e não executa ação.
+
+"vamos lá", "ok", "continua" ou qualquer outra mensagem de chat NÃO constitui
+assinatura nem autorização de execução.
