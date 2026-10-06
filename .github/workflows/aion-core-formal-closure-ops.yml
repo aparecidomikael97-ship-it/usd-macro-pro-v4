@@ -1,0 +1,62 @@
+name: AION Core Formal Closure OPS
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - integration/aion-core-v1-technical-closure-candidate-20261006
+    paths:
+      - "ops/aion-core-v1-formal-closure/**"
+      - "ops/aion_core_v1_formal_closure/**"
+      - ".github/workflows/aion-core-formal-closure-ops.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-core-formal-closure-ops-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-ops-packet:
+    name: Validate unsigned packet and no-authority tooling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install cryptographic verification dependency only
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install cryptography==50.0.2
+
+      - name: Compile OPS ceremony tooling
+        run: |
+          python -m py_compile             ops/aion_core_v1_formal_closure/validate_unsigned_v220_packet.py             ops/aion_core_v1_formal_closure/export_v220_signing_bundle.py             ops/aion_core_v1_formal_closure/apply_v220_signatures.py             ops/aion_core_v1_formal_closure/prepare_v220_v222.py             ops/aion_core_v1_formal_closure/perform_v223_runtime_write.py             ops/aion_core_v1_formal_closure/smoke_check.py
+
+      - name: Validate unsigned V2.20 packet
+        run: |
+          python ops/aion_core_v1_formal_closure/smoke_check.py
+
+      - name: Export canonical external-signing bundle without a private key
+        run: |
+          python -m ops.aion_core_v1_formal_closure.export_v220_signing_bundle             --packet ops/aion-core-v1-formal-closure/unsigned_v220_evidence_packet.json             --key-id ci-public-placeholder             --key-version 1             --issued-at 2026-10-06T00:00:00Z             --expires-at 2026-10-07T00:00:00Z             --output /tmp/v220_signing_bundle.json
+
+      - name: Assert OPS boundary remains action-free
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          bundle = json.loads(Path("/tmp/v220_signing_bundle.json").read_text(encoding="utf-8"))
+          assert bundle["state"] == "READY_FOR_EXTERNAL_SIGNATURE"
+          assert len(bundle["entries"]) == 17
+          assert bundle["private_key_loaded"] is False
+          assert bundle["signature_performed"] is False
+          assert bundle["network_called"] is False
+          assert bundle["executes_action"] is False
+          assert all(not entry["row_to_sign"]["signature_b64"] for entry in bundle["entries"])
+          print("OPS boundary PASS: 17 canonical messages, zero private-key/sign/write action")
+          PY
