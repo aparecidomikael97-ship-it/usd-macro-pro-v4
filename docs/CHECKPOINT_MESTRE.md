@@ -1245,3 +1245,67 @@ Estado máximo:
 
 Próximo passo permitido:
 `DESIGN_EXECUTION_ENVELOPE_CONTRACT_ONLY`
+
+
+---
+
+## 33. Capability Binding + Execution Envelope — atualização
+
+### 33.1 Provider Capability Binding Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #903.
+- CI-only Draft #904.
+- HEAD validado: `bd64ed0c36bc196bdc7213fd498037ae8e48c53e`.
+- 67/67 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
+
+Modo:
+`EXACT_INTERSECTION_FAIL_CLOSED`
+
+Nenhuma capability nova nasce no binding. Adapter allowlist é teto, nunca
+autoridade. Empty intersection, capability extra, wildcard e qualquer expansão
+de scope bloqueiam.
+
+Estado máximo:
+`READY_FOR_PROVIDER_CAPABILITY_BINDING_DESIGN_REVIEW`
+
+Próximo passo permitido:
+`DESIGN_EXECUTION_ENVELOPE_CONTRACT_ONLY`
+
+### 33.2 Execution Envelope Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #905.
+- CI-only Draft #906.
+- HEAD atual: `9bc089ea6b2322f1dabf7942c2f490fce0d97aa7`.
+- Workflow específico da branch empilhada já verde.
+- CI completa contra main ainda deve fechar.
+
+Modo:
+`SEALED_DIGEST_REFERENCES_ONLY`
+
+O futuro envelope deverá vincular por digest/referência:
+scope completo, action/operation, execution request, fresh Owner authorization,
+authenticated receipt, command/adapter/dry-run/rollback plans,
+idempotency/effect key, rollback-compensation, runtime guards,
+provider adapter attestation, provider capability binding, effective capability,
+provider identity ref, FinOps ceiling, before-state, expected postcondition,
+issued/expires e envelope nonce.
+
+Janela máxima do envelope: 120 segundos e nunca maior que a autorização fresca.
+
+Material real proibido:
+credencial, secret, senha, API key/token/private key, auth header/cookie,
+endpoint/URL/webhook/callback, HTTP method/headers, payload/body,
+command/shell/subprocess/PowerShell/curl/script.
+
+Estado máximo planejado:
+`READY_FOR_EXECUTION_ENVELOPE_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_PRE_DISPATCH_ATTESTATION_CONTRACT_ONLY`
