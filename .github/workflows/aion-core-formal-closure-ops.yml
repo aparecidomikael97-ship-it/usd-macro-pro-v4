@@ -65,6 +65,90 @@ jobs:
             --nonce-registry /tmp/aion-core-formal-closure-nonce.sqlite3 \
             --allow-non-windows-ci
 
+      - name: Red-team readiness gate rejects repository-local durable state
+        shell: bash
+        run: |
+          set +e
+          output="$(python -m ops.aion_core_v1_formal_closure.windows_readiness_preflight \
+            --repo-root "${{ github.workspace }}" \
+            --work-dir "${{ github.workspace }}/.closure-work" \
+            --nonce-registry "${{ github.workspace }}/nonce-registry.sqlite3" \
+            --allow-non-windows-ci)"
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          OUTPUT="$output" python - <<'PY'
+          import json, os
+          row = json.loads(os.environ["OUTPUT"])
+          assert row["state"] == "BLOCKED"
+          assert "WORK_DIR_MUST_BE_OUTSIDE_REPOSITORY" in row["blockers"]
+          assert "NONCE_REGISTRY_MUST_BE_OUTSIDE_REPOSITORY" in row["blockers"]
+          assert row["nonce_consumed"] is False
+          assert row["runtime_write_performed"] is False
+          assert row["executes_action"] is False
+          print("FAIL-CLOSED PASS: repository-local durable state rejected")
+          PY
+
+      - name: Red-team readiness gate rejects tampered V2.20 packet
+        shell: bash
+        run: |
+          cp ops/aion-core-v1-formal-closure/unsigned_v220_evidence_packet.json /tmp/tampered-v220.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("/tmp/tampered-v220.json")
+          row = json.loads(p.read_text(encoding="utf-8"))
+          row["contract_test_count_sum"] = int(row["contract_test_count_sum"]) + 1
+          p.write_text(json.dumps(row, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+          PY
+          set +e
+          output="$(python -m ops.aion_core_v1_formal_closure.windows_readiness_preflight \
+            --repo-root "${{ github.workspace }}" \
+            --packet /tmp/tampered-v220.json \
+            --work-dir /tmp/aion-core-formal-closure-work \
+            --nonce-registry /tmp/aion-core-formal-closure-nonce.sqlite3 \
+            --allow-non-windows-ci)"
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          OUTPUT="$output" python - <<'PY'
+          import json, os
+          row = json.loads(os.environ["OUTPUT"])
+          assert row["state"] == "BLOCKED"
+          assert "UNSIGNED_V220_PACKET_NOT_CANONICAL" in row["blockers"]
+          assert row["signature_performed"] is False
+          assert row["runtime_write_performed"] is False
+          assert row["executes_action"] is False
+          print("FAIL-CLOSED PASS: tampered V2.20 packet rejected")
+          PY
+
+      - name: Red-team readiness gate rejects private key material in trust-root file
+        shell: bash
+        run: |
+          cat > /tmp/unsafe-trust-root.json <<'JSON'
+          {"private_key_b64":"MUST_NEVER_BE_ACCEPTED"}
+          JSON
+          set +e
+          output="$(python -m ops.aion_core_v1_formal_closure.windows_readiness_preflight \
+            --repo-root "${{ github.workspace }}" \
+            --work-dir /tmp/aion-core-formal-closure-work \
+            --nonce-registry /tmp/aion-core-formal-closure-nonce.sqlite3 \
+            --certification-trust-root /tmp/unsafe-trust-root.json \
+            --allow-non-windows-ci)"
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          OUTPUT="$output" python - <<'PY'
+          import json, os
+          row = json.loads(os.environ["OUTPUT"])
+          assert row["state"] == "BLOCKED"
+          assert "CERTIFICATION_TRUST_ROOT_CONTAINS_PRIVATE_FIELD" in row["blockers"]
+          assert row["private_key_loaded"] is False
+          assert row["signature_performed"] is False
+          assert row["runtime_write_performed"] is False
+          print("FAIL-CLOSED PASS: private-key material rejected from trust-root input")
+          PY
+
       - name: Export canonical external-signing bundle without a private key
         run: |
           python -m ops.aion_core_v1_formal_closure.export_v220_signing_bundle \
