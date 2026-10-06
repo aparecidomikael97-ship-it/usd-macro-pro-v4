@@ -19,7 +19,7 @@ Keep both private Ed25519 keys outside `$Repo`.
 
 ## 0. Read-only readiness gate
 
-Before generating any signing request, consuming any nonce or attempting any runtime write, run the fail-closed readiness preflight.
+Before generating any signing request, consuming any nonce or attempting any runtime write, use the tested PowerShell launcher. This is the preferred entrypoint for the real ceremony.
 
 Prepare **public-only** certification and HUMAN_OWNER trust-root JSON files outside the repository. Private Ed25519 keys must never be passed to this tool, committed, printed, uploaded or placed in runtime JSON.
 
@@ -27,17 +27,15 @@ Prepare **public-only** certification and HUMAN_OWNER trust-root JSON files outs
 $CertTrust = "<PUBLIC_CERTIFICATION_TRUST_ROOT_JSON>"
 $OwnerTrust = "<PUBLIC_OWNER_TRUST_ROOT_JSON>"
 
-python -m ops.aion_core_v1_formal_closure.windows_readiness_preflight `
-  --repo-root $Repo `
-  --packet $Packet `
-  --work-dir $Work `
-  --nonce-registry $NonceDb `
-  --certification-trust-root $CertTrust `
-  --owner-trust-root $OwnerTrust `
-  --expected-runtime-sha "020facc9991c5d2d4ce457e0840b04c875f8cfae" `
-  --check-runtime-read `
-  --require-write-ready
+.\ops\aion-core-v1-formal-closure\Start-AionCoreClosure.ps1 `
+  -CertificationTrustRoot $CertTrust `
+  -OwnerTrustRoot $OwnerTrust `
+  -ExpectedRuntimeSha "020facc9991c5d2d4ce457e0840b04c875f8cfae" `
+  -CheckRuntimeRead `
+  -RequireWriteReady
 ```
+
+The launcher invokes the underlying read-only readiness preflight and stops before REAL V2.20 signing.
 
 Required state:
 
