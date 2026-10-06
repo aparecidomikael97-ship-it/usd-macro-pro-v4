@@ -905,3 +905,76 @@ Nenhuma operação real está autorizada ou implementada:
 nonce claim, registry write, idempotency reservation, execution record, lease,
 dispatch, retry, reconciliation, provider, network, billing, customer contact,
 CRM write, provisioning, deploy e produção permanecem false/proibidos.
+
+
+---
+
+## 28. Idempotency/Replay + Rollback/Compensation — atualização
+
+### 28.1 Idempotency + Replay Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #892.
+- CI-only Draft #893.
+- HEAD validado: `6fe38c91086667ed2f60e4202b822839a83181ea`.
+- 62/62 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security e demais gates verdes.
+
+Estado máximo:
+`READY_FOR_IDEMPOTENCY_REPLAY_DESIGN_REVIEW`
+
+Próximo passo permitido:
+`DESIGN_ROLLBACK_COMPENSATION_CONTRACT_ONLY`
+
+Arquitetura consolidada:
+- PersistentNonceRegistry;
+- DurableExecutionStore;
+- canonical_execution_id;
+- idempotency/effect-key uniqueness;
+- lease ownership;
+- durable dispatch record;
+- OUTCOME_UNKNOWN;
+- automatic retry proibido após efeito externo ambíguo;
+- reconciliação explícita com evidência e autorização separada.
+
+### 28.2 Rollback + Compensation Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #894.
+- CI-only original #895 ficou no SHA anterior.
+- CI-only corrigida #896.
+- HEAD atual corrigido: `0bbd6889cf61cc8c4cc98bcb163a5a4d0e9cd53a`.
+- 9 testes do contrato passaram.
+- O primeiro workflow falhou somente porque o assert estático procurava
+  `"production_rollback_proven"` com aspas, enquanto o Python usa
+  `production_rollback_proven=False`.
+- A correção mudou somente o assert do workflow; nenhuma regra de runtime mudou.
+- Workflow específico da branch empilhada passou no HEAD corrigido.
+- CI completa contra main ainda deve fechar antes da próxima camada.
+
+Regra arquitetural central:
+- rollback sintético/pre-execução comprovado NÃO equivale a rollback real de produção;
+- `production_rollback_proven=False`;
+- `production_compensation_proven=False`;
+- OUTCOME_UNKNOWN bloqueia compensação automática;
+- compensação futura exige classe de reversibilidade, before/after state,
+  rollback plan, evidência, receipt, FinOps/customer impact e autorização separada.
+
+Estado máximo planejado:
+`READY_FOR_ROLLBACK_COMPENSATION_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_FRESH_OWNER_EXECUTION_AUTHORIZATION_CONTRACT_ONLY`
+
+### 28.3 Trava de segurança
+
+Não abrir implementação/PR da camada de Fresh Owner Execution Authorization
+enquanto o HEAD corrigido de Rollback/Compensation não estiver completamente
+verde nos gates relevantes.
+
+Nenhuma autorização histórica pode ser reutilizada.
+"vamos lá" não constitui assinatura nem autorização de execução.
