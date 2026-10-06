@@ -1,14 +1,11 @@
 """AION Developer Physical Execution V1 — pre-execution evidence gate.
 
-This first operational slice is intentionally fail-closed. It models the exact
-evidence required before a physical Windows sandbox executor may be attached.
+This module consumes a trusted, already-verified physical attestation and the
+raw measurement record. It still does not execute commands or write files.
 
-It does NOT spawn a process, apply a patch, mutate git, write repository files,
-use the network, mount secrets, merge, deploy, publish or trade.
-
-Caller-supplied proof flags are never sufficient. A trusted verifier must bind
-the exact handoff/input to the exact physical-evidence digest. Until then the
-state remains PHYSICAL_EXECUTION_BLOCKED.
+READY_FOR_PHYSICAL_EXECUTOR means the authority-free pre-execution evidence
+contract is satisfied. It is not merge/deploy/production authority and the
+actual host adapter must revalidate immediately before use.
 """
 from __future__ import annotations
 
@@ -16,25 +13,15 @@ from hashlib import sha256
 from typing import Any, Mapping, Sequence
 import json
 
+from atlasquant_aion_physical_evidence_attestation_v1 import (
+    REQUIRED_PROOFS,
+    RESULT_SCHEMA as PHYSICAL_VERIFICATION_SCHEMA,
+    physical_evidence_digest,
+)
+
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_PHYSICAL_EXECUTION_V1"
 READY = "READY_FOR_PHYSICAL_EXECUTOR"
 BLOCKED = "PHYSICAL_EXECUTION_BLOCKED"
-REQUIRED_PROOFS = (
-    "WINDOWS_PLATFORM_VERIFIED",
-    "EXECUTABLE_PINNING_VERIFIED",
-    "FINAL_PATH_CONTAINMENT_VERIFIED",
-    "FILESYSTEM_ISOLATION_VERIFIED",
-    "NETWORK_ISOLATION_VERIFIED",
-    "CHILD_PROCESS_POLICY_VERIFIED",
-    "RESOURCE_LIMITS_VERIFIED",
-    "OUTPUT_LIMITS_VERIFIED",
-    "DISK_WRITE_LIMIT_VERIFIED",
-    "ENVIRONMENT_ISOLATION_VERIFIED",
-    "SYMLINK_BOUNDARY_VERIFIED",
-    "HARDLINK_BOUNDARY_VERIFIED",
-    "TOCTOU_RECHECK_VERIFIED",
-    "SANDBOX_IDENTITY_VERIFIED",
-)
 FORBIDDEN_ENV_KEYS = frozenset({
     "OPENAI_API_KEY", "GITHUB_TOKEN", "GH_TOKEN", "AWS_SECRET_ACCESS_KEY",
     "AZURE_CLIENT_SECRET", "GOOGLE_APPLICATION_CREDENTIALS",
@@ -70,67 +57,18 @@ def _proofs(value: Any) -> dict[str, dict[str, Any]]:
     return out
 
 
-def physical_evidence_digest(evidence: Mapping[str, Any]) -> str:
-    material = {
-        "platform": _text(evidence.get("platform"), 40).upper(),
-        "handoff_digest": _text(evidence.get("handoff_digest"), 160),
-        "input_digest": _text(evidence.get("input_digest"), 160),
-        "probe_principal_id": _text(evidence.get("probe_principal_id"), 160),
-        "probe_session_id": _text(evidence.get("probe_session_id"), 160),
-        "proofs": _proofs(evidence.get("proofs")),
-    }
-    return _digest(material)
-
-
-def _verify_physical_evidence(
-    evidence: Mapping[str, Any],
-    *,
-    evidence_verifier: Any,
-    handoff_digest: str,
-    input_digest: str,
-) -> tuple[dict[str, Any], list[str]]:
-    blockers: list[str] = []
-    computed = physical_evidence_digest(evidence)
-    if _text(evidence.get("physical_evidence_digest"), 160) != computed:
-        blockers.append("PHYSICAL_EVIDENCE_DIGEST_MISMATCH")
-    if not callable(evidence_verifier):
-        blockers.append("INDEPENDENT_PHYSICAL_EVIDENCE_VERIFIER_REQUIRED")
-        return {}, blockers
-    try:
-        verdict = evidence_verifier(dict(evidence))
-    except Exception:
-        blockers.append("PHYSICAL_EVIDENCE_VERIFIER_FAILED")
-        return {}, blockers
-    if not isinstance(verdict, Mapping) or verdict.get("state") != "VERIFIED":
-        blockers.append("PHYSICAL_EVIDENCE_VERIFIER_NOT_VERIFIED")
-        return dict(verdict) if isinstance(verdict, Mapping) else {}, blockers
-
-    expected_pairs = (
-        ("handoff_digest", handoff_digest, "PHYSICAL_VERIFIER_HANDOFF_MISMATCH"),
-        ("input_digest", input_digest, "PHYSICAL_VERIFIER_INPUT_MISMATCH"),
-        ("physical_evidence_digest", computed, "PHYSICAL_VERIFIER_EVIDENCE_DIGEST_MISMATCH"),
-    )
-    for field, expected, blocker in expected_pairs:
-        if verdict.get(field) != expected:
-            blockers.append(blocker)
-    if verdict.get("cryptographically_verified") is not True:
-        blockers.append("PHYSICAL_EVIDENCE_CRYPTOGRAPHIC_VERIFICATION_REQUIRED")
-    if verdict.get("independent") is not True:
-        blockers.append("PHYSICAL_EVIDENCE_INDEPENDENCE_REQUIRED")
-    return dict(verdict), blockers
-
-
 def evaluate_physical_executor_readiness(
     *,
     handoff: Mapping[str, Any] | None,
     physical_evidence: Mapping[str, Any] | None,
+    trusted_attestation: Mapping[str, Any] | None,
     environment: Mapping[str, Any] | None,
     allowed_files: Sequence[Any] | None,
     current_input_digest: str,
-    evidence_verifier: Any = None,
 ) -> dict[str, Any]:
     h = dict(handoff or {})
     evidence = dict(physical_evidence or {})
+    attestation = dict(trusted_attestation or {})
     env = dict(environment or {})
     blockers: list[str] = []
 
@@ -147,11 +85,39 @@ def evaluate_physical_executor_readiness(
     if not expected.startswith("sha256:") or current != expected:
         blockers.append("INPUT_DIGEST_MISMATCH")
 
-    platform = _text(evidence.get("platform"), 40).upper()
-    if platform != "WINDOWS":
+    evidence_digest = ""
+    try:
+        evidence_digest = physical_evidence_digest(evidence)
+    except Exception:
+        blockers.append("PHYSICAL_EVIDENCE_INVALID")
+
+    if attestation.get("schema") != PHYSICAL_VERIFICATION_SCHEMA:
+        blockers.append("TRUSTED_PHYSICAL_ATTESTATION_SCHEMA_MISMATCH")
+    for field in (
+        "trust_root_configured", "signature_verified", "nonce_registered",
+        "physical_attestation_verified", "trusted_probe_attestation",
+    ):
+        if attestation.get(field) is not True:
+            blockers.append("TRUSTED_PHYSICAL_ATTESTATION_REQUIRED:" + field)
+    for field in ("execution_allowed", "executes_action", "private_key_used"):
+        if attestation.get(field) is not False:
+            blockers.append("TRUSTED_PHYSICAL_ATTESTATION_UNSAFE:" + field)
+    if attestation.get("state") != "VERIFIED" or list(attestation.get("blockers") or []):
+        blockers.append("TRUSTED_PHYSICAL_ATTESTATION_NOT_VERIFIED")
+    if attestation.get("platform") != "WINDOWS":
         blockers.append("WINDOWS_PLATFORM_REQUIRED")
-    if evidence.get("independent") is not True:
-        blockers.append("INDEPENDENT_PHYSICAL_EVIDENCE_REQUIRED")
+    if attestation.get("handoff_digest") != h.get("handoff_digest"):
+        blockers.append("PHYSICAL_ATTESTATION_HANDOFF_MISMATCH")
+    if attestation.get("input_digest") != expected:
+        blockers.append("PHYSICAL_ATTESTATION_INPUT_MISMATCH")
+    if attestation.get("physical_evidence_digest") != evidence_digest:
+        blockers.append("PHYSICAL_ATTESTATION_EVIDENCE_MISMATCH")
+    attested_proofs = attestation.get("verified_proofs")
+    if not isinstance(attested_proofs, (list, tuple)) or set(attested_proofs) != set(REQUIRED_PROOFS):
+        blockers.append("PHYSICAL_ATTESTATION_PROOF_SET_MISMATCH")
+
+    if _text(evidence.get("platform"), 40).upper() != "WINDOWS":
+        blockers.append("PHYSICAL_EVIDENCE_PLATFORM_INVALID")
     if evidence.get("handoff_digest") != h.get("handoff_digest"):
         blockers.append("PHYSICAL_EVIDENCE_HANDOFF_MISMATCH")
     if evidence.get("input_digest") != expected:
@@ -160,29 +126,17 @@ def evaluate_physical_executor_readiness(
         blockers.append("PHYSICAL_PROBE_PRINCIPAL_REQUIRED")
     if not _text(evidence.get("probe_session_id"), 160):
         blockers.append("PHYSICAL_PROBE_SESSION_REQUIRED")
-
-    verifier_result, verifier_blockers = _verify_physical_evidence(
-        evidence,
-        evidence_verifier=evidence_verifier,
-        handoff_digest=_text(h.get("handoff_digest"), 160),
-        input_digest=expected,
-    )
-    blockers.extend(verifier_blockers)
+    if evidence.get("probe_principal_id") != attestation.get("probe_principal_id"):
+        blockers.append("PHYSICAL_PROBE_PRINCIPAL_MISMATCH")
+    if evidence.get("probe_session_id") != attestation.get("probe_session_id"):
+        blockers.append("PHYSICAL_PROBE_SESSION_MISMATCH")
 
     proofs = _proofs(evidence.get("proofs"))
-    verifier_proofs = verifier_result.get("verified_proofs")
-    verifier_proof_set = (
-        {str(x) for x in verifier_proofs}
-        if isinstance(verifier_proofs, (list, tuple))
-        else set()
-    )
     for name in REQUIRED_PROOFS:
         row = proofs.get(name) or {}
         if row.get("verified") is not True:
             blockers.append(name + "_REQUIRED")
             continue
-        if name not in verifier_proof_set:
-            blockers.append(name + "_NOT_BOUND_BY_VERIFIER")
         if not str(row.get("evidence_digest") or "").startswith("sha256:"):
             blockers.append(name + "_DIGEST_REQUIRED")
         if not row.get("evidence_ref") or not row.get("measured_by"):
@@ -208,12 +162,8 @@ def evaluate_physical_executor_readiness(
         for raw in allowed_files[:200]:
             path = _text(raw, 500).replace("\\", "/")
             if (
-                not path
-                or path.startswith("/")
-                or ":" in path
-                or path.startswith("../")
-                or "/../" in path
-                or path.startswith("//")
+                not path or path.startswith("/") or ":" in path
+                or path.startswith("../") or "/../" in path or path.startswith("//")
             ):
                 blockers.append("UNSAFE_ALLOWED_FILE")
                 continue
@@ -227,12 +177,12 @@ def evaluate_physical_executor_readiness(
         "blockers": blockers,
         "handoff_digest": h.get("handoff_digest"),
         "input_digest": expected,
-        "platform": platform,
-        "physical_evidence_digest": _text(evidence.get("physical_evidence_digest"), 160),
-        "physical_verifier_ref": _text(verifier_result.get("verifier_ref"), 160),
-        "physical_evidence_cryptographically_verified": verifier_result.get("cryptographically_verified") is True,
+        "physical_evidence_digest": evidence_digest,
+        "physical_attestation_id": _text(attestation.get("attestation_id"), 160),
+        "physical_key_id": _text(attestation.get("key_id"), 160),
+        "physical_key_version": attestation.get("key_version"),
         "required_proofs": list(REQUIRED_PROOFS),
-        "verified_proofs": [name for name in REQUIRED_PROOFS if name in verifier_proof_set],
+        "verified_proofs": list(REQUIRED_PROOFS) if not blockers else [],
         "allowed_files": files,
         "environment_keys": sorted(normalized_env),
         "executor_must_revalidate_immediately_before_use": True,
@@ -280,6 +230,5 @@ def expected_executor_receipt_template(readiness: Mapping[str, Any]) -> dict[str
 
 __all__ = [
     "SCHEMA", "READY", "BLOCKED", "REQUIRED_PROOFS", "FORBIDDEN_ENV_KEYS",
-    "physical_evidence_digest", "evaluate_physical_executor_readiness",
-    "expected_executor_receipt_template",
+    "evaluate_physical_executor_readiness", "expected_executor_receipt_template",
 ]

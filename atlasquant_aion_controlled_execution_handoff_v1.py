@@ -1,17 +1,31 @@
 """AION Controlled Execution Handoff V1.
 
-Authority-free bridge between an already-governed orchestration decision and a
-capability-specific executor. This module never invokes the executor. It only
-builds a fail-closed, lineage-bound handoff envelope.
+Canonical bridge between a governed orchestration decision and a
+capability-specific executor.
 
-A ready handoff is not authorization to merge, deploy, publish, charge, trade,
-change policy, read secrets, or mutate production.
+Authority is verified by the existing V2.13 Ed25519 trust-root path. This
+module does not accept caller-supplied "verified" booleans or generic verifier
+callbacks as authority. The cryptographic verification consumes its durable
+nonce exactly once, then the handoff stores only the resulting public
+verification lineage.
+
+A ready handoff does not execute anything and never authorizes merge, deploy,
+publish, payments, secrets, policy changes, permission expansion or real
+trading.
 """
 from __future__ import annotations
 
 from hashlib import sha256
 from typing import Any, Mapping, Sequence
 import json
+
+from atlasquant_aion_authority_verifier import RESULT_SCHEMA as AUTHORITY_RESULT_SCHEMA
+from atlasquant_aion_nonce_registry import PersistentNonceRegistry
+from atlasquant_aion_trust_root import TrustRootRegistry
+from atlasquant_aion_trusted_authority_bridge import (
+    SCHEMA as TRUSTED_AUTHORITY_SCHEMA,
+    verify_and_build_trusted_authority_view,
+)
 
 SCHEMA = "ATLASQUANT_AION_CONTROLLED_EXECUTION_HANDOFF_V1"
 READY = "READY_FOR_CAPABILITY_EXECUTOR"
@@ -23,6 +37,7 @@ NON_DELEGABLE = frozenset({
 ALLOWED_EXECUTION_CLASSES = frozenset({
     "LOCAL_READ", "LOCAL_DRAFT", "SANDBOX_CODE", "SANDBOX_TEST",
 })
+TRUSTED_SCOPE_FIELDS = ("subject_id", "tenant_id", "domain", "policy_id")
 
 
 def _text(value: Any, limit: int = 1200) -> str:
@@ -48,49 +63,69 @@ def _refs(value: Any) -> list[str]:
     return out
 
 
-def _verify_authority(
-    authority: Mapping[str, Any],
-    *,
-    authority_verifier: Any,
-    owner_id: str,
-    tenant_id: str,
-    workspace_id: str,
-    capability: str,
-) -> tuple[dict[str, Any], list[str]]:
-    blockers: list[str] = []
-    authority_digest = _text(authority.get("authority_digest"), 160)
-    if not authority_digest.startswith("sha256:"):
-        blockers.append("AUTHORITY_DIGEST_REQUIRED")
-    if not callable(authority_verifier):
-        blockers.append("INDEPENDENT_AUTHORITY_VERIFIER_REQUIRED")
-        return {}, blockers
-    try:
-        verdict = authority_verifier(dict(authority))
-    except Exception:
-        blockers.append("AUTHORITY_VERIFIER_FAILED")
-        return {}, blockers
-    if not isinstance(verdict, Mapping) or verdict.get("state") != "VERIFIED":
-        blockers.append("AUTHORITY_VERIFIER_NOT_VERIFIED")
-        return dict(verdict) if isinstance(verdict, Mapping) else {}, blockers
+def _trusted_scope(raw: Mapping[str, Any] | None) -> tuple[dict[str, str], list[str]]:
+    source = dict(raw or {})
+    out = {field: _text(source.get(field), 160) for field in TRUSTED_SCOPE_FIELDS}
+    blockers = [f"TRUSTED_SCOPE_REQUIRED:{field}" for field, value in out.items() if not value]
+    return out, blockers
 
-    checks = (
-        ("owner_id", owner_id, "AUTHORITY_VERIFIER_OWNER_MISMATCH"),
-        ("tenant_id", tenant_id, "AUTHORITY_VERIFIER_TENANT_MISMATCH"),
-        ("workspace_id", workspace_id, "AUTHORITY_VERIFIER_WORKSPACE_MISMATCH"),
-        ("authority_digest", authority_digest, "AUTHORITY_VERIFIER_DIGEST_MISMATCH"),
+
+def _authority_view_is_exact(
+    view: Mapping[str, Any],
+    *,
+    scope: Mapping[str, str],
+    capability: str,
+) -> list[str]:
+    blockers: list[str] = []
+    if view.get("schema") != TRUSTED_AUTHORITY_SCHEMA:
+        blockers.append("TRUSTED_AUTHORITY_SCHEMA_MISMATCH")
+    required_true = (
+        "authority_available",
+        "authority_verified",
+        "authority_binding_configured",
+        "trust_root_configured",
+        "signature_verification_available",
+        "signature_verified",
+        "origin_authenticated",
+        "execution_authority_granted",
     )
-    for field, expected, blocker in checks:
-        if verdict.get(field) != expected:
-            blockers.append(blocker)
-    bound_caps = verdict.get("allowed_capabilities")
-    if (
-        not isinstance(bound_caps, (list, tuple))
-        or capability not in {str(x).upper() for x in bound_caps}
+    for field in required_true:
+        if view.get(field) is not True:
+            blockers.append("TRUSTED_AUTHORITY_REQUIRED:" + field)
+    required_false = (
+        "execution_allowed",
+        "approval_implied",
+        "executes_action",
+        "network_called",
+        "private_key_used",
+    )
+    for field in required_false:
+        if view.get(field) is not False:
+            blockers.append("TRUSTED_AUTHORITY_UNSAFE:" + field)
+    if view.get("state") != "VERIFIED" or list(view.get("blockers") or []):
+        blockers.append("TRUSTED_AUTHORITY_NOT_VERIFIED")
+
+    verification = view.get("verification")
+    if not isinstance(verification, Mapping):
+        return blockers + ["AUTHORITY_VERIFICATION_RECORD_REQUIRED"]
+    if verification.get("schema") != AUTHORITY_RESULT_SCHEMA:
+        blockers.append("AUTHORITY_VERIFICATION_SCHEMA_MISMATCH")
+    for field in TRUSTED_SCOPE_FIELDS:
+        if verification.get(field) != scope[field]:
+            blockers.append("AUTHORITY_SCOPE_MISMATCH:" + field)
+    caps = verification.get("capabilities")
+    if not isinstance(caps, (list, tuple)) or capability not in {str(x).upper() for x in caps}:
+        blockers.append("CAPABILITY_NOT_IN_SIGNED_AUTHORITY")
+    for field in (
+        "trust_root_configured", "signature_verified", "binding_verified",
+        "nonce_registered", "authority_verified", "execution_authority_granted",
     ):
-        blockers.append("AUTHORITY_VERIFIER_CAPABILITY_MISMATCH")
-    if verdict.get("cryptographically_verified") is not True:
-        blockers.append("AUTHORITY_CRYPTOGRAPHIC_VERIFICATION_REQUIRED")
-    return dict(verdict), blockers
+        if verification.get(field) is not True:
+            blockers.append("AUTHORITY_VERIFICATION_REQUIRED:" + field)
+    for field in ("execution_allowed", "approval_implied", "executes_action", "private_key_used"):
+        if verification.get(field) is not False:
+            blockers.append("AUTHORITY_VERIFICATION_UNSAFE:" + field)
+    return list(dict.fromkeys(blockers))
 
 
 def build_controlled_handoff(
@@ -100,26 +135,21 @@ def build_controlled_handoff(
     capability: str,
     execution_class: str,
     executor_id: str,
-    authority_evidence: Mapping[str, Any] | None,
-    authority_verifier: Any = None,
+    authority_statement: Mapping[str, Any] | None,
+    authority_signature_b64: str,
+    trust_roots: TrustRootRegistry,
+    nonce_registry: PersistentNonceRegistry,
+    now_ts: str,
     evidence_refs: Sequence[Any] | None = None,
     expected_input_digest: str = "",
 ) -> dict[str, Any]:
     orch = dict(orchestration or {})
-    scope = dict(trusted_scope or {})
-    authority = dict(authority_evidence or {})
-    blockers: list[str] = []
-
-    owner_id = _text(scope.get("owner_id"), 120)
-    tenant_id = _text(scope.get("tenant_id"), 120)
-    workspace_id = _text(scope.get("workspace_id"), 120)
+    scope, blockers = _trusted_scope(trusted_scope)
     cap = _text(capability, 120).upper()
     klass = _text(execution_class, 80).upper()
     executor = _text(executor_id, 160)
     refs = _refs(evidence_refs)
 
-    if not owner_id or not tenant_id or not workspace_id:
-        blockers.append("TRUSTED_SCOPE_REQUIRED")
     if not cap:
         blockers.append("CAPABILITY_REQUIRED")
     if cap in NON_DELEGABLE:
@@ -130,7 +160,8 @@ def build_controlled_handoff(
         blockers.append("EXECUTOR_ID_REQUIRED")
     if not refs:
         blockers.append("EVIDENCE_REFS_REQUIRED")
-    if not _text(expected_input_digest, 160).startswith("sha256:"):
+    expected_digest = _text(expected_input_digest, 160)
+    if not expected_digest.startswith("sha256:"):
         blockers.append("EXPECTED_INPUT_DIGEST_REQUIRED")
 
     if orch.get("external_action_executed") is not False:
@@ -142,43 +173,35 @@ def build_controlled_handoff(
     if orch.get("external_ai_direct_tool_control") is True:
         blockers.append("EXTERNAL_AI_DIRECT_TOOL_CONTROL_FORBIDDEN")
 
-    if authority.get("state") != "VERIFIED":
-        blockers.append("AUTHORITY_EVIDENCE_NOT_VERIFIED")
-    if authority.get("owner_id") != owner_id:
-        blockers.append("AUTHORITY_OWNER_MISMATCH")
-    if authority.get("tenant_id") != tenant_id:
-        blockers.append("AUTHORITY_TENANT_MISMATCH")
-    if authority.get("workspace_id") != workspace_id:
-        blockers.append("AUTHORITY_WORKSPACE_MISMATCH")
-    allowed_caps = authority.get("allowed_capabilities")
-    if not isinstance(allowed_caps, (list, tuple)) or cap not in {str(x).upper() for x in allowed_caps}:
-        blockers.append("CAPABILITY_NOT_IN_AUTHORITY_SCOPE")
-    if authority.get("grants_root_authority") is True:
-        blockers.append("ROOT_AUTHORITY_DELEGATION_FORBIDDEN")
-    if authority.get("tool_output_is_authority") is True:
-        blockers.append("TOOL_OUTPUT_AUTHORITY_FORBIDDEN")
+    authority_view: dict[str, Any]
+    if blockers and any(x.startswith("TRUSTED_SCOPE_REQUIRED:") for x in blockers):
+        authority_view = {"state": "BLOCKED", "blockers": ["TRUSTED_SCOPE_INVALID"]}
+    else:
+        try:
+            authority_view = verify_and_build_trusted_authority_view(
+                authority_statement,
+                signature_b64=authority_signature_b64,
+                trust_roots=trust_roots,
+                nonce_registry=nonce_registry,
+                now_ts=_text(now_ts, 80),
+                expected_binding=scope,
+            )
+        except Exception:
+            authority_view = {"state": "BLOCKED", "blockers": ["AUTHORITY_VERIFICATION_EXCEPTION"]}
+    blockers.extend(_authority_view_is_exact(authority_view, scope=scope, capability=cap))
 
-    verified_authority, verifier_blockers = _verify_authority(
-        authority,
-        authority_verifier=authority_verifier,
-        owner_id=owner_id,
-        tenant_id=tenant_id,
-        workspace_id=workspace_id,
-        capability=cap,
-    )
-    blockers.extend(verifier_blockers)
+    verification = authority_view.get("verification")
+    verification = dict(verification) if isinstance(verification, Mapping) else {}
     blockers = list(dict.fromkeys(blockers))
     material = {
         "schema": SCHEMA,
         "state": READY if not blockers else BLOCKED,
         "blockers": blockers,
-        "owner_id": owner_id,
-        "tenant_id": tenant_id,
-        "workspace_id": workspace_id,
+        **scope,
         "capability": cap,
         "execution_class": klass,
         "executor_id": executor,
-        "expected_input_digest": _text(expected_input_digest, 160),
+        "expected_input_digest": expected_digest,
         "evidence_refs": refs,
         "orchestration_ref": _text(
             orch.get("request_id")
@@ -186,10 +209,12 @@ def build_controlled_handoff(
             or orch.get("trace_id"),
             160,
         ),
-        "authority_ref": _text(authority.get("authority_ref") or authority.get("decision_id"), 160),
-        "authority_digest": _text(authority.get("authority_digest"), 160),
-        "authority_verifier_ref": _text(verified_authority.get("verifier_ref"), 160),
-        "authority_cryptographically_verified": verified_authority.get("cryptographically_verified") is True,
+        "authority_id": _text(verification.get("authority_id"), 160),
+        "authority_statement_id": _text(verification.get("statement_id"), 160),
+        "authority_key_id": _text(verification.get("key_id"), 160),
+        "authority_key_version": verification.get("key_version"),
+        "authority_nonce_registered": verification.get("nonce_registered") is True,
+        "authority_verification_digest": _digest(verification) if verification else "",
         "executor_must_revalidate": True,
         "handoff_grants_authority": False,
         "external_ai_direct_tool_control": False,
@@ -232,8 +257,8 @@ def verify_executor_receipt(
         if handoff.get("execution_class") in {"SANDBOX_CODE", "SANDBOX_TEST"}:
             if row.get("tests_verified") is not True:
                 blockers.append("SUCCESS_TEST_VERIFICATION_REQUIRED")
-            test_refs = row.get("test_receipts")
-            if not isinstance(test_refs, (list, tuple)) or not test_refs:
+            refs = row.get("test_receipts")
+            if not isinstance(refs, (list, tuple)) or not refs:
                 blockers.append("SUCCESS_TEST_RECEIPTS_REQUIRED")
     return {
         "schema": SCHEMA,

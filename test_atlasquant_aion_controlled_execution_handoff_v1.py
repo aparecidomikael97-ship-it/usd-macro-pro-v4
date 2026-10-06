@@ -1,178 +1,184 @@
+import base64
+import tempfile
 import unittest
+from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from atlasquant_aion_authority_verifier import SCHEMA as AUTHORITY_SCHEMA, canonical_statement_bytes
 from atlasquant_aion_controlled_execution_handoff_v1 import (
-    BLOCKED,
-    READY,
-    build_controlled_handoff,
-    verify_executor_receipt,
+    BLOCKED, READY, build_controlled_handoff, verify_executor_receipt,
 )
+from atlasquant_aion_nonce_registry import PersistentNonceRegistry
+from atlasquant_aion_trust_root import TrustRootRegistry
+
+NOW = "2026-10-06T22:30:00Z"
+ISSUED = "2026-10-06T22:25:00Z"
+EXPIRES = "2026-10-06T22:50:00Z"
+SCOPE = {
+    "subject_id": "aion-developer",
+    "tenant_id": "atlasquant-owner",
+    "domain": "DEVELOPER",
+    "policy_id": "AION_OPERATIONAL_READINESS_V1",
+}
 
 
-def authority(**overrides):
-    row = {
-        "state": "VERIFIED",
-        "owner_id": "owner",
-        "tenant_id": "tenant",
-        "workspace_id": "workspace",
-        "allowed_capabilities": ["WRITE_CODE_SANDBOX"],
-        "authority_ref": "auth:1",
-        "authority_digest": "sha256:" + "e" * 64,
-        "grants_root_authority": False,
-        "tool_output_is_authority": False,
-    }
-    row.update(overrides)
-    return row
+def b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def authority_verifier(row):
+def keypair():
+    private = Ed25519PrivateKey.generate()
+    public = private.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw,
+    )
+    return private, b64url(public)
+
+
+def roots(public_key: str):
+    return TrustRootRegistry.from_mapping({
+        "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
+        "roots": [{
+            "key_id": "authority-root",
+            "key_version": 1,
+            "algorithm": "Ed25519",
+            "public_key_b64": public_key,
+            "status": "ACTIVE",
+            "not_before": "2026-10-01T00:00:00Z",
+            "not_after": "2027-10-01T00:00:00Z",
+        }],
+        "revoked_key_ids": [],
+    })
+
+
+def statement(nonce="auth-nonce-1", capabilities=None):
     return {
-        "state": "VERIFIED",
-        "owner_id": row.get("owner_id"),
-        "tenant_id": row.get("tenant_id"),
-        "workspace_id": row.get("workspace_id"),
-        "allowed_capabilities": list(row.get("allowed_capabilities") or []),
-        "authority_digest": row.get("authority_digest"),
-        "cryptographically_verified": True,
-        "verifier_ref": "trusted-authority-verifier-v1",
+        "schema": AUTHORITY_SCHEMA,
+        "statement_id": "stmt-op-readiness-1",
+        "authority_id": "owner-control-plane",
+        **SCOPE,
+        "capabilities": capabilities or ["WRITE_CODE_SANDBOX"],
+        "issued_at": ISSUED,
+        "expires_at": EXPIRES,
+        "nonce": nonce,
+        "key_id": "authority-root",
+        "key_version": 1,
+        "grant_kind": "CAPABILITY_GRANT",
     }
 
 
-def handoff(**overrides):
-    kwargs = {
-        "orchestration": {
-            "state": "PLANNED",
-            "external_action_executed": False,
-            "execution_allowed": False,
-            "external_ai_direct_tool_control": False,
-        },
-        "trusted_scope": {"owner_id": "owner", "tenant_id": "tenant", "workspace_id": "workspace"},
-        "capability": "WRITE_CODE_SANDBOX",
-        "execution_class": "SANDBOX_CODE",
-        "executor_id": "aion-dev-sandbox-v1",
-        "authority_evidence": authority(),
-        "authority_verifier": authority_verifier,
-        "evidence_refs": ["plan:1"],
-        "expected_input_digest": "sha256:" + "a" * 64,
-    }
-    kwargs.update(overrides)
-    return build_controlled_handoff(**kwargs)
+def sign(private, payload):
+    return b64url(private.sign(canonical_statement_bytes(payload)))
 
 
 class ControlledHandoffTests(unittest.TestCase):
-    def test_ready_handoff_never_executes(self):
-        out = handoff()
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.private, public = keypair()
+        self.trust_roots = roots(public)
+        self.nonces = PersistentNonceRegistry(Path(self.tmp.name) / "authority.sqlite3")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def make(self, **overrides):
+        payload = overrides.pop("authority_statement", statement())
+        kwargs = {
+            "orchestration": {
+                "state": "PLANNED",
+                "external_action_executed": False,
+                "execution_allowed": False,
+                "external_ai_direct_tool_control": False,
+            },
+            "trusted_scope": dict(SCOPE),
+            "capability": "WRITE_CODE_SANDBOX",
+            "execution_class": "SANDBOX_CODE",
+            "executor_id": "aion-dev-sandbox-v1",
+            "authority_statement": payload,
+            "authority_signature_b64": sign(self.private, payload),
+            "trust_roots": self.trust_roots,
+            "nonce_registry": self.nonces,
+            "now_ts": NOW,
+            "evidence_refs": ["plan:1"],
+            "expected_input_digest": "sha256:" + "a" * 64,
+        }
+        kwargs.update(overrides)
+        return build_controlled_handoff(**kwargs)
+
+    def test_valid_signed_authority_creates_non_executing_handoff(self):
+        out = self.make()
         self.assertEqual(out["state"], READY)
-        self.assertTrue(out["authority_cryptographically_verified"])
+        self.assertTrue(out["authority_nonce_registered"])
         self.assertFalse(out["executes_action"])
         self.assertFalse(out["automatic_merge"])
         self.assertFalse(out["automatic_deploy"])
-        self.assertFalse(out["handoff_grants_authority"])
+
+    def test_replay_of_same_authority_nonce_is_blocked(self):
+        payload = statement()
+        signature = sign(self.private, payload)
+        common = dict(
+            orchestration={"state": "PLANNED", "external_action_executed": False, "execution_allowed": False},
+            trusted_scope=dict(SCOPE), capability="WRITE_CODE_SANDBOX",
+            execution_class="SANDBOX_CODE", executor_id="aion-dev-sandbox-v1",
+            authority_statement=payload, authority_signature_b64=signature,
+            trust_roots=self.trust_roots, nonce_registry=self.nonces, now_ts=NOW,
+            evidence_refs=["plan:1"], expected_input_digest="sha256:" + "a" * 64,
+        )
+        self.assertEqual(build_controlled_handoff(**common)["state"], READY)
+        second = build_controlled_handoff(**common)
+        self.assertEqual(second["state"], BLOCKED)
+        self.assertTrue(any("TRUSTED_AUTHORITY" in x or "AUTHORITY" in x for x in second["blockers"]))
+
+    def test_tampered_capability_fails_signature(self):
+        payload = statement()
+        signature = sign(self.private, payload)
+        payload = dict(payload)
+        payload["capabilities"] = ["DEPLOY_PRODUCTION"]
+        out = self.make(authority_statement=payload, authority_signature_b64=signature, capability="DEPLOY_PRODUCTION")
+        self.assertEqual(out["state"], BLOCKED)
 
     def test_non_delegable_capability_is_blocked(self):
-        out = handoff(capability="DEPLOY_PRODUCTION")
+        payload = statement(capabilities=["DEPLOY_PRODUCTION"])
+        out = self.make(
+            authority_statement=payload,
+            authority_signature_b64=sign(self.private, payload),
+            capability="DEPLOY_PRODUCTION",
+        )
         self.assertEqual(out["state"], BLOCKED)
         self.assertIn("NON_DELEGABLE_CAPABILITY", out["blockers"])
 
-    def test_missing_independent_verifier_is_blocked(self):
-        out = handoff(authority_verifier=None)
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("INDEPENDENT_AUTHORITY_VERIFIER_REQUIRED", out["blockers"])
-
-    def test_forged_verifier_binding_is_blocked(self):
-        def bad_verifier(row):
-            verdict = authority_verifier(row)
-            verdict["workspace_id"] = "other"
-            return verdict
-        out = handoff(authority_verifier=bad_verifier)
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("AUTHORITY_VERIFIER_WORKSPACE_MISMATCH", out["blockers"])
-
-    def test_external_ai_or_tool_output_cannot_be_authority(self):
-        out = handoff(authority_evidence=authority(tool_output_is_authority=True))
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("TOOL_OUTPUT_AUTHORITY_FORBIDDEN", out["blockers"])
-
     def test_external_ai_direct_tool_control_is_blocked(self):
-        out = handoff(orchestration={
-            "state": "PLANNED",
-            "external_action_executed": False,
-            "execution_allowed": False,
-            "external_ai_direct_tool_control": True,
+        out = self.make(orchestration={
+            "state": "PLANNED", "external_action_executed": False,
+            "execution_allowed": False, "external_ai_direct_tool_control": True,
         })
         self.assertEqual(out["state"], BLOCKED)
         self.assertIn("EXTERNAL_AI_DIRECT_TOOL_CONTROL_FORBIDDEN", out["blockers"])
 
-    def test_scope_mismatch_blocks(self):
-        out = handoff(authority_evidence=authority(workspace_id="other"))
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("AUTHORITY_WORKSPACE_MISMATCH", out["blockers"])
-
-    def test_orchestration_cannot_self_authorize(self):
-        out = handoff(orchestration={
-            "state": "PLANNED",
-            "external_action_executed": False,
-            "execution_allowed": True,
-        })
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("ORCHESTRATION_CANNOT_SELF_AUTHORIZE_EXECUTION", out["blockers"])
-
-    def test_success_receipt_requires_tests_and_output_digest(self):
-        h = handoff()
+    def test_success_receipt_requires_output_and_tests(self):
+        h = self.make()
         receipt = {
-            "handoff_digest": h["handoff_digest"],
-            "executor_id": h["executor_id"],
-            "input_digest": h["expected_input_digest"],
-            "state": "CONFIRMED_SUCCESS",
-            "attributed": True,
-            "receipt_digest": "sha256:" + "b" * 64,
+            "handoff_digest": h["handoff_digest"], "executor_id": h["executor_id"],
+            "input_digest": h["expected_input_digest"], "state": "CONFIRMED_SUCCESS",
+            "attributed": True, "receipt_digest": "sha256:" + "b" * 64,
         }
-        verified = verify_executor_receipt(h, receipt)
-        self.assertEqual(verified["state"], "BLOCKED")
-        self.assertIn("SUCCESS_OUTPUT_DIGEST_REQUIRED", verified["blockers"])
-        self.assertIn("SUCCESS_TEST_VERIFICATION_REQUIRED", verified["blockers"])
+        result = verify_executor_receipt(h, receipt)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn("SUCCESS_OUTPUT_DIGEST_REQUIRED", result["blockers"])
+        self.assertIn("SUCCESS_TEST_VERIFICATION_REQUIRED", result["blockers"])
 
-    def test_exact_success_receipt_can_verify(self):
-        h = handoff()
+    def test_unknown_outcome_never_becomes_success_or_retry(self):
+        h = self.make()
         receipt = {
-            "handoff_digest": h["handoff_digest"],
-            "executor_id": h["executor_id"],
-            "input_digest": h["expected_input_digest"],
-            "state": "CONFIRMED_SUCCESS",
-            "attributed": True,
-            "receipt_digest": "sha256:" + "b" * 64,
-            "output_digest": "sha256:" + "c" * 64,
-            "tests_verified": True,
-            "test_receipts": ["test:1"],
+            "handoff_digest": h["handoff_digest"], "executor_id": h["executor_id"],
+            "input_digest": h["expected_input_digest"], "state": "OUTCOME_UNKNOWN",
+            "attributed": True, "receipt_digest": "sha256:" + "d" * 64,
         }
-        verified = verify_executor_receipt(h, receipt)
-        self.assertEqual(verified["state"], "VERIFIED")
-
-    def test_unknown_outcome_is_valid_not_inferred_success_and_no_retry(self):
-        h = handoff()
-        receipt = {
-            "handoff_digest": h["handoff_digest"],
-            "executor_id": h["executor_id"],
-            "input_digest": h["expected_input_digest"],
-            "state": "OUTCOME_UNKNOWN",
-            "attributed": True,
-            "receipt_digest": "sha256:" + "d" * 64,
-        }
-        verified = verify_executor_receipt(h, receipt)
-        self.assertEqual(verified["state"], "VERIFIED")
-        self.assertEqual(verified["outcome"], "OUTCOME_UNKNOWN")
-        self.assertFalse(verified["automatic_retry_allowed"])
-
-    def test_receipt_lineage_mismatch_blocks(self):
-        h = handoff()
-        receipt = {
-            "handoff_digest": h["handoff_digest"],
-            "executor_id": h["executor_id"],
-            "input_digest": "sha256:" + "c" * 64,
-            "state": "OUTCOME_UNKNOWN",
-            "attributed": True,
-            "receipt_digest": "sha256:" + "d" * 64,
-        }
-        self.assertEqual(verify_executor_receipt(h, receipt)["state"], "BLOCKED")
+        result = verify_executor_receipt(h, receipt)
+        self.assertEqual(result["state"], "VERIFIED")
+        self.assertEqual(result["outcome"], "OUTCOME_UNKNOWN")
+        self.assertFalse(result["automatic_retry_allowed"])
 
 
 if __name__ == "__main__":

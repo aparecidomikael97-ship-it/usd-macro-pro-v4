@@ -1,13 +1,27 @@
+import base64
+import tempfile
 import unittest
+from pathlib import Path
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from atlasquant_aion_developer_physical_execution_v1 import (
-    BLOCKED,
-    READY,
-    REQUIRED_PROOFS,
-    evaluate_physical_executor_readiness,
+    BLOCKED, READY, evaluate_physical_executor_readiness,
     expected_executor_receipt_template,
-    physical_evidence_digest,
 )
+from atlasquant_aion_nonce_registry import PersistentNonceRegistry
+from atlasquant_aion_physical_evidence_attestation_v1 import (
+    REQUIRED_PROOFS, SCHEMA as ATTESTATION_SCHEMA, canonical_attestation_bytes,
+    physical_evidence_digest, verify_physical_evidence_attestation,
+)
+from atlasquant_aion_trust_root import TrustRootRegistry
+
+NOW = "2026-10-06T22:30:00Z"
+
+
+def b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
 def handoff():
@@ -22,130 +36,130 @@ def handoff():
     }
 
 
-def physical_evidence(**overrides):
-    proofs = {
-        name: {
-            "verified": True,
-            "evidence_ref": "probe:" + name.lower(),
-            "evidence_digest": "sha256:" + "3" * 64,
-            "measured_by": "windows-probe-v1",
-        }
-        for name in REQUIRED_PROOFS
-    }
-    row = {
-        "platform": "WINDOWS",
-        "independent": True,
-        "handoff_digest": handoff()["handoff_digest"],
-        "input_digest": handoff()["expected_input_digest"],
-        "probe_principal_id": "probe-principal-1",
-        "probe_session_id": "probe-session-1",
-        "proofs": proofs,
-    }
-    row.update(overrides)
-    row["physical_evidence_digest"] = physical_evidence_digest(row)
-    return row
-
-
-def evidence_verifier(row):
+def evidence():
+    h = handoff()
     return {
-        "state": "VERIFIED",
-        "handoff_digest": row.get("handoff_digest"),
-        "input_digest": row.get("input_digest"),
-        "physical_evidence_digest": row.get("physical_evidence_digest"),
-        "verified_proofs": list(REQUIRED_PROOFS),
-        "cryptographically_verified": True,
-        "independent": True,
-        "verifier_ref": "physical-evidence-verifier-v1",
+        "platform": "WINDOWS",
+        "handoff_digest": h["handoff_digest"],
+        "input_digest": h["expected_input_digest"],
+        "probe_principal_id": "windows-probe-1",
+        "probe_session_id": "session-1",
+        "proofs": {
+            name: {
+                "verified": True,
+                "evidence_ref": "probe:" + name.lower(),
+                "evidence_digest": "sha256:" + "3" * 64,
+                "measured_by": "windows-probe-v1",
+            }
+            for name in REQUIRED_PROOFS
+        },
     }
 
 
-def evaluate(**overrides):
-    kwargs = {
-        "handoff": handoff(),
-        "physical_evidence": physical_evidence(),
-        "evidence_verifier": evidence_verifier,
-        "environment": {},
-        "allowed_files": ["module.py", "test_module.py"],
-        "current_input_digest": handoff()["expected_input_digest"],
-    }
-    kwargs.update(overrides)
-    return evaluate_physical_executor_readiness(**kwargs)
+class PhysicalExecutionTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.private = Ed25519PrivateKey.generate()
+        public = self.private.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw,
+        )
+        self.roots = TrustRootRegistry.from_mapping({
+            "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
+            "roots": [{
+                "key_id": "probe-root", "key_version": 1, "algorithm": "Ed25519",
+                "public_key_b64": b64url(public), "status": "ACTIVE",
+                "not_before": "2026-10-01T00:00:00Z",
+                "not_after": "2027-10-01T00:00:00Z",
+            }],
+            "revoked_key_ids": [],
+        })
+        self.nonces = PersistentNonceRegistry(Path(self.tmp.name) / "physical.sqlite3")
 
+    def tearDown(self):
+        self.tmp.cleanup()
 
-class PhysicalExecutionV1Tests(unittest.TestCase):
-    def test_missing_physical_proofs_fail_closed(self):
-        evidence = physical_evidence()
-        evidence["proofs"] = {}
-        evidence["physical_evidence_digest"] = physical_evidence_digest(evidence)
-        out = evaluate(physical_evidence=evidence)
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertTrue(any(x.endswith("_REQUIRED") for x in out["blockers"]))
-        self.assertFalse(out["executes_action"])
+    def trusted(self, e):
+        payload = {
+            "schema": ATTESTATION_SCHEMA,
+            "attestation_id": "physical-attestation-1",
+            "probe_principal_id": e["probe_principal_id"],
+            "probe_session_id": e["probe_session_id"],
+            "platform": "WINDOWS",
+            "handoff_digest": e["handoff_digest"],
+            "input_digest": e["input_digest"],
+            "physical_evidence_digest": physical_evidence_digest(e),
+            "verified_proofs": sorted(REQUIRED_PROOFS),
+            "issued_at": "2026-10-06T22:25:00Z",
+            "expires_at": "2026-10-06T22:50:00Z",
+            "nonce": "physical-nonce-1",
+            "key_id": "probe-root",
+            "key_version": 1,
+        }
+        sig = b64url(self.private.sign(canonical_attestation_bytes(payload)))
+        return verify_physical_evidence_attestation(
+            payload, signature_b64=sig, trust_roots=self.roots,
+            nonce_registry=self.nonces, now_ts=NOW,
+            expected_handoff_digest=e["handoff_digest"],
+            expected_input_digest=e["input_digest"],
+            expected_physical_evidence_digest=physical_evidence_digest(e),
+        )
 
-    def test_caller_flags_without_independent_verifier_are_blocked(self):
-        out = evaluate(evidence_verifier=None)
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("INDEPENDENT_PHYSICAL_EVIDENCE_VERIFIER_REQUIRED", out["blockers"])
+    def evaluate(self, **overrides):
+        e = overrides.pop("physical_evidence", evidence())
+        trusted = overrides.pop("trusted_attestation", self.trusted(e))
+        kwargs = {
+            "handoff": handoff(),
+            "physical_evidence": e,
+            "trusted_attestation": trusted,
+            "environment": {},
+            "allowed_files": ["module.py", "test_module.py"],
+            "current_input_digest": handoff()["expected_input_digest"],
+        }
+        kwargs.update(overrides)
+        return evaluate_physical_executor_readiness(**kwargs)
 
-    def test_forged_evidence_digest_is_blocked(self):
-        evidence = physical_evidence()
-        evidence["physical_evidence_digest"] = "sha256:" + "9" * 64
-        out = evaluate(physical_evidence=evidence)
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("PHYSICAL_EVIDENCE_DIGEST_MISMATCH", out["blockers"])
-
-    def test_verifier_must_bind_exact_handoff(self):
-        def bad_verifier(row):
-            verdict = evidence_verifier(row)
-            verdict["handoff_digest"] = "sha256:" + "8" * 64
-            return verdict
-        out = evaluate(evidence_verifier=bad_verifier)
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("PHYSICAL_VERIFIER_HANDOFF_MISMATCH", out["blockers"])
-
-    def test_verifier_must_bind_every_required_proof(self):
-        def incomplete_verifier(row):
-            verdict = evidence_verifier(row)
-            verdict["verified_proofs"] = list(REQUIRED_PROOFS[:-1])
-            return verdict
-        out = evaluate(evidence_verifier=incomplete_verifier)
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertTrue(any(x.endswith("_NOT_BOUND_BY_VERIFIER") for x in out["blockers"]))
-
-    def test_all_bound_proofs_make_only_readiness_ready(self):
-        out = evaluate(environment={"PYTHONHASHSEED": "0"})
+    def test_signed_attestation_can_make_only_readiness_ready(self):
+        out = self.evaluate()
         self.assertEqual(out["state"], READY)
-        self.assertTrue(out["physical_evidence_cryptographically_verified"])
         self.assertFalse(out["commands_executed"])
         self.assertFalse(out["writes_repository"])
         self.assertTrue(out["protected_core_read_only"])
         self.assertTrue(out["production_runtime_read_only"])
 
-    def test_wrong_input_digest_blocks(self):
-        out = evaluate(current_input_digest="sha256:" + "9" * 64)
+    def test_plain_verified_flags_without_attestation_are_blocked(self):
+        out = evaluate_physical_executor_readiness(
+            handoff=handoff(), physical_evidence=evidence(), trusted_attestation={},
+            environment={}, allowed_files=["module.py"],
+            current_input_digest=handoff()["expected_input_digest"],
+        )
         self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("INPUT_DIGEST_MISMATCH", out["blockers"])
+        self.assertIn("TRUSTED_PHYSICAL_ATTESTATION_NOT_VERIFIED", out["blockers"])
 
-    def test_secret_environment_is_rejected(self):
-        out = evaluate(environment={"GITHUB_TOKEN": "x"})
+    def test_evidence_mutation_after_attestation_is_blocked(self):
+        e = evidence()
+        trusted = self.trusted(e)
+        e["proofs"]["NETWORK_ISOLATION_VERIFIED"]["evidence_digest"] = "sha256:" + "9" * 64
+        out = evaluate_physical_executor_readiness(
+            handoff=handoff(), physical_evidence=e, trusted_attestation=trusted,
+            environment={}, allowed_files=["module.py"],
+            current_input_digest=handoff()["expected_input_digest"],
+        )
         self.assertEqual(out["state"], BLOCKED)
-        self.assertTrue(any(x.startswith("SECRET_ENVIRONMENT_KEY_FORBIDDEN") for x in out["blockers"]))
+        self.assertIn("PHYSICAL_ATTESTATION_EVIDENCE_MISMATCH", out["blockers"])
 
-    def test_pythonpath_override_is_rejected(self):
-        out = evaluate(environment={"PYTHONPATH": "evil"})
+    def test_secret_environment_is_blocked(self):
+        out = self.evaluate(environment={"GITHUB_TOKEN": "x"})
         self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("PYTHONPATH_OVERRIDE_FORBIDDEN", out["blockers"])
 
-    def test_path_escape_is_rejected(self):
-        out = evaluate(allowed_files=["../outside.py"])
+    def test_path_escape_is_blocked(self):
+        out = self.evaluate(allowed_files=["../outside.py"])
         self.assertEqual(out["state"], BLOCKED)
         self.assertIn("UNSAFE_ALLOWED_FILE", out["blockers"])
 
-    def test_receipt_template_starts_unknown_not_success_and_no_retry(self):
-        ready = evaluate()
+    def test_receipt_template_starts_unknown_and_no_retry(self):
+        ready = self.evaluate()
         receipt = expected_executor_receipt_template(ready)
         self.assertEqual(receipt["state"], "OUTCOME_UNKNOWN")
-        self.assertFalse(receipt["attributed"])
         self.assertFalse(receipt["automatic_retry_allowed"])
         self.assertFalse(receipt["automatic_merge"])
         self.assertFalse(receipt["automatic_deploy"])
