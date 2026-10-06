@@ -1428,14 +1428,16 @@ Próximo passo permitido:
 
 ### 35.2 Durable Dispatch Record Contract V1
 
-**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
 
 Evidências:
 - Draft PR #909.
 - CI-only Draft #910.
-- HEAD atual: `8acda88a5801f1ddbf9bec70eeb5fe38011e87e0`.
-- Workflow específico da branch empilhada em validação/CI.
-- CI completa contra main deve fechar antes da próxima camada.
+- HEAD validado: `8acda88a5801f1ddbf9bec70eeb5fe38011e87e0`.
+- 70/70 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
+- O Global Worker teve um snapshot transitório de pulse antigo; rerun do mesmo
+  job, sem qualquer mudança de código/runtime, concluiu com sucesso.
 
 A camada reutiliza a semântica do núcleo:
 `atlasquant_aion_durable_execution_kernel.DurableExecutionStore`
@@ -1452,10 +1454,10 @@ Depois de `DISPATCH_RECORDED`:
 - retry automático => proibido;
 - reconciliação => explícita, com evidência e autorização separada.
 
-Estado máximo planejado:
+Estado máximo:
 `READY_FOR_DURABLE_DISPATCH_RECORD_DESIGN_REVIEW`
 
-Próximo passo planejado, somente após CI completo verde:
+Próximo passo permitido:
 `DESIGN_EXTERNAL_EFFECT_CALL_BOUNDARY_CONTRACT_ONLY`
 
 Nenhum store foi aberto, nenhum record persistido, nenhum dispatch foi
