@@ -60,8 +60,8 @@ REQUIRED_CERTIFICATE_INVARIANTS = (
     "TERMINAL_EXECUTION_REQUIRED",
     "PERSISTED_FINALIZATION_RECORD_REQUIRED",
     "PERSISTED_AUDIT_SEAL_REQUIRED",
-    "AUDIT_SEAL_REOPEN_VERIFICATION_REQUIRED",
-    "RECOMPUTED_AUDIT_SEAL_DIGEST_MATCH_REQUIRED",
+    "DURABLE_AUDIT_SEAL_REOPEN_CONSISTENCY_REQUIRED",
+    "PERSISTED_AUDIT_SEAL_DIGEST_MATCH_REQUIRED",
     "CANONICAL_CERTIFICATE_MANIFEST_REQUIRED",
     "DETERMINISTIC_CERTIFICATE_DIGEST_REQUIRED",
     "SHA256_DIGEST_REQUIRED",
@@ -105,7 +105,7 @@ CERTIFICATE_INVALIDATORS = (
     "TERMINAL_EXECUTION_RECORD_MISSING",
     "FINALIZATION_RECORD_MISSING",
     "AUDIT_SEAL_RECORD_MISSING",
-    "AUDIT_SEAL_RECOMPUTATION_MISMATCH",
+    "AUDIT_SEAL_REOPEN_RECORD_MISMATCH",
     "NON_TERMINAL_EXECUTION_STATE",
     "OUTCOME_UNKNOWN_PRESENT",
     "STILL_OUTCOME_UNKNOWN_PRESENT",
@@ -228,20 +228,39 @@ def build_execution_terminal_certificate_contract(
         blockers.append("IMMUTABLE_SEAL_RECORD_REQUIRED")
     if row.get("durable_reopen_consistency_required") is not True:
         blockers.append("DURABLE_REOPEN_CONSISTENCY_REQUIRED")
-    if row.get("recompute_manifest_on_reopen_required") is not True:
-        blockers.append("RECOMPUTE_MANIFEST_ON_REOPEN_REQUIRED")
-    if row.get("persisted_digest_must_match_recomputed_digest") is not True:
-        blockers.append("PERSISTED_AND_RECOMPUTED_DIGEST_MATCH_REQUIRED")
+    if row.get("seal_replace_forbidden") is not True:
+        blockers.append("SEAL_REPLACE_MUST_BE_FORBIDDEN")
+    if row.get("terminal_execution_reopen_forbidden") is not True:
+        blockers.append("TERMINAL_EXECUTION_REOPEN_MUST_BE_FORBIDDEN")
     if row.get("persistence_creates_execution_authority") is not False:
         blockers.append("PERSISTENCE_MUST_NOT_CREATE_EXECUTION_AUTHORITY")
-    if row.get("persistence_authorizes_retry") is not False:
-        blockers.append("PERSISTENCE_MUST_NOT_AUTHORIZE_RETRY")
-    if row.get("persistence_authorizes_reopen") is not False:
-        blockers.append("PERSISTENCE_MUST_NOT_AUTHORIZE_REOPEN")
-    if row.get("persistence_authorizes_external_effect") is not False:
-        blockers.append("PERSISTENCE_MUST_NOT_AUTHORIZE_EXTERNAL_EFFECT")
+    if row.get("digest_algorithm") != DIGEST_ALGORITHM:
+        blockers.append("SHA256_DIGEST_REQUIRED")
+    if row.get("canonical_encoding") != CANONICAL_ENCODING:
+        blockers.append("UTF8_CANONICAL_JSON_REQUIRED")
     if row.get("finops_cap_cents") != FINOPS_CAP_CENTS_REQUIRED:
         blockers.append("FINOPS_CAP_MUST_REMAIN_20000_CENTS")
+
+    persistence_invariants = set(row.get("required_seal_persistence_invariants") or ())
+    for marker in (
+        "DURABLE_REOPEN_MUST_PRESERVE_SEAL_RECORD",
+        "SEAL_RECORD_IMMUTABLE",
+        "TERMINAL_EXECUTION_REOPEN_FORBIDDEN",
+        "SEAL_PERSISTENCE_DOES_NOT_CREATE_EXECUTION_AUTHORITY",
+    ):
+        if marker not in persistence_invariants:
+            blockers.append("SEAL_PERSISTENCE_INVARIANT_REQUIRED:" + marker)
+
+    reopen_assertions = set(row.get("required_seal_reopen_assertions") or ())
+    for marker in (
+        "SEAL_RECORD_EXISTS_AFTER_REOPEN",
+        "AUDIT_SEAL_MANIFEST_DIGEST_MATCH",
+        "AUDIT_SEAL_DIGEST_MATCH",
+        "NO_DUPLICATE_SEAL_RECORD",
+        "NO_SEAL_REVISION_REGRESSION",
+    ):
+        if marker not in reopen_assertions:
+            blockers.append("SEAL_REOPEN_ASSERTION_REQUIRED:" + marker)
     if row.get("next_allowed_step") != seal_persistence.NEXT_ALLOWED_STEP:
         blockers.append("AUDIT_SEAL_PERSISTENCE_NEXT_STEP_INVALID")
 
@@ -274,7 +293,7 @@ def build_execution_terminal_certificate_contract(
         any_bound_field_change_changes_digest_required=True,
         any_verification_mismatch_fails_closed=True,
         persisted_audit_seal_required=True,
-        audit_seal_recomputation_required=True,
+        audit_seal_reopen_consistency_required=True,
         terminal_execution_required=True,
         certificate_read_only=True,
         certificate_is_real_signature=False,
