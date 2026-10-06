@@ -1146,14 +1146,14 @@ nenhuma cobrança, CRM, deploy ou produção ocorreu.
 
 ### 31.1 Provider Adapter Attestation Contract V1
 
-**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
 
 Evidências:
 - Draft PR #901.
 - CI-only Draft #902.
-- HEAD atual: `b944976c02c718d9ebce04b8c1f7d2c9b7b69a05`.
-- Workflow específico já passou compile, testes e o gate de zero provider material.
-- CI completa contra main ainda deve fechar antes da próxima camada.
+- HEAD validado: `b944976c02c718d9ebce04b8c1f7d2c9b7b69a05`.
+- 66/66 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
 
 A camada reutiliza os contratos existentes:
 - `ATLASQUANT_AION_MODEL_GATEWAY_V2`;
@@ -1190,10 +1190,10 @@ shell command.
 
 FinOps cap permanece `20000` cents.
 
-Estado máximo planejado:
+Estado máximo:
 `READY_FOR_PROVIDER_ADAPTER_ATTESTATION_DESIGN_REVIEW`
 
-Próximo passo planejado, somente após CI completo verde:
+Próximo passo permitido:
 `DESIGN_PROVIDER_CAPABILITY_BINDING_CONTRACT_ONLY`
 
 Provider continua NÃO selecionado, NÃO carregado e NÃO ligado.
