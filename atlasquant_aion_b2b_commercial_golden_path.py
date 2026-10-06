@@ -103,6 +103,12 @@ def _source_scope(stage: str, row: Mapping[str, Any]) -> dict[str, str]:
         return _scope(row.get("proposal") if isinstance(row.get("proposal"), Mapping) else {})
     if stage == "managed_service":
         return _scope(row.get("contract") if isinstance(row.get("contract"), Mapping) else {})
+    if stage == "recurring_customer":
+        return {
+            "owner_id": "",
+            "tenant_id": _text(row.get("service_tenant_id"), 120),
+            "workspace_id": _text(row.get("workspace_id"), 120),
+        }
     return _scope(row.get("scope") if isinstance(row.get("scope"), Mapping) else {})
 
 
@@ -156,8 +162,10 @@ def _stage(
     blockers.extend(_unsafe_flags(row))
 
     source_scope = _source_scope(key, row)
-    if any(source_scope.values()) and source_scope != dict(trusted_scope):
-        blockers.append("SCOPE_MISMATCH")
+    for scope_key, source_value in source_scope.items():
+        if source_value and source_value != trusted_scope.get(scope_key):
+            blockers.append("SCOPE_MISMATCH")
+            break
 
     if callable(extra_checks):
         blockers.extend(extra_checks(row))
