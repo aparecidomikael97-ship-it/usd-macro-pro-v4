@@ -66,6 +66,15 @@ class TemporalMemoryV2Tests(unittest.TestCase):
         )
         self.assertEqual([x["event_id"] for x in result["results"]], ["e2", "e3"])
 
+
+    def test_nonreciprocal_supersession_blocks_timeline(self):
+        timeline = build_timeline([
+            event("old", "2026-09-15"),
+            event("new", "2026-09-16", supersedes=("old",)),
+        ])
+        self.assertEqual(timeline["state"], "BLOCKED")
+        self.assertTrue(any(x.startswith("NON_RECIPROCAL_SUPERSESSION") for x in timeline["blockers"]))
+
     def test_superseded_can_be_hidden_without_erasing_history(self):
         timeline = build_timeline([
             event("old", "2026-09-15", state="SUPERSEDED", superseded_by=("new",)),
