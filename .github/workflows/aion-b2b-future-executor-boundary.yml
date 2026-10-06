@@ -1,0 +1,62 @@
+name: AION B2B Future Executor Boundary Design
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - fix/aion-b2b-adapter-command-plan-v2-reconciliation-20261005
+    paths:
+      - "atlasquant_aion_b2b_future_executor_boundary.py"
+      - "test_atlasquant_aion_b2b_future_executor_boundary.py"
+      - "docs/aion/AION_B2B_FUTURE_EXECUTOR_BOUNDARY_V1.md"
+      - ".github/workflows/aion-b2b-future-executor-boundary.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  future-executor-boundary-design:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing pinned project dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design-only boundary
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_future_executor_boundary.py \
+            test_atlasquant_aion_b2b_future_executor_boundary.py
+      - name: Run future-boundary design tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_future_executor_boundary.py
+      - name: Assert zero executor implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path(
+              "atlasquant_aion_b2b_future_executor_boundary.py"
+          ).read_text(encoding="utf-8")
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+          ):
+              assert banned not in source, banned
+          assert '"DESIGN_EXECUTOR_CONTRACT_ONLY"' in source
+          assert '"executor_created"' in source
+          assert '"execution_command_generated"' in source
+          PY
