@@ -37,6 +37,10 @@ DEFAULT_MAX_BACKOFF_SECONDS = 300
 DEFAULT_LEASE_SECONDS = 120
 MAX_LEASE_SECONDS = 1800
 DEFAULT_POISON_THRESHOLD = 3
+STORE_SCHEMA_VERSION = 2
+TERMINAL_FINAL_STATES = {"FINALIZED_SUCCESS", "FINALIZED_TERMINAL_FAILURE"}
+TERMINAL_EVIDENCE_DIGEST_ALGORITHM = "SHA256"
+TERMINAL_EVIDENCE_CANONICAL_ENCODING = "UTF8_CANONICAL_JSON"
 
 
 class DurableExecutionError(ValueError):
@@ -74,6 +78,27 @@ def _clean(value: Any, limit: int = 256) -> str:
 def _digest(value: Any) -> str:
     raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _required_text(value: Any, code: str, limit: int = 256) -> str:
+    text = _clean(value, limit)
+    if not text:
+        raise DurableExecutionError(code)
+    return text
+
+
+def _terminal_revision(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise DurableExecutionError("TERMINAL_REVISION_INVALID")
+    return value
+
+
+def _evidence_row(row, missing_code: str) -> dict[str, Any]:
+    if row is None:
+        raise DurableExecutionError(missing_code)
+    item = dict(row)
+    item["executes_action"] = False
+    return item
 
 
 def canonical_execution_id(task_id: str, step_id: str, idempotency_key: str, payload_digest: str) -> str:
@@ -121,36 +146,140 @@ class DurableExecutionStore:
     def _initialize(self):
         with self._connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS executions (
-                    execution_id TEXT PRIMARY KEY,
-                    task_id TEXT NOT NULL,
-                    step_id TEXT NOT NULL,
-                    idempotency_key TEXT NOT NULL UNIQUE,
-                    effect_key TEXT NOT NULL UNIQUE,
-                    payload_digest TEXT NOT NULL,
-                    mode TEXT NOT NULL,
-                    state TEXT NOT NULL,
-                    attempt INTEGER NOT NULL,
-                    max_attempts INTEGER NOT NULL,
-                    poison_threshold INTEGER NOT NULL,
-                    same_error_count INTEGER NOT NULL,
-                    last_error_fingerprint TEXT NOT NULL,
-                    next_attempt_at TEXT NOT NULL,
-                    deadline_at TEXT NOT NULL,
-                    lease_owner TEXT NOT NULL,
-                    lease_token TEXT NOT NULL,
-                    lease_expires_at TEXT NOT NULL,
-                    dispatch_recorded_at TEXT NOT NULL,
-                    completed_at TEXT NOT NULL,
-                    result_digest TEXT NOT NULL,
-                    reconciliation_evidence_digest TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS executions (
+                        execution_id TEXT PRIMARY KEY,
+                        task_id TEXT NOT NULL,
+                        step_id TEXT NOT NULL,
+                        idempotency_key TEXT NOT NULL UNIQUE,
+                        effect_key TEXT NOT NULL UNIQUE,
+                        payload_digest TEXT NOT NULL,
+                        mode TEXT NOT NULL,
+                        state TEXT NOT NULL,
+                        attempt INTEGER NOT NULL,
+                        max_attempts INTEGER NOT NULL,
+                        poison_threshold INTEGER NOT NULL,
+                        same_error_count INTEGER NOT NULL,
+                        last_error_fingerprint TEXT NOT NULL,
+                        next_attempt_at TEXT NOT NULL,
+                        deadline_at TEXT NOT NULL,
+                        lease_owner TEXT NOT NULL,
+                        lease_token TEXT NOT NULL,
+                        lease_expires_at TEXT NOT NULL,
+                        dispatch_recorded_at TEXT NOT NULL,
+                        completed_at TEXT NOT NULL,
+                        result_digest TEXT NOT NULL,
+                        reconciliation_evidence_digest TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
                 )
-                """
-            )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS execution_store_meta (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS execution_scope_bindings (
+                        execution_id TEXT PRIMARY KEY,
+                        owner_id TEXT NOT NULL,
+                        tenant_id TEXT NOT NULL,
+                        workspace_id TEXT NOT NULL,
+                        scope_digest TEXT NOT NULL,
+                        scope_binding_source_digest TEXT NOT NULL,
+                        bound_at TEXT NOT NULL,
+                        FOREIGN KEY(execution_id)
+                            REFERENCES executions(execution_id) ON DELETE RESTRICT
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS execution_terminal_finalizations (
+                        execution_id TEXT PRIMARY KEY,
+                        terminal_revision INTEGER NOT NULL CHECK (terminal_revision >= 1),
+                        core_execution_state TEXT NOT NULL,
+                        final_execution_state TEXT NOT NULL,
+                        execution_finalization_contract_digest TEXT NOT NULL,
+                        finalization_record_digest TEXT NOT NULL,
+                        external_effect_outcome_receipt_digest TEXT NOT NULL,
+                        outcome_reconciliation_record_digest TEXT NOT NULL,
+                        rollback_or_compensation_settlement_digest TEXT NOT NULL,
+                        finops_estimate_digest TEXT NOT NULL,
+                        finops_observation_digest TEXT NOT NULL,
+                        observability_trace_id TEXT NOT NULL,
+                        pre_terminal_audit_chain_digest TEXT NOT NULL,
+                        persisted_at TEXT NOT NULL,
+                        FOREIGN KEY(execution_id)
+                            REFERENCES executions(execution_id) ON DELETE RESTRICT
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS execution_audit_seals (
+                        execution_id TEXT PRIMARY KEY,
+                        terminal_revision INTEGER NOT NULL CHECK (terminal_revision >= 1),
+                        finalization_record_digest TEXT NOT NULL,
+                        audit_seal_manifest_digest TEXT NOT NULL,
+                        audit_seal_record_digest TEXT NOT NULL,
+                        audit_chain_digest TEXT NOT NULL,
+                        finops_observation_digest TEXT NOT NULL,
+                        observability_trace_id TEXT NOT NULL,
+                        persisted_at TEXT NOT NULL,
+                        FOREIGN KEY(execution_id)
+                            REFERENCES execution_terminal_finalizations(execution_id)
+                            ON DELETE RESTRICT
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS execution_terminal_certificates (
+                        execution_id TEXT PRIMARY KEY,
+                        terminal_revision INTEGER NOT NULL CHECK (terminal_revision >= 1),
+                        final_execution_state TEXT NOT NULL,
+                        scope_digest TEXT NOT NULL,
+                        finalization_record_digest TEXT NOT NULL,
+                        audit_seal_manifest_digest TEXT NOT NULL,
+                        audit_seal_record_digest TEXT NOT NULL,
+                        certificate_manifest_digest TEXT NOT NULL,
+                        certificate_digest TEXT NOT NULL,
+                        certificate_persistence_record_digest TEXT NOT NULL,
+                        terminal_evidence_set_digest TEXT NOT NULL,
+                        finops_observation_digest TEXT NOT NULL,
+                        observability_trace_id TEXT NOT NULL,
+                        pre_terminal_audit_chain_digest TEXT NOT NULL,
+                        digest_algorithm TEXT NOT NULL,
+                        canonical_encoding TEXT NOT NULL,
+                        persisted_at TEXT NOT NULL,
+                        FOREIGN KEY(execution_id)
+                            REFERENCES execution_audit_seals(execution_id)
+                            ON DELETE RESTRICT
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO execution_store_meta(key, value)
+                    VALUES ('schema_version', ?)
+                    ON CONFLICT(key) DO UPDATE SET value=excluded.value
+                    """,
+                    (str(STORE_SCHEMA_VERSION),),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
 
     def _row(self, row) -> dict[str, Any]:
         if row is None:
@@ -598,6 +727,697 @@ class DurableExecutionStore:
                  evidence, now_ts, execution_id),
             )
         return self.get(execution_id)
+
+
+    def store_schema_version(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM execution_store_meta WHERE key='schema_version'"
+            ).fetchone()
+        if row is None:
+            raise DurableExecutionError("STORE_SCHEMA_VERSION_MISSING")
+        try:
+            return int(row["value"])
+        except Exception as exc:
+            raise DurableExecutionError("STORE_SCHEMA_VERSION_INVALID") from exc
+
+    def get_execution_scope(self, execution_id: str) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM execution_scope_bindings WHERE execution_id=?",
+                (execution_id,),
+            ).fetchone()
+        return _evidence_row(row, "EXECUTION_SCOPE_NOT_FOUND")
+
+    def bind_execution_scope_once(
+        self,
+        execution_id: str,
+        *,
+        owner_id: str,
+        tenant_id: str,
+        workspace_id: str,
+        scope_digest: str,
+        scope_binding_source_digest: str,
+        bound_at: str,
+    ) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        values = {
+            "owner_id": _required_text(owner_id, "OWNER_ID_REQUIRED", 128),
+            "tenant_id": _required_text(tenant_id, "TENANT_ID_REQUIRED", 128),
+            "workspace_id": _required_text(workspace_id, "WORKSPACE_ID_REQUIRED", 128),
+            "scope_digest": _required_text(scope_digest, "SCOPE_DIGEST_REQUIRED", 128),
+            "scope_binding_source_digest": _required_text(
+                scope_binding_source_digest,
+                "SCOPE_BINDING_SOURCE_DIGEST_REQUIRED",
+                128,
+            ),
+            "bound_at": _required_text(bound_at, "BOUND_AT_REQUIRED", 64),
+        }
+        _parse_ts(values["bound_at"])
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                parent = conn.execute(
+                    "SELECT execution_id FROM executions WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                if parent is None:
+                    raise DurableExecutionError("EXECUTION_NOT_FOUND")
+                existing = conn.execute(
+                    "SELECT * FROM execution_scope_bindings WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                if existing is not None:
+                    item = dict(existing)
+                    same = all(item[key] == value for key, value in values.items())
+                    if not same:
+                        raise DurableExecutionError("EXECUTION_SCOPE_CONFLICT", item)
+                    conn.execute("COMMIT")
+                    item["replay"] = True
+                    item["executes_action"] = False
+                    return item
+                conn.execute(
+                    """
+                    INSERT INTO execution_scope_bindings (
+                        execution_id, owner_id, tenant_id, workspace_id,
+                        scope_digest, scope_binding_source_digest, bound_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        execution_id,
+                        values["owner_id"],
+                        values["tenant_id"],
+                        values["workspace_id"],
+                        values["scope_digest"],
+                        values["scope_binding_source_digest"],
+                        values["bound_at"],
+                    ),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+        item = self.get_execution_scope(execution_id)
+        item["replay"] = False
+        return item
+
+    def get_terminal_finalization(self, execution_id: str) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM execution_terminal_finalizations WHERE execution_id=?",
+                (execution_id,),
+            ).fetchone()
+        return _evidence_row(row, "TERMINAL_FINALIZATION_NOT_FOUND")
+
+    def persist_terminal_finalization_once(
+        self,
+        execution_id: str,
+        *,
+        terminal_revision: int,
+        final_execution_state: str,
+        execution_finalization_contract_digest: str,
+        finalization_record_digest: str,
+        external_effect_outcome_receipt_digest: str,
+        outcome_reconciliation_record_digest: str = "",
+        rollback_or_compensation_settlement_digest: str = "",
+        finops_estimate_digest: str,
+        finops_observation_digest: str,
+        observability_trace_id: str,
+        pre_terminal_audit_chain_digest: str,
+        persisted_at: str,
+    ) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        revision = _terminal_revision(terminal_revision)
+        final_state = _required_text(
+            final_execution_state, "FINAL_EXECUTION_STATE_REQUIRED", 64
+        )
+        if final_state not in TERMINAL_FINAL_STATES:
+            raise DurableExecutionError("FINAL_EXECUTION_STATE_INVALID")
+        values = {
+            "execution_finalization_contract_digest": _required_text(
+                execution_finalization_contract_digest,
+                "EXECUTION_FINALIZATION_CONTRACT_DIGEST_REQUIRED",
+                128,
+            ),
+            "finalization_record_digest": _required_text(
+                finalization_record_digest, "FINALIZATION_RECORD_DIGEST_REQUIRED", 128
+            ),
+            "external_effect_outcome_receipt_digest": _required_text(
+                external_effect_outcome_receipt_digest,
+                "OUTCOME_RECEIPT_DIGEST_REQUIRED",
+                128,
+            ),
+            "outcome_reconciliation_record_digest": _clean(
+                outcome_reconciliation_record_digest, 128
+            ),
+            "rollback_or_compensation_settlement_digest": _clean(
+                rollback_or_compensation_settlement_digest, 128
+            ),
+            "finops_estimate_digest": _required_text(
+                finops_estimate_digest, "FINOPS_ESTIMATE_DIGEST_REQUIRED", 128
+            ),
+            "finops_observation_digest": _required_text(
+                finops_observation_digest, "FINOPS_OBSERVATION_DIGEST_REQUIRED", 128
+            ),
+            "observability_trace_id": _required_text(
+                observability_trace_id, "OBSERVABILITY_TRACE_ID_REQUIRED", 128
+            ),
+            "pre_terminal_audit_chain_digest": _required_text(
+                pre_terminal_audit_chain_digest,
+                "PRE_TERMINAL_AUDIT_CHAIN_DIGEST_REQUIRED",
+                128,
+            ),
+            "persisted_at": _required_text(persisted_at, "PERSISTED_AT_REQUIRED", 64),
+        }
+        _parse_ts(values["persisted_at"])
+
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                execution = conn.execute(
+                    "SELECT * FROM executions WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                if execution is None:
+                    raise DurableExecutionError("EXECUTION_NOT_FOUND")
+                execution = dict(execution)
+                if execution["state"] not in TERMINAL:
+                    raise DurableExecutionError("EXECUTION_NOT_TERMINAL", execution)
+                scope = conn.execute(
+                    "SELECT execution_id FROM execution_scope_bindings WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                if scope is None:
+                    raise DurableExecutionError("EXECUTION_SCOPE_NOT_FOUND", execution)
+                expected_final = (
+                    "FINALIZED_SUCCESS"
+                    if execution["state"] == "COMPLETED"
+                    else "FINALIZED_TERMINAL_FAILURE"
+                )
+                if final_state != expected_final:
+                    raise DurableExecutionError(
+                        "FINAL_EXECUTION_STATE_CORE_MISMATCH", execution
+                    )
+                existing = conn.execute(
+                    "SELECT * FROM execution_terminal_finalizations WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                expected = {
+                    "terminal_revision": revision,
+                    "core_execution_state": execution["state"],
+                    "final_execution_state": final_state,
+                    **values,
+                }
+                if existing is not None:
+                    item = dict(existing)
+                    same = all(item[key] == value for key, value in expected.items())
+                    if not same:
+                        raise DurableExecutionError(
+                            "TERMINAL_FINALIZATION_CONFLICT", item
+                        )
+                    conn.execute("COMMIT")
+                    item["replay"] = True
+                    item["executes_action"] = False
+                    return item
+                conn.execute(
+                    """
+                    INSERT INTO execution_terminal_finalizations (
+                        execution_id, terminal_revision, core_execution_state,
+                        final_execution_state,
+                        execution_finalization_contract_digest,
+                        finalization_record_digest,
+                        external_effect_outcome_receipt_digest,
+                        outcome_reconciliation_record_digest,
+                        rollback_or_compensation_settlement_digest,
+                        finops_estimate_digest, finops_observation_digest,
+                        observability_trace_id, pre_terminal_audit_chain_digest,
+                        persisted_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        execution_id,
+                        revision,
+                        execution["state"],
+                        final_state,
+                        values["execution_finalization_contract_digest"],
+                        values["finalization_record_digest"],
+                        values["external_effect_outcome_receipt_digest"],
+                        values["outcome_reconciliation_record_digest"],
+                        values["rollback_or_compensation_settlement_digest"],
+                        values["finops_estimate_digest"],
+                        values["finops_observation_digest"],
+                        values["observability_trace_id"],
+                        values["pre_terminal_audit_chain_digest"],
+                        values["persisted_at"],
+                    ),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+        item = self.get_terminal_finalization(execution_id)
+        item["replay"] = False
+        return item
+
+    def get_audit_seal(self, execution_id: str) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM execution_audit_seals WHERE execution_id=?",
+                (execution_id,),
+            ).fetchone()
+        return _evidence_row(row, "AUDIT_SEAL_NOT_FOUND")
+
+    def persist_audit_seal_once(
+        self,
+        execution_id: str,
+        *,
+        terminal_revision: int,
+        finalization_record_digest: str,
+        audit_seal_manifest_digest: str,
+        audit_seal_record_digest: str,
+        audit_chain_digest: str,
+        finops_observation_digest: str,
+        observability_trace_id: str,
+        persisted_at: str,
+    ) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        revision = _terminal_revision(terminal_revision)
+        values = {
+            "finalization_record_digest": _required_text(
+                finalization_record_digest, "FINALIZATION_RECORD_DIGEST_REQUIRED", 128
+            ),
+            "audit_seal_manifest_digest": _required_text(
+                audit_seal_manifest_digest, "AUDIT_SEAL_MANIFEST_DIGEST_REQUIRED", 128
+            ),
+            "audit_seal_record_digest": _required_text(
+                audit_seal_record_digest, "AUDIT_SEAL_RECORD_DIGEST_REQUIRED", 128
+            ),
+            "audit_chain_digest": _required_text(
+                audit_chain_digest, "AUDIT_CHAIN_DIGEST_REQUIRED", 128
+            ),
+            "finops_observation_digest": _required_text(
+                finops_observation_digest, "FINOPS_OBSERVATION_DIGEST_REQUIRED", 128
+            ),
+            "observability_trace_id": _required_text(
+                observability_trace_id, "OBSERVABILITY_TRACE_ID_REQUIRED", 128
+            ),
+            "persisted_at": _required_text(persisted_at, "PERSISTED_AT_REQUIRED", 64),
+        }
+        _parse_ts(values["persisted_at"])
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                finalization = conn.execute(
+                    "SELECT * FROM execution_terminal_finalizations WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                if finalization is None:
+                    raise DurableExecutionError("TERMINAL_FINALIZATION_NOT_FOUND")
+                finalization = dict(finalization)
+                if finalization["terminal_revision"] != revision:
+                    raise DurableExecutionError(
+                        "AUDIT_SEAL_TERMINAL_REVISION_MISMATCH", finalization
+                    )
+                if (
+                    finalization["finalization_record_digest"]
+                    != values["finalization_record_digest"]
+                ):
+                    raise DurableExecutionError(
+                        "AUDIT_SEAL_FINALIZATION_DIGEST_MISMATCH", finalization
+                    )
+                if (
+                    finalization["finops_observation_digest"]
+                    != values["finops_observation_digest"]
+                ):
+                    raise DurableExecutionError(
+                        "AUDIT_SEAL_FINOPS_DIGEST_MISMATCH", finalization
+                    )
+                if (
+                    finalization["observability_trace_id"]
+                    != values["observability_trace_id"]
+                ):
+                    raise DurableExecutionError(
+                        "AUDIT_SEAL_TRACE_MISMATCH", finalization
+                    )
+                existing = conn.execute(
+                    "SELECT * FROM execution_audit_seals WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                expected = {"terminal_revision": revision, **values}
+                if existing is not None:
+                    item = dict(existing)
+                    same = all(item[key] == value for key, value in expected.items())
+                    if not same:
+                        raise DurableExecutionError("AUDIT_SEAL_CONFLICT", item)
+                    conn.execute("COMMIT")
+                    item["replay"] = True
+                    item["executes_action"] = False
+                    return item
+                conn.execute(
+                    """
+                    INSERT INTO execution_audit_seals (
+                        execution_id, terminal_revision, finalization_record_digest,
+                        audit_seal_manifest_digest, audit_seal_record_digest,
+                        audit_chain_digest, finops_observation_digest,
+                        observability_trace_id, persisted_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        execution_id,
+                        revision,
+                        values["finalization_record_digest"],
+                        values["audit_seal_manifest_digest"],
+                        values["audit_seal_record_digest"],
+                        values["audit_chain_digest"],
+                        values["finops_observation_digest"],
+                        values["observability_trace_id"],
+                        values["persisted_at"],
+                    ),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+        item = self.get_audit_seal(execution_id)
+        item["replay"] = False
+        return item
+
+    def get_terminal_certificate(self, execution_id: str) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM execution_terminal_certificates WHERE execution_id=?",
+                (execution_id,),
+            ).fetchone()
+        return _evidence_row(row, "TERMINAL_CERTIFICATE_NOT_FOUND")
+
+    def persist_terminal_certificate_once(
+        self,
+        execution_id: str,
+        *,
+        terminal_revision: int,
+        final_execution_state: str,
+        scope_digest: str,
+        finalization_record_digest: str,
+        audit_seal_manifest_digest: str,
+        audit_seal_record_digest: str,
+        certificate_manifest_digest: str,
+        certificate_digest: str,
+        certificate_persistence_record_digest: str,
+        terminal_evidence_set_digest: str,
+        finops_observation_digest: str,
+        observability_trace_id: str,
+        pre_terminal_audit_chain_digest: str,
+        digest_algorithm: str = TERMINAL_EVIDENCE_DIGEST_ALGORITHM,
+        canonical_encoding: str = TERMINAL_EVIDENCE_CANONICAL_ENCODING,
+        persisted_at: str,
+    ) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        revision = _terminal_revision(terminal_revision)
+        final_state = _required_text(
+            final_execution_state, "FINAL_EXECUTION_STATE_REQUIRED", 64
+        )
+        if digest_algorithm != TERMINAL_EVIDENCE_DIGEST_ALGORITHM:
+            raise DurableExecutionError("CERTIFICATE_DIGEST_ALGORITHM_INVALID")
+        if canonical_encoding != TERMINAL_EVIDENCE_CANONICAL_ENCODING:
+            raise DurableExecutionError("CERTIFICATE_CANONICAL_ENCODING_INVALID")
+        values = {
+            "scope_digest": _required_text(scope_digest, "SCOPE_DIGEST_REQUIRED", 128),
+            "finalization_record_digest": _required_text(
+                finalization_record_digest, "FINALIZATION_RECORD_DIGEST_REQUIRED", 128
+            ),
+            "audit_seal_manifest_digest": _required_text(
+                audit_seal_manifest_digest, "AUDIT_SEAL_MANIFEST_DIGEST_REQUIRED", 128
+            ),
+            "audit_seal_record_digest": _required_text(
+                audit_seal_record_digest, "AUDIT_SEAL_RECORD_DIGEST_REQUIRED", 128
+            ),
+            "certificate_manifest_digest": _required_text(
+                certificate_manifest_digest,
+                "CERTIFICATE_MANIFEST_DIGEST_REQUIRED",
+                128,
+            ),
+            "certificate_digest": _required_text(
+                certificate_digest, "CERTIFICATE_DIGEST_REQUIRED", 128
+            ),
+            "certificate_persistence_record_digest": _required_text(
+                certificate_persistence_record_digest,
+                "CERTIFICATE_PERSISTENCE_RECORD_DIGEST_REQUIRED",
+                128,
+            ),
+            "terminal_evidence_set_digest": _required_text(
+                terminal_evidence_set_digest,
+                "TERMINAL_EVIDENCE_SET_DIGEST_REQUIRED",
+                128,
+            ),
+            "finops_observation_digest": _required_text(
+                finops_observation_digest, "FINOPS_OBSERVATION_DIGEST_REQUIRED", 128
+            ),
+            "observability_trace_id": _required_text(
+                observability_trace_id, "OBSERVABILITY_TRACE_ID_REQUIRED", 128
+            ),
+            "pre_terminal_audit_chain_digest": _required_text(
+                pre_terminal_audit_chain_digest,
+                "PRE_TERMINAL_AUDIT_CHAIN_DIGEST_REQUIRED",
+                128,
+            ),
+            "persisted_at": _required_text(persisted_at, "PERSISTED_AT_REQUIRED", 64),
+        }
+        _parse_ts(values["persisted_at"])
+
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                scope = conn.execute(
+                    "SELECT * FROM execution_scope_bindings WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                finalization = conn.execute(
+                    "SELECT * FROM execution_terminal_finalizations WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                seal = conn.execute(
+                    "SELECT * FROM execution_audit_seals WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                if scope is None:
+                    raise DurableExecutionError("EXECUTION_SCOPE_NOT_FOUND")
+                if finalization is None:
+                    raise DurableExecutionError("TERMINAL_FINALIZATION_NOT_FOUND")
+                if seal is None:
+                    raise DurableExecutionError("AUDIT_SEAL_NOT_FOUND")
+                scope = dict(scope)
+                finalization = dict(finalization)
+                seal = dict(seal)
+                if scope["scope_digest"] != values["scope_digest"]:
+                    raise DurableExecutionError("CERTIFICATE_SCOPE_DIGEST_MISMATCH")
+                if finalization["terminal_revision"] != revision:
+                    raise DurableExecutionError("CERTIFICATE_TERMINAL_REVISION_MISMATCH")
+                if finalization["final_execution_state"] != final_state:
+                    raise DurableExecutionError("CERTIFICATE_FINAL_STATE_MISMATCH")
+                if (
+                    finalization["finalization_record_digest"]
+                    != values["finalization_record_digest"]
+                ):
+                    raise DurableExecutionError("CERTIFICATE_FINALIZATION_DIGEST_MISMATCH")
+                if (
+                    finalization["finops_observation_digest"]
+                    != values["finops_observation_digest"]
+                ):
+                    raise DurableExecutionError("CERTIFICATE_FINOPS_DIGEST_MISMATCH")
+                if (
+                    finalization["observability_trace_id"]
+                    != values["observability_trace_id"]
+                ):
+                    raise DurableExecutionError("CERTIFICATE_TRACE_MISMATCH")
+                if (
+                    finalization["pre_terminal_audit_chain_digest"]
+                    != values["pre_terminal_audit_chain_digest"]
+                ):
+                    raise DurableExecutionError("CERTIFICATE_AUDIT_CHAIN_MISMATCH")
+                if (
+                    seal["audit_seal_manifest_digest"]
+                    != values["audit_seal_manifest_digest"]
+                    or seal["audit_seal_record_digest"]
+                    != values["audit_seal_record_digest"]
+                ):
+                    raise DurableExecutionError("CERTIFICATE_AUDIT_SEAL_DIGEST_MISMATCH")
+                existing = conn.execute(
+                    "SELECT * FROM execution_terminal_certificates WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                expected = {
+                    "terminal_revision": revision,
+                    "final_execution_state": final_state,
+                    **values,
+                    "digest_algorithm": digest_algorithm,
+                    "canonical_encoding": canonical_encoding,
+                }
+                if existing is not None:
+                    item = dict(existing)
+                    same = all(item[key] == value for key, value in expected.items())
+                    if not same:
+                        raise DurableExecutionError("TERMINAL_CERTIFICATE_CONFLICT", item)
+                    conn.execute("COMMIT")
+                    item["replay"] = True
+                    item["executes_action"] = False
+                    return item
+                conn.execute(
+                    """
+                    INSERT INTO execution_terminal_certificates (
+                        execution_id, terminal_revision, final_execution_state,
+                        scope_digest, finalization_record_digest,
+                        audit_seal_manifest_digest, audit_seal_record_digest,
+                        certificate_manifest_digest, certificate_digest,
+                        certificate_persistence_record_digest,
+                        terminal_evidence_set_digest, finops_observation_digest,
+                        observability_trace_id, pre_terminal_audit_chain_digest,
+                        digest_algorithm, canonical_encoding, persisted_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        execution_id,
+                        revision,
+                        final_state,
+                        values["scope_digest"],
+                        values["finalization_record_digest"],
+                        values["audit_seal_manifest_digest"],
+                        values["audit_seal_record_digest"],
+                        values["certificate_manifest_digest"],
+                        values["certificate_digest"],
+                        values["certificate_persistence_record_digest"],
+                        values["terminal_evidence_set_digest"],
+                        values["finops_observation_digest"],
+                        values["observability_trace_id"],
+                        values["pre_terminal_audit_chain_digest"],
+                        digest_algorithm,
+                        canonical_encoding,
+                        values["persisted_at"],
+                    ),
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+        item = self.get_terminal_certificate(execution_id)
+        item["replay"] = False
+        return item
+
+    def read_terminal_certificate_snapshot(
+        self,
+        execution_id: str,
+        *,
+        owner_id: str,
+        tenant_id: str,
+        workspace_id: str,
+    ) -> dict[str, Any]:
+        execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
+        owner = _required_text(owner_id, "OWNER_ID_REQUIRED", 128)
+        tenant = _required_text(tenant_id, "TENANT_ID_REQUIRED", 128)
+        workspace = _required_text(workspace_id, "WORKSPACE_ID_REQUIRED", 128)
+        with self._connect() as conn:
+            conn.execute("BEGIN")
+            try:
+                scope = conn.execute(
+                    "SELECT * FROM execution_scope_bindings WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                finalization = conn.execute(
+                    "SELECT * FROM execution_terminal_finalizations WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                seal = conn.execute(
+                    "SELECT * FROM execution_audit_seals WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                certificate = conn.execute(
+                    "SELECT * FROM execution_terminal_certificates WHERE execution_id=?",
+                    (execution_id,),
+                ).fetchone()
+                conn.execute("COMMIT")
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+
+        if scope is None:
+            return {
+                "state": "UNAVAILABLE",
+                "error_code": "EXECUTION_SCOPE_NOT_FOUND",
+                "execution_id": execution_id,
+                "executes_action": False,
+            }
+        scope = dict(scope)
+        if (
+            scope["owner_id"] != owner
+            or scope["tenant_id"] != tenant
+            or scope["workspace_id"] != workspace
+        ):
+            return {
+                "state": "MISMATCH",
+                "error_code": "EXECUTION_SCOPE_MISMATCH",
+                "execution_id": execution_id,
+                "executes_action": False,
+            }
+        if finalization is None or seal is None or certificate is None:
+            return {
+                "state": "UNAVAILABLE",
+                "error_code": "TERMINAL_EVIDENCE_CHAIN_INCOMPLETE",
+                "execution_id": execution_id,
+                "executes_action": False,
+            }
+        finalization = dict(finalization)
+        seal = dict(seal)
+        certificate = dict(certificate)
+        consistent = (
+            finalization["terminal_revision"] == seal["terminal_revision"]
+            == certificate["terminal_revision"]
+            and finalization["final_execution_state"]
+            == certificate["final_execution_state"]
+            and scope["scope_digest"] == certificate["scope_digest"]
+            and finalization["finalization_record_digest"]
+            == seal["finalization_record_digest"]
+            == certificate["finalization_record_digest"]
+            and seal["audit_seal_manifest_digest"]
+            == certificate["audit_seal_manifest_digest"]
+            and seal["audit_seal_record_digest"]
+            == certificate["audit_seal_record_digest"]
+            and finalization["finops_observation_digest"]
+            == seal["finops_observation_digest"]
+            == certificate["finops_observation_digest"]
+            and finalization["observability_trace_id"]
+            == seal["observability_trace_id"]
+            == certificate["observability_trace_id"]
+            and finalization["pre_terminal_audit_chain_digest"]
+            == certificate["pre_terminal_audit_chain_digest"]
+            and certificate["digest_algorithm"]
+            == TERMINAL_EVIDENCE_DIGEST_ALGORITHM
+            and certificate["canonical_encoding"]
+            == TERMINAL_EVIDENCE_CANONICAL_ENCODING
+        )
+        if not consistent:
+            return {
+                "state": "MISMATCH",
+                "error_code": "TERMINAL_EVIDENCE_CHAIN_MISMATCH",
+                "execution_id": execution_id,
+                "executes_action": False,
+            }
+        return {
+            "state": "VERIFIED",
+            "execution_id": execution_id,
+            "scope": {**scope, "executes_action": False},
+            "finalization": {**finalization, "executes_action": False},
+            "audit_seal": {**seal, "executes_action": False},
+            "certificate": {**certificate, "executes_action": False},
+            "executes_action": False,
+        }
 
     def list_dlq(self) -> list[dict[str, Any]]:
         with self._connect() as conn:
