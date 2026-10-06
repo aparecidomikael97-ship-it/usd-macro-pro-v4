@@ -1094,14 +1094,14 @@ Próximo passo permitido:
 
 ### 30.2 Runtime Execution Guards Contract V1
 
-**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
 
 Evidências:
 - Draft PR #899.
 - CI-only Draft #900.
-- HEAD atual: `d3c2c48dacbbd1cb3df3545706e8587c3ec2451a`.
-- Workflow específico já passou na branch empilhada.
-- CI completa contra main ainda deve fechar antes da próxima camada.
+- HEAD validado: `d3c2c48dacbbd1cb3df3545706e8587c3ec2451a`.
+- 65/65 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
 
 Guardrails de runtime definidos:
 - fresh authorization verificada no dispatch;
@@ -1130,10 +1130,10 @@ Guardrails de runtime definidos:
 
 Provider permanece NÃO selecionado e NÃO ligado.
 
-Estado máximo planejado:
+Estado máximo:
 `READY_FOR_RUNTIME_EXECUTION_GUARDS_DESIGN_REVIEW`
 
-Próximo passo planejado, somente após CI completo verde:
+Próximo passo permitido:
 `DESIGN_PROVIDER_ADAPTER_ATTESTATION_CONTRACT_ONLY`
 
 Nenhum runtime guard foi consumido de verdade; nenhum provider foi chamado;
