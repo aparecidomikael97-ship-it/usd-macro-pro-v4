@@ -19,11 +19,19 @@ from atlasquant_aion_b2b_owner_renewal_action_command_plan_v2 import (
 
 SCHEMA = "ATLASQUANT_AION_B2B_OWNER_RENEWAL_ACTION_ADAPTER_PLAN_V2"
 READY = v1.READY
-ENVIRONMENT_SCHEMA = v1.ENVIRONMENT_SCHEMA
+# V2 owns its policy-critical environment contract. Changes in archival V1
+# must never silently widen or narrow V2 validation.
+ENVIRONMENT_SCHEMA = "ATLASQUANT_AION_B2B_SYNTHETIC_ADAPTER_ENVIRONMENT_V1"
 ADAPTER_KIND = v1.ADAPTER_KIND
 FALSE_FIELDS = v1.FALSE_FIELDS
 CAPABILITIES = v1.CAPABILITIES
-RISKS = v1.RISKS
+RISKS = (
+    "billing_dispute",
+    "security_incident",
+    "privacy_incident",
+    "contract_conflict",
+    "irreversible_boundary_detected",
+)
 # V2 policy is independent of the archival V1 constant and validator.
 FINOPS_CAP_CENTS = 20000
 MAX_ENVIRONMENT_WINDOW_SECONDS = 180
