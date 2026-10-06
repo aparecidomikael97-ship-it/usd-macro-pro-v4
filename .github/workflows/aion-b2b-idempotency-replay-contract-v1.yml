@@ -1,0 +1,70 @@
+name: AION B2B Idempotency Replay Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-real-receipt-authenticator-contract-v1-20261005
+    paths:
+      - "atlasquant_aion_b2b_idempotency_replay_contract_v1.py"
+      - "test_atlasquant_aion_b2b_idempotency_replay_contract_v1.py"
+      - "docs/aion/AION_B2B_IDEMPOTENCY_REPLAY_CONTRACT_V1.md"
+      - ".github/workflows/aion-b2b-idempotency-replay-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  idempotency-replay-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design contract
+        run: |
+          python -m py_compile             atlasquant_aion_b2b_idempotency_replay_contract_v1.py             test_atlasquant_aion_b2b_idempotency_replay_contract_v1.py
+      - name: Run idempotency-replay contract tests
+        run: |
+          python -m unittest -q             test_atlasquant_aion_b2b_idempotency_replay_contract_v1.py
+      - name: Assert no persistence or external-effect implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_idempotency_replay_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "sqlite3.connect(",
+              "PersistentNonceRegistry(",
+              "DurableExecutionStore(",
+              ".claim(",
+              ".prepare(",
+              ".acquire_lease(",
+              ".record_dispatch_started(",
+              ".reconcile_unknown(",
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_IDEMPOTENCY_REPLAY_DESIGN_REVIEW"',
+              '"DESIGN_ROLLBACK_COMPENSATION_CONTRACT_ONLY"',
+              '"idempotency_reserved"',
+              '"dispatch_recorded"',
+              '"reconciliation_performed"',
+          ):
+              assert marker in source, marker
+          PY
