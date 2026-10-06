@@ -1352,14 +1352,14 @@ Próximo passo permitido:
 
 ### 34.2 Pre-Dispatch Attestation Contract V1
 
-**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
 
 Evidências:
 - Draft PR #907.
 - CI-only Draft #908.
-- HEAD atual: `e777bed9270d11c6a7142addc7bdf5ed29fcc1ee`.
-- Workflow específico da branch empilhada já verde.
-- CI completa contra main ainda deve fechar antes da próxima camada.
+- HEAD validado: `e777bed9270d11c6a7142addc7bdf5ed29fcc1ee`.
+- 69/69 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
 
 Modo:
 `IMMEDIATE_PRE_EFFECT_REVALIDATION`
@@ -1387,10 +1387,10 @@ Revalidações obrigatórias:
 - observability/audit context;
 - durable dispatch record obrigatório antes de qualquer external effect.
 
-Estado máximo planejado:
+Estado máximo:
 `READY_FOR_PRE_DISPATCH_ATTESTATION_DESIGN_REVIEW`
 
-Próximo passo planejado, somente após CI completo verde:
+Próximo passo permitido:
 `DESIGN_DURABLE_DISPATCH_RECORD_CONTRACT_ONLY`
 
 Nenhuma attestation real, nonce claim, reservation, lease, endpoint, payload,
