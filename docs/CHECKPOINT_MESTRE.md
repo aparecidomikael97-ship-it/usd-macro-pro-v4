@@ -1395,3 +1395,68 @@ Próximo passo permitido:
 
 Nenhuma attestation real, nonce claim, reservation, lease, endpoint, payload,
 dispatch, provider call, billing, CRM, deploy ou produção ocorreu.
+
+
+---
+
+## 35. Pre-Dispatch + Durable Dispatch Record — atualização
+
+### 35.1 Pre-Dispatch Attestation Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #907.
+- CI-only Draft #908.
+- HEAD validado: `e777bed9270d11c6a7142addc7bdf5ed29fcc1ee`.
+- 69/69 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
+
+Modo:
+`IMMEDIATE_PRE_EFFECT_REVALIDATION`
+
+A attestation futura deve ser fresca (máximo 30 segundos), fail-closed e
+revalidar envelope, autorização single-use, before-state, idempotency/effect
+key, lease, provider/capability, health, FinOps, capacity/quota, incidents,
+circuit breaker, kill switch, rollback/compensation, observability e audit.
+
+Estado máximo:
+`READY_FOR_PRE_DISPATCH_ATTESTATION_DESIGN_REVIEW`
+
+Próximo passo permitido:
+`DESIGN_DURABLE_DISPATCH_RECORD_CONTRACT_ONLY`
+
+### 35.2 Durable Dispatch Record Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #909.
+- CI-only Draft #910.
+- HEAD atual: `8acda88a5801f1ddbf9bec70eeb5fe38011e87e0`.
+- Workflow específico da branch empilhada em validação/CI.
+- CI completa contra main deve fechar antes da próxima camada.
+
+A camada reutiliza a semântica do núcleo:
+`atlasquant_aion_durable_execution_kernel.DurableExecutionStore`
+
+Transição obrigatória:
+`PREPARED -> LEASED -> DISPATCH_RECORDED`
+
+Invariante:
+nenhum efeito externo antes do dispatch record durável.
+
+Depois de `DISPATCH_RECORDED`:
+- crash => OUTCOME_UNKNOWN;
+- ambiguidade => OUTCOME_UNKNOWN;
+- retry automático => proibido;
+- reconciliação => explícita, com evidência e autorização separada.
+
+Estado máximo planejado:
+`READY_FOR_DURABLE_DISPATCH_RECORD_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_EXTERNAL_EFFECT_CALL_BOUNDARY_CONTRACT_ONLY`
+
+Nenhum store foi aberto, nenhum record persistido, nenhum dispatch foi
+registrado e nenhum provider foi chamado.
