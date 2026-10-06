@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     branches:
+      - main
       - fix/aion-b2b-adapter-command-plan-v2-reconciliation-20261005
     paths:
       - "atlasquant_aion_b2b_future_executor_boundary.py"
