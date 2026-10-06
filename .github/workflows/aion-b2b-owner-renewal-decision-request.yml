@@ -1,0 +1,69 @@
+name: AION B2B Owner Renewal Decision Request
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_owner_renewal_review.py"
+      - "atlasquant_aion_b2b_owner_renewal_decision_request.py"
+      - "test_atlasquant_aion_b2b_owner_renewal_decision_request.py"
+      - "docs/aion/AION_B2B_OWNER_RENEWAL_DECISION_REQUEST_V1.md"
+      - ".github/workflows/aion-b2b-owner-renewal-decision-request.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-renewal-decision-request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile owner renewal decision request
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_owner_renewal_review.py \
+            atlasquant_aion_b2b_owner_renewal_decision_request.py \
+            test_atlasquant_aion_b2b_owner_renewal_decision_request.py
+      - name: Run owner renewal decision request tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_owner_renewal_review.py \
+            test_atlasquant_aion_b2b_owner_renewal_decision_request.py
+      - name: Assert decision and execution separation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_b2b_owner_renewal_decision_request.py"
+          ).read_text(encoding="utf-8")
+          for marker in (
+              '"owner_signature_verified": False',
+              '"owner_decision_verified": False',
+              '"owner_decision_recorded": False',
+              '"decision_persisted": False',
+              '"generic_chat_instruction_accepted_as_decision": False',
+              '"renewal_authorized": False',
+              '"expansion_authorized": False',
+              '"termination_authorized": False',
+              '"billing_authorized": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "subprocess.",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          PY

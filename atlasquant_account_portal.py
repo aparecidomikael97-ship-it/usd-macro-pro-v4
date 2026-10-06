@@ -186,7 +186,14 @@ def account_visual_state(summary:Mapping[str,Any]|None)->dict[str,str]:
     return {"label":"ACESSO BLOQUEADO","detail":"Autenticação necessária para este perfil"}
 
 
-def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
+def render_account_portal(
+    access:Mapping[str,Any]|None,
+    *,
+    customer_portal_binding:Mapping[str,Any]|None=None,
+    customer_read_model:Mapping[str,Any]|None=None,
+    customer_portal_records:Mapping[str,Any]|None=None,
+    customer_portal_operations:Mapping[str,Any]|None=None,
+)->dict[str,Any]:
     summary=account_summary(access)
     visual=account_visual_state(summary)
     st.markdown(
@@ -210,6 +217,21 @@ def render_account_portal(access:Mapping[str,Any]|None)->dict[str,Any]:
     if summary["username"]:
         st.info("Conta ativa: **"+summary["username"]+"**")
     st.write(role_description(summary["role"]))
+
+    # Customer portal is opt-in from a trusted host. Never discover the binding
+    # from session state, environment variables, URL parameters or client input.
+    if summary["role"]=="USER" and (
+        customer_portal_binding is not None or customer_read_model is not None
+    ):
+        from atlasquant_aion_b2b_customer_portal import render_customer_portal
+        render_customer_portal(
+            st,
+            access=access,
+            binding=customer_portal_binding,
+            read_model=customer_read_model,
+            records=customer_portal_records,
+            operations=customer_portal_operations,
+        )
 
     if summary["role"]=="OPEN":
         st.warning(

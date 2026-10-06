@@ -1,0 +1,71 @@
+name: AION B2B Recurring Customer Safe Projection
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_recurring_customer_projection.py"
+      - "atlasquant_aion_b2b_customer_portal.py"
+      - "test_atlasquant_aion_b2b_recurring_customer_projection.py"
+      - "docs/aion/AION_B2B_RECURRING_CUSTOMER_SAFE_PROJECTION_V1.md"
+      - ".github/workflows/aion-b2b-recurring-customer-safe-projection.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  recurring-customer-safe-projection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile recurring customer-safe chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_value_bound_service_cycle.py \
+            atlasquant_aion_b2b_recurring_customer_projection.py \
+            atlasquant_aion_b2b_customer_portal.py \
+            test_atlasquant_aion_b2b_recurring_customer_projection.py
+      - name: Run recurring customer-safe tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_value_bound_service_cycle.py \
+            test_atlasquant_aion_b2b_recurring_customer_projection.py \
+            test_atlasquant_aion_b2b_customer_portal.py \
+            test_atlasquant_aion_b2b_customer_portal_pilot_value.py
+      - name: Assert no customer leak markers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_b2b_recurring_customer_projection.py"
+          ).read_text(encoding="utf-8")
+          for marker in (
+              '"internal_service_cost_exposed": False',
+              '"provider_margin_exposed": False',
+              '"retention_risk_exposed": False',
+              '"internal_recommendation_exposed": False',
+              '"internal_review_reasons_exposed": False',
+              '"automatic_renewal": False',
+              '"automatic_expansion": False',
+              '"grants_authority": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "subprocess.",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          PY
