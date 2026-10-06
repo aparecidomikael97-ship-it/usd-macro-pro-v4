@@ -124,10 +124,10 @@ def evaluate_physical_executor_readiness(
     *,
     handoff: Mapping[str, Any] | None,
     physical_evidence: Mapping[str, Any] | None,
-    evidence_verifier: Any = None,
     environment: Mapping[str, Any] | None,
     allowed_files: Sequence[Any] | None,
     current_input_digest: str,
+    evidence_verifier: Any = None,
 ) -> dict[str, Any]:
     h = dict(handoff or {})
     evidence = dict(physical_evidence or {})
