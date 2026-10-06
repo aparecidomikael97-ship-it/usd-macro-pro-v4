@@ -17,6 +17,46 @@ New-Item -ItemType Directory -Force -Path $Work | Out-Null
 
 Keep both private Ed25519 keys outside `$Repo`.
 
+## 0. Read-only readiness gate
+
+Before generating any signing request, consuming any nonce or attempting any runtime write, run the fail-closed readiness preflight.
+
+Prepare **public-only** certification and HUMAN_OWNER trust-root JSON files outside the repository. Private Ed25519 keys must never be passed to this tool, committed, printed, uploaded or placed in runtime JSON.
+
+```powershell
+$CertTrust = "<PUBLIC_CERTIFICATION_TRUST_ROOT_JSON>"
+$OwnerTrust = "<PUBLIC_OWNER_TRUST_ROOT_JSON>"
+
+python -m ops.aion_core_v1_formal_closure.windows_readiness_preflight `
+  --repo-root $Repo `
+  --packet $Packet `
+  --work-dir $Work `
+  --nonce-registry $NonceDb `
+  --certification-trust-root $CertTrust `
+  --owner-trust-root $OwnerTrust `
+  --expected-runtime-sha "020facc9991c5d2d4ce457e0840b04c875f8cfae" `
+  --check-runtime-read `
+  --require-write-ready
+```
+
+Required state:
+
+`READY_FOR_FORMAL_CLOSURE_CEREMONY`
+
+Required safety flags:
+
+- `private_key_loaded=false`
+- `signature_performed=false`
+- `nonce_consumed=false`
+- `runtime_write_performed=false`
+- `merge_authorized=false`
+- `deploy_authorized=false`
+- `worker_armed=false`
+- `executes_action=false`
+
+If the runtime SHA is no longer `020facc9991c5d2d4ce457e0840b04c875f8cfae`, **stop**. Reconcile the new runtime state and rebuild the ceremony baseline; never force the stale CAS value.
+
+
 ## 1. Validate unsigned V2.20
 
 ```powershell
