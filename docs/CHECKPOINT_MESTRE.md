@@ -840,3 +840,68 @@ Estado máximo planejado:
 Não avançar para Idempotency/Replay Contract enquanto o HEAD do Real Receipt Authenticator Contract não estiver completamente verde nos gates relevantes.
 
 Generic acknowledgements como "vamos lá" continuam significando apenas continuidade do trabalho seguro em Draft/design/testes; nunca autorização de merge, deploy, provider, billing, CRM ou produção.
+
+
+---
+
+## 27. Real Receipt + Idempotency/Replay — atualização de continuidade
+
+### 27.1 Real Receipt Authenticator Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #890.
+- CI-only Draft #891.
+- HEAD validado: `c76d20ee5ff9e95e05f98e716b3b726e8a3c701f`.
+- 61/61 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security Gate e UI/runtime gates verdes.
+
+Estado máximo:
+`READY_FOR_REAL_RECEIPT_AUTHENTICATOR_DESIGN_REVIEW`
+
+Próximo passo permitido:
+`DESIGN_IDEMPOTENCY_REPLAY_CONTRACT_ONLY`
+
+O contrato exige futuramente Ed25519, SHA-256 canônico, trust root,
+key lifecycle, freshness, nonce persistente, replay rejection e binding
+de scope/provider/writer/digests, mas NÃO executa autenticação real.
+
+### 27.2 Idempotency + Replay Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #892.
+- CI-only Draft #893.
+- HEAD atual: `6fe38c91086667ed2f60e4202b822839a83181ea`.
+- Workflow específico já passou em branch empilhada e no CI-only.
+- FinOps já verde.
+- Quality/Security e demais gates globais ainda devem concluir antes de avançar.
+
+Arquitetura obrigatória definida:
+- reutilizar `atlasquant_aion_nonce_registry.PersistentNonceRegistry`;
+- reutilizar `atlasquant_aion_durable_execution_kernel.DurableExecutionStore`;
+- reutilizar `canonical_execution_id`;
+- autenticação antes da reserva de idempotência;
+- idempotency key persistente e única;
+- effect key persistente e única;
+- mesma idempotência + mesmo payload = replay seguro;
+- mesma idempotência + payload diferente = conflito;
+- concorrência duplicada = single winner;
+- lease/token/deadline/attempt/backoff;
+- dispatch externo registrado antes do efeito;
+- crash/ambiguidade pós-dispatch = OUTCOME_UNKNOWN;
+- retry automático proibido em OUTCOME_UNKNOWN;
+- reconciliação explícita, com evidência e autorização separada.
+
+Estado máximo planejado:
+`READY_FOR_IDEMPOTENCY_REPLAY_DESIGN_REVIEW`
+
+Próximo passo planejado, apenas depois de CI completo verde:
+`DESIGN_ROLLBACK_COMPENSATION_CONTRACT_ONLY`
+
+Nenhuma operação real está autorizada ou implementada:
+nonce claim, registry write, idempotency reservation, execution record, lease,
+dispatch, retry, reconciliation, provider, network, billing, customer contact,
+CRM write, provisioning, deploy e produção permanecem false/proibidos.
