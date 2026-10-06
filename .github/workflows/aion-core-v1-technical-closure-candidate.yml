@@ -1,0 +1,131 @@
+name: AION Core V1 Technical Closure Candidate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - integration/aion-b2b-terminal-certificate-reference-ui-draft-v1-20261006
+    paths:
+      - "atlasquant_aion_core_v1_technical_closure_candidate.py"
+      - "test_atlasquant_aion_core_v1_technical_closure_candidate.py"
+      - "docs/aion/AION_CORE_V1_TECHNICAL_CLOSURE_CANDIDATE.md"
+      - ".github/workflows/aion-core-v1-technical-closure-candidate.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  core-v1-technical-closure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check pytest==9.1.1
+
+      - name: Compile closure and critical chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_core_v1_technical_closure_candidate.py \
+            atlasquant_aion_core_certification.py \
+            atlasquant_aion_core_completion_review.py \
+            atlasquant_aion_core_freeze_preflight.py \
+            atlasquant_aion_external_persistence_attestation.py \
+            atlasquant_aion_owner_signature_ceremony.py \
+            atlasquant_aion_owner_decision_record.py \
+            atlasquant_aion_owner_decision_persistence_attestation.py \
+            atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py \
+            atlasquant_reference_ui.py
+
+      - name: Validate closure invariants
+        run: |
+          python -m pytest -q -s \
+            test_atlasquant_aion_core_v1_technical_closure_candidate.py
+
+      - name: Re-run V2.13 through V2.20 structural certification chain
+        run: |
+          python -m pytest -q -s \
+            test_atlasquant_aion_v213_real_trust_authority_redteam.py \
+            test_atlasquant_aion_v214_durable_execution_redteam.py \
+            test_atlasquant_aion_v215_capability_isolation_redteam.py \
+            test_atlasquant_aion_v216_operational_resilience_redteam.py \
+            test_atlasquant_aion_v217_multiagent_memory_governance_redteam.py \
+            test_atlasquant_aion_v218_policy_kernel_redteam.py \
+            test_atlasquant_aion_v219_provider_neutral_gateway_redteam.py \
+            test_atlasquant_aion_v220_core_certification.py
+
+      - name: Re-run V2.21 through V2.26 freeze-boundary chain
+        run: |
+          python -m pytest -q -s \
+            test_atlasquant_aion_v221_core_completion_review.py \
+            test_atlasquant_aion_v222_core_freeze_preflight.py \
+            test_atlasquant_aion_v223_external_persistence_attestation.py \
+            test_atlasquant_aion_v224_owner_signature_ceremony.py \
+            test_atlasquant_aion_v225_explicit_owner_decision_record.py \
+            test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+
+      - name: Re-run terminal certificate chain through Reference UI Draft
+        run: |
+          python -m pytest -q -s \
+            test_atlasquant_aion_b2b_execution_terminal_certificate_durable_store_extension_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_runtime_reader_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_read_model_runtime_projection_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_reference_ui_draft_v1.py
+
+      - name: Re-run E2E load chaos recovery and durable isolation
+        run: |
+          python -m pytest -q -s \
+            test_atlasquant_aion_core_e2e_integration.py \
+            test_atlasquant_aion_chat_load.py \
+            test_atlasquant_aion_chaos_recovery.py \
+            test_atlasquant_aion_recovery.py \
+            test_atlasquant_aion_recovery_traceability_gate.py \
+            test_atlasquant_aion_global_worker_recovery_drill.py \
+            test_atlasquant_aion_durable_tasks.py \
+            test_atlasquant_aion_tenant_privacy.py \
+            test_atlasquant_aion_tenant_durable_store.py \
+            test_atlasquant_aion_tenant_persistence_gate.py \
+            test_atlasquant_aion_unified_journal_store.py \
+            test_atlasquant_aion_unified_journal_store_governance.py \
+            test_atlasquant_aion_resource_bounds.py \
+            test_atlasquant_aion_resource_bounds_residual.py
+
+      - name: Assert closure never becomes authority
+        run: |
+          python - <<'PY'
+          from atlasquant_aion_core_v1_technical_closure_candidate import (
+              TARGET_COMMIT_SHA,
+              build_core_v1_technical_closure_candidate,
+          )
+
+          row = build_core_v1_technical_closure_candidate()
+          assert TARGET_COMMIT_SHA == "1f0575a650bce16acb94c69a24b880c16a79b445"
+          assert row["state"] == "TECHNICAL_CLOSURE_CANDIDATE"
+          assert row["owner_decision"] == "UNDECIDED"
+          for field in (
+              "owner_decision_recorded",
+              "core_complete",
+              "core_freeze_authorized",
+              "core_freeze_execution_authorized",
+              "core_frozen",
+              "merge_authorized",
+              "deploy_authorized",
+              "execution_allowed",
+              "worker_armed",
+              "external_action_executed",
+              "production_mutation_performed",
+              "executes_action",
+          ):
+              assert row[field] is False, field
+          PY
