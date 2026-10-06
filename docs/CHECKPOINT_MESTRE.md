@@ -1138,3 +1138,62 @@ Próximo passo permitido:
 
 Nenhum runtime guard foi consumido de verdade; nenhum provider foi chamado;
 nenhuma cobrança, CRM, deploy ou produção ocorreu.
+
+
+---
+
+## 31. Provider Adapter Attestation — atualização
+
+### 31.1 Provider Adapter Attestation Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #901.
+- CI-only Draft #902.
+- HEAD atual: `b944976c02c718d9ebce04b8c1f7d2c9b7b69a05`.
+- Workflow específico já passou compile, testes e o gate de zero provider material.
+- CI completa contra main ainda deve fechar antes da próxima camada.
+
+A camada reutiliza os contratos existentes:
+- `ATLASQUANT_AION_MODEL_GATEWAY_V2`;
+- `ATLASQUANT_AION_PROVIDER_NEUTRAL_MODEL_REGISTRY_V1`;
+- `ATLASQUANT_AION_CAPABILITY_SCOPE_GRANT_V1`.
+
+Evidências exigidas de um futuro adapter:
+- adapter identity estável;
+- versão pinada;
+- manifest/code digest;
+- supply-chain evidence;
+- provider identity reference;
+- transport class;
+- capability allowlist e forbidden capabilities;
+- tenant/scope + action/operation binding;
+- request/response schema digests;
+- error taxonomy;
+- timeout/retry;
+- idempotency/effect-key support;
+- health evidence;
+- cost model e custo máximo por ação;
+- data classification/retention/redaction;
+- secret handling + credential source policy;
+- audit receipt schema;
+- rollback/compensation support;
+- irreversible effects declaration;
+- local fallback compatibility;
+- no implicit authority.
+
+Material real explicitamente proibido nesta fase:
+credencial, secret, API key, access/refresh token, senha, private key,
+Authorization header, cookie, provider endpoint, webhook/callback, payload e
+shell command.
+
+FinOps cap permanece `20000` cents.
+
+Estado máximo planejado:
+`READY_FOR_PROVIDER_ADAPTER_ATTESTATION_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_PROVIDER_CAPABILITY_BINDING_CONTRACT_ONLY`
+
+Provider continua NÃO selecionado, NÃO carregado e NÃO ligado.
