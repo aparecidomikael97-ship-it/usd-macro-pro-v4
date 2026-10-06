@@ -6,8 +6,12 @@ performed here; those remain separate future contracts.
 from __future__ import annotations
 
 import atlasquant_aion_b2b_owner_renewal_action_adapter_plan as v1
+from atlasquant_aion_b2b_v2_input_contract import safe_input_v2
+from atlasquant_aion_b2b_owner_renewal_action_command_plan_v2 import SCHEMA as COMMAND_SCHEMA
+from atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2 import SCHEMA as ADAPTER_SCHEMA
 from atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run_v2 import (
     validate_dry_run_v2,
+    SCHEMA as DRY_SCHEMA,
 )
 
 SCHEMA = "ATLASQUANT_AION_B2B_OWNER_RENEWAL_ACTION_ADAPTER_RECEIPT_CONTRACT_V2"
@@ -37,6 +41,7 @@ FALSE_FIELDS = v1.FALSE_FIELDS
 
 
 def owner_execution_binding_digest_v2(binding):
+    binding = safe_input_v2({'binding': binding})['binding']
     return v1.digest(
         {
             "scope": binding["scope"],
@@ -56,6 +61,11 @@ def owner_renewal_action_receipt_contract_v2():
         "FUTURE_RECEIPT_SCHEMA_ONLY",
         required_fields=list(REQUIRED_FIELDS),
         command_plan_version="V2",
+        required_command_plan_schema=COMMAND_SCHEMA,
+        required_adapter_plan_schema=ADAPTER_SCHEMA,
+        required_dry_run_schema=DRY_SCHEMA,
+        required_receipt_schema=SYNTHETIC_RECEIPT_SCHEMA,
+        legacy_v1_allowed=False,
         external_scope_input_allowed=False,
         future_real_receipt_requires_separate_authenticated_verifier=True,
         actual_receipt_generated=False,
@@ -83,7 +93,7 @@ def validate_synthetic_owner_renewal_action_receipt_v2(
             capabilities,
             provider,
             service,
-        ) = v1.safe_copy([
+        ) = safe_input_v2([
             receipt,
             adapter_plan,
             dry_run,
@@ -177,6 +187,8 @@ def validate_synthetic_owner_renewal_action_receipt_v2(
             ["SYNTHETIC_RECEIPT_V2_INVALID"],
             actual_receipt_generated=False,
             execution_verified=False,
+            provider_identity_authenticated=False,
+            writer_identity_authenticated=False,
         )
 
 

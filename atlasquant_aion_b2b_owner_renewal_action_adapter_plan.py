@@ -1,4 +1,7 @@
-"""Bounded offline adapter planning. Digests are bindings, never authority.
+"""LEGACY / NON-EXECUTABLE V1 bounded offline adapter planning.
+
+Historical/test compatibility only; future execution contracts require V2 and
+must reject V1 artifacts. Digests are bindings, never authority.
 
 Upstream attestations must come from their trusted host verifiers. This module
 does not re-sign, re-verify keys, claim nonces, load secrets or select a provider.

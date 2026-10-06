@@ -1,4 +1,7 @@
-"""AION B2B recurring business-action abstract command plan.
+"""LEGACY / NON-EXECUTABLE V1 recurring business-action abstract command plan.
+
+Historical evidence and test compatibility only. Future execution contracts must
+require V2 schemas and reject this V1 artifact; no executor may consume V1.
 
 This layer freezes *what* the verified recurring action means, but deliberately
 does not describe *how* to execute it. It never emits provider endpoints,

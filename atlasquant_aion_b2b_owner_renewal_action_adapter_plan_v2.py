@@ -9,6 +9,7 @@ This module remains pure/offline and never selects or calls a real provider.
 from __future__ import annotations
 
 from typing import Any
+from atlasquant_aion_b2b_v2_input_contract import safe_input_v2
 
 import atlasquant_aion_b2b_owner_renewal_action_adapter_plan as v1
 from atlasquant_aion_b2b_owner_renewal_action_command_plan_v2 import (
@@ -23,7 +24,9 @@ ADAPTER_KIND = v1.ADAPTER_KIND
 FALSE_FIELDS = v1.FALSE_FIELDS
 CAPABILITIES = v1.CAPABILITIES
 RISKS = v1.RISKS
-FINOPS_CAP_CENTS = v1.FINOPS_CAP_CENTS
+# V2 policy is independent of the archival V1 constant and validator.
+FINOPS_CAP_CENTS = 20000
+MAX_ENVIRONMENT_WINDOW_SECONDS = 180
 BINDING_FIELDS_V2 = (
     *v1.BINDING_FIELDS,
     "execution_request_digest",
@@ -56,7 +59,46 @@ def _canonical_body(binding, environment, rebuilt):
     body["operation_kind_source"] = "DERIVED_FROM_ACTION_FAMILY"
     body["command_plan_v1_digest"] = rebuilt["command_plan_v1_digest"]
     body["red_team_hardening_digest"] = v1.digest(rebuilt["red_team_hardening"])
+    body["finops_cap_cents"] = FINOPS_CAP_CENTS
     return body
+
+
+def environment_blockers_v2(environment, binding, now_ts):
+    expected = {'schema', 'synthetic', 'binding', 'as_of', 'expires_at', 'evidence_refs',
+        'provider_state', 'rollback_state', 'capacity_sufficient', 'rollback_supported',
+        'finops_monthly_cents', *RISKS}
+    blockers = []
+    if set(environment) != expected or environment.get('schema') != ENVIRONMENT_SCHEMA:
+        blockers.append('ADAPTER_ENVIRONMENT_SCHEMA_INVALID')
+    if environment.get('synthetic') is not True:
+        blockers.append('SYNTHETIC_ENVIRONMENT_REQUIRED')
+    if v1.digest(environment.get('binding')) != v1.digest(binding):
+        blockers.append('ADAPTER_ENVIRONMENT_BINDING_MISMATCH')
+    try:
+        observed, expires, now = (v1.timestamp(value) for value in (
+            environment.get('as_of'), environment.get('expires_at'), now_ts))
+        if not (observed <= now < expires and 0 < (expires-observed).total_seconds() <= MAX_ENVIRONMENT_WINDOW_SECONDS):
+            blockers.append('ADAPTER_ENVIRONMENT_STALE')
+    except ValueError:
+        blockers.append('ADAPTER_ENVIRONMENT_TIME_INVALID')
+    for key in RISKS:
+        if environment.get(key) is not False:
+            blockers.append('ADAPTER_RISK:' + key)
+    for key in ('capacity_sufficient', 'rollback_supported'):
+        if environment.get(key) is not True:
+            blockers.append('ADAPTER_REQUIREMENT_MISSING:' + key)
+    for key in ('provider_state', 'rollback_state'):
+        if environment.get(key) != 'SYNTHETIC_READY':
+            blockers.append('ADAPTER_DEGRADED:' + key)
+    cost = environment.get('finops_monthly_cents')
+    if type(cost) is not int or not 0 <= cost <= FINOPS_CAP_CENTS:
+        blockers.append('FINOPS_CAP_VIOLATION')
+    refs = environment.get('evidence_refs')
+    if (type(refs) is not list or not 1 <= len(refs) <= 16
+            or any(type(ref) is not str or not v1._ID.fullmatch(ref) for ref in refs)
+            or len(set(refs)) != len(refs)):
+        blockers.append('ADAPTER_EVIDENCE_REQUIRED')
+    return blockers
 
 
 def build_owner_renewal_action_adapter_plan_v2(
@@ -70,7 +112,7 @@ def build_owner_renewal_action_adapter_plan_v2(
 ):
     """Rebuild Command Plan V2 and bind a fresh synthetic adapter environment."""
     try:
-        supplied, persisted, writer, preflight, environment = v1.safe_copy([
+        supplied, persisted, writer, preflight, environment = safe_input_v2([
             command_plan,
             execution_persistence_attestation,
             execution_writer_attestation,
@@ -137,7 +179,7 @@ def build_owner_renewal_action_adapter_plan_v2(
             **{key: plan[key] for key in BINDING_FIELDS_V2},
             "command_plan_digest": rebuilt["command_plan_digest"],
         }
-        blockers = v1.environment_blockers(environment, binding, now_ts)
+        blockers = environment_blockers_v2(environment, binding, now_ts)
         if blockers:
             return _blocked(*blockers)
 
@@ -157,7 +199,7 @@ def build_owner_renewal_action_adapter_plan_v2(
 
 def validate_adapter_plan_v2(adapter_plan, now_ts):
     """Rebuild the canonical V2 adapter plan without accepting external scope."""
-    supplied = v1.safe_copy(adapter_plan)
+    supplied = safe_input_v2(adapter_plan)
     if type(supplied) is not dict:
         raise ValueError("ADAPTER_PLAN_V2_INVALID")
     if supplied.get("schema") != SCHEMA or supplied.get("state") != READY:
@@ -205,7 +247,7 @@ def validate_adapter_plan_v2(adapter_plan, now_ts):
     environment = body.get("environment")
     if (
         type(environment) is not dict
-        or v1.environment_blockers(environment, binding, now_ts)
+        or environment_blockers_v2(environment, binding, now_ts)
     ):
         raise ValueError("ADAPTER_ENVIRONMENT_V2_INVALID")
 

@@ -11,6 +11,7 @@ from hashlib import sha256
 import json
 import re
 from typing import Any, Mapping
+from atlasquant_aion_b2b_v2_input_contract import safe_input_v2
 
 from atlasquant_aion_b2b_owner_renewal_action_command_plan import (
     ACTION_OPERATION_KIND,
@@ -35,7 +36,7 @@ def _digest(value: Any) -> str:
 
 
 def _identity(value: Any, limit: int) -> str:
-    if not isinstance(value, str) or not value or len(value) > limit:
+    if type(value) is not str or not value or len(value) > limit:
         return ""
     if "\x00" in value or " ".join(value.split()) != value:
         return ""
@@ -90,6 +91,14 @@ def build_owner_renewal_action_command_plan_v2(
     execution_writer_attestation: Mapping[str, Any] | None,
     execution_preflight: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    try:
+        execution_persistence_attestation, execution_writer_attestation, execution_preflight = safe_input_v2([
+            execution_persistence_attestation, execution_writer_attestation, execution_preflight])
+        if any(type(item) is not dict for item in (
+                execution_persistence_attestation, execution_writer_attestation, execution_preflight)):
+            raise ValueError('V2_ATTESTATION_TYPE_INVALID')
+    except (ValueError, TypeError, KeyError, OverflowError):
+        return _blocked('COMMAND_PLAN_V2_INPUT_INVALID')
     persisted = (
         dict(execution_persistence_attestation)
         if isinstance(execution_persistence_attestation, Mapping)

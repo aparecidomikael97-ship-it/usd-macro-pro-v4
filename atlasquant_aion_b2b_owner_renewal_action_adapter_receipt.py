@@ -1,4 +1,7 @@
-"""Future receipt schema plus validation of synthetic receipts only.
+"""LEGACY / NON-EXECUTABLE V1 synthetic receipt schema and validator.
+
+Historical/test compatibility only. Future execution contracts require V2 schemas
+and reject V1 receipts; no executor may consume this artifact.
 
 No receipt of real execution is issued. Structural checks do not authenticate a
 writer/provider, replace owner authorization, or supply a future executor.
