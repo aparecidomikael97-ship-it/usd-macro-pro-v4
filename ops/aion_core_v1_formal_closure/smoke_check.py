@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 PACKET = ROOT / "ops" / "aion-core-v1-formal-closure" / "unsigned_v220_evidence_packet.json"
 VALIDATOR = ROOT / "ops" / "aion_core_v1_formal_closure" / "validate_unsigned_v220_packet.py"
 
