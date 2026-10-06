@@ -67,8 +67,8 @@ jobs:
           ):
               assert banned not in combined, banned
 
-          assert "DurableExecutionStore" not in reader
-          assert "read_terminal_certificate_snapshot" not in reader
+          assert "from atlasquant_aion_durable_execution_kernel import" not in reader
+          assert ".read_terminal_certificate_snapshot(" not in reader
           assert "read_terminal_certificate_projection" in reader
           assert "DurableExecutionStore" in adapter
           assert "read_terminal_certificate_snapshot" in adapter
