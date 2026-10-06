@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
@@ -35,15 +37,43 @@ jobs:
 
       - name: Compile OPS ceremony tooling
         run: |
-          python -m py_compile             ops/aion_core_v1_formal_closure/validate_unsigned_v220_packet.py             ops/aion_core_v1_formal_closure/export_v220_signing_bundle.py             ops/aion_core_v1_formal_closure/apply_v220_signatures.py             ops/aion_core_v1_formal_closure/prepare_v220_v222.py             ops/aion_core_v1_formal_closure/perform_v223_runtime_write.py             ops/aion_core_v1_formal_closure/prepare_v224_owner_signature.py             ops/aion_core_v1_formal_closure/verify_v224_prepare_v225.py             ops/aion_core_v1_formal_closure/perform_v225_v226.py             ops/aion_core_v1_formal_closure/core_freeze_ceremony.py             ops/aion_core_v1_formal_closure/prepare_core_freeze.py             ops/aion_core_v1_formal_closure/perform_core_freeze.py             ops/aion_core_v1_formal_closure/validate_post_freeze_boundary.py             ops/aion_core_v1_formal_closure/smoke_check.py
+          python -m py_compile \
+            ops/aion_core_v1_formal_closure/validate_unsigned_v220_packet.py \
+            ops/aion_core_v1_formal_closure/export_v220_signing_bundle.py \
+            ops/aion_core_v1_formal_closure/apply_v220_signatures.py \
+            ops/aion_core_v1_formal_closure/prepare_v220_v222.py \
+            ops/aion_core_v1_formal_closure/perform_v223_runtime_write.py \
+            ops/aion_core_v1_formal_closure/prepare_v224_owner_signature.py \
+            ops/aion_core_v1_formal_closure/verify_v224_prepare_v225.py \
+            ops/aion_core_v1_formal_closure/perform_v225_v226.py \
+            ops/aion_core_v1_formal_closure/core_freeze_ceremony.py \
+            ops/aion_core_v1_formal_closure/prepare_core_freeze.py \
+            ops/aion_core_v1_formal_closure/perform_core_freeze.py \
+            ops/aion_core_v1_formal_closure/validate_post_freeze_boundary.py \
+            ops/aion_core_v1_formal_closure/windows_readiness_preflight.py \
+            ops/aion_core_v1_formal_closure/smoke_check.py
 
       - name: Validate packet and authority boundaries
         run: |
           python ops/aion_core_v1_formal_closure/smoke_check.py
 
+      - name: Validate read-only Windows readiness preflight contract
+        run: |
+          python -m ops.aion_core_v1_formal_closure.windows_readiness_preflight \
+            --repo-root "${{ github.workspace }}" \
+            --work-dir /tmp/aion-core-formal-closure-work \
+            --nonce-registry /tmp/aion-core-formal-closure-nonce.sqlite3 \
+            --allow-non-windows-ci
+
       - name: Export canonical external-signing bundle without a private key
         run: |
-          python -m ops.aion_core_v1_formal_closure.export_v220_signing_bundle             --packet ops/aion-core-v1-formal-closure/unsigned_v220_evidence_packet.json             --key-id ci-public-placeholder             --key-version 1             --issued-at 2026-10-06T00:00:00Z             --expires-at 2026-10-07T00:00:00Z             --output /tmp/v220_signing_bundle.json
+          python -m ops.aion_core_v1_formal_closure.export_v220_signing_bundle \
+            --packet ops/aion-core-v1-formal-closure/unsigned_v220_evidence_packet.json \
+            --key-id ci-public-placeholder \
+            --key-version 1 \
+            --issued-at 2026-10-06T00:00:00Z \
+            --expires-at 2026-10-07T00:00:00Z \
+            --output /tmp/v220_signing_bundle.json
 
       - name: Assert OPS boundary remains action-free
         run: |
