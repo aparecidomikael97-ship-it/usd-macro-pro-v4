@@ -49,6 +49,43 @@ The helpers live in `ops/aion_core_v1_formal_closure/`.
 - `prepare_v224_owner_signature.py`: creates the short-lived HUMAN_OWNER acknowledgement request; no nonce consumption and no signing.
 - `verify_v224_prepare_v225.py`: prebuilds V2.25, verifies V2.24, durably claims the V2.24 nonce, and prepares only `APPROVE_CORE_FREEZE` or `DENY_CORE_FREEZE`.
 - `perform_v225_v226.py`: dry-run cryptographically prechecks V2.25 without consuming its nonce; only `--execute-v226-write` consumes the decision nonce and attempts the V2.26 CAS write/attestation.
+- `windows_readiness_preflight.py`: fail-closed, read-only Windows readiness gate. It verifies the immutable target, canonical unsigned V2.20 packet, Python/cryptography environment, clean repository, external work/nonce paths, public trust-root shape and runtime capability without exposing credentials. Network runtime read occurs only with `--check-runtime-read`; it never signs, consumes a nonce or writes runtime state.
+
+
+## Windows readiness gate
+
+Before generating any real V2.20/V2.24/V2.25/Core Freeze signing material, run the read-only readiness gate on the authorized Windows host.
+
+Example from repository root:
+
+```powershell
+$Work = Join-Path $env:LOCALAPPDATA "AtlasQuantAION\formal-closure\work"
+$NonceDb = Join-Path $env:LOCALAPPDATA "AtlasQuantAION\formal-closure\nonce_registry.sqlite3"
+
+python -m ops.aion_core_v1_formal_closure.windows_readiness_preflight `
+  --repo-root (Get-Location).Path `
+  --work-dir $Work `
+  --nonce-registry $NonceDb `
+  --certification-trust-root "<PUBLIC_CERT_TRUST_ROOT_JSON>" `
+  --owner-trust-root "<PUBLIC_OWNER_TRUST_ROOT_JSON>" `
+  --expected-runtime-sha "020facc9991c5d2d4ce457e0840b04c875f8cfae" `
+  --check-runtime-read `
+  --require-write-ready
+```
+
+Required state before the real ceremony:
+
+`READY_FOR_FORMAL_CLOSURE_CEREMONY`
+
+The preflight must still report:
+
+- `private_key_loaded=false`
+- `signature_performed=false`
+- `nonce_consumed=false`
+- `runtime_write_performed=false`
+- `executes_action=false`
+
+If the official runtime SHA changed, stop and reconcile the baseline. Do not force the old CAS value.
 
 ## Durable nonce registry
 
