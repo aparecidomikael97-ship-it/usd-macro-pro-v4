@@ -1,0 +1,64 @@
+name: AION B2B Future Executor Boundary V2
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - fix/aion-b2b-v2-red-team-final-closure-20261005
+    paths:
+      - "atlasquant_aion_b2b_future_executor_boundary_v2.py"
+      - "test_atlasquant_aion_b2b_future_executor_boundary_v2.py"
+      - "docs/aion/AION_B2B_FUTURE_EXECUTOR_BOUNDARY_V2.md"
+      - ".github/workflows/aion-b2b-future-executor-boundary-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  future-executor-boundary-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design boundary
+        run: |
+          python -m py_compile             atlasquant_aion_b2b_future_executor_boundary_v2.py             test_atlasquant_aion_b2b_future_executor_boundary_v2.py
+      - name: Run design-boundary tests
+        run: |
+          python -m unittest -q             test_atlasquant_aion_b2b_future_executor_boundary_v2.py
+      - name: Assert design-only semantics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_future_executor_boundary_v2.py").read_text(encoding="utf-8")
+          required = (
+              '"READY_FOR_FUTURE_EXECUTOR_DESIGN_REVIEW"',
+              '"DESIGN_EXECUTOR_CONTRACT_ONLY"',
+              '"executor_created"',
+              '"execution_command_generated"',
+              '"production_mutation_performed"',
+          )
+          for marker in required:
+              assert marker in source, marker
+          banned = (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+          )
+          for marker in banned:
+              assert marker not in source, marker
+          PY
