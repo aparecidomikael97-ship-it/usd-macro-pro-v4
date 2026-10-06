@@ -150,11 +150,24 @@ def build_timeline(events: Sequence[Mapping[str, Any]] | None) -> dict[str, Any]
         normalized.append(row)
 
     known = set(seen)
+    by_id = {row["event_id"]: row for row in normalized}
     relationship_errors: list[str] = []
     for row in normalized:
         for ref in row["supersedes"] + row["superseded_by"]:
             if ref not in known:
                 relationship_errors.append(f"UNKNOWN_RELATION:{row['event_id']}:{ref}")
+        for ref in row["supersedes"]:
+            peer = by_id.get(ref)
+            if peer is not None and row["event_id"] not in peer["superseded_by"]:
+                relationship_errors.append(
+                    f"NON_RECIPROCAL_SUPERSESSION:{row['event_id']}:{ref}"
+                )
+        for ref in row["superseded_by"]:
+            peer = by_id.get(ref)
+            if peer is not None and row["event_id"] not in peer["supersedes"]:
+                relationship_errors.append(
+                    f"NON_RECIPROCAL_SUPERSEDED_BY:{row['event_id']}:{ref}"
+                )
 
     normalized.sort(key=lambda x: (x["date"], x["observed_at"], x["event_id"]))
     coverage_dates = sorted({x["date"] for x in normalized})
