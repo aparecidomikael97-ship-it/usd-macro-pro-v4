@@ -40,12 +40,57 @@ def _digest(value: Any) -> str:
 def _refs(value: Any) -> list[str]:
     if not isinstance(value, (list, tuple)):
         return []
-    out = []
+    out: list[str] = []
     for raw in value[:100]:
         item = _text(raw, 500)
         if item and item not in out:
             out.append(item)
     return out
+
+
+def _verify_authority(
+    authority: Mapping[str, Any],
+    *,
+    authority_verifier: Any,
+    owner_id: str,
+    tenant_id: str,
+    workspace_id: str,
+    capability: str,
+) -> tuple[dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    authority_digest = _text(authority.get("authority_digest"), 160)
+    if not authority_digest.startswith("sha256:"):
+        blockers.append("AUTHORITY_DIGEST_REQUIRED")
+    if not callable(authority_verifier):
+        blockers.append("INDEPENDENT_AUTHORITY_VERIFIER_REQUIRED")
+        return {}, blockers
+    try:
+        verdict = authority_verifier(dict(authority))
+    except Exception:
+        blockers.append("AUTHORITY_VERIFIER_FAILED")
+        return {}, blockers
+    if not isinstance(verdict, Mapping) or verdict.get("state") != "VERIFIED":
+        blockers.append("AUTHORITY_VERIFIER_NOT_VERIFIED")
+        return dict(verdict) if isinstance(verdict, Mapping) else {}, blockers
+
+    checks = (
+        ("owner_id", owner_id, "AUTHORITY_VERIFIER_OWNER_MISMATCH"),
+        ("tenant_id", tenant_id, "AUTHORITY_VERIFIER_TENANT_MISMATCH"),
+        ("workspace_id", workspace_id, "AUTHORITY_VERIFIER_WORKSPACE_MISMATCH"),
+        ("authority_digest", authority_digest, "AUTHORITY_VERIFIER_DIGEST_MISMATCH"),
+    )
+    for field, expected, blocker in checks:
+        if verdict.get(field) != expected:
+            blockers.append(blocker)
+    bound_caps = verdict.get("allowed_capabilities")
+    if (
+        not isinstance(bound_caps, (list, tuple))
+        or capability not in {str(x).upper() for x in bound_caps}
+    ):
+        blockers.append("AUTHORITY_VERIFIER_CAPABILITY_MISMATCH")
+    if verdict.get("cryptographically_verified") is not True:
+        blockers.append("AUTHORITY_CRYPTOGRAPHIC_VERIFICATION_REQUIRED")
+    return dict(verdict), blockers
 
 
 def build_controlled_handoff(
@@ -56,6 +101,7 @@ def build_controlled_handoff(
     execution_class: str,
     executor_id: str,
     authority_evidence: Mapping[str, Any] | None,
+    authority_verifier: Any = None,
     evidence_refs: Sequence[Any] | None = None,
     expected_input_digest: str = "",
 ) -> dict[str, Any]:
@@ -93,6 +139,8 @@ def build_controlled_handoff(
         blockers.append("ORCHESTRATION_NOT_ELIGIBLE")
     if orch.get("execution_allowed") is True:
         blockers.append("ORCHESTRATION_CANNOT_SELF_AUTHORIZE_EXECUTION")
+    if orch.get("external_ai_direct_tool_control") is True:
+        blockers.append("EXTERNAL_AI_DIRECT_TOOL_CONTROL_FORBIDDEN")
 
     if authority.get("state") != "VERIFIED":
         blockers.append("AUTHORITY_EVIDENCE_NOT_VERIFIED")
@@ -110,6 +158,15 @@ def build_controlled_handoff(
     if authority.get("tool_output_is_authority") is True:
         blockers.append("TOOL_OUTPUT_AUTHORITY_FORBIDDEN")
 
+    verified_authority, verifier_blockers = _verify_authority(
+        authority,
+        authority_verifier=authority_verifier,
+        owner_id=owner_id,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+        capability=cap,
+    )
+    blockers.extend(verifier_blockers)
     blockers = list(dict.fromkeys(blockers))
     material = {
         "schema": SCHEMA,
@@ -130,6 +187,9 @@ def build_controlled_handoff(
             160,
         ),
         "authority_ref": _text(authority.get("authority_ref") or authority.get("decision_id"), 160),
+        "authority_digest": _text(authority.get("authority_digest"), 160),
+        "authority_verifier_ref": _text(verified_authority.get("verifier_ref"), 160),
+        "authority_cryptographically_verified": verified_authority.get("cryptographically_verified") is True,
         "executor_must_revalidate": True,
         "handoff_grants_authority": False,
         "external_ai_direct_tool_control": False,
@@ -159,19 +219,30 @@ def verify_executor_receipt(
         blockers.append("RECEIPT_EXECUTOR_MISMATCH")
     if row.get("input_digest") != handoff.get("expected_input_digest"):
         blockers.append("RECEIPT_INPUT_MISMATCH")
-    if row.get("state") not in {"CONFIRMED_SUCCESS", "CONFIRMED_TERMINAL_FAILURE", "OUTCOME_UNKNOWN"}:
+    outcome = row.get("state")
+    if outcome not in {"CONFIRMED_SUCCESS", "CONFIRMED_TERMINAL_FAILURE", "OUTCOME_UNKNOWN"}:
         blockers.append("RECEIPT_STATE_INVALID")
     if row.get("attributed") is not True:
         blockers.append("RECEIPT_ATTRIBUTION_REQUIRED")
     if not _text(row.get("receipt_digest"), 160).startswith("sha256:"):
         blockers.append("RECEIPT_DIGEST_REQUIRED")
+    if outcome == "CONFIRMED_SUCCESS":
+        if not _text(row.get("output_digest"), 160).startswith("sha256:"):
+            blockers.append("SUCCESS_OUTPUT_DIGEST_REQUIRED")
+        if handoff.get("execution_class") in {"SANDBOX_CODE", "SANDBOX_TEST"}:
+            if row.get("tests_verified") is not True:
+                blockers.append("SUCCESS_TEST_VERIFICATION_REQUIRED")
+            test_refs = row.get("test_receipts")
+            if not isinstance(test_refs, (list, tuple)) or not test_refs:
+                blockers.append("SUCCESS_TEST_RECEIPTS_REQUIRED")
     return {
         "schema": SCHEMA,
         "state": "VERIFIED" if not blockers else "BLOCKED",
         "blockers": list(dict.fromkeys(blockers)),
-        "outcome": row.get("state") if not blockers else "UNTRUSTED",
+        "outcome": outcome if not blockers else "UNTRUSTED",
         "handoff_digest": handoff.get("handoff_digest"),
         "receipt_digest": _text(row.get("receipt_digest"), 160),
+        "automatic_retry_allowed": False,
         "grants_authority": False,
         "executes_action": False,
     }
