@@ -57,8 +57,8 @@ jobs:
           for marker in (
               '"READY_FOR_ROLLBACK_COMPENSATION_DESIGN_REVIEW"',
               '"DESIGN_FRESH_OWNER_EXECUTION_AUTHORIZATION_CONTRACT_ONLY"',
-              '"production_rollback_proven"',
-              '"production_compensation_proven"',
+              "production_rollback_proven=",
+              "production_compensation_proven=",
               '"compensation_performed"',
           ):
               assert marker in source, marker
