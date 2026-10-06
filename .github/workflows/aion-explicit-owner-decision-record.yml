@@ -1,0 +1,65 @@
+name: AION Explicit Owner Decision Record
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_trust_root.py"
+      - "atlasquant_aion_nonce_registry.py"
+      - "atlasquant_aion_external_persistence_attestation.py"
+      - "atlasquant_aion_owner_signature_ceremony.py"
+      - "atlasquant_aion_owner_decision_record.py"
+      - "test_atlasquant_aion_v223_external_persistence_attestation.py"
+      - "test_atlasquant_aion_v224_owner_signature_ceremony.py"
+      - "test_atlasquant_aion_v225_explicit_owner_decision_record.py"
+      - "docs/aion/AION_V225_EXPLICIT_OWNER_DECISION_RECORD.md"
+      - "docs/adr/ADR-0024-owner-decision-separate-from-freeze-execution.md"
+      - ".github/workflows/aion-explicit-owner-decision-record.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-explicit-owner-decision-record-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  owner-decision:
+    name: V2.25 explicit owner decision and decision-signature replay protection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic decision dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+
+      - name: Compile V2.23-V2.25 decision chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_external_persistence_attestation.py \
+            atlasquant_aion_owner_signature_ceremony.py \
+            atlasquant_aion_owner_decision_record.py \
+            test_atlasquant_aion_v223_external_persistence_attestation.py \
+            test_atlasquant_aion_v224_owner_signature_ceremony.py \
+            test_atlasquant_aion_v225_explicit_owner_decision_record.py
+
+      - name: Run V2.25 explicit owner decision red-team
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v225_explicit_owner_decision_record.py
+
+      - name: Re-run V2.24 owner signature ceremony
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v224_owner_signature_ceremony.py
+
+      - name: Re-run V2.23 persistence attestation
+        run: |
+          python -m pytest -q -s test_atlasquant_aion_v223_external_persistence_attestation.py

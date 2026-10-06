@@ -1,0 +1,97 @@
+name: AION B2B Pilot Value Realization
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_outcome_health.py"
+      - "atlasquant_aion_b2b_pilot_value_realization.py"
+      - "test_atlasquant_aion_b2b_pilot_value_realization.py"
+      - "atlasquant_aion_b2b_pilot_value_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_value_read_model.py"
+      - "test_atlasquant_aion_b2b_pilot_value_ui.py"
+      - "atlasquant_reference_ui.py"
+      - "docs/aion/AION_B2B_PILOT_VALUE_REALIZATION_V1.md"
+      - "docs/aion/AION_B2B_PILOT_VALUE_READ_MODELS_V1.md"
+      - ".github/workflows/aion-b2b-pilot-value-realization.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  value-realization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile value-realization chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_outcome_health.py \
+            atlasquant_aion_b2b_pilot_value_realization.py \
+            atlasquant_aion_b2b_pilot_value_read_model.py \
+            atlasquant_reference_ui.py \
+            test_atlasquant_aion_b2b_pilot_value_realization.py \
+            test_atlasquant_aion_b2b_pilot_value_read_model.py \
+            test_atlasquant_aion_b2b_pilot_value_ui.py
+      - name: Run value-realization tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_outcome_health.py \
+            test_atlasquant_aion_b2b_pilot_value_realization.py \
+            test_atlasquant_aion_b2b_pilot_value_read_model.py \
+            test_atlasquant_aion_b2b_pilot_value_ui.py
+      - name: Assert review-only business boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          engine = Path("atlasquant_aion_b2b_pilot_value_realization.py").read_text(encoding="utf-8")
+          for marker in (
+              '"owner_review_required": True',
+              '"automatic_renewal": False',
+              '"automatic_expansion": False',
+              '"automatic_pause": False',
+              '"automatic_termination": False',
+              '"automatic_billing": False',
+              '"automatic_customer_contact": False',
+              '"automatic_provisioning": False',
+              '"automatic_deploy": False',
+              '"crm_write": False',
+              '"provider_called": False',
+              '"production_mutation": False',
+              '"executes_action": False',
+          ):
+              assert marker in engine, marker
+          model = Path("atlasquant_aion_b2b_pilot_value_read_model.py").read_text(encoding="utf-8")
+          for marker in (
+              '"provider_margin_exposed": False',
+              '"retention_risk_exposed": False',
+              '"internal_recommendation_exposed": False',
+              '"renewal_control_exposed": False',
+              '"expansion_control_exposed": False',
+              '"grants_authority": False',
+              '"executes_action": False',
+          ):
+              assert marker in model, marker
+          ui = Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+          assert 'data-pilot-value-readonly="true"' in ui
+          for forbidden in (
+              ">Renovar<",
+              ">Expandir<",
+              ">Cobrar<",
+              ">Contatar cliente<",
+          ):
+              assert forbidden not in ui, forbidden
+          for source in (engine, model):
+              for banned in (
+                  "requests.post(",
+                  "requests.put(",
+                  "subprocess.",
+                  "deploy_to_production(",
+              ):
+                  assert banned not in source, banned
+          PY

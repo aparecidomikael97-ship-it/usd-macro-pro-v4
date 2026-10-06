@@ -1,0 +1,86 @@
+name: AION B2B Pilot Customer Value Binding
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_customer_value_binding.py"
+      - "test_atlasquant_aion_b2b_pilot_customer_value_binding.py"
+      - "atlasquant_aion_b2b_customer_portal.py"
+      - "test_atlasquant_aion_b2b_customer_portal_pilot_value.py"
+      - "atlasquant_aion_b2b_pilot_value_read_model.py"
+      - "docs/aion/AION_B2B_PILOT_CUSTOMER_VALUE_BINDING_V1.md"
+      - ".github/workflows/aion-b2b-pilot-customer-value-binding.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-customer-value-binding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile customer value binding chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_customer_value_binding.py \
+            atlasquant_aion_b2b_customer_portal.py \
+            atlasquant_aion_b2b_pilot_value_read_model.py \
+            test_atlasquant_aion_b2b_pilot_customer_value_binding.py \
+            test_atlasquant_aion_b2b_customer_portal_pilot_value.py
+      - name: Run customer value binding tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_customer_value_binding.py \
+            test_atlasquant_aion_b2b_customer_portal_pilot_value.py \
+            test_atlasquant_aion_b2b_customer_portal.py \
+            test_atlasquant_aion_b2b_pilot_value_read_model.py
+      - name: Assert customer-safe boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          binding = Path("atlasquant_aion_b2b_pilot_customer_value_binding.py").read_text(encoding="utf-8")
+          for marker in (
+              '"internal_economics_exposed": False',
+              '"retention_risk_exposed": False',
+              '"internal_recommendation_exposed": False',
+              '"other_tenant_access": False',
+              '"admin_memory_access": False',
+              '"grants_authority": False',
+              '"automatic_billing": False',
+              '"automatic_renewal": False',
+              '"automatic_expansion": False',
+              '"automatic_customer_contact": False',
+              '"automatic_deploy": False',
+              '"production_mutation": False',
+              '"executes_action": False',
+          ):
+              assert marker in binding, marker
+
+          portal = Path("atlasquant_aion_b2b_customer_portal.py").read_text(encoding="utf-8")
+          for marker in (
+              "VALOR DO PILOTO",
+              "ROI DO PILOTO",
+              "ECONOMIA OBSERVADA",
+              "Valor observado; não é promessa futura",
+          ):
+              assert marker in portal, marker
+
+          for source in (binding, portal):
+              for banned in (
+                  "requests.post(",
+                  "requests.put(",
+                  "httpx.post(",
+                  "subprocess.",
+                  "deploy_to_production(",
+                  "send_whatsapp(",
+                  "send_email(",
+              ):
+                  assert banned not in source, banned
+          PY

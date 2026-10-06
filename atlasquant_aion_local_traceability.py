@@ -16,6 +16,7 @@ from typing import Any, Mapping, Sequence
 
 from atlasquant_aion_observability import redact_text
 from atlasquant_aion_tool_hub import default_tool_hub
+from atlasquant_aion_tool_supply_chain import enrich_tool_contract
 
 SCHEMA = "ATLASQUANT_AION_LOCAL_TRACEABILITY_V1"
 MAX_RECORDS = 8
@@ -110,6 +111,7 @@ def local_contract_fingerprint(
         tool_id = str(item.get("tool_id") or "")
         if tool_id not in catalog and tool_id != WRITE_TOOL_ID:
             continue
+        secured = enrich_tool_contract(item, item)
         rows.append({
             "tool_id": tool_id,
             "workspace_id": str(item.get("workspace_id") or ""),
@@ -119,6 +121,19 @@ def local_contract_fingerprint(
             "connector_id": str(item.get("connector_id") or ""),
             "required_scopes": sorted(str(x) for x in list(item.get("required_scopes") or [])),
             "external_side_effects": bool(item.get("external_side_effects", False)),
+            "owner": str(secured.get("owner") or ""),
+            "version": str(secured.get("version") or ""),
+            "schema_hash": str(secured.get("schema_hash") or ""),
+            "contract_hash": str(secured.get("contract_hash") or ""),
+            "implementation_ref": str(secured.get("implementation_ref") or ""),
+            "sandbox_profile": str(secured.get("sandbox_profile") or ""),
+            "credential_ref": str(secured.get("credential_ref") or ""),
+            "credential_scopes": sorted(
+                str(x) for x in list(secured.get("credential_scopes") or [])
+            ),
+            "egress_allowlist": sorted(
+                str(x) for x in list(secured.get("egress_allowlist") or [])
+            ),
         })
     rows.sort(key=lambda item: item["tool_id"])
 
