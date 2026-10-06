@@ -25,6 +25,7 @@ from atlasquant_aion_trust_root import TrustRootRegistry
 SCHEMA = "ATLASQUANT_AION_PHYSICAL_EVIDENCE_ATTESTATION_V1"
 RESULT_SCHEMA = "ATLASQUANT_AION_PHYSICAL_EVIDENCE_VERIFICATION_V1"
 MAX_STATEMENT_BYTES = 65_536
+MAX_ATTESTATION_WINDOW_SECONDS = 180
 REQUIRED_PROOFS = (
     "WINDOWS_PLATFORM_VERIFIED",
     "EXECUTABLE_PINNING_VERIFIED",
@@ -47,6 +48,16 @@ ALLOWED_FIELDS = {
     "verified_proofs", "issued_at", "expires_at", "nonce", "key_id",
     "key_version",
 }
+
+
+def _sha256_token(value: Any) -> bool:
+    if not isinstance(value, str) or len(value) != 71 or not value.startswith("sha256:"):
+        return False
+    try:
+        int(value[7:], 16)
+    except ValueError:
+        return False
+    return True
 
 
 def _canonical_bytes(statement: Mapping[str, Any]) -> bytes:
@@ -160,14 +171,18 @@ def verify_physical_evidence_attestation(
     if not isinstance(version, int) or isinstance(version, bool) or version < 1:
         blockers.append("PHYSICAL_ATTESTATION_KEY_VERSION_INVALID")
     proofs = data.get("verified_proofs")
+    proof_items_valid = (
+        isinstance(proofs, list)
+        and all(isinstance(item, str) and item for item in proofs)
+    )
     if (
-        not isinstance(proofs, list)
+        not proof_items_valid
         or proofs != sorted(set(proofs))
         or set(proofs) != set(REQUIRED_PROOFS)
     ):
         blockers.append("PHYSICAL_ATTESTATION_PROOF_SET_INVALID")
     for field in ("handoff_digest", "input_digest", "physical_evidence_digest"):
-        if not str(data.get(field) or "").startswith("sha256:"):
+        if not _sha256_token(data.get(field)):
             blockers.append("PHYSICAL_ATTESTATION_DIGEST_INVALID:" + field)
     if data.get("handoff_digest") != expected_handoff_digest:
         blockers.append("PHYSICAL_ATTESTATION_HANDOFF_MISMATCH")
@@ -185,6 +200,12 @@ def verify_physical_evidence_attestation(
         blockers.append("PHYSICAL_ATTESTATION_NOT_YET_VALID")
     if expires <= now or expires <= issued:
         blockers.append("PHYSICAL_ATTESTATION_EXPIRED_OR_INVALID_WINDOW")
+    window_seconds = (expires - issued).total_seconds()
+    age_seconds = (now - issued).total_seconds()
+    if window_seconds > MAX_ATTESTATION_WINDOW_SECONDS:
+        blockers.append("PHYSICAL_ATTESTATION_WINDOW_TOO_LARGE")
+    if age_seconds < 0 or age_seconds > MAX_ATTESTATION_WINDOW_SECONDS:
+        blockers.append("PHYSICAL_ATTESTATION_NOT_FRESH")
     try:
         entry, key_problem = trust_roots.verify_key_available(
             data["key_id"], data["key_version"], now_ts
@@ -243,6 +264,7 @@ def verify_physical_evidence_attestation(
 
 __all__ = [
     "SCHEMA", "RESULT_SCHEMA", "REQUIRED_PROOFS", "ALLOWED_FIELDS",
+    "MAX_ATTESTATION_WINDOW_SECONDS",
     "canonical_attestation_bytes", "physical_evidence_digest",
     "verify_physical_evidence_attestation",
 ]
