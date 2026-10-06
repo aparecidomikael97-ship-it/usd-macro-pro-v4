@@ -5,13 +5,13 @@ import unittest
 import atlasquant_aion_b2b_execution_audit_seal_persistence_contract_v1 as seal_persistence
 import atlasquant_aion_b2b_execution_terminal_certificate_contract_v1 as certificate
 from test_atlasquant_aion_b2b_execution_audit_seal_persistence_contract_v1 import (
-    approved_audit_seal_review,
+    approved_seal_review,
 )
 
 
 def approved_seal_persistence_review():
     return seal_persistence.build_execution_audit_seal_persistence_contract(
-        execution_audit_seal_review=approved_audit_seal_review(),
+        audit_seal_review=approved_seal_review(),
     )
 
 
@@ -97,13 +97,13 @@ class ExecutionTerminalCertificateContractV1Tests(unittest.TestCase):
             "TERMINAL_EXECUTION_REQUIRED",
             "PERSISTED_FINALIZATION_RECORD_REQUIRED",
             "PERSISTED_AUDIT_SEAL_REQUIRED",
-            "AUDIT_SEAL_REOPEN_VERIFICATION_REQUIRED",
-            "RECOMPUTED_AUDIT_SEAL_DIGEST_MATCH_REQUIRED",
+            "DURABLE_AUDIT_SEAL_REOPEN_CONSISTENCY_REQUIRED",
+            "PERSISTED_AUDIT_SEAL_DIGEST_MATCH_REQUIRED",
             "NO_OUTCOME_UNKNOWN",
             "NO_STILL_OUTCOME_UNKNOWN",
         }.issubset(invariants))
         self.assertTrue(out["persisted_audit_seal_required"])
-        self.assertTrue(out["audit_seal_recomputation_required"])
+        self.assertTrue(out["audit_seal_reopen_consistency_required"])
         self.assert_no_authority(out)
 
     def test_certificate_is_deterministic_and_fail_closed(self):
@@ -126,7 +126,7 @@ class ExecutionTerminalCertificateContractV1Tests(unittest.TestCase):
             "TERMINAL_EXECUTION_RECORD_MISSING",
             "FINALIZATION_RECORD_MISSING",
             "AUDIT_SEAL_RECORD_MISSING",
-            "AUDIT_SEAL_RECOMPUTATION_MISMATCH",
+            "AUDIT_SEAL_REOPEN_RECORD_MISMATCH",
             "NON_TERMINAL_EXECUTION_STATE",
             "OUTCOME_UNKNOWN_PRESENT",
             "STILL_OUTCOME_UNKNOWN_PRESENT",
