@@ -1052,3 +1052,89 @@ claim, não persiste autorização e não executa ação.
 
 "vamos lá", "ok", "continua" ou qualquer outra mensagem de chat NÃO constitui
 assinatura nem autorização de execução.
+
+
+---
+
+## 30. Fresh Owner Authorization + Runtime Execution Guards — atualização
+
+### 30.1 Fresh Owner Execution Authorization Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #897.
+- CI-only Draft #898.
+- HEAD validado: `0a5e59d8fb11cbaba48b518189c34b1e0e66f170`.
+- 64/64 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security e demais gates verdes.
+
+A camada reutiliza a cerimônia existente:
+`atlasquant_aion_b2b_owner_renewal_action_execution_ceremony`
+
+Requisitos consolidados:
+- decisão explícita `AUTHORIZE_BUSINESS_ACTION_EXECUTION`;
+- Ed25519 externo;
+- trust root ativo;
+- public-key fingerprint;
+- nonce persistente + replay rejection;
+- janela máxima de 120s;
+- exact request/state rebuild;
+- execution record persistence;
+- persistence attestation;
+- writer attestation;
+- single-use authorization;
+- generic chat rejeitado como execução.
+
+Estado máximo:
+`READY_FOR_FRESH_OWNER_EXECUTION_AUTHORIZATION_DESIGN_REVIEW`
+
+Próximo passo permitido:
+`DESIGN_RUNTIME_EXECUTION_GUARDS_CONTRACT_ONLY`
+
+### 30.2 Runtime Execution Guards Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #899.
+- CI-only Draft #900.
+- HEAD atual: `d3c2c48dacbbd1cb3df3545706e8587c3ec2451a`.
+- Workflow específico já passou na branch empilhada.
+- CI completa contra main ainda deve fechar antes da próxima camada.
+
+Guardrails de runtime definidos:
+- fresh authorization verificada no dispatch;
+- single-use / not-expired;
+- exact tenant/workspace/customer/pilot/action binding;
+- zero production scope expansion;
+- capability allowlist mínima;
+- tenant isolation;
+- persistent idempotency/effect-key uniqueness;
+- lease;
+- dispatch record before effect;
+- OUTCOME_UNKNOWN fail-closed;
+- rollback/compensation class bound;
+- irreversible boundary fail-closed;
+- FinOps cap runtime = 20.000 cents;
+- evidência de custo por ação;
+- capacity reservation + quota enforcement;
+- provider adapter attestation obrigatória;
+- provider/writer identity binding;
+- security/privacy incident fail-closed;
+- circuit breaker;
+- kill switch;
+- before/after state evidence;
+- observability trace;
+- audit receipt.
+
+Provider permanece NÃO selecionado e NÃO ligado.
+
+Estado máximo planejado:
+`READY_FOR_RUNTIME_EXECUTION_GUARDS_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_PROVIDER_ADAPTER_ATTESTATION_CONTRACT_ONLY`
+
+Nenhum runtime guard foi consumido de verdade; nenhum provider foi chamado;
+nenhuma cobrança, CRM, deploy ou produção ocorreu.
