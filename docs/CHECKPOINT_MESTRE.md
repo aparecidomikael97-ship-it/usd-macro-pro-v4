@@ -1309,3 +1309,89 @@ Estado máximo:
 
 Próximo passo permitido:
 `DESIGN_PRE_DISPATCH_ATTESTATION_CONTRACT_ONLY`
+
+
+---
+
+## 34. Execution Envelope + Pre-Dispatch Attestation — atualização
+
+### 34.1 Execution Envelope Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #905.
+- CI-only Draft #906.
+- HEAD validado: `9bc089ea6b2322f1dabf7942c2f490fce0d97aa7`.
+- 68/68 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
+
+Modo:
+`SEALED_DIGEST_REFERENCES_ONLY`
+
+O envelope futuro carrega somente digests/referências e preserva:
+- exact scope/action binding;
+- fresh Owner authorization;
+- authenticated receipt;
+- idempotency/effect key;
+- rollback/compensation;
+- runtime guards;
+- provider adapter attestation;
+- provider capability binding;
+- FinOps ceiling;
+- before-state;
+- expected postcondition;
+- nonce/single-use;
+- janela máxima de 120 segundos.
+
+Estado máximo:
+`READY_FOR_EXECUTION_ENVELOPE_DESIGN_REVIEW`
+
+Próximo passo permitido:
+`DESIGN_PRE_DISPATCH_ATTESTATION_CONTRACT_ONLY`
+
+### 34.2 Pre-Dispatch Attestation Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #907.
+- CI-only Draft #908.
+- HEAD atual: `e777bed9270d11c6a7142addc7bdf5ed29fcc1ee`.
+- Workflow específico da branch empilhada já verde.
+- CI completa contra main ainda deve fechar antes da próxima camada.
+
+Modo:
+`IMMEDIATE_PRE_EFFECT_REVALIDATION`
+
+Idade máxima planejada da attestation:
+30 segundos.
+
+Revalidações obrigatórias:
+- execution envelope rebuild match;
+- autorização fresca ainda válida/não consumida;
+- envelope nonce e single-use;
+- exact scope/action/operation;
+- before-state ainda igual;
+- idempotency/effect-key reservation antes do dispatch;
+- lease ownership válido;
+- provider adapter/capability ainda válidos;
+- provider health fresca;
+- FinOps <= 20.000 cents;
+- capacity/quota;
+- security/privacy/scope-breach clear;
+- circuit breaker closed;
+- kill switch available;
+- rollback/compensation class;
+- irreversible boundary;
+- observability/audit context;
+- durable dispatch record obrigatório antes de qualquer external effect.
+
+Estado máximo planejado:
+`READY_FOR_PRE_DISPATCH_ATTESTATION_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_DURABLE_DISPATCH_RECORD_CONTRACT_ONLY`
+
+Nenhuma attestation real, nonce claim, reservation, lease, endpoint, payload,
+dispatch, provider call, billing, CRM, deploy ou produção ocorreu.
