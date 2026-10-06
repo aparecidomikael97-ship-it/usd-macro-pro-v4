@@ -71,7 +71,7 @@ def ensure_registry_outside_repo(path: Path) -> Path:
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def blocked(reason: str, *, output_dir: Path, evidence: Any = None) -> int:

@@ -40,7 +40,7 @@ def write_json(path: Path, value: Any) -> None:
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def fail(message: str, *, result: Any = None, output_dir: Path | None = None) -> int:

@@ -72,6 +72,22 @@ def main() -> int:
     assert "if not args.execute_v226_write" in v226
     assert v226.index("if not args.execute_v226_write") < v226.index("verify_owner_decision(")
 
+    from atlasquant_aion_core_freeze_preflight import _parse_ts as parse_v222_ts
+    from ops.aion_core_v1_formal_closure.perform_v223_runtime_write import now_iso as v223_now_iso
+    from ops.aion_core_v1_formal_closure.perform_v225_v226 import now_iso as v226_now_iso
+    from ops.aion_core_v1_formal_closure.perform_core_freeze import now_iso as freeze_now_iso
+
+    for label, factory in (
+        ("V223", v223_now_iso),
+        ("V226", v226_now_iso),
+        ("CORE_FREEZE", freeze_now_iso),
+    ):
+        timestamp = factory()
+        assert timestamp.endswith("Z"), f"{label} timestamp must be canonical RFC3339 UTC Z"
+        assert "+00:00" not in timestamp, f"{label} timestamp must not use +00:00"
+        parsed = parse_v222_ts(timestamp)
+        assert parsed.utcoffset() is not None
+
     freeze_exec = (ROOT / "ops/aion_core_v1_formal_closure/perform_core_freeze.py").read_text(encoding="utf-8")
     assert "--execute-core-freeze" in freeze_exec
     assert "allow_global_arming_transition=False" in freeze_exec
