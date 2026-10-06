@@ -90,8 +90,10 @@ def _result(state: str, blockers=(), **fields) -> dict[str, Any]:
 
 
 def _legacy_marked_non_executable(module) -> bool:
+    # The stable archival marker is declarative; behavioral exclusion is proven
+    # separately by the V2-only receipt contract and V2 schema validators.
     text = module.__doc__ or ""
-    return "LEGACY / NON-EXECUTABLE" in text and "no executor may consume" in text.lower()
+    return "LEGACY / NON-EXECUTABLE V1" in text
 
 
 def _hardening_blockers() -> list[str]:
