@@ -7,13 +7,17 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from atlasquant_aion_developer_physical_execution_v1 import (
-    BLOCKED, READY, evaluate_physical_executor_readiness,
+    BLOCKED,
+    READY,
+    evaluate_physical_executor_readiness,
     expected_executor_receipt_template,
 )
 from atlasquant_aion_nonce_registry import PersistentNonceRegistry
 from atlasquant_aion_physical_evidence_attestation_v1 import (
-    REQUIRED_PROOFS, SCHEMA as ATTESTATION_SCHEMA, canonical_attestation_bytes,
-    physical_evidence_digest, verify_physical_evidence_attestation,
+    REQUIRED_PROOFS,
+    SCHEMA as ATTESTATION_SCHEMA,
+    canonical_attestation_bytes,
+    physical_evidence_digest,
 )
 from atlasquant_aion_trust_root import TrustRootRegistry
 
@@ -61,13 +65,17 @@ class PhysicalExecutionTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.private = Ed25519PrivateKey.generate()
         public = self.private.public_key().public_bytes(
-            serialization.Encoding.Raw, serialization.PublicFormat.Raw,
+            serialization.Encoding.Raw,
+            serialization.PublicFormat.Raw,
         )
         self.roots = TrustRootRegistry.from_mapping({
             "schema": "ATLASQUANT_AION_TRUST_ROOT_V1",
             "roots": [{
-                "key_id": "probe-root", "key_version": 1, "algorithm": "Ed25519",
-                "public_key_b64": b64url(public), "status": "ACTIVE",
+                "key_id": "probe-root",
+                "key_version": 1,
+                "algorithm": "Ed25519",
+                "public_key_b64": b64url(public),
+                "status": "ACTIVE",
                 "not_before": "2026-10-01T00:00:00Z",
                 "not_after": "2027-10-01T00:00:00Z",
             }],
@@ -78,7 +86,7 @@ class PhysicalExecutionTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def trusted(self, e):
+    def attestation(self, e, nonce="physical-nonce-1"):
         payload = {
             "schema": ATTESTATION_SCHEMA,
             "attestation_id": "physical-attestation-1",
@@ -89,28 +97,27 @@ class PhysicalExecutionTests(unittest.TestCase):
             "input_digest": e["input_digest"],
             "physical_evidence_digest": physical_evidence_digest(e),
             "verified_proofs": sorted(REQUIRED_PROOFS),
-            "issued_at": "2026-10-06T22:25:00Z",
-            "expires_at": "2026-10-06T22:50:00Z",
-            "nonce": "physical-nonce-1",
+            "issued_at": "2026-10-06T22:29:00Z",
+            "expires_at": "2026-10-06T22:32:00Z",
+            "nonce": nonce,
             "key_id": "probe-root",
             "key_version": 1,
         }
-        sig = b64url(self.private.sign(canonical_attestation_bytes(payload)))
-        return verify_physical_evidence_attestation(
-            payload, signature_b64=sig, trust_roots=self.roots,
-            nonce_registry=self.nonces, now_ts=NOW,
-            expected_handoff_digest=e["handoff_digest"],
-            expected_input_digest=e["input_digest"],
-            expected_physical_evidence_digest=physical_evidence_digest(e),
-        )
+        signature = b64url(self.private.sign(canonical_attestation_bytes(payload)))
+        return payload, signature
 
     def evaluate(self, **overrides):
         e = overrides.pop("physical_evidence", evidence())
-        trusted = overrides.pop("trusted_attestation", self.trusted(e))
+        nonce = overrides.pop("nonce", "physical-nonce-1")
+        statement, signature = self.attestation(e, nonce=nonce)
         kwargs = {
             "handoff": handoff(),
             "physical_evidence": e,
-            "trusted_attestation": trusted,
+            "attestation_statement": statement,
+            "attestation_signature_b64": signature,
+            "trust_roots": self.roots,
+            "nonce_registry": self.nonces,
+            "now_ts": NOW,
             "environment": {},
             "allowed_files": ["module.py", "test_module.py"],
             "current_input_digest": handoff()["expected_input_digest"],
@@ -121,40 +128,84 @@ class PhysicalExecutionTests(unittest.TestCase):
     def test_signed_attestation_can_make_only_readiness_ready(self):
         out = self.evaluate()
         self.assertEqual(out["state"], READY)
+        self.assertTrue(out["physical_nonce_registered"])
         self.assertFalse(out["commands_executed"])
         self.assertFalse(out["writes_repository"])
         self.assertTrue(out["protected_core_read_only"])
         self.assertTrue(out["production_runtime_read_only"])
 
-    def test_plain_verified_flags_without_attestation_are_blocked(self):
-        out = evaluate_physical_executor_readiness(
-            handoff=handoff(), physical_evidence=evidence(), trusted_attestation={},
-            environment={}, allowed_files=["module.py"],
-            current_input_digest=handoff()["expected_input_digest"],
-        )
-        self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("TRUSTED_PHYSICAL_ATTESTATION_NOT_VERIFIED", out["blockers"])
-
-    def test_evidence_mutation_after_attestation_is_blocked(self):
+    def test_fabricated_verified_mapping_is_not_an_input_path(self):
         e = evidence()
-        trusted = self.trusted(e)
-        e["proofs"]["NETWORK_ISOLATION_VERIFIED"]["evidence_digest"] = "sha256:" + "9" * 64
         out = evaluate_physical_executor_readiness(
-            handoff=handoff(), physical_evidence=e, trusted_attestation=trusted,
-            environment={}, allowed_files=["module.py"],
+            handoff=handoff(),
+            physical_evidence=e,
+            attestation_statement={"state": "VERIFIED"},
+            attestation_signature_b64="fake",
+            trust_roots=self.roots,
+            nonce_registry=self.nonces,
+            now_ts=NOW,
+            environment={},
+            allowed_files=["module.py"],
             current_input_digest=handoff()["expected_input_digest"],
         )
         self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("PHYSICAL_ATTESTATION_EVIDENCE_MISMATCH", out["blockers"])
 
-    def test_secret_environment_is_blocked(self):
+    def test_invalid_secret_environment_does_not_burn_physical_nonce(self):
         out = self.evaluate(environment={"GITHUB_TOKEN": "x"})
         self.assertEqual(out["state"], BLOCKED)
+        self.assertEqual(self.nonces.count(), 0)
 
-    def test_path_escape_is_blocked(self):
+    def test_path_escape_does_not_burn_physical_nonce(self):
         out = self.evaluate(allowed_files=["../outside.py"])
         self.assertEqual(out["state"], BLOCKED)
-        self.assertIn("UNSAFE_ALLOWED_FILE", out["blockers"])
+        self.assertEqual(self.nonces.count(), 0)
+
+    def test_unknown_evidence_field_fails_closed_without_nonce(self):
+        e = evidence()
+        e["caller_says_execute"] = True
+        out = self.evaluate(physical_evidence=e)
+        self.assertEqual(out["state"], BLOCKED)
+        self.assertTrue(
+            any(x.startswith("PHYSICAL_EVIDENCE_UNKNOWN_FIELD") for x in out["blockers"])
+        )
+        self.assertEqual(self.nonces.count(), 0)
+
+    def test_evidence_mutation_breaks_signature_or_binding(self):
+        e = evidence()
+        statement, signature = self.attestation(e)
+        e["proofs"]["NETWORK_ISOLATION_VERIFIED"]["evidence_digest"] = "sha256:" + "9" * 64
+        out = evaluate_physical_executor_readiness(
+            handoff=handoff(),
+            physical_evidence=e,
+            attestation_statement=statement,
+            attestation_signature_b64=signature,
+            trust_roots=self.roots,
+            nonce_registry=self.nonces,
+            now_ts=NOW,
+            environment={},
+            allowed_files=["module.py"],
+            current_input_digest=handoff()["expected_input_digest"],
+        )
+        self.assertEqual(out["state"], BLOCKED)
+        self.assertEqual(self.nonces.count(), 0)
+
+    def test_replay_of_physical_attestation_is_blocked(self):
+        e = evidence()
+        statement, signature = self.attestation(e)
+        args = dict(
+            handoff=handoff(),
+            physical_evidence=e,
+            attestation_statement=statement,
+            attestation_signature_b64=signature,
+            trust_roots=self.roots,
+            nonce_registry=self.nonces,
+            now_ts=NOW,
+            environment={},
+            allowed_files=["module.py"],
+            current_input_digest=handoff()["expected_input_digest"],
+        )
+        self.assertEqual(evaluate_physical_executor_readiness(**args)["state"], READY)
+        self.assertEqual(evaluate_physical_executor_readiness(**args)["state"], BLOCKED)
 
     def test_receipt_template_starts_unknown_and_no_retry(self):
         ready = self.evaluate()
