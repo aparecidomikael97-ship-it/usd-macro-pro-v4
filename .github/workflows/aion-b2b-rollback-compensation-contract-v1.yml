@@ -1,0 +1,65 @@
+name: AION B2B Rollback Compensation Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-idempotency-replay-contract-v1-20261005
+    paths:
+      - "atlasquant_aion_b2b_rollback_compensation_contract_v1.py"
+      - "test_atlasquant_aion_b2b_rollback_compensation_contract_v1.py"
+      - "docs/aion/AION_B2B_ROLLBACK_COMPENSATION_CONTRACT_V1.md"
+      - ".github/workflows/aion-b2b-rollback-compensation-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rollback-compensation-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design contract
+        run: |
+          python -m py_compile             atlasquant_aion_b2b_rollback_compensation_contract_v1.py             test_atlasquant_aion_b2b_rollback_compensation_contract_v1.py
+      - name: Run rollback-compensation tests
+        run: |
+          python -m unittest -q             test_atlasquant_aion_b2b_rollback_compensation_contract_v1.py
+      - name: Assert no rollback or compensation execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_rollback_compensation_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "restore_production(",
+              "execute_compensation(",
+              "rollback_production(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_ROLLBACK_COMPENSATION_DESIGN_REVIEW"',
+              '"DESIGN_FRESH_OWNER_EXECUTION_AUTHORIZATION_CONTRACT_ONLY"',
+              '"production_rollback_proven"',
+              '"production_compensation_proven"',
+              '"compensation_performed"',
+          ):
+              assert marker in source, marker
+          PY
