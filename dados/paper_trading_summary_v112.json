@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-10-06T16:26:16.362803+00:00",
+    "ran_at": "2026-10-06T16:54:23.677536+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -29,10 +29,12 @@
       "USD/CHF": {
         "side": "BUY",
         "passed": false,
-        "state": "🟠 SETUP EM FORMAÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "H1 está contra o viés"
+        ],
         "soft_blocks": [
-          "ICT incompleto (40/100)",
+          "ICT incompleto (56/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -43,25 +45,12 @@
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
           "H1 está contra o viés",
-          "ADR14 muito esticado (141%)"
+          "ADR14 muito esticado (142%)"
         ],
         "soft_blocks": [
-          "ADR14 em 141%: evitar perseguir preço",
-          "ICT incompleto (45/100)",
-          "Fluxo institucional incompleto (61/100)",
-          "M15 ainda não confirmou gatilho"
-        ],
-        "daily_gain_lock": false
-      },
-      "USD/JPY": {
-        "side": "BUY",
-        "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
-        "soft_blocks": [
-          "Gate ainda não liberou execução",
-          "ICT incompleto (45/100)",
-          "Fluxo institucional incompleto (53/100)",
+          "ADR14 em 142%: evitar perseguir preço",
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (62/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -75,7 +64,21 @@
         ],
         "soft_blocks": [
           "ADR14 em 99%: evitar perseguir preço",
-          "ICT incompleto (33/100)",
+          "ICT incompleto (48/100)",
+          "Fluxo institucional incompleto (66/100)",
+          "M15 ainda não confirmou gatilho"
+        ],
+        "daily_gain_lock": false
+      },
+      "USD/JPY": {
+        "side": "BUY",
+        "passed": false,
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
+        "hard_blocks": [],
+        "soft_blocks": [
+          "Gate ainda não liberou execução",
+          "ICT incompleto (52/100)",
+          "Fluxo institucional incompleto (53/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -89,27 +92,26 @@
           "ADR14 muito esticado (145%)"
         ],
         "soft_blocks": [
+          "Gate ainda não liberou execução",
           "ADR14 em 145%: evitar perseguir preço",
-          "ICT incompleto (45/100)",
+          "ICT incompleto (49/100)",
           "Fluxo institucional incompleto (60/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
       },
       "GBP/USD": {
-        "side": "SELL",
+        "side": "WAIT",
         "passed": false,
-        "state": "🔴 BLOQUEADO",
+        "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [
-          "H4 está contra o viés",
-          "H1 está contra o viés",
-          "ADR14 muito esticado (142%)"
+          "ADR14 muito esticado (143%)"
         ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ADR14 em 142%: evitar perseguir preço",
-          "ICT incompleto (55/100)",
-          "Fluxo institucional incompleto (67/100)",
+          "ADR14 em 143%: evitar perseguir preço",
+          "ICT incompleto (0/100)",
+          "Fluxo institucional incompleto (0/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
