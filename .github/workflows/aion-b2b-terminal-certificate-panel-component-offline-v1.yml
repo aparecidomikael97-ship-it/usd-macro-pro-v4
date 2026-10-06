@@ -74,7 +74,7 @@ jobs:
               '"<script"',
               '"controls"',
               '"executes_action"',
-              "html.escape",
+              "from html import escape",
               "def render_terminal_certificate_panel_offline",
           ):
               assert marker in text, marker
