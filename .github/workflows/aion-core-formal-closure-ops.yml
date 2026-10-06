@@ -65,6 +65,11 @@ jobs:
             --nonce-registry /tmp/aion-core-formal-closure-nonce.sqlite3 \
             --allow-non-windows-ci
 
+      - name: Validate PowerShell closure launcher in structural CI mode
+        shell: pwsh
+        run: |
+          ./ops/aion-core-v1-formal-closure/Start-AionCoreClosure.ps1 -CiMode
+
       - name: Red-team readiness gate rejects repository-local durable state
         shell: bash
         run: |
