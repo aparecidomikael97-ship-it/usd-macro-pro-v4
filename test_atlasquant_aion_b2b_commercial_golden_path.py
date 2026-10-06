@@ -112,7 +112,8 @@ def _safe_rows():
         "recurring_projection": {
             "schema": RECURRING_SCHEMA,
             "state": "READY",
-            "scope": SCOPE,
+            "service_tenant_id": SCOPE["tenant_id"],
+            "workspace_id": SCOPE["workspace_id"],
             "read_only": True,
             "customer_safe": True,
             "allowed": True,
@@ -173,6 +174,20 @@ def test_cross_tenant_evidence_blocks_instead_of_advancing():
     assert "PILOT_VALUE:SCOPE_MISMATCH" in result["blockers"]
     assert result["grants_authority"] is False
     assert result["executes_action"] is False
+
+
+def test_recurring_projection_cross_tenant_is_blocked():
+    rows = _safe_rows()
+    rows["recurring_projection"] = {
+        **rows["recurring_projection"],
+        "service_tenant_id": "tenant-other",
+    }
+    result = build_commercial_golden_path(trusted_scope=SCOPE, **rows)
+
+    assert result["state"] == "BLOCKED"
+    recurring = next(row for row in result["stages"] if row["key"] == "recurring_customer")
+    assert recurring["status"] == "BLOCKED"
+    assert "RECURRING_CUSTOMER:SCOPE_MISMATCH" in result["blockers"]
 
 
 def test_automatic_billing_or_contact_flag_blocks_commercial_projection():
