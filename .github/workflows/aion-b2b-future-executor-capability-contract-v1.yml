@@ -1,0 +1,61 @@
+name: AION B2B Future Executor Capability Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-future-executor-boundary-v2-20261005
+    paths:
+      - "atlasquant_aion_b2b_future_executor_capability_contract_v1.py"
+      - "test_atlasquant_aion_b2b_future_executor_capability_contract_v1.py"
+      - "docs/aion/AION_B2B_FUTURE_EXECUTOR_CAPABILITY_CONTRACT_V1.md"
+      - ".github/workflows/aion-b2b-future-executor-capability-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  future-executor-capability-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design contract
+        run: |
+          python -m py_compile             atlasquant_aion_b2b_future_executor_capability_contract_v1.py             test_atlasquant_aion_b2b_future_executor_capability_contract_v1.py
+      - name: Run capability-contract tests
+        run: |
+          python -m unittest -q             test_atlasquant_aion_b2b_future_executor_capability_contract_v1.py
+      - name: Assert zero runtime implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_future_executor_capability_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_FUTURE_EXECUTOR_CAPABILITY_DESIGN_REVIEW"',
+              '"DESIGN_REAL_RECEIPT_AUTHENTICATOR_CONTRACT_ONLY"',
+              '"executor_implementation_allowed"',
+              '"provider_selection_allowed"',
+          ):
+              assert marker in source, marker
+          PY
