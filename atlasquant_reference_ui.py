@@ -1033,6 +1033,7 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
 
 
 def business_reference_home_html(*, mode="Avançado", name="Usuário", show_central=True, business_read_model=None, commercial_journey_read_model=None):
+    from atlasquant_aion_b2b_commercial_golden_path_ui import commercial_golden_path_html
     """Interactive Negócios home using the current B2B operating model.
 
     The legacy market-research raster remains versioned as provenance, but it is
@@ -1155,7 +1156,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
             else '<p class="ref-state">CLIENTE · aguardando evidência validada para métricas de saúde, ROI, SLA e quotas</p>'
         )
         + (
-            __import__("atlasquant_aion_b2b_commercial_golden_path_ui", fromlist=["commercial_golden_path_html"]).commercial_golden_path_html(commercial_journey_read_model)
+            commercial_golden_path_html(commercial_journey_read_model)
             if commercial_journey_read_model is not None
             else ""
         )
