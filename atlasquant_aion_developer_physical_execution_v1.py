@@ -1,11 +1,11 @@
-"""AION Developer Physical Execution V1 — pre-execution evidence gate.
+"""AION Developer Physical Execution V1 — cryptographic pre-execution gate.
 
-This module consumes a trusted, already-verified physical attestation and the
-raw measurement record. It still does not execute commands or write files.
+The gate performs structural validation first. Invalid requests do not consume
+a physical-attestation nonce. Only after the request is structurally eligible
+does it call the canonical Ed25519 physical-evidence verifier.
 
-READY_FOR_PHYSICAL_EXECUTOR means the authority-free pre-execution evidence
-contract is satisfied. It is not merge/deploy/production authority and the
-actual host adapter must revalidate immediately before use.
+The module still does not execute commands or write files. A ready result is
+pre-execution evidence, never merge/deploy/production authority.
 """
 from __future__ import annotations
 
@@ -13,11 +13,13 @@ from hashlib import sha256
 from typing import Any, Mapping, Sequence
 import json
 
+from atlasquant_aion_nonce_registry import PersistentNonceRegistry
 from atlasquant_aion_physical_evidence_attestation_v1 import (
     REQUIRED_PROOFS,
-    RESULT_SCHEMA as PHYSICAL_VERIFICATION_SCHEMA,
+    verify_physical_evidence_attestation,
     physical_evidence_digest,
 )
+from atlasquant_aion_trust_root import TrustRootRegistry
 
 SCHEMA = "ATLASQUANT_AION_DEVELOPER_PHYSICAL_EXECUTION_V1"
 READY = "READY_FOR_PHYSICAL_EXECUTOR"
@@ -26,6 +28,11 @@ FORBIDDEN_ENV_KEYS = frozenset({
     "OPENAI_API_KEY", "GITHUB_TOKEN", "GH_TOKEN", "AWS_SECRET_ACCESS_KEY",
     "AZURE_CLIENT_SECRET", "GOOGLE_APPLICATION_CREDENTIALS",
 })
+EVIDENCE_FIELDS = frozenset({
+    "platform", "handoff_digest", "input_digest", "probe_principal_id",
+    "probe_session_id", "proofs",
+})
+PROOF_FIELDS = frozenset({"verified", "evidence_ref", "evidence_digest", "measured_by"})
 
 
 def _text(value: Any, limit: int = 1200) -> str:
@@ -40,38 +47,87 @@ def _digest(value: Any) -> str:
     return "sha256:" + sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
-def _proofs(value: Any) -> dict[str, dict[str, Any]]:
-    if not isinstance(value, Mapping):
-        return {}
+def _sha256_token(value: Any) -> bool:
+    text = _text(value, 160)
+    if len(text) != 71 or not text.startswith("sha256:"):
+        return False
+    try:
+        int(text[7:], 16)
+    except ValueError:
+        return False
+    return True
+
+
+def _validate_evidence_shape(evidence: Mapping[str, Any]) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    blockers: list[str] = []
+    unknown = sorted(set(evidence) - EVIDENCE_FIELDS)
+    missing = sorted(EVIDENCE_FIELDS - set(evidence))
+    if unknown:
+        blockers.append("PHYSICAL_EVIDENCE_UNKNOWN_FIELD:" + unknown[0])
+    if missing:
+        blockers.append("PHYSICAL_EVIDENCE_MISSING_FIELD:" + missing[0])
+
+    raw_proofs = evidence.get("proofs")
+    if not isinstance(raw_proofs, Mapping):
+        return {}, blockers + ["PHYSICAL_EVIDENCE_PROOFS_NOT_MAPPING"]
+
+    unknown_proofs = sorted(set(raw_proofs) - set(REQUIRED_PROOFS))
+    missing_proofs = sorted(set(REQUIRED_PROOFS) - set(raw_proofs))
+    if unknown_proofs:
+        blockers.append("PHYSICAL_EVIDENCE_UNKNOWN_PROOF:" + unknown_proofs[0])
+    if missing_proofs:
+        blockers.append("PHYSICAL_EVIDENCE_MISSING_PROOF:" + missing_proofs[0])
+
     out: dict[str, dict[str, Any]] = {}
     for name in REQUIRED_PROOFS:
-        raw = value.get(name)
+        raw = raw_proofs.get(name)
         if not isinstance(raw, Mapping):
+            blockers.append(name + "_NOT_MAPPING")
             continue
-        out[name] = {
+        unknown_fields = sorted(set(raw) - PROOF_FIELDS)
+        missing_fields = sorted(PROOF_FIELDS - set(raw))
+        if unknown_fields:
+            blockers.append(name + "_UNKNOWN_FIELD:" + unknown_fields[0])
+        if missing_fields:
+            blockers.append(name + "_MISSING_FIELD:" + missing_fields[0])
+
+        row = {
             "verified": raw.get("verified") is True,
             "evidence_ref": _text(raw.get("evidence_ref"), 500),
             "evidence_digest": _text(raw.get("evidence_digest"), 160),
             "measured_by": _text(raw.get("measured_by"), 160),
         }
-    return out
+        if not row["verified"]:
+            blockers.append(name + "_REQUIRED")
+        if not _sha256_token(row["evidence_digest"]):
+            blockers.append(name + "_DIGEST_REQUIRED")
+        if not row["evidence_ref"] or not row["measured_by"]:
+            blockers.append(name + "_ATTRIBUTION_REQUIRED")
+        out[name] = row
+
+    return out, list(dict.fromkeys(blockers))
 
 
 def evaluate_physical_executor_readiness(
     *,
     handoff: Mapping[str, Any] | None,
     physical_evidence: Mapping[str, Any] | None,
-    trusted_attestation: Mapping[str, Any] | None,
+    attestation_statement: Mapping[str, Any] | None,
+    attestation_signature_b64: str,
+    trust_roots: TrustRootRegistry,
+    nonce_registry: PersistentNonceRegistry,
+    now_ts: str,
     environment: Mapping[str, Any] | None,
     allowed_files: Sequence[Any] | None,
     current_input_digest: str,
 ) -> dict[str, Any]:
-    h = dict(handoff or {})
-    evidence = dict(physical_evidence or {})
-    attestation = dict(trusted_attestation or {})
-    env = dict(environment or {})
+    h = dict(handoff) if isinstance(handoff, Mapping) else {}
+    evidence = dict(physical_evidence) if isinstance(physical_evidence, Mapping) else {}
+    env = dict(environment) if isinstance(environment, Mapping) else {}
     blockers: list[str] = []
 
+    if not isinstance(handoff, Mapping):
+        blockers.append("CONTROLLED_HANDOFF_NOT_MAPPING")
     if h.get("state") != "READY_FOR_CAPABILITY_EXECUTOR":
         blockers.append("CONTROLLED_HANDOFF_NOT_READY")
     if h.get("execution_class") not in {"SANDBOX_CODE", "SANDBOX_TEST"}:
@@ -80,41 +136,22 @@ def evaluate_physical_executor_readiness(
         blockers.append("HANDOFF_RELEASE_BOUNDARY_UNSAFE")
     if h.get("handoff_grants_authority") is not False:
         blockers.append("HANDOFF_AUTHORITY_UNSAFE")
+
     expected = _text(h.get("expected_input_digest"), 160)
     current = _text(current_input_digest, 160)
-    if not expected.startswith("sha256:") or current != expected:
+    if not _sha256_token(expected) or current != expected:
         blockers.append("INPUT_DIGEST_MISMATCH")
+    if not _sha256_token(h.get("handoff_digest")):
+        blockers.append("HANDOFF_DIGEST_INVALID")
 
-    evidence_digest = ""
-    try:
-        evidence_digest = physical_evidence_digest(evidence)
-    except Exception:
-        blockers.append("PHYSICAL_EVIDENCE_INVALID")
-
-    if attestation.get("schema") != PHYSICAL_VERIFICATION_SCHEMA:
-        blockers.append("TRUSTED_PHYSICAL_ATTESTATION_SCHEMA_MISMATCH")
-    for field in (
-        "trust_root_configured", "signature_verified", "nonce_registered",
-        "physical_attestation_verified", "trusted_probe_attestation",
-    ):
-        if attestation.get(field) is not True:
-            blockers.append("TRUSTED_PHYSICAL_ATTESTATION_REQUIRED:" + field)
-    for field in ("execution_allowed", "executes_action", "private_key_used"):
-        if attestation.get(field) is not False:
-            blockers.append("TRUSTED_PHYSICAL_ATTESTATION_UNSAFE:" + field)
-    if attestation.get("state") != "VERIFIED" or list(attestation.get("blockers") or []):
-        blockers.append("TRUSTED_PHYSICAL_ATTESTATION_NOT_VERIFIED")
-    if attestation.get("platform") != "WINDOWS":
-        blockers.append("WINDOWS_PLATFORM_REQUIRED")
-    if attestation.get("handoff_digest") != h.get("handoff_digest"):
-        blockers.append("PHYSICAL_ATTESTATION_HANDOFF_MISMATCH")
-    if attestation.get("input_digest") != expected:
-        blockers.append("PHYSICAL_ATTESTATION_INPUT_MISMATCH")
-    if attestation.get("physical_evidence_digest") != evidence_digest:
-        blockers.append("PHYSICAL_ATTESTATION_EVIDENCE_MISMATCH")
-    attested_proofs = attestation.get("verified_proofs")
-    if not isinstance(attested_proofs, (list, tuple)) or set(attested_proofs) != set(REQUIRED_PROOFS):
-        blockers.append("PHYSICAL_ATTESTATION_PROOF_SET_MISMATCH")
+    if not isinstance(physical_evidence, Mapping):
+        blockers.append("PHYSICAL_EVIDENCE_NOT_MAPPING")
+    proofs, evidence_blockers = (
+        _validate_evidence_shape(evidence)
+        if evidence
+        else ({}, ["PHYSICAL_EVIDENCE_EMPTY"])
+    )
+    blockers.extend(evidence_blockers)
 
     if _text(evidence.get("platform"), 40).upper() != "WINDOWS":
         blockers.append("PHYSICAL_EVIDENCE_PLATFORM_INVALID")
@@ -126,29 +163,18 @@ def evaluate_physical_executor_readiness(
         blockers.append("PHYSICAL_PROBE_PRINCIPAL_REQUIRED")
     if not _text(evidence.get("probe_session_id"), 160):
         blockers.append("PHYSICAL_PROBE_SESSION_REQUIRED")
-    if evidence.get("probe_principal_id") != attestation.get("probe_principal_id"):
-        blockers.append("PHYSICAL_PROBE_PRINCIPAL_MISMATCH")
-    if evidence.get("probe_session_id") != attestation.get("probe_session_id"):
-        blockers.append("PHYSICAL_PROBE_SESSION_MISMATCH")
 
-    proofs = _proofs(evidence.get("proofs"))
-    for name in REQUIRED_PROOFS:
-        row = proofs.get(name) or {}
-        if row.get("verified") is not True:
-            blockers.append(name + "_REQUIRED")
-            continue
-        if not str(row.get("evidence_digest") or "").startswith("sha256:"):
-            blockers.append(name + "_DIGEST_REQUIRED")
-        if not row.get("evidence_ref") or not row.get("measured_by"):
-            blockers.append(name + "_ATTRIBUTION_REQUIRED")
-
+    if not isinstance(environment, Mapping):
+        blockers.append("ENVIRONMENT_NOT_MAPPING")
     normalized_env: dict[str, str] = {}
     for raw_key, raw_value in env.items():
         key = _text(raw_key, 120).upper()
         if not key:
             blockers.append("ENVIRONMENT_KEY_INVALID")
             continue
-        if key in FORBIDDEN_ENV_KEYS or any(token in key for token in ("SECRET", "TOKEN", "PASSWORD", "PRIVATE_KEY")):
+        if key in FORBIDDEN_ENV_KEYS or any(
+            token in key for token in ("SECRET", "TOKEN", "PASSWORD", "PRIVATE_KEY")
+        ):
             blockers.append("SECRET_ENVIRONMENT_KEY_FORBIDDEN:" + key)
             continue
         normalized_env[key] = _text(raw_value, 500)
@@ -162,13 +188,64 @@ def evaluate_physical_executor_readiness(
         for raw in allowed_files[:200]:
             path = _text(raw, 500).replace("\\", "/")
             if (
-                not path or path.startswith("/") or ":" in path
-                or path.startswith("../") or "/../" in path or path.startswith("//")
+                not path
+                or path.startswith("/")
+                or ":" in path
+                or path.startswith("../")
+                or "/../" in path
+                or path.startswith("//")
             ):
                 blockers.append("UNSAFE_ALLOWED_FILE")
                 continue
             if path not in files:
                 files.append(path)
+
+    evidence_digest = ""
+    if not blockers:
+        try:
+            evidence_digest = physical_evidence_digest(evidence)
+        except Exception:
+            blockers.append("PHYSICAL_EVIDENCE_DIGEST_FAILURE")
+
+    attestation: dict[str, Any]
+    if blockers:
+        attestation = {
+            "state": "BLOCKED",
+            "blockers": ["PHYSICAL_ATTESTATION_NOT_CONSUMED_DUE_TO_PREFLIGHT"],
+        }
+    else:
+        attestation = verify_physical_evidence_attestation(
+            attestation_statement,
+            signature_b64=attestation_signature_b64,
+            trust_roots=trust_roots,
+            nonce_registry=nonce_registry,
+            now_ts=_text(now_ts, 80),
+            expected_handoff_digest=_text(h.get("handoff_digest"), 160),
+            expected_input_digest=expected,
+            expected_physical_evidence_digest=evidence_digest,
+        )
+        if attestation.get("state") != "VERIFIED" or list(attestation.get("blockers") or []):
+            blockers.append("TRUSTED_PHYSICAL_ATTESTATION_NOT_VERIFIED")
+        for field in (
+            "trust_root_configured",
+            "signature_verified",
+            "nonce_registered",
+            "physical_attestation_verified",
+            "trusted_probe_attestation",
+        ):
+            if attestation.get(field) is not True:
+                blockers.append("TRUSTED_PHYSICAL_ATTESTATION_REQUIRED:" + field)
+        for field in ("execution_allowed", "executes_action", "private_key_used"):
+            if attestation.get(field) is not False:
+                blockers.append("TRUSTED_PHYSICAL_ATTESTATION_UNSAFE:" + field)
+        if attestation.get("platform") != "WINDOWS":
+            blockers.append("PHYSICAL_ATTESTATION_PLATFORM_MISMATCH")
+        if attestation.get("probe_principal_id") != evidence.get("probe_principal_id"):
+            blockers.append("PHYSICAL_PROBE_PRINCIPAL_MISMATCH")
+        if attestation.get("probe_session_id") != evidence.get("probe_session_id"):
+            blockers.append("PHYSICAL_PROBE_SESSION_MISMATCH")
+        if set(attestation.get("verified_proofs") or []) != set(REQUIRED_PROOFS):
+            blockers.append("PHYSICAL_ATTESTATION_PROOF_SET_MISMATCH")
 
     blockers = list(dict.fromkeys(blockers))
     material = {
@@ -181,6 +258,7 @@ def evaluate_physical_executor_readiness(
         "physical_attestation_id": _text(attestation.get("attestation_id"), 160),
         "physical_key_id": _text(attestation.get("key_id"), 160),
         "physical_key_version": attestation.get("key_version"),
+        "physical_nonce_registered": attestation.get("nonce_registered") is True,
         "required_proofs": list(REQUIRED_PROOFS),
         "verified_proofs": list(REQUIRED_PROOFS) if not blockers else [],
         "allowed_files": files,
@@ -229,6 +307,11 @@ def expected_executor_receipt_template(readiness: Mapping[str, Any]) -> dict[str
 
 
 __all__ = [
-    "SCHEMA", "READY", "BLOCKED", "REQUIRED_PROOFS", "FORBIDDEN_ENV_KEYS",
-    "evaluate_physical_executor_readiness", "expected_executor_receipt_template",
+    "SCHEMA",
+    "READY",
+    "BLOCKED",
+    "REQUIRED_PROOFS",
+    "FORBIDDEN_ENV_KEYS",
+    "evaluate_physical_executor_readiness",
+    "expected_executor_receipt_template",
 ]
