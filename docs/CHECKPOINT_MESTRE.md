@@ -1277,14 +1277,14 @@ Próximo passo permitido:
 
 ### 33.2 Execution Envelope Contract V1
 
-**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
 
 Evidências:
 - Draft PR #905.
 - CI-only Draft #906.
-- HEAD atual: `9bc089ea6b2322f1dabf7942c2f490fce0d97aa7`.
-- Workflow específico da branch empilhada já verde.
-- CI completa contra main ainda deve fechar.
+- HEAD validado: `9bc089ea6b2322f1dabf7942c2f490fce0d97aa7`.
+- 68/68 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
 
 Modo:
 `SEALED_DIGEST_REFERENCES_ONLY`
@@ -1304,8 +1304,8 @@ credencial, secret, senha, API key/token/private key, auth header/cookie,
 endpoint/URL/webhook/callback, HTTP method/headers, payload/body,
 command/shell/subprocess/PowerShell/curl/script.
 
-Estado máximo planejado:
+Estado máximo:
 `READY_FOR_EXECUTION_ENVELOPE_DESIGN_REVIEW`
 
-Próximo passo planejado, somente após CI completo verde:
+Próximo passo permitido:
 `DESIGN_PRE_DISPATCH_ATTESTATION_CONTRACT_ONLY`
