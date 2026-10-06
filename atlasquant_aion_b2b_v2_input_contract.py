@@ -6,6 +6,12 @@ transport/material guards are checked before producers, hashing or lookups.
 from atlasquant_aion_b2b_owner_renewal_action_adapter_plan import safe_copy
 
 _MATERIAL_KEYS = frozenset((
+    # V2 owns the full dangerous-material vocabulary. The archival V1 guard is
+    # still defense-in-depth, but changes to its blacklist cannot weaken V2.
+    'secret', 'password', 'token', 'api_key', 'credential', 'credentials',
+    'cookie', 'authorization', 'endpoint', 'url', 'ip', 'method', 'http_method',
+    'headers', 'header', 'payload', 'body', 'command', 'shell', 'subprocess',
+    'powershell', 'curl', 'script', 'request', 'private_key', 'access_token',
     'api_base', 'webhook', 'callback', 'invoke', 'transport', 'provider_config',
     'connection', 'secret_ref',
 ))
