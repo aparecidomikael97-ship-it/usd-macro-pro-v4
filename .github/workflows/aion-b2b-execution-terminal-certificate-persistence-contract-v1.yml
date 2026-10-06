@@ -1,0 +1,70 @@
+name: AION B2B Execution Terminal Certificate Persistence Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-execution-terminal-certificate-contract-v1-20261006
+    paths:
+      - "atlasquant_aion_b2b_execution_terminal_certificate_persistence_contract_v1.py"
+      - "test_atlasquant_aion_b2b_execution_terminal_certificate_persistence_contract_v1.py"
+      - "docs/aion/AION_B2B_EXECUTION_TERMINAL_CERTIFICATE_PERSISTENCE_CONTRACT_V1.md"
+      - ".github/workflows/aion-b2b-execution-terminal-certificate-persistence-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  execution-terminal-certificate-persistence-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_execution_terminal_certificate_persistence_contract_v1.py \
+            test_atlasquant_aion_b2b_execution_terminal_certificate_persistence_contract_v1.py
+      - name: Run terminal-certificate-persistence design tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_execution_terminal_certificate_persistence_contract_v1.py
+      - name: Assert no database, signing or external-effect implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_execution_terminal_certificate_persistence_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "sqlite3.connect(",
+              "DurableExecutionStore(",
+              ".execute(",
+              ".commit(",
+              "load_pem_private_key(",
+              ".sign(",
+              "requests.get(",
+              "requests.post(",
+              "httpx.request(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "os.system(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_EXECUTION_TERMINAL_CERTIFICATE_PERSISTENCE_DESIGN_REVIEW"',
+              '"DESIGN_EXECUTION_TERMINAL_CERTIFICATE_READ_MODEL_ONLY"',
+              'PERSISTENCE_MODE = "APPEND_ONLY_CAS_TERMINAL_CERTIFICATE_COMMIT"',
+              '"certificate_record_written"',
+              '"cas_attempted"',
+              '"private_key_loaded"',
+              '"external_action_executed"',
+          ):
+              assert marker in source, marker
+          PY
