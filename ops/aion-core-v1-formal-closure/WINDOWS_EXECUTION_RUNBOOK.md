@@ -126,3 +126,67 @@ Do not freeze, merge, deploy or arm the Global Worker from this runbook.
 - Keep `$NonceDb` outside the repository and durable across the ceremony.
 - If runtime changes after V2.23, rebuild owner ceremony material before consuming the V2.25 nonce.
 - If a V2.23/V2.26 write outcome is unknown, reconcile manually; never retry automatically.
+
+## 9. Prepare the separate Core Freeze signature
+
+Only a positive V2.26 APPROVE may enter this step. A DENY terminates the freeze path.
+
+Run `prepare_core_freeze.py` only when the HUMAN_OWNER signer is ready, using:
+
+- the full `v226_attestation.json`;
+- the public owner trust root;
+- a fresh freeze ceremony id;
+- a fresh freeze nonce;
+- a <= 180-second validity window;
+- the HUMAN_OWNER key id/version.
+
+Required state:
+
+`READY_FOR_EXTERNAL_CORE_FREEZE_SIGNATURE`
+
+Externally sign the exported canonical freeze message and save only the returned signature outside the repository, e.g. `$Work\core_freeze_signature.txt`.
+
+## 10. Core Freeze dry-run
+
+Run `perform_core_freeze.py` without `--execute-core-freeze`.
+
+The dry-run:
+
+- cryptographically verifies the third owner signature;
+- re-reads the official runtime;
+- requires its SHA and source digest to still equal the exact post-V2.26 runtime;
+- does not consume the freeze nonce;
+- does not write runtime state.
+
+Required dry state:
+
+`READY_FOR_EXPLICIT_CORE_FREEZE_WRITE`
+
+## 11. Explicit Core Freeze write
+
+Only after the owner intentionally chooses to execute the freeze, rerun the same command with:
+
+`--execute-core-freeze`
+
+This:
+
+- claims the fresh freeze nonce in `$NonceDb`;
+- attempts exactly one CAS write;
+- persists `aion_core_freeze_v1`;
+- requires receipt, read-after-write and write attribution;
+- uses `allow_global_arming_transition=False`;
+- never retries an ambiguous write automatically.
+
+Required positive terminal state:
+
+`CORE_FREEZE_PERSISTENCE_ATTESTED`
+
+Then run:
+
+`validate_post_freeze_boundary.py --freeze-attestation <core_freeze_attestation.json>`
+
+Required boundary state:
+
+`CORE_V1_FROZEN_RELEASE_BOUNDARIES_CLOSED`
+
+At that point Core V1 may be formally frozen, but merge, deploy, Global Worker arming and Global Worker activation remain explicitly unauthorized and require separate ceremonies.
