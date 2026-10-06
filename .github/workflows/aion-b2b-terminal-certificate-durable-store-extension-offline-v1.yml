@@ -1,0 +1,67 @@
+name: AION B2B Terminal Certificate Durable Store Extension Offline V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-execution-terminal-certificate-durable-store-extension-v1-20261006
+    paths:
+      - "atlasquant_aion_durable_execution_kernel.py"
+      - "test_atlasquant_aion_v214_durable_execution_redteam.py"
+      - "test_atlasquant_aion_b2b_execution_terminal_certificate_durable_store_extension_offline_v1.py"
+      - "docs/aion/AION_B2B_EXECUTION_TERMINAL_CERTIFICATE_DURABLE_STORE_EXTENSION_OFFLINE_V1.md"
+      - ".github/workflows/aion-b2b-terminal-certificate-durable-store-extension-offline-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  durable-store-extension-offline-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile durable kernel and offline tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_durable_execution_kernel.py \
+            test_atlasquant_aion_b2b_execution_terminal_certificate_durable_store_extension_offline_v1.py
+      - name: Run legacy durable-execution red team and new extension tests
+        run: |
+          python -m pytest -q \
+            test_atlasquant_aion_v214_durable_execution_redteam.py \
+            test_atlasquant_aion_b2b_execution_terminal_certificate_durable_store_extension_offline_v1.py
+      - name: Assert offline-only implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_durable_execution_kernel.py").read_text(encoding="utf-8")
+          test = Path("test_atlasquant_aion_b2b_execution_terminal_certificate_durable_store_extension_offline_v1.py").read_text(encoding="utf-8")
+          for marker in (
+              "STORE_SCHEMA_VERSION = 2",
+              "CREATE TABLE IF NOT EXISTS execution_scope_bindings",
+              "CREATE TABLE IF NOT EXISTS execution_terminal_finalizations",
+              "CREATE TABLE IF NOT EXISTS execution_audit_seals",
+              "CREATE TABLE IF NOT EXISTS execution_terminal_certificates",
+              "def read_terminal_certificate_snapshot",
+          ):
+              assert marker in source, marker
+          for banned in (
+              "requests.get(",
+              "requests.post(",
+              "httpx.request(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "os.system(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+              assert banned not in test, banned
+          PY
