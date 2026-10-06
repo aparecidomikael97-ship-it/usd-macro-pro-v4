@@ -1197,3 +1197,50 @@ Próximo passo permitido:
 `DESIGN_PROVIDER_CAPABILITY_BINDING_CONTRACT_ONLY`
 
 Provider continua NÃO selecionado, NÃO carregado e NÃO ligado.
+
+
+---
+
+## 32. Provider Capability Binding — atualização
+
+### 32.1 Provider Capability Binding Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências:
+- Draft PR #903.
+- CI-only Draft #904.
+- HEAD atual: `bd64ed0c36bc196bdc7213fd498037ae8e48c53e`.
+- CI completa contra main em execução.
+
+Modo:
+`EXACT_INTERSECTION_FAIL_CLOSED`
+
+A capability efetiva futura deve ser somente a interseção entre:
+- Fresh Owner Authorization Scope;
+- Runtime Guard Allowlist;
+- Adapter Attested Allowlist;
+- Tenant/Workspace/Domain Scope;
+- Action Family/Operation Scope.
+
+Regras fail-closed:
+- empty intersection bloqueia;
+- capability pedida além do permitido bloqueia;
+- wildcard proibido;
+- permission expansion proibida;
+- cross-tenant/workspace/domain/action/operation proibido;
+- Owner scope não pode ser sobrescrito;
+- Runtime Guard não pode ser sobrescrito;
+- forbidden capability do adapter prevalece;
+- adapter allowlist é teto, não autoridade;
+- FinOps ceiling permanece 20.000 cents;
+- binding precisa de digest, freshness e single-use com a autorização.
+
+Provider permanece NÃO selecionado e NÃO bound.
+Nenhuma capability é materializada nesta camada.
+
+Estado máximo planejado:
+`READY_FOR_PROVIDER_CAPABILITY_BINDING_DESIGN_REVIEW`
+
+Próximo passo planejado, somente após CI completo verde:
+`DESIGN_EXECUTION_ENVELOPE_CONTRACT_ONLY`
