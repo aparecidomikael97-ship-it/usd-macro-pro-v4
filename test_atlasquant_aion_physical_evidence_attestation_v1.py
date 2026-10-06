@@ -71,8 +71,8 @@ def statement(e, nonce="physical-nonce-1"):
         "input_digest": e["input_digest"],
         "physical_evidence_digest": physical_evidence_digest(e),
         "verified_proofs": sorted(REQUIRED_PROOFS),
-        "issued_at": "2026-10-06T22:25:00Z",
-        "expires_at": "2026-10-06T22:50:00Z",
+        "issued_at": "2026-10-06T22:29:00Z",
+        "expires_at": "2026-10-06T22:32:00Z",
         "nonce": nonce,
         "key_id": "probe-root",
         "key_version": 1,
@@ -130,6 +130,25 @@ class PhysicalAttestationTests(unittest.TestCase):
         second = self.verify(payload, signature)
         self.assertEqual(second["state"], "BLOCKED")
         self.assertIn("PHYSICAL_ATTESTATION_NONCE_REPLAYED", second["blockers"])
+
+    def test_malformed_non_string_proof_fails_closed_not_exception(self):
+        e = evidence()
+        payload = statement(e)
+        payload["verified_proofs"] = [{"fake": True}]
+        signature = sign(self.private, payload)
+        result = self.verify(payload, signature)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn("PHYSICAL_ATTESTATION_PROOF_SET_INVALID", result["blockers"])
+
+    def test_oversized_time_window_is_blocked(self):
+        e = evidence()
+        payload = statement(e)
+        payload["issued_at"] = "2026-10-06T22:20:00Z"
+        payload["expires_at"] = "2026-10-06T22:40:00Z"
+        signature = sign(self.private, payload)
+        result = self.verify(payload, signature)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn("PHYSICAL_ATTESTATION_WINDOW_TOO_LARGE", result["blockers"])
 
     def test_incomplete_proof_set_is_blocked(self):
         e = evidence()
