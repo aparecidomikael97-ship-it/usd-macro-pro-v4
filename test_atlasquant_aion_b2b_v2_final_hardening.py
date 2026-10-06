@@ -29,6 +29,46 @@ class FinalHardeningTests(unittest.TestCase):
             data['adapter_environment']['finops_monthly_cents'] = 20001
             self.assertEqual(adapter.build_owner_renewal_action_adapter_plan_v2(**data)['state'], 'BLOCKED')
 
+    def test_n1_v2_environment_policy_is_independent_of_legacy_risks_and_schema(self):
+        data = args_v2()
+        expected_risks = (
+            'billing_dispute', 'security_incident', 'privacy_incident',
+            'contract_conflict', 'irreversible_boundary_detected',
+        )
+        self.assertEqual(adapter.RISKS, expected_risks)
+        self.assertEqual(
+            adapter.ENVIRONMENT_SCHEMA,
+            'ATLASQUANT_AION_B2B_SYNTHETIC_ADAPTER_ENVIRONMENT_V1',
+        )
+        with (
+            patch.object(legacy, 'RISKS', ('legacy_mutation_canary',)),
+            patch.object(legacy, 'ENVIRONMENT_SCHEMA', 'LEGACY_MUTATED_SCHEMA'),
+        ):
+            out = adapter.build_owner_renewal_action_adapter_plan_v2(**data)
+            self.assertEqual(out['state'], adapter.READY)
+            env = data['adapter_environment'].copy()
+            env['legacy_mutation_canary'] = False
+            self.assertIn(
+                'ADAPTER_ENVIRONMENT_SCHEMA_INVALID',
+                adapter.environment_blockers_v2(env, env['binding'], NOW),
+            )
+
+    def test_n2_v2_material_guard_does_not_depend_on_legacy_blacklist(self):
+        from atlasquant_aion_b2b_v2_input_contract import safe_input_v2
+        dangerous = (
+            'secret', 'password', 'token', 'api_key', 'credential', 'credentials',
+            'cookie', 'authorization', 'endpoint', 'url', 'ip', 'method',
+            'http_method', 'headers', 'header', 'payload', 'body', 'command',
+            'shell', 'subprocess', 'powershell', 'curl', 'script', 'request',
+            'private_key', 'access_token', 'api_base', 'webhook', 'callback',
+            'invoke', 'transport', 'provider_config', 'connection', 'secret_ref',
+        )
+        with patch.object(legacy, '_BANNED_KEYS', set()):
+            for key in dangerous:
+                with self.subTest(key=key):
+                    with self.assertRaises(ValueError):
+                        safe_input_v2({key: 'CANARY'})
+
     def test_g5_future_contract_explicitly_requires_every_v2_schema(self):
         out = receipt.owner_renewal_action_receipt_contract_v2()
         self.assertEqual(out['required_command_plan_schema'], command.SCHEMA)
