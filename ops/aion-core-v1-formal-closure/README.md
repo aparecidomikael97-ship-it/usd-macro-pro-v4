@@ -75,3 +75,26 @@ Core Freeze, merge, deploy and Global Worker activation remain separate owner-co
 ## Current real state
 
 The authorized Windows device remains offline. No private-key operation, production trust-root provisioning, real V2.20 signature, nonce consumption, runtime write, owner signature, owner decision or freeze has been performed.
+
+## Separate Core Freeze ceremony
+
+The OPS packet now includes a third, separate HUMAN_OWNER signature boundary after a positively attested V2.26 APPROVE:
+
+- `core_freeze_ceremony.py`: pure request/signature contract bound to the exact V2.26 freeze material digest and post-decision runtime SHA.
+- `prepare_core_freeze.py`: exports the canonical Core Freeze signing message; does not consume a nonce and does not write runtime state.
+- `perform_core_freeze.py`: dry-run verifies the signature and runtime continuity; only `--execute-core-freeze` claims the freeze nonce and attempts one CAS persistence.
+- `validate_post_freeze_boundary.py`: read-only gate proving that a frozen Core still has merge/deploy/Worker authority closed.
+
+A real freeze writes only the namespace `aion_core_freeze_v1` and may attest `core_complete=true` / `core_frozen=true`.
+
+It must keep:
+
+- `merge_authorized=false`
+- `deploy_authorized=false`
+- `execution_allowed=false`
+- `worker_armed=false`
+- `global_worker_activation_authorized=false`
+
+The freeze writer uses `allow_global_arming_transition=False` and never calls merge, deploy, Worker arming or Worker activation functions.
+
+A positive freeze therefore closes **Core V1 itself only**. Merge, deploy, Global Worker arming and Global Worker activation remain separate future owner-controlled transitions.
