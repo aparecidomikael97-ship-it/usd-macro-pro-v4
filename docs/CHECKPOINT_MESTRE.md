@@ -748,3 +748,95 @@ Objetivos da varredura:
 Regra:
 
 **O Núcleo/AION não recebe encerramento definitivo sem essa varredura retrospectiva completa.**
+
+
+---
+
+## 26. Progressão design-only do futuro executor — atualização 05/10/2026
+
+### 26.1 Future Executor Capability / Readiness Contract V1
+
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
+
+Evidências:
+- Draft PR #886.
+- CI-only atual #888.
+- HEAD validado: `54a12dff5ec5b84f3057aaf1e15cccd46a46c977`.
+- 60/60 workflows concluídos com sucesso.
+- Quality, FinOps e workflow específico do Capability Contract verdes.
+
+Estado máximo permitido:
+`READY_FOR_FUTURE_EXECUTOR_CAPABILITY_DESIGN_REVIEW`
+
+Único próximo passo permitido a partir dessa camada:
+`DESIGN_REAL_RECEIPT_AUTHENTICATOR_CONTRACT_ONLY`
+
+Essa validação NÃO autoriza:
+- criação de executor real;
+- seleção ou ligação de provider;
+- emissão ou carregamento de credenciais;
+- billing;
+- contato com cliente;
+- CRM write;
+- provisionamento;
+- deploy;
+- mutação de produção.
+
+### 26.2 Real Receipt Authenticator Contract V1
+
+**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+
+Evidências atuais:
+- Draft PR #890.
+- CI-only Draft #891.
+- HEAD atual: `c76d20ee5ff9e95e05f98e716b3b726e8a3c701f`.
+- Workflow específico do contrato já concluiu uma execução com sucesso na branch empilhada.
+- Validação completa contra main/Quality ainda deve fechar antes de avançar.
+
+Objetivo:
+definir apenas o contrato de segurança que um futuro verificador de receipt real deverá satisfazer.
+
+Requisitos arquiteturais definidos:
+- Ed25519 como algoritmo de assinatura requerido;
+- SHA-256 canônico;
+- trust root;
+- key_id e key_version;
+- status/lifecycle de chave;
+- not_before e not_after;
+- freshness;
+- nonce;
+- persistent nonce registry;
+- replay rejection;
+- binding exato de owner/tenant/workspace;
+- binding de customer/pilot/package;
+- binding de action family / operation kind;
+- binding de provider e writer identity;
+- binding dos digests de execution request, execution record, writer request, command plan, adapter, dry run, rollback, idempotency e before/after state.
+
+Proibições explícitas desta fase:
+- não verificar assinatura real;
+- não carregar chave pública/privada real;
+- não registrar nonce real;
+- não escrever replay registry real;
+- não criar executor;
+- não selecionar provider;
+- não emitir token;
+- não gerar request/payload/comando executável;
+- não faturar;
+- não contactar cliente;
+- não escrever CRM;
+- não provisionar;
+- não deployar;
+- não tocar produção.
+
+Estado máximo planejado:
+`READY_FOR_REAL_RECEIPT_AUTHENTICATOR_DESIGN_REVIEW`
+
+Único próximo passo planejado, somente após CI completo verde:
+`DESIGN_IDEMPOTENCY_REPLAY_CONTRACT_ONLY`
+
+### 26.3 Regra de continuidade
+
+Não avançar para Idempotency/Replay Contract enquanto o HEAD do Real Receipt Authenticator Contract não estiver completamente verde nos gates relevantes.
+
+Generic acknowledgements como "vamos lá" continuam significando apenas continuidade do trabalho seguro em Draft/design/testes; nunca autorização de merge, deploy, provider, billing, CRM ou produção.
