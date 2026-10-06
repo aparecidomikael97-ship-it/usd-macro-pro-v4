@@ -1205,13 +1205,14 @@ Provider continua NÃO selecionado, NÃO carregado e NÃO ligado.
 
 ### 32.1 Provider Capability Binding Contract V1
 
-**Status:** EM IMPLEMENTAÇÃO / DRAFT / CI EM VALIDAÇÃO
+**Status:** VALIDADO NO CI / DRAFT / NÃO MERGIADO / NÃO DEPLOYADO
 
 Evidências:
 - Draft PR #903.
 - CI-only Draft #904.
-- HEAD atual: `bd64ed0c36bc196bdc7213fd498037ae8e48c53e`.
-- CI completa contra main em execução.
+- HEAD validado: `bd64ed0c36bc196bdc7213fd498037ae8e48c53e`.
+- 67/67 workflows concluídos com sucesso.
+- Workflow específico, Quality, FinOps, Security, UI e demais gates verdes.
 
 Modo:
 `EXACT_INTERSECTION_FAIL_CLOSED`
@@ -1239,8 +1240,8 @@ Regras fail-closed:
 Provider permanece NÃO selecionado e NÃO bound.
 Nenhuma capability é materializada nesta camada.
 
-Estado máximo planejado:
+Estado máximo:
 `READY_FOR_PROVIDER_CAPABILITY_BINDING_DESIGN_REVIEW`
 
-Próximo passo planejado, somente após CI completo verde:
+Próximo passo permitido:
 `DESIGN_EXECUTION_ENVELOPE_CONTRACT_ONLY`
