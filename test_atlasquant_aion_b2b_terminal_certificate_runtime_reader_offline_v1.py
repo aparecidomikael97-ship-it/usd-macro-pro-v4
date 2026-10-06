@@ -4,14 +4,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from atlasquant_aion_b2b_terminal_certificate_read_model_store_projection_offline_v1 import (
+    DurableTerminalCertificateReadModelSource,
+)
 from atlasquant_aion_b2b_terminal_certificate_runtime_reader_offline_v1 import (
     FALSE_FIELDS,
     read_terminal_certificate_offline,
 )
 from atlasquant_aion_durable_execution_kernel import DurableExecutionStore
 from test_atlasquant_aion_b2b_execution_terminal_certificate_durable_store_extension_offline_v1 import (
-    NOW,
-    DEADLINE,
     build_full_chain,
     prepare_completed,
 )
@@ -22,12 +23,15 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
         for key in FALSE_FIELDS:
             self.assertIs(out[key], False, key)
 
+    def make_source(self, store):
+        return DurableTerminalCertificateReadModelSource(store)
+
     def test_verified_projection_is_evidence_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = DurableExecutionStore(Path(tmp) / "execution.sqlite3")
             execution_id = build_full_chain(store)
             out = read_terminal_certificate_offline(
-                store=store,
+                read_model_source=self.make_source(store),
                 execution_id=execution_id,
                 owner_id="owner-1",
                 tenant_id="tenant-1",
@@ -46,7 +50,7 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
             store = DurableExecutionStore(Path(tmp) / "execution.sqlite3")
             execution_id = build_full_chain(store)
             out = read_terminal_certificate_offline(
-                store=store,
+                read_model_source=self.make_source(store),
                 execution_id=execution_id,
                 owner_id="owner-1",
                 tenant_id="tenant-1",
@@ -63,12 +67,13 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = DurableExecutionStore(Path(tmp) / "execution.sqlite3")
             execution_id = build_full_chain(store)
+            source = self.make_source(store)
             for tenant_id, workspace_id in (
                 ("tenant-other", "workspace-1"),
                 ("tenant-1", "workspace-other"),
             ):
                 out = read_terminal_certificate_offline(
-                    store=store,
+                    read_model_source=source,
                     execution_id=execution_id,
                     owner_id="owner-1",
                     tenant_id=tenant_id,
@@ -84,7 +89,7 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
             store = DurableExecutionStore(Path(tmp) / "execution.sqlite3")
             execution_id = prepare_completed(store, "2")
             out = read_terminal_certificate_offline(
-                store=store,
+                read_model_source=self.make_source(store),
                 execution_id=execution_id,
                 owner_id="owner-1",
                 tenant_id="tenant-1",
@@ -100,7 +105,7 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
             store = DurableExecutionStore(Path(tmp) / "execution.sqlite3")
             execution_id = build_full_chain(store)
             out = read_terminal_certificate_offline(
-                store=store,
+                read_model_source=self.make_source(store),
                 execution_id=execution_id,
                 owner_id="owner-1",
                 tenant_id="tenant-1",
@@ -118,9 +123,10 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = DurableExecutionStore(Path(tmp) / "execution.sqlite3")
             execution_id = build_full_chain(store)
+            source = self.make_source(store)
             for value in (0, -1, True, 86401, "300"):
                 out = read_terminal_certificate_offline(
-                    store=store,
+                    read_model_source=source,
                     execution_id=execution_id,
                     owner_id="owner-1",
                     tenant_id="tenant-1",
@@ -132,17 +138,43 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
                 self.assertEqual(out["error_code"], "FRESHNESS_POLICY_INVALID")
                 self.assert_no_authority(out)
 
-    def test_non_store_object_is_unavailable(self):
+    def test_runtime_reader_rejects_direct_store_dependency(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = DurableExecutionStore(Path(tmp) / "execution.sqlite3")
+            execution_id = build_full_chain(store)
+            out = read_terminal_certificate_offline(
+                read_model_source=store,
+                execution_id=execution_id,
+                owner_id="owner-1",
+                tenant_id="tenant-1",
+                workspace_id="workspace-1",
+                observed_at="2026-10-06T13:33:00Z",
+            )
+            self.assertEqual(out["state"], "UNAVAILABLE")
+            self.assertEqual(
+                out["error_code"],
+                "TERMINAL_CERTIFICATE_READ_MODEL_SOURCE_REQUIRED",
+            )
+            self.assert_no_authority(out)
+
+    def test_read_model_without_authority_marker_fails_closed(self):
+        class UnsafeSource:
+            def read_terminal_certificate_projection(self, *args, **kwargs):
+                return {
+                    "state": "VERIFIED",
+                    "persisted_at": "2026-10-06T13:32:00Z",
+                }
+
         out = read_terminal_certificate_offline(
-            store=object(),
+            read_model_source=UnsafeSource(),
             execution_id="EXE-test",
             owner_id="owner-1",
             tenant_id="tenant-1",
             workspace_id="workspace-1",
             observed_at="2026-10-06T13:33:00Z",
         )
-        self.assertEqual(out["state"], "UNAVAILABLE")
-        self.assertEqual(out["error_code"], "DURABLE_EXECUTION_STORE_REQUIRED")
+        self.assertEqual(out["state"], "MISMATCH")
+        self.assertEqual(out["error_code"], "READ_MODEL_AUTHORITY_BOUNDARY_MISSING")
         self.assert_no_authority(out)
 
     def test_read_does_not_mutate_durable_chain(self):
@@ -157,7 +189,7 @@ class TerminalCertificateRuntimeReaderOfflineV1Tests(unittest.TestCase):
                 store.get_terminal_certificate(execution_id),
             )
             out = read_terminal_certificate_offline(
-                store=store,
+                read_model_source=self.make_source(store),
                 execution_id=execution_id,
                 owner_id="owner-1",
                 tenant_id="tenant-1",

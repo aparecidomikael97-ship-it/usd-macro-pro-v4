@@ -4,11 +4,20 @@ Status: **offline-only / read-only / fail-closed / Draft**.
 
 ## Objetivo
 
-Conectar o Runtime Reader ao `DurableExecutionStore` já estendido, sem provider,
-rede, banco paralelo ou autoridade operacional.
+Conectar o Runtime Reader ao certificado terminal persistido sem permitir que o
+reader conheça ou consulte diretamente o `DurableExecutionStore`.
 
-O leitor recebe uma instância já autorizada do store e não recebe caminho de
-arquivo/banco.
+A separação fica explícita:
+
+1. o adapter físico
+   `DurableTerminalCertificateReadModelSource` recebe uma instância já
+   autorizada do store;
+2. esse adapter produz somente uma projeção lógica segura/read-only;
+3. o Runtime Reader consome exclusivamente a interface
+   `read_terminal_certificate_projection(...)`.
+
+Assim, o store permanece a fonte física de verdade e o Terminal Certificate
+Read Model permanece a fonte lógica do reader.
 
 ## Estados
 
@@ -33,6 +42,17 @@ Não existe fallback cross-tenant ou cross-workspace.
 
 Execução legada sem scope retorna UNAVAILABLE.
 
+## Fronteira lógica obrigatória
+
+O Runtime Reader não importa `DurableExecutionStore`, não chama
+`read_terminal_certificate_snapshot` e rejeita um store passado diretamente.
+
+Somente uma fonte que exponha
+`read_terminal_certificate_projection(...)` pode alimentar o reader.
+
+O adapter físico é read-only, não abre um banco novo e não cria sidecar/segunda
+verdade.
+
 ## Projeção segura
 
 O resultado expõe apenas identidade de escopo e digests/evidências já
@@ -48,5 +68,6 @@ efeito externo, billing, CRM, provisionamento ou deploy.
 
 ## Limite
 
-Esta camada só opera com SQLite temporário nos testes e com o store passado pelo
-caller. Não existe integração com banco de produção nesta etapa.
+Esta camada só opera com SQLite temporário nos testes e com um store já
+autorizado injetado no adapter físico. Não existe integração com banco de
+produção nesta etapa.
