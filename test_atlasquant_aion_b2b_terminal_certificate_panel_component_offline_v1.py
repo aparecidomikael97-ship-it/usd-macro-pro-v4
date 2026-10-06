@@ -81,7 +81,7 @@ class TerminalCertificatePanelComponentOfflineV1Tests(unittest.TestCase):
         self.assertTrue(out["static_only"])
         self.assertEqual(out["section_count"], 10)
         self.assertIn("Evidência verificada", out["html"])
-        self.assertIn("não autoriza execução", out["html"])
+        self.assertIn("Não autoriza execução", out["html"])
         parser = Tags()
         parser.feed(out["html"])
         self.assertEqual(tuple(parser.sections), REQUIRED_UI_SECTIONS)
