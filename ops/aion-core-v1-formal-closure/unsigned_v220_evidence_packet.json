@@ -176,7 +176,7 @@
         "verified": true
       },
       "signature_fields_pending": ["key_id","key_version","issued_at","expires_at","signature_b64"],
-      "supporting_note": "V2.20 recovery evidence bundle; 52 passed. Must be rechecked by signer that backup/restore support is present in the referenced recovery suite before signing."
+      "supporting_note": "V2.20 chaos/recovery/traceability step; 52 passed. Referenced recovery suites explicitly cover historical checkpoint revision loading, integrity verification, approved conditional restore, restore confirmation, tamper blocking and fail-closed recovery traceability."
     },
     {
       "claim": {
@@ -252,5 +252,5 @@
   "schema": "AION_CORE_V1_V220_UNSIGNED_EVIDENCE_PACKET_V1",
   "source_runtime_sha_observed": "020facc9991c5d2d4ce457e0840b04c875f8cfae",
   "technical_closure_candidate_pr": 951,
-  "unsigned_packet_digest": "sha256:83af01e15aeefe1e41b88472d267c8bc3b6687fdc01b915e307cf2673d8bc585"
+  "unsigned_packet_digest": "sha256:99b2864646042f37f821732216ec41aa554965f6c78c8001b5e161efacf58fd8"
 }
