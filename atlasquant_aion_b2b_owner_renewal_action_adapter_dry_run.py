@@ -1,4 +1,8 @@
-"""Pure synthetic simulation; no executor, provider or persistence wiring."""
+"""LEGACY / NON-EXECUTABLE V1 synthetic simulation.
+
+Historical/test compatibility only; no executor may consume V1. Future execution
+contracts must require V2. No executor, provider or persistence wiring exists.
+"""
 from atlasquant_aion_b2b_owner_renewal_action_adapter_plan import (
     CAPABILITIES, FALSE_FIELDS, FINOPS_CAP_CENTS, digest, environment_blockers,
     result, safe_copy, validate_adapter_plan,

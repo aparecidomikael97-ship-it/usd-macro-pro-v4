@@ -6,16 +6,47 @@ from __future__ import annotations
 
 import atlasquant_aion_b2b_owner_renewal_action_adapter_plan as v1
 import atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run as dry_v1
+from atlasquant_aion_b2b_v2_input_contract import safe_input_v2
 from atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2 import (
     CAPABILITIES,
     FALSE_FIELDS,
     FINOPS_CAP_CENTS,
     validate_adapter_plan_v2,
+    environment_blockers_v2,
 )
 
 SCHEMA = "ATLASQUANT_AION_B2B_OWNER_RENEWAL_ACTION_ADAPTER_DRY_RUN_V2"
 SNAPSHOT_SCHEMA = dry_v1.SNAPSHOT_SCHEMA
 SERVICE_SCHEMA = dry_v1.SERVICE_SCHEMA
+
+
+def _snapshot_blockers_v2(snapshot, schema, binding, now_ts, *, service=False):
+    expected = {'schema', 'synthetic', 'binding', 'environment', 'state_digest'}
+    if service:
+        expected |= {'contract_state', 'service_state', 'before_state'}
+    if type(snapshot) is not dict or set(snapshot) != expected:
+        return ['SYNTHETIC_SNAPSHOT_SCHEMA_INVALID']
+    blockers = []
+    if snapshot['schema'] != schema or snapshot['synthetic'] is not True:
+        blockers.append('SYNTHETIC_SNAPSHOT_REQUIRED')
+    if v1.digest(snapshot['binding']) != v1.digest(binding):
+        blockers.append('SYNTHETIC_SNAPSHOT_BINDING_MISMATCH')
+    environment = snapshot['environment']
+    if type(environment) is not dict:
+        blockers.append('SYNTHETIC_ENVIRONMENT_INVALID')
+    else:
+        blockers += environment_blockers_v2(environment, binding, now_ts)
+    if snapshot['state_digest'] != v1.digest({k:v for k,v in snapshot.items() if k != 'state_digest'}):
+        blockers.append('SYNTHETIC_SNAPSHOT_DIGEST_MISMATCH')
+    if service:
+        if snapshot['contract_state'] != 'SYNTHETIC_VALID' or snapshot['service_state'] != 'SYNTHETIC_HEALTHY':
+            blockers.append('SYNTHETIC_CONTRACT_OR_SERVICE_CONFLICT')
+        before = snapshot['before_state']
+        if (type(before) is not dict or set(before) != {'staging_revision', 'change_pending'}
+                or type(before['staging_revision']) is not int or not 0 <= before['staging_revision'] < 10**9
+                or before['change_pending'] is not False):
+            blockers.append('SYNTHETIC_BEFORE_STATE_INVALID')
+    return blockers
 
 
 def build_owner_renewal_action_adapter_dry_run_v2(
@@ -28,7 +59,7 @@ def build_owner_renewal_action_adapter_dry_run_v2(
 ):
     try:
         plan = validate_adapter_plan_v2(adapter_plan, now_ts)
-        capabilities, provider, service = v1.safe_copy([
+        capabilities, provider, service = safe_input_v2([
             synthetic_adapter_capabilities,
             synthetic_provider_snapshot,
             synthetic_contract_service_state,
@@ -50,13 +81,13 @@ def build_owner_renewal_action_adapter_dry_run_v2(
 
         missing = sorted(set(required) - set(capabilities))
         blockers = ["MISSING_CAPABILITY:" + item for item in missing]
-        blockers += dry_v1._snapshot_blockers(
+        blockers += _snapshot_blockers_v2(
             provider,
             SNAPSHOT_SCHEMA,
             binding,
             now_ts,
         )
-        blockers += dry_v1._snapshot_blockers(
+        blockers += _snapshot_blockers_v2(
             service,
             SERVICE_SCHEMA,
             binding,
@@ -149,7 +180,7 @@ def validate_dry_run_v2(
     synthetic_contract_service_state,
     now_ts,
 ):
-    supplied = v1.safe_copy(dry_run)
+    supplied = safe_input_v2(dry_run)
     expected = build_owner_renewal_action_adapter_dry_run_v2(
         adapter_plan=adapter_plan,
         synthetic_adapter_capabilities=synthetic_adapter_capabilities,

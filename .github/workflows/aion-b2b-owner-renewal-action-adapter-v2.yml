@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - business/aion-b2b-controlled-adapter-dry-run-20261005
+      - fix/aion-b2b-adapter-command-plan-v2-reconciliation-20261005
     paths:
       - "atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py"
       - "atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2.py"
@@ -13,6 +14,8 @@ on:
       - "atlasquant_aion_b2b_owner_renewal_action_adapter_receipt_v2.py"
       - "test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py"
       - "test_atlasquant_aion_b2b_owner_renewal_action_adapter_v2.py"
+      - "atlasquant_aion_b2b_v2_input_contract.py"
+      - "test_atlasquant_aion_b2b_v2_final_hardening.py"
       - "docs/aion/AION_B2B_OWNER_RENEWAL_ACTION_ADAPTER_V2.md"
       - ".github/workflows/aion-b2b-owner-renewal-action-adapter-v2.yml"
 
@@ -33,7 +36,9 @@ jobs:
       - name: Compile V1 plus reconciled V2 contracts
         run: python -m py_compile atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py atlasquant_aion_b2b_owner_renewal_action_adapter_plan.py atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run.py atlasquant_aion_b2b_owner_renewal_action_adapter_receipt.py atlasquant_aion_b2b_owner_renewal_action_adapter_plan_v2.py atlasquant_aion_b2b_owner_renewal_action_adapter_dry_run_v2.py atlasquant_aion_b2b_owner_renewal_action_adapter_receipt_v2.py test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py test_atlasquant_aion_b2b_owner_renewal_action_adapter.py test_atlasquant_aion_b2b_owner_renewal_action_adapter_v2.py
       - name: Run original Codex adapter plus V2 reconciliation
-        run: python -m unittest -q test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py test_atlasquant_aion_b2b_owner_renewal_action_adapter.py test_atlasquant_aion_b2b_owner_renewal_action_adapter_v2.py
+        run: python -m unittest -q test_atlasquant_aion_b2b_owner_renewal_action_command_plan_v2.py test_atlasquant_aion_b2b_owner_renewal_action_adapter.py test_atlasquant_aion_b2b_owner_renewal_action_adapter_v2.py test_atlasquant_aion_b2b_v2_final_hardening.py
+      - name: Compile focal semantic input guards
+        run: python -m py_compile atlasquant_aion_b2b_v2_input_contract.py test_atlasquant_aion_b2b_v2_final_hardening.py
       - name: Assert reconciled V2 has no external execution stack
         run: |
           python - <<'PY'
