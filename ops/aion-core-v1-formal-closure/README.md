@@ -52,6 +52,27 @@ The helpers live in `ops/aion_core_v1_formal_closure/`.
 - `windows_readiness_preflight.py`: fail-closed, read-only Windows readiness gate. It verifies the immutable target, canonical unsigned V2.20 packet, Python/cryptography environment, clean repository, external work/nonce paths, public trust-root shape and runtime capability without exposing credentials. Network runtime read occurs only with `--check-runtime-read`; it never signs, consumes a nonce or writes runtime state.
 
 
+## Preferred Windows entrypoint
+
+Use the tested PowerShell launcher as the single entrypoint on the authorized Windows host:
+
+```powershell
+$CertTrust = "<PUBLIC_CERTIFICATION_TRUST_ROOT_JSON>"
+$OwnerTrust = "<PUBLIC_OWNER_TRUST_ROOT_JSON>"
+
+.\ops\aion-core-v1-formal-closure\Start-AionCoreClosure.ps1 `
+  -CertificationTrustRoot $CertTrust `
+  -OwnerTrustRoot $OwnerTrust `
+  -CheckRuntimeRead `
+  -RequireWriteReady
+```
+
+Required terminal state before any signing request is generated:
+
+`READY_FOR_FORMAL_CLOSURE_CEREMONY`
+
+The launcher wraps the readiness gate only. It intentionally stops before REAL V2.20 signing and never signs, consumes a nonce, writes runtime state, freezes the Core, merges, deploys, or arms/activates the Global Worker.
+
 ## Windows readiness gate
 
 Before generating any real V2.20/V2.24/V2.25/Core Freeze signing material, run the read-only readiness gate on the authorized Windows host.
