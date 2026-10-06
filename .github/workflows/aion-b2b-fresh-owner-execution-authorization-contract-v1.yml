@@ -1,0 +1,64 @@
+name: AION B2B Fresh Owner Execution Authorization Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-rollback-compensation-contract-v1-20261005
+    paths:
+      - "atlasquant_aion_b2b_fresh_owner_execution_authorization_contract_v1.py"
+      - "test_atlasquant_aion_b2b_fresh_owner_execution_authorization_contract_v1.py"
+      - "docs/aion/AION_B2B_FRESH_OWNER_EXECUTION_AUTHORIZATION_CONTRACT_V1.md"
+      - ".github/workflows/aion-b2b-fresh-owner-execution-authorization-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-owner-execution-authorization-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design contract
+        run: |
+          python -m py_compile             atlasquant_aion_b2b_fresh_owner_execution_authorization_contract_v1.py             test_atlasquant_aion_b2b_fresh_owner_execution_authorization_contract_v1.py
+      - name: Run fresh-Owner authorization design tests
+        run: |
+          python -m unittest -q             test_atlasquant_aion_b2b_fresh_owner_execution_authorization_contract_v1.py
+      - name: Assert no authorization ceremony or execution is performed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_fresh_owner_execution_authorization_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "build_owner_business_action_execution_request(",
+              "verify_owner_business_action_execution_decision(",
+              "PersistentNonceRegistry(",
+              ".claim(",
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "subprocess.run(",
+              "subprocess.Popen(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+              "save_runtime_checkpoint(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_FRESH_OWNER_EXECUTION_AUTHORIZATION_DESIGN_REVIEW"',
+              '"DESIGN_RUNTIME_EXECUTION_GUARDS_CONTRACT_ONLY"',
+              '"AUTHORIZE_BUSINESS_ACTION_EXECUTION"',
+              '"generic_chat_instruction_accepted_as_execution"',
+              '"fresh_execution_authorization_verified"',
+          ):
+              assert marker in source, marker
+          PY
