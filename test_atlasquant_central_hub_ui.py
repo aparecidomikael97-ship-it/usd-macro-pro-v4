@@ -566,6 +566,15 @@ class LoginGreetingTests(unittest.TestCase):
         self.assertIn('data-confirmed="sessao"', confirmed)
         self.assertIn("O que você gostaria de saber ou fazer?", confirmed)
 
+    def test_central_render_mounts_visible_owner_presence_without_opening_aion(self):
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        render = source[source.index("def render_central_hub"):]
+        self.assertIn("presence_html = aion_login_presence_html(", render)
+        self.assertIn("st.markdown(_CENTRAL_CSS + presence_html, unsafe_allow_html=True)", render)
+        self.assertIn("acknowledge_login_greeting(", render)
+        self.assertNotIn("request_return_to_aion(st.session_state)", render)
+        self.assertNotIn("provider_configured=True", render)
+
     def test_greeting_does_not_open_aion_or_write_memory(self):
         source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
         render = source[source.index("def render_central_hub"):]
