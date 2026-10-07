@@ -40,13 +40,12 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:",trigger)
         self.assertIn("schedule:",trigger)
 
-    def test_build_identity_observes_main_push_without_implicitly_deploying_render(self):
+    def test_build_identity_is_manual_post_deploy_verifier_with_manual_render_deploy(self):
         identity=Path(".github/workflows/production-build-identity.yml").read_text(encoding="utf-8")
         trigger=identity.split("permissions:",1)[0]
         self.assertIn("workflow_dispatch:",trigger)
-        self.assertIn("push:",trigger)
-        self.assertIn("branches: [main]",trigger)
-        self.assertIn("schedule:",trigger)
+        self.assertNotIn("\n  push:",trigger)
+        self.assertNotIn("schedule:",trigger)
         render=Path("render.yaml").read_text(encoding="utf-8")
         self.assertIn("autoDeployTrigger: off",render)
         self.assertNotIn("autoDeployTrigger: commit",render)
