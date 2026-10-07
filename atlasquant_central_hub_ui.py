@@ -33,6 +33,8 @@ _AREA_ORDER = ("trader", "negocios", "investimentos", "aion")
 CENTRAL_ROOT = "central_root"
 CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
 LOGIN_GREETING_KEY = "aion_login_greeting_shown"
+HUMAN_OWNER_ID = "HUMAN_OWNER"
+_HUMAN_OWNER_ALIASES = frozenset({"mikael", "aparecidomikael"})
 _ROOT_TOKENS = {"central", "central root", "ecosystem root", "central principal"}
 
 _AREAS = {
@@ -640,8 +642,48 @@ def _session_map(access: Mapping[str, Any] | None) -> Mapping[str, Any]:
     return session if isinstance(session, Mapping) else {}
 
 
+def _owner_alias_token(value: Any) -> str:
+    """Normalize only for owner-alias comparison; never for authentication."""
+    return "".join(ch for ch in str(value or "").casefold() if ch.isalnum())
+
+
+def owner_session_context(access: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Derive UX owner context from an already-authenticated ADMIN session.
+
+    This is presentation/session binding only. It never grants signing,
+    deployment, Worker, financial, trading or other privileged authority.
+    """
+    denied = {
+        "is_human_owner": False,
+        "owner_id": "",
+        "name": "",
+        "session_bound": False,
+    }
+    if not _admin(access):
+        return denied
+    if str(access.get("mode") or "").strip().upper() != "AUTHENTICATED":
+        return denied
+    session = _session_map(access)
+    if str(session.get("role") or "").strip().upper() != "ADMIN":
+        return denied
+    if not session.get("authenticated_at"):
+        return denied
+    username = _owner_alias_token(session.get("username"))
+    if username not in _HUMAN_OWNER_ALIASES:
+        return denied
+    return {
+        "is_human_owner": True,
+        "owner_id": HUMAN_OWNER_ID,
+        "name": "Mikael",
+        "session_bound": True,
+    }
+
+
 def _greeting_name(access: Mapping[str, Any]) -> str:
-    """Name already on the authenticated access mapping. Owner aliases stay Mikael."""
+    """Use Mikael only for a proven owner session; other admins stay neutral."""
+    owner = owner_session_context(access)
+    if owner["is_human_owner"]:
+        return str(owner["name"])
     session = _session_map(access)
     for raw in (
         access.get("display_name"),
@@ -650,12 +692,9 @@ def _greeting_name(access: Mapping[str, Any]) -> str:
         session.get("username"),
     ):
         name = " ".join(str(raw or "").split())
-        if not name:
-            continue
-        if name.casefold() in {"mikael", "aparecidomikael"}:
-            return "Mikael"
-        return name[:64]
-    return "Mikael"
+        if name:
+            return name[:64]
+    return "Administrador"
 
 
 def _login_mark(access: Mapping[str, Any]) -> str:
@@ -687,12 +726,28 @@ def login_greeting(
 ) -> dict[str, Any]:
     """Text for a valid ADMIN session. Missing facts stay out of the sentence."""
     if not _admin(access):
-        return {"show": False, "text": "", "period": "", "name": "", "status": ""}
+        return {
+            "show": False,
+            "text": "",
+            "period": "",
+            "name": "",
+            "status": "",
+            "owner_id": "",
+            "is_human_owner": False,
+            "session_bound": False,
+        }
     period = greeting_period(now, timezone_name=timezone_name).casefold()
+    owner = owner_session_context(access)
     name = _greeting_name(access)
+    owner_sentence = (
+        "Contexto HUMAN_OWNER reconhecido nesta sessão. "
+        if owner["is_human_owner"]
+        else ""
+    )
     text = (
         f"{name}, {period}. AION ativo. "
-        "Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?"
+        + owner_sentence
+        + "Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?"
     )
     return {
         "show": True,
@@ -700,6 +755,9 @@ def login_greeting(
         "period": period,
         "name": name,
         "status": confirmed_status_line(confirmed_status),
+        "owner_id": owner["owner_id"],
+        "is_human_owner": owner["is_human_owner"],
+        "session_bound": owner["session_bound"],
     }
 
 
@@ -719,6 +777,12 @@ def aion_login_presence_html(
     )
     if not greeting["show"]:
         return ""
+    owner_line = ""
+    if greeting.get("is_human_owner") is True:
+        owner_line = (
+            '<p class="aq-aion-presence-line" data-owner-context="HUMAN_OWNER">'
+            "HUMAN_OWNER · sessão autenticada</p>"
+        )
     status = ""
     if greeting["status"]:
         source = ""
@@ -733,7 +797,8 @@ def aion_login_presence_html(
         '<p class="aq-aion-presence-kicker">AION</p>'
         '<p class="aq-aion-presence-state"><span class="aq-aion-dot" aria-hidden="true"></span>ATIVO</p>'
         f'<p class="aq-aion-presence-line">{escape(greeting["name"])}, {escape(greeting["period"])}. AION ativo.</p>'
-        '<p class="aq-aion-presence-line">Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?</p>'
+        + owner_line
+        + '<p class="aq-aion-presence-line">Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?</p>'
         + status
         + '<p class="aq-central-back">Abrir AION pelos controles de navegação abaixo.</p>'
         "</section>"
@@ -931,6 +996,8 @@ __all__ = [
     "central_surface_html",
     "aion_login_presence_html",
     "login_greeting",
+    "owner_session_context",
+    "HUMAN_OWNER_ID",
     "application_timezone",
     "greeting_period",
     "DEFAULT_TIMEZONE",
