@@ -29,6 +29,12 @@ This stage exists to prove the storage contract against a real PostgreSQL transa
 - Fail-closed connection/schema behavior.
 - Real concurrent-append test against PostgreSQL.
 - Cross-owner, cross-tenant and cross-workspace denial tests.
+- HMAC-authenticated keyset cursors with caller-injected signing key.
+- Cursor binding covers owner/tenant/workspace scope plus resource/query specification.
+- Conversation pagination is keyset-bound by updated_at + id.
+- Message pagination is keyset-bound by sequence and direction.
+- Conversation search/filter pagination is executed in PostgreSQL, including title/message query, tag, date bounds and archived state.
+- Retrieval query is executed directly in PostgreSQL and is no longer capped by the legacy 201-row adapter fetch.
 - No binary attachment storage; metadata only.
 
 ## CI database
@@ -57,16 +63,28 @@ The dedicated workflow must prove:
 12. Checkpoint coverage is monotonic and cannot exceed message count.
 13. Summary source coverage is validated.
 14. Retrieval limits remain bounded and scope-bound.
-15. Non-empty cursors remain fail-closed until a separately reviewed bound-cursor implementation exists.
-16. Provider, billing, deploy, Worker, external-action and Core execution remain absent.
+15. Non-empty cursors are HMAC-authenticated and fail closed if tampered, cross-scope, cross-conversation, cross-direction or reused under a different query/filter specification.
+16. Ascending and newest-first message keyset pagination returns complete non-duplicated sequences across pages.
+17. Conversation keyset pagination preserves query/tag filters across pages.
+18. Cursor signing material is injected by composition; the store does not resolve it from environment or provider secrets.
+19. Provider, billing, deploy, Worker, external-action and Core execution remain absent.
 
-## Intentional limitation: cursors
+## Bound cursor pagination
 
-This stage does not claim full PostgreSQL cursor pagination.
+This stage now implements keyset cursor pagination for the real PostgreSQL path.
 
-Until a scope/query-bound cursor implementation is reviewed, any non-empty cursor is rejected. This is fail-closed behavior and prevents an unbound cursor from being accepted as valid evidence.
+Cursor tokens are opaque, HMAC-authenticated and bound to:
 
-A future cursor implementation must bind owner + tenant + workspace + query specification before this limitation can be removed.
+- owner + tenant + workspace scope;
+- resource kind;
+- conversation id and newest-first direction for message history;
+- query, tag, since, until and archived filters for conversation history.
+
+The cursor signing key is caller-injected and must contain at least 32 bytes. The store does not read it from environment variables or provider configuration.
+
+A cursor is rejected fail-closed when its signature is invalid, its scope changes, its conversation/direction changes, or its query/filter specification changes. This prevents a cursor issued for one authority/query from becoming evidence for another.
+
+This CI implementation does not authorize or define the future production secret source. Production composition must provide a stable, least-privilege secret through a separately reviewed configuration boundary.
 
 ## Explicitly not authorized or implemented
 
