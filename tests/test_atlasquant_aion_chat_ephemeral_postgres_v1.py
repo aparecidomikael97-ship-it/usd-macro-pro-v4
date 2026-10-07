@@ -62,7 +62,11 @@ class EphemeralPostgresV1Tests(unittest.TestCase):
         finally:
             conn.close()
         self.backend = pg.EphemeralPostgresBackendV1(self.connect, environment="CI")
-        self.store = pg.EphemeralPostgresChatStoreV1(self.backend)
+        self.cursor_key = b"atlasquant-aion-chat-ci-bound-cursor-key-v1"
+        self.store = pg.EphemeralPostgresChatStoreV1(
+            self.backend,
+            cursor_signing_key=self.cursor_key,
+        )
         self.scope = Scope("mikael", "atlasquant-owner", "central")
         self.other_owner = Scope("other", "atlasquant-owner", "central")
         self.other_tenant = Scope("mikael", "other-tenant", "central")
@@ -101,6 +105,11 @@ class EphemeralPostgresV1Tests(unittest.TestCase):
         self.assertFalse(policy["environment_read_by_store"])
         self.assertFalse(policy["secret_lookup_by_store"])
         self.assertFalse(policy["database_url_read_by_store"])
+        self.assertTrue(policy["cursor_pagination_bound"])
+        self.assertTrue(policy["cursor_scope_binding"])
+        self.assertTrue(policy["cursor_query_binding"])
+        self.assertTrue(policy["cursor_hmac_authenticated"])
+        self.assertFalse(policy["cursor_key_read_by_store"])
 
     def test_health_proves_schema_and_fails_closed_for_wrong_schema_version(self):
         report = self.store.storage_health()
@@ -383,21 +392,198 @@ class EphemeralPostgresV1Tests(unittest.TestCase):
                 limit=201,
             )
 
-    def test_nonempty_cursor_fails_closed_until_bound_cursor_stage(self):
-        with self.assertRaisesRegex(
-            ValueError, "cursor pagination is not implemented"
-        ):
+    def test_bound_message_cursor_paginates_ascending_without_duplicates(self):
+        stored = [
+            self.store.append_message(
+                self.scope,
+                self.message(f"page-{index}", f"page-{index}"),
+            )
+            for index in range(5)
+        ]
+        first = self.store.list_messages(
+            self.scope,
+            self.conversation.id,
+            page_size=2,
+        )
+        second = self.store.list_messages(
+            self.scope,
+            self.conversation.id,
+            cursor=first.next_cursor,
+            page_size=2,
+        )
+        third = self.store.list_messages(
+            self.scope,
+            self.conversation.id,
+            cursor=second.next_cursor,
+            page_size=2,
+        )
+        self.assertEqual(
+            [item.id for item in first.items + second.items + third.items],
+            [item.id for item in stored],
+        )
+        self.assertIsNotNone(first.next_cursor)
+        self.assertIsNotNone(second.next_cursor)
+        self.assertIsNone(third.next_cursor)
+
+    def test_bound_message_cursor_paginates_newest_first(self):
+        stored = [
+            self.store.append_message(
+                self.scope,
+                self.message(f"newest-{index}", f"newest-{index}"),
+            )
+            for index in range(5)
+        ]
+        first = self.store.list_messages(
+            self.scope,
+            self.conversation.id,
+            page_size=2,
+            newest_first=True,
+        )
+        second = self.store.list_messages(
+            self.scope,
+            self.conversation.id,
+            cursor=first.next_cursor,
+            page_size=2,
+            newest_first=True,
+        )
+        third = self.store.list_messages(
+            self.scope,
+            self.conversation.id,
+            cursor=second.next_cursor,
+            page_size=2,
+            newest_first=True,
+        )
+        self.assertEqual(
+            [item.id for item in first.items + second.items + third.items],
+            [item.id for item in reversed(stored)],
+        )
+        self.assertIsNone(third.next_cursor)
+
+    def test_bound_conversation_cursor_paginates_filtered_query(self):
+        created = [self.conversation]
+        for index in range(4):
+            conversation = self.store.create_conversation(
+                self.scope,
+                title=f"alpha {index}",
+                metadata={"tags": ["owner", "alpha"]},
+            )
+            created.append(conversation)
+        ignored = self.store.create_conversation(
+            self.scope,
+            title="beta only",
+            metadata={"tags": ["owner", "beta"]},
+        )
+        self.store.append_message(
+            self.scope,
+            Message(
+                conversation_id=ignored.id,
+                role="user",
+                content="not part of alpha result",
+                metadata={"idempotency_key": "ignored-message"},
+            ),
+        )
+        first = self.store.list_conversations(
+            self.scope,
+            query="alpha",
+            tag="alpha",
+            page_size=2,
+        )
+        second = self.store.list_conversations(
+            self.scope,
+            query="alpha",
+            tag="alpha",
+            cursor=first.next_cursor,
+            page_size=2,
+        )
+        all_items = first.items + second.items
+        self.assertEqual(len(all_items), 4)
+        self.assertEqual(len({item.id for item in all_items}), 4)
+        self.assertTrue(all("alpha" in item.title for item in all_items))
+        self.assertIsNotNone(first.next_cursor)
+        self.assertIsNone(second.next_cursor)
+
+    def test_cursor_tamper_scope_query_conversation_and_direction_fail_closed(self):
+        for index in range(3):
+            self.store.append_message(
+                self.scope,
+                self.message(f"bound-{index}", f"bound-{index}"),
+            )
+        page = self.store.list_messages(
+            self.scope,
+            self.conversation.id,
+            page_size=1,
+        )
+        cursor = page.next_cursor
+        self.assertIsNotNone(cursor)
+
+        tampered = cursor[:-1] + ("A" if cursor[-1] != "A" else "B")
+        with self.assertRaisesRegex(ValueError, "cursor invalid or not bound"):
             self.store.list_messages(
                 self.scope,
                 self.conversation.id,
-                cursor="foreign-or-untrusted-cursor",
+                cursor=tampered,
+                page_size=1,
             )
-        with self.assertRaisesRegex(
-            ValueError, "cursor pagination is not implemented"
-        ):
+        with self.assertRaisesRegex(ValueError, "cursor invalid or not bound"):
+            self.store.list_messages(
+                self.other_owner,
+                self.conversation.id,
+                cursor=cursor,
+                page_size=1,
+            )
+
+        other = self.store.create_conversation(self.scope, title="other")
+        with self.assertRaisesRegex(ValueError, "cursor invalid or not bound"):
+            self.store.list_messages(
+                self.scope,
+                other.id,
+                cursor=cursor,
+                page_size=1,
+            )
+        with self.assertRaisesRegex(ValueError, "cursor invalid or not bound"):
+            self.store.list_messages(
+                self.scope,
+                self.conversation.id,
+                cursor=cursor,
+                page_size=1,
+                newest_first=True,
+            )
+
+        for index in range(3):
+            self.store.create_conversation(
+                self.scope,
+                title=f"cursor-alpha-{index}",
+                metadata={"tags": ["cursor-alpha"]},
+            )
+        conversations = self.store.list_conversations(
+            self.scope,
+            query="cursor-alpha",
+            tag="cursor-alpha",
+            page_size=1,
+        )
+        self.assertIsNotNone(conversations.next_cursor)
+        with self.assertRaisesRegex(ValueError, "cursor invalid or not bound"):
+            self.store.list_conversations(
+                self.scope,
+                query="changed-query",
+                tag="cursor-alpha",
+                cursor=conversations.next_cursor,
+                page_size=1,
+            )
+        with self.assertRaisesRegex(ValueError, "cursor invalid or not bound"):
             self.store.list_conversations(
                 self.other_workspace,
-                cursor="untrusted-cursor",
+                query="cursor-alpha",
+                tag="cursor-alpha",
+                cursor=conversations.next_cursor,
+                page_size=1,
+            )
+
+    def test_cursor_signing_key_boundary_requires_32_bytes(self):
+        with self.assertRaisesRegex(ValueError, "at least 32 bytes"):
+            pg.EphemeralPostgresChatStoreV1(
+                self.backend,
+                cursor_signing_key=b"too-short",
             )
 
     def test_explicit_schema_install_is_not_store_startup_migration(self):
