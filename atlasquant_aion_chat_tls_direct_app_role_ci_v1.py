@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 
 from aion_chat.store import StorageUnavailableError
 from atlasquant_aion_chat_direct_app_role_connection_ci_v1 import (
@@ -30,6 +31,15 @@ class TlsDirectLoginAuditedPostgresBackendCiV1(
     def _connection(self) -> psycopg.Connection:
         conn = super()._connection()
         try:
+            params = conninfo_to_dict(conn.info.dsn)
+            if (
+                str(params.get("sslmode") or "").strip().lower()
+                != "verify-full"
+                or not str(params.get("sslrootcert") or "").strip()
+            ):
+                raise StorageUnavailableError(
+                    "verify-full PostgreSQL TLS client policy is not proven"
+                )
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT s.ssl,s.version,s.cipher,"
@@ -73,6 +83,8 @@ class TlsDirectLoginAuditedPostgresBackendCiV1(
             tcp_transport=False,
             plaintext_connection_allowed=False,
             certificate_hostname_verification_required=True,
+            client_sslmode_required="verify-full",
+            sslrootcert_required=True,
         )
         if report["state"] != HEALTHY:
             return report
