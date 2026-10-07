@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = 2
+MAX_SCOPE_LENGTH = 512
 _TS_RE = re.compile(
     r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?Z$"
 )
@@ -114,7 +115,7 @@ class PersistentNonceRegistry:
             )
 
     def claim(self, *, scope: str, nonce: str, expires_at: str, now_ts: str) -> bool:
-        if not isinstance(scope, str) or not scope or len(scope) > 256:
+        if not isinstance(scope, str) or not scope or len(scope) > MAX_SCOPE_LENGTH:
             raise ValueError("invalid nonce scope")
         if not isinstance(nonce, str) or not nonce or len(nonce) > 256:
             raise ValueError("invalid nonce")
@@ -158,7 +159,7 @@ class PersistentNonceRegistry:
 
     def read_claim(self, *, scope: str, nonce: str) -> dict[str, str] | None:
         """Read exact durable claim metadata without mutating or pruning state."""
-        if not isinstance(scope, str) or not scope or len(scope) > 256:
+        if not isinstance(scope, str) or not scope or len(scope) > MAX_SCOPE_LENGTH:
             raise ValueError("invalid nonce scope")
         if not isinstance(nonce, str) or not nonce or len(nonce) > 256:
             raise ValueError("invalid nonce")
