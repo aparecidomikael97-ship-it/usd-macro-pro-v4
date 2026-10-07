@@ -627,6 +627,7 @@ class EphemeralPostgresBackendV1:
         conn = self._connection()
         stored = None
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.conversations "
