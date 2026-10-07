@@ -322,7 +322,7 @@ class EphemeralPostgresBackendV1:
         connection_factory: ConnectionFactory,
         *,
         environment: str = "CI",
-        schema: str = self.schema,
+        schema: str = DB_SCHEMA,
     ):
         if not callable(connection_factory):
             raise TypeError("connection factory required")
