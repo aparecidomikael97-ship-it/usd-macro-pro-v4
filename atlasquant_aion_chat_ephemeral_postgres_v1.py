@@ -9,6 +9,9 @@ already-reviewed AION Chat adapter surface from the fake-backend stage.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 from dataclasses import asdict
 from typing import Any, Callable
@@ -21,6 +24,7 @@ from aion_chat.models import (
     Conversation,
     ConversationCheckpoint,
     Message,
+    Page,
     Scope,
     now,
 )
@@ -48,6 +52,102 @@ FAILED = "failed"
 NEXT_ALLOWED_STEP = "REVIEW_EPHEMERAL_POSTGRES_EVIDENCE_BEFORE_ANY_PRODUCTION_BINDING"
 
 ConnectionFactory = Callable[[], psycopg.Connection]
+
+
+class BoundCursorCodecV1:
+    """Opaque HMAC-authenticated cursor bound to scope, resource and query."""
+
+    VERSION = 1
+    MIN_KEY_BYTES = 32
+
+    def __init__(self, signing_key: bytes):
+        if not isinstance(signing_key, bytes) or len(signing_key) < self.MIN_KEY_BYTES:
+            raise ValueError("cursor signing key must be at least 32 bytes")
+        self._key = bytes(signing_key)
+
+    @staticmethod
+    def _b64encode(value: bytes) -> str:
+        return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+    @staticmethod
+    def _b64decode(value: str) -> bytes:
+        if not isinstance(value, str) or not value:
+            raise ValueError("cursor invalid or not bound to this query")
+        padding = "=" * (-len(value) % 4)
+        return base64.urlsafe_b64decode((value + padding).encode("ascii"))
+
+    @staticmethod
+    def _canonical(value: Any) -> bytes:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    def _digest(self, label: bytes, value: Any) -> str:
+        return hmac.new(
+            self._key,
+            label + b"\x00" + self._canonical(value),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def encode(
+        self,
+        *,
+        kind: str,
+        scope: Scope,
+        spec: dict[str, Any],
+        position: Any,
+    ) -> str:
+        owner, tenant, workspace = _scope_tuple(scope)
+        payload = {
+            "v": self.VERSION,
+            "k": str(kind),
+            "s": self._digest(b"scope", [owner, tenant, workspace]),
+            "q": self._digest(b"spec", spec),
+            "p": position,
+        }
+        body = self._canonical(payload)
+        signature = hmac.new(self._key, body, hashlib.sha256).digest()
+        return self._b64encode(body) + "." + self._b64encode(signature)
+
+    def decode(
+        self,
+        token: str,
+        *,
+        kind: str,
+        scope: Scope,
+        spec: dict[str, Any],
+    ) -> Any:
+        try:
+            body_part, signature_part = str(token).split(".", 1)
+            body = self._b64decode(body_part)
+            signature = self._b64decode(signature_part)
+            expected_signature = hmac.new(self._key, body, hashlib.sha256).digest()
+            if not hmac.compare_digest(signature, expected_signature):
+                raise ValueError
+            payload = json.loads(body.decode("utf-8"))
+            owner, tenant, workspace = _scope_tuple(scope)
+            if payload.get("v") != self.VERSION:
+                raise ValueError
+            if payload.get("k") != str(kind):
+                raise ValueError
+            if not hmac.compare_digest(
+                str(payload.get("s") or ""),
+                self._digest(b"scope", [owner, tenant, workspace]),
+            ):
+                raise ValueError
+            if not hmac.compare_digest(
+                str(payload.get("q") or ""),
+                self._digest(b"spec", spec),
+            ):
+                raise ValueError
+            if "p" not in payload:
+                raise ValueError
+            return payload["p"]
+        except Exception as exc:
+            raise ValueError("cursor invalid or not bound to this query") from exc
 
 
 def _scope_tuple(scope: Scope) -> tuple[str, str, str]:
@@ -398,6 +498,66 @@ class EphemeralPostgresBackendV1:
         finally:
             conn.close()
 
+    def list_conversations_page(
+        self,
+        scope: Scope,
+        *,
+        after: tuple[str, str] | None,
+        limit: int,
+        query: str,
+        tag: str | None,
+        since: str | None,
+        until: str | None,
+        archived: bool,
+    ) -> list[Conversation]:
+        self.require_healthy()
+        owner, tenant, workspace = _scope_tuple(scope)
+        clauses = [
+            "c.owner_id=%s",
+            "c.tenant_id=%s",
+            "c.workspace_id=%s",
+            "c.archived=%s",
+        ]
+        params: list[Any] = [owner, tenant, workspace, bool(archived)]
+        if query:
+            clauses.append(
+                "(STRPOS(LOWER(c.title), LOWER(%s)) > 0 OR EXISTS ("
+                f"SELECT 1 FROM {DB_SCHEMA}.messages m "
+                "WHERE m.owner_id=c.owner_id AND m.tenant_id=c.tenant_id "
+                "AND m.workspace_id=c.workspace_id AND m.conversation_id=c.id "
+                "AND STRPOS(LOWER(m.content), LOWER(%s)) > 0))"
+            )
+            params.extend([query, query])
+        if tag is not None:
+            clauses.append(
+                "COALESCE(c.data->'metadata'->'tags','[]'::jsonb) ? %s"
+            )
+            params.append(tag)
+        if since:
+            clauses.append("c.updated_at >= %s")
+            params.append(since)
+        if until:
+            clauses.append("c.updated_at <= %s")
+            params.append(until)
+        if after is not None:
+            clauses.append("(c.updated_at,c.id) < (%s,%s)")
+            params.extend([after[0], after[1]])
+        params.append(int(limit))
+        conn = self._connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT c.data FROM {DB_SCHEMA}.conversations c WHERE "
+                    + " AND ".join(clauses)
+                    + " ORDER BY c.updated_at DESC,c.id DESC LIMIT %s",
+                    tuple(params),
+                )
+                rows = cur.fetchall()
+            conn.rollback()
+            return [_load(Conversation, row[0]) for row in rows]
+        finally:
+            conn.close()
+
     def update_conversation(self, scope: Scope, conversation: Conversation) -> Conversation:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
@@ -581,6 +741,80 @@ class EphemeralPostgresBackendV1:
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND conversation_id=%s "
                     "ORDER BY sequence ASC LIMIT 201",
                     (owner, tenant, workspace, str(conversation_id)),
+                )
+                rows = cur.fetchall()
+            conn.rollback()
+            return [_load(Message, row[0]) for row in rows]
+        finally:
+            conn.close()
+
+    def list_messages_page(
+        self,
+        scope: Scope,
+        conversation_id: str,
+        *,
+        after_sequence: int | None,
+        limit: int,
+        newest_first: bool,
+    ) -> list[Message]:
+        self.get_conversation(scope, conversation_id)
+        owner, tenant, workspace = _scope_tuple(scope)
+        clauses = [
+            "owner_id=%s",
+            "tenant_id=%s",
+            "workspace_id=%s",
+            "conversation_id=%s",
+        ]
+        params: list[Any] = [owner, tenant, workspace, str(conversation_id)]
+        if after_sequence is not None:
+            clauses.append("sequence < %s" if newest_first else "sequence > %s")
+            params.append(int(after_sequence))
+        params.append(int(limit))
+        direction = "DESC" if newest_first else "ASC"
+        conn = self._connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT data FROM {DB_SCHEMA}.messages WHERE "
+                    + " AND ".join(clauses)
+                    + f" ORDER BY sequence {direction} LIMIT %s",
+                    tuple(params),
+                )
+                rows = cur.fetchall()
+            conn.rollback()
+            return [_load(Message, row[0]) for row in rows]
+        finally:
+            conn.close()
+
+    def retrieve_messages_page(
+        self,
+        scope: Scope,
+        conversation_id: str,
+        query: str,
+        *,
+        before_sequence: int,
+        limit: int,
+    ) -> list[Message]:
+        self.get_conversation(scope, conversation_id)
+        owner, tenant, workspace = _scope_tuple(scope)
+        conn = self._connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT data FROM {DB_SCHEMA}.messages "
+                    "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s "
+                    "AND conversation_id=%s AND sequence < %s "
+                    "AND STRPOS(LOWER(content), LOWER(%s)) > 0 "
+                    "ORDER BY sequence DESC LIMIT %s",
+                    (
+                        owner,
+                        tenant,
+                        workspace,
+                        str(conversation_id),
+                        int(before_sequence),
+                        query,
+                        int(limit),
+                    ),
                 )
                 rows = cur.fetchall()
             conn.rollback()
@@ -840,10 +1074,165 @@ class EphemeralPostgresBackendV1:
 class EphemeralPostgresChatStoreV1(PostgresChatStoreAdapterSkeleton):
     """AionChatStore-compatible adapter over the real disposable PostgreSQL backend."""
 
-    def __init__(self, backend: EphemeralPostgresBackendV1):
+    def __init__(
+        self,
+        backend: EphemeralPostgresBackendV1,
+        *,
+        cursor_signing_key: bytes,
+    ):
         if not isinstance(backend, EphemeralPostgresBackendV1):
             raise TypeError("EphemeralPostgresBackendV1 required")
         self.backend = backend
+        self._cursor = BoundCursorCodecV1(cursor_signing_key)
+
+    @staticmethod
+    def _conversation_spec(
+        *,
+        query: str,
+        tag: str | None,
+        since: str | None,
+        until: str | None,
+        archived: bool,
+    ) -> dict[str, Any]:
+        return {
+            "query": str(query or "").strip(),
+            "tag": None if tag is None else str(tag),
+            "since": None if since in (None, "") else str(since),
+            "until": None if until in (None, "") else str(until),
+            "archived": bool(archived),
+        }
+
+    def list_conversations(
+        self,
+        scope: Scope,
+        cursor=None,
+        page_size=30,
+        *,
+        query="",
+        tag=None,
+        since=None,
+        until=None,
+        archived=False,
+        **_filters,
+    ) -> Page:
+        scope = self._scope(scope)
+        size = self._size(page_size)
+        spec = self._conversation_spec(
+            query=query,
+            tag=tag,
+            since=since,
+            until=until,
+            archived=archived,
+        )
+        after = None
+        if cursor not in (None, ""):
+            position = self._cursor.decode(
+                str(cursor),
+                kind="conversations",
+                scope=scope,
+                spec=spec,
+            )
+            if (
+                not isinstance(position, list)
+                or len(position) != 2
+                or not all(isinstance(value, str) and value for value in position)
+            ):
+                raise ValueError("cursor invalid or not bound to this query")
+            after = (position[0], position[1])
+
+        rows = self.backend.list_conversations_page(
+            scope,
+            after=after,
+            limit=size + 1,
+            query=spec["query"],
+            tag=spec["tag"],
+            since=spec["since"],
+            until=spec["until"],
+            archived=spec["archived"],
+        )
+        has_more = len(rows) > size
+        items = rows[:size]
+        next_cursor = None
+        if has_more and items:
+            last = items[-1]
+            next_cursor = self._cursor.encode(
+                kind="conversations",
+                scope=scope,
+                spec=spec,
+                position=[last.updated_at, last.id],
+            )
+        return Page(items, next_cursor)
+
+    def list_messages(
+        self,
+        scope: Scope,
+        conversation_id: str,
+        cursor=None,
+        page_size=50,
+        *,
+        newest_first=False,
+        **_options,
+    ) -> Page:
+        scope = self._scope(scope)
+        size = self._size(page_size)
+        conversation_id = str(conversation_id)
+        spec = {
+            "conversation_id": conversation_id,
+            "newest_first": bool(newest_first),
+        }
+        after_sequence = None
+        if cursor not in (None, ""):
+            position = self._cursor.decode(
+                str(cursor),
+                kind="messages",
+                scope=scope,
+                spec=spec,
+            )
+            if not isinstance(position, int) or position < 1:
+                raise ValueError("cursor invalid or not bound to this query")
+            after_sequence = position
+
+        rows = self.backend.list_messages_page(
+            scope,
+            conversation_id,
+            after_sequence=after_sequence,
+            limit=size + 1,
+            newest_first=bool(newest_first),
+        )
+        has_more = len(rows) > size
+        items = rows[:size]
+        next_cursor = None
+        if has_more and items:
+            next_cursor = self._cursor.encode(
+                kind="messages",
+                scope=scope,
+                spec=spec,
+                position=items[-1].sequence,
+            )
+        return Page(items, next_cursor)
+
+    def retrieve_messages(
+        self,
+        scope: Scope,
+        conversation_id: str,
+        query: str,
+        *,
+        before_sequence: int,
+        limit=10,
+        **_options,
+    ) -> list[Message]:
+        scope = self._scope(scope)
+        size = self._size(limit)
+        query = str(query or "").strip()
+        if not query:
+            return []
+        return self.backend.retrieve_messages_page(
+            scope,
+            str(conversation_id),
+            query,
+            before_sequence=int(before_sequence),
+            limit=size,
+        )
 
 
 def ephemeral_policy() -> dict[str, Any]:
@@ -857,6 +1246,11 @@ def ephemeral_policy() -> dict[str, Any]:
         "secret_lookup_by_store": False,
         "database_url_read_by_store": False,
         "explicit_schema_install_only": True,
+        "cursor_pagination_bound": True,
+        "cursor_scope_binding": True,
+        "cursor_query_binding": True,
+        "cursor_hmac_authenticated": True,
+        "cursor_key_read_by_store": False,
         "provider_called": False,
         "billing_executed": False,
         "deploy_executed": False,
@@ -874,6 +1268,7 @@ __all__ = [
     "HEALTHY",
     "FAILED",
     "NEXT_ALLOWED_STEP",
+    "BoundCursorCodecV1",
     "install_ephemeral_schema",
     "reset_ephemeral_schema",
     "EphemeralPostgresBackendV1",
