@@ -1,27 +1,29 @@
-name: AION Chat Production Schema Binding CI V1
+name: AION Chat Storage Audit Receipts CI V1
 
 on:
   workflow_dispatch:
   pull_request:
     branches:
-      - impl/aion-chat-postgres-migration-rls-restore-ci-v1-20261007
+      - impl/aion-chat-production-schema-binding-ci-v1-20261007
     paths:
       - "atlasquant_aion_chat_ephemeral_postgres_v1.py"
       - "atlasquant_aion_chat_production_schema_binding_ci_v1.py"
+      - "atlasquant_aion_chat_storage_audit_receipts_ci_v1.py"
       - "atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
       - "migrations/aion_chat_postgres_v1/0001_initial.sql"
       - "tests/test_atlasquant_aion_chat_ephemeral_postgres_v1.py"
       - "tests/test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
       - "tests/test_atlasquant_aion_chat_production_schema_binding_ci_v1.py"
-      - "docs/aion/AION_CHAT_PRODUCTION_SCHEMA_BINDING_CI_V1.md"
-      - ".github/workflows/aion-chat-production-schema-binding-ci-v1.yml"
+      - "tests/test_atlasquant_aion_chat_storage_audit_receipts_ci_v1.py"
+      - "docs/aion/AION_CHAT_STORAGE_AUDIT_RECEIPTS_CI_V1.md"
+      - ".github/workflows/aion-chat-storage-audit-receipts-ci-v1.yml"
       - "requirements.txt"
 
 permissions:
   contents: read
 
 jobs:
-  production-schema-binding-ci-v1:
+  storage-audit-receipts-ci-v1:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -44,6 +46,7 @@ jobs:
       AION_CHAT_EPHEMERAL_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
       AION_CHAT_MIGRATION_CI_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
       AION_CHAT_PRODUCTION_SCHEMA_CI_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
+      AION_CHAT_AUDIT_CI_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -59,9 +62,9 @@ jobs:
           python -m pip install "psycopg[binary]==3.3.6"
           python -m pip check
 
-      - name: Compile binding chain
+      - name: Compile audited storage chain
         run: |
-          python -m py_compile             atlasquant_aion_chat_postgres_store_adapter_fake_v1.py             atlasquant_aion_chat_ephemeral_postgres_v1.py             atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             atlasquant_aion_chat_production_schema_binding_ci_v1.py             tests/test_atlasquant_aion_chat_ephemeral_postgres_v1.py             tests/test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             tests/test_atlasquant_aion_chat_production_schema_binding_ci_v1.py
+          python -m py_compile             atlasquant_aion_chat_postgres_store_adapter_fake_v1.py             atlasquant_aion_chat_ephemeral_postgres_v1.py             atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             atlasquant_aion_chat_production_schema_binding_ci_v1.py             atlasquant_aion_chat_storage_audit_receipts_ci_v1.py             tests/test_atlasquant_aion_chat_ephemeral_postgres_v1.py             tests/test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             tests/test_atlasquant_aion_chat_production_schema_binding_ci_v1.py             tests/test_atlasquant_aion_chat_storage_audit_receipts_ci_v1.py
 
       - name: Verify migration checksum
         run: |
@@ -79,20 +82,22 @@ jobs:
         run: |
           python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py'
 
-      - name: Run production-schema adapter binding tests
+      - name: Run production-schema binding regression
         run: |
           python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_production_schema_binding_ci_v1.py'
+
+      - name: Run atomic storage-audit receipt tests
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_storage_audit_receipts_ci_v1.py'
 
       - name: Assert production authority remains absent
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          files = [
-              Path("atlasquant_aion_chat_production_schema_binding_ci_v1.py"),
-              Path("atlasquant_aion_chat_ephemeral_postgres_v1.py"),
-          ]
-          source = "\n".join(path.read_text(encoding="utf-8") for path in files)
+          audited = Path(
+              "atlasquant_aion_chat_storage_audit_receipts_ci_v1.py"
+          ).read_text(encoding="utf-8")
 
           for banned in (
               "os.getenv(",
@@ -100,16 +105,12 @@ jobs:
               "streamlit.secrets",
               "render.com",
               "api.openai.com",
+              "DATABASE_URL",
           ):
-              assert banned not in source, banned
-
-          binding = Path(
-              "atlasquant_aion_chat_production_schema_binding_ci_v1.py"
-          ).read_text(encoding="utf-8")
+              assert banned not in audited, banned
 
           for marker in (
               '"production_allowed": False',
-              '"production_connection_allowed": False',
               '"provider_called": False',
               '"billing_executed": False',
               '"deploy_executed": False',
@@ -117,5 +118,5 @@ jobs:
               '"external_action_executed": False',
               '"core_checkpoint_write": False',
           ):
-              assert marker in binding, marker
+              assert marker in audited, marker
           PY

@@ -60,7 +60,7 @@ jobs:
 
       - name: Verify pinned migration artifact checksum
         run: |
-          printf '%s  %s\n'             "d57d5c225c86306afb79cb1d5dba2a6cd8e2838730ac27171243b4ec82664ab2"             "migrations/aion_chat_postgres_v1/0001_initial.sql"             | sha256sum --check --strict
+          printf '%s  %s\n'             "7dd72d75365862f54c81110027430011f8ac8f81ce629f500cbbd9aa0c00c50c"             "migrations/aion_chat_postgres_v1/0001_initial.sql"             | sha256sum --check --strict
 
       - name: Run migration RLS and least-privilege tests
         run: |

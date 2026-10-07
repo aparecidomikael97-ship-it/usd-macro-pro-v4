@@ -365,8 +365,8 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
                 cur.execute(
                     f"INSERT INTO {migration.SCHEMA}.access_audit"
                     "(owner_id,tenant_id,workspace_id,id,operation,actor_id,"
-                    "result,evidence_digest) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                    "resource_type,resource_id,result,evidence_digest) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                     (
                         scope[0],
                         scope[1],
@@ -374,6 +374,8 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
                         "audit-append-only",
                         "TEST",
                         "ci",
+                        "conversation",
+                        "append-only-parent",
                         "OK",
                         "sha256:append-only-proof",
                     ),
