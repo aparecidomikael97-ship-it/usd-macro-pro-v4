@@ -84,7 +84,6 @@ Presentation Mode must:
 - provide immediate owner stop/pause controls;
 - never auto-contact, bill, write CRM, deploy, trade, sign, or execute sensitive actions.
 
-
 ## PowerPoint / live presentation orchestration
 
 Presentation Mode must support a professional deck-driven meeting flow, including Microsoft PowerPoint-compatible presentations or an equivalent slide surface.
@@ -106,6 +105,69 @@ Deck content must be sourced only from an owner-approved presentation package. A
 Presentation control is a low-risk navigation capability. Editing the deck, replacing approved evidence, changing commercial commitments, publishing externally, sending files or executing actions outside the meeting remains separately authorized.
 
 This capability is intended to let HUMAN_OWNER participate naturally in the meeting while AION conducts the structured product/project presentation as the primary presenter.
+
+## Client dialogue, risk and probability reasoning
+
+Presentation Mode must support real two-way professional dialogue with meeting participants instead of following only a fixed script.
+
+When asked questions such as "qual é o risco disso dar errado?", "qual a probabilidade disso dar certo?", "o que pode impedir esse resultado?" or "qual evidência sustenta isso?", AION must:
+- pause the current presentation flow;
+- identify the scenario and assumptions being discussed;
+- separate known facts, estimates, hypotheses and unknowns;
+- explain principal risks, failure modes, mitigations and trade-offs;
+- provide a numeric probability only when there is enough evidence or a defensible model to support it;
+- state the method, assumptions, evidence period and confidence behind any probability shown;
+- prefer calibrated probability ranges or qualitative bands when an exact percentage would create false precision;
+- explicitly state when there is not enough evidence to quantify a probability;
+- compare success and failure scenarios using approved evidence, benchmarks, validated historical data or clearly labeled simulation;
+- distinguish synthetic/demo evidence from real production evidence;
+- never invent customer results, success rates or guarantees;
+- resume the presentation from the correct point after the question is resolved.
+
+## Adaptive meeting modes
+
+AION Presentation Mode should support explicit meeting profiles:
+- EXECUTIVE: concise, focused on value, ROI, risk, governance and next decision;
+- TECHNICAL: deeper architecture, integrations, controls, evidence and limitations;
+- COMMERCIAL: diagnostic value, use cases, pilot, objections and next steps;
+- DEMO: product behavior and approved synthetic scenarios.
+
+AION may adapt depth and language during the meeting, but must not silently change policy boundaries or authority.
+
+## Human handoff and owner control
+
+AION must hand control back to HUMAN_OWNER when:
+- the participant requests a binding commercial commitment;
+- pricing, discounts, contract terms or exceptional promises are requested beyond an approved range;
+- the question depends on unavailable or private information;
+- a sensitive action or privileged authorization is required;
+- confidence is too low for a reliable answer;
+- the owner says "AION, pausa", "AION, eu assumo" or equivalent.
+
+The handoff must be graceful: AION should explain that the point requires owner confirmation rather than improvising an answer.
+
+## Meeting summary and follow-up
+
+If the participants have been informed and recording/transcription is permitted, AION may generate a post-meeting summary containing:
+- questions asked;
+- main interests and use cases;
+- objections and risks discussed;
+- evidence requested;
+- decisions actually made;
+- open items;
+- agreed next steps.
+
+The summary must separate agreed facts from inferred interest. It must not automatically send messages, create commitments, update CRM, schedule follow-ups or share files unless the corresponding action is separately authorized.
+
+## Offline continuity
+
+An owner-approved presentation package should have an offline fallback containing the deck, synthetic demo data, required images, charts, key reports and presentation script.
+
+If connectivity is lost:
+- AION should continue the local presentation where possible;
+- live-data sections must be clearly marked unavailable rather than replaced with stale data without disclosure;
+- Q&A must be limited to locally available approved knowledge;
+- any action requiring network access remains blocked.
 
 ## Voice + camera interaction
 
@@ -155,6 +217,9 @@ Future implementation should compose with:
 4. Local owner-presence enrollment and verification candidate.
 5. On-demand visual question pipeline.
 6. Presentation Mode over synthetic Demo/Sandbox.
-7. Mobile parity where Android/iOS permissions allow.
+7. PowerPoint/live presentation orchestration.
+8. Adaptive Q&A with risk/probability reasoning and human handoff.
+9. Meeting summary and offline continuity.
+10. Mobile parity where Android/iOS permissions allow.
 
 This sequence remains subordinate to completion of the official AION Core V1 closure.
