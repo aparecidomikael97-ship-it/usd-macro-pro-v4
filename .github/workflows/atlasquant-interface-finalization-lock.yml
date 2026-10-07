@@ -1,0 +1,91 @@
+name: AtlasQuant Interface Finalization Lock
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "test_atlasquant_interface_finalization_lock.py"
+      - "atlasquant_central_hub_ui.py"
+      - "atlasquant_reference_ui.py"
+      - "atlasquant_compact_cockpit.py"
+      - "atlasquant_ecosystem_workspace_ui.py"
+      - "atlasquant_premium_shell.py"
+      - "assets/ecosystem_reference/**"
+      - "test_atlasquant_central_hub_ui.py"
+      - "test_atlasquant_ecosystem_workspace_ui.py"
+      - "test_atlasquant_reference_ui.py"
+      - "test_atlasquant_reference_browser.py"
+      - "docs/continuidade/INTERFACE_FINALIZATION_LOCK_2026-10-07.md"
+      - ".github/workflows/atlasquant-interface-finalization-lock.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlasquant-interface-finalization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interface-finalization:
+    name: Validate four-door entry and workspace navigation
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install UI validation dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+          python -m playwright install --with-deps chromium
+
+      - name: Validate finalization lock and existing UI contracts
+        run: |
+          python -m pytest -q             test_atlasquant_interface_finalization_lock.py             test_atlasquant_central_hub_ui.py             test_atlasquant_ecosystem_workspace_ui.py             test_atlasquant_reference_ui.py
+
+      - name: Validate real desktop/mobile navigation
+        run: |
+          python -m pytest -q -s             test_atlasquant_reference_browser.py::test_all_screens_real_clicks_desktop_mobile             test_atlasquant_reference_browser.py::test_central_and_legacy_cards_keep_exact_hover_and_keyboard_geometry             test_atlasquant_reference_browser.py::test_trader_24_functions_discoverable_and_clickable_in_both_modes             test_atlasquant_reference_browser.py::test_login_and_existing_offline_backtest_matrix
+
+      - name: Assert Core/authority boundary untouched
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          changed = set()
+          # The PR intentionally changes only the lock test/docs/workflow
+          # plus Quality registration for the new regression test.
+          expected = {
+              "test_atlasquant_interface_finalization_lock.py",
+              "docs/continuidade/INTERFACE_FINALIZATION_LOCK_2026-10-07.md",
+              ".github/workflows/atlasquant-interface-finalization-lock.yml",
+              ".github/workflows/quality-tests.yml",
+          }
+          print("Expected UI-only delta:", sorted(expected))
+          for path in expected:
+              assert Path(path).exists(), path
+          forbidden = (
+              "atlasquant_aion_owner_signature_ceremony.py",
+              "atlasquant_aion_owner_decision_record.py",
+              "atlasquant_aion_owner_decision_persistence_attestation.py",
+              "atlasquant_aion_global_worker_activation.py",
+          )
+          for path in forbidden:
+              assert Path(path).exists(), path
+          print("Authority boundary PASS: validation-only UI delta")
+          PY
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: atlasquant-interface-finalization-evidence-${{ github.sha }}
+          path: visual_review/
+          if-no-files-found: ignore
+          retention-days: 30
