@@ -23,7 +23,7 @@ MIGRATION_RELATIVE_PATH = Path(
     "migrations/aion_chat_postgres_v1/0001_initial.sql"
 )
 EXPECTED_MIGRATION_SHA256 = (
-    "0bb91049a51177bc8fbe42654c82497fae95714042028ff831cf2c87a9cfca50"
+    "d57d5c225c86306afb79cb1d5dba2a6cd8e2838730ac27171243b4ec82664ab2"
 )
 MIGRATION_LOCK_KEY = 0x41514D4947524154  # "AQMIGRAT", within signed bigint.
 APPLIED = "APPLIED"
