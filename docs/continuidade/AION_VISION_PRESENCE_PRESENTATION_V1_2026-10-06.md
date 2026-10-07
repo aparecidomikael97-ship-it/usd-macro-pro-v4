@@ -177,6 +177,74 @@ The preflight should expose only explicit states such as READY, DEGRADED or BLOC
 
 Preflight never starts a meeting, opens the camera, records participants, sends data, changes credentials or authorizes external actions by itself.
 
+
+## Rehearsal mode
+
+Before a real meeting, AION should support a REHEARSAL mode that uses the exact approved deck, script, charts, demo routes and offline fallback without exposing any real participant data.
+
+Rehearsal mode should:
+- simulate the full presentation timing;
+- surface missing assets, broken links, unsupported media and unavailable live dependencies;
+- generate likely audience questions and objections from the approved meeting profile;
+- test transitions between slides and live AtlasQuant demo screens;
+- let HUMAN_OWNER interrupt, change depth and practice handoffs;
+- produce a readiness report without sending, publishing or recording externally.
+
+Rehearsal is non-authoritative and must never create customer commitments.
+
+## Audience privacy and disclosure boundary
+
+Presentation Mode must enforce an audience-safe data boundary.
+
+Before the meeting starts, AION should know which information classes are allowed for the audience:
+- PUBLIC_DEMO
+- APPROVED_COMMERCIAL
+- APPROVED_TECHNICAL
+- OWNER_PRIVATE
+- CUSTOMER_CONFIDENTIAL
+- PRODUCTION_SECRET
+
+Only explicitly allowed classes may be shown or spoken. OWNER_PRIVATE, CUSTOMER_CONFIDENTIAL and PRODUCTION_SECRET are denied by default.
+
+If microphone, camera, transcription or recording is enabled, the meeting flow must provide an explicit disclosure state and only proceed when the configured consent requirements are satisfied.
+
+AION must never use private owner memory merely because it is relevant to an answer.
+
+## Evidence traceability in live answers
+
+Whenever AION makes a material factual, quantitative, validation, performance, risk or probability claim during a meeting, it should be able to identify the approved source class behind the answer.
+
+Possible evidence classes include:
+- VALIDATED_INTERNAL_EVIDENCE
+- APPROVED_EXTERNAL_SOURCE
+- SYNTHETIC_DEMO
+- HISTORICAL_OBSERVATION
+- MODEL_ESTIMATE
+- UNKNOWN
+
+For claims that materially affect a customer decision, AION should be able to surface the source, date or evidence reference on request.
+
+If the source is UNKNOWN or the evidence is stale, conflicting or insufficient, AION must say so instead of presenting the statement as established fact.
+
+## Immediate stop / safe presentation state
+
+HUMAN_OWNER must have a deterministic emergency control that immediately stops AION's active presentation behavior.
+
+Examples include:
+- "AION, parar apresentação"
+- "AION, modo seguro"
+- an explicit visible STOP control.
+
+The safe presentation state must:
+- stop narration;
+- stop slide/demo navigation;
+- stop active camera capture unless separately required by an already-approved user action;
+- stop microphone processing beyond what the platform requires to detect the explicit stop command;
+- prevent new external actions;
+- preserve enough local state to resume safely only after an explicit owner command.
+
+Emergency stop must not depend on network connectivity.
+
 ## Voice + camera interaction
 
 The future resident AION agent should support:
@@ -228,6 +296,7 @@ Future implementation should compose with:
 7. PowerPoint/live presentation orchestration.
 8. Adaptive Q&A with risk/probability reasoning and human handoff.
 9. Meeting summary and offline continuity.
-10. Mobile parity where Android/iOS permissions allow.
+10. Rehearsal mode, audience privacy, evidence traceability and emergency stop.
+11. Mobile parity where Android/iOS permissions allow.
 
 This sequence remains subordinate to completion of the official AION Core V1 closure.
