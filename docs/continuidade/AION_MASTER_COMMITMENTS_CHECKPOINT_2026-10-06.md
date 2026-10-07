@@ -315,7 +315,95 @@ AION should eventually surface a concise HUMAN_OWNER dashboard showing:
 
 The goal is decision clarity, not dashboard overload.
 
-## 15. Transition-from-CLT operating objective
+## 15. Final structural resilience pillars
+
+These six items are required before considering the strategic architecture sufficiently covered for disciplined implementation and commercialization.
+
+### 15.1 Business continuity and recovery
+Maintain:
+- backup policy for configuration, memory, documents and operational data;
+- tested restore procedure;
+- recovery runbooks;
+- recovery-point and recovery-time targets appropriate to each subsystem;
+- explicit degraded/offline operating modes;
+- evidence that backups can actually be restored.
+
+A backup that has never been restored successfully must not be treated as proven recovery.
+
+### 15.2 Operational observability
+AION should monitor and surface:
+- service health;
+- workflow failures;
+- latency;
+- queue/backlog state;
+- broken integrations;
+- provider outages;
+- API/model cost;
+- retry/reconciliation state;
+- unresolved external-effect outcomes.
+
+The goal is to detect material failure before the customer becomes the monitoring system.
+
+### 15.3 Secrets and dependency management
+Maintain:
+- centralized secret storage;
+- least-privilege credentials;
+- rotation/revocation capability;
+- no secrets embedded in source, logs or training content;
+- dependency inventory;
+- provider substitution/fallback plan for critical AI, email, CRM, storage and communication services where practical;
+- explicit handling for provider outage or account lockout.
+
+The ecosystem should avoid unnecessary single-provider lock-in.
+
+### 15.4 Complete customer lifecycle
+Customer operations must cover the full lifecycle:
+- lead;
+- diagnostic;
+- proposal/pilot;
+- contract;
+- onboarding;
+- implementation;
+- activation;
+- support;
+- value/ROI review;
+- renewal/expansion;
+- pause;
+- cancellation;
+- data export/return when applicable;
+- access revocation;
+- retention/deletion obligations;
+- final account closure.
+
+Customer offboarding must be as controlled as onboarding.
+
+### 15.5 AION change and release governance
+Changes to AION models, prompts, policies, tools, integrations and automations should use:
+- versioning;
+- test/sandbox validation;
+- feature flags where appropriate;
+- staged promotion;
+- rollback;
+- change attribution;
+- release evidence;
+- compatibility checks;
+- explicit handling of behavior regressions.
+
+AION must not silently self-modify production-critical behavior.
+
+### 15.6 Key-person risk reduction
+Because HUMAN_OWNER may initially be the only person who understands the full operation, maintain:
+- current runbooks;
+- architecture and operating documentation;
+- credential recovery procedures that do not expose secrets;
+- emergency contacts and specialist handoff information;
+- documented recurring obligations;
+- owner absence/delegation procedure with least privilege;
+- enough operational documentation for the business to continue safely during temporary HUMAN_OWNER unavailability.
+
+This does not remove HUMAN_OWNER authority over reserved decisions; it reduces avoidable operational dependency.
+
+## 16. Transition-from-CLT operating objective
 
 The ecosystem should support a safe transition rather than chase an arbitrary date.
 
@@ -329,7 +417,7 @@ The preferred path remains:
 
 Trader should not be treated as the primary funding source for the transition. Negócios is the intended first cash engine; Investimentos is primarily preservation/long-term capital.
 
-## 16. Change discipline
+## 17. Change discipline
 
 For any new idea:
 1. determine whether it belongs in frozen Core or a governed module;
@@ -340,7 +428,7 @@ For any new idea:
 6. do not merge/deploy without the required authorization;
 7. do not let non-essential work displace official Core closure.
 
-## 17. Current linked design PRs
+## 18. Current linked design PRs
 
 - #966 — AION Vision, Presence & Presentation V1
 - #967 — AION Commercial Autonomy & Outreach V1
@@ -350,7 +438,7 @@ For any new idea:
 
 These tracks are intentionally separate from official Core closure and are not proof of production readiness.
 
-## 18. Definition of success for this checkpoint
+## 19. Definition of success for this checkpoint
 
 This checkpoint succeeds if:
 - none of today's important requirements are lost;
