@@ -360,6 +360,20 @@ class EphemeralPostgresBackendV1:
         """Hook for stronger CI bindings; base ephemeral schema has no RLS."""
         _scope_tuple(scope)
 
+    def _audit_mutation(
+        self,
+        cur,
+        scope: Scope,
+        *,
+        operation: str,
+        resource_type: str,
+        resource_id: str,
+        result: str,
+        evidence: dict[str, Any],
+    ) -> None:
+        """Mutation-audit hook. Base ephemeral backend intentionally emits none."""
+        _scope_tuple(scope)
+
     def health_report(self) -> dict[str, Any]:
         report = {
             "state": FAILED,
@@ -468,6 +482,18 @@ class EphemeralPostgresBackendV1:
                         conversation.title,
                         _dump(conversation),
                     ),
+                )
+                self._audit_mutation(
+                    cur,
+                    scope,
+                    operation="CONVERSATION_CREATE",
+                    resource_type="conversation",
+                    resource_id=conversation.id,
+                    result="COMMITTED",
+                    evidence={
+                        "conversation_id": conversation.id,
+                        "created_at": conversation.created_at,
+                    },
                 )
             conn.commit()
             return Conversation(**asdict(conversation))
@@ -605,9 +631,22 @@ class EphemeralPostgresBackendV1:
                     ),
                 )
                 changed = cur.rowcount
+                if changed != 1:
+                    raise LookupError("conversation unavailable")
+                self._audit_mutation(
+                    cur,
+                    scope,
+                    operation="CONVERSATION_UPDATE",
+                    resource_type="conversation",
+                    resource_id=conversation.id,
+                    result="COMMITTED",
+                    evidence={
+                        "conversation_id": conversation.id,
+                        "archived": bool(conversation.archived),
+                        "updated_at": conversation.updated_at,
+                    },
+                )
             conn.commit()
-            if changed != 1:
-                raise LookupError("conversation unavailable")
             return Conversation(**asdict(conversation))
         finally:
             conn.close()
@@ -702,6 +741,28 @@ class EphemeralPostgresBackendV1:
                             conversation.id,
                         ),
                     )
+                self._audit_mutation(
+                    cur,
+                    scope,
+                    operation=(
+                        "MESSAGE_APPEND_IDEMPOTENT"
+                        if prior is not None
+                        else "MESSAGE_APPEND"
+                    ),
+                    resource_type="message",
+                    resource_id=stored.id,
+                    result=(
+                        "ALREADY_COMMITTED"
+                        if prior is not None
+                        else "COMMITTED"
+                    ),
+                    evidence={
+                        "conversation_id": stored.conversation_id,
+                        "message_id": stored.id,
+                        "sequence": stored.sequence,
+                        "idempotency_key": key,
+                    },
+                )
             try:
                 conn.commit()
             except Exception as exc:
@@ -898,6 +959,20 @@ class EphemeralPostgresBackendV1:
                         _dump(attachment),
                     ),
                 )
+                self._audit_mutation(
+                    cur,
+                    scope,
+                    operation="ATTACHMENT_METADATA_ADD",
+                    resource_type="attachment",
+                    resource_id=attachment.id,
+                    result="COMMITTED",
+                    evidence={
+                        "conversation_id": attachment.conversation_id,
+                        "attachment_id": attachment.id,
+                        "digest": attachment.digest,
+                        "size": attachment.size,
+                    },
+                )
             conn.commit()
             return Attachment(**asdict(attachment))
         except psycopg.errors.UniqueViolation as exc:
@@ -996,6 +1071,19 @@ class EphemeralPostgresBackendV1:
                         conversation.id,
                     ),
                 )
+                self._audit_mutation(
+                    cur,
+                    scope,
+                    operation="CHECKPOINT_SAVE",
+                    resource_type="checkpoint",
+                    resource_id=checkpoint.id,
+                    result="COMMITTED",
+                    evidence={
+                        "conversation_id": checkpoint.conversation_id,
+                        "checkpoint_id": checkpoint.id,
+                        "through_sequence": checkpoint.through_sequence,
+                    },
+                )
             conn.commit()
             return ConversationCheckpoint(**asdict(checkpoint))
         except (LookupError, ValueError):
@@ -1075,6 +1163,20 @@ class EphemeralPostgresBackendV1:
                         summary.through_sequence,
                         _dump(summary),
                     ),
+                )
+                self._audit_mutation(
+                    cur,
+                    scope,
+                    operation="SUMMARY_SAVE",
+                    resource_type="summary",
+                    resource_id=summary.id,
+                    result="COMMITTED",
+                    evidence={
+                        "conversation_id": summary.conversation_id,
+                        "summary_id": summary.id,
+                        "through_sequence": summary.through_sequence,
+                        "source_message_ids": list(summary.source_message_ids),
+                    },
                 )
             conn.commit()
             return ContextSummary(**asdict(summary))
