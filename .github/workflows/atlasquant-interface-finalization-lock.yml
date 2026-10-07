@@ -17,7 +17,7 @@ on:
       - "test_atlasquant_ecosystem_workspace_ui.py"
       - "test_atlasquant_reference_ui.py"
       - "test_atlasquant_reference_browser.py"
-      - "docs/continuidade/INTERFACE_FINALIZATION_LOCK_2026-10-06.md"
+      - "docs/continuidade/INTERFACE_FINALIZATION_LOCK_2026-10-07.md"
       - ".github/workflows/atlasquant-interface-finalization-lock.yml"
 
 permissions:
@@ -62,7 +62,7 @@ jobs:
           # The PR intentionally changes only the lock test/docs/workflow.
           expected = {
               "test_atlasquant_interface_finalization_lock.py",
-              "docs/continuidade/INTERFACE_FINALIZATION_LOCK_2026-10-06.md",
+              "docs/continuidade/INTERFACE_FINALIZATION_LOCK_2026-10-07.md",
               ".github/workflows/atlasquant-interface-finalization-lock.yml",
           }
           print("Expected UI-only delta:", sorted(expected))
