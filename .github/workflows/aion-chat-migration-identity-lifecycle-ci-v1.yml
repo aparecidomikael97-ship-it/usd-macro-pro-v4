@@ -1,0 +1,164 @@
+name: AION Chat Migration Identity Lifecycle CI V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - impl/aion-chat-tls-direct-app-role-ci-v1-20261007
+    paths:
+      - "atlasquant_aion_chat_migration_identity_lifecycle_ci_v1.py"
+      - "tests/test_atlasquant_aion_chat_migration_identity_lifecycle_ci_v1.py"
+      - "atlasquant_aion_chat_tls_direct_app_role_ci_v1.py"
+      - "tests/test_atlasquant_aion_chat_tls_direct_app_role_ci_v1.py"
+      - "atlasquant_aion_chat_postgres_schema_candidate_freeze_v1.py"
+      - "migrations/aion_chat_postgres_v1/0001_initial.sql"
+      - "docs/aion/AION_CHAT_MIGRATION_IDENTITY_LIFECYCLE_CI_V1.md"
+      - ".github/workflows/aion-chat-migration-identity-lifecycle-ci-v1.yml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  migration-identity-lifecycle-ci-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aion_chat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aion_chat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned PostgreSQL driver
+        run: |
+          grep -Fx "psycopg[binary]==3.3.6" requirements.txt
+          python -m pip install pip==26.2.1
+          python -m pip install "psycopg[binary]==3.3.6"
+          python -m pip check
+
+      - name: Generate disposable CA and enable PostgreSQL TLS-only TCP
+        shell: bash
+        run: |
+          set -euo pipefail
+          TLS_DIR="$RUNNER_TEMP/aion-chat-postgres-tls"
+          mkdir -p "$TLS_DIR"
+
+          openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 1             -subj "/CN=AtlasQuant AION CI Root"             -keyout "$TLS_DIR/ca.key"             -out "$TLS_DIR/ca.crt"
+
+          openssl req -newkey rsa:2048 -nodes -sha256             -subj "/CN=localhost"             -keyout "$TLS_DIR/server.key"             -out "$TLS_DIR/server.csr"
+
+          cat > "$TLS_DIR/server.ext" <<'EOF'
+          subjectAltName=DNS:localhost
+          extendedKeyUsage=serverAuth
+          EOF
+
+          openssl x509 -req -sha256 -days 1             -in "$TLS_DIR/server.csr"             -CA "$TLS_DIR/ca.crt"             -CAkey "$TLS_DIR/ca.key"             -CAcreateserial             -extfile "$TLS_DIR/server.ext"             -out "$TLS_DIR/server.crt"
+
+          CID="$(docker ps --filter ancestor=postgres:17-alpine --format '{{.ID}}' | head -n1)"
+          test -n "$CID"
+
+          docker cp "$TLS_DIR/server.crt" "$CID":/var/lib/postgresql/server.crt
+          docker cp "$TLS_DIR/server.key" "$CID":/var/lib/postgresql/server.key
+
+          docker exec -u root "$CID" sh -c '
+            set -eu
+            chown postgres:postgres               /var/lib/postgresql/server.crt               /var/lib/postgresql/server.key
+            chmod 644 /var/lib/postgresql/server.crt
+            chmod 600 /var/lib/postgresql/server.key
+
+            printf "\nssl = on\nssl_cert_file = '\''/var/lib/postgresql/server.crt'\''\nssl_key_file = '\''/var/lib/postgresql/server.key'\''\n"               >> "$PGDATA/postgresql.conf"
+
+            TMP_HBA="$(mktemp)"
+            {
+              echo "hostssl all all 0.0.0.0/0 scram-sha-256"
+              echo "host all all 0.0.0.0/0 reject"
+              echo "hostssl all all ::0/0 scram-sha-256"
+              echo "host all all ::0/0 reject"
+              cat "$PGDATA/pg_hba.conf"
+            } > "$TMP_HBA"
+            cat "$TMP_HBA" > "$PGDATA/pg_hba.conf"
+            rm -f "$TMP_HBA"
+          '
+
+          docker restart "$CID" >/dev/null
+          for attempt in $(seq 1 30); do
+            if docker exec "$CID" pg_isready -U postgres -d aion_chat_test >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$CID" pg_isready -U postgres -d aion_chat_test
+
+          ADMIN_DSN="postgresql://postgres:postgres@localhost:5432/aion_chat_test?sslmode=verify-full&sslrootcert=$TLS_DIR/ca.crt"
+          {
+            echo "AION_CHAT_MIGRATION_IDENTITY_CI_ADMIN_DSN=$ADMIN_DSN"
+            echo "AION_CHAT_TLS_CI_ADMIN_DSN=$ADMIN_DSN"
+          } >> "$GITHUB_ENV"
+
+      - name: Compile migration identity chain
+        run: |
+          python -m py_compile             atlasquant_aion_chat_migration_identity_lifecycle_ci_v1.py             atlasquant_aion_chat_tls_direct_app_role_ci_v1.py             tests/test_atlasquant_aion_chat_migration_identity_lifecycle_ci_v1.py             tests/test_atlasquant_aion_chat_tls_direct_app_role_ci_v1.py
+
+      - name: Verify frozen schema candidate checksum
+        run: |
+          printf '%s  %s\n'             "7dd72d75365862f54c81110027430011f8ac8f81ce629f500cbbd9aa0c00c50c"             "migrations/aion_chat_postgres_v1/0001_initial.sql"             | sha256sum --check --strict
+
+      - name: Run verified TLS regression
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_tls_direct_app_role_ci_v1.py'
+
+      - name: Run short-lived migration identity lifecycle tests
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_migration_identity_lifecycle_ci_v1.py'
+
+      - name: Assert production authority and secret lookup remain absent
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_chat_migration_identity_lifecycle_ci_v1.py"
+          ).read_text(encoding="utf-8")
+
+          for banned in (
+              "DATABASE_URL",
+              "os.getenv(",
+              "os.environ",
+              "streamlit.secrets",
+              "render.com",
+              "api.openai.com",
+          ):
+              assert banned not in source, banned
+
+          for marker in (
+              '"post_migration_database_create_revoked": True',
+              '"post_migration_login_disabled": True',
+              '"migration_role_is_application_role": False',
+              '"superuser_allowed": False',
+              '"production_connection_allowed": False',
+              '"provider_called": False',
+              '"billing_executed": False',
+              '"deploy_executed": False',
+              '"worker_armed": False',
+              '"external_action_executed": False',
+              '"core_checkpoint_write": False',
+          ):
+              assert marker in source, marker
+          PY
