@@ -107,6 +107,15 @@ class EphemeralPostgresV1Tests(unittest.TestCase):
         self.assertEqual(report["state"], pg.HEALTHY)
         self.assertEqual(report["schema_version"], pg.SCHEMA_VERSION)
         self.assertTrue(report["scope_policy_healthy"])
+        self.assertTrue(report["transaction_healthy"])
+        self.assertEqual(
+            report["required_constraints_present"],
+            len(pg.REQUIRED_CONSTRAINTS),
+        )
+        self.assertEqual(
+            report["required_constraints_expected"],
+            len(pg.REQUIRED_CONSTRAINTS),
+        )
 
         conn = self.connect()
         try:
@@ -129,6 +138,70 @@ class EphemeralPostgresV1Tests(unittest.TestCase):
                     (pg.SCHEMA_VERSION, "aion_chat"),
                 )
             conn.commit()
+        finally:
+            conn.close()
+
+    def test_health_fails_closed_when_required_scope_constraint_is_missing(self):
+        constraint = "attachments_scope_conversation_fk_v1"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"ALTER TABLE {pg.DB_SCHEMA}.attachments DROP CONSTRAINT {constraint}"
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+        try:
+            report = self.store.storage_health()
+            self.assertEqual(report["state"], pg.FAILED)
+            self.assertFalse(report["scope_policy_healthy"])
+            self.assertEqual(
+                report["required_constraints_present"],
+                len(pg.REQUIRED_CONSTRAINTS) - 1,
+            )
+            with self.assertRaises(StorageUnavailableError):
+                self.store.require_healthy()
+        finally:
+            conn = self.connect()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"ALTER TABLE {pg.DB_SCHEMA}.attachments "
+                        f"ADD CONSTRAINT {constraint} "
+                        f"FOREIGN KEY(owner_id,tenant_id,workspace_id,conversation_id) "
+                        f"REFERENCES {pg.DB_SCHEMA}.conversations"
+                        f"(owner_id,tenant_id,workspace_id,id) ON DELETE CASCADE"
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def test_schema_rejects_idempotency_message_from_another_conversation(self):
+        original = self.store.append_message(
+            self.scope, self.message("bound", "bound-key")
+        )
+        other = self.store.create_conversation(self.scope, title="other")
+        conn = self.connect()
+        try:
+            with conn.cursor() as cur:
+                with self.assertRaises(psycopg.errors.ForeignKeyViolation):
+                    cur.execute(
+                        f"INSERT INTO {pg.DB_SCHEMA}.message_idempotency"
+                        "(owner_id,tenant_id,workspace_id,conversation_id,"
+                        "idempotency_key,message_id) "
+                        "VALUES (%s,%s,%s,%s,%s,%s)",
+                        (
+                            self.scope.owner_id,
+                            self.scope.tenant_id,
+                            self.scope.workspace_id,
+                            other.id,
+                            "malicious-cross-conversation",
+                            original.id,
+                        ),
+                    )
+            conn.rollback()
         finally:
             conn.close()
 
