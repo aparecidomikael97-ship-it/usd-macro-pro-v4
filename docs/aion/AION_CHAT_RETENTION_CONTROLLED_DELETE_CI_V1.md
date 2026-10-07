@@ -103,10 +103,14 @@ model before they can use this path.
 
 ## Stale-plan protection
 
-At execution, the conversation is locked with `FOR UPDATE`.
+Execution runs at PostgreSQL `SERIALIZABLE` isolation without granting UPDATE
+privilege to the retention role.
 
-The child counts are recomputed inside that transaction. If the resulting plan
-digest differs from the approved plan digest, execution stops.
+The conversation and child counts are reread inside that serializable
+transaction before DELETE. If the resulting plan digest differs from the
+approved plan digest, execution stops. A concurrent write that races the
+protected delete must serialize cleanly or make the destructive transaction
+fail closed rather than widening the role with UPDATE authority.
 
 A new plan and new approval are required.
 
