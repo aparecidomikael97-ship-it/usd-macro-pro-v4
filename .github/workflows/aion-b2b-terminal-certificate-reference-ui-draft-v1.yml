@@ -1,0 +1,65 @@
+name: AION B2B Terminal Certificate Reference UI Draft V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - integration/aion-b2b-terminal-certificate-panel-component-offline-v1-20261006
+    paths:
+      - "atlasquant_reference_ui.py"
+      - "atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py"
+      - "test_atlasquant_aion_b2b_terminal_certificate_reference_ui_draft_v1.py"
+      - "docs/aion/AION_B2B_TERMINAL_CERTIFICATE_REFERENCE_UI_DRAFT_V1.md"
+      - ".github/workflows/aion-b2b-terminal-certificate-reference-ui-draft-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-certificate-reference-ui-draft-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check pytest==9.1.1
+      - name: Compile reference UI integration
+        run: |
+          python -m py_compile \
+            atlasquant_reference_ui.py \
+            atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_reference_ui_draft_v1.py
+      - name: Run reference UI terminal-certificate Draft tests
+        run: |
+          python -m pytest -q \
+            test_atlasquant_aion_b2b_terminal_certificate_panel_component_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_reference_ui_draft_v1.py \
+            test_atlasquant_reference_ui.py
+      - name: Assert no live terminal-certificate session binding
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("atlasquant_reference_ui.py").read_text(encoding="utf-8")
+          runtime = source[
+              source.index("def render_reference_workspace("):
+              source.index("def render_trader_entry(")
+          ]
+          assert "terminal_certificate_panel_view_model" not in runtime
+          assert "terminal_certificate_panel" not in runtime
+          assert "atlasquant_b2b_terminal_certificate" not in runtime
+
+          signature = source[
+              source.index("def reference_html("):
+              source.index("):", source.index("def reference_html(")) + 2
+          ]
+          assert "terminal_certificate_panel_view_model" in signature
+          assert 'selected == "privacy"' in source
+          assert "render_terminal_certificate_panel_offline" in source
+          PY

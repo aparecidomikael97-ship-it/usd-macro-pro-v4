@@ -1,0 +1,70 @@
+name: AION B2B Pilot Activation Preflight
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_pilot_activation_preflight.py"
+      - "test_atlasquant_aion_b2b_pilot_activation_preflight.py"
+      - "atlasquant_aion_b2b_pilot_owner_decision_persistence_attestation.py"
+      - "atlasquant_aion_b2b_pilot_checkpoint_writer_attestation.py"
+      - "docs/aion/AION_B2B_PILOT_ACTIVATION_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-b2b-pilot-activation-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  activation-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile activation preflight chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_pilot_owner_decision_persistence_attestation.py \
+            atlasquant_aion_b2b_pilot_checkpoint_writer_attestation.py \
+            atlasquant_aion_b2b_pilot_activation_preflight.py \
+            test_atlasquant_aion_b2b_pilot_activation_preflight.py
+      - name: Run activation preflight tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_pilot_activation_preflight.py
+      - name: Assert ceremony eligibility is not activation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_pilot_activation_preflight.py").read_text(encoding="utf-8")
+          for marker in (
+              '"READY_FOR_ACTIVATION_CEREMONY"',
+              '"activation_request_issued": False',
+              '"owner_activation_signature_required": True',
+              '"owner_activation_signature_verified": False',
+              '"pilot_activation_authorized": False',
+              '"pilot_activated": False',
+              '"customer_contact_authorized": False',
+              '"contract_signature_authorized": False',
+              '"billing_authorized": False',
+              '"spend_authorized": False',
+              '"provisioning_authorized": False',
+              '"deploy_authorized": False',
+              '"crm_write_authorized": False',
+              '"production_mutation_authorized": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+          for banned in (
+              "append_checkpoint_patch(",
+              "save_runtime_checkpoint(",
+              "requests.post(",
+              "requests.put(",
+              "subprocess.",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          PY

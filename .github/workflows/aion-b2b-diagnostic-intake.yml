@@ -1,0 +1,55 @@
+name: AION B2B Diagnostic Intake
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_b2b_diagnostic_intake.py"
+      - "test_atlasquant_aion_b2b_diagnostic_intake.py"
+      - "atlasquant_aion_b2b_pilot_readiness.py"
+      - "docs/aion/AION_B2B_DIAGNOSTIC_INTAKE_V1.md"
+      - ".github/workflows/aion-b2b-diagnostic-intake.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile diagnostic chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_diagnostic_intake.py \
+            atlasquant_aion_b2b_pilot_readiness.py \
+            test_atlasquant_aion_b2b_diagnostic_intake.py
+      - name: Run diagnostic and Pilot Readiness integration tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_diagnostic_intake.py \
+            test_atlasquant_aion_b2b_pilot_readiness.py
+      - name: Assert human-scoring and non-action boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_diagnostic_intake.py").read_text(encoding="utf-8")
+          for marker in (
+              '"automatic_score_generation": False',
+              '"automatic_acceptance": False',
+              '"automatic_outreach": False',
+              '"automatic_proposal": False',
+              '"automatic_pricing": False',
+              '"automatic_contract": False',
+              '"crm_write": False',
+              '"executes_action": False',
+          ):
+              assert marker in source, marker
+          assert "EXPLICIT_HUMAN_ASSESSMENT_REQUIRED" in source
+          assert "READY_FOR_PILOT_READINESS" in source
+          PY

@@ -1,0 +1,82 @@
+name: AION B2B Terminal Certificate Read Model UI Runtime Binding Offline V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - integration/aion-b2b-terminal-certificate-read-model-runtime-projection-offline-v1-20261006
+    paths:
+      - "atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py"
+      - "test_atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py"
+      - "atlasquant_aion_b2b_terminal_certificate_read_model_runtime_projection_offline_v1.py"
+      - "atlasquant_aion_b2b_execution_terminal_certificate_read_model_ui_v1.py"
+      - "docs/aion/AION_B2B_TERMINAL_CERTIFICATE_READ_MODEL_UI_RUNTIME_BINDING_OFFLINE_V1.md"
+      - ".github/workflows/aion-b2b-terminal-certificate-read-model-ui-runtime-binding-offline-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-certificate-read-model-ui-runtime-binding-offline-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check pytest==9.1.1
+      - name: Compile UI runtime binding chain
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_terminal_certificate_read_model_runtime_projection_offline_v1.py \
+            atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py
+      - name: Run UI runtime binding offline tests
+        run: |
+          python -m pytest -q \
+            test_atlasquant_aion_b2b_terminal_certificate_read_model_runtime_projection_offline_v1.py \
+            test_atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py
+      - name: Assert presentation-only boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          text = Path(
+              "atlasquant_aion_b2b_terminal_certificate_read_model_ui_runtime_binding_offline_v1.py"
+          ).read_text(encoding="utf-8")
+
+          for banned in (
+              "DurableExecutionStore",
+              "sqlite3.connect(",
+              "requests.get(",
+              "requests.post(",
+              "httpx.request(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "os.system(",
+              "st.button(",
+              "deploy_to_production(",
+              "send_whatsapp(",
+              "send_email(",
+          ):
+              assert banned not in text, banned
+
+          for marker in (
+              'MODE = "OFFLINE_READ_ONLY_FAIL_CLOSED_TERMINAL_CERTIFICATE_PANEL_VIEW_MODEL"',
+              '"VERIFIED"',
+              '"MISMATCH"',
+              '"UNAVAILABLE"',
+              '"STALE"',
+              '"controls": ()',
+              '"action_controls_present": False',
+              '"executes_action"',
+              "def build_terminal_certificate_panel_view_model_offline",
+          ):
+              assert marker in text, marker
+          PY

@@ -1,0 +1,71 @@
+name: AION B2B External Effect Outcome Receipt Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-external-effect-call-boundary-contract-v1-20261006
+    paths:
+      - "atlasquant_aion_b2b_external_effect_outcome_receipt_contract_v1.py"
+      - "test_atlasquant_aion_b2b_external_effect_outcome_receipt_contract_v1.py"
+      - "docs/aion/AION_B2B_EXTERNAL_EFFECT_OUTCOME_RECEIPT_CONTRACT_V1.md"
+      - ".github/workflows/aion-b2b-external-effect-outcome-receipt-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  external-effect-outcome-receipt-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_external_effect_outcome_receipt_contract_v1.py \
+            test_atlasquant_aion_b2b_external_effect_outcome_receipt_contract_v1.py
+      - name: Run outcome-receipt design tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_external_effect_outcome_receipt_contract_v1.py
+      - name: Assert no external observation, retry or reconciliation implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_external_effect_outcome_receipt_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "requests.get(",
+              "requests.post(",
+              "requests.put(",
+              "httpx.get(",
+              "httpx.post(",
+              "httpx.request(",
+              "socket.socket(",
+              "urllib.request",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "os.system(",
+              "sqlite3.connect(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_EXTERNAL_EFFECT_OUTCOME_RECEIPT_DESIGN_REVIEW"',
+              '"DESIGN_OUTCOME_RECONCILIATION_CONTRACT_ONLY"',
+              'RECEIPT_MODE = "IMMUTABLE_PROVIDER_OUTCOME_CLASSIFICATION"',
+              '"OUTCOME_UNKNOWN"',
+              '"provider_called"',
+              '"retry_performed"',
+              '"reconciliation_performed"',
+          ):
+              assert marker in source, marker
+          PY

@@ -493,8 +493,8 @@ def execute_local_tool(
         portable_core=portable_core if portable_core is not None else default_portable_core(),
         access=access,
         source_kind=source_kind,
-        authenticated_admin=bool(authenticated_admin),
-        approved=bool(approved),
+        authenticated_admin=authenticated_admin is True,
+        approved=approved is True,
         feature_flags=feature_flags,
         scope="Consulta local allowlisted do Tool Hub.",
         uncertainty_pct=0,
@@ -508,6 +508,17 @@ def execute_local_tool(
     preflight_state = str(plan.get("state") or "BLOCK")
     workspace_id = str(tool.get("workspace_id") or "")
     kind = str(tool.get("kind") or "")
+    local_executor_denied = bool(tool) and (
+        bool(tool.get("connector_id"))
+        or tool.get("state") != "LOCAL_READY"
+        or kind not in ALLOWED_KINDS
+        or kind in FORBIDDEN_KINDS
+    )
+    # Independent defense layers must remain visible together. A Tool Hub
+    # supply-chain/policy block does not replace the executor's own closed
+    # allowlist verdict.
+    if local_executor_denied and "LOCAL_EXECUTOR_DENIED" not in blockers:
+        blockers.append("LOCAL_EXECUTOR_DENIED")
     base = {
         "request_id": str(request_id or ""),
         "tool_id": key,
@@ -521,8 +532,7 @@ def execute_local_tool(
         return _envelope(state="BLOCKED", result=None, truncated=False, source_function="", **base)
     if preflight_state != "READY_FOR_EXECUTOR":
         return _envelope(state="DEGRADED", result=None, truncated=False, source_function="", **base)
-    if tool.get("connector_id") or tool.get("state") != "LOCAL_READY" or kind not in ALLOWED_KINDS or kind in FORBIDDEN_KINDS:
-        base["blockers"] = blockers + ["LOCAL_EXECUTOR_DENIED"]
+    if local_executor_denied:
         return _envelope(state="BLOCKED", result=None, truncated=False, source_function="", **base)
     handler = _HANDLERS.get(key)
     if handler is None:

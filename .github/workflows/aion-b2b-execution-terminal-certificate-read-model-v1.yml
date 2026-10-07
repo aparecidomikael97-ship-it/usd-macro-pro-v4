@@ -1,0 +1,70 @@
+name: AION B2B Execution Terminal Certificate Read Model V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-execution-terminal-certificate-persistence-contract-v1-20261006
+    paths:
+      - "atlasquant_aion_b2b_execution_terminal_certificate_read_model_v1.py"
+      - "test_atlasquant_aion_b2b_execution_terminal_certificate_read_model_v1.py"
+      - "docs/aion/AION_B2B_EXECUTION_TERMINAL_CERTIFICATE_READ_MODEL_V1.md"
+      - ".github/workflows/aion-b2b-execution-terminal-certificate-read-model-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  execution-terminal-certificate-read-model-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile read-model contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_b2b_execution_terminal_certificate_read_model_v1.py \
+            test_atlasquant_aion_b2b_execution_terminal_certificate_read_model_v1.py
+      - name: Run terminal-certificate read-model tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_b2b_execution_terminal_certificate_read_model_v1.py
+      - name: Assert read-only and zero external effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_execution_terminal_certificate_read_model_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "sqlite3.connect(",
+              "DurableExecutionStore(",
+              ".execute(",
+              ".commit(",
+              ".rollback(",
+              "requests.get(",
+              "requests.post(",
+              "httpx.request(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "os.system(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_EXECUTION_TERMINAL_CERTIFICATE_READ_MODEL_DESIGN_REVIEW"',
+              '"DESIGN_EXECUTION_TERMINAL_CERTIFICATE_READ_MODEL_UI_ONLY"',
+              'READ_MODEL_MODE = "READ_ONLY_TERMINAL_CERTIFICATE_PROJECTION"',
+              '"read_model_verified"',
+              '"network_called"',
+              '"external_action_executed"',
+          ):
+              assert marker in source, marker
+          PY

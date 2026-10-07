@@ -1,0 +1,388 @@
+from __future__ import annotations
+
+from copy import deepcopy
+import unittest
+
+from atlasquant_aion_blast_radius_gate import (
+    BUDGET_SCHEMA,
+    blast_radius_policy_contract,
+    candidate_digest,
+    evaluate_blast_radius,
+)
+
+SCOPE = {"owner_id": "owner-a", "tenant_id": "tenant-a", "workspace_id": "ws-a"}
+
+
+def policy(**overrides):
+    row = {
+        "state": "VERIFIED",
+        "policy_id": "blast-v1",
+        "revision": 1,
+        **SCOPE,
+        "max_affected_records": 100,
+        "max_external_targets": 5,
+        "max_financial_value_minor": 10000,
+        "max_tenants": 1,
+        "max_workspaces": 1,
+        "quorum_by_risk": {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 2},
+        "human_owner_required_for": ["HIGH", "CRITICAL"],
+    }
+    row.update(overrides)
+    return row
+
+
+def candidate(**overrides):
+    row = {
+        **SCOPE,
+        "action_id": "action-1",
+        "transaction_id": "tx-1",
+        "action": "SEND_EMAIL",
+        "proposer_id": "prime",
+        "risk_level": "MEDIUM",
+        "affected_tenant_ids": ["tenant-a"],
+        "affected_workspace_ids": ["ws-a"],
+        "affected_records": 10,
+        "external_targets": 1,
+        "financial_value_minor": 0,
+        "external_side_effect": True,
+        "reversible": True,
+        "rollback_ref": "rollback:1",
+        "authority_budget_ref": "budget-1",
+        "authority_budget_policy_digest": "budget-policy-digest",
+    }
+    row.update(overrides)
+    return row
+
+
+def budget(**overrides):
+    row = {
+        "schema": BUDGET_SCHEMA,
+        "allowed": True,
+        "transaction_id": "tx-1",
+        "authority_budget_ref": "budget-1",
+        "policy_digest": "budget-policy-digest",
+        "scope": dict(SCOPE),
+        "grants_authority": False,
+        "execution_allowed_by_this_component": False,
+        "executes_action": False,
+    }
+    row.update(overrides)
+    return row
+
+
+def review(cand, reviewer_id="guardian", reviewer_kind="GUARDIAN", **overrides):
+    row = {
+        **SCOPE,
+        "reviewer_id": reviewer_id,
+        "reviewer_kind": reviewer_kind,
+        "decision": "SUPPORT",
+        "independent": True,
+        "candidate_digest": candidate_digest(cand),
+    }
+    row.update(overrides)
+    return row
+
+
+def trusted_reviewers(**overrides):
+    row = {
+        "guardian": "GUARDIAN",
+        "shadow": "SHADOW",
+        "sentinel": "SENTINEL",
+        "reviewer-human": "HUMAN_REVIEWER",
+    }
+    row.update(overrides)
+    return row
+
+
+def owner_approval(cand, **overrides):
+    row = {
+        **SCOPE,
+        "owner_id": "owner-a",
+        "action_id": cand["action_id"],
+        "candidate_digest": candidate_digest(cand),
+        "authority_class": "HUMAN_OWNER",
+        "approved": True,
+    }
+    row.update(overrides)
+    return row
+
+
+def evaluate(cand, *, pol=None, guard=None, reviews=None, owner=None, assignments=None):
+    return evaluate_blast_radius(
+        trusted_scope=SCOPE,
+        policy=pol or policy(),
+        candidate=cand,
+        authority_budget_guard=budget() if guard is None else guard,
+        reviews=[] if reviews is None else reviews,
+        human_owner_approval=owner,
+        trusted_reviewer_assignments=(
+            trusted_reviewers() if assignments is None else assignments
+        ),
+    )
+
+
+class AionBlastRadiusQuorumTests(unittest.TestCase):
+    def test_medium_side_effect_requires_budget_and_independent_quorum(self):
+        cand = candidate()
+        out = evaluate(cand, reviews=[review(cand)])
+        self.assertEqual(out["state"], "READY_FOR_DOWNSTREAM_EXECUTION_GATE")
+        self.assertEqual(out["valid_reviewer_count"], 1)
+        self.assertFalse(out["execution_authorized"])
+        self.assertFalse(out["executes_action"])
+
+    def test_quorum_never_replaces_human_owner_for_high_risk(self):
+        cand = candidate(risk_level="HIGH")
+        out = evaluate(
+            cand,
+            reviews=[
+                review(cand, "guardian", "GUARDIAN"),
+                review(cand, "shadow", "SHADOW"),
+                review(cand, "sentinel", "SENTINEL"),
+            ],
+        )
+        self.assertEqual(out["state"], "BLOCKED")
+        self.assertIn("HUMAN_OWNER_APPROVAL_REQUIRED", out["blockers"])
+        self.assertTrue(out["quorum_never_replaces_human_owner"])
+
+    def test_exact_owner_approval_allows_review_readiness_but_not_execution(self):
+        cand = candidate(risk_level="HIGH")
+        out = evaluate(
+            cand,
+            reviews=[
+                review(cand, "guardian", "GUARDIAN"),
+                review(cand, "shadow", "SHADOW"),
+            ],
+            owner=owner_approval(cand),
+        )
+        self.assertEqual(out["state"], "READY_FOR_DOWNSTREAM_EXECUTION_GATE")
+        self.assertTrue(out["human_owner_approval_valid"])
+        self.assertFalse(out["execution_authorized"])
+        self.assertFalse(out["automatic_execution"])
+
+    def test_sensitive_action_requires_owner_even_when_declared_medium(self):
+        cand = candidate(action="DEPLOY_PRODUCTION")
+        out = evaluate(cand, reviews=[review(cand)])
+        self.assertIn("HUMAN_OWNER_APPROVAL_REQUIRED", out["blockers"])
+        self.assertIn("RISK_LEVEL_UNDERSTATED", out["blockers"])
+        self.assertTrue(out["requires_specialized_execution_gate"])
+
+    def test_agent_cannot_forge_human_owner_approval(self):
+        cand = candidate(risk_level="HIGH")
+        fake = owner_approval(cand, authority_class="GUARDIAN", owner_id="guardian")
+        out = evaluate(
+            cand,
+            reviews=[
+                review(cand, "guardian", "GUARDIAN"),
+                review(cand, "shadow", "SHADOW"),
+            ],
+            owner=fake,
+        )
+        joined = " ".join(out["blockers"])
+        self.assertIn("HUMAN_OWNER_AUTHORITY_CLASS_REQUIRED", joined)
+        self.assertIn("HUMAN_OWNER_ID_MISMATCH", joined)
+
+    def test_duplicate_and_self_reviews_do_not_count(self):
+        cand = candidate(risk_level="HIGH")
+        rows = [
+            review(cand, "guardian", "GUARDIAN"),
+            review(cand, "guardian", "GUARDIAN"),
+            review(cand, "prime", "SHADOW"),
+        ]
+        out = evaluate(cand, reviews=rows, owner=owner_approval(cand))
+        self.assertEqual(out["valid_reviewer_count"], 1)
+        self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
+
+    def test_review_is_bound_to_exact_candidate_digest_and_scope(self):
+        cand = candidate()
+        bad = review(cand, candidate_digest="sha256:other", tenant_id="tenant-b")
+        out = evaluate(cand, reviews=[bad])
+        self.assertEqual(out["valid_reviewer_count"], 0)
+        self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
+
+    def test_authority_budget_must_be_allow_and_exactly_bound(self):
+        cand = candidate()
+        out = evaluate(
+            cand,
+            guard=budget(
+                allowed=False,
+                transaction_id="tx-other",
+                policy_digest="other",
+            ),
+            reviews=[review(cand)],
+        )
+        joined = " ".join(out["blockers"])
+        self.assertIn("AUTHORITY_BUDGET_BLOCKED", joined)
+        self.assertIn("AUTHORITY_BUDGET_TRANSACTION_MISMATCH", joined)
+        self.assertIn("AUTHORITY_BUDGET_POLICY_MISMATCH", joined)
+
+    def test_budget_cannot_claim_authority_or_execution(self):
+        cand = candidate()
+        out = evaluate(
+            cand,
+            guard=budget(
+                grants_authority=True,
+                executes_action=True,
+                execution_allowed_by_this_component=True,
+            ),
+            reviews=[review(cand)],
+        )
+        joined = " ".join(out["blockers"])
+        self.assertIn("AUTHORITY_BUDGET_MUST_NOT_GRANT_AUTHORITY", joined)
+        self.assertIn("AUTHORITY_BUDGET_MUST_NOT_EXECUTE", joined)
+        self.assertIn("AUTHORITY_BUDGET_MUST_NOT_AUTHORIZE_EXECUTION", joined)
+
+    def test_budget_guard_is_bound_to_same_scope(self):
+        cand = candidate()
+        out = evaluate(
+            cand,
+            guard=budget(scope={**SCOPE, "tenant_id": "tenant-b"}),
+            reviews=[review(cand)],
+        )
+        self.assertIn("AUTHORITY_BUDGET_SCOPE_MISMATCH", out["blockers"])
+
+    def test_cross_tenant_or_workspace_blast_is_blocked(self):
+        cand = candidate(
+            affected_tenant_ids=["tenant-a", "tenant-b"],
+            affected_workspace_ids=["ws-a", "ws-b"],
+        )
+        out = evaluate(
+            cand,
+            pol=policy(max_tenants=2, max_workspaces=2),
+            reviews=[review(cand)],
+        )
+        joined = " ".join(out["blockers"])
+        self.assertIn("CROSS_TENANT_BLAST_RADIUS_FORBIDDEN", joined)
+        self.assertIn("CROSS_WORKSPACE_BLAST_RADIUS_FORBIDDEN", joined)
+
+    def test_record_external_and_financial_limits_fail_closed(self):
+        cand = candidate(
+            affected_records=101,
+            external_targets=6,
+            financial_value_minor=10001,
+            risk_level="HIGH",
+        )
+        out = evaluate(
+            cand,
+            reviews=[
+                review(cand, "guardian", "GUARDIAN"),
+                review(cand, "shadow", "SHADOW"),
+            ],
+            owner=owner_approval(cand),
+        )
+        joined = " ".join(out["blockers"])
+        self.assertIn("RECORD_BLAST_RADIUS_LIMIT", joined)
+        self.assertIn("EXTERNAL_TARGET_BLAST_RADIUS_LIMIT", joined)
+        self.assertIn("FINANCIAL_BLAST_RADIUS_LIMIT", joined)
+
+    def test_high_risk_must_be_reversible(self):
+        cand = candidate(risk_level="HIGH", reversible=False, rollback_ref="")
+        out = evaluate(
+            cand,
+            reviews=[
+                review(cand, "guardian", "GUARDIAN"),
+                review(cand, "shadow", "SHADOW"),
+            ],
+            owner=owner_approval(cand),
+        )
+        self.assertIn("HIGH_RISK_MUST_BE_REVERSIBLE", out["blockers"])
+
+    def test_string_booleans_do_not_pass(self):
+        cand = candidate(external_side_effect="true", reversible="true")
+        out = evaluate(cand, reviews=[review(cand)])
+        joined = " ".join(out["blockers"])
+        self.assertIn("EXTERNAL_SIDE_EFFECT_BOOL_REQUIRED", joined)
+        self.assertIn("REVERSIBLE_BOOL_REQUIRED", joined)
+
+    def test_candidate_tamper_after_review_breaks_binding(self):
+        original = candidate()
+        signed_review = review(original)
+        changed = deepcopy(original)
+        changed["affected_records"] = 11
+        out = evaluate(changed, reviews=[signed_review])
+        self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
+
+    def test_policy_requires_critical_human_owner(self):
+        cand = candidate()
+        out = evaluate(
+            cand,
+            pol=policy(human_owner_required_for=["HIGH"]),
+            reviews=[review(cand)],
+        )
+        self.assertIn("CRITICAL_MUST_REQUIRE_HUMAN_OWNER", out["blockers"])
+
+    def test_reviewer_must_exist_in_trusted_assignments(self):
+        cand = candidate()
+        out = evaluate(
+            cand,
+            reviews=[review(cand, "invented-reviewer", "GUARDIAN")],
+        )
+        self.assertEqual(out["valid_reviewer_count"], 0)
+        joined = " ".join(
+            reason
+            for row in out["reviews"]
+            for reason in row["blockers"]
+        )
+        self.assertIn("REVIEWER_NOT_IN_TRUSTED_ASSIGNMENTS", joined)
+        self.assertIn("INDEPENDENT_REVIEW_QUORUM_INSUFFICIENT", out["blockers"])
+
+    def test_trusted_reviewer_kind_must_match_exactly(self):
+        cand = candidate()
+        out = evaluate(
+            cand,
+            reviews=[review(cand, "guardian", "SHADOW")],
+        )
+        self.assertEqual(out["valid_reviewer_count"], 0)
+        joined = " ".join(
+            reason
+            for row in out["reviews"]
+            for reason in row["blockers"]
+        )
+        self.assertIn("REVIEWER_TRUSTED_KIND_MISMATCH", joined)
+
+    def test_missing_trusted_assignments_blocks_quorum(self):
+        cand = candidate()
+        out = evaluate(
+            cand,
+            reviews=[review(cand)],
+            assignments={},
+        )
+        self.assertIn("TRUSTED_REVIEWER_ASSIGNMENTS_REQUIRED", out["blockers"])
+        self.assertEqual(out["valid_reviewer_count"], 0)
+
+    def test_sensitive_action_cannot_understate_risk_to_low(self):
+        cand = candidate(
+            action="CHARGE_CUSTOMER",
+            risk_level="LOW",
+            external_side_effect=False,
+            external_targets=0,
+            financial_value_minor=0,
+        )
+        out = evaluate(cand, owner=owner_approval(cand))
+        self.assertIn("RISK_LEVEL_UNDERSTATED", out["blockers"])
+
+    def test_financial_impact_cannot_understate_risk_or_skip_budget(self):
+        cand = candidate(
+            risk_level="LOW",
+            external_side_effect=False,
+            external_targets=0,
+            financial_value_minor=1,
+        )
+        out = evaluate(cand, guard={})
+        joined = " ".join(out["blockers"])
+        self.assertIn("RISK_LEVEL_UNDERSTATED", joined)
+        self.assertIn("AUTHORITY_BUDGET_SCHEMA_INVALID", joined)
+
+    def test_unknown_candidate_fields_are_blocked_before_review(self):
+        cand = candidate(hidden_execution_payload={"do": "something"})
+        out = evaluate(cand, reviews=[review(cand)])
+        self.assertIn("CANDIDATE_UNKNOWN_FIELDS", out["blockers"])
+
+    def test_contract_is_non_authoritative(self):
+        contract = blast_radius_policy_contract()
+        self.assertTrue(contract["quorum_never_replaces_human_owner"])
+        self.assertFalse(contract["automatic_execution"])
+        self.assertFalse(contract["executes_action"])
+
+
+if __name__ == "__main__":
+    unittest.main()

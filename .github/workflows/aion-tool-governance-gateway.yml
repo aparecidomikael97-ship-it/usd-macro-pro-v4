@@ -1,0 +1,63 @@
+name: AION Tool Governance Gateway
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "atlasquant_aion_tool_governance_gateway.py"
+      - "test_atlasquant_aion_tool_governance_gateway.py"
+      - "docs/aion/AION_TOOL_GOVERNANCE_GATEWAY_P1.md"
+      - "atlasquant_aion_tool_hub.py"
+      - "atlasquant_aion_tool_supply_chain.py"
+      - "atlasquant_aion_tool_sandbox.py"
+      - "atlasquant_aion_cumulative_authority_budget.py"
+      - ".github/workflows/aion-tool-governance-gateway.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+
+      - name: Compile governance chain
+        run: |
+          python -m py_compile             atlasquant_aion_tool_governance_gateway.py             atlasquant_aion_tool_hub.py             atlasquant_aion_tool_supply_chain.py             atlasquant_aion_tool_sandbox.py             atlasquant_aion_cumulative_authority_budget.py             test_atlasquant_aion_tool_governance_gateway.py
+
+      - name: Run governance gateway tests
+        run: |
+          python -m unittest -q             test_atlasquant_aion_tool_governance_gateway.py             test_atlasquant_aion_tool_hub.py             test_atlasquant_aion_tool_supply_chain_security.py             test_atlasquant_aion_cumulative_authority_budget.py
+
+      - name: Assert authority-free gateway boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_tool_governance_gateway.py").read_text(encoding="utf-8")
+          banned = (
+              "requests.",
+              "socket.",
+              "subprocess.",
+              "os.system(",
+              "adapter.send(",
+              "execute_tool(",
+              "run_tool(",
+          )
+          for item in banned:
+              assert item not in source, item
+          assert '"handoff_grants_authority": False' in source
+          assert '"executes_action": False' in source
+          assert '"executor_must_revalidate": True' in source
+          assert "TOOL_HUB_HUMAN_REVIEW_REQUIRED" in source
+          PY

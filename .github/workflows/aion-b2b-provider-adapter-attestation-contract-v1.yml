@@ -1,0 +1,64 @@
+name: AION B2B Provider Adapter Attestation Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - design/aion-b2b-runtime-execution-guards-contract-v1-20261005
+    paths:
+      - "atlasquant_aion_b2b_provider_adapter_attestation_contract_v1.py"
+      - "test_atlasquant_aion_b2b_provider_adapter_attestation_contract_v1.py"
+      - "docs/aion/AION_B2B_PROVIDER_ADAPTER_ATTESTATION_CONTRACT_V1.md"
+      - ".github/workflows/aion-b2b-provider-adapter-attestation-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  provider-adapter-attestation-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Compile design contract
+        run: |
+          python -m py_compile             atlasquant_aion_b2b_provider_adapter_attestation_contract_v1.py             test_atlasquant_aion_b2b_provider_adapter_attestation_contract_v1.py
+      - name: Run provider-adapter attestation design tests
+        run: |
+          python -m unittest -q             test_atlasquant_aion_b2b_provider_adapter_attestation_contract_v1.py
+      - name: Assert no provider material or external effect
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_b2b_provider_adapter_attestation_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "requests.post(",
+              "requests.put(",
+              "httpx.post(",
+              "socket.socket(",
+              "subprocess.Popen(",
+              "subprocess.run(",
+              "os.environ[",
+              "load_credentials(",
+              "resolve_endpoint(",
+              "call_provider(",
+              "send_whatsapp(",
+              "send_email(",
+              "deploy_to_production(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_PROVIDER_ADAPTER_ATTESTATION_DESIGN_REVIEW"',
+              '"DESIGN_PROVIDER_CAPABILITY_BINDING_CONTRACT_ONLY"',
+              '"credential_value"',
+              '"provider_endpoint_value"',
+              '"provider_adapter_attested"',
+          ):
+              assert marker in source, marker
+          PY
