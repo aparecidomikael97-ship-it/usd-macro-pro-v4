@@ -309,6 +309,154 @@ def migration_health_report(
                 pass
 
 
+RESTORE_FIXTURE_SCOPE = ("restore-owner", "restore-tenant", "restore-workspace")
+RESTORE_FIXTURE_CONVERSATION_ID = "restore-proof-conversation-v1"
+RESTORE_FIXTURE_AUDIT_ID = "restore-proof-audit-v1"
+RESTORE_FIXTURE_DIGEST = (
+    "sha256:9d44fc01e5f5bd6b6d6b807067b9329d88cba9c70b11d28f9fd7d95ef39d60d8"
+)
+
+
+def seed_restore_fixture(
+    connection_factory: ConnectionFactory,
+    *,
+    environment: str = "CI",
+) -> dict[str, Any]:
+    """Seed deterministic non-secret rows before a disposable CI backup drill."""
+    _require_ci_environment(environment)
+    owner, tenant, workspace = RESTORE_FIXTURE_SCOPE
+    conn = _connection(connection_factory)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.conversations"
+                "(owner_id,tenant_id,workspace_id,id,created_at,updated_at,"
+                "archived,title,data) "
+                "VALUES (%s,%s,%s,%s,%s,%s,FALSE,%s,%s::jsonb) "
+                "ON CONFLICT(owner_id,tenant_id,workspace_id,id) DO NOTHING",
+                (
+                    owner,
+                    tenant,
+                    workspace,
+                    RESTORE_FIXTURE_CONVERSATION_ID,
+                    "2026-10-07T00:00:00+00:00",
+                    "2026-10-07T00:00:00+00:00",
+                    "restore proof",
+                    '{"fixture":"restore-v1"}',
+                ),
+            )
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.access_audit"
+                "(owner_id,tenant_id,workspace_id,id,operation,actor_id,"
+                "result,evidence_digest) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON CONFLICT(owner_id,tenant_id,workspace_id,id) DO NOTHING",
+                (
+                    owner,
+                    tenant,
+                    workspace,
+                    RESTORE_FIXTURE_AUDIT_ID,
+                    "RESTORE_DRILL_FIXTURE",
+                    "ci",
+                    "SEEDED",
+                    RESTORE_FIXTURE_DIGEST,
+                ),
+            )
+        conn.commit()
+        return {
+            "state": "RESTORE_FIXTURE_SEEDED",
+            "conversation_id": RESTORE_FIXTURE_CONVERSATION_ID,
+            "audit_id": RESTORE_FIXTURE_AUDIT_ID,
+            "evidence_digest": RESTORE_FIXTURE_DIGEST,
+        }
+    except Exception as exc:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise StorageUnavailableError("restore fixture seed failed") from exc
+    finally:
+        conn.close()
+
+
+def restore_fixture_report(
+    connection_factory: ConnectionFactory,
+    *,
+    environment: str = "CI",
+) -> dict[str, Any]:
+    """Verify migration/RLS health and deterministic rows after CI restore."""
+    normalized = _require_ci_environment(environment)
+    health = migration_health_report(
+        connection_factory,
+        environment=normalized,
+    )
+    report = {
+        "state": FAILED,
+        "environment": normalized,
+        "migration_health": health["state"],
+        "conversation_restored": False,
+        "audit_restored": False,
+        "digest_verified": False,
+        "provider_called": False,
+        "deploy_executed": False,
+        "worker_armed": False,
+        "core_checkpoint_write": False,
+    }
+    if health["state"] != HEALTHY:
+        return report
+
+    owner, tenant, workspace = RESTORE_FIXTURE_SCOPE
+    conn = None
+    try:
+        conn = _connection(connection_factory)
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT data FROM {SCHEMA}.conversations "
+                "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND id=%s",
+                (
+                    owner,
+                    tenant,
+                    workspace,
+                    RESTORE_FIXTURE_CONVERSATION_ID,
+                ),
+            )
+            conversation = cur.fetchone()
+            cur.execute(
+                f"SELECT evidence_digest FROM {SCHEMA}.access_audit "
+                "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND id=%s",
+                (
+                    owner,
+                    tenant,
+                    workspace,
+                    RESTORE_FIXTURE_AUDIT_ID,
+                ),
+            )
+            audit = cur.fetchone()
+        conn.rollback()
+        conversation_ok = bool(conversation)
+        audit_ok = bool(audit)
+        digest_ok = audit_ok and str(audit[0]) == RESTORE_FIXTURE_DIGEST
+        report.update(
+            state=(
+                HEALTHY
+                if conversation_ok and audit_ok and digest_ok
+                else FAILED
+            ),
+            conversation_restored=conversation_ok,
+            audit_restored=audit_ok,
+            digest_verified=digest_ok,
+        )
+        return report
+    except Exception:
+        return report
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 def migration_policy() -> dict[str, Any]:
     return {
         "schema": "ATLASQUANT_AION_CHAT_POSTGRES_MIGRATION_RLS_RESTORE_CI_V1",
@@ -348,5 +496,11 @@ __all__ = [
     "require_migration_artifact",
     "apply_migration",
     "migration_health_report",
+    "seed_restore_fixture",
+    "restore_fixture_report",
+    "RESTORE_FIXTURE_SCOPE",
+    "RESTORE_FIXTURE_CONVERSATION_ID",
+    "RESTORE_FIXTURE_AUDIT_ID",
+    "RESTORE_FIXTURE_DIGEST",
     "migration_policy",
 ]
