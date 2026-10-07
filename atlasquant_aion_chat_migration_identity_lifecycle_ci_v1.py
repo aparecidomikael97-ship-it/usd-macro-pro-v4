@@ -101,6 +101,10 @@ class AttestedMigrationConnectionFactoryCiV1:
                 raise StorageUnavailableError(
                     "verified migration TLS transport is not proven"
                 )
+            # The attestation queries intentionally run before any migration
+            # transaction. Return the connection in IDLE state so the shared
+            # migration runner may establish its own explicit transaction.
+            conn.rollback()
             return conn
         except Exception as exc:
             if conn is not None:
