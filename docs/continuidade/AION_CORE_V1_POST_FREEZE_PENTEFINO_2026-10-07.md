@@ -63,4 +63,12 @@ Before any production deploy, treat #965 and any remaining release-readiness evi
 6. Keep #955–#971 product/design work outside Core closure.
 7. Do not infer production readiness merely from Core freeze or main merge.
 
+## Exact tree-equivalence verification
+
+GitHub commit comparison confirms:
+- frozen target `662eab4d...` -> frozen integration `b2f7c67d...`: 1 commit ahead, **0 changed files**;
+- frozen integration `b2f7c67d...` -> audited main merge `2f6213ea...`: 1 commit ahead, **0 changed files**.
+
+Therefore the audited merge path preserved the frozen Core file tree across both integration and main merge boundaries.
+
 End of audit.
