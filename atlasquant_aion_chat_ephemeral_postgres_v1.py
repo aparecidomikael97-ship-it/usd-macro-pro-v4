@@ -33,6 +33,16 @@ from atlasquant_aion_chat_postgres_store_adapter_fake_v1 import (
 
 SCHEMA_VERSION = 1
 DB_SCHEMA = "aion_chat_ephemeral_v1"
+REQUIRED_CONSTRAINTS = frozenset({
+    "messages_scope_sequence_uq_v1",
+    "messages_scope_conversation_message_uq_v1",
+    "messages_scope_conversation_fk_v1",
+    "idempotency_scope_conversation_fk_v1",
+    "idempotency_scope_message_conversation_fk_v1",
+    "attachments_scope_conversation_fk_v1",
+    "checkpoints_scope_conversation_fk_v1",
+    "summaries_scope_conversation_fk_v1",
+})
 HEALTHY = "healthy"
 FAILED = "failed"
 NEXT_ALLOWED_STEP = "REVIEW_EPHEMERAL_POSTGRES_EVIDENCE_BEFORE_ANY_PRODUCTION_BINDING"
@@ -228,6 +238,9 @@ class EphemeralPostgresBackendV1:
             "schema_version": None,
             "expected_schema_version": SCHEMA_VERSION,
             "scope_policy_healthy": False,
+            "transaction_healthy": False,
+            "required_constraints_present": 0,
+            "required_constraints_expected": len(REQUIRED_CONSTRAINTS),
             "backend": "ephemeral_postgres_ci",
             "environment": self.environment,
             "production_allowed": False,
@@ -265,12 +278,29 @@ class EphemeralPostgresBackendV1:
                 )
                 required = cur.fetchone()
                 tables_ok = bool(required) and all(value is not None for value in required)
+                cur.execute(
+                    "SELECT conname FROM pg_constraint c "
+                    "JOIN pg_namespace n ON n.oid=c.connamespace "
+                    "WHERE n.nspname=%s AND conname = ANY(%s)",
+                    (DB_SCHEMA, list(REQUIRED_CONSTRAINTS)),
+                )
+                present_constraints = {row[0] for row in cur.fetchall()}
+                constraints_ok = present_constraints == REQUIRED_CONSTRAINTS
+                cur.execute("SAVEPOINT aion_health_probe")
+                cur.execute("SELECT 1")
+                transaction_ok = cur.fetchone() == (1,)
+                cur.execute("ROLLBACK TO SAVEPOINT aion_health_probe")
+                cur.execute("RELEASE SAVEPOINT aion_health_probe")
             conn.rollback()
-            healthy = version == SCHEMA_VERSION and tables_ok
+            scope_policy_ok = tables_ok and constraints_ok
+            healthy = version == SCHEMA_VERSION and scope_policy_ok and transaction_ok
             report.update(
                 state=HEALTHY if healthy else FAILED,
                 schema_version=version,
-                scope_policy_healthy=tables_ok,
+                scope_policy_healthy=scope_policy_ok,
+                transaction_healthy=transaction_ok,
+                required_constraints_present=len(present_constraints),
+                required_constraints_expected=len(REQUIRED_CONSTRAINTS),
             )
             return report
         except Exception:
@@ -831,6 +861,7 @@ def ephemeral_policy() -> dict[str, Any]:
 __all__ = [
     "SCHEMA_VERSION",
     "DB_SCHEMA",
+    "REQUIRED_CONSTRAINTS",
     "HEALTHY",
     "FAILED",
     "NEXT_ALLOWED_STEP",
