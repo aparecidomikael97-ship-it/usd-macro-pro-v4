@@ -1032,7 +1032,8 @@ def module_panel(area, selected, *, resident=None, business_read_model=None, rev
         f'<section data-tab-panel="status" hidden><p>{escape(model["state"]) if model else "Aguardando dados validados."}</p></section></main>')
 
 
-def business_reference_home_html(*, mode="Avançado", name="Usuário", show_central=True, business_read_model=None):
+def business_reference_home_html(*, mode="Avançado", name="Usuário", show_central=True, business_read_model=None, commercial_journey_read_model=None):
+    from atlasquant_aion_b2b_commercial_golden_path_ui import commercial_golden_path_html
     """Interactive Negócios home using the current B2B operating model.
 
     The legacy market-research raster remains versioned as provenance, but it is
@@ -1117,6 +1118,10 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
         '.aq-ws-business-canvas{position:relative!important;width:100%!important;height:auto!important;'
         'aspect-ratio:auto!important;background:none!important;margin:0!important}'
         '.ref-negocios .ref-mobile-art{background-size:cover!important;background-position:center!important}'
+        '.aq-b2b-journey{margin:18px 0;padding:16px;border:1px solid rgba(73,230,178,.22);border-radius:18px;background:rgba(5,17,36,.72)}'
+        '.aq-b2b-journey-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.aq-b2b-journey-head small{color:#65efc0;letter-spacing:.12em}.aq-b2b-journey-head h3{margin:4px 0 2px}.aq-b2b-journey-head p{margin:0;color:#9fb5cc}.aq-b2b-journey-head>span{font-size:11px;border:1px solid rgba(73,230,178,.35);border-radius:999px;padding:6px 9px;color:#7ef1c7}'
+        '.aq-b2b-journey-current{margin:12px 0;padding:10px 12px;border-radius:12px;background:rgba(31,79,111,.25);display:flex;gap:10px;flex-wrap:wrap}.aq-b2b-journey-current em{font-style:normal;color:#b7c9db}'
+        '.aq-b2b-journey-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.aq-b2b-journey-stage{padding:9px;border:1px solid rgba(111,151,184,.18);border-radius:11px;background:rgba(8,26,50,.62)}.aq-b2b-journey-stage small,.aq-b2b-journey-stage strong{display:block}.aq-b2b-journey-stage small{color:#91a8bf}.aq-b2b-journey-stage strong{font-size:11px;margin-top:4px;color:#d9eaf8}.aq-b2b-journey-gap{color:#ffc36b}.aq-b2b-journey-foot{margin:10px 0 0;color:#8ca2b8;font-size:12px}'
         '@media(max-width:700px){.ref-negocios .aq-ws-business-canvas{display:none!important}'
         '.ref-negocios .ref-mobile-grid{display:grid!important}.ref-negocios .ref-mobile-header{display:block!important}}'
         '</style>'
@@ -1150,6 +1155,11 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
             if _business_read_model_ready(business_read_model)
             else '<p class="ref-state">CLIENTE · aguardando evidência validada para métricas de saúde, ROI, SLA e quotas</p>'
         )
+        + (
+            commercial_golden_path_html(commercial_journey_read_model)
+            if commercial_journey_read_model is not None
+            else ""
+        )
         + '<p class="ref-truth">Arte aprovada · dados da imagem ilustrativos; '
         'o workspace ativo usa o contrato B2B atual e não executa ações externas automaticamente.</p>'
         f'<p class="ref-truth">Sessão: {escape(name)}</p>'
@@ -1163,7 +1173,7 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, commercial_journey_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None):
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -1174,7 +1184,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
         from atlasquant_interface_final import aion_workspace_html
         return aion_workspace_html(mode=mode,name=name,show_central=show_central,nav_html=nav_html,uri=asset_uri)
     if area == "negocios" and not selected:
-        return business_reference_home_html(mode=mode, name=name, show_central=show_central, business_read_model=business_read_model)
+        return business_reference_home_html(mode=mode, name=name, show_central=show_central, business_read_model=business_read_model, commercial_journey_read_model=commercial_journey_read_model)
     filename = SURFACES[area][0]
     uri = asset_uri(filename)
     w,h = dimensions(area)
@@ -1516,8 +1526,13 @@ def render_reference_workspace(
         if area == "negocios"
         else None
     )
+    commercial_journey_read_model = (
+        st.session_state.get("atlasquant_b2b_commercial_golden_path")
+        if area == "negocios"
+        else None
+    )
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft,pilot_planning_read_model=pilot_planning_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft,pilot_planning_read_model=pilot_planning_read_model,commercial_journey_read_model=commercial_journey_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()
