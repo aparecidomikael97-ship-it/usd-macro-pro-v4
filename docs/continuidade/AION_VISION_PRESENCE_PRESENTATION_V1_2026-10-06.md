@@ -84,6 +84,29 @@ Presentation Mode must:
 - provide immediate owner stop/pause controls;
 - never auto-contact, bill, write CRM, deploy, trade, sign, or execute sensitive actions.
 
+
+## PowerPoint / live presentation orchestration
+
+Presentation Mode must support a professional deck-driven meeting flow, including Microsoft PowerPoint-compatible presentations or an equivalent slide surface.
+
+AION should be able to:
+- open the approved presentation deck;
+- advance, return to, or jump to a requested slide;
+- narrate the presentation in natural language rather than merely reading slide text;
+- show charts, images, dashboards, screenshots, reports and validation evidence;
+- highlight the current metric, chart area, finding or validation being discussed;
+- pause the deck when a participant asks a question;
+- answer the question within the approved demo scope and then resume the presentation;
+- switch between slides and approved live AtlasQuant demo screens when useful;
+- present a short executive version or a detailed technical/commercial version depending on the meeting context;
+- close with the approved next step, such as diagnostic, pilot or follow-up, without committing pricing, contracts, billing or sensitive actions on its own.
+
+Deck content must be sourced only from an owner-approved presentation package. AION must not invent metrics, customer results, certifications, validations or live operational status. Any uncertain or unavailable data must be stated as unavailable rather than fabricated.
+
+Presentation control is a low-risk navigation capability. Editing the deck, replacing approved evidence, changing commercial commitments, publishing externally, sending files or executing actions outside the meeting remains separately authorized.
+
+This capability is intended to let HUMAN_OWNER participate naturally in the meeting while AION conducts the structured product/project presentation as the primary presenter.
+
 ## Voice + camera interaction
 
 The future resident AION agent should support:
