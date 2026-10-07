@@ -123,6 +123,7 @@ class ControlledRetentionExecutorCiV1:
         self.commit_outcome_unknown_once = False
 
     def _connection(self) -> psycopg.Connection:
+        conn = None
         try:
             conn = self._connect()
             conn.autocommit = False
@@ -130,10 +131,11 @@ class ControlledRetentionExecutorCiV1:
                 cur.execute(f"SET ROLE {RETENTION_ROLE}")
             return conn
         except Exception as exc:
-            try:
-                conn.close()
-            except Exception:
-                pass
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
             raise StorageUnavailableError(
                 "retention database connection unavailable"
             ) from exc
