@@ -1,0 +1,42 @@
+name: AION Chat Postgres Driver Binding Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "atlasquant_aion_chat_postgres_driver_binding_contract_v1.py"
+      - "test_atlasquant_aion_chat_postgres_driver_binding_contract_v1.py"
+      - "docs/aion/AION_CHAT_POSTGRES_DRIVER_BINDING_CONTRACT_V1.md"
+      - ".github/workflows/aion-chat-postgres-driver-binding-contract-v1.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-driver-binding-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile driver binding contract
+        run: |
+          python -m py_compile atlasquant_aion_chat_postgres_driver_binding_contract_v1.py test_atlasquant_aion_chat_postgres_driver_binding_contract_v1.py
+      - name: Run driver binding tests
+        run: |
+          python -m unittest -q test_atlasquant_aion_chat_postgres_driver_binding_contract_v1.py
+      - name: Assert zero driver secret network execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path("atlasquant_aion_chat_postgres_driver_binding_contract_v1.py").read_text(encoding="utf-8")
+          for banned in ("import psycopg","import asyncpg","import sqlalchemy","import requests","import socket","import os","os.getenv(","os.environ","DATABASE_URL",".connect(","execute(","subprocess"):
+              assert banned not in source,banned
+          for marker in ('"READY_FOR_REAL_POSTGRES_DRIVER_BINDING_IMPLEMENTATION_REVIEW"','"PSYCOPG3_SYNC"','"INTERNAL_PRIVATE"','"REQUIRE"','"driver_installed"','"connection_opened"','"external_action_executed"'):
+              assert marker in source,marker
+          PY
