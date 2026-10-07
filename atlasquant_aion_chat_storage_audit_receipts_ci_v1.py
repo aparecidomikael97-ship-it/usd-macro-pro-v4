@@ -147,8 +147,9 @@ class AuditedProductionSchemaPostgresBackendCiV1(
         )
         cur.execute(
             f"INSERT INTO {SCHEMA}.access_audit"
-            "(owner_id,tenant_id,workspace_id,id,operation,actor_id,result,evidence_digest) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            "(owner_id,tenant_id,workspace_id,id,operation,actor_id,"
+            "resource_type,resource_id,result,evidence_digest) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 scope.owner_id,
                 scope.tenant_id,
@@ -156,6 +157,8 @@ class AuditedProductionSchemaPostgresBackendCiV1(
                 uuid4().hex,
                 operation,
                 scope.owner_id,
+                str(resource_type),
+                str(resource_id),
                 str(result),
                 digest,
             ),
@@ -175,7 +178,8 @@ class AuditedProductionSchemaPostgresBackendCiV1(
             self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT id,operation,actor_id,result,evidence_digest,created_at "
+                    f"SELECT id,operation,actor_id,resource_type,resource_id,"
+                    "result,evidence_digest,created_at "
                     f"FROM {SCHEMA}.access_audit "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s "
                     "ORDER BY created_at ASC,id ASC LIMIT %s",
@@ -193,11 +197,13 @@ class AuditedProductionSchemaPostgresBackendCiV1(
                     "id": row[0],
                     "operation": row[1],
                     "actor_id": row[2],
-                    "result": row[3],
-                    "evidence_digest": row[4],
-                    "created_at": row[5].isoformat()
-                    if hasattr(row[5], "isoformat")
-                    else str(row[5]),
+                    "resource_type": row[3],
+                    "resource_id": row[4],
+                    "result": row[5],
+                    "evidence_digest": row[6],
+                    "created_at": row[7].isoformat()
+                    if hasattr(row[7], "isoformat")
+                    else str(row[7]),
                 }
                 for row in rows
             ]
