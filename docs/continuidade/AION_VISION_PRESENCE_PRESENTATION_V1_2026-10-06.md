@@ -169,6 +169,14 @@ If connectivity is lost:
 - Q&A must be limited to locally available approved knowledge;
 - any action requiring network access remains blocked.
 
+## Meeting preflight
+
+Before an owner-started meeting, AION should run a non-destructive readiness check covering the approved deck, local/offline assets, charts, images, reports, demo routes, microphone, optional camera, presentation display, local audio output, required network dependencies and fallback package.
+
+The preflight should expose only explicit states such as READY, DEGRADED or BLOCKED with concrete reasons. A missing live dependency must not prevent a safe offline presentation when the approved offline package is complete, but the unavailable live capability must be disclosed.
+
+Preflight never starts a meeting, opens the camera, records participants, sends data, changes credentials or authorizes external actions by itself.
+
 ## Voice + camera interaction
 
 The future resident AION agent should support:
