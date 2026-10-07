@@ -1,0 +1,67 @@
+name: AION Chat Postgres Driver Binding V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "requirements.txt"
+      - "atlasquant_aion_chat_postgres_driver_binding_v1.py"
+      - "test_atlasquant_aion_chat_postgres_driver_binding_v1.py"
+      - "docs/aion/AION_CHAT_POSTGRES_DRIVER_BINDING_V1.md"
+      - ".github/workflows/aion-chat-postgres-driver-binding-v1.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-driver-binding-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned runtime dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip check
+      - name: Compile driver binding
+        run: |
+          python -m py_compile \
+            atlasquant_aion_chat_postgres_driver_binding_v1.py \
+            test_atlasquant_aion_chat_postgres_driver_binding_v1.py
+      - name: Run driver binding tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_chat_postgres_driver_binding_v1.py
+      - name: Assert dependency pin and zero network binding
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          requirements=Path("requirements.txt").read_text(encoding="utf-8")
+          source=Path("atlasquant_aion_chat_postgres_driver_binding_v1.py").read_text(encoding="utf-8")
+          assert "psycopg[binary]==3.3.6" in requirements
+          for banned in (
+              "os.getenv(",
+              "os.environ",
+              "DATABASE_URL",
+              "psycopg.connect(",
+              "socket.",
+              "requests.",
+              "subprocess",
+          ):
+              assert banned not in source,banned
+          for marker in (
+              "NetworkDisabledError",
+              '"production_credentials_allowed": False',
+              '"connection_opened": False',
+              '"network_called": False',
+              '"external_action_executed": False',
+          ):
+              assert marker in source,marker
+          PY
