@@ -65,6 +65,17 @@ ALLOWED_AUDIT_EVIDENCE = {
         "through_sequence",
         "source_message_ids",
     }),
+    "CONVERSATION_DELETE": frozenset({
+        "conversation_id",
+        "request_id",
+        "plan_digest",
+        "approval_evidence_digest",
+        "messages",
+        "idempotency_records",
+        "attachments",
+        "checkpoints",
+        "summaries",
+    }),
 }
 
 FORBIDDEN_EVIDENCE_TERMS = (
