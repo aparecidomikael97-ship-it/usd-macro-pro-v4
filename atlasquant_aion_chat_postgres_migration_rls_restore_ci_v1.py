@@ -23,7 +23,7 @@ MIGRATION_RELATIVE_PATH = Path(
     "migrations/aion_chat_postgres_v1/0001_initial.sql"
 )
 EXPECTED_MIGRATION_SHA256 = (
-    "d57d5c225c86306afb79cb1d5dba2a6cd8e2838730ac27171243b4ec82664ab2"
+    "7dd72d75365862f54c81110027430011f8ac8f81ce629f500cbbd9aa0c00c50c"
 )
 MIGRATION_LOCK_KEY = 0x41514D4947524154  # "AQMIGRAT", within signed bigint.
 APPLIED = "APPLIED"
@@ -348,8 +348,8 @@ def seed_restore_fixture(
             cur.execute(
                 f"INSERT INTO {SCHEMA}.access_audit"
                 "(owner_id,tenant_id,workspace_id,id,operation,actor_id,"
-                "result,evidence_digest) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) "
+                "resource_type,resource_id,result,evidence_digest) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
                 "ON CONFLICT(owner_id,tenant_id,workspace_id,id) DO NOTHING",
                 (
                     owner,
@@ -358,6 +358,8 @@ def seed_restore_fixture(
                     RESTORE_FIXTURE_AUDIT_ID,
                     "RESTORE_DRILL_FIXTURE",
                     "ci",
+                    "conversation",
+                    RESTORE_FIXTURE_CONVERSATION_ID,
                     "SEEDED",
                     RESTORE_FIXTURE_DIGEST,
                 ),
