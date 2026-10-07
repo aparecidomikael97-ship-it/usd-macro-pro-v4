@@ -1,0 +1,67 @@
+name: AION Chat Production Postgres Preflight V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - impl/aion-chat-ephemeral-postgres-binding-v1-20261007
+    paths:
+      - "atlasquant_aion_chat_production_postgres_preflight_v1.py"
+      - "tests/test_atlasquant_aion_chat_production_postgres_preflight_v1.py"
+      - "docs/aion/AION_CHAT_PRODUCTION_POSTGRES_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-chat-production-postgres-preflight-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  production-postgres-preflight-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile preflight policy
+        run: |
+          python -m py_compile             atlasquant_aion_chat_production_postgres_preflight_v1.py             tests/test_atlasquant_aion_chat_production_postgres_preflight_v1.py
+
+      - name: Run preflight policy tests
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_production_postgres_preflight_v1.py'
+
+      - name: Assert zero runtime authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_chat_production_postgres_preflight_v1.py"
+          ).read_text(encoding="utf-8")
+
+          for banned in (
+              "psycopg.connect",
+              "requests.",
+              "subprocess",
+              "os.getenv(",
+              "os.environ",
+              "streamlit.secrets",
+          ):
+              assert banned not in source, banned
+
+          for marker in (
+              '"provider_network_called": False',
+              '"database_connection_opened": False',
+              '"secret_resolved": False',
+              '"migration_executed": False',
+              '"deploy_executed": False',
+              '"worker_armed": False',
+              '"external_action_executed": False',
+              '"core_checkpoint_write": False',
+          ):
+              assert marker in source, marker
+          PY
