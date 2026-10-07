@@ -59,11 +59,13 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           changed = set()
-          # The PR intentionally changes only the lock test/docs/workflow.
+          # The PR intentionally changes only the lock test/docs/workflow
+          # plus Quality registration for the new regression test.
           expected = {
               "test_atlasquant_interface_finalization_lock.py",
               "docs/continuidade/INTERFACE_FINALIZATION_LOCK_2026-10-07.md",
               ".github/workflows/atlasquant-interface-finalization-lock.yml",
+              ".github/workflows/quality-tests.yml",
           }
           print("Expected UI-only delta:", sorted(expected))
           for path in expected:
