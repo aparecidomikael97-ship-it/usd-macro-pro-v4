@@ -1,0 +1,67 @@
+name: AION Chat Production Postgres Adapter Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "atlasquant_aion_chat_production_postgres_adapter_contract_v1.py"
+      - "test_atlasquant_aion_chat_production_postgres_adapter_contract_v1.py"
+      - "docs/aion/AION_CHAT_PRODUCTION_POSTGRES_ADAPTER_CONTRACT_V1.md"
+      - ".github/workflows/aion-chat-production-postgres-adapter-contract-v1.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  production-postgres-adapter-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile adapter contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_chat_production_postgres_adapter_contract_v1.py \
+            test_atlasquant_aion_chat_production_postgres_adapter_contract_v1.py
+      - name: Run adapter design tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_chat_production_postgres_adapter_contract_v1.py
+      - name: Assert zero DB/provider/network/execution side effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_chat_production_postgres_adapter_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "import psycopg",
+              "import sqlalchemy",
+              "import requests",
+              "import socket",
+              "os.getenv(",
+              ".connect(",
+              "execute_openai_answer(",
+              "provider_config(",
+              "CREATE TABLE",
+              "INSERT INTO",
+              "UPDATE ",
+              "DELETE FROM",
+              "subprocess",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_PRODUCTION_POSTGRES_ADAPTER_IMPLEMENTATION_REVIEW"',
+              '"PERSISTENCE_OUTCOME_UNKNOWN"',
+              '"FORBIDDEN_AUTOMATICALLY"',
+              '"SEPARATE_IDEMPOTENT_PATH"',
+              '"provider_called"',
+              '"sql_executed"',
+              '"external_action_executed"',
+          ):
+              assert marker in source, marker
+          PY
