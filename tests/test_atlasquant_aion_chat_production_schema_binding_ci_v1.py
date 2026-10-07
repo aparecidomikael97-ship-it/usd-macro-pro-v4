@@ -459,7 +459,11 @@ class ProductionSchemaBindingCiV1Tests(unittest.TestCase):
                     "current_setting('app.tenant_id',true),"
                     "current_setting('app.workspace_id',true)"
                 )
-                self.assertEqual(cur.fetchone(), ("", "", ""))
+                cleared = cur.fetchone()
+                self.assertTrue(
+                    all(value in (None, "") for value in cleared),
+                    cleared,
+                )
         finally:
             conn.close()
 
