@@ -149,6 +149,8 @@ CREATE TABLE aion_chat_v1.access_audit(
     id TEXT NOT NULL,
     operation TEXT NOT NULL,
     actor_id TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
     result TEXT NOT NULL,
     evidence_digest TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -158,6 +160,12 @@ CREATE TABLE aion_chat_v1.access_audit(
 CREATE INDEX access_audit_scope_time_v1
 ON aion_chat_v1.access_audit(
     owner_id, tenant_id, workspace_id, created_at DESC, id DESC
+);
+
+CREATE INDEX access_audit_scope_resource_v1
+ON aion_chat_v1.access_audit(
+    owner_id, tenant_id, workspace_id, resource_type, resource_id,
+    created_at DESC, id DESC
 );
 
 ALTER TABLE aion_chat_v1.conversations ENABLE ROW LEVEL SECURITY;
