@@ -14,6 +14,25 @@ class QualityWorkflowCoverageTests(unittest.TestCase):
         self.assertEqual(missing,[],f"Quality workflow omits test files: {missing}")
 
 
+    def test_workflow_yaml_files_are_not_collapsed_into_literal_newline_text(self):
+        workflow_dir=ROOT/".github"/"workflows"
+        malformed=[]
+        for path in sorted(workflow_dir.glob("*.yml")):
+            raw=path.read_text(encoding="utf-8")
+            physical_lines=len(raw.splitlines())
+            literal_newlines=raw.count("\\n")
+            if physical_lines <= 2 and literal_newlines >= 3:
+                malformed.append(
+                    f"{path.name}: physical_lines={physical_lines}, literal_newlines={literal_newlines}"
+                )
+        self.assertEqual(
+            malformed,
+            [],
+            "Workflow YAML appears serialized as one line with literal \\n markers: "
+            + "; ".join(malformed),
+        )
+
+
     def test_core_workflows_use_current_node24_action_generation(self):
         workflow_dir=ROOT/".github"/"workflows"
         names=("quality-tests.yml","autopilot-v107.yml","atlasquant-checkpoint.yml","coleta_automatica.yml","atlasquant-integration-gate.yml","atlasquant-source-parity.yml","atlasquant-ui-smoke.yml","production-build-identity.yml")

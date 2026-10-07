@@ -106,6 +106,19 @@ def _forbidden_production_paths(paths):
     return forbidden
 
 
+def _render_manual_deploy_hardening_only(base):
+    previous=_git(["show",f"{base}:render.yaml"])
+    if previous.returncode != 0:
+        return False
+    current=(ROOT/"render.yaml").read_text(encoding="utf-8")
+    before=previous.stdout
+    marker="autoDeployTrigger: commit"
+    if before.count(marker) != 1:
+        return False
+    expected=before.replace(marker,"autoDeployTrigger: off")
+    return current == expected
+
+
 def _task(**step_fields):
     return new_durable_task(
         "Local work",
@@ -342,7 +355,10 @@ class AionConvergenceTests(unittest.TestCase):
             )
         diff = _git(["diff", "--name-only", base])
         self.assertEqual(diff.returncode, 0, diff.stderr)
-        self.assertEqual(_forbidden_production_paths(diff.stdout.splitlines()), [])
+        forbidden=_forbidden_production_paths(diff.stdout.splitlines())
+        if "render.yaml" in forbidden and _render_manual_deploy_hardening_only(base):
+            forbidden.remove("render.yaml")
+        self.assertEqual(forbidden, [])
         checkpoint = default_checkpoint()
         self.assertFalse(checkpoint["aion"]["real_trading"])
         self.assertFalse(guardian_decision("deploy_production", ADMIN, approved=True)["allowed"])

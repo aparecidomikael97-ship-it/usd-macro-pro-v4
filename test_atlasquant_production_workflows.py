@@ -30,16 +30,17 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("Safety Core monitorado",text)
 
 
-    def test_browser_smoke_remains_post_deploy_observer_with_render_on_commit(self):
+    def test_browser_smoke_remains_post_deploy_observer_with_manual_render_deploy(self):
         browser=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")
         render=Path("render.yaml").read_text(encoding="utf-8")
-        self.assertIn("autoDeployTrigger: commit",render)
+        self.assertIn("autoDeployTrigger: off",render)
+        self.assertNotIn("autoDeployTrigger: commit",render)
         trigger=browser.split("permissions:",1)[0]
         self.assertNotIn("\n  push:",trigger)
         self.assertIn("workflow_dispatch:",trigger)
         self.assertIn("schedule:",trigger)
 
-    def test_build_identity_runs_on_main_push_after_render_commit_trigger(self):
+    def test_build_identity_observes_main_push_without_implicitly_deploying_render(self):
         identity=Path(".github/workflows/production-build-identity.yml").read_text(encoding="utf-8")
         trigger=identity.split("permissions:",1)[0]
         self.assertIn("workflow_dispatch:",trigger)
@@ -47,7 +48,8 @@ class AtlasQuantProductionWorkflowContractTests(unittest.TestCase):
         self.assertIn("branches: [main]",trigger)
         self.assertIn("schedule:",trigger)
         render=Path("render.yaml").read_text(encoding="utf-8")
-        self.assertIn("autoDeployTrigger: commit",render)
+        self.assertIn("autoDeployTrigger: off",render)
+        self.assertNotIn("autoDeployTrigger: commit",render)
 
     def test_browser_smoke_is_post_deploy_observer_not_quality_workflow_gate(self):
         text=Path(".github/workflows/production-browser-smoke.yml").read_text(encoding="utf-8")

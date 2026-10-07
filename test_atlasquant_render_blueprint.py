@@ -6,10 +6,11 @@ class AtlasQuantRenderBlueprintContractTests(unittest.TestCase):
     def setUp(self):
         self.text=Path("render.yaml").read_text(encoding="utf-8")
 
-    def test_production_service_is_pinned_to_main(self):
+    def test_production_service_is_pinned_to_main_and_requires_manual_deploy(self):
         self.assertIn("name: atlasquant-private",self.text)
         self.assertIn("branch: main",self.text)
-        self.assertIn("autoDeployTrigger: commit",self.text)
+        self.assertIn("autoDeployTrigger: off",self.text)
+        self.assertNotIn("autoDeployTrigger: commit",self.text)
 
     def test_streamlit_commands_and_health_are_explicit(self):
         self.assertIn("pip install -r requirements.txt",self.text)
