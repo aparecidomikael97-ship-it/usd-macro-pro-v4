@@ -91,9 +91,19 @@ The disposable CI application role has:
 - no CREATEROLE;
 - no REPLICATION;
 - no BYPASSRLS;
-- no CREATE privilege on the AION Chat schema.
+- no CREATE privilege on the AION Chat schema;
+- no DELETE privilege on application data tables by default;
+- no UPDATE privilege on messages, idempotency, attachments, checkpoints, summaries or audit rows.
 
-It receives only schema USAGE, schema metadata read access, and required DML on scoped data tables.
+The least-privilege profile grants:
+
+- conversations: SELECT + INSERT + UPDATE;
+- messages/idempotency/attachments/checkpoints/summaries: SELECT + INSERT;
+- access audit: SELECT + INSERT only;
+- schema metadata: SELECT only;
+- migration history: no application-role access.
+
+Retention/deletion remains a separate controlled capability rather than an ordinary application-role privilege. Audit rows are append-only under the application role.
 
 RLS is defense in depth only. Trusted application scope validation remains mandatory; RLS does not replace authentication or the existing application-level scope predicates.
 
@@ -104,7 +114,11 @@ The CI evidence must show:
 - no scope context -> zero scoped rows visible;
 - wrong owner/tenant/workspace -> foreign rows invisible;
 - an insert that conflicts with the bound scope is rejected;
-- a correctly bound scope sees only its own rows.
+- a correctly bound scope sees only its own rows;
+- scope context is transaction-local and clears after commit, preventing pooled-connection scope bleed;
+- append-only audit data cannot be updated or deleted by the application role.
+
+The CI binding uses transaction-local PostgreSQL settings for owner, tenant and workspace scope. Production composition must preserve this property for every pooled connection/transaction; session-persistent scope values are not acceptable.
 
 ## Backup / restore drill
 
