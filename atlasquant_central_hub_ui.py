@@ -958,9 +958,26 @@ def render_central_hub(
         return resolved
     if resolved.get("root"):
         try:
-            acknowledge_login_greeting(st.session_state, access, now=now,
-                confirmed_status=confirmed_status, timezone_name=timezone_name)
+            acknowledge_login_greeting(
+                st.session_state,
+                access,
+                now=now,
+                confirmed_status=confirmed_status,
+                timezone_name=timezone_name,
+            )
         except Exception:
+            pass
+        try:
+            presence_html = aion_login_presence_html(
+                access,
+                now=now,
+                confirmed_status=confirmed_status,
+                timezone_name=timezone_name,
+            )
+            if presence_html:
+                st.markdown(_CENTRAL_CSS + presence_html, unsafe_allow_html=True)
+        except Exception:
+            # Presence is progressive enhancement. Central navigation stays usable.
             pass
     area = "central" if resolved.get("root") else resolved["area"]
     if area != "trader":
