@@ -1,0 +1,67 @@
+name: AION Chat Production Activation Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "atlasquant_aion_chat_production_activation_contract_v1.py"
+      - "test_atlasquant_aion_chat_production_activation_contract_v1.py"
+      - "docs/aion/AION_CHAT_PRODUCTION_ACTIVATION_CONTRACT_V1.md"
+      - ".github/workflows/aion-chat-production-activation-contract-v1.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  production-chat-activation-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile design contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_chat_production_activation_contract_v1.py \
+            test_atlasquant_aion_chat_production_activation_contract_v1.py
+      - name: Run production-chat activation design tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_chat_production_activation_contract_v1.py
+      - name: Assert zero provider, secret, storage or execution side effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_chat_production_activation_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "import requests",
+              "import socket",
+              "import subprocess",
+              "urllib.request",
+              "os.getenv(",
+              "st.secrets",
+              "execute_openai_answer(",
+              "provider_config(",
+              "SQLiteChatStore(",
+              "requests.post(",
+              "requests.put(",
+              "subprocess.run(",
+              "subprocess.Popen(",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_PRODUCTION_CHAT_ACTIVATION_DESIGN_REVIEW"',
+              '"IMPLEMENT_PRODUCTION_CHAT_HOST_ADAPTER_IN_SEPARATE_PR"',
+              '"PER_TURN_EXPLICIT"',
+              '"provider_called"',
+              '"billing_executed"',
+              '"external_action_executed"',
+              '"worker_armed"',
+          ):
+              assert marker in source, marker
+          PY
