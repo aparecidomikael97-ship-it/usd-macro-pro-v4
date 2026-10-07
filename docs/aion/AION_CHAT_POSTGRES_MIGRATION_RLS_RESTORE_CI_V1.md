@@ -37,7 +37,7 @@ Version:
 
 Pinned SHA-256:
 
-`d57d5c225c86306afb79cb1d5dba2a6cd8e2838730ac27171243b4ec82664ab2`
+`7dd72d75365862f54c81110027430011f8ac8f81ce629f500cbbd9aa0c00c50c`
 
 The migration runner computes the repository artifact SHA-256 before opening the database. A mismatch fails closed.
 
