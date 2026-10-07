@@ -1,37 +1,52 @@
 {
   "version": "V11.2_PAPER_TRADING",
   "trades_total": 1,
-  "pending_entries": 1,
+  "pending_entries": 0,
   "open_positions": 0,
-  "closed_trades": 0,
+  "closed_trades": 1,
   "wins": 0,
-  "losses": 0,
+  "losses": 1,
   "breakeven": 0,
   "win_rate_pct": 0.0,
-  "net_r": 0.0,
-  "avg_r": 0.0,
-  "profit_factor_r": null,
-  "by_pair": {},
+  "net_r": -1.0,
+  "avg_r": -1.0,
+  "profit_factor_r": 0.0,
+  "by_pair": {
+    "USD/CHF": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "win_rate_pct": 0.0,
+      "net_r": -1.0,
+      "avg_r": -1.0
+    }
+  },
   "by_setup": {},
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-10-07T09:53:12.780350+00:00",
+    "ran_at": "2026-10-07T10:26:00.314332+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
-    "entries_opened": 0,
-    "trades_closed": 0,
+    "entries_opened": 1,
+    "trades_closed": 1,
     "wins_today": 0,
     "daily_gain_lock": false,
     "daily_gain_lock_reason": "",
-    "closed_pairs_this_cycle": [],
+    "closed_pairs_this_cycle": [
+      "USD/CHF"
+    ],
     "checklists": {
       "USD/CHF": {
         "side": "BUY",
-        "passed": true,
-        "state": "🟢 EXECUTÁVEL",
+        "passed": false,
+        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
         "hard_blocks": [],
-        "soft_blocks": [],
+        "soft_blocks": [
+          "ICT incompleto (33/100)",
+          "Fluxo institucional incompleto (65/100)",
+          "M15 ainda não confirmou gatilho"
+        ],
         "daily_gain_lock": false
       },
       "USD/CAD": {
@@ -43,8 +58,8 @@
           "H1 está contra o viés"
         ],
         "soft_blocks": [
-          "ICT incompleto (33/100)",
-          "Fluxo institucional incompleto (59/100)",
+          "ICT incompleto (45/100)",
+          "Fluxo institucional incompleto (53/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -59,7 +74,7 @@
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ICT incompleto (34/100)",
-          "Fluxo institucional incompleto (65/100)",
+          "Fluxo institucional incompleto (50/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -71,7 +86,7 @@
         "hard_blocks": [],
         "soft_blocks": [
           "Gate ainda não liberou execução",
-          "ICT incompleto (47/100)",
+          "ICT incompleto (65/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -85,7 +100,7 @@
           "Gate ainda não liberou execução",
           "ADR14 em 107%: evitar perseguir preço",
           "ICT incompleto (40/100)",
-          "Fluxo institucional incompleto (61/100)",
+          "Fluxo institucional incompleto (50/100)",
           "M15 ainda não confirmou gatilho"
         ],
         "daily_gain_lock": false
@@ -117,25 +132,25 @@
       }
     },
     "trades_total": 1,
-    "pending_entries": 1,
+    "pending_entries": 0,
     "open_positions": 0,
-    "closed_trades": 0,
+    "closed_trades": 1,
     "wins": 0,
-    "losses": 0,
+    "losses": 1,
     "breakeven": 0,
     "win_rate_pct": 0.0,
-    "net_r": 0.0,
-    "avg_r": 0.0,
-    "profit_factor_r": null
+    "net_r": -1.0,
+    "avg_r": -1.0,
+    "profit_factor_r": 0.0
   },
   "friction_v116": {
     "version": "V11.6_PAPER_FRICTION",
-    "closed_costed": 0,
-    "gross_r": 0.0,
-    "friction_r": 0.0,
-    "net_r": 0.0,
-    "avg_net_r": 0.0,
-    "profit_factor_net_r": null,
+    "closed_costed": 1,
+    "gross_r": -1.0,
+    "friction_r": 0.06,
+    "net_r": -1.06,
+    "avg_net_r": -1.06,
+    "profit_factor_net_r": 0.0,
     "assumptions": {
       "spread_cost_r_per_closed_trade": 0.04,
       "slippage_cost_r_per_closed_trade": 0.02,
@@ -150,9 +165,9 @@
       "auto_strategy_selection": false
     }
   },
-  "gross_r_before_friction": 0.0,
-  "friction_r": 0.0,
-  "net_r_after_friction": 0.0,
+  "gross_r_before_friction": -1.0,
+  "friction_r": 0.06,
+  "net_r_after_friction": -1.06,
   "safety": {
     "real_orders": false,
     "broker_connection": false,
