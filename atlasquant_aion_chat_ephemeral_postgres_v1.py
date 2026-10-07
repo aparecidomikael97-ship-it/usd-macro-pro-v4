@@ -450,8 +450,8 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"INSERT INTO {self.schema}.conversations"
@@ -486,8 +486,8 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.conversations "
@@ -506,8 +506,8 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.conversations "
@@ -567,8 +567,8 @@ class EphemeralPostgresBackendV1:
             params.extend([after[0], after[1]])
         params.append(int(limit))
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT c.data FROM {self.schema}.conversations c WHERE "
@@ -586,8 +586,8 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"UPDATE {self.schema}.conversations "
@@ -732,8 +732,8 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT m.data FROM {self.schema}.message_idempotency i "
@@ -760,8 +760,8 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.messages "
@@ -799,8 +799,8 @@ class EphemeralPostgresBackendV1:
         params.append(int(limit))
         direction = "DESC" if newest_first else "ASC"
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.messages WHERE "
@@ -826,8 +826,8 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.messages "
@@ -855,8 +855,8 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.messages WHERE owner_id=%s AND tenant_id=%s "
@@ -881,8 +881,8 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, attachment.conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"INSERT INTO {self.schema}.attachments"
@@ -914,8 +914,8 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.attachments WHERE owner_id=%s AND tenant_id=%s "
@@ -944,8 +944,8 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.conversations WHERE owner_id=%s AND tenant_id=%s "
@@ -1011,8 +1011,8 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.checkpoints WHERE owner_id=%s AND tenant_id=%s "
@@ -1030,8 +1030,8 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.conversations WHERE owner_id=%s AND tenant_id=%s "
@@ -1091,8 +1091,8 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
-        self._bind_scope(conn, scope)
         try:
+            self._bind_scope(conn, scope)
             with conn.cursor() as cur:
                 cur.execute(
                     f"SELECT data FROM {self.schema}.summaries WHERE owner_id=%s AND tenant_id=%s "
