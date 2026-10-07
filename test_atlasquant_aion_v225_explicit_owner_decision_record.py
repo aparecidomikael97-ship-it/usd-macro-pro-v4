@@ -15,6 +15,7 @@ from atlasquant_aion_owner_decision_record import (
     build_owner_decision_request,
     canonical_owner_decision_bytes,
     verify_owner_decision,
+    owner_decision_nonce_scope,
 )
 from test_atlasquant_aion_v222_core_freeze_preflight import NOW
 from test_atlasquant_aion_v224_owner_signature_ceremony import (
@@ -112,6 +113,45 @@ def verify_fixture(
     }
     kwargs.update(overrides)
     return verify_owner_decision(**kwargs)
+
+
+def test_production_shape_owner_decision_scope_is_accepted_and_oversize_is_blocked(tmp_path):
+    request = {
+        "target_commit_sha": "6" * 40,
+        "v224_request_digest": "sha256:" + "a" * 64,
+        "decision_key_id": "k" * 27,
+        "decision_key_version": 1,
+    }
+    request_digest = "sha256:" + "b" * 64
+    scope = owner_decision_nonce_scope(request, request_digest=request_digest)
+
+    assert len(scope) == 258
+
+    registry = PersistentNonceRegistry(tmp_path / "scope-length.sqlite3")
+    assert registry.claim(
+        scope=scope,
+        nonce="owner_decision_nonce_scope_length_regression_0001",
+        expires_at="2026-10-04T20:02:30Z",
+        now_ts=NOW,
+    ) is True
+    assert registry.read_claim(
+        scope=scope,
+        nonce="owner_decision_nonce_scope_length_regression_0001",
+    ) is not None
+
+    oversized = "x" * 513
+    with pytest.raises(ValueError, match="invalid nonce scope"):
+        registry.claim(
+            scope=oversized,
+            nonce="owner_decision_nonce_scope_length_regression_0002",
+            expires_at="2026-10-04T20:02:30Z",
+            now_ts=NOW,
+        )
+    with pytest.raises(ValueError, match="invalid nonce scope"):
+        registry.read_claim(
+            scope=oversized,
+            nonce="owner_decision_nonce_scope_length_regression_0002",
+        )
 
 
 def test_decision_request_requires_second_signature_and_does_not_record_decision():
