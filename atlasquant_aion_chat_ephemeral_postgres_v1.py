@@ -185,6 +185,7 @@ def install_ephemeral_schema(connection_factory: ConnectionFactory) -> None:
         tenant_id TEXT NOT NULL,
         workspace_id TEXT NOT NULL,
         id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         archived BOOLEAN NOT NULL,
         title TEXT NOT NULL,
@@ -316,14 +317,28 @@ def reset_ephemeral_schema(connection_factory: ConnectionFactory) -> None:
 class EphemeralPostgresBackendV1:
     """Real psycopg backend permitted only for disposable CI/test PostgreSQL."""
 
-    def __init__(self, connection_factory: ConnectionFactory, *, environment: str = "CI"):
+    def __init__(
+        self,
+        connection_factory: ConnectionFactory,
+        *,
+        environment: str = "CI",
+        schema: str = self.schema,
+    ):
         if not callable(connection_factory):
             raise TypeError("connection factory required")
         normalized = str(environment or "").strip().upper()
         if normalized not in {"CI", "TEST"}:
             raise ValueError("ephemeral CI/TEST environment required")
+        schema_name = str(schema or "").strip()
+        if (
+            not schema_name
+            or not schema_name.replace("_", "").isalnum()
+            or not (schema_name[0].isalpha() or schema_name[0] == "_")
+        ):
+            raise ValueError("trusted PostgreSQL schema identifier required")
         self._connect = connection_factory
         self.environment = normalized
+        self.schema = schema_name
         self.commit_outcome_unknown_once = False
 
     def _connection(self) -> psycopg.Connection:
@@ -340,6 +355,10 @@ class EphemeralPostgresBackendV1:
                 pass
             raise StorageUnavailableError("ephemeral postgres transaction mode unavailable") from exc
         return conn
+
+    def _bind_scope(self, conn: psycopg.Connection, scope: Scope) -> None:
+        """Hook for stronger CI bindings; base ephemeral schema has no RLS."""
+        _scope_tuple(scope)
 
     def health_report(self) -> dict[str, Any]:
         report = {
@@ -365,7 +384,7 @@ class EphemeralPostgresBackendV1:
             conn = self._connection()
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT version FROM {DB_SCHEMA}.schema_meta WHERE name=%s",
+                    f"SELECT version FROM {self.schema}.schema_meta WHERE name=%s",
                     ("aion_chat",),
                 )
                 row = cur.fetchone()
@@ -374,7 +393,7 @@ class EphemeralPostgresBackendV1:
                     "SELECT to_regclass(%s), to_regclass(%s), to_regclass(%s), "
                     "to_regclass(%s), to_regclass(%s), to_regclass(%s)",
                     tuple(
-                        f"{DB_SCHEMA}.{name}"
+                        f"{self.schema}.{name}"
                         for name in (
                             "conversations",
                             "messages",
@@ -391,7 +410,7 @@ class EphemeralPostgresBackendV1:
                     "SELECT conname FROM pg_constraint c "
                     "JOIN pg_namespace n ON n.oid=c.connamespace "
                     "WHERE n.nspname=%s AND conname = ANY(%s)",
-                    (DB_SCHEMA, list(REQUIRED_CONSTRAINTS)),
+                    (self.schema, list(REQUIRED_CONSTRAINTS)),
                 )
                 present_constraints = {row[0] for row in cur.fetchall()}
                 constraints_ok = present_constraints == REQUIRED_CONSTRAINTS
@@ -431,17 +450,19 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"INSERT INTO {DB_SCHEMA}.conversations"
-                    "(owner_id,tenant_id,workspace_id,id,updated_at,archived,title,data) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)",
+                    f"INSERT INTO {self.schema}.conversations"
+                    "(owner_id,tenant_id,workspace_id,id,created_at,updated_at,archived,title,data) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)",
                     (
                         owner,
                         tenant,
                         workspace,
                         conversation.id,
+                        conversation.created_at,
                         conversation.updated_at,
                         conversation.archived,
                         conversation.title,
@@ -465,10 +486,11 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.conversations "
+                    f"SELECT data FROM {self.schema}.conversations "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND id=%s",
                     (owner, tenant, workspace, str(conversation_id)),
                 )
@@ -484,10 +506,11 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.conversations "
+                    f"SELECT data FROM {self.schema}.conversations "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s "
                     "ORDER BY updated_at DESC,id DESC LIMIT 201",
                     (owner, tenant, workspace),
@@ -522,7 +545,7 @@ class EphemeralPostgresBackendV1:
         if query:
             clauses.append(
                 "(STRPOS(LOWER(c.title), LOWER(%s)) > 0 OR EXISTS ("
-                f"SELECT 1 FROM {DB_SCHEMA}.messages m "
+                f"SELECT 1 FROM {self.schema}.messages m "
                 "WHERE m.owner_id=c.owner_id AND m.tenant_id=c.tenant_id "
                 "AND m.workspace_id=c.workspace_id AND m.conversation_id=c.id "
                 "AND STRPOS(LOWER(m.content), LOWER(%s)) > 0))"
@@ -544,10 +567,11 @@ class EphemeralPostgresBackendV1:
             params.extend([after[0], after[1]])
         params.append(int(limit))
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT c.data FROM {DB_SCHEMA}.conversations c WHERE "
+                    f"SELECT c.data FROM {self.schema}.conversations c WHERE "
                     + " AND ".join(clauses)
                     + " ORDER BY c.updated_at DESC,c.id DESC LIMIT %s",
                     tuple(params),
@@ -562,10 +586,11 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"UPDATE {DB_SCHEMA}.conversations "
+                    f"UPDATE {self.schema}.conversations "
                     "SET updated_at=%s, archived=%s, title=%s, data=%s::jsonb "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND id=%s",
                     (
@@ -604,7 +629,7 @@ class EphemeralPostgresBackendV1:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.conversations "
+                    f"SELECT data FROM {self.schema}.conversations "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND id=%s FOR UPDATE",
                     (owner, tenant, workspace, message.conversation_id),
                 )
@@ -614,7 +639,7 @@ class EphemeralPostgresBackendV1:
                 conversation = _load(Conversation, row[0])
 
                 cur.execute(
-                    f"SELECT message_id FROM {DB_SCHEMA}.message_idempotency "
+                    f"SELECT message_id FROM {self.schema}.message_idempotency "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s "
                     "AND conversation_id=%s AND idempotency_key=%s",
                     (owner, tenant, workspace, message.conversation_id, key),
@@ -622,7 +647,7 @@ class EphemeralPostgresBackendV1:
                 prior = cur.fetchone()
                 if prior is not None:
                     cur.execute(
-                        f"SELECT data FROM {DB_SCHEMA}.messages "
+                        f"SELECT data FROM {self.schema}.messages "
                         "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s "
                         "AND conversation_id=%s AND id=%s",
                         (owner, tenant, workspace, message.conversation_id, prior[0]),
@@ -635,7 +660,7 @@ class EphemeralPostgresBackendV1:
                     stored = Message(**redact(asdict(message)))
                     stored.sequence = conversation.message_count + 1
                     cur.execute(
-                        f"INSERT INTO {DB_SCHEMA}.messages"
+                        f"INSERT INTO {self.schema}.messages"
                         "(owner_id,tenant_id,workspace_id,conversation_id,id,sequence,content,data) "
                         "VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)",
                         (
@@ -650,7 +675,7 @@ class EphemeralPostgresBackendV1:
                         ),
                     )
                     cur.execute(
-                        f"INSERT INTO {DB_SCHEMA}.message_idempotency"
+                        f"INSERT INTO {self.schema}.message_idempotency"
                         "(owner_id,tenant_id,workspace_id,conversation_id,idempotency_key,message_id) "
                         "VALUES (%s,%s,%s,%s,%s,%s)",
                         (
@@ -665,7 +690,7 @@ class EphemeralPostgresBackendV1:
                     conversation.message_count = stored.sequence
                     conversation.updated_at = now()
                     cur.execute(
-                        f"UPDATE {DB_SCHEMA}.conversations SET updated_at=%s,data=%s::jsonb "
+                        f"UPDATE {self.schema}.conversations SET updated_at=%s,data=%s::jsonb "
                         "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND id=%s",
                         (
                             conversation.updated_at,
@@ -707,11 +732,12 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT m.data FROM {DB_SCHEMA}.message_idempotency i "
-                    f"JOIN {DB_SCHEMA}.messages m ON "
+                    f"SELECT m.data FROM {self.schema}.message_idempotency i "
+                    f"JOIN {self.schema}.messages m ON "
                     "m.owner_id=i.owner_id AND m.tenant_id=i.tenant_id AND "
                     "m.workspace_id=i.workspace_id AND m.id=i.message_id "
                     "WHERE i.owner_id=%s AND i.tenant_id=%s AND i.workspace_id=%s "
@@ -734,10 +760,11 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.messages "
+                    f"SELECT data FROM {self.schema}.messages "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND conversation_id=%s "
                     "ORDER BY sequence ASC LIMIT 201",
                     (owner, tenant, workspace, str(conversation_id)),
@@ -772,10 +799,11 @@ class EphemeralPostgresBackendV1:
         params.append(int(limit))
         direction = "DESC" if newest_first else "ASC"
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.messages WHERE "
+                    f"SELECT data FROM {self.schema}.messages WHERE "
                     + " AND ".join(clauses)
                     + f" ORDER BY sequence {direction} LIMIT %s",
                     tuple(params),
@@ -798,10 +826,11 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.messages "
+                    f"SELECT data FROM {self.schema}.messages "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s "
                     "AND conversation_id=%s AND sequence < %s "
                     "AND STRPOS(LOWER(content), LOWER(%s)) > 0 "
@@ -826,10 +855,11 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.messages WHERE owner_id=%s AND tenant_id=%s "
+                    f"SELECT data FROM {self.schema}.messages WHERE owner_id=%s AND tenant_id=%s "
                     "AND workspace_id=%s AND conversation_id=%s AND id=%s",
                     (
                         owner,
@@ -851,10 +881,11 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, attachment.conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"INSERT INTO {DB_SCHEMA}.attachments"
+                    f"INSERT INTO {self.schema}.attachments"
                     "(owner_id,tenant_id,workspace_id,conversation_id,id,data) "
                     "VALUES (%s,%s,%s,%s,%s,%s::jsonb)",
                     (
@@ -883,10 +914,11 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.attachments WHERE owner_id=%s AND tenant_id=%s "
+                    f"SELECT data FROM {self.schema}.attachments WHERE owner_id=%s AND tenant_id=%s "
                     "AND workspace_id=%s AND conversation_id=%s AND id=%s",
                     (
                         owner,
@@ -912,10 +944,11 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.conversations WHERE owner_id=%s AND tenant_id=%s "
+                    f"SELECT data FROM {self.schema}.conversations WHERE owner_id=%s AND tenant_id=%s "
                     "AND workspace_id=%s AND id=%s FOR UPDATE",
                     (owner, tenant, workspace, checkpoint.conversation_id),
                 )
@@ -924,7 +957,7 @@ class EphemeralPostgresBackendV1:
                     raise LookupError("conversation unavailable")
                 conversation = _load(Conversation, row[0])
                 cur.execute(
-                    f"SELECT through_sequence FROM {DB_SCHEMA}.checkpoints "
+                    f"SELECT through_sequence FROM {self.schema}.checkpoints "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND conversation_id=%s "
                     "ORDER BY through_sequence DESC,id DESC LIMIT 1",
                     (owner, tenant, workspace, checkpoint.conversation_id),
@@ -935,7 +968,7 @@ class EphemeralPostgresBackendV1:
                 if checkpoint.through_sequence > conversation.message_count:
                     raise ValueError("coverage beyond conversation")
                 cur.execute(
-                    f"INSERT INTO {DB_SCHEMA}.checkpoints"
+                    f"INSERT INTO {self.schema}.checkpoints"
                     "(owner_id,tenant_id,workspace_id,conversation_id,id,through_sequence,data) "
                     "VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb)",
                     (
@@ -951,7 +984,7 @@ class EphemeralPostgresBackendV1:
                 conversation.latest_checkpoint = checkpoint.id
                 conversation.updated_at = now()
                 cur.execute(
-                    f"UPDATE {DB_SCHEMA}.conversations SET updated_at=%s,data=%s::jsonb "
+                    f"UPDATE {self.schema}.conversations SET updated_at=%s,data=%s::jsonb "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s AND id=%s",
                     (
                         conversation.updated_at,
@@ -978,10 +1011,11 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.checkpoints WHERE owner_id=%s AND tenant_id=%s "
+                    f"SELECT data FROM {self.schema}.checkpoints WHERE owner_id=%s AND tenant_id=%s "
                     "AND workspace_id=%s AND conversation_id=%s "
                     "ORDER BY through_sequence DESC,id DESC LIMIT 1",
                     (owner, tenant, workspace, str(conversation_id)),
@@ -996,10 +1030,11 @@ class EphemeralPostgresBackendV1:
         self.require_healthy()
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.conversations WHERE owner_id=%s AND tenant_id=%s "
+                    f"SELECT data FROM {self.schema}.conversations WHERE owner_id=%s AND tenant_id=%s "
                     "AND workspace_id=%s AND id=%s FOR UPDATE",
                     (owner, tenant, workspace, summary.conversation_id),
                 )
@@ -1011,7 +1046,7 @@ class EphemeralPostgresBackendV1:
                     raise ValueError("coverage beyond conversation")
                 for message_id in summary.source_message_ids:
                     cur.execute(
-                        f"SELECT sequence FROM {DB_SCHEMA}.messages WHERE owner_id=%s AND tenant_id=%s "
+                        f"SELECT sequence FROM {self.schema}.messages WHERE owner_id=%s AND tenant_id=%s "
                         "AND workspace_id=%s AND conversation_id=%s AND id=%s",
                         (
                             owner,
@@ -1027,7 +1062,7 @@ class EphemeralPostgresBackendV1:
                     if int(source[0]) > summary.through_sequence:
                         raise ValueError("source beyond coverage")
                 cur.execute(
-                    f"INSERT INTO {DB_SCHEMA}.summaries"
+                    f"INSERT INTO {self.schema}.summaries"
                     "(owner_id,tenant_id,workspace_id,conversation_id,id,through_sequence,data) "
                     "VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb)",
                     (
@@ -1056,10 +1091,11 @@ class EphemeralPostgresBackendV1:
         self.get_conversation(scope, conversation_id)
         owner, tenant, workspace = _scope_tuple(scope)
         conn = self._connection()
+        self._bind_scope(conn, scope)
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT data FROM {DB_SCHEMA}.summaries WHERE owner_id=%s AND tenant_id=%s "
+                    f"SELECT data FROM {self.schema}.summaries WHERE owner_id=%s AND tenant_id=%s "
                     "AND workspace_id=%s AND conversation_id=%s "
                     "ORDER BY through_sequence DESC,id DESC LIMIT 1",
                     (owner, tenant, workspace, str(conversation_id)),
