@@ -1,0 +1,184 @@
+name: AION Chat Postgres Migration RLS Restore CI V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - design/aion-chat-production-postgres-preflight-v1-20261007
+    paths:
+      - "migrations/aion_chat_postgres_v1/0001_initial.sql"
+      - "atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
+      - "tests/test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
+      - "docs/aion/AION_CHAT_POSTGRES_MIGRATION_RLS_RESTORE_CI_V1.md"
+      - ".github/workflows/aion-chat-postgres-migration-rls-restore-ci-v1.yml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-migration-rls-restore-ci-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aion_chat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aion_chat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      AION_CHAT_MIGRATION_CI_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
+      AION_CHAT_RESTORE_CI_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_restore_test?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned PostgreSQL driver
+        run: |
+          grep -Fx "psycopg[binary]==3.3.6" requirements.txt
+          python -m pip install pip==26.2.1
+          python -m pip install "psycopg[binary]==3.3.6"
+          python -m pip check
+
+      - name: Compile migration and RLS validation
+        run: |
+          python -m py_compile             atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             tests/test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py
+
+      - name: Verify pinned migration artifact checksum
+        run: |
+          printf '%s  %s\n'             "0bb91049a51177bc8fbe42654c82497fae95714042028ff831cf2c87a9cfca50"             "migrations/aion_chat_postgres_v1/0001_initial.sql"             | sha256sum --check --strict
+
+      - name: Run migration RLS and least-privilege tests
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py'
+
+      - name: Apply migration and seed deterministic restore fixture
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+          import atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1 as migration
+
+          dsn = os.environ["AION_CHAT_MIGRATION_CI_PG_DSN"]
+
+          def connect():
+              return psycopg.connect(
+                  dsn,
+                  autocommit=False,
+                  connect_timeout=5,
+                  application_name="atlasquant-aion-chat-backup-seed-ci",
+              )
+
+          applied = migration.apply_migration(connect, environment="CI")
+          seeded = migration.seed_restore_fixture(connect, environment="CI")
+          health = migration.migration_health_report(connect, environment="CI")
+
+          assert applied["state"] == migration.APPLIED, applied
+          assert seeded["state"] == "RESTORE_FIXTURE_SEEDED", seeded
+          assert health["state"] == migration.HEALTHY, health
+          print("SOURCE_MIGRATION_HEALTH=HEALTHY")
+          print("RESTORE_FIXTURE=SEEDED")
+          PY
+
+      - name: Create PostgreSQL 17 logical backup
+        run: |
+          docker run --rm --network host             -e PGPASSWORD=postgres             postgres:17-alpine             pg_dump               -h 127.0.0.1               -U postgres               -d aion_chat_test               --format=custom               --no-owner             > "$RUNNER_TEMP/aion_chat_v1.dump"
+
+          test -s "$RUNNER_TEMP/aion_chat_v1.dump"
+          sha256sum "$RUNNER_TEMP/aion_chat_v1.dump"
+
+      - name: Create fresh restore database
+        run: |
+          python - <<'PY'
+          import psycopg
+
+          conn = psycopg.connect(
+              "postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable",
+              autocommit=True,
+              connect_timeout=5,
+          )
+          try:
+              with conn.cursor() as cur:
+                  cur.execute("DROP DATABASE IF EXISTS aion_chat_restore_test")
+                  cur.execute("CREATE DATABASE aion_chat_restore_test")
+          finally:
+              conn.close()
+          PY
+
+      - name: Restore PostgreSQL 17 logical backup
+        run: |
+          docker run --rm --network host -i             -e PGPASSWORD=postgres             postgres:17-alpine             pg_restore               -h 127.0.0.1               -U postgres               -d aion_chat_restore_test               --exit-on-error               --no-owner             < "$RUNNER_TEMP/aion_chat_v1.dump"
+
+      - name: Attest restored schema RLS checksum and fixture
+        run: |
+          python - <<'PY'
+          import os
+          import psycopg
+          import atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1 as migration
+
+          dsn = os.environ["AION_CHAT_RESTORE_CI_PG_DSN"]
+
+          def connect():
+              return psycopg.connect(
+                  dsn,
+                  autocommit=False,
+                  connect_timeout=5,
+                  application_name="atlasquant-aion-chat-restore-attestation-ci",
+              )
+
+          report = migration.restore_fixture_report(connect, environment="CI")
+          assert report["state"] == migration.HEALTHY, report
+          assert report["migration_health"] == migration.HEALTHY, report
+          assert report["conversation_restored"], report
+          assert report["audit_restored"], report
+          assert report["digest_verified"], report
+          print("RESTORE_ATTESTATION=HEALTHY")
+          print("MIGRATION_CHECKSUM=VERIFIED")
+          print("RLS_AND_CONSTRAINTS=HEALTHY")
+          print("RESTORE_FIXTURE_DIGEST=VERIFIED")
+          PY
+
+      - name: Assert production authority remains absent
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
+          ).read_text(encoding="utf-8")
+
+          for banned in (
+              "DATABASE_URL",
+              "os.getenv(",
+              "os.environ",
+              "streamlit.secrets",
+              "render.com",
+              "api.openai.com",
+          ):
+              assert banned not in source, banned
+
+          for marker in (
+              '"production_connection_allowed": False',
+              '"provider_called": False',
+              '"billing_executed": False',
+              '"deploy_executed": False',
+              '"worker_armed": False',
+              '"external_action_executed": False',
+              '"core_checkpoint_write": False',
+          ):
+              assert marker in source, marker
+          PY
