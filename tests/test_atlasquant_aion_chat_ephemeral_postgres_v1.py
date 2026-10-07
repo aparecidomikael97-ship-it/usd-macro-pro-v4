@@ -516,7 +516,9 @@ class EphemeralPostgresV1Tests(unittest.TestCase):
         cursor = page.next_cursor
         self.assertIsNotNone(cursor)
 
-        tampered = cursor[:-1] + ("A" if cursor[-1] != "A" else "B")
+        body, signature = cursor.split(".", 1)
+        tampered_signature = ("A" if signature[0] != "A" else "B") + signature[1:]
+        tampered = body + "." + tampered_signature
         with self.assertRaisesRegex(ValueError, "cursor invalid or not bound"):
             self.store.list_messages(
                 self.scope,
