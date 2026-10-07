@@ -1,14 +1,14 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-07T10:24:22.524405+00:00",
+  "generated_at": "2026-10-07T10:51:46.582093+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
       "claim": "build",
-      "value": "020de2e29db5d4cf",
+      "value": "6096e5685c17522e",
       "truth_state": "CONFIRMED",
       "source": "AtlasQuant runtime identity",
-      "source_ref": "runtime-build:020de2e29db5d4cf",
+      "source_ref": "runtime-build:6096e5685c17522e",
       "time_sensitive": false
     }
   ],
@@ -19,7 +19,7 @@
       "Score final": 79.0,
       "Qualidade": 88.0,
       "Confluência": "MODERADA",
-      "Dif. macro": 20.1,
+      "Dif. macro": 19.8,
       "Índice ranking": 82.7
     },
     {
@@ -46,7 +46,7 @@
       "Score final": 79.0,
       "Qualidade": 81.0,
       "Confluência": "MODERADA",
-      "Dif. macro": 27.2,
+      "Dif. macro": 26.9,
       "Índice ranking": 79.5
     },
     {
@@ -55,7 +55,7 @@
       "Score final": 78.0,
       "Qualidade": 67.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -17.8,
+      "Dif. macro": -17.5,
       "Índice ranking": 73.5
     },
     {
@@ -64,7 +64,7 @@
       "Score final": 65.0,
       "Qualidade": 67.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -16.3,
+      "Dif. macro": -18.9,
       "Índice ranking": 65.8
     },
     {
@@ -73,7 +73,7 @@
       "Score final": 44.0,
       "Qualidade": 88.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -13.0,
+      "Dif. macro": -11.5,
       "Índice ranking": 61.5
     }
   ],
@@ -439,7 +439,7 @@
         "juros": 3.75,
         "inflacao": 3.35302,
         "pib": 2.19157,
-        "sentimento": 42.85714285714286,
+        "sentimento": 40.90909090909091,
         "fonte": "FRED + transformação anual"
       },
       "EUR": {
@@ -453,7 +453,7 @@
         "juros": 4.0,
         "inflacao": 3.2,
         "pib": 1.1,
-        "sentimento": 66.66666666666666,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "JPY": {
@@ -481,7 +481,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 50.0,
+        "sentimento": 57.14285714285714,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -512,12 +512,12 @@
         "n_juros": 100.0,
         "n_inflacao": 100.0,
         "n_pib": 83.49591589284022,
-        "n_sentimento": 12.499999999999995,
+        "n_sentimento": 15.384615384615389,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 68.8,
+        "Pontuação_Macro": 69.1,
         "Influência_Fed": -1.4,
-        "Pontuação_Final": 67.4,
+        "Pontuação_Final": 67.7,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 20.0,
@@ -525,13 +525,13 @@
             "PIB": 12.524387383926031,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
+            "Sentimento": 1.538461538461539
           },
           "fed": -1.406842105263158,
           "other": {
-            "Limite da escala 0–100": 1.4210854715202004e-14
+            "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 67.36754527866289
+          "unrounded_final": 67.65600681712442
         },
         "Posição": 1
       },
@@ -540,7 +540,7 @@
         "juros": 3.8,
         "inflacao": 3.4,
         "pib": 2.2,
-        "sentimento": 42.9,
+        "sentimento": 40.9,
         "fonte": "FRED + transformação anual",
         "Moeda": "Dólar Americano",
         "juros_reais": 0.4,
@@ -570,6 +570,41 @@
           "unrounded_final": 56.98715697894737
         },
         "Posição": 2
+      },
+      {
+        "Código": "AUD",
+        "juros": 4.5,
+        "inflacao": 2.7,
+        "pib": 2.1,
+        "sentimento": 57.1,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Australiano",
+        "juros_reais": 1.8,
+        "n_juros": 28.98896661469615,
+        "n_inflacao": 49.66887417218545,
+        "n_pib": 70.40481809880697,
+        "n_sentimento": 27.47252747252747,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 46.6,
+        "Influência_Fed": -1.1,
+        "Pontuação_Final": 45.5,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 5.79779332293923,
+            "Inflação": 7.450331125827817,
+            "PIB": 10.560722714821045,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 2.7472527472527473
+          },
+          "fed": -1.0551315789473685,
+          "other": {
+            "Limite da escala 0–100": -7.105427357601002e-15
+          },
+          "unrounded_final": 45.50096833189347
+        },
+        "Posição": 3
       },
       {
         "Código": "NZD",
@@ -604,77 +639,7 @@
           },
           "unrounded_final": 45.28955426125361
         },
-        "Posição": 3
-      },
-      {
-        "Código": "AUD",
-        "juros": 4.5,
-        "inflacao": 2.7,
-        "pib": 2.1,
-        "sentimento": 50.0,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Australiano",
-        "juros_reais": 1.8,
-        "n_juros": 28.98896661469615,
-        "n_inflacao": 49.66887417218545,
-        "n_pib": 70.40481809880697,
-        "n_sentimento": 12.499999999999995,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 45.1,
-        "Influência_Fed": -1.1,
-        "Pontuação_Final": 44.0,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 5.79779332293923,
-            "Inflação": 7.450331125827817,
-            "PIB": 10.560722714821045,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
-          },
-          "fed": -1.0551315789473685,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 44.00371558464072
-        },
         "Posição": 4
-      },
-      {
-        "Código": "GBP",
-        "juros": 4.0,
-        "inflacao": 3.2,
-        "pib": 1.1,
-        "sentimento": 66.7,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Libra Esterlina",
-        "juros_reais": 0.8,
-        "n_juros": 19.698663024131786,
-        "n_inflacao": 66.22516556291392,
-        "n_pib": 18.629216959148952,
-        "n_sentimento": 41.66666666666664,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 40.8,
-        "Influência_Fed": -0.1,
-        "Pontuação_Final": 40.7,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 3.9397326048263572,
-            "Inflação": 9.933774834437086,
-            "PIB": 2.794382543872343,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 4.166666666666664
-          },
-          "fed": -0.11723684210526318,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 40.71731980769719
-        },
-        "Posição": 5
       },
       {
         "Código": "CAD",
@@ -709,7 +674,7 @@
           },
           "unrounded_final": 40.19456658469492
         },
-        "Posição": 6
+        "Posição": 5
       },
       {
         "Código": "EUR",
@@ -723,12 +688,12 @@
         "n_juros": 5.657886869857563,
         "n_inflacao": 67.10099337748345,
         "n_pib": 46.58676419956989,
-        "n_sentimento": 12.499999999999995,
+        "n_sentimento": 15.384615384615389,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 39.4,
+        "Pontuação_Macro": 39.7,
         "Influência_Fed": -0.2,
-        "Pontuação_Final": 39.2,
+        "Pontuação_Final": 39.5,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 1.1315773739715127,
@@ -736,13 +701,48 @@
             "PIB": 6.988014629935484,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
+            "Sentimento": 1.538461538461539
           },
           "fed": -0.23447368421052636,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 39.200267326318986
+          "unrounded_final": 39.488728864780526
+        },
+        "Posição": 6
+      },
+      {
+        "Código": "GBP",
+        "juros": 4.0,
+        "inflacao": 3.2,
+        "pib": 1.1,
+        "sentimento": 50.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Libra Esterlina",
+        "juros_reais": 0.8,
+        "n_juros": 19.698663024131786,
+        "n_inflacao": 66.22516556291392,
+        "n_pib": 18.629216959148952,
+        "n_sentimento": 15.384615384615389,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 38.2,
+        "Influência_Fed": -0.1,
+        "Pontuação_Final": 38.1,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 3.9397326048263572,
+            "Inflação": 9.933774834437086,
+            "PIB": 2.794382543872343,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 1.538461538461539
+          },
+          "fed": -0.11723684210526318,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 38.08911467949206
         },
         "Posição": 7
       },
@@ -758,12 +758,12 @@
         "n_juros": 0.8880978333356321,
         "n_inflacao": 0.0,
         "n_pib": 100.0,
-        "n_sentimento": 12.499999999999995,
+        "n_sentimento": 15.384615384615389,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 36.4,
+        "Pontuação_Macro": 36.7,
         "Influência_Fed": 0.5,
-        "Pontuação_Final": 36.9,
+        "Pontuação_Final": 37.2,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 0.17761956666712642,
@@ -771,13 +771,13 @@
             "PIB": 15.0,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
+            "Sentimento": 1.538461538461539
           },
           "fed": 0.4689473684210527,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 36.89656693508818
+          "unrounded_final": 37.18502847354972
         },
         "Posição": 8
       },
@@ -793,12 +793,12 @@
         "n_juros": 0.0,
         "n_inflacao": 52.980132450331126,
         "n_pib": 0.0,
-        "n_sentimento": 12.499999999999995,
+        "n_sentimento": 15.384615384615389,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 29.2,
+        "Pontuação_Macro": 29.5,
         "Influência_Fed": 0.6,
-        "Pontuação_Final": 29.8,
+        "Pontuação_Final": 30.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 0.0,
@@ -806,13 +806,13 @@
             "PIB": 0.0,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
+            "Sentimento": 1.538461538461539
           },
           "fed": 0.5861842105263159,
           "other": {
             "Limite da escala 0–100": 3.552713678800501e-15
           },
-          "unrounded_final": 29.783204078075986
+          "unrounded_final": 30.071665616537526
         },
         "Posição": 9
       }
