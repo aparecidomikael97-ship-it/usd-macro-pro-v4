@@ -127,6 +127,7 @@ class ControlledRetentionExecutorCiV1:
         try:
             conn = self._connect()
             conn.autocommit = False
+            conn.isolation_level = psycopg.IsolationLevel.SERIALIZABLE
             with conn.cursor() as cur:
                 cur.execute(f"SET ROLE {RETENTION_ROLE}")
             return conn
@@ -170,6 +171,8 @@ class ControlledRetentionExecutorCiV1:
             "schema_create_denied": False,
             "migration_history_denied": False,
             "automatic_deletion_enabled": False,
+            "serializable_execution": True,
+            "row_update_privilege_required": False,
             "production_allowed": False,
             "provider_called": False,
             "billing_executed": False,
@@ -454,7 +457,7 @@ class ControlledRetentionExecutorCiV1:
                 cur.execute(
                     f"SELECT archived FROM {SCHEMA}.conversations "
                     "WHERE owner_id=%s AND tenant_id=%s AND workspace_id=%s "
-                    "AND id=%s FOR UPDATE",
+                    "AND id=%s",
                     (
                         scope.owner_id,
                         scope.tenant_id,
@@ -654,6 +657,8 @@ def retention_policy() -> dict[str, Any]:
         "approval_evidence_digest_required": True,
         "plan_digest_required": True,
         "stale_plan_fails_closed": True,
+        "serializable_execution_required": True,
+        "row_update_privilege_required": False,
         "separate_retention_role_required": True,
         "normal_application_delete_allowed": False,
         "audit_receipt_atomic_with_delete": True,
