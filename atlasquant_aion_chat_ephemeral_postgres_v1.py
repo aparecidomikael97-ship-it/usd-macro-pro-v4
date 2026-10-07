@@ -104,8 +104,12 @@ def install_ephemeral_schema(connection_factory: ConnectionFactory) -> None:
         content TEXT NOT NULL,
         data JSONB NOT NULL,
         PRIMARY KEY(owner_id, tenant_id, workspace_id, id),
-        UNIQUE(owner_id, tenant_id, workspace_id, conversation_id, sequence),
-        FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
+        CONSTRAINT messages_scope_sequence_uq_v1
+          UNIQUE(owner_id, tenant_id, workspace_id, conversation_id, sequence),
+        CONSTRAINT messages_scope_conversation_message_uq_v1
+          UNIQUE(owner_id, tenant_id, workspace_id, conversation_id, id),
+        CONSTRAINT messages_scope_conversation_fk_v1
+          FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
           REFERENCES {DB_SCHEMA}.conversations(owner_id, tenant_id, workspace_id, id)
           ON DELETE CASCADE
     );
@@ -120,11 +124,13 @@ def install_ephemeral_schema(connection_factory: ConnectionFactory) -> None:
         idempotency_key TEXT NOT NULL,
         message_id TEXT NOT NULL,
         PRIMARY KEY(owner_id, tenant_id, workspace_id, conversation_id, idempotency_key),
-        FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
+        CONSTRAINT idempotency_scope_conversation_fk_v1
+          FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
           REFERENCES {DB_SCHEMA}.conversations(owner_id, tenant_id, workspace_id, id)
           ON DELETE CASCADE,
-        FOREIGN KEY(owner_id, tenant_id, workspace_id, message_id)
-          REFERENCES {DB_SCHEMA}.messages(owner_id, tenant_id, workspace_id, id)
+        CONSTRAINT idempotency_scope_message_conversation_fk_v1
+          FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id, message_id)
+          REFERENCES {DB_SCHEMA}.messages(owner_id, tenant_id, workspace_id, conversation_id, id)
           ON DELETE CASCADE
     );
 
@@ -136,7 +142,8 @@ def install_ephemeral_schema(connection_factory: ConnectionFactory) -> None:
         id TEXT NOT NULL,
         data JSONB NOT NULL,
         PRIMARY KEY(owner_id, tenant_id, workspace_id, id),
-        FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
+        CONSTRAINT attachments_scope_conversation_fk_v1
+          FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
           REFERENCES {DB_SCHEMA}.conversations(owner_id, tenant_id, workspace_id, id)
           ON DELETE CASCADE
     );
@@ -150,7 +157,8 @@ def install_ephemeral_schema(connection_factory: ConnectionFactory) -> None:
         through_sequence INTEGER NOT NULL CHECK(through_sequence >= 0),
         data JSONB NOT NULL,
         PRIMARY KEY(owner_id, tenant_id, workspace_id, id),
-        FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
+        CONSTRAINT checkpoints_scope_conversation_fk_v1
+          FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
           REFERENCES {DB_SCHEMA}.conversations(owner_id, tenant_id, workspace_id, id)
           ON DELETE CASCADE
     );
@@ -166,7 +174,8 @@ def install_ephemeral_schema(connection_factory: ConnectionFactory) -> None:
         through_sequence INTEGER NOT NULL CHECK(through_sequence >= 0),
         data JSONB NOT NULL,
         PRIMARY KEY(owner_id, tenant_id, workspace_id, id),
-        FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
+        CONSTRAINT summaries_scope_conversation_fk_v1
+          FOREIGN KEY(owner_id, tenant_id, workspace_id, conversation_id)
           REFERENCES {DB_SCHEMA}.conversations(owner_id, tenant_id, workspace_id, id)
           ON DELETE CASCADE
     );
