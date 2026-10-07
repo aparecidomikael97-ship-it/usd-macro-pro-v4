@@ -1,0 +1,107 @@
+name: AION Chat Direct App Role Connection CI V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - design/aion-chat-postgres-schema-candidate-freeze-v1-20261007
+    paths:
+      - "atlasquant_aion_chat_direct_app_role_connection_ci_v1.py"
+      - "tests/test_atlasquant_aion_chat_direct_app_role_connection_ci_v1.py"
+      - "atlasquant_aion_chat_postgres_schema_candidate_freeze_v1.py"
+      - "atlasquant_aion_chat_storage_audit_receipts_ci_v1.py"
+      - "atlasquant_aion_chat_production_schema_binding_ci_v1.py"
+      - "atlasquant_aion_chat_ephemeral_postgres_v1.py"
+      - "atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
+      - "migrations/aion_chat_postgres_v1/0001_initial.sql"
+      - "docs/aion/AION_CHAT_DIRECT_APP_ROLE_CONNECTION_CI_V1.md"
+      - ".github/workflows/aion-chat-direct-app-role-connection-ci-v1.yml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  direct-app-role-connection-ci-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aion_chat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aion_chat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      AION_CHAT_DIRECT_ROLE_CI_ADMIN_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned PostgreSQL driver
+        run: |
+          grep -Fx "psycopg[binary]==3.3.6" requirements.txt
+          python -m pip install pip==26.2.1
+          python -m pip install "psycopg[binary]==3.3.6"
+          python -m pip check
+
+      - name: Compile direct-login chain
+        run: |
+          python -m py_compile             atlasquant_aion_chat_ephemeral_postgres_v1.py             atlasquant_aion_chat_production_schema_binding_ci_v1.py             atlasquant_aion_chat_storage_audit_receipts_ci_v1.py             atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             atlasquant_aion_chat_postgres_schema_candidate_freeze_v1.py             atlasquant_aion_chat_direct_app_role_connection_ci_v1.py             tests/test_atlasquant_aion_chat_direct_app_role_connection_ci_v1.py
+
+      - name: Verify frozen schema candidate checksum
+        run: |
+          printf '%s  %s\n'             "7dd72d75365862f54c81110027430011f8ac8f81ce629f500cbbd9aa0c00c50c"             "migrations/aion_chat_postgres_v1/0001_initial.sql"             | sha256sum --check --strict
+
+      - name: Run direct least-privilege login tests
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_direct_app_role_connection_ci_v1.py'
+
+      - name: Assert connector remains CI-only and secret-free
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_chat_direct_app_role_connection_ci_v1.py"
+          ).read_text(encoding="utf-8")
+
+          for banned in (
+              "DATABASE_URL",
+              "os.getenv(",
+              "os.environ",
+              "streamlit.secrets",
+              "render.com",
+              "api.openai.com",
+              'execute("SET ROLE',
+              'execute(f"SET ROLE',
+          ):
+              assert banned not in source, banned
+
+          for marker in (
+              '"production_allowed": False',
+              '"production_connection_allowed": False',
+              '"set_role_used": False',
+              '"direct_login_identity_required": True',
+              '"provider_called": False',
+              '"billing_executed": False',
+              '"deploy_executed": False',
+              '"worker_armed": False',
+              '"external_action_executed": False',
+              '"core_checkpoint_write": False',
+          ):
+              assert marker in source, marker
+          PY
