@@ -11,8 +11,8 @@ import atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1 as migration
 
 
 APP_ROLE = "aion_chat_app_ci"
-DATA_TABLES = (
-    "conversations",
+CONVERSATION_TABLE = "conversations"
+APPEND_ONLY_TABLES = (
     "messages",
     "message_idempotency",
     "attachments",
@@ -82,9 +82,13 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
                 cur.execute(
                     f"GRANT SELECT ON {migration.SCHEMA}.schema_meta TO {APP_ROLE}"
                 )
-                for table in DATA_TABLES:
+                cur.execute(
+                    f"GRANT SELECT,INSERT,UPDATE "
+                    f"ON {migration.SCHEMA}.{CONVERSATION_TABLE} TO {APP_ROLE}"
+                )
+                for table in APPEND_ONLY_TABLES:
                     cur.execute(
-                        f"GRANT SELECT,INSERT,UPDATE,DELETE "
+                        f"GRANT SELECT,INSERT "
                         f"ON {migration.SCHEMA}.{table} TO {APP_ROLE}"
                     )
             conn.commit()
@@ -98,15 +102,15 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
             if scope is not None:
                 owner, tenant, workspace = scope
                 cur.execute(
-                    "SELECT set_config('app.owner_id',%s,false)",
+                    "SELECT set_config('app.owner_id',%s,true)",
                     (owner,),
                 )
                 cur.execute(
-                    "SELECT set_config('app.tenant_id',%s,false)",
+                    "SELECT set_config('app.tenant_id',%s,true)",
                     (tenant,),
                 )
                 cur.execute(
-                    "SELECT set_config('app.workspace_id',%s,false)",
+                    "SELECT set_config('app.workspace_id',%s,true)",
                     (workspace,),
                 )
         return conn
@@ -242,6 +246,30 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
                     (APP_ROLE, migration.SCHEMA, APP_ROLE, migration.SCHEMA),
                 )
                 self.assertEqual(cur.fetchone(), (True, False))
+                cur.execute(
+                    "SELECT "
+                    "has_table_privilege(%s,%s,'UPDATE'),"
+                    "has_table_privilege(%s,%s,'DELETE'),"
+                    "has_table_privilege(%s,%s,'UPDATE'),"
+                    "has_table_privilege(%s,%s,'DELETE'),"
+                    "has_table_privilege(%s,%s,'DELETE')",
+                    (
+                        APP_ROLE,
+                        f"{migration.SCHEMA}.messages",
+                        APP_ROLE,
+                        f"{migration.SCHEMA}.messages",
+                        APP_ROLE,
+                        f"{migration.SCHEMA}.access_audit",
+                        APP_ROLE,
+                        f"{migration.SCHEMA}.access_audit",
+                        APP_ROLE,
+                        f"{migration.SCHEMA}.conversations",
+                    ),
+                )
+                self.assertEqual(
+                    cur.fetchone(),
+                    (False, False, False, False, False),
+                )
             conn.rollback()
         finally:
             conn.close()
@@ -252,6 +280,75 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
                 with self.assertRaises(psycopg.errors.InsufficientPrivilege):
                     cur.execute(
                         f"SELECT * FROM {migration.SCHEMA}.schema_migrations"
+                    )
+            app.rollback()
+        finally:
+            app.close()
+
+    def test_scope_context_is_transaction_local_and_clears_after_commit(self):
+        scope = ("mikael", "atlasquant-owner", "central")
+        app = self._app_connection(scope)
+        try:
+            self._insert_conversation(app, scope, "transaction-local-proof")
+            with app.cursor() as cur:
+                cur.execute(
+                    f"SELECT count(*) FROM {migration.SCHEMA}.conversations"
+                )
+                self.assertEqual(cur.fetchone()[0], 0)
+        finally:
+            app.rollback()
+            app.close()
+
+    def test_append_only_tables_reject_update_and_delete(self):
+        scope = ("mikael", "atlasquant-owner", "central")
+        app = self._app_connection(scope)
+        try:
+            self._insert_conversation(app, scope, "append-only-parent")
+        finally:
+            app.close()
+
+        app = self._app_connection(scope)
+        try:
+            with app.cursor() as cur:
+                cur.execute(
+                    f"INSERT INTO {migration.SCHEMA}.access_audit"
+                    "(owner_id,tenant_id,workspace_id,id,operation,actor_id,"
+                    "result,evidence_digest) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (
+                        scope[0],
+                        scope[1],
+                        scope[2],
+                        "audit-append-only",
+                        "TEST",
+                        "ci",
+                        "OK",
+                        "sha256:append-only-proof",
+                    ),
+                )
+            app.commit()
+        finally:
+            app.close()
+
+        app = self._app_connection(scope)
+        try:
+            with app.cursor() as cur:
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    cur.execute(
+                        f"UPDATE {migration.SCHEMA}.access_audit "
+                        "SET result='MUTATED' WHERE id='audit-append-only'"
+                    )
+            app.rollback()
+        finally:
+            app.close()
+
+        app = self._app_connection(scope)
+        try:
+            with app.cursor() as cur:
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    cur.execute(
+                        f"DELETE FROM {migration.SCHEMA}.access_audit "
+                        "WHERE id='audit-append-only'"
                     )
             app.rollback()
         finally:
@@ -368,6 +465,10 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
     def test_policy_forbids_production_runtime_authority(self):
         policy = migration.migration_policy()
         self.assertFalse(policy["application_startup_auto_migration"])
+        self.assertTrue(policy["transaction_local_scope_context_required"])
+        self.assertFalse(policy["application_delete_privilege_default"])
+        self.assertFalse(policy["message_update_privilege_default"])
+        self.assertTrue(policy["audit_append_only_role_profile"])
         self.assertFalse(policy["production_connection_allowed"])
         for key in (
             "provider_called",
