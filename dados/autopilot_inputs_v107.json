@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-07T03:52:07.265555+00:00",
+  "generated_at": "2026-10-07T04:24:27.828845+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -28,7 +28,7 @@
       "Score final": 79.0,
       "Qualidade": 88.0,
       "Confluência": "MODERADA",
-      "Dif. macro": 25.5,
+      "Dif. macro": 16.8,
       "Índice ranking": 82.7
     },
     {
@@ -55,7 +55,7 @@
       "Score final": 78.0,
       "Qualidade": 67.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -17.7,
+      "Dif. macro": -17.1,
       "Índice ranking": 73.5
     },
     {
@@ -446,7 +446,7 @@
         "juros": 2.5,
         "inflacao": 3.22645,
         "pib": 1.6603,
-        "sentimento": 50.0,
+        "sentimento": 53.333333333333336,
         "fonte": "FRED + transformação anual"
       },
       "GBP": {
@@ -474,7 +474,7 @@
         "juros": 2.28,
         "inflacao": 2.3,
         "pib": 1.1279,
-        "sentimento": 50.0,
+        "sentimento": 100.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "AUD": {
@@ -677,23 +677,58 @@
         "Posição": 5
       },
       {
+        "Código": "CAD",
+        "juros": 2.3,
+        "inflacao": 2.3,
+        "pib": 1.1,
+        "sentimento": 100.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Canadense",
+        "juros_reais": -0.0,
+        "n_juros": 12.15604030703993,
+        "n_inflacao": 36.42384105960265,
+        "n_pib": 20.021356113187398,
+        "n_sentimento": 100.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 40.9,
+        "Influência_Fed": -0.7,
+        "Pontuação_Final": 40.2,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 2.431208061407986,
+            "Inflação": 5.4635761589403975,
+            "PIB": 3.0032034169781094,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 10.0
+          },
+          "fed": -0.7128000000000001,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 40.18518763732649
+        },
+        "Posição": 6
+      },
+      {
         "Código": "EUR",
         "juros": 2.5,
         "inflacao": 3.2,
         "pib": 1.7,
-        "sentimento": 50.0,
+        "sentimento": 53.3,
         "fonte": "FRED + transformação anual",
         "Moeda": "Euro",
         "juros_reais": -0.7,
         "n_juros": 5.657886869857563,
         "n_inflacao": 67.10099337748345,
         "n_pib": 46.58676419956989,
-        "n_sentimento": 13.636363636363633,
+        "n_sentimento": 19.393939393939394,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 39.5,
+        "Pontuação_Macro": 40.1,
         "Influência_Fed": -0.2,
-        "Pontuação_Final": 39.3,
+        "Pontuação_Final": 39.9,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 1.1315773739715127,
@@ -701,15 +736,15 @@
             "PIB": 6.988014629935484,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.3636363636363633
+            "Sentimento": 1.9393939393939394
           },
           "fed": -0.23760000000000003,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 39.31077737416588
+          "unrounded_final": 39.88653494992345
         },
-        "Posição": 6
+        "Posição": 7
       },
       {
         "Código": "CHF",
@@ -743,41 +778,6 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 37.01645593030349
-        },
-        "Posição": 7
-      },
-      {
-        "Código": "CAD",
-        "juros": 2.3,
-        "inflacao": 2.3,
-        "pib": 1.1,
-        "sentimento": 50.0,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Canadense",
-        "juros_reais": -0.0,
-        "n_juros": 12.15604030703993,
-        "n_inflacao": 36.42384105960265,
-        "n_pib": 20.021356113187398,
-        "n_sentimento": 13.636363636363633,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 32.3,
-        "Influência_Fed": -0.7,
-        "Pontuação_Final": 31.5,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 2.431208061407986,
-            "Inflação": 5.4635761589403975,
-            "PIB": 3.0032034169781094,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 1.3636363636363633
-          },
-          "fed": -0.7128000000000001,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 31.548824000962853
         },
         "Posição": 8
       },
