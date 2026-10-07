@@ -1,0 +1,65 @@
+name: AION Chat Postgres Schema Scope Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "atlasquant_aion_chat_postgres_schema_scope_contract_v1.py"
+      - "test_atlasquant_aion_chat_postgres_schema_scope_contract_v1.py"
+      - "docs/aion/AION_CHAT_POSTGRES_SCHEMA_SCOPE_CONTRACT_V1.md"
+      - ".github/workflows/aion-chat-postgres-schema-scope-contract-v1.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-schema-scope-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile schema scope contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_chat_postgres_schema_scope_contract_v1.py \
+            test_atlasquant_aion_chat_postgres_schema_scope_contract_v1.py
+      - name: Run schema scope design tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_chat_postgres_schema_scope_contract_v1.py
+      - name: Assert zero SQL/network/provisioning side effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_chat_postgres_schema_scope_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "import psycopg",
+              "import sqlalchemy",
+              "import sqlite3",
+              "import requests",
+              "import socket",
+              "os.getenv(",
+              ".connect(",
+              "CREATE TABLE",
+              "ALTER TABLE",
+              "DROP TABLE",
+              "execute(",
+              "subprocess",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_POSTGRES_SCHEMA_SCOPE_DESIGN_REVIEW"',
+              '"owner_id"',
+              '"tenant_id"',
+              '"workspace_id"',
+              '"sql_executed"',
+              '"external_action_executed"',
+          ):
+              assert marker in source, marker
+          PY
