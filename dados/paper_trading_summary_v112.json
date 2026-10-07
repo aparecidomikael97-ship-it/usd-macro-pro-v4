@@ -16,7 +16,7 @@
   "setup_attribution_inferred": false,
   "last_cycle": {
     "version": "V11.2_PAPER_TRADING",
-    "ran_at": "2026-10-07T01:24:11.589518+00:00",
+    "ran_at": "2026-10-07T01:50:53.207384+00:00",
     "pending_created": 0,
     "pending_cancelled_by_gain_lock": 0,
     "entries_opened": 0,
@@ -72,8 +72,11 @@
       "USD/JPY": {
         "side": "BUY",
         "passed": false,
-        "state": "🟡 DIREÇÃO CONFIRMADA — AGUARDAR EXECUÇÃO",
-        "hard_blocks": [],
+        "state": "🔴 BLOQUEADO",
+        "hard_blocks": [
+          "Dados técnicos insuficientes (0/100)",
+          "Técnica desatualizada (76 min)"
+        ],
         "soft_blocks": [
           "Gate ainda não liberou execução",
           "ICT incompleto (60/100)",
@@ -86,8 +89,10 @@
         "passed": false,
         "state": "🔴 BLOQUEADO",
         "hard_blocks": [
+          "Dados técnicos insuficientes (0/100)",
           "H4 está contra o viés",
           "H1 está contra o viés",
+          "Técnica desatualizada (77 min)",
           "ADR14 muito esticado (145%)"
         ],
         "soft_blocks": [
@@ -103,6 +108,8 @@
         "passed": false,
         "state": "⚪ AGUARDAR DIREÇÃO",
         "hard_blocks": [
+          "Dados técnicos insuficientes (0/100)",
+          "Técnica desatualizada (77 min)",
           "ADR14 muito esticado (143%)"
         ],
         "soft_blocks": [
@@ -118,7 +125,10 @@
         "side": "WAIT",
         "passed": false,
         "state": "⚪ AGUARDAR DIREÇÃO",
-        "hard_blocks": [],
+        "hard_blocks": [
+          "Dados técnicos insuficientes (0/100)",
+          "Técnica desatualizada (76 min)"
+        ],
         "soft_blocks": [
           "ICT incompleto (0/100)",
           "Fluxo institucional incompleto (0/100)",
