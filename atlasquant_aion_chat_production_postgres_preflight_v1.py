@@ -6,7 +6,7 @@ deploy AtlasQuant, arm a Worker, execute an external action, or mutate Core V1.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 MAX_MONTHLY_BRL = 200.0
