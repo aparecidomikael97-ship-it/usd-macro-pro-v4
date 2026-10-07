@@ -109,13 +109,14 @@ class PostgresStoreAdapterFakeV1Tests(unittest.TestCase):
             self.store.list_conversations(self.scope)
 
     def test_attachment_scope_is_enforced(self):
+        digest = "a" * 64
         attachment = Attachment(
             conversation_id=self.conversation.id,
             name="a.txt",
             mime_type="text/plain",
             size=1,
-            digest="sha256:" + "a" * 64,
-            storage_reference="metadata-only",
+            digest=digest,
+            storage_reference=digest + ".blob",
         )
         stored = self.store.add_attachment_metadata(self.scope, attachment)
         self.assertEqual(
