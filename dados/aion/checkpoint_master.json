@@ -19,6 +19,24 @@
     "truth_policy": "never_invent",
     "version": "0.1-foundation"
   },
+  "aion_core_checkpoint_master_v1": {
+    "binding_digest": "sha256:9f185b7012c88aaf2d6b329963987867c46b4cd4bcadfe6b62e3157a978ea03f",
+    "checkpoint_master_digest": "sha256:9d25ae3c1f4d0b0079ab4051b1b35b557aac9df495d49f75455f70683f45b428",
+    "checkpoint_revision": 1,
+    "checkpoint_state_digest": "sha256:e22afcc2ec08a7ba196e788c4265d435f0a2b2e9b04a43c92343dec6916700c1",
+    "core_freeze_authorized": false,
+    "core_frozen": false,
+    "external_action_executed": false,
+    "owner_decision": "UNDECIDED",
+    "owner_decision_ready": false,
+    "persistence_claimed_by_binding": false,
+    "schema": "ATLASQUANT_AION_CHECKPOINT_RUNTIME_BINDING_V1",
+    "signature_material_ready": false,
+    "target_commit_sha": "662eab4dc4f5bb009fa1ca89f87530df74d30ddf",
+    "v221_review_digest": "sha256:a2919fa807030154cef65227417bb3a5e905db038098950ff1f0d8c1b3b7aa58",
+    "v222_preflight_challenge_digest": "sha256:5d9ed3031187a99dedc09ea34c0dc4a2064fd7514d043806e40e60c903440399",
+    "worker_armed": false
+  },
   "approved_foundation": [
     "Prioridade: Interface + Modo Administrador + Central AION + Memória/Checkpoint + Segurança antes de novo refinamento operacional.",
     "AION oficial é assistente central do administrador: secretário, desenvolvedor, orquestrador, Guardian e memória persistente.",
@@ -376,6 +394,14 @@
     "events": [],
     "heartbeats": []
   },
+  "memory_governance": {
+    "automatic_promotion": false,
+    "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "executes_action": false,
+    "memory_authority": "NONE",
+    "proposals": [],
+    "schema": "ATLASQUANT_AION_MEMORY_GOVERNANCE_V1"
+  },
   "memory_layers": {
     "automatic_cross_domain_access": false,
     "automatic_cross_persona_access": false,
@@ -590,6 +616,18 @@
       "WEBHOOK"
     ],
     "real_trading_enabled": false,
+    "registry_digest": "16c52804014523b126d4ed30377bc86002fe7211d22a2ff8cea3a7c523766486",
+    "registry_integrity": {
+      "automatic_tool_registration": false,
+      "digest": "16c52804014523b126d4ed30377bc86002fe7211d22a2ff8cea3a7c523766486",
+      "keys_match": true,
+      "pinned_digest": "16c52804014523b126d4ed30377bc86002fe7211d22a2ff8cea3a7c523766486",
+      "registry_version": "1.0.0",
+      "requires_code_review_for_change": true,
+      "schema": "ATLASQUANT_AION_TOOL_SUPPLY_CHAIN_V1",
+      "state": "VERIFIED",
+      "tool_count": 13
+    },
     "schema": "ATLASQUANT_AION_TOOL_HUB_V1",
     "tool_output_is_authority": false,
     "tools": [
@@ -646,7 +684,7 @@
       }
     ]
   },
-  "updated_at": "2026-09-25T22:54:11.228528+00:00",
+  "updated_at": "2026-10-07T00:08:35.885244+00:00",
   "vault": {
     "aion_can_delete_vault": false,
     "backend_connected": false,
@@ -674,6 +712,18 @@
     "real_trading_enabled": false,
     "schema": "ATLASQUANT_AION_VAULT_V1",
     "version": "1.0"
+  },
+  "verification_ledger": {
+    "append_only": true,
+    "automatic_authority": false,
+    "digest": "9f0d1ca31e38fcc4d1ec8c1857a8e6aca05ada32526b17b448131dcc092d24d0",
+    "entries": [],
+    "executes_action": false,
+    "integrity_reason": "OK",
+    "integrity_state": "MATCH",
+    "schema": "ATLASQUANT_AION_VERIFICATION_LEDGER_V1",
+    "tip_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "version": 1
   },
   "wisdom": {
     "digest": "4f53cda18c2baa0c0354bb5f",
