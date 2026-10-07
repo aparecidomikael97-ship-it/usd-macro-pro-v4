@@ -10,7 +10,7 @@ on:
       - "requirements.txt"
       - "atlasquant_aion_chat_postgres_store_adapter_fake_v1.py"
       - "atlasquant_aion_chat_ephemeral_postgres_v1.py"
-      - "test_atlasquant_aion_chat_ephemeral_postgres_v1.py"
+      - "tests/test_atlasquant_aion_chat_ephemeral_postgres_v1.py"
       - "docs/aion/AION_CHAT_EPHEMERAL_POSTGRES_BINDING_V1.md"
       - ".github/workflows/aion-chat-ephemeral-postgres-v1.yml"
 
@@ -58,7 +58,7 @@ jobs:
           python -m py_compile \
             atlasquant_aion_chat_postgres_store_adapter_fake_v1.py \
             atlasquant_aion_chat_ephemeral_postgres_v1.py \
-            test_atlasquant_aion_chat_ephemeral_postgres_v1.py
+            tests/test_atlasquant_aion_chat_ephemeral_postgres_v1.py
 
       - name: Run fake-adapter regression
         run: |
@@ -67,8 +67,7 @@ jobs:
 
       - name: Run real ephemeral PostgreSQL contract tests
         run: |
-          python -m unittest -v \
-            test_atlasquant_aion_chat_ephemeral_postgres_v1.py
+          python -m unittest discover -v -s tests -p 'test_atlasquant_aion_chat_ephemeral_postgres_v1.py'
 
       - name: Assert production authority remains absent
         run: |
