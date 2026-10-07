@@ -188,6 +188,58 @@ class PostgresMigrationRlsRestoreCiV1Tests(unittest.TestCase):
             [migration.APPLIED, migration.ALREADY_APPLIED],
         )
 
+    def test_missing_expected_migration_history_fails_closed(self):
+        conn = self.connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"DELETE FROM {migration.SCHEMA}.schema_migrations "
+                    "WHERE version=%s",
+                    (migration.MIGRATION_VERSION,),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+        with self.assertRaises(StorageUnavailableError):
+            migration.apply_migration(self.connect, environment="CI")
+
+    def test_failed_migration_rolls_back_partial_ddl_and_history(self):
+        self._reset_database_objects()
+        conn = self.connect()
+        try:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute(f"CREATE SCHEMA {migration.SCHEMA}")
+                cur.execute(
+                    f"CREATE TABLE {migration.SCHEMA}.messages("
+                    "preexisting INTEGER NOT NULL)"
+                )
+        finally:
+            conn.close()
+
+        with self.assertRaises(StorageUnavailableError):
+            migration.apply_migration(self.connect, environment="CI")
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT to_regclass(%s),to_regclass(%s),to_regclass(%s)",
+                    (
+                        f"{migration.SCHEMA}.schema_migrations",
+                        f"{migration.SCHEMA}.conversations",
+                        f"{migration.SCHEMA}.messages",
+                    ),
+                )
+                history, conversations, preexisting = cur.fetchone()
+                self.assertIsNone(history)
+                self.assertIsNone(conversations)
+                self.assertIsNotNone(preexisting)
+            conn.rollback()
+        finally:
+            conn.close()
+
     def test_migration_health_proves_rls_policies_constraints_and_transaction(self):
         report = migration.migration_health_report(
             self.connect,
