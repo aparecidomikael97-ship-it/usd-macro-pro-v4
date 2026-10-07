@@ -54,6 +54,8 @@ Two concurrent migration attempts must result in exactly:
 
 No second schema application is permitted.
 
+The CI suite also proves that an ambiguous migration-history state fails closed and that a migration error after partial DDL execution rolls the transaction back without writing a false migration-history success record.
+
 ## Schema candidate
 
 The production-like schema candidate is:
