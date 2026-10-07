@@ -1,0 +1,65 @@
+name: AION Chat Postgres Migration Health Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "atlasquant_aion_chat_postgres_migration_health_contract_v1.py"
+      - "test_atlasquant_aion_chat_postgres_migration_health_contract_v1.py"
+      - "docs/aion/AION_CHAT_POSTGRES_MIGRATION_HEALTH_CONTRACT_V1.md"
+      - ".github/workflows/aion-chat-postgres-migration-health-contract-v1.yml"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-migration-health-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile migration health contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_chat_postgres_migration_health_contract_v1.py \
+            test_atlasquant_aion_chat_postgres_migration_health_contract_v1.py
+      - name: Run migration health design tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_chat_postgres_migration_health_contract_v1.py
+      - name: Assert zero SQL/network/execution side effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_chat_postgres_migration_health_contract_v1.py").read_text(encoding="utf-8")
+          for banned in (
+              "import psycopg",
+              "import sqlalchemy",
+              "import sqlite3",
+              "import requests",
+              "import socket",
+              "os.getenv(",
+              ".connect(",
+              "CREATE TABLE",
+              "ALTER TABLE",
+              "DROP TABLE",
+              "execute(",
+              "subprocess",
+          ):
+              assert banned not in source, banned
+          for marker in (
+              '"READY_FOR_POSTGRES_MIGRATION_HEALTH_DESIGN_REVIEW"',
+              '"NO_AUTO_PROD_MIGRATION_ON_STARTUP"',
+              '"NO_SESSION_ONLY_DURABLE_FALLBACK"',
+              '"PROVIDER_CALL_BEFORE_USER_PERSIST_FORBIDDEN"',
+              '"sql_executed"',
+              '"external_action_executed"',
+          ):
+              assert marker in source, marker
+          PY
