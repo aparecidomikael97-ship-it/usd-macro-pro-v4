@@ -379,11 +379,26 @@ class CollectorRawEvidenceTests(unittest.TestCase):
                     SQLiteCollectorChallengeReplay(path)
 
     def test_null_and_oversized_raw_bundle_fail_closed(self):
+        ch = self.challenge()
+        _, att = self.bundle_and_attestation(ch)
+        raw_reg, root_sig = self.signed_registry()
+        sig = self.signed_attestation(ch, att)
         with tempfile.TemporaryDirectory() as td:
             for raw in (None, b"x" * 131073):
                 with self.subTest(size=len(raw) if raw else None):
-                    result = self.invoke(td, raw=raw, attestation=self.bundle_and_attestation()[1],
-                                         attestation_sig=b64(b"x" * 64))
+                    result = verify_rooted_collector_raw_evidence(
+                        raw_reg, root_sig, ch, att, sig, raw,
+                        pinned_enrollment_root_public_key=public(self.root),
+                        expected_root_fingerprint=digest(public(self.root)),
+                        expected_registry_id="aion-owner-host-registry",
+                        expected_host_issuer="atlasquant-owner-host",
+                        expected_host_binding_digest=self.host_binding,
+                        expected_device_binding_digest=self.device_binding,
+                        expected_collector_id="aion-physical-collector",
+                        minimum_enrollment_epoch=4, now=self.now,
+                        replay_store=SQLiteCollectorChallengeReplay(
+                            Path(td) / "invalid-nonces.sqlite3"),
+                    )
                     self.assertEqual(result["state"], "BLOCKED")
                     self.no_authority(result)
 
