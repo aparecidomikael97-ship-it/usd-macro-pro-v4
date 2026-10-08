@@ -282,6 +282,19 @@ def assess_ci_native_preflight(
     """Shape-only review. No observed data may claim owner/installer trust."""
     o = dict(observation) if isinstance(observation, Mapping) else {}
     errors: list[str] = []
+    expected_keys = set(FIELDS) | {
+        "observation_digest", "state", "blockers",
+        "human_owner_sid_verified", "aion_binary_or_signer_verified",
+        "aion_owner_acl_verified", "aion_startup_entry_verified",
+        "aion_process_running_verified", "real_boot_transition_proven",
+        "aion_runtime_health_verified", "trusted_attestation_issued",
+        "aion_installed", "owner_pc_accessed", "production_write_executed",
+        "runtime_trusted_healthy",
+    }
+    if set(o) - expected_keys:
+        errors.append("UNEXPECTED_OBSERVATION_FIELDS")
+    if expected_keys - set(o):
+        errors.append("MISSING_REQUIRED_OBSERVATION_FIELDS")
     if o.get("schema") != SCHEMA or o.get("state") != OBSERVED:
         errors.append("NATIVE_OBSERVATION_REQUIRED")
     if not all(_sha(x) for x in (
