@@ -1,0 +1,84 @@
+name: AION Owner Stack Live Merge Step Preflight Challenge V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_stack_live_merge_step_preflight_challenge_v1.py"
+      - "tests/test_atlasquant_aion_owner_stack_live_merge_step_preflight_challenge_v1.py"
+      - "docs/aion/AION_OWNER_STACK_LIVE_MERGE_STEP_PREFLIGHT_CHALLENGE_V1.md"
+      - ".github/workflows/aion-owner-stack-live-merge-step-preflight-challenge-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-stack-live-merge-step-preflight-challenge-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile live preflight challenge contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_stack_live_merge_step_preflight_challenge_v1.py \
+            tests/test_atlasquant_aion_owner_stack_live_merge_step_preflight_challenge_v1.py
+
+      - name: Run live preflight challenge tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_stack_live_merge_step_preflight_challenge_v1.py'
+
+      - name: Assert challenge is never repository authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_owner_stack_live_merge_step_preflight_challenge_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import git",
+              "from git",
+              "import requests",
+              "urllib.request",
+              "import socket",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"challenge_is_authorization": False',
+              '"generic_chat_is_authorization": False',
+              '"chat_acknowledgement_accepted_as_signature": False',
+              '"real_owner_signature_verified": False',
+              '"authorization_granted": False',
+              '"repository_mutation_authorized": False',
+              '"repository_mutation_performed": False',
+              '"automatic_draft_transition_allowed": False',
+              '"automatic_retarget_allowed": False',
+              '"automatic_rebase_allowed": False',
+              '"automatic_merge_allowed": False',
+              '"automatic_branch_delete_allowed": False',
+              '"automatic_deploy_allowed": False',
+              '"worker_activation_allowed": False',
+              '"provider_activation_allowed": False',
+              '"merge_executed": False',
+              '"retarget_executed": False',
+              '"draft_transition_executed": False',
+              '"deploy_executed": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
