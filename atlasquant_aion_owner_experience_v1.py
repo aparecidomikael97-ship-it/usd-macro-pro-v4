@@ -224,6 +224,14 @@ def _normalize_command(text: Any) -> str:
     return " ".join(value.split())
 
 
+def _strip_leading_hotword(command: str) -> str:
+    """Remove only the leading wake word so it cannot be mistaken for a target."""
+    parts = command.split()
+    if parts and parts[0] == "aion":
+        return " ".join(parts[1:])
+    return command
+
+
 def command_plan(
     text: Any,
     *,
@@ -232,6 +240,7 @@ def command_plan(
 ) -> dict[str, Any]:
     """Classify owner commands; never executes navigation/app launch itself."""
     command = _normalize_command(text)
+    routed_command = _strip_leading_hotword(command)
     device_name = _clean(device, 20).upper()
     if device_name not in DEVICES:
         raise ValueError("unsupported device")
@@ -245,7 +254,7 @@ def command_plan(
         }
 
     for alias, target in INTERNAL_DESTINATIONS.items():
-        if alias in command and any(word in command for word in ("abre", "abrir", "entra", "ir", "vai")):
+        if alias in routed_command and any(word in routed_command for word in ("abre", "abrir", "entra", "ir", "vai")):
             return {
                 "schema": SCHEMA,
                 "state": "PLANNED",
@@ -258,7 +267,7 @@ def command_plan(
             }
 
     for alias, app in EXTERNAL_APPS.items():
-        if alias in command and any(word in command for word in ("abre", "abrir", "toca", "tocar")):
+        if alias in routed_command and any(word in routed_command for word in ("abre", "abrir", "toca", "tocar")):
             return {
                 "schema": SCHEMA,
                 "state": "PLANNED",
