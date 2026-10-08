@@ -1,0 +1,78 @@
+name: AION Owner Provisional Cap Growth Policy V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_provisional_cap_growth_policy_v1.py"
+      - "tests/test_atlasquant_aion_owner_provisional_cap_growth_policy_v1.py"
+      - "docs/aion/AION_OWNER_PROVISIONAL_CAP_GROWTH_POLICY_V1.md"
+      - ".github/workflows/aion-owner-provisional-cap-growth-policy-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-budget-growth-planning-only:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify PR-only isolated test context
+        run: |
+          python - <<'PY'
+          import os, sys
+          assert sys.version_info[:2] == (3, 12)
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows", "Linux")
+          PY
+      - name: Compile policy and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_provisional_cap_growth_policy_v1.py \
+            tests/test_atlasquant_aion_owner_provisional_cap_growth_policy_v1.py
+      - name: Validate two months, profit, cash and owner-only approval gates
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_provisional_cap_growth_policy_v1.py'
+      - name: Enforce no cost, I/O, billing, or production authority
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          source=Path("atlasquant_aion_owner_provisional_cap_growth_policy_v1.py").read_text("utf-8")
+          tree=ast.parse(source)
+          forbidden_import_roots={"requests","httpx","urllib","socket","subprocess","sqlite3","os","pathlib","stripe","boto3"}
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Import):
+                  assert not any(a.name.split(".")[0] in forbidden_import_roots for a in node.names)
+              if isinstance(node,ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden_import_roots
+          from atlasquant_aion_owner_provisional_cap_growth_policy_v1 import (
+              OWNER_FUNDED_INITIAL_CAP_CENTS, MIN_PAID_MONTHS,
+              evaluate_owner_cap_growth_review,
+          )
+          assert OWNER_FUNDED_INITIAL_CAP_CENTS == 20000
+          assert MIN_PAID_MONTHS == 2
+          result=evaluate_owner_cap_growth_review(
+              as_of="2026-10-08",paid_months=[],
+              declared_current_cap_cents=20000,proposed_cap_cents=40000,
+              available_working_capital_cents=None)
+          assert result["status"]=="NOT_ELIGIBLE_FOR_REVIEW"
+          for key in ("budget_increase_approved","paid_api_call_authorized",
+                      "subscription_purchase_authorized","automatic_cap_escalation_enabled",
+                      "current_production_cap_changed","executes_action"):
+              assert result[key] is False,key
+          PY
