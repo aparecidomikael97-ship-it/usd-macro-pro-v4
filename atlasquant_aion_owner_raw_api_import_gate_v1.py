@@ -106,12 +106,27 @@ def _dynamic_import_ref(node: ast.Call) -> str | None:
         function_name = function.attr
     else:
         return None
+    if function_name in ("run_path", "spec_from_file_location"):
+        # Detect literal file loaders for privileged source modules.
+        position = 1 if function_name == "spec_from_file_location" else 0
+        target = node.args[position] if len(node.args) > position else None
+        if isinstance(target, ast.Constant) and type(target.value) is str:
+            filename = target.value.replace("\\", "/").rsplit("/", 1)[-1]
+            if filename.endswith(".py"):
+                return filename[:-3]
+    if function_name in ("exec", "eval"):
+        # Exact literal code that mentions a sensitive module is never needed
+        # by approved production paths; block this elementary escape hatch.
+        first = node.args[0] if node.args else None
+        if isinstance(first, ast.Constant) and type(first.value) is str:
+            for name in sorted(INTERNAL_MODULES):
+                if name in first.value:
+                    return name
     if function_name not in DYNAMIC_IMPORT_NAMES:
         return None
     first = node.args[0] if node.args else None
     if isinstance(first, ast.Constant) and type(first.value) is str:
         return first.value
-    # Literal keyword in importlib.import_module(name="module").
     for kw in node.keywords:
         if kw.arg in ("name", "mod_name") and isinstance(kw.value, ast.Constant):
             if type(kw.value.value) is str:
