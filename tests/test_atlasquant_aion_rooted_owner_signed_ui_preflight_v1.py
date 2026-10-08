@@ -452,7 +452,169 @@ class RootedOwnerSignedUIIntegrationTests(TestCase):
             text="AION, abre Trader",
         )
         self.assertEqual(r["state"],"BLOCKED")
-        self.assertEqual(r["reason"],"TRUSTED_SESSION_STATE_REQUIRED")
+        self.assertEqual(r["reason"],"HOST_SESSION_PLAIN_DICT_REQUIRED")
+
+    def test_signed_navigation_only_commits_expected_trader_keys(self):
+        state = {
+            "unrelated_secret_state": "PRESERVED",
+            "atlasquant_experience_mode": "Avançado",
+        }
+        _, result = self.invoke(state=state)
+        self.assertEqual(result["state"], "INTERNAL_NAVIGATION_REQUESTED")
+        self.assertEqual(state["unrelated_secret_state"], "PRESERVED")
+        self.assertEqual(state["atlasquant_experience_mode"], "Avançado")
+        self.assertEqual(
+            set(state) - {"unrelated_secret_state", "atlasquant_experience_mode"},
+            {"atlasquant_central_choice", "atlasquant_guided_revalidation_request"},
+        )
+        self.assertEqual(
+            state["atlasquant_guided_revalidation_request"]["surface"],
+            "advanced_radar",
+        )
+
+    def test_signed_atlasquant_root_only_commits_central_choice(self):
+        state, r = self.invoke(text="AION, abre AtlasQuant")
+        self.assertEqual(r["state"], "INTERNAL_NAVIGATION_REQUESTED", r)
+        self.assertEqual(r["target"], "central")
+        self.assertEqual(state, {"atlasquant_central_choice": "central_root"})
+
+    def test_signed_business_only_commits_reviewed_navigation_keys(self):
+        state, r = self.invoke(text="AION, abre Negócios")
+        self.assertEqual(r["state"], "INTERNAL_NAVIGATION_REQUESTED", r)
+        self.assertEqual(
+            set(state), {
+                "atlasquant_central_choice",
+                "atlasquant_guided_revalidation_request",
+                "aion_admin_workspace_jump",
+            },
+        )
+        self.assertEqual(state["aion_admin_workspace_jump"], "💼 Negócios")
+        self.assertFalse(state["atlasquant_guided_revalidation_request"]["executes_action"])
+
+    def test_signed_aion_internal_route_has_expected_request(self):
+        state, r = self.invoke(text="AION, abre AION")
+        self.assertEqual(r["state"], "INTERNAL_NAVIGATION_REQUESTED", r)
+        self.assertEqual(state["atlasquant_guided_revalidation_request"]["surface"], "aion")
+        self.assertEqual(state["atlasquant_guided_revalidation_request"]["state"], "RETURN_REQUESTED")
+
+    def test_signed_investments_internal_route_has_expected_request(self):
+        state, r = self.invoke(text="AION, abre Investimentos")
+        self.assertEqual(r["state"], "INTERNAL_NAVIGATION_REQUESTED", r)
+        self.assertEqual(state["atlasquant_guided_revalidation_request"]["surface"], "investments")
+        self.assertEqual(state["atlasquant_guided_revalidation_request"]["state"], "INVESTMENTS_PAGE_REQUESTED")
+
+    def test_exception_after_downstream_partial_write_does_not_mutate_real_state(self):
+        from unittest.mock import patch
+        existing = {"persistent_user_state": "safe"}
+        def fail_partial(st, access, target):
+            st["atlasquant_central_choice"] = "trader"
+            st["atlasquant_guided_revalidation_request"] = {"executes_action": True}
+            raise RuntimeError("synthetic partial mutation then failure")
+        with patch("atlasquant_central_hub_ui.request_central_destination", side_effect=fail_partial):
+            _, result = self.invoke(state=existing)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "STAGED_OWNER_NAVIGATION_FAILED")
+        self.assertEqual(existing, {"persistent_user_state": "safe"})
+        self.assertFalse(result["navigation_requested"])
+
+    def test_router_handled_failure_after_partial_write_leaves_session_untouched(self):
+        from unittest.mock import patch
+        existing = {"persistent_user_state": "safe"}
+        def fail_handled(st, access, target):
+            st["atlasquant_central_choice"] = "trader"
+            raise ValueError("synthetic expected exception")
+        with patch("atlasquant_central_hub_ui.request_central_destination", side_effect=fail_handled):
+            _, result = self.invoke(state=existing)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "SIGNED_OWNER_INTENT_OR_NAVIGATION_REJECTED")
+        self.assertEqual(existing, {"persistent_user_state": "safe"})
+
+    def test_unreviewed_downstream_state_key_denied(self):
+        from unittest.mock import patch
+        from atlasquant_central_hub_ui import request_central_destination
+        existing = {"persistent_user_state": "safe"}
+        def inject(st, access, target):
+            reply = request_central_destination(st, access, target)
+            st["surprise_privileged_action"] = True
+            return reply
+        with patch("atlasquant_central_hub_ui.request_central_destination", side_effect=inject):
+            _, result = self.invoke(state=existing)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "UNREVIEWED_ROUTE_STATE_MUTATION")
+        self.assertEqual(existing, {"persistent_user_state": "safe"})
+
+    def test_downstream_mode_mutation_denied(self):
+        from unittest.mock import patch
+        from atlasquant_central_hub_ui import request_central_destination
+        state = {"atlasquant_experience_mode": "Iniciante"}
+        original = dict(state)
+        def inject(st, access, target):
+            reply = request_central_destination(st, access, target)
+            st["atlasquant_experience_mode"] = "Avançado"
+            return reply
+        with patch("atlasquant_central_hub_ui.request_central_destination", side_effect=inject):
+            _, result = self.invoke(state=state)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "UNREVIEWED_ROUTE_MODE_MUTATION")
+        self.assertEqual(state, original)
+
+    def test_unsafe_request_execution_flag_denied(self):
+        from unittest.mock import patch
+        from atlasquant_central_hub_ui import request_central_destination
+        state = {"persistent_user_state": "safe"}
+        def inject(st, access, target):
+            reply = request_central_destination(st, access, target)
+            st["atlasquant_guided_revalidation_request"]["executes_action"] = True
+            return reply
+        with patch("atlasquant_central_hub_ui.request_central_destination", side_effect=inject):
+            _, result = self.invoke(state=state)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "UNSAFE_NAVIGATION_REQUEST_CONTENT")
+        self.assertEqual(state, {"persistent_user_state": "safe"})
+
+    def test_unsafe_request_surface_swap_denied(self):
+        from unittest.mock import patch
+        from atlasquant_central_hub_ui import request_central_destination
+        state = {}
+        def inject(st, access, target):
+            reply = request_central_destination(st, access, target)
+            st["atlasquant_guided_revalidation_request"]["surface"] = "executor"
+            return reply
+        with patch("atlasquant_central_hub_ui.request_central_destination", side_effect=inject):
+            _, result = self.invoke(state=state)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "UNSAFE_NAVIGATION_REQUEST_CONTENT")
+        self.assertEqual(state, {})
+
+    def test_business_workspace_retarget_denied(self):
+        from unittest.mock import patch
+        from atlasquant_central_hub_ui import request_central_destination
+        state = {}
+        def inject(st, access, target):
+            reply = request_central_destination(st, access, target)
+            st["aion_admin_workspace_jump"] = "🔓 Admin"
+            return reply
+        with patch("atlasquant_central_hub_ui.request_central_destination", side_effect=inject):
+            _, result = self.invoke(state=state, text="AION, abre Negócios")
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "UNSAFE_BUSINESS_WORKSPACE_NAVIGATION")
+        self.assertEqual(state, {})
+
+    def test_non_plain_dict_is_not_accepted_as_host_commit_target(self):
+        class FakeStreamlitLikeSession(dict):
+            pass
+        state = FakeStreamlitLikeSession({"private": "untouched"})
+        _, result = self.invoke(state=state)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "HOST_SESSION_PLAIN_DICT_REQUIRED")
+        self.assertEqual(state, {"private": "untouched"})
+
+    def test_invalid_session_navigation_mode_does_not_mutate_state(self):
+        state = {"atlasquant_experience_mode": True, "secret": "preserved"}
+        _, result = self.invoke(state=state)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["reason"], "SESSION_NAV_MODE_INVALID")
+        self.assertEqual(state, {"atlasquant_experience_mode": True, "secret": "preserved"})
 
     def test_bad_command_type_denied(self):
         for value in (None, 42, True, "", []):
