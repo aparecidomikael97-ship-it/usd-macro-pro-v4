@@ -1,0 +1,79 @@
+name: AION Owner Stack Pre-Merge Readiness V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_stack_pre_merge_readiness_v1.py"
+      - "tests/test_atlasquant_aion_owner_stack_pre_merge_readiness_v1.py"
+      - "docs/aion/AION_OWNER_STACK_PRE_MERGE_READINESS_V1.md"
+      - ".github/workflows/aion-owner-stack-pre-merge-readiness-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-stack-pre-merge-readiness-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile pre-merge readiness
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_stack_pre_merge_readiness_v1.py \
+            tests/test_atlasquant_aion_owner_stack_pre_merge_readiness_v1.py
+
+      - name: Run pre-merge readiness tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_stack_pre_merge_readiness_v1.py'
+
+      - name: Assert no repository mutation authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_owner_stack_pre_merge_readiness_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import requests",
+              "urllib.request",
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import git",
+              "from git",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"merge_authorized": False',
+              '"retarget_authorized": False',
+              '"rebase_authorized": False',
+              '"deploy_authorized": False',
+              '"worker_activation_authorized": False',
+              '"provider_activation_authorized": False',
+              '"external_action_authorized": False',
+              '"merge_executed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"executes_action": False',
+              '"automatic_merge_allowed": False',
+              '"automatic_retarget_allowed": False',
+              '"automatic_rebase_allowed": False',
+              '"automatic_branch_delete_allowed": False',
+              '"automatic_deploy_allowed": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
