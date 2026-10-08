@@ -1,0 +1,88 @@
+name: AION Windows Host Anchor Read-Only Inventory CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_host_anchor_readonly_inventory_v1.py"
+      - "tests/test_atlasquant_aion_windows_host_anchor_readonly_inventory_v1.py"
+      - "docs/aion/AION_WINDOWS_HOST_ANCHOR_READONLY_INVENTORY_V1.md"
+      - ".github/workflows/aion-windows-host-anchor-readonly-inventory-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  readonly-anchor-inventory:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Ensure disposable PR CI only
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile inventory and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_host_anchor_readonly_inventory_v1.py \
+            tests/test_atlasquant_aion_windows_host_anchor_readonly_inventory_v1.py
+      - name: Run negative-only/native Windows and synthetic Linux tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_host_anchor_readonly_inventory_v1.py'
+      - name: Static guard for no registry write/network/OS privilege mutation
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          source=Path("atlasquant_aion_windows_host_anchor_readonly_inventory_v1.py").read_text("utf-8")
+          tree=ast.parse(source)
+          forbidden_imports={
+              "subprocess","socket","ctypes","urllib","requests","httpx",
+              "shutil","tempfile",
+          }
+          forbidden_calls={
+              "CreateKey","SetValueEx","SetValue","DeleteKey",
+              "DeleteValue","SaveKey","LoadKey","ConnectRegistry",
+              "RegSetValueEx","CreateProcessW","ResumeThread",
+              "FwpmFilterAdd0","CreateAppContainerProfile",
+          }
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(x.name.split(".")[0] not in forbidden_imports for x in node.names)
+              if isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden_imports
+              if isinstance(node, ast.Attribute):
+                  assert node.attr not in forbidden_calls
+          assert 'winreg.HKEY_LOCAL_MACHINE' in source
+          assert 'winreg.KEY_READ | winreg.KEY_WOW64_64KEY' in source
+          for name in (
+              '"host_anchor_is_protected": False',
+              '"registry_acl_verified": False',
+              '"independent_host_policy_origin_verified": False',
+              '"hardware_antirollback_verified": False',
+              '"collector_launch_authorized": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"trust_store_modified": False',
+              '"system_registry_modified": False',
+          ):
+              assert name in source,name
+          PY
