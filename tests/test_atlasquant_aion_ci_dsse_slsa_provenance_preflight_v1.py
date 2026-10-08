@@ -203,6 +203,23 @@ class AIONCIDSSESLSAPreflightV1Tests(unittest.TestCase):
         env["signatures"]=[]
         self.fail(self.verify(envelope=env), "EXACTLY_ONE_DSSE_SIGNATURE_REQUIRED")
 
+    def test_extra_envelope_bytes_field_fails_closed_without_crash(self):
+        env=copy.deepcopy(self.envelope)
+        env["raw_certificate"]=b"not-json"
+        self.fail(self.verify(envelope=env),
+                  "DSSE_ENVELOPE_NONJSON_FIELDS_INVALID")
+
+    def test_binary_invalid_expected_field_fails_closed_without_crash(self):
+        e=dict(self.expected, artifact_subject_digest=b"not-json")
+        self.fail(self.verify(expected=e),
+                  "EXTERNAL_DIGEST_INVALID:artifact_subject_digest")
+
+    def test_oversized_dsse_base64_payload_fails(self):
+        env=copy.deepcopy(self.envelope)
+        env["payload"]=b64(b"z"*32769)
+        self.fail(self.verify(envelope=env),
+                  "DSSE_PAYLOAD_OR_SIGNATURE_LENGTH_INVALID")
+
     def test_noncanonical_base64_fails(self):
         env=copy.deepcopy(self.envelope)
         env["payload"]="%%"
