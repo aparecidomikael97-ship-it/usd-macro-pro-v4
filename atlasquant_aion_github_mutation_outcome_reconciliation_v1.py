@@ -59,6 +59,29 @@ AUTHORITATIVE_EVIDENCE_CLASSES = (
     "GITHUB_REPOSITORY_AUDIT_EVENT",
     "IMMUTABLE_REPOSITORY_OBSERVATION",
 )
+SUCCESS_EVIDENCE_CLASS_REQUIREMENTS = {
+    "PR_DRAFT_TO_READY": ("GITHUB_PR_STATE_READBACK",),
+    "PR_RETARGET_TO_MAIN": (
+        "GITHUB_PR_STATE_READBACK",
+        "GITHUB_BRANCH_BASE_READBACK",
+    ),
+    "SQUASH_MERGE_TO_MAIN": (
+        "GITHUB_PR_STATE_READBACK",
+        "GITHUB_MAIN_COMMIT_GRAPH_READBACK",
+        "GITHUB_MERGE_COMMIT_READBACK",
+    ),
+}
+NO_EFFECT_EVIDENCE_CLASS_REQUIREMENTS = {
+    "PR_DRAFT_TO_READY": ("GITHUB_PR_STATE_READBACK",),
+    "PR_RETARGET_TO_MAIN": (
+        "GITHUB_PR_STATE_READBACK",
+        "GITHUB_BRANCH_BASE_READBACK",
+    ),
+    "SQUASH_MERGE_TO_MAIN": (
+        "GITHUB_PR_STATE_READBACK",
+        "GITHUB_MAIN_COMMIT_GRAPH_READBACK",
+    ),
+}
 UNKNOWN_PRESERVING_CONDITIONS = (
     "EVIDENCE_MISSING",
     "EVIDENCE_INCOMPLETE",
@@ -415,6 +438,31 @@ def build_authoritative_reconciliation_evidence(
         observed = None
         current = None
         blockers.append("RECONCILIATION_EVIDENCE_TIME_INVALID")
+
+    mutation = _clean(receipt.get("requested_mutation"), 100).upper()
+    class_set = set(classes)
+    success_required_classes = set(
+        SUCCESS_EVIDENCE_CLASS_REQUIREMENTS.get(mutation, ())
+    )
+    no_effect_required_classes = set(
+        NO_EFFECT_EVIDENCE_CLASS_REQUIREMENTS.get(mutation, ())
+    )
+
+    if success_postcondition_verified is True and not success_required_classes.issubset(
+        class_set
+    ):
+        blockers.append("SUCCESS_EVIDENCE_CLASS_REQUIREMENTS_NOT_MET")
+    if authoritative_no_effect_verified is True and not no_effect_required_classes.issubset(
+        class_set
+    ):
+        blockers.append("NO_EFFECT_EVIDENCE_CLASS_REQUIREMENTS_NOT_MET")
+    if (
+        authoritative_terminal_rejection_verified is True
+        and not class_set.intersection(
+            {"GITHUB_REPOSITORY_AUDIT_EVENT", "IMMUTABLE_REPOSITORY_OBSERVATION"}
+        )
+    ):
+        blockers.append("TERMINAL_REJECTION_EVIDENCE_CLASS_REQUIRED")
 
     success_signal = success_postcondition_verified is True
     failure_signal = (
@@ -819,6 +867,8 @@ __all__ = [
     "RECONCILIATION_DECISIONS",
     "RECONCILIATION_STATES",
     "AUTHORITATIVE_EVIDENCE_CLASSES",
+    "SUCCESS_EVIDENCE_CLASS_REQUIREMENTS",
+    "NO_EFFECT_EVIDENCE_CLASS_REQUIREMENTS",
     "UNKNOWN_PRESERVING_CONDITIONS",
     "MAX_RECONCILIATION_AUTH_WINDOW_SECONDS",
     "MAX_EVIDENCE_AGE_SECONDS",
