@@ -5,7 +5,7 @@ import unittest
 
 import psycopg
 from psycopg import sql
-from psycopg.conninfo import conninfo_to_dict, make_conninfo
+from psycopg.conninfo import conninfo_to_dict
 
 from aion_chat.models import Message, Scope
 from aion_chat.store import StorageUnavailableError
