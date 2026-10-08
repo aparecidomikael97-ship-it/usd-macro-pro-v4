@@ -348,6 +348,32 @@ class AIONWindowsSignedReleaseProvenanceCIFixtureV1Tests(unittest.TestCase):
         p = self.handoff(v)
         self.assertEqual(p["state"], BLOCKED)
 
+    def test_handoff_rejects_extra_self_authorizing_field(self):
+        v = self.verify()
+        v["publisher_approval_self_asserted"] = True
+        p = self.handoff(v)
+        self.assertEqual(p["state"], BLOCKED)
+        self.assertIn("EXACT_CI_CRYPTO_EVIDENCE_KEYS_REQUIRED", p["blockers"])
+
+    def test_handoff_rejects_missing_false_denial_field(self):
+        v = self.verify()
+        del v["owner_authorization_consumed"]
+        p = self.handoff(v)
+        self.assertEqual(p["state"], BLOCKED)
+        self.assertIn("EXACT_CI_CRYPTO_EVIDENCE_KEYS_REQUIRED", p["blockers"])
+
+    def test_handoff_rejects_forged_trusted_build_attestation(self):
+        v = self.verify()
+        v["slsa_build_provenance_trusted"] = True
+        p = self.handoff(v)
+        self.assertEqual(p["state"], BLOCKED)
+        self.assertIn("TRUST_ESCALATION_REFUSED:slsa_build_provenance_trusted", p["blockers"])
+
+    def test_handoff_rejects_manipulated_candidate_blockers(self):
+        v = self.verify()
+        v["blockers"] = ["UNRESOLVED_DIVERGENCE"]
+        self.assertEqual(self.handoff(v)["state"], BLOCKED)
+
     def test_handoff_rejects_missing_independent_builder_policy(self):
         p = self.handoff(independent_build_attestor_manifest_digest="")
         self.assertEqual(p["state"], BLOCKED)
