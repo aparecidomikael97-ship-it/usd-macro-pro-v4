@@ -1,0 +1,125 @@
+name: AION Windows Physical Verification Build Authorization Gate V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_physical_verification_build_authorization_gate_v1.py"
+      - "tests/test_atlasquant_aion_windows_physical_verification_build_authorization_gate_v1.py"
+      - "docs/aion/AION_WINDOWS_PHYSICAL_VERIFICATION_BUILD_AUTHORIZATION_GATE_V1.md"
+      - ".github/workflows/aion-windows-physical-verification-build-authorization-gate-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-physical-verification-build-authorization-gate-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile build authorization gate
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_physical_verification_build_authorization_gate_v1.py \
+            tests/test_atlasquant_aion_windows_physical_verification_build_authorization_gate_v1.py
+
+      - name: Run build authorization gate tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_physical_verification_build_authorization_gate_v1.py'
+
+      - name: Assert authorization gate cannot authorize or execute a build
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_physical_verification_build_authorization_gate_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import sqlite3",
+              "from sqlite3",
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import httpx",
+              "win32process",
+              "win32job",
+              "win32security",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          forbidden_live_material = (
+              "api.github.com",
+              "GITHUB_TOKEN",
+              "GH_TOKEN",
+          )
+          for marker in forbidden_live_material:
+              assert marker not in source, marker
+
+          required = (
+              '"generic_chat_is_build_authorization": False',
+              '"chat_acknowledgement_is_authorization": False',
+              '"explicit_owner_signature_required": True',
+              '"persistent_nonce_replay_guard_required": True',
+              '"single_use_authorization_required": True',
+              '"authorization_persistence_required": True',
+              '"authorization_cas_required": True',
+              '"authorization_read_after_write_required": True',
+              '"authorization_reopen_required": True',
+              '"all_12_physical_requirements_required": True',
+              '"signed_verifier_receipt_required": True',
+              '"persisted_verifier_receipt_required": True',
+              '"receipt_reopen_required": True',
+              '"evidence_chain_reopen_required": True',
+              '"prelaunch_revalidation_required": True',
+              '"caller_physical_verification_claim_is_authority": False',
+              '"caller_authorization_persistence_claim_is_authority": False',
+              '"launch_gate_implemented": False',
+              '"physical_certificate_trusted": False',
+              '"owner_nonce_registry_implemented": False',
+              '"owner_authorization_persistence_implemented": False',
+              '"build_token_implemented": False',
+              '"build_token_issued": False',
+              '"build_authorized": False',
+              '"build_started": False',
+              '"package_built": False',
+              '"package_installed": False',
+              '"process_spawned": False',
+              '"filesystem_modified": False',
+              '"network_called": False',
+              '"github_api_called": False',
+              '"live_repository_mutation_authorized": False',
+              '"live_repository_mutation_performed": False',
+              '"production_repository_mutation_performed": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
