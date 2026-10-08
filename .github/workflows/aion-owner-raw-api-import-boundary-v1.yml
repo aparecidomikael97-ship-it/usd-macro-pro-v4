@@ -1,0 +1,76 @@
+name: AION Owner Raw API Import Boundary V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_raw_api_import_gate_v1.py"
+      - "tests/test_atlasquant_aion_owner_raw_api_import_gate_v1.py"
+      - "docs/aion/AION_OWNER_RAW_API_IMPORT_BOUNDARY_V1.md"
+      - ".github/workflows/aion-owner-raw-api-import-boundary-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-raw-api-no-bypass:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Ensure ephemeral PR runner
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile scanner and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_raw_api_import_gate_v1.py \
+            tests/test_atlasquant_aion_owner_raw_api_import_gate_v1.py
+      - name: Test owner raw API dependency protection
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_raw_api_import_gate_v1.py'
+      - name: Audit all production Python imports in checkout
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from atlasquant_aion_owner_raw_api_import_gate_v1 import scan_production_checkout
+          checked, findings = scan_production_checkout(Path.cwd())
+          print(f"AION OWNER RAW API IMPORT AUDIT: files_checked={checked}, violations={len(findings)}")
+          for violation in findings[:100]:
+              print(f"BLOCKED: {violation.path}:{violation.line} {violation.code} {violation.module}")
+          assert checked >= 300, "unexpectedly small checkout/coverage"
+          assert not findings, "unaudited owner trust boundary import detected"
+          PY
+      - name: Static guard scanner itself cannot execute apps or network
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path("atlasquant_aion_owner_raw_api_import_gate_v1.py").read_text("utf-8"))
+          bad = {"subprocess", "socket", "requests", "httpx", "urllib", "ctypes",
+                 "winreg", "streamlit", "boto3", "sqlite3"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(alias.name.split(".")[0] not in bad for alias in node.names)
+              elif isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in bad
+          PY
