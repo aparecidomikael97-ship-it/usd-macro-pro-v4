@@ -1,0 +1,87 @@
+name: AION Rooted Collector Raw Evidence CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_rooted_collector_raw_evidence_preflight_v1.py"
+      - "tests/test_atlasquant_aion_rooted_collector_raw_evidence_preflight_v1.py"
+      - "docs/aion/AION_ROOTED_COLLECTOR_RAW_EVIDENCE_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-rooted-collector-raw-evidence-ci-v1.yml"
+      - "atlasquant_aion_independent_physical_process_attestation_contract_v1.py"
+
+permissions:
+  contents: read
+
+jobs:
+  rooted-collector-evidence:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce PR-only runner context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Install pinned crypto dependency in ephemeral runner
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+          python - <<'PY'
+          import cryptography
+          assert cryptography.__version__ == "50.0.2"
+          PY
+      - name: Compile verifier and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_rooted_collector_raw_evidence_preflight_v1.py \
+            tests/test_atlasquant_aion_rooted_collector_raw_evidence_preflight_v1.py
+      - name: Execute rooted enrollment and byte-bound adversarial tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_rooted_collector_raw_evidence_preflight_v1.py'
+      - name: Enforce no OS-process/network mutation and fixed authority ceiling
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          p=Path("atlasquant_aion_rooted_collector_raw_evidence_preflight_v1.py")
+          text=p.read_text("utf-8")
+          tree=ast.parse(text)
+          forbidden={"subprocess","socket","ctypes","winreg","requests","urllib","httpx"}
+          calls={"CreateProcessW","ResumeThread","CreateAppContainerProfile",
+                 "FwpmFilterAdd0","DeleteAppContainerProfile","TerminateProcess"}
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Import):
+                  for item in node.names:
+                      assert item.name.split(".")[0] not in forbidden
+              if isinstance(node,ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+              if isinstance(node,ast.Attribute):
+                  assert node.attr not in calls
+              if isinstance(node,ast.Call) and isinstance(node.func,ast.Name):
+                  assert node.func.id not in calls
+          for field in (
+              '"physical_attestation_verified": False',
+              '"network_deny_verified": False',
+              '"safe_to_resume": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+          ):
+              assert field in text,field
+          PY
