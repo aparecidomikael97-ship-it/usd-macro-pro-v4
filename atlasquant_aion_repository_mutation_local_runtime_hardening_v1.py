@@ -387,9 +387,28 @@ class HardenedLocalRepositoryMutationStore(LocalRepositoryMutationStore):
                     if any(item[key] != expected[key] for key in comparable):
                         raise OfflineRuntimeError("OWNER_KEY_ALREADY_ENROLLED_CONFLICT")
                     conn.execute("COMMIT")
-                    item["replay"] = True
-                    item["private_key_material_present"] = False
-                    return item
+                    material = {
+                        key: item[key]
+                        for key in (
+                            "owner_subject",
+                            "owner_binding_digest",
+                            "device_binding_digest",
+                            "public_key_fingerprint",
+                            "enrollment_nonce_digest",
+                            "enrolled_at",
+                            "physical_owner_presence_verified",
+                            "owner_only_acl_verified",
+                            "status",
+                        )
+                    }
+                    return {
+                        "schema": OWNER_KEY_SCHEMA,
+                        "state": "OWNER_PUBLIC_KEY_ENROLLED",
+                        **item,
+                        "enrollment_digest": _digest(material),
+                        "replay": True,
+                        "private_key_material_present": False,
+                    }
 
                 conn.execute(
                     """
@@ -417,7 +436,28 @@ class HardenedLocalRepositoryMutationStore(LocalRepositoryMutationStore):
                 if conn.in_transaction:
                     conn.execute("ROLLBACK")
                 raise
-        return {**expected, "replay": False, "private_key_material_present": False}
+        material = {
+            key: expected[key]
+            for key in (
+                "owner_subject",
+                "owner_binding_digest",
+                "device_binding_digest",
+                "public_key_fingerprint",
+                "enrollment_nonce_digest",
+                "enrolled_at",
+                "physical_owner_presence_verified",
+                "owner_only_acl_verified",
+                "status",
+            )
+        }
+        return {
+            "schema": OWNER_KEY_SCHEMA,
+            "state": "OWNER_PUBLIC_KEY_ENROLLED",
+            **expected,
+            "enrollment_digest": _digest(material),
+            "replay": False,
+            "private_key_material_present": False,
+        }
 
     def get_active_owner_key(self) -> dict[str, Any]:
         with self._connect() as conn:
