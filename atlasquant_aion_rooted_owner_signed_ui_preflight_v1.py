@@ -28,6 +28,71 @@ from atlasquant_aion_trusted_owner_host_crypto_proof_v1 import (
 
 SCHEMA = "AION_ROOTED_OWNER_SIGNED_UI_PREFLIGHT_V1"
 
+# Only these same-session navigation fields are allowed out of the private
+# staging state. A future route adding a new write must be security-reviewed.
+_NAV_PENDING_KEYS = frozenset({
+    "atlasquant_central_choice",
+    "atlasquant_guided_revalidation_request",
+    "aion_admin_workspace_jump",
+})
+_EXPECTED_KEYS_BY_TARGET = {
+    "central": frozenset({"atlasquant_central_choice"}),
+    "trader": frozenset({"atlasquant_central_choice", "atlasquant_guided_revalidation_request"}),
+    "investimentos": frozenset({"atlasquant_central_choice", "atlasquant_guided_revalidation_request"}),
+    "aion": frozenset({"atlasquant_central_choice", "atlasquant_guided_revalidation_request"}),
+    "negocios": frozenset({
+        "atlasquant_central_choice", "atlasquant_guided_revalidation_request",
+        "aion_admin_workspace_jump",
+    }),
+}
+
+
+def _stage_navigation(
+    session_state: dict[str, Any],
+) -> tuple[dict[str, Any] | None, str]:
+    """Use a minimal routing snapshot. No references to unrelated session data."""
+    try:
+        mode = session_state.get("atlasquant_experience_mode", "")
+    except Exception:
+        return None, "SESSION_SNAPSHOT_UNAVAILABLE"
+    if type(mode) is not str or len(mode) > 80:
+        return None, "SESSION_NAV_MODE_INVALID"
+    # This is a *private* dict, never the real browser/Streamlit session.
+    return {"atlasquant_experience_mode": mode}, ""
+
+
+def _commit_allowed_navigation(
+    session_state: dict[str, Any],
+    staged: dict[str, Any],
+    target: Any,
+) -> str:
+    """Apply only expected keys after a fully successful signed route.
+
+    V1 intentionally requires a plain dict; Streamlit's mutable proxy must
+    NOT be sent here until a separately trusted host supplies its own atomic,
+    authenticated commit transaction.
+    """
+    expected = _EXPECTED_KEYS_BY_TARGET.get(target)
+    if expected is None:
+        return "UNRECOGNIZED_SIGNED_NAVIGATION_TARGET"
+    actual = set(staged) - {"atlasquant_experience_mode"}
+    if actual != expected or not actual.issubset(_NAV_PENDING_KEYS):
+        return "UNREVIEWED_ROUTE_STATE_MUTATION"
+    if staged.get("atlasquant_central_choice") != target:
+        # "central" is the only special root target; the resolver uses
+        # an internal string constant for its visible label.
+        if target != "central" or staged.get("atlasquant_central_choice") != "central_root":
+            return "NAVIGATION_STATE_TARGET_MISMATCH"
+    try:
+        values = {key: staged[key] for key in expected}
+        # dict.update with controlled str keys and validated mapping. All
+        # actual session mutations occur AFTER proof+intent verification.
+        session_state.update(values)
+    except Exception:
+        return "HOST_SESSION_NAV_COMMIT_FAILED"
+    return ""
+
+
 
 @dataclass(frozen=True)
 class HostEvidence:
@@ -147,23 +212,38 @@ def request_rooted_owner_navigation(
     text: str,
 ) -> dict[str, Any]:
     """Checks rooted key/device + exact signed command BEFORE navigation."""
-    if not isinstance(session_state, MutableMapping):
-        return _blocked("TRUSTED_SESSION_STATE_REQUIRED")
+    # Prototype safe boundary: refuse Streamlit/mutable proxy writes directly.
+    # A real trusted host must implement a separate, protected commit adapter.
+    if type(session_state) is not dict:
+        return _blocked("HOST_SESSION_PLAIN_DICT_REQUIRED")
     if type(text) is not str or not 1 <= len(text) <= 160:
         return _blocked("EXACT_SINGLE_COMMAND_REQUIRED")
+    staged, snapshot_reason = _stage_navigation(session_state)
+    if staged is None:
+        return _blocked(snapshot_reason)
     policy, registry, reason, registry_reason = _derive_policy(
         registry_raw, registry_root_signature_b64, owner_payload,
         host=host, now_epoch=now_epoch,
     )
     if policy is None:
         return _blocked(reason, registry_reason)
-    result = request_intent_bound_navigation(
-        session_state, access, owner_payload, owner_signature_b64,
-        intent, intent_signature_b64,
-        policy=policy, now_epoch=now_epoch, text=text,
-    )
+    try:
+        result = request_intent_bound_navigation(
+            staged, access, owner_payload, owner_signature_b64,
+            intent, intent_signature_b64,
+            policy=policy, now_epoch=now_epoch, text=text,
+        )
+    except Exception:
+        # The proof nonce may have been consumed (fail closed), but the real
+        # session_state remains unchanged. No error/secret reflected to client.
+        return _blocked("STAGED_OWNER_NAVIGATION_FAILED")
     if result.get("state") != "INTERNAL_NAVIGATION_REQUESTED":
         return _blocked("SIGNED_OWNER_INTENT_OR_NAVIGATION_REJECTED")
+    commit_reason = _commit_allowed_navigation(
+        session_state, staged, result.get("target"),
+    )
+    if commit_reason:
+        return _blocked(commit_reason)
     return {
         **result, "schema": SCHEMA,
         "root_signed_registry_verified": True,
