@@ -1,0 +1,78 @@
+name: AION Windows Terminal Persistence Postreboot Health V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1.py"
+      - "tests/test_atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1.py"
+      - "docs/aion/AION_WINDOWS_TERMINAL_RECEIPT_PERSISTENCE_POSTREBOOT_HEALTH_V1.md"
+      - ".github/workflows/aion-windows-terminal-persistence-postreboot-health-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-persistence-postreboot-health-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2"
+          PY
+
+      - name: Compile contract and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1.py \
+            tests/test_atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1.py
+
+      - name: Run adversarial terminal CAS and reboot-health tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1.py'
+
+      - name: Assert design-only non-persisting non-rebooting boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1.py").read_text(encoding="utf-8")
+          forbidden = (
+              "import sqlite3", "from sqlite3", "import subprocess", "from subprocess",
+              "import shutil", "from shutil", "import socket", "from socket",
+              "import requests", "from requests", "urllib.request", "import httpx",
+              "win32file", "win32security", "win32process", "winreg",
+              "os.system", "os.exec", "pathlib.Path.write",
+          )
+          for marker in forbidden:
+              assert marker not in source, marker
+          from atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1 import terminal_reboot_policy
+          p = terminal_reboot_policy()
+          assert p["design_only"] is True
+          for key in (
+              "terminal_candidate_is_durable_receipt",
+              "receipt_write_claim_is_persistence_proof",
+              "durable_receipt_means_healthy_after_reboot",
+              "replay_and_cross_install_receipts_allowed",
+              "unknown_is_healthy",
+              "unhealthy_means_clean_terminal_failure",
+              "automatic_retry_after_unknown_allowed",
+              "automatic_reinstall_on_unhealthy_allowed",
+              "terminal_receipt_persisted", "reboot_executed",
+              "postreboot_health_trusted", "package_installed",
+              "deploy_executed", "worker_activated",
+          ):
+              assert p[key] is False, (key, p[key])
+          PY
