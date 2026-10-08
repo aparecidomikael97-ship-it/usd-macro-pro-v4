@@ -355,9 +355,10 @@ def verify_independent_physical_process_attestation(
         Ed25519PublicKey.from_public_bytes(pinned_collector_public_key).verify(
             signature, message
         )
-    except (ValueError, InvalidSignature, TypeError, OverflowError) as exc:
-        reason = str(exc) or "ATTESTATION_OR_SIGNATURE_INVALID"
-        return _blocked(reason)
+    except InvalidSignature:
+        return _blocked("COLLECTOR_SIGNATURE_INVALID")
+    except (ValueError, TypeError, OverflowError) as exc:
+        return _blocked(str(exc) or "ATTESTATION_INVALID")
     if not isinstance(replay_store, SQLitePhysicalAttestationReplayStore):
         return _blocked("DURABLE_CHALLENGE_REPLAY_STORE_REQUIRED")
     replay_key = _sha(
