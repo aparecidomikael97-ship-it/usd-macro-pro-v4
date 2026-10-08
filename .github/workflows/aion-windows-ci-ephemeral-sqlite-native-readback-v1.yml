@@ -1,0 +1,93 @@
+name: AION Windows CI Ephemeral SQLite Native Readback V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_ci_ephemeral_sqlite_native_readback_v1.py"
+      - "tests/test_atlasquant_aion_windows_ci_ephemeral_sqlite_native_readback_v1.py"
+      - "docs/aion/AION_WINDOWS_CI_EPHEMERAL_SQLITE_NATIVE_READBACK_V1.md"
+      - ".github/workflows/aion-windows-ci-ephemeral-sqlite-native-readback-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-windows-sqlite-cas-v1:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify restricted Windows CI toolchain
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import os
+          import sys
+          import sqlite3
+          import cryptography
+          assert os.name == "nt"
+          assert sys.platform == "win32"
+          assert sys.version_info[:2] == (3, 12), sys.version
+          assert cryptography.__version__ == "50.0.2"
+          assert sqlite3.sqlite_version_info >= (3, 35, 0), sqlite3.sqlite_version
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["RUNNER_OS"] == "Windows"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.path.isdir(os.environ["RUNNER_TEMP"])
+          PY
+
+      - name: Compile Windows scratch SQLite module and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_ci_ephemeral_sqlite_native_readback_v1.py \
+            tests/test_atlasquant_aion_windows_ci_ephemeral_sqlite_native_readback_v1.py
+
+      - name: Run real temporary runner-disk CAS integration tests
+        env:
+          AION_CI_EPHEMERAL_DISK_TEST: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_ci_ephemeral_sqlite_native_readback_v1.py'
+
+      - name: Check no package install or native mutation interfaces
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          module = Path("atlasquant_aion_windows_ci_ephemeral_sqlite_native_readback_v1.py").read_text(encoding="utf-8")
+          forbidden = (
+              "import subprocess", "from subprocess", "import requests",
+              "from requests", "import socket", "from socket",
+              "urllib.request", "import httpx", "import winreg",
+              "from winreg", "import ctypes", "from ctypes",
+              "import win32security", "import win32process",
+              "import win32service", "os.system(", "os.exec",
+              "shutil.copy", "shutil.move", "Path.write_bytes(",
+              "Path.write_text(", "os.startfile(",
+          )
+          for marker in forbidden:
+              assert marker not in module, marker
+          from atlasquant_aion_windows_ci_ephemeral_sqlite_native_readback_v1 import POLICY
+          assert POLICY["test_only"] is True
+          assert POLICY["physical_ci_disk_write_can_occur"] is True
+          for field in (
+              "owner_workstation_writes_allowed", "production_store_connected",
+              "install_target_accessed", "windows_registry_changed",
+              "windows_acl_changed", "startup_entry_changed", "service_created",
+              "reboot_performed", "package_installed", "real_aion_started",
+              "aion_health_attested", "physical_install_trusted",
+              "durable_power_loss_verified", "production_receipt_persisted",
+              "independent_windows_attestor_implemented",
+              "owner_authorization_consumed", "install_token_consumed",
+              "automatic_retry_after_unknown_allowed", "deploy_executed",
+              "worker_activated",
+          ):
+              assert POLICY[field] is False, field
+          PY
