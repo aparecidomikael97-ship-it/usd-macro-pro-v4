@@ -1,0 +1,82 @@
+name: AION FinOps Ephemeral SQLite Atomic Reservation V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py"
+      - "tests/test_atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py"
+      - "docs/aion/AION_FINOPS_EPHEMERAL_SQLITE_RESERVATION_CAS_V1.md"
+      - ".github/workflows/aion-finops-ephemeral-sqlite-atomic-reservation-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-atomic-finops:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Guard ephemeral hosted PR runner
+        run: |
+          python - <<'PY'
+          import os,sys
+          assert sys.version_info[:2] == (3,12)
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows","Linux")
+          assert os.environ["RUNNER_TEMP"]
+          PY
+
+      - name: Compile immutable budget gate and scratch SQLite contracts
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_brl200_finops_ceiling_v1.py \
+            atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py \
+            tests/test_atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py
+
+      - name: Concurrency, CAS, replay and accounting divergence tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          AION_FINOPS_CI_EPHEMERAL: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py'
+
+      - name: Ensure no production billing, privileged Windows or provider side effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path("atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py").read_text("utf-8")
+          forbidden=(
+              "import requests","urllib.request","import httpx",
+              "import subprocess","import socket","import winreg","import ctypes",
+              "os.system(","os.exec","os.startfile(","stripe.",
+              "requests.post(","requests.get(","from anthropic",
+          )
+          for token in forbidden:
+              assert token not in source,token
+          from atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1 import ephemeral_finops_policy
+          p=ephemeral_finops_policy()
+          assert p["scratch_sqlite_written_on_ci_runner"] is True
+          assert p["atomic_sqlite_begin_immediate"] is True
+          for flag in (
+              "real_owner_billing_sources_authenticated","real_provider_integration_live",
+              "human_owner_approval_consumed","production_payment_enforcement",
+              "production_ledger_deployed","refund_or_released_funds_authorized",
+              "real_provider_bill_paid","automatic_paid_fallback",
+              "owner_workstation_accessed","worker_activated","deploy_executed",
+          ):
+              assert p[flag] is False,flag
+          PY
