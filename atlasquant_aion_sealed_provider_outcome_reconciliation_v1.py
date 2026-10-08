@@ -973,6 +973,294 @@ def build_outcome_reconciliation(
     }
 
 
+def _verification_material(
+    raw: Mapping[str, Any],
+    schema: str,
+) -> tuple[str, dict[str, Any], str, tuple[str, ...], tuple[str, ...]]:
+    specs = {
+        DISPATCH_WRITE_ATTESTATION_SCHEMA: (
+            "dispatch_write_attestation_digest",
+            "DISPATCH_RECORDED_ATTESTED",
+            (
+                "execution_id",
+                "dispatch_candidate_digest",
+                "durable_dispatch_record_digest",
+                "store_writer_attestation_digest",
+                "persisted_state",
+                "lease_identity_digest",
+                "idempotency_key_digest",
+                "effect_key_digest",
+                "authorization_digest",
+                "payload_attestation_digest",
+                "lease_ownership_verified",
+                "lease_not_expired",
+                "idempotency_reservation_verified",
+                "effect_key_reservation_verified",
+                "authorization_consumed_atomically",
+                "read_after_write_verified",
+                "writer_identity_verified",
+                "persisted_at",
+            ),
+            (
+                "lease_ownership_verified",
+                "lease_not_expired",
+                "idempotency_reservation_verified",
+                "effect_key_reservation_verified",
+                "authorization_consumed_atomically",
+                "read_after_write_verified",
+                "writer_identity_verified",
+            ),
+            (
+                "dispatch_written_by_this_module",
+                "authorization_consumed_by_this_module",
+                "provider_called",
+                "network_called",
+                "external_action_executed",
+                "executes_action",
+            ),
+        ),
+        PROVIDER_RUNTIME_ATTESTATION_SCHEMA: (
+            "runtime_attestation_digest",
+            "PROVIDER_RUNTIME_ATTESTED",
+            (
+                "provider_identity_ref",
+                "runtime_build_digest",
+                "adapter_manifest_digest",
+                "endpoint_reference_digest",
+                "credential_reference_digest",
+                "signed_runtime_verified",
+                "endpoint_allowlist_verified",
+                "credential_scope_verified",
+                "credential_not_expired",
+                "redirect_disabled_or_bounded",
+                "timeout_policy_verified",
+                "transport_policy_verified",
+                "checked_at",
+            ),
+            (
+                "signed_runtime_verified",
+                "endpoint_allowlist_verified",
+                "credential_scope_verified",
+                "credential_not_expired",
+                "redirect_disabled_or_bounded",
+                "timeout_policy_verified",
+                "transport_policy_verified",
+            ),
+            (
+                "raw_endpoint_included",
+                "raw_credential_included",
+                "secret_material_included",
+                "provider_called",
+                "network_called",
+                "external_action_executed",
+                "executes_action",
+            ),
+        ),
+        CALL_BOUNDARY_SCHEMA: (
+            "call_boundary_digest",
+            "SEALED_SINGLE_CALL_READY",
+            (
+                "call_attempt_id",
+                "execution_id",
+                "observability_trace_id",
+                "durable_dispatch_record_digest",
+                "dispatch_write_attestation_digest",
+                "provider_runtime_attestation_digest",
+                "provider_identity_ref",
+                "runtime_build_digest",
+                "adapter_manifest_digest",
+                "subject_digest",
+                "requested_action",
+                "payload_digest",
+                "recipient_resolution_digest",
+                "endpoint_reference_digest",
+                "credential_reference_digest",
+                "request_headers_policy_digest",
+                "transport_policy_digest",
+                "timeout_policy_digest",
+                "idempotency_key_digest",
+                "effect_key_digest",
+                "provider_request_correlation_digest",
+            ),
+            ("exactly_one_call_attempt_allowed",),
+            (
+                "provider_switch_allowed",
+                "endpoint_switch_allowed",
+                "credential_switch_allowed",
+                "payload_mutation_allowed",
+                "capability_expansion_allowed",
+                "scope_expansion_allowed",
+                "provider_called",
+                "network_called",
+                "call_attempt_started",
+                "outcome_receipt_created",
+                "external_action_executed",
+                "executes_action",
+            ),
+        ),
+        OUTCOME_RECEIPT_SCHEMA: (
+            "outcome_receipt_digest",
+            "OUTCOME_RECEIPT_READY",
+            (
+                "call_boundary_digest",
+                "call_attempt_id",
+                "execution_id",
+                "observability_trace_id",
+                "durable_dispatch_record_digest",
+                "provider_identity_ref",
+                "runtime_build_digest",
+                "subject_digest",
+                "requested_action",
+                "payload_digest",
+                "idempotency_key_digest",
+                "effect_key_digest",
+                "provider_request_correlation_digest",
+                "provider_response_evidence_digest",
+                "requested_outcome",
+                "outcome_state",
+                "ambiguity_triggers",
+                "observed_at",
+                "provider_identity_match",
+                "runtime_build_match",
+                "execution_id_match",
+                "trace_id_match",
+                "provider_request_correlation_match",
+                "idempotency_key_match",
+                "effect_key_match",
+                "response_schema_valid",
+                "response_authenticity_verified",
+                "provider_success_semantics_attested",
+                "effect_confirmation_complete",
+                "expected_postcondition_match",
+                "provider_terminal_failure_semantics_attested",
+                "no_effect_or_terminal_rejection_evidence_complete",
+            ),
+            (
+                "receipt_is_append_only",
+                "receipt_is_immutable",
+                "outcome_unknown_requires_separate_reconciliation",
+                "new_attempt_requires_fresh_authorization",
+            ),
+            (
+                "success_inferred_from_silence",
+                "failure_inferred_from_silence",
+                "outcome_unknown_automatic_retry_allowed",
+                "original_receipt_mutable",
+                "receipt_persisted_by_this_module",
+                "provider_called_by_this_module",
+                "network_called_by_this_module",
+                "retry_executed",
+                "external_action_executed_by_this_module",
+                "executes_action",
+            ),
+        ),
+        RECONCILIATION_AUTH_SCHEMA: (
+            "reconciliation_authorization_digest",
+            "RECONCILIATION_AUTHORIZED",
+            (
+                "authorization_id",
+                "purpose",
+                "mechanism",
+                "decision",
+                "original_outcome_receipt_digest",
+                "execution_id",
+                "owner_binding_digest",
+                "owner_key_fingerprint",
+                "signed_request_digest",
+                "nonce_digest",
+                "verified_owner_signature",
+                "verified_active_trust_root",
+                "persistent_nonce_replay_guard_verified",
+                "nonce_single_use_claimed",
+                "issued_at",
+                "expires_at",
+                "verified_at",
+            ),
+            (
+                "reconciliation_authorized",
+                "verified_owner_signature",
+                "verified_active_trust_root",
+                "persistent_nonce_replay_guard_verified",
+                "nonce_single_use_claimed",
+            ),
+            (
+                "reconciliation_denied",
+                "authorization_consumed",
+                "provider_query_authorized_by_this_module",
+                "retry_authorized",
+                "new_attempt_authorized",
+                "provider_called",
+                "network_called",
+                "external_action_executed",
+                "executes_action",
+            ),
+        ),
+        RECONCILIATION_SCHEMA: (
+            "reconciliation_digest",
+            "RECONCILIATION_RECORD_READY",
+            (
+                "reconciliation_id",
+                "original_outcome_receipt_digest",
+                "reconciliation_authorization_digest",
+                "execution_id",
+                "observability_trace_id",
+                "provider_request_correlation_digest",
+                "idempotency_key_digest",
+                "effect_key_digest",
+                "evidence_class",
+                "evidence_source_digest",
+                "evidence_record_digest",
+                "provider_identity_match",
+                "execution_id_match",
+                "trace_id_match",
+                "provider_request_correlation_match",
+                "idempotency_key_match",
+                "effect_key_match",
+                "evidence_source_attested",
+                "evidence_schema_valid",
+                "evidence_authenticity_verified",
+                "evidence_freshness_verified",
+                "evidence_sequence_monotonic",
+                "success_evidence_complete",
+                "expected_postcondition_match",
+                "terminal_failure_or_no_effect_evidence_complete",
+                "conflicting_evidence_present",
+                "reconciled_outcome_state",
+                "observed_at",
+            ),
+            (
+                "original_receipt_immutable",
+                "new_attempt_requires_confirmed_no_effect",
+                "new_attempt_requires_fresh_owner_authorization",
+                "new_attempt_requires_new_durable_dispatch",
+            ),
+            (
+                "original_receipt_mutated",
+                "reconciliation_is_retry",
+                "external_effect_replayed",
+                "automatic_retry_allowed",
+                "new_attempt_authorized",
+                "authorization_consumed_by_this_module",
+                "provider_called_by_this_module",
+                "network_called_by_this_module",
+                "external_action_executed_by_this_module",
+                "executes_action",
+            ),
+        ),
+    }
+    spec = specs.get(schema)
+    if spec is None:
+        return "", {}, "", (), ()
+    digest_field, expected_state, fields, required_true, required_false = spec
+    return (
+        digest_field,
+        {key: raw.get(key) for key in fields},
+        expected_state,
+        required_true,
+        required_false,
+    )
+
+
 def verify_outcome_chain_record(
     record: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -980,19 +1268,15 @@ def verify_outcome_chain_record(
     blockers: list[str] = []
     schema = raw.get("schema")
 
-    if schema == CALL_BOUNDARY_SCHEMA:
-        digest_field = "call_boundary_digest"
-    elif schema == OUTCOME_RECEIPT_SCHEMA:
-        digest_field = "outcome_receipt_digest"
-    elif schema == RECONCILIATION_SCHEMA:
-        digest_field = "reconciliation_digest"
-    elif schema == DISPATCH_WRITE_ATTESTATION_SCHEMA:
-        digest_field = "dispatch_write_attestation_digest"
-    elif schema == PROVIDER_RUNTIME_ATTESTATION_SCHEMA:
-        digest_field = "runtime_attestation_digest"
-    elif schema == RECONCILIATION_AUTH_SCHEMA:
-        digest_field = "reconciliation_authorization_digest"
-    else:
+    (
+        digest_field,
+        material,
+        expected_state,
+        required_true,
+        required_false,
+    ) = _verification_material(raw, schema)
+
+    if not digest_field:
         return {
             "schema": VERIFY_SCHEMA,
             "state": "INVALID",
@@ -1001,13 +1285,21 @@ def verify_outcome_chain_record(
             "executes_action": False,
         }
 
+    if raw.get("state") != expected_state:
+        blockers.append("RECORD_STATE_INVALID")
+
     supplied = _sha256(raw.get(digest_field))
-    expected = _digest(_digest_material(raw, digest_field))
+    expected = _digest(material)
     if not supplied or supplied != expected:
         blockers.append("RECORD_DIGEST_MISMATCH")
 
-    if raw.get("executes_action") is not False:
-        blockers.append("EXECUTION_BOUNDARY_INVALID")
+    for key in required_true:
+        if raw.get(key) is not True:
+            blockers.append("REQUIRED_RECORD_GUARD_MISSING:" + key)
+
+    for key in required_false:
+        if raw.get(key) is not False:
+            blockers.append("RECORD_BOUNDARY_INVALID:" + key)
 
     blockers = list(dict.fromkeys(blockers))
     return {
