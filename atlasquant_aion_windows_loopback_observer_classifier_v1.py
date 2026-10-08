@@ -80,7 +80,7 @@ def classify_localhost_receipt(receipt: Mapping[str, Any] | None) -> dict[str, A
     ):
         if type(receipt[key]) is not bool:
             return _result("INVALID", "OBSERVATION_BOOL_INVALID")
-    if receipt["child_reported_status"] not in STATUSES:
+    if type(receipt["child_reported_status"]) is not str or receipt["child_reported_status"] not in STATUSES:
         return _result("INVALID", "CHILD_STATUS_INVALID")
     ec = receipt["child_exit_code"]
     ne = receipt["child_reported_error_code"]
