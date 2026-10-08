@@ -1,0 +1,104 @@
+name: AION Windows Installation Manifest Package Attestation V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_installation_manifest_package_attestation_v1.py"
+      - "tests/test_atlasquant_aion_windows_installation_manifest_package_attestation_v1.py"
+      - "docs/aion/AION_WINDOWS_INSTALLATION_MANIFEST_PACKAGE_ATTESTATION_V1.md"
+      - ".github/workflows/aion-windows-installation-manifest-package-attestation-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installation-manifest-package-attestation-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned crypto runtime dependency
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+
+      - name: Compile Windows package attestation
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_installation_manifest_package_attestation_v1.py \
+            tests/test_atlasquant_aion_windows_installation_manifest_package_attestation_v1.py
+
+      - name: Run Windows package attestation tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_installation_manifest_package_attestation_v1.py'
+
+      - name: Assert package boundary cannot install or call network
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_installation_manifest_package_attestation_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+              "from github",
+              "import github",
+              "import git",
+              "from git",
+              "winreg",
+              "win32service",
+              "win32serviceutil",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          forbidden_live_material = (
+              "api.github.com",
+              "GITHUB_TOKEN",
+              "GH_TOKEN",
+          )
+          for marker in forbidden_live_material:
+              assert marker not in source, marker
+
+          required = (
+              '"extra_files_allowed": False',
+              '"package_built_by_this_module": False',
+              '"package_installed": False',
+              '"files_copied": False',
+              '"windows_service_installed": False',
+              '"scheduled_task_installed": False',
+              '"startup_entry_created": False',
+              '"windows_acl_modified": False',
+              '"windows_registry_modified": False',
+              '"process_spawned": False',
+              '"uninstall_executed": False',
+              '"private_signing_key_loaded": False',
+              '"credential_material_loaded": False',
+              '"network_called": False',
+              '"github_api_called": False',
+              '"live_repository_mutation_authorized": False',
+              '"live_repository_mutation_performed": False',
+              '"production_repository_mutation_performed": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
