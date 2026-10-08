@@ -59,6 +59,20 @@ EVIDENCE_KEYS = (
     "signature_sha256", "release_id", "source_commit",
     "build_run_id", "release_challenge_digest",
 )
+VERIFICATION_TRUTH_FLAGS = (
+    "signature_verified_with_supplied_ci_key",
+    "artifact_bytes_match_manifest_ci_only", "ci_key_ephemeral_untrusted",
+)
+VERIFICATION_DENIAL_FLAGS = (
+    "signed_by_authorized_aion_publisher", "trusted_source_commit_attested",
+    "slsa_build_provenance_trusted", "reproducible_build_verified",
+    "certificate_chain_and_revocation_trusted", "aion_release_approved",
+    "owner_authorization_consumed", "install_token_consumed",
+    "aion_package_installed", "worker_activated", "deploy_executed",
+)
+VERIFICATION_KEYS = set(EVIDENCE_KEYS) | {
+    "schema", "state", "blockers", "candidate_evidence_digest",
+} | set(VERIFICATION_TRUTH_FLAGS) | set(VERIFICATION_DENIAL_FLAGS)
 
 def _canonical_bytes(data: Any) -> bytes:
     return json.dumps(
@@ -251,20 +265,22 @@ def build_ci_release_handoff_plan(
     """Shape-only consumer handoff; does NOT assert registry or attestations."""
     v = _mapping(verification)
     errors = []
-    if v.get("schema") != SCHEMA or v.get("state") != RELEASE_READY:
+    if set(v) != VERIFICATION_KEYS:
+        errors.append("EXACT_CI_CRYPTO_EVIDENCE_KEYS_REQUIRED")
+    if v.get("schema") != SCHEMA or v.get("state") != RELEASE_READY or v.get("blockers") != []:
         errors.append("READY_CI_CRYPTO_CANDIDATE_REQUIRED")
+    for flag in VERIFICATION_TRUTH_FLAGS:
+        if v.get(flag) is not True:
+            errors.append("MISSING_CI_CRYPTO_SHAPE:" + flag)
+    for flag in VERIFICATION_DENIAL_FLAGS:
+        if v.get(flag) is not False:
+            errors.append("TRUST_ESCALATION_REFUSED:" + flag)
     if v.get("candidate_evidence_digest") != _digest({
         k: v.get(k) for k in EVIDENCE_KEYS
     }):
         errors.append("CI_CRYPTO_CANDIDATE_TAMPERED")
     if v.get("signature_verified_with_supplied_ci_key") is not True:
         errors.append("CI_SIGNATURE_PROOF_REQUIRED")
-    if v.get("ci_key_ephemeral_untrusted") is not True:
-        errors.append("CI_EPHEMERAL_KEY_FLAG_REQUIRED")
-    for field in ("signed_by_authorized_aion_publisher", "aion_release_approved",
-                  "aion_package_installed", "worker_activated", "deploy_executed"):
-        if v.get(field) is not False:
-            errors.append("TRUST_ESCALATION_REFUSED:" + field)
     external = {
         "expected_installation_binding_digest": expected_installation_binding_digest,
         "approved_publisher_registry_digest": approved_publisher_registry_digest,
