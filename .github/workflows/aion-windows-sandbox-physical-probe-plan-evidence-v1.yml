@@ -1,0 +1,113 @@
+name: AION Windows Sandbox Physical Probe Plan Evidence V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1.py"
+      - "tests/test_atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1.py"
+      - "docs/aion/AION_WINDOWS_SANDBOX_PHYSICAL_PROBE_PLAN_EVIDENCE_V1.md"
+      - ".github/workflows/aion-windows-sandbox-physical-probe-plan-evidence-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-sandbox-physical-probe-plan-evidence-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact contract import dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile physical probe plan and evidence schema
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1.py \
+            tests/test_atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1.py
+
+      - name: Run physical probe plan and evidence-schema tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1.py'
+
+      - name: Assert probe-plan layer cannot collect or execute physical proof
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import httpx",
+              "win32job",
+              "win32process",
+              "win32security",
+              "win32file",
+              "win32net",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          forbidden_live_material = (
+              "api.github.com",
+              "pypi.org",
+              "python.org/ftp",
+          )
+          for marker in forbidden_live_material:
+              assert marker not in source, marker
+
+          required = (
+              '"physical_probe_implemented": False',
+              '"physical_probe_executed": False',
+              '"physical_proof_verified": False',
+              '"independent_verifier_implemented": False',
+              '"external_root_of_trust_available": False',
+              '"caller_boolean_verification_is_authority": False',
+              '"document_digest_is_physical_proof": False',
+              '"collector_implemented": False',
+              '"collector_executed": False',
+              '"evidence_collected": False',
+              '"windows_sandbox_verified": False',
+              '"build_authorized": False',
+              '"build_started": False',
+              '"package_built": False',
+              '"package_installed": False',
+              '"process_spawned": False',
+              '"filesystem_modified": False',
+              '"network_called": False',
+              '"github_api_called": False',
+              '"live_repository_mutation_authorized": False',
+              '"live_repository_mutation_performed": False',
+              '"production_repository_mutation_performed": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
