@@ -7,6 +7,7 @@ An advertised CI candidate is never evidence that a real model runs locally.
 """
 from __future__ import annotations
 
+from datetime import date
 from hashlib import sha256
 import json
 import re
@@ -220,7 +221,9 @@ def assess_synthetic_local_model_option(
         state=BLOCKED
     return {
         "schema":SCHEMA, "state":state, "blockers":errors,
-        **material, "assessment_digest":_safe_digest(material) if state != BLOCKED else "",
+        **material, "assessment_digest":_safe_digest({
+            **material, "state":state, "blockers":errors,
+        }) if state != BLOCKED else "",
         "synthetic_fixture_only":True,
         **{f:False for f in ASSESSMENT_FALSE},
     }
@@ -255,19 +258,42 @@ def plan_local_first_spending_route(
     ):
         errors.append("DEGRADED_CANDIDATE_MUST_HAVE_BLOCKERS")
     material={k:a.get(k) for k in ASSESSMENT_MATERIAL}
-    expected_digest = _safe_digest(material)
+    expected_digest = _safe_digest({
+        **material, "state":a.get("state"), "blockers":a.get("blockers"),
+    })
     if (not expected_digest or a.get("assessment_digest") != expected_digest
         or a.get("assessment_digest") != expected_assessment_digest
         or type(expected_assessment_digest) is not str
         or not DIGEST.fullmatch(expected_assessment_digest)):
         errors.append("ASSESSMENT_SNAPSHOT_OR_EXTERNAL_PIN_MISMATCH")
-    errors.extend(_validate_budget(b))
+    if a.get("state") == CANDIDATE and not (
+        a.get("simulated_quality_pass") is True
+        and a.get("simulated_safety_pass") is True
+        and a.get("simulated_latency_pass") is True
+        and a.get("simulated_ram_headroom_pass") is True
+        and a.get("simulated_disk_headroom_pass") is True
+        and a.get("simulated_cpu_only_candidate") is True
+        and a.get("dedicated_vram_unverified") is True
+    ):
+        errors.append("FORGED_CANDIDATE_PASS_FLAGS")
+    try:
+        errors.extend(_validate_budget(b))
+    except (TypeError, ValueError, RecursionError, OverflowError):
+        errors.append("BUDGET_NOT_JSON_COMPATIBLE")
+    if type(expected_owner_id) is not str or not expected_owner_id:
+        errors.append("EXPECTED_OWNER_ID_REQUIRED")
+    if type(expected_month) is not str or not re.fullmatch(r"20[0-9]{2}-(0[1-9]|1[0-2])", expected_month):
+        errors.append("EXPECTED_MONTH_INVALID")
     if b.get("owner_id") != expected_owner_id or b.get("expected_month") != expected_month:
         errors.append("BUDGET_OWNER_MONTH_SCOPE_MISMATCH")
     if b.get("hard_cap_brl_cents") != HARD_CAP_CENTS:
         errors.append("OWNER_R200_CAP_NOT_ENFORCED")
-    if type(as_of) is not str or as_of[:7] != expected_month:
-        errors.append("REQUEST_BUDGET_DATE_MISMATCH")
+    try:
+        parsed = date.fromisoformat(as_of if type(as_of) is str else "")
+        if parsed.strftime("%Y-%m") != expected_month:
+            errors.append("REQUEST_BUDGET_DATE_MISMATCH")
+    except ValueError:
+        errors.append("REQUEST_BUDGET_DATE_INVALID")
     if errors:
         decision="BLOCKED"
     elif a["state"] == CANDIDATE:
