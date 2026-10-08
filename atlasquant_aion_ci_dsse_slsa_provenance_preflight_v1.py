@@ -93,6 +93,12 @@ def _hash(data: bytes) -> str:
 def _digest(v: Any) -> str:
     return _hash(_canonical(v))
 
+def _safe_digest(v: Any) -> str:
+    try:
+        return _digest(v)
+    except (TypeError, ValueError, OverflowError, RecursionError):
+        return ""
+
 def _sha(v: Any) -> bool:
     return type(v) is str and SHA.fullmatch(v) is not None
 
@@ -268,11 +274,14 @@ def verify_ci_dsse_slsa_subset(
             signature_valid = True
         except (ValueError, InvalidSignature):
             errors.append("DSSE_ED25519_SIGNATURE_INVALID")
+    envelope_digest = _safe_digest(env)
+    if not envelope_digest:
+        errors.append("DSSE_ENVELOPE_NONJSON_FIELDS_INVALID")
     material = {
-        "dsse_envelope_digest": _digest(env),
+        "dsse_envelope_digest": envelope_digest,
         "payload_sha256": _hash(payload), "public_key_sha256": pk_hash,
         "signature_sha256": _hash(sig),
-        **{f: ex.get(f) for f in (
+        **{f: ex.get(f) if type(ex.get(f)) is str else "" for f in (
             "subject_name", "subject_sha256", "source_commit", "run_id",
             "builder_id", "build_type", "repository", "workflow_ref",
             "issuer", "audience", "anchor_digest", "registry_digest",
