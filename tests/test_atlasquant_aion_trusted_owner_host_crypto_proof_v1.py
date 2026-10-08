@@ -172,7 +172,7 @@ class OwnerHostCryptoProofTests(unittest.TestCase):
     def test_admin_role_is_not_owner_identity(self):
         self.access["session"]["role"] = "ADMIN"
         p = dict(self.payload, principal="ADMIN")
-        self.assertEqual(self.verify(p)["reason"], "INVALID_PAYLOAD")
+        self.assertEqual(self.verify(p, signature=self.sign())["reason"], "INVALID_PAYLOAD")
 
     def test_not_authenticated_access_blocks(self):
         self.access["mode"] = "GUEST"
