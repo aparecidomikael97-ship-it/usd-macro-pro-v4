@@ -1,0 +1,86 @@
+name: AION Local First Model FinOps Preflight V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_local_first_finops_routing_preflight_v1.py"
+      - "tests/test_atlasquant_aion_local_first_finops_routing_preflight_v1.py"
+      - "docs/aion/AION_LOCAL_FIRST_MODEL_FINOPS_ROUTING_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-local-first-model-finops-preflight-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ci-synthetic-local-first-model-finops:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Assert isolated CI test runner and no prod secret
+        run: |
+          python - <<'PY'
+          import sys,os
+          assert sys.version_info[:2]==(3,12),sys.version
+          assert os.environ["GITHUB_ACTIONS"]=="true"
+          assert os.environ["GITHUB_EVENT_NAME"]=="pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows","Linux")
+          PY
+
+      - name: Compile pure preflight module and synthetic benchmark tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_local_ai_hardware_readonly_capacity_v1.py \
+            atlasquant_aion_owner_brl200_finops_ceiling_v1.py \
+            atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py \
+            atlasquant_aion_local_first_finops_routing_preflight_v1.py \
+            tests/test_atlasquant_aion_local_first_finops_routing_preflight_v1.py
+
+      - name: Exercise local-first task gates and fail-closed paid fallback
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_local_first_finops_routing_preflight_v1.py'
+
+      - name: Enforce no model execution, bill or real provider effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path("atlasquant_aion_local_first_finops_routing_preflight_v1.py").read_text("utf-8")
+          forbidden=(
+              "import subprocess","import socket","import requests","import httpx",
+              "urllib.request","import winreg","import ctypes",
+              "import sqlite3","os.system(","os.exec","os.startfile(",
+              "Path.write_bytes(","Path.write_text(","open(",
+              "AutoModel.from_pretrained","hf_hub_download",
+              "requests.post(","requests.get(","from openai","from anthropic",
+              "from ollama","import torch","import transformers",
+          )
+          for token in forbidden:
+              assert token not in source,token
+          from atlasquant_aion_local_first_finops_routing_preflight_v1 import local_first_finops_policy
+          p=local_first_finops_policy()
+          assert p["hard_cap_owner_brl_cents"]==20000
+          assert p["synthetic_benchmarks_only"] is True
+          for key in (
+              "genuine_hardware_verified","real_local_model_tested",
+              "official_model_weights_authenticated",
+              "real_quality_or_safety_metrics_confirmed",
+              "energy_costs_verified","zero_cost_guaranteed",
+              "real_paid_provider_call_enabled","real_owner_approval_used",
+              "real_router_deployed","owner_device_accessed","worker_activated",
+          ):
+              assert p[key] is False,key
+          PY
