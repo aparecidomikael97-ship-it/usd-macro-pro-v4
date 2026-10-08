@@ -40,8 +40,11 @@ def _digest(data: Any) -> str:
     return sha256(json.dumps(data, sort_keys=True, ensure_ascii=True,
                              separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
-def _int(value: Any, minimum: int = 0) -> bool:
-    return type(value) is int and value >= minimum
+def _int(value: Any, minimum: int = 0, maximum: int = 10**13) -> bool:
+    return type(value) is int and minimum <= value <= maximum
+
+def _one_of(value: Any, allowed: set[str]) -> bool:
+    return type(value) is str and value in allowed
 
 def _str(value: Any, limit: int = 128) -> bool:
     return type(value) is str and 1 <= len(value) <= limit and value.strip() == value and "\x00" not in value
@@ -129,15 +132,15 @@ def build_owner_monthly_budget(
         for key in ("entry_id", "category"):
             if not _str(item.get(key)):
                 row_errors.append("ENTRY_ID_OR_CATEGORY_INVALID")
-        if item.get("category") not in CATEGORIES:
+        if not _one_of(item.get("category"), CATEGORIES):
             row_errors.append("ENTRY_CATEGORY_UNRECOGNIZED")
         if item.get("owner_id") != trusted_owner_id:
             row_errors.append("OWNER_SCOPE_MISMATCH")
         if item.get("month") != expected_month:
             row_errors.append("ENTRY_MONTH_MISMATCH")
-        if item.get("status") not in STATUSES:
+        if not _one_of(item.get("status"), STATUSES):
             row_errors.append("ENTRY_STATUS_UNKNOWN")
-        if item.get("evidence") not in EVIDENCE or item.get("evidence") == "UNKNOWN":
+        if not _one_of(item.get("evidence"), EVIDENCE) or item.get("evidence") == "UNKNOWN":
             row_errors.append("AMOUNT_EVIDENCE_MISSING")
         amount, amount_error = _brl_cents(item.get("currency"),
                                           item.get("brl_cents"), item.get("usd_micros"), fx)
@@ -172,6 +175,11 @@ def build_owner_monthly_budget(
         "forecast_brl_cents": total_cents,
         "headroom_brl_cents": max(0, HARD_CAP_CENTS-total_cents),
         "entries_count": len(rows), "evidence_digest": _digest(rows),
+        "forecast_snapshot_digest": _digest({
+            "owner_id":trusted_owner_id, "month":expected_month,
+            "forecast":total_cents, "count":len(rows), "evidence":_digest(rows),
+            "state":state, "blockers":errors,
+        }),
         "unknown_other_bills_possible": True,
         "input_costs_independently_reconciled": False,
         "completeness_of_subscriptions_verified": False,
@@ -193,6 +201,13 @@ def preflight_owner_paid_request(
     issues = []
     if b.get("schema") != SCHEMA or b.get("blockers") != []:
         issues.append("OWNER_BUDGET_NOT_READY")
+    if b.get("forecast_snapshot_digest") != _digest({
+        "owner_id":b.get("owner_id"), "month":b.get("expected_month"),
+        "forecast":b.get("forecast_brl_cents"), "count":b.get("entries_count"),
+        "evidence":b.get("evidence_digest"), "state":b.get("state"),
+        "blockers":b.get("blockers"),
+    }):
+        issues.append("BUDGET_SNAPSHOT_TAMPERED")
     if (b.get("state") not in {"WITHIN_TARGET_PROVISIONAL", "DEGRADE", "CRITICAL"}
         or b.get("hard_cap_brl_cents") != HARD_CAP_CENTS
         or type(b.get("forecast_brl_cents")) is not int
@@ -200,7 +215,7 @@ def preflight_owner_paid_request(
         issues.append("INVALID_OR_BLOCKED_BUDGET")
     if set(q) != QUOTE_FIELDS:
         issues.append("QUOTE_EXACT_FIELDS_REQUIRED")
-    if q.get("cost_type") not in {"PAID_EXTERNAL", "LOCAL_ZERO_MARGINAL"}:
+    if not _one_of(q.get("cost_type"), {"PAID_EXTERNAL", "LOCAL_ZERO_MARGINAL"}):
         issues.append("UNKNOWN_REQUEST_COST_TYPE")
     if q.get("cost_type") == "LOCAL_ZERO_MARGINAL":
         if q.get("currency") != "BRL" or q.get("brl_cents") != 0 or q.get("usd_micros") is not None:
