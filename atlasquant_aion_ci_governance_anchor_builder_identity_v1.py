@@ -294,6 +294,8 @@ def verify_ci_builder_identity(
         a.get("governance_key_sha256") != g.get("governance_key_sha256") or
         a.get("publisher_key_sha256") != g.get("active_key_sha256")):
         errors.append("ANCHOR_REGISTRY_PROOF_DIVERGENCE")
+    if a.get("custodian_review_key_sha256") == w.get("witness_key_sha256"):
+        errors.append("CUSTODIAN_AND_WITNESS_ROLES_MUST_DIFFER")
     if (w.get("registry_digest") != g.get("registry_digest") or
         w.get("registry_sequence") != g.get("sequence") or
         w.get("active_publisher_key_sha256") != g.get("active_key_sha256") or
@@ -437,6 +439,22 @@ def review_ci_governance_builder_preflight(
     )
     if any(left != right for left, right in links):
         errors.append("CROSS_PROOF_RELEASE_ANCHOR_BUILDER_DIVERGENCE")
+    expected_subject = _digest({
+        "release_manifest_sha256": r.get("manifest_sha256"),
+        "release_file_table_digest": r.get("file_table_digest"),
+        "release_candidate_digest": r.get("candidate_evidence_digest"),
+    })
+    if b.get("subject_digest") != expected_subject:
+        errors.append("RELEASE_ARTIFACT_SUBJECT_DIGEST_MISMATCH")
+    role_keys = (
+        a.get("custodian_review_key_sha256"),
+        g.get("governance_key_sha256"),
+        g.get("active_key_sha256"),
+        w.get("witness_key_sha256"),
+        b.get("builder_public_key_sha256"),
+    )
+    if len(set(role_keys)) != len(role_keys):
+        errors.append("FIVE_CI_KEY_ROLES_MUST_BE_DISTINCT")
     errors = list(dict.fromkeys(errors))
     material = {
         "anchor_proof_digest": a.get("anchor_proof_digest"),
