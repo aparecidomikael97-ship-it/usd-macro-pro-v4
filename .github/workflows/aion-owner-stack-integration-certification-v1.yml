@@ -1,0 +1,122 @@
+name: AION Owner Stack Integration Certification V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_stack_integration_certification_v1.py"
+      - "tests/test_atlasquant_aion_owner_stack_integration_certification_v1.py"
+      - "docs/aion/AION_OWNER_STACK_INTEGRATION_CERTIFICATION_V1.md"
+      - ".github/workflows/aion-owner-stack-integration-certification-v1.yml"
+      - "atlasquant_aion_owner_experience_v1.py"
+      - "atlasquant_aion_cognitive_continuity_v1.py"
+      - "atlasquant_aion_secure_local_agent_v1.py"
+      - "atlasquant_aion_local_action_audit_receipt_v1.py"
+      - "atlasquant_aion_secure_desktop_runtime_blueprint_v1.py"
+      - "atlasquant_aion_voice_hotword_runtime_v1.py"
+      - "atlasquant_aion_teaching_meeting_orchestrator_v1.py"
+      - "atlasquant_aion_presentation_artifact_control_v1.py"
+      - "atlasquant_aion_advisor_decision_support_v1.py"
+      - "atlasquant_aion_contract_communication_draft_approval_v1.py"
+      - "atlasquant_aion_approval_outbound_dispatch_bridge_v1.py"
+      - "atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py"
+      - "atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py"
+      - "atlasquant_aion_outbound_terminal_audit_certificate_v1.py"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-stack-integration-certification-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile certification
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_stack_integration_certification_v1.py \
+            tests/test_atlasquant_aion_owner_stack_integration_certification_v1.py
+
+      - name: Run full owner-stack dedicated battery
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            test_atlasquant_aion_owner_experience_v1.py
+            test_atlasquant_aion_cognitive_continuity_v1.py
+            test_atlasquant_aion_secure_local_agent_v1.py
+            test_atlasquant_aion_local_action_audit_receipt_v1.py
+            test_atlasquant_aion_secure_desktop_runtime_blueprint_v1.py
+            test_atlasquant_aion_voice_hotword_runtime_v1.py
+            test_atlasquant_aion_teaching_meeting_orchestrator_v1.py
+            test_atlasquant_aion_presentation_artifact_control_v1.py
+            test_atlasquant_aion_advisor_decision_support_v1.py
+            test_atlasquant_aion_contract_communication_draft_approval_v1.py
+            test_atlasquant_aion_approval_outbound_dispatch_bridge_v1.py
+            test_atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py
+            test_atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py
+            test_atlasquant_aion_outbound_terminal_audit_certificate_v1.py
+          )
+          for test_file in "${tests[@]}"; do
+            echo "==> ${test_file}"
+            python -m unittest discover -v -s tests -p "${test_file}"
+          done
+
+      - name: Run cross-stack certification tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_stack_integration_certification_v1.py'
+
+      - name: Assert certification has zero production authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_owner_stack_integration_certification_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import socket",
+              "import requests",
+              "urllib.request",
+              "import smtplib",
+              "import sqlite3",
+              "from sqlite3",
+              "import subprocess",
+              "from subprocess",
+              "import win32com",
+              "import pyautogui",
+              "from pptx",
+              "import pptx",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"synthetic_only": True',
+              '"production_ready": False',
+              '"merge_authorized": False',
+              '"deploy_authorized": False',
+              '"worker_activation_authorized": False',
+              '"physical_runtime_certified": False',
+              '"provider_execution_certified": False',
+              '"external_action_authorized": False',
+              '"external_action_executed": False',
+              '"network_called": False',
+              '"provider_called": False',
+              '"deploy_executed": False',
+              '"worker_armed": False',
+              '"core_checkpoint_write": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
