@@ -1,0 +1,125 @@
+name: AION Windows Package Attestation Persistence Install Auth Gate V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_package_attestation_persistence_install_auth_gate_v1.py"
+      - "tests/test_atlasquant_aion_windows_package_attestation_persistence_install_auth_gate_v1.py"
+      - "docs/aion/AION_WINDOWS_PACKAGE_ATTESTATION_PERSISTENCE_INSTALL_AUTH_GATE_V1.md"
+      - ".github/workflows/aion-windows-package-attestation-persistence-install-auth-gate-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-package-attestation-persistence-install-auth-gate-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile package persistence/install gate contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_package_attestation_persistence_install_auth_gate_v1.py \
+            tests/test_atlasquant_aion_windows_package_attestation_persistence_install_auth_gate_v1.py
+
+      - name: Run package persistence/install gate tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_package_attestation_persistence_install_auth_gate_v1.py'
+
+      - name: Assert install gate remains non-installing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_package_attestation_persistence_install_auth_gate_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import sqlite3",
+              "from sqlite3",
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import httpx",
+              "win32process",
+              "win32service",
+              "win32security",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"package_persistence_append_only_required":True',
+              '"package_persistence_cas_required":True',
+              '"package_persistence_exactly_once_required":True',
+              '"package_persistence_read_after_write_required":True',
+              '"package_persistence_reopen_required":True',
+              '"package_persistence_replace_allowed":False',
+              '"fresh_owner_install_signature_required":True',
+              '"persistent_nonce_replay_guard_required":True',
+              '"single_use_install_authorization_required":True',
+              '"install_authorization_persistence_required":True',
+              '"install_authorization_cas_required":True',
+              '"install_authorization_read_after_write_required":True',
+              '"install_authorization_reopen_required":True',
+              '"rollback_material_required":True',
+              '"uninstall_manifest_required":True',
+              '"generic_chat_is_install_authorization":False',
+              '"caller_package_persistence_claim_is_authority":False',
+              '"caller_install_auth_persistence_claim_is_authority":False',
+              '"package_persistence_writer_implemented":False',
+              '"package_reopen_verifier_implemented":False',
+              '"install_nonce_registry_implemented":False',
+              '"install_authorization_writer_implemented":False',
+              '"package_attestation_persisted":False',
+              '"package_attestation_reopen_verified":False',
+              '"owner_install_authorization_persisted":False',
+              '"installation_authorized":False',
+              '"install_token_issued":False',
+              '"installation_started":False',
+              '"package_installed":False',
+              '"files_copied":False',
+              '"filesystem_modified":False',
+              '"windows_acl_modified":False',
+              '"windows_registry_modified":False',
+              '"startup_entry_created":False',
+              '"scheduled_task_installed":False',
+              '"windows_service_installed":False',
+              '"process_spawned":False',
+              '"network_called":False',
+              '"github_api_called":False',
+              '"live_repository_mutation_authorized":False',
+              '"live_repository_mutation_performed":False',
+              '"production_repository_mutation_performed":False',
+              '"deploy_executed":False',
+              '"worker_activated":False',
+              '"provider_activated":False',
+              '"production_persistence_activated":False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
