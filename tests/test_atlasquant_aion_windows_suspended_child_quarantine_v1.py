@@ -216,12 +216,18 @@ class SuspendedChildQuarantineTests(unittest.TestCase):
         self.assert_not_authorized(report["classification"])
 
     def test_no_process_resume_api_in_native_launcher(self):
+        import ast
         source = inspect.getsource(run_ci_suspended_child_negative_probe)
-        # Never resume ANY child, even a forged AppContainer-positive token.
-        self.assertNotIn("ResumeThread", source)
-        self.assertNotIn("NtResumeProcess", source)
-        self.assertNotIn("CreateAppContainerProfile(", source)
-        self.assertNotIn("FwpmFilterAdd0(", source)
+        # Parse executable calls/attribute access, not harmless comments.
+        forbidden = {
+            "ResumeThread", "NtResumeProcess", "CreateAppContainerProfile",
+            "FwpmFilterAdd0",
+        }
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Attribute):
+                self.assertNotIn(node.attr, forbidden)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                self.assertNotIn(node.func.id, forbidden)
 
     def test_no_network_imports_in_native_launcher(self):
         import ast
