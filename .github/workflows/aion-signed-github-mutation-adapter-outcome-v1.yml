@@ -1,0 +1,83 @@
+name: AION Signed GitHub Mutation Adapter Outcome V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_signed_github_mutation_adapter_outcome_v1.py"
+      - "tests/test_atlasquant_aion_signed_github_mutation_adapter_outcome_v1.py"
+      - "docs/aion/AION_SIGNED_GITHUB_MUTATION_ADAPTER_OUTCOME_RECEIPT_V1.md"
+      - ".github/workflows/aion-signed-github-mutation-adapter-outcome-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  signed-github-mutation-adapter-outcome-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile signed GitHub mutation adapter outcome contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_signed_github_mutation_adapter_outcome_v1.py \
+            tests/test_atlasquant_aion_signed_github_mutation_adapter_outcome_v1.py
+
+      - name: Run signed GitHub mutation adapter outcome tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_signed_github_mutation_adapter_outcome_v1.py'
+
+      - name: Assert adapter and receipt cannot execute
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_signed_github_mutation_adapter_outcome_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import git",
+              "from git",
+              "import requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"endpoint_included": False',
+              '"credential_material_included": False',
+              '"token_material_included": False',
+              '"raw_request_payload_included": False',
+              '"adapter_loaded_by_this_module": False',
+              '"api_request_generated": False',
+              '"github_api_called": False',
+              '"network_called": False',
+              '"attempt_performed_by_this_module": False',
+              '"api_request_generated_by_this_module": False',
+              '"github_api_called_by_this_module": False',
+              '"network_called_by_this_module": False',
+              '"repository_mutation_performed_by_this_module": False',
+              '"automatic_retry_allowed": False',
+              '"retry_scheduled": False',
+              '"retry_performed": False',
+              '"new_attempt_authorized": False',
+              '"original_receipt_mutable": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
