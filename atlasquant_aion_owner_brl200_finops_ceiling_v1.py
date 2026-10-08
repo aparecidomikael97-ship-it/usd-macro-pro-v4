@@ -66,6 +66,7 @@ def _fx_rate(fx: Mapping[str, Any] | None, *, as_of: str) -> tuple[Decimal | Non
         if not rate.is_finite() or rate <= 0 or rate > 100 or rate.as_tuple().exponent < -6:
             raise InvalidOperation
     except (InvalidOperation, ValueError):
+        rate = None
         errors.append("FX_RATE_INVALID")
     try:
         observed = date.fromisoformat(m.get("observed_date") if type(m.get("observed_date")) is str else "")
