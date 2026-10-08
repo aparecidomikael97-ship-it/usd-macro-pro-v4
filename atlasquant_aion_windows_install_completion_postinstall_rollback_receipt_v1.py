@@ -102,6 +102,13 @@ def build_completion_journal_gate(
         errors.append("JOURNAL_COUNT_INVALID")
     if not _sha(p.get("journal_plan_digest")) or not _sha(p.get("journal_genesis_digest")):
         errors.append("JOURNAL_PLAN_DIGESTS_REQUIRED")
+    expected_genesis = _digest({
+        "installation_id": p.get("installation_id"),
+        "install_commitment_digest": p.get("install_commitment_digest"),
+        "journal_kind": "WINDOWS_INSTALL_FILE_TRANSACTION_V1",
+    })
+    if p.get("journal_genesis_digest") != expected_genesis:
+        errors.append("JOURNAL_GENESIS_MISMATCH")
     plan_material = {key: p.get(key) for key in (
         "atomic_install_contract_digest", "install_commitment_digest",
         "installation_id", "journal_genesis_digest", "operation_count", "operations",
@@ -277,6 +284,8 @@ def validate_postinstall_evidence_shape(
     material = {
         "installation_id": p.get("installation_id"),
         "verification_plan_digest": _sha(p.get("verification_plan_digest")),
+        "completion_gate_digest": _sha(p.get("completion_gate_digest")),
+        "journal_plan_digest": _sha(p.get("journal_plan_digest")),
         "check_evidence_digests": [_digest(r) for r in rows],
     }
     return {
@@ -387,6 +396,9 @@ def build_terminal_install_receipt_candidate(
             or gate.get("installation_id") != installation_id
             or v.get("schema") != VERIFY_EVIDENCE_SCHEMA or v.get("state") != VERIFY_READY
             or v.get("installation_id") != installation_id
+            or v.get("completion_gate_digest") != gate.get("completion_gate_digest")
+            or v.get("journal_plan_digest") != gate.get("journal_plan_digest")
+            or not _sha(v.get("verification_evidence_candidate_digest"))
             or r or f):
             errors.append("EXHAUSTIVE_POSTINSTALL_REOPEN_PROOF_SHAPE_REQUIRED")
         disposition = SUCCESS_CANDIDATE
