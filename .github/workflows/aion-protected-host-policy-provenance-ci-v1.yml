@@ -1,0 +1,85 @@
+name: AION Protected Host Policy Provenance CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_protected_host_policy_provenance_v1.py"
+      - "tests/test_atlasquant_aion_protected_host_policy_provenance_v1.py"
+      - "docs/aion/AION_PROTECTED_HOST_POLICY_PROVENANCE_V1.md"
+      - ".github/workflows/aion-protected-host-policy-provenance-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-anchor-host-policy:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce PR CI context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Pin crypto library on ephemeral runner only
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+          python - <<'PY'
+          import cryptography
+          assert cryptography.__version__ == "50.0.2"
+          PY
+      - name: Compile provenance verifier
+        run: |
+          python -m py_compile \
+            atlasquant_aion_protected_host_policy_provenance_v1.py \
+            tests/test_atlasquant_aion_protected_host_policy_provenance_v1.py
+      - name: Execute exact-anchor adversarial tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_protected_host_policy_provenance_v1.py'
+      - name: Audit no host mutation or escalation in provenance verifier
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          source=Path("atlasquant_aion_protected_host_policy_provenance_v1.py").read_text("utf-8")
+          tree=ast.parse(source)
+          forbidden={"subprocess","socket","ctypes","winreg","requests",
+                     "urllib","httpx","shutil","tempfile"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(x.name.split(".")[0] not in forbidden for x in node.names)
+              if isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+          for name in ("CreateProcessW", "ResumeThread", "FwpmFilterAdd0",
+                       "SetTokenInformation", "CreateAppContainerProfile"):
+              assert name not in source
+          for literal in (
+              '"protected_host_source_independently_verified": False',
+              '"hardware_antirollback_verified": False',
+              '"collector_launch_authorized": False',
+              '"host_trust_state_modified": False',
+              '"physical_attestation_verified": False',
+              '"network_deny_verified": False',
+              '"installer_authorized": False',
+              '"build_authorized": False', '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert literal in source,literal
+          PY
