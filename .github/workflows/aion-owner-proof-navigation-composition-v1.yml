@@ -37,7 +37,7 @@ jobs:
           PY
       - name: Pin ephemeral test dependencies
         run: |
-          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2" "streamlit==1.64.0"
       - name: Compile proof-to-navigation composition and test fixtures
         run: |
           python -m py_compile \
