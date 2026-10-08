@@ -147,7 +147,8 @@ class AionOutboundExecutionAuthorizationDurableDispatchV1Tests(unittest.TestCase
     def payload(self, bridge=None, authorization=None, persistence=None, **changes):
         bridge = bridge or self.bridge()
         authorization = authorization or self.authorization(bridge)
-        persistence = persistence or self.persistence(authorization)
+        if persistence is None:
+            persistence = self.persistence(authorization)
         kwargs = {
             "bridge": bridge,
             "authorization": authorization,
