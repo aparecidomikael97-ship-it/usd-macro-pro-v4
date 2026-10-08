@@ -294,22 +294,36 @@ class AionWindowsBuildInputOfflineCacheAttestationV1Tests(unittest.TestCase):
         snapshot = self.snapshot()
 
         observed = self.observed_cache(snapshot)
-        observed[0] = dict(observed[0])
-        observed[0]["sha256"] = D("0")
+        python_index = next(
+            index for index, row in enumerate(observed)
+            if row["role"] == "PYTHON_RUNTIME"
+        )
+        observed[python_index] = dict(observed[python_index])
+        observed[python_index]["sha256"] = D("0")
         out = self.cache_attestation(snapshot, observed)
         self.assertEqual(out["state"], "BLOCKED")
         self.assertIn("CACHE_HASH_DRIFT:PYTHON_RUNTIME", out["blockers"])
 
         observed = self.observed_cache(snapshot)
-        observed[1] = dict(observed[1])
-        observed[1]["size_bytes"] += 1
+        pip_index = next(
+            index for index, row in enumerate(observed)
+            if row["role"] == "PIP_WHEEL"
+        )
+        observed[pip_index] = dict(observed[pip_index])
+        observed[pip_index]["size_bytes"] += 1
         out2 = self.cache_attestation(snapshot, observed)
         self.assertEqual(out2["state"], "BLOCKED")
         self.assertIn("CACHE_SIZE_DRIFT:PIP_WHEEL", out2["blockers"])
 
         observed = self.observed_cache(snapshot)
-        observed[4] = dict(observed[4])
-        observed[4]["filename"] = "pycparser-3.1-py3-none-any-copy.whl"
+        pycparser_index = next(
+            index for index, row in enumerate(observed)
+            if row["role"] == "PYCPARSER_WHEEL"
+        )
+        observed[pycparser_index] = dict(observed[pycparser_index])
+        observed[pycparser_index]["filename"] = (
+            "pycparser-3.1-py3-none-any-copy.whl"
+        )
         out3 = self.cache_attestation(snapshot, observed)
         self.assertEqual(out3["state"], "BLOCKED")
         self.assertIn("CACHE_FILENAME_DRIFT:PYCPARSER_WHEEL", out3["blockers"])
