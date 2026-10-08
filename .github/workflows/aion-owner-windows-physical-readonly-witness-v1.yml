@@ -1,0 +1,56 @@
+name: AION Owner Windows Physical Read-Only Witness CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_windows_physical_readonly_witness_v1.py"
+      - "tests/test_atlasquant_aion_owner_windows_physical_readonly_witness_v1.py"
+      - "docs/aion/AION_OWNER_WINDOWS_PHYSICAL_READONLY_WITNESS_V1.md"
+      - ".github/workflows/aion-owner-windows-physical-readonly-witness-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native-readonly-witness:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce PR CI scope
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile observer
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_windows_physical_readonly_witness_v1.py \
+            tests/test_atlasquant_aion_owner_windows_physical_readonly_witness_v1.py
+      - name: Run adversarial and native read-only tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_windows_physical_readonly_witness_v1.py'
+      - name: Explicit Windows native read-only runner
+        if: runner.os == 'Windows'
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python atlasquant_aion_owner_windows_physical_readonly_witness_v1.py \
+            --owner-authorized-physical-readonly \
+            123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0
