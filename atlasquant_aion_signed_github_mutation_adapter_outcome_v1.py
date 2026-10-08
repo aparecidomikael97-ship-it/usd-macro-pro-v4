@@ -544,6 +544,8 @@ def build_immutable_mutation_outcome_receipt(
         if unknown_forced
         else declared
     )
+    if final_outcome == "OUTCOME_UNKNOWN" and not ambiguity_evidence:
+        blockers.append("AMBIGUITY_EVIDENCE_DIGEST_REQUIRED")
 
     expected_postcondition = EXPECTED_POSTCONDITIONS.get(
         _clean(attempt.get("requested_mutation"), 100).upper(),
