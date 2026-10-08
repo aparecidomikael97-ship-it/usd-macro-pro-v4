@@ -6,18 +6,19 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 
 ## Resumo
 
-- Compromissos rastreados: **108**.
+- Compromissos rastreados: **118**.
 - Dias na janela: **18**.
 - Dias ainda exigindo varredura: **nenhum**.
 - Lacunas herdadas da reconciliação de 29/09: **8**.
+- Revisão: **V2_CONVERSATION_RECONCILIATION**.
 
 ### Estados
 
-- APROVADO / PENDENTE: 75
+- APROVADO / PENDENTE: 83
 - DEPENDÊNCIA EXTERNA: 3
 - DESCARTADO: 2
 - IMPLEMENTADO / EM VALIDAÇÃO: 25
-- SUBSTITUÍDO: 2
+- SUBSTITUÍDO: 4
 - UNVERIFIED: 1
 
 ## Cobertura diária
@@ -29,8 +30,8 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 | 2026-09-17 | COVERED_WITH_EVIDENCE | 3 | NÃO |
 | 2026-09-18 | COVERED_WITH_EVIDENCE | 5 | NÃO |
 | 2026-09-19 | COVERED_WITH_EVIDENCE | 1 | NÃO |
-| 2026-09-20 | COVERED_WITH_EVIDENCE | 2 | NÃO |
-| 2026-09-21 | COVERED_WITH_EVIDENCE | 1 | NÃO |
+| 2026-09-20 | COVERED_WITH_EVIDENCE | 3 | NÃO |
+| 2026-09-21 | COVERED_WITH_EVIDENCE | 2 | NÃO |
 | 2026-09-22 | COVERED_WITH_EVIDENCE | 8 | NÃO |
 | 2026-09-23 | COVERED_WITH_EVIDENCE | 10 | NÃO |
 | 2026-09-24 | COVERED_WITH_EVIDENCE | 5 | NÃO |
@@ -38,10 +39,10 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 | 2026-09-26 | COVERED_WITH_EVIDENCE | 1 | NÃO |
 | 2026-09-27 | COVERED_WITH_EVIDENCE | 4 | NÃO |
 | 2026-09-28 | COVERED_WITH_EVIDENCE | 3 | NÃO |
-| 2026-09-29 | COVERED_WITH_EVIDENCE | 37 | NÃO |
+| 2026-09-29 | COVERED_WITH_EVIDENCE | 40 | NÃO |
 | 2026-09-30 | COVERED_WITH_EVIDENCE | 6 | NÃO |
-| 2026-10-01 | COVERED_WITH_EVIDENCE | 3 | NÃO |
-| 2026-10-02 | COVERED_WITH_EVIDENCE | 5 | NÃO |
+| 2026-10-01 | COVERED_WITH_EVIDENCE | 4 | NÃO |
+| 2026-10-02 | COVERED_WITH_EVIDENCE | 9 | NÃO |
 
 > Cobertura com evidência não fecha automaticamente um dia; fechamento exige estados terminais e evidência explícita.
 
@@ -61,9 +62,11 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 | 2026-09-18 | `D-2026-09-18-COT-FINAL-PHASE` | APROVADO / PENDENTE | market-intelligence | COT e posicionamento institucional em fase final |
 | 2026-09-18 | `D-2026-09-18-ELLIOTT-OUT-OF-ENGINE` | DESCARTADO | trader | Elliott fora do motor |
 | 2026-09-19 | `D-PRODUCT-STILL-PRIVATE-PHASE` | UNVERIFIED | product | Fase comercial pública |
+| 2026-09-20 | `D-2026-09-20-ACCOUNT-SESSION-ONBOARDING` | APROVADO / PENDENTE | access | Conta individual, sessão/dispositivo e onboarding |
 | 2026-09-20 | `D-2026-09-20-EVENT-POSITION-MANAGER` | APROVADO / PENDENTE | trader | Gestor de posi??o por evento |
 | 2026-09-20 | `D-2026-09-20-OPERATE-INVEST-BOTH` | APROVADO / PENDENTE | investments | Ecossistema Operar / Investir / Os dois |
 | 2026-09-21 | `D-2026-09-21-FIXED-NEURAL-VOICE` | IMPLEMENTADO / EM VALIDAÇÃO | voice | Voz neural oficial fixa e fallback fail-closed |
+| 2026-09-21 | `D-2026-09-21-INTRO-VIDEO-ONBOARDING` | APROVADO / PENDENTE | education | Vídeo curto de onboarding do AtlasQuant |
 | 2026-09-22 | `D-2026-09-22-AGENDA-DIARY-PERFORMANCE` | APROVADO / PENDENTE | interface | Agenda e Di?rio/Performance |
 | 2026-09-22 | `D-2026-09-22-COMMUNITY-WHATSAPP` | APROVADO / PENDENTE | community | Comunidade e WhatsApp |
 | 2026-09-22 | `D-2026-09-22-IMMEDIATE-PRIORITY` | SUBSTITUÍDO | continuity | Prioridade técnica imediata de 22/09/2026 |
@@ -82,7 +85,7 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 | 2026-09-23 | `D-2026-09-23-RADAR-28FX-TOP10` | APROVADO / PENDENTE | trader | Radar oficial 28 pares + TOP 10 |
 | 2026-09-23 | `D-2026-09-23-STUDENT-CONSISTENCY-RANKING` | APROVADO / PENDENTE | education | Ranking de alunos por consist?ncia comprovada |
 | 2026-09-23 | `D-2026-09-23-STUDIO-PUBLISH-APPROVAL` | APROVADO / PENDENTE | studio | Studio cria e mede; publicação exige aprovação |
-| 2026-09-24 | `D-2026-09-24-BUSINESS-MARKETPLACE-IN-ECOSYSTEM` | APROVADO / PENDENTE | business | Marketplace/Vendas passa a integrar AION Neg?cios |
+| 2026-09-24 | `D-2026-09-24-BUSINESS-MARKETPLACE-IN-ECOSYSTEM` | SUBSTITUÍDO | business | Marketplace/Vendas passa a integrar AION Neg?cios |
 | 2026-09-24 | `D-2026-09-24-CONTROLLED-EVOLUTION-DARWIN` | APROVADO / PENDENTE | learning | Evolução contínua controlada |
 | 2026-09-24 | `D-2026-09-24-DIGITAL-INCOME-AREA` | APROVADO / PENDENTE | digital | ?rea Digital/Renda Digital separada |
 | 2026-09-24 | `D-2026-09-24-REALTIME-EVENT-ALERTS` | APROVADO / PENDENTE | market-intelligence | Alertas de not?cias e eventos relevantes 24h |
@@ -109,11 +112,14 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 | 2026-09-29 | `D-2026-09-22-DOCUMENT-PRESERVED` | IMPLEMENTADO / EM VALIDAÇÃO | continuity | Checkpoint Mestre de 22/09/2026 permanece |
 | 2026-09-29 | `D-2026-09-29-AION-CENTRAL-INDEPENDENT` | APROVADO / PENDENTE | aion-core | Central AION independente do Trader |
 | 2026-09-29 | `D-2026-09-29-BLAST-RADIUS-BUDGET-LOOP-GOVERNOR` | APROVADO / PENDENTE | governance | Blast Radius + Budget/Loop Governor |
+| 2026-09-29 | `D-2026-09-29-BUSINESS-TOP5-ONLY` | APROVADO / PENDENTE | business | Negócios limitado às cinco frentes atuais |
 | 2026-09-29 | `D-2026-09-29-CHAOS-DR-RPO-RTO` | APROVADO / PENDENTE | recovery | Chaos/DR com RPO/RTO e recovery fail-closed |
 | 2026-09-29 | `D-2026-09-29-EXECUTABLE-CONSTITUTION-HUMAN-CONTROL` | APROVADO / PENDENTE | governance | Constitui??o execut?vel + Human Control Center |
 | 2026-09-29 | `D-2026-09-29-GITHUB-MAIN-PROTECTION` | APROVADO / PENDENTE | developer | Prote??o administrativa da main |
+| 2026-09-29 | `D-2026-09-29-MARKET-VIDEO-EDITORIAL-PROTOCOL` | APROVADO / PENDENTE | studio | Protocolo editorial recorrente de vídeos de mercado |
 | 2026-09-29 | `D-2026-09-29-MEMORY-QUARANTINE-KNOWLEDGE-VAULT` | APROVADO / PENDENTE | memory | Memory Quarantine + Knowledge Vault |
 | 2026-09-29 | `D-2026-09-29-MODEL-REGISTRY-CANARY` | APROVADO / PENDENTE | models | Model Registry + promo??o can?rio |
+| 2026-09-29 | `D-2026-09-29-PERMANENT-SLOGAN` | APROVADO / PENDENTE | interface | Bordão permanente do ecossistema |
 | 2026-09-29 | `D-2026-09-29-PRIME-SHADOW-SENTINEL` | APROVADO / PENDENTE | aion-core | AION Prime + Shadow + Sentinel com qu?rum |
 | 2026-09-29 | `D-2026-09-29-PROTOCOL-FIREWALL-ACTION-RECEIPT` | APROVADO / PENDENTE | audit | Protocol Firewall + Action Receipt/Flight Recorder |
 | 2026-09-29 | `D-2026-09-29-SUPPLY-CHAIN-SECURITY` | APROVADO / PENDENTE | security | Supply-chain security do AION |
@@ -149,14 +155,19 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 | 2026-09-30 | `D-2026-09-30-CLT-INDEPENDENCE-INDEX` | APROVADO / PENDENTE | finance | Índice de Independência CLT |
 | 2026-09-30 | `D-2026-09-30-FUTURE-BIOMETRIC-CRITICAL-DECISION` | APROVADO / PENDENTE | security | Biometria local futura para decisões críticas |
 | 2026-09-30 | `D-2026-09-30-LIBRARY-OFFICIAL-KNOWLEDGE-FLOW` | IMPLEMENTADO / EM VALIDAÇÃO | library | Fluxo oficial da Biblioteca AION |
+| 2026-10-01 | `D-2026-10-01-AION-ENGLISH` | APROVADO / PENDENTE | education | AION English do zero ao avançado |
 | 2026-10-01 | `D-2026-10-01-LIBRARY-FOUNDATION-INDEX-PDF` | IMPLEMENTADO / EM VALIDAÇÃO | library | Biblioteca AION: Foundation, Index e PDF Ingestion |
 | 2026-10-01 | `D-2026-10-01-LIBRARY-IDENTITY-ACL-DR-BLOCKERS` | DEPENDÊNCIA EXTERNA | security | Identidade durável, ACL e DR continuam bloqueios reais |
 | 2026-10-01 | `D-2026-10-01-NIGHTSHIFT-V1-RECOVERY` | IMPLEMENTADO / EM VALIDAÇÃO | aion-core | AION Core Nightshift V1 recuperado e integrado |
+| 2026-10-02 | `D-2026-10-02-AION-CONTINUOUS-CHAT` | APROVADO / PENDENTE | aion-core | Chat contínuo do AION com arquivos e histórico |
 | 2026-10-02 | `D-2026-10-02-AION-EIGHT-INTERNAL-ROLES` | IMPLEMENTADO / EM VALIDAÇÃO | aion-core | Oito pap?is internos do AION |
 | 2026-10-02 | `D-2026-10-02-DAILY-HISTORICAL-SWEEP` | IMPLEMENTADO / EM VALIDAÇÃO | memory | Varredura hist?rica di?ria desde 15/09 |
 | 2026-10-02 | `D-2026-10-02-DECEMBER-90-PLANNING-TARGET` | APROVADO / PENDENTE | governance | Meta de planejamento superior a 90% at? o fim de dezembro |
+| 2026-10-02 | `D-2026-10-02-FEATURE-FREEZE-UNTIL-CLOSE` | APROVADO / PENDENTE | governance | Congelar novas expansões até finalizar a fila atual |
+| 2026-10-02 | `D-2026-10-02-INTERFACE-REFERENCE-FREEZE` | APROVADO / PENDENTE | interface | Interface guiada pelas imagens de referência aprovadas |
 | 2026-10-02 | `D-2026-10-02-PHASE2-60-20-20` | APROVADO / PENDENTE | governance | Distribui??o p?s-fechamento: 60/20/20 |
-| 2026-10-02 | `D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS` | APROVADO / PENDENTE | governance | Prioridade atual: N?cleo, Interface e Neg?cios em paralelo |
+| 2026-10-02 | `D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS` | SUBSTITUÍDO | governance | Prioridade atual: N?cleo, Interface e Neg?cios em paralelo |
+| 2026-10-02 | `D-2026-10-02-PRIORITY-INTERFACE-FIRST` | APROVADO / PENDENTE | continuity | Prioridade mais recente: Interface primeiro |
 
 ## Lacunas herdadas
 
@@ -172,7 +183,16 @@ Este documento é gerado a partir do registro canônico `aion_historical_commitm
 ## Segurança e precedência
 
 - Requisitos antigos não são apagados quando uma decisão nova os substitui.
-- Pendências de Trader e Investimentos continuam rastreadas mesmo com Núcleo, Interface e Negócios priorizados.
+- Pendências de Trader e Investimentos continuam rastreadas mesmo com Interface, Núcleo e Negócios priorizados.
+- A decisão mais recente de prioridade coloca **Interface primeiro**; Núcleo só avança em paralelo quando não atrasa a Interface; depois retomam Núcleo e Negócios.
+- A aba Negócios atual mantém as cinco frentes definidas em 29/09; a inclusão ampla de marketplace/e-commerce de 24/09 está preservada como **SUBSTITUÍDA**.
+- AION English (#483) e o chat contínuo do AION (#537) permanecem **APROVADOS / PENDENTES**, não implementados.
 - Os oito papéis internos pertencem ao mesmo AION Core; não são oito IAs independentes.
 - Biblioteca não promove conhecimento automaticamente e preserva conflito, quarentena e rejeição para auditoria.
 - Produção tenant, trading real, merge e deploy continuam sujeitos aos gates e autorizações explícitas.
+
+## Reconciliação V2 — decisões recuperadas
+
+A revisão V2 acrescenta decisões explícitas que estavam ausentes ou insuficientemente representadas no registro anterior: conta/sessão/onboarding, vídeo inicial, escopo atual de Negócios, protocolo editorial de mercado, slogan permanente, AION English, referência visual congelada da Interface, prioridade Interface-first, chat contínuo do AION e congelamento de novas expansões até fechar a fila atual.
+
+Fonte complementar: `docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md`.

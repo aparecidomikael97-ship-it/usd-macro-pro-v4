@@ -5,7 +5,7 @@
     "end": "2026-10-02"
   },
   "precedence": "Complementa, sem apagar, os checkpoints e reconciliações anteriores. Aprovação histórica não significa implementação; implementação não significa validação.",
-  "recovered_at": "2026-10-02",
+  "recovered_at": "2026-10-03T00:19:20.169Z",
   "sources": [
     {
       "path": "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
@@ -563,19 +563,21 @@
     {
       "id": "D-2026-09-24-BUSINESS-MARKETPLACE-IN-ECOSYSTEM",
       "title": "Marketplace/Vendas passa a integrar AION Neg?cios",
-      "state": "APROVADO / PENDENTE",
+      "state": "SUBSTITUÍDO",
       "domain": "business",
       "source_date": "2026-09-24",
       "summary": "Decis?o posterior traz Mercado Livre/TikTok Shop e automa??o comercial para a ?rea Neg?cios/Vendas separada do Trade, sob aprova??o para publica??o, gasto, compra ou contrata??o.",
       "evidence": [
         "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
-        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md"
+        "docs/continuidade/AION_CHECKPOINT_ECOSSISTEMA_UX_2026-09-27.md",
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "supersedes": [
         "D-2026-09-22-OUTSIDE-MERCADO-LIVRE"
       ],
       "implemented": false,
-      "validated": false
+      "validated": false,
+      "superseded_by": "D-2026-09-29-BUSINESS-TOP5-ONLY"
     },
     {
       "id": "D-2026-09-24-DIGITAL-INCOME-AREA",
@@ -1305,15 +1307,17 @@
     {
       "id": "D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS",
       "title": "Prioridade atual: N?cleo, Interface e Neg?cios em paralelo",
-      "state": "APROVADO / PENDENTE",
+      "state": "SUBSTITUÍDO",
       "domain": "governance",
       "source_date": "2026-10-02",
       "summary": "At? fechar N?cleo e Interface, essas duas frentes s?o prim?rias; Neg?cios avan?a em paralelo. Trader e Investimentos permanecem rastreados para a fase correta.",
       "evidence": [
-        "AION_CORE_NIGHTSHIFT_CHECKPOINT.json"
+        "AION_CORE_NIGHTSHIFT_CHECKPOINT.json",
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "implemented": false,
-      "validated": false
+      "validated": false,
+      "superseded_by": "D-2026-10-02-PRIORITY-INTERFACE-FIRST"
     },
     {
       "id": "D-2026-10-02-PHASE2-60-20-20",
@@ -1454,6 +1458,142 @@
       "summary": "Sandboxes PostgreSQL/browser não substituem identidade durável, revogação autoritativa, witness externo, tombstone e DR independente.",
       "evidence": [
         "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-20-ACCOUNT-SESSION-ONBOARDING",
+      "title": "Conta individual, sessão/dispositivo e onboarding",
+      "state": "APROVADO / PENDENTE",
+      "domain": "access",
+      "source_date": "2026-09-20",
+      "summary": "Acesso individual por conta, controle de sessão/dispositivo, perfis ADMIN/Vendas/Cliente separados, modos Iniciante/Avançado e onboarding; link compartilhado é entrada/apresentação/login, não compartilhamento irrestrito de conta.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-21-INTRO-VIDEO-ONBOARDING",
+      "title": "Vídeo curto de onboarding do AtlasQuant",
+      "state": "APROVADO / PENDENTE",
+      "domain": "education",
+      "source_date": "2026-09-21",
+      "summary": "Vídeo inicial de aproximadamente 20–30 segundos com legendas, Pular, Não mostrar novamente e área Conheça o AtlasQuant; narrativa humana e menos impulso, mais evidência; publicação externa continua sob aprovação.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-BUSINESS-TOP5-ONLY",
+      "title": "Negócios limitado às cinco frentes atuais",
+      "state": "APROVADO / PENDENTE",
+      "domain": "business",
+      "source_date": "2026-09-29",
+      "summary": "Manter na aba Negócios: automação B2B, captação/Revenue Ops com IA, Micro-SaaS próprio, serviços internacionais de IA e produtos digitais próprios. Remover da aba atual dropshipping, afiliados, TikTok Shop, Mercado Livre/e-commerce genérico, conteúdo genérico, assistente virtual básico e white label.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false,
+      "supersedes": [
+        "D-2026-09-24-BUSINESS-MARKETPLACE-IN-ECOSYSTEM"
+      ]
+    },
+    {
+      "id": "D-2026-09-29-MARKET-VIDEO-EDITORIAL-PROTOCOL",
+      "title": "Protocolo editorial recorrente de vídeos de mercado",
+      "state": "APROVADO / PENDENTE",
+      "domain": "studio",
+      "source_date": "2026-09-29",
+      "summary": "Segunda cedo vídeo mais longo da semana; segunda a sexta expectativa curta do dia; fechamento diário compara expectativa versus realizado; sexta fecha a semana. Produção não autoriza publicação externa sem aprovação.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-09-29-PERMANENT-SLOGAN",
+      "title": "Bordão permanente do ecossistema",
+      "state": "APROVADO / PENDENTE",
+      "domain": "interface",
+      "source_date": "2026-09-29",
+      "summary": "Preservar de forma permanente e visível o bordão “Poderoso por dentro. Simples por fora.” na identidade principal do AtlasQuant/AION.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-01-AION-ENGLISH",
+      "title": "AION English do zero ao avançado",
+      "state": "APROVADO / PENDENTE",
+      "domain": "education",
+      "source_date": "2026-10-01",
+      "summary": "Criar experiência AION English para ensinar inglês do zero/A1 a conversação avançada/C1+, com explicações em PT-BR, progresso persistente, retomada do checkpoint, leitura, escrita, escuta e fases posteriores de voz/pronúncia. Rastreio na issue #483; implementação ainda não concluída.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-INTERFACE-REFERENCE-FREEZE",
+      "title": "Interface guiada pelas imagens de referência aprovadas",
+      "state": "APROVADO / PENDENTE",
+      "domain": "interface",
+      "source_date": "2026-10-02",
+      "summary": "Congelar a arquitetura visual durante o fechamento: usar as imagens aprovadas como referência principal; pós-login com Trader, Negócios, Investimentos e AION separados; Trader é área completa; preservar integralmente o AION Core e reorganizar apenas interface/navegação.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-PRIORITY-INTERFACE-FIRST",
+      "title": "Prioridade mais recente: Interface primeiro",
+      "state": "APROVADO / PENDENTE",
+      "domain": "continuity",
+      "source_date": "2026-10-02",
+      "summary": "Finalizar Interface como prioridade imediata; Núcleo pode avançar em paralelo somente se não atrasar a Interface. Depois do fechamento da Interface, retomar Núcleo e Negócios. Demais áreas continuam rastreadas.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false,
+      "supersedes": [
+        "D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS"
+      ]
+    },
+    {
+      "id": "D-2026-10-02-AION-CONTINUOUS-CHAT",
+      "title": "Chat contínuo do AION com arquivos e histórico",
+      "state": "APROVADO / PENDENTE",
+      "domain": "aion-core",
+      "source_date": "2026-10-02",
+      "summary": "A aba AION deve ter conversa estilo chat com texto/comandos, envio, imagem, arquivo, histórico gravado/reabrível, continuidade e pedidos de tarefas. Não impor limite artificial de mensagens/sessões; contexto técnico deve ser gerido por memória/checkpoints/compactação e recuperação seletiva. Rastreio na issue #537.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
+      ],
+      "implemented": false,
+      "validated": false
+    },
+    {
+      "id": "D-2026-10-02-FEATURE-FREEZE-UNTIL-CLOSE",
+      "title": "Congelar novas expansões até finalizar a fila atual",
+      "state": "APROVADO / PENDENTE",
+      "domain": "governance",
+      "source_date": "2026-10-02",
+      "summary": "Evitar continuar empilhando novas melhorias enquanto a fase atual não estiver finalizada. Novas ideias podem ser registradas no backlog sem interromper a fila; revisão de expansões volta após o fechamento.",
+      "evidence": [
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "implemented": false,
       "validated": false
@@ -1601,11 +1741,13 @@
       "source_paths": [
         "docs/product/ADMIN_EVENT_FOUNDATION_2026-09-20.md",
         "docs/product/GUIDED_ADVANCED_SESSION_RADAR_2026-09-20.md",
-        "docs/product/INVESTMENT_ECOSYSTEM_FOUNDATION_2026-09-20.md"
+        "docs/product/INVESTMENT_ECOSYSTEM_FOUNDATION_2026-09-20.md",
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "closed": false,
       "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
       "commitment_ids": [
+        "D-2026-09-20-ACCOUNT-SESSION-ONBOARDING",
         "D-2026-09-20-EVENT-POSITION-MANAGER",
         "D-2026-09-20-OPERATE-INVEST-BOTH"
       ]
@@ -1614,12 +1756,14 @@
       "date": "2026-09-21",
       "state": "COVERED_WITH_EVIDENCE",
       "source_paths": [
-        "docs/product/FIXED_NEURAL_VOICE_2026-09-21.md"
+        "docs/product/FIXED_NEURAL_VOICE_2026-09-21.md",
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "closed": false,
       "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
       "commitment_ids": [
-        "D-2026-09-21-FIXED-NEURAL-VOICE"
+        "D-2026-09-21-FIXED-NEURAL-VOICE",
+        "D-2026-09-21-INTRO-VIDEO-ONBOARDING"
       ]
     },
     {
@@ -1751,7 +1895,8 @@
       "state": "COVERED_WITH_EVIDENCE",
       "source_paths": [
         "docs/continuidade/CHECKPOINT_MESTRE_RECONCILIACAO_2026-09-29.md",
-        "docs/continuidade/checkpoint_mestre_reconciliation_2026-09-29.json"
+        "docs/continuidade/checkpoint_mestre_reconciliation_2026-09-29.json",
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "closed": false,
       "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
@@ -1759,11 +1904,14 @@
         "D-2026-09-22-DOCUMENT-PRESERVED",
         "D-2026-09-29-AION-CENTRAL-INDEPENDENT",
         "D-2026-09-29-BLAST-RADIUS-BUDGET-LOOP-GOVERNOR",
+        "D-2026-09-29-BUSINESS-TOP5-ONLY",
         "D-2026-09-29-CHAOS-DR-RPO-RTO",
         "D-2026-09-29-EXECUTABLE-CONSTITUTION-HUMAN-CONTROL",
         "D-2026-09-29-GITHUB-MAIN-PROTECTION",
+        "D-2026-09-29-MARKET-VIDEO-EDITORIAL-PROTOCOL",
         "D-2026-09-29-MEMORY-QUARANTINE-KNOWLEDGE-VAULT",
         "D-2026-09-29-MODEL-REGISTRY-CANARY",
+        "D-2026-09-29-PERMANENT-SLOGAN",
         "D-2026-09-29-PRIME-SHADOW-SENTINEL",
         "D-2026-09-29-PROTOCOL-FIREWALL-ACTION-RECEIPT",
         "D-2026-09-29-SUPPLY-CHAIN-SECURITY",
@@ -1816,11 +1964,13 @@
       "date": "2026-10-01",
       "state": "COVERED_WITH_EVIDENCE",
       "source_paths": [
-        "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md"
+        "docs/continuidade/HISTORICAL_EVIDENCE_2026-10-01.md",
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "closed": false,
       "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
       "commitment_ids": [
+        "D-2026-10-01-AION-ENGLISH",
         "D-2026-10-01-LIBRARY-FOUNDATION-INDEX-PDF",
         "D-2026-10-01-LIBRARY-IDENTITY-ACL-DR-BLOCKERS",
         "D-2026-10-01-NIGHTSHIFT-V1-RECOVERY"
@@ -1831,16 +1981,21 @@
       "state": "COVERED_WITH_EVIDENCE",
       "source_paths": [
         "docs/continuidade/AION_HISTORICAL_COMMITMENTS_2026-10-02.md",
-        "docs/continuidade/aion_historical_commitments_2026-10-02.json"
+        "docs/continuidade/aion_historical_commitments_2026-10-02.json",
+        "docs/continuidade/HISTORICAL_EVIDENCE_RECONCILIATION_V2_2026-10-02.md"
       ],
       "closed": false,
       "closure_rule": "Only close after all known commitments for the day are reconciled and evidenced.",
       "commitment_ids": [
+        "D-2026-10-02-AION-CONTINUOUS-CHAT",
         "D-2026-10-02-AION-EIGHT-INTERNAL-ROLES",
         "D-2026-10-02-DAILY-HISTORICAL-SWEEP",
         "D-2026-10-02-DECEMBER-90-PLANNING-TARGET",
+        "D-2026-10-02-FEATURE-FREEZE-UNTIL-CLOSE",
+        "D-2026-10-02-INTERFACE-REFERENCE-FREEZE",
         "D-2026-10-02-PHASE2-60-20-20",
-        "D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS"
+        "D-2026-10-02-PRIORITY-CORE-INTERFACE-BUSINESS",
+        "D-2026-10-02-PRIORITY-INTERFACE-FIRST"
       ]
     }
   ],
@@ -1848,6 +2003,8 @@
     "as_of": "2026-10-02",
     "coverage_complete_for_period": true,
     "historical_days_auto_closed": false,
-    "rule": "Coverage evidence does not close commitments; terminal state still requires explicit evidence."
+    "rule": "Coverage evidence does not close commitments; terminal state still requires explicit evidence.",
+    "revision": "V2_CONVERSATION_RECONCILIATION",
+    "notes": "Complementa o registro de 108 compromissos com decisões explícitas recuperadas de conversas e corrige precedência de Negócios e prioridade de Interface."
   }
 }
