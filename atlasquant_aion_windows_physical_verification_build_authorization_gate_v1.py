@@ -30,6 +30,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from atlasquant_aion_windows_immutable_evidence_receipt_persistence_v1 import (
+    STORE_SCHEMA,
+    RECEIPT_PERSISTENCE_SCHEMA,
     READY_STORE_STATE,
     READY_RECEIPT_PERSISTENCE_STATE,
 )
@@ -210,8 +212,12 @@ def build_gate_contract(
     receipt = dict(receipt_persistence_contract or {})
     blockers: list[str] = []
 
+    if store.get("schema") != STORE_SCHEMA:
+        blockers.append("EVIDENCE_STORE_CONTRACT_SCHEMA_MISMATCH")
     if store.get("state") != READY_STORE_STATE:
         blockers.append("READY_EVIDENCE_STORE_CONTRACT_REQUIRED")
+    if receipt.get("schema") != RECEIPT_PERSISTENCE_SCHEMA:
+        blockers.append("RECEIPT_PERSISTENCE_CONTRACT_SCHEMA_MISMATCH")
     if receipt.get("state") != READY_RECEIPT_PERSISTENCE_STATE:
         blockers.append("READY_RECEIPT_PERSISTENCE_CONTRACT_REQUIRED")
     if receipt.get("receipt_issued") is not False:
@@ -327,7 +333,13 @@ def validate_physical_certificate_shape(
         if _sha256(cert.get(key)) != _sha256(gate.get(key)):
             blockers.append(label)
 
+    certificate_digest = _sha256(cert.get("certificate_digest"))
+    if not certificate_digest:
+        blockers.append("PHYSICAL_CERTIFICATE_DIGEST_REQUIRED")
+
     for key, label in (
+        ("evidence_store_contract_digest", "PHYSICAL_CERTIFICATE_EVIDENCE_STORE_CONTRACT_DIGEST_REQUIRED"),
+        ("receipt_persistence_contract_digest", "PHYSICAL_CERTIFICATE_RECEIPT_PERSISTENCE_CONTRACT_DIGEST_REQUIRED"),
         ("verification_receipt_digest", "VERIFICATION_RECEIPT_DIGEST_REQUIRED"),
         ("verification_receipt_signature_digest", "VERIFICATION_RECEIPT_SIGNATURE_DIGEST_REQUIRED"),
         ("receipt_persistence_attestation_digest", "RECEIPT_PERSISTENCE_ATTESTATION_DIGEST_REQUIRED"),
@@ -340,6 +352,15 @@ def validate_physical_certificate_shape(
     ):
         if not _sha256(cert.get(key)):
             blockers.append(label)
+
+    if _sha256(cert.get("evidence_store_contract_digest")) != _sha256(
+        gate.get("evidence_store_contract_digest")
+    ):
+        blockers.append("PHYSICAL_CERTIFICATE_EVIDENCE_STORE_BINDING_MISMATCH")
+    if _sha256(cert.get("receipt_persistence_contract_digest")) != _sha256(
+        gate.get("receipt_persistence_contract_digest")
+    ):
+        blockers.append("PHYSICAL_CERTIFICATE_RECEIPT_PERSISTENCE_BINDING_MISMATCH")
 
     if int(cert.get("verified_total") or -1) != EXPECTED_VERIFIED_REQUIREMENTS:
         blockers.append("ALL_12_PHYSICAL_REQUIREMENTS_MUST_BE_VERIFIED")
@@ -376,7 +397,7 @@ def validate_physical_certificate_shape(
     blockers = list(dict.fromkeys(blockers))
     material = {
         "gate_contract_digest": _sha256(gate.get("gate_contract_digest")),
-        "certificate_digest": _sha256(cert.get("certificate_digest")),
+        "certificate_digest": certificate_digest,
         "verification_receipt_digest": _sha256(
             cert.get("verification_receipt_digest")
         ),
