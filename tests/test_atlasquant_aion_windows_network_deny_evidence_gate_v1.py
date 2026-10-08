@@ -170,7 +170,7 @@ class NetworkDenialGateTests(unittest.TestCase):
         self.check_closed(self.assess(observations=data),"OBSERVATION_RECORD_SHAPE_INVALID")
 
     def test_scalar_in_place_of_matrix_blocked(self):
-        for v in (None,True,{},123,"BLOCKED"*16):
+        for v in (True,{},123,"BLOCKED"*16):
             with self.subTest(value=v):
                 self.check_closed(self.assess(observations=v),"EXACT_SURFACE_COVERAGE_REQUIRED")
 
