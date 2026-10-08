@@ -84,7 +84,7 @@ def review_local_model_hardware_report(report: Mapping[str, Any] | None) -> dict
         "schema": REVIEW,
         "state": "BLOCKED" if errors else "READ_ONLY_CAPACITY_ADVISORY_UNTRUSTED",
         "advisory_tier": tier, "blockers": blockers,
-        "source": raw.get("source") if raw.get("source") in SOURCES else "",
+        "source": raw.get("source") if type(raw.get("source")) is str and raw.get("source") in SOURCES else "",
         "ram_total_gib":ram if _finite_number(ram,low=0.01,high=4096) else None,
         "system_disk_free_gib":disk if _finite_number(disk,low=0,high=1048576) else None,
         "cpu_logical_processors":cpus if type(cpus) is int and 1 <= cpus <= 4096 else None,
