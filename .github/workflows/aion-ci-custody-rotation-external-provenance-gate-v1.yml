@@ -1,0 +1,80 @@
+name: AION CI Custody Rotation and External Provenance Gate V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_ci_custody_rotation_external_provenance_gate_v1.py"
+      - "tests/test_atlasquant_aion_ci_custody_rotation_external_provenance_gate_v1.py"
+      - "docs/aion/AION_CI_CUSTODY_ROTATION_EXTERNAL_PROVENANCE_GATE_V1.md"
+      - ".github/workflows/aion-ci-custody-rotation-external-provenance-gate-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pure-ci-custody-and-provenance-v1:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify ephemeral test-only toolchain
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import os, sys, cryptography
+          assert sys.version_info[:2] == (3, 12), sys.version
+          assert cryptography.__version__ == "50.0.2"
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows", "Linux")
+          PY
+
+      - name: Compile pure custody/provenance verifier and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_ci_custody_rotation_external_provenance_gate_v1.py \
+            tests/test_atlasquant_aion_ci_custody_rotation_external_provenance_gate_v1.py
+
+      - name: Test synthetic dual signature rotation and external provenance limits
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_ci_custody_rotation_external_provenance_gate_v1.py'
+
+      - name: Deny real key activation, installer, network and native side effects
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_ci_custody_rotation_external_provenance_gate_v1.py").read_text("utf-8")
+          forbidden = (
+              "Ed25519PrivateKey", "generate_private_key",
+              "import subprocess", "from subprocess", "import socket",
+              "from socket", "import requests", "from requests",
+              "urllib.request", "import httpx", "import winreg",
+              "from winreg", "import ctypes", "from ctypes",
+              "import sqlite3", "os.system(", "os.exec",
+              "Path.write_bytes(", "Path.write_text(",
+              "open(", "os.startfile(", "Start-Process ",
+          )
+          for item in forbidden:
+              assert item not in source, item
+          from atlasquant_aion_ci_custody_rotation_external_provenance_gate_v1 import custody_provenance_policy
+          p = custody_provenance_policy()
+          assert p["ci_only"] is True
+          assert p["ephemeral_signing_keys_only"] is True
+          for k, v in p.items():
+              if k not in ("schema", "ci_only", "ephemeral_signing_keys_only"):
+                  assert v is False, k
+          PY
