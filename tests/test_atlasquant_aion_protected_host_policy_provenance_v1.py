@@ -87,7 +87,9 @@ class HostPolicyProvenanceTests(unittest.TestCase):
                ceremony_witness_signature=None,
                ceremony_root_pop_signature=None, ceremony_snapshot_signature=None,
                ceremony_proposal_raw=None, owner_registry_raw=None,
-               raw_policy=None, now=None, store="auto"):
+               raw_policy=None, now=None, store="auto",
+               externally_measured_binary=None,
+               externally_measured_manifest=None):
         f = self.fixture
         case = self.case() if case is None else case
         old = case["old_case"]
@@ -132,6 +134,14 @@ class HostPolicyProvenanceTests(unittest.TestCase):
             ),
             independently_pinned_owner_registry_root_public_key=(
                 public(f.reg_root) if owner_registry_root is None else owner_registry_root
+            ),
+            independently_observed_collector_binary_digest=(
+                f.binary_digest if externally_measured_binary is None
+                else externally_measured_binary
+            ),
+            independently_observed_collector_manifest_digest=(
+                f.manifest_digest if externally_measured_manifest is None
+                else externally_measured_manifest
             ),
             now=self.now if now is None else now,
             ceremony_nonce_store=store,
@@ -211,6 +221,24 @@ class HostPolicyProvenanceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             result = self.invoke(td, expected_authority_fp=digest(b"fake"))
         self.assertEqual(result["reason"], "HOST_POLICY_AUTHORITY_KEY_UNPINNED")
+
+    def test_external_binary_observation_must_match_signed_policy(self):
+        with tempfile.TemporaryDirectory() as td:
+            result = self.invoke(td, externally_measured_binary=digest(b"OTHER-BINARY"))
+        self.assertEqual(result["reason"], "INDEPENDENT_COLLECTOR_MEASUREMENT_MISMATCH")
+        self.no_authority(result)
+
+    def test_external_manifest_observation_must_match_signed_policy(self):
+        with tempfile.TemporaryDirectory() as td:
+            result = self.invoke(td, externally_measured_manifest=digest(b"OTHER-MANIFEST"))
+        self.assertEqual(result["reason"], "INDEPENDENT_COLLECTOR_MEASUREMENT_MISMATCH")
+        self.no_authority(result)
+
+    def test_external_observation_missing_invalid_digest_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            result = self.invoke(td, externally_measured_binary="NOT-A-SHA")
+        self.assertEqual(result["reason"], "PREEXISTING_HOST_PINS_REQUIRED")
+        self.no_authority(result)
 
     def test_owner_registry_root_swapped_rejected(self):
         attacker = Ed25519PrivateKey.generate()
