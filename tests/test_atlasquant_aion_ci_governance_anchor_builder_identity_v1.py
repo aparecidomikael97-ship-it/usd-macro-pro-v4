@@ -14,7 +14,8 @@ import test_atlasquant_aion_ci_publisher_registry_build_witness_v1 as upstream
 from atlasquant_aion_ci_governance_anchor_builder_identity_v1 import (
     SCHEMA, ANCHOR_SCHEMA, BUILD_SCHEMA, SCOPE,
     ANCHOR_READY, BUILD_READY, REVIEW_READY, BLOCKED,
-    ANCHOR_FIELDS, BUILD_FIELDS, _canonical, _digest, _bdigest,
+    ANCHOR_FIELDS, BUILD_FIELDS, ANCHOR_PROOF_FIELDS, BUILD_PROOF_FIELDS,
+    _canonical, _digest, _bdigest,
     verify_ci_governance_anchor, verify_ci_builder_identity,
     review_ci_governance_builder_preflight, governance_builder_policy,
 )
@@ -381,6 +382,31 @@ class AIONCIGovernanceRootBuilderIdentityV1Tests(unittest.TestCase):
         a = dict(self.anchor_proof, real_owner_approval_verified=True)
         self.assert_blocked(self.builder_verify(a=a),
                             "ANCHOR_PROOF_FALSE_TRUST_REQUIRED:real_owner_approval_verified")
+
+    def test_builder_rejects_custodian_as_witness_even_with_rehashed_proof(self):
+        a = dict(self.anchor_proof)
+        a["custodian_review_key_sha256"] = self.w["witness_key_sha256"]
+        a["anchor_proof_digest"] = _digest({
+            k: a.get(k) for k in ANCHOR_PROOF_FIELDS
+        })
+        self.assert_blocked(self.builder_verify(a=a),
+                            "CUSTODIAN_AND_WITNESS_ROLES_MUST_DIFFER")
+
+    def test_review_rechecks_exact_release_subject_even_if_receipt_rehashed(self):
+        b = dict(self.builder_proof, subject_digest=D("f"))
+        b["builder_proof_digest"] = _digest({
+            k: b.get(k) for k in BUILD_PROOF_FIELDS
+        })
+        self.assert_blocked(self.review(b=b),
+                            "RELEASE_ARTIFACT_SUBJECT_DIGEST_MISMATCH")
+
+    def test_review_rejects_reused_builder_witness_key_even_when_rehashed(self):
+        b = dict(self.builder_proof, builder_public_key_sha256=self.w["witness_key_sha256"])
+        b["builder_proof_digest"] = _digest({
+            k: b.get(k) for k in BUILD_PROOF_FIELDS
+        })
+        self.assert_blocked(self.review(b=b),
+                            "FIVE_CI_KEY_ROLES_MUST_BE_DISTINCT")
 
     def test_review_rejects_old_external_anchor(self):
         self.assert_blocked(self.review(external_anchor_digest=D("f")),
