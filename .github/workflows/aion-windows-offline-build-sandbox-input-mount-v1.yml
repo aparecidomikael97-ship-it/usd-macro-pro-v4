@@ -1,0 +1,127 @@
+name: AION Windows Offline Build Sandbox Input Mount V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_offline_build_sandbox_input_mount_v1.py"
+      - "tests/test_atlasquant_aion_windows_offline_build_sandbox_input_mount_v1.py"
+      - "docs/aion/AION_WINDOWS_OFFLINE_BUILD_SANDBOX_INPUT_MOUNT_V1.md"
+      - ".github/workflows/aion-windows-offline-build-sandbox-input-mount-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-offline-build-sandbox-input-mount-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact contract import dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile offline build sandbox contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_offline_build_sandbox_input_mount_v1.py \
+            tests/test_atlasquant_aion_windows_offline_build_sandbox_input_mount_v1.py
+
+      - name: Run offline build sandbox contract tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_offline_build_sandbox_input_mount_v1.py'
+
+      - name: Assert sandbox layer remains non-executing and network-free
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_offline_build_sandbox_input_mount_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+              "win32job",
+              "win32process",
+              "win32security",
+              "win32net",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          forbidden_live_material = (
+              "api.github.com",
+              "pypi.org",
+              "python.org/ftp",
+          )
+          for marker in forbidden_live_material:
+              assert marker not in source, marker
+
+          # Credential-bearing environment names are present only as denylist
+          # entries and therefore must exist in the source.
+          assert '"GITHUB_TOKEN",' in source
+          assert '"GH_TOKEN",' in source
+
+          required = (
+              '"cache_read_only_required": True',
+              '"source_read_only_required": True',
+              '"runtime_read_only_required": True',
+              '"output_temp_only_writable": True',
+              '"unc_paths_allowed": False',
+              '"symlink_escape_allowed": False',
+              '"reparse_point_escape_allowed": False',
+              '"hardlink_escape_allowed": False',
+              '"alternate_data_streams_allowed": False',
+              '"parent_environment_inheritance_allowed": False',
+              '"caller_environment_overrides_allowed": False',
+              '"path_lookup_allowed": False',
+              '"shell_allowed": False',
+              '"powershell_allowed": False',
+              '"cmd_exe_allowed": False',
+              '"arbitrary_process_spawn_allowed": False',
+              '"child_process_allowed": False',
+              '"network_allowed": False',
+              '"dns_allowed": False',
+              '"tcp_allowed": False',
+              '"udp_allowed": False',
+              '"loopback_allowed": False',
+              '"physical_windows_sandbox_verified": False',
+              '"restricted_token_created": False',
+              '"job_object_created": False',
+              '"read_only_mounts_created": False',
+              '"network_isolation_physically_verified": False',
+              '"build_authorized": False',
+              '"build_started": False',
+              '"package_built": False',
+              '"package_installed": False',
+              '"process_spawned": False',
+              '"filesystem_modified": False',
+              '"network_called": False',
+              '"github_api_called": False',
+              '"live_repository_mutation_performed": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
