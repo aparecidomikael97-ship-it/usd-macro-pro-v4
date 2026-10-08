@@ -1,0 +1,65 @@
+name: AION Owner Signed Intent Exact Command Binding V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_signed_intent_guard_v1.py"
+      - "tests/test_atlasquant_aion_owner_signed_intent_guard_v1.py"
+      - "docs/aion/AION_OWNER_SIGNED_INTENT_COMMAND_BINDING_V1.md"
+      - ".github/workflows/aion-owner-signed-intent-command-binding-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  signed-command-proof-offline:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Gate scratch CI only
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv("GITHUB_ACTIONS") == "true"
+          assert os.getenv("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.getenv("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Install ephemeral dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2" "streamlit==1.64.0"
+      - name: Compile new guard and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_signed_intent_guard_v1.py \
+            tests/test_atlasquant_aion_owner_signed_intent_guard_v1.py
+      - name: Test 28 signed intent variants against existing bridge
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_signed_intent_guard_v1.py'
+      - name: Guard against OS mutation or network provider imports
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path("atlasquant_aion_owner_signed_intent_guard_v1.py").read_text("utf-8"))
+          forbidden = {"subprocess","socket","requests","httpx","urllib","ctypes",
+                       "winreg","boto3","shutil","os","streamlit"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(a.name.split(".")[0] not in forbidden for a in node.names)
+              elif isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+          PY
