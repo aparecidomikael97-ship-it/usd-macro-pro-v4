@@ -192,11 +192,14 @@ class SQLiteCollectorChallengeReplay:
         if not name or name == ":memory:" or name.startswith("file:"):
             raise ValueError("EXPLICIT_DURABLE_DATABASE_REQUIRED")
         self.path = name
-        with sqlite3.connect(name, timeout=10, isolation_level=None) as db:
+        db = sqlite3.connect(name, timeout=10, isolation_level=None)
+        try:
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
             db.execute("CREATE TABLE IF NOT EXISTS consumed_challenges ("
                        "nonce_key TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
+        finally:
+            db.close()
 
     def consume_once(self, nonce_key: str, expiry: int, now: int) -> bool:
         if not _valid_digest(nonce_key) or type(expiry) is not int or type(now) is not int or now > expiry:
