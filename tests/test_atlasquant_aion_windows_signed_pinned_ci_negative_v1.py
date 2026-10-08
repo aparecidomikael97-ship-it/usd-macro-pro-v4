@@ -201,9 +201,15 @@ class SignedPinnedExecutableTests(unittest.TestCase):
         self.assertEqual(self.result(m)["reason"],"EXACT_SIGNED_MANIFEST_FIELDS_REQUIRED")
 
     def test_non_dict_manifest_rejected(self):
-        for m in (None,[],True,"a",100,()):
+        for m in (None, [], True, "a", 100, ()):
             with self.subTest(value=str(m)):
-                self.assertEqual(self.result(m)["reason"],"EXACT_SIGNED_MANIFEST_FIELDS_REQUIRED")
+                self.assertEqual(
+                    check_signed_ci_negative_intent(
+                        m, b"", b"", observed_image_path="",
+                        observed_image_sha256="", now=1050,
+                    )["reason"],
+                    "EXACT_SIGNED_MANIFEST_FIELDS_REQUIRED",
+                )
 
     def test_invalid_observed_sha256_format_rejected(self):
         for val in (None,True,"0"*63,"0"*65,{}):
