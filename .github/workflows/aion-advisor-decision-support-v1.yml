@@ -1,0 +1,84 @@
+name: AION Advisor Decision Support V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_advisor_decision_support_v1.py"
+      - "tests/test_atlasquant_aion_advisor_decision_support_v1.py"
+      - "docs/aion/AION_ADVISOR_DECISION_SUPPORT_V1.md"
+      - ".github/workflows/aion-advisor-decision-support-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  advisor-decision-support-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile advisor contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_advisor_decision_support_v1.py \
+            tests/test_atlasquant_aion_advisor_decision_support_v1.py
+
+      - name: Run advisor contract tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_advisor_decision_support_v1.py'
+
+      - name: Assert advice-only boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_advisor_decision_support_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import requests",
+              "urllib.request",
+              "import smtplib",
+              "import win32com",
+              "import pyautogui",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"recommendation_is_approval": False',
+              '"approval_is_execution": False',
+              '"owner_decision_required": True',
+              '"single_point_success_probability_used": False',
+              '"false_precision_allowed": False',
+              '"legal_conclusion_issued": False',
+              '"action_authorized": False',
+              '"automatic_execution": False',
+              '"trading_order_authorized": False',
+              '"payment_authorized": False',
+              '"contract_signed": False',
+              '"message_sent": False',
+              '"provider_called": False',
+              '"network_called": False',
+              '"memory_written": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
