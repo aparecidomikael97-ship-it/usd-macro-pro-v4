@@ -388,6 +388,15 @@ def review_ci_custody_provenance(
         type(c.get("next_epoch")) is not int or
         c.get("next_epoch") < minimum_expected_custody_epoch):
         errors.append("CUSTODY_EPOCH_BELOW_EXPECTED_MINIMUM")
+    role_keys = (
+        c.get("old_root_key_sha256"), c.get("new_root_key_sha256"),
+        a.get("custodian_review_key_sha256"),
+        a.get("governance_key_sha256"), a.get("publisher_key_sha256"),
+        b.get("builder_public_key_sha256"), b.get("witness_key_sha256"),
+        p.get("fixture_signer_key_sha256"),
+    )
+    if any(not _sha(k) for k in role_keys) or len(set(role_keys)) != len(role_keys):
+        errors.append("EIGHT_CI_KEY_ROLES_MUST_BE_DISTINCT")
     for k, val in (
         ("external_issuer_policy_digest", external_issuer_policy_digest),
         ("independent_publisher_approval_policy_digest", independent_publisher_approval_policy_digest),
