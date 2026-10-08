@@ -32,7 +32,7 @@ class AionCognitiveContinuityV1Tests(unittest.TestCase):
             domain="CORE",
             source_refs=["decision:crm-canonical"],
             memory_key="semantic:crm",
-            promotion_state="PROMOTED",
+            promotion_state="UNGOVERNED",
         )
         memory = remember(
             memory,
@@ -45,7 +45,7 @@ class AionCognitiveContinuityV1Tests(unittest.TestCase):
             domain="CORE",
             source_refs=["session:2026-10-08"],
             memory_key="episode:greeting-review",
-            promotion_state="PROMOTED",
+            promotion_state="UNGOVERNED",
         )
         memory = remember(
             memory,
@@ -58,7 +58,7 @@ class AionCognitiveContinuityV1Tests(unittest.TestCase):
             domain="CORE",
             source_refs=["owner-experience-v1"],
             memory_key="decision:secure-local-agent",
-            promotion_state="PROMOTED",
+            promotion_state="UNGOVERNED",
         )
         return memory
 
@@ -119,8 +119,14 @@ class AionCognitiveContinuityV1Tests(unittest.TestCase):
         self.assertEqual(snapshot["counts"]["EPISODIC"], 1)
         self.assertEqual(snapshot["counts"]["PROCEDURAL"], 1)
         self.assertEqual(snapshot["counts"]["DECISION"], 1)
-        self.assertTrue(
+        self.assertFalse(
             snapshot["channels"]["SEMANTIC"][0]["used_as_current_fact"]
+        )
+        self.assertFalse(
+            snapshot["channels"]["EPISODIC"][0]["used_as_current_fact"]
+        )
+        self.assertFalse(
+            snapshot["channels"]["DECISION"][0]["used_as_current_fact"]
         )
         self.assertTrue(
             snapshot["channels"]["PROCEDURAL"][0]["used_as_current_fact"]
