@@ -264,6 +264,21 @@ def validate_postinstall_evidence_shape(
         errors.append("VERIFICATION_PLAN_REQUIRED")
     checks = _rows(p.get("checks"))
     expected_ids = [c.get("check_id") for c in checks]
+    plan_material = {key: p.get(key) for key in (
+        "installation_id", "journal_plan_digest", "completion_gate_digest",
+        "reopen_policy_digest", "health_policy_digest",
+        "independent_verifier_manifest_digest", "checks",
+    )}
+    if not _sha(p.get("verification_plan_digest")) or p.get("verification_plan_digest") != _digest(plan_material):
+        errors.append("VERIFICATION_PLAN_DIGEST_MISMATCH")
+    if set("GLOBAL:" + x for x in GLOBAL_CHECKS) != set(
+        x for x in expected_ids if isinstance(x, str) and x.startswith("GLOBAL:")
+    ):
+        errors.append("MANDATORY_GLOBAL_REOPEN_SCOPE_MISSING")
+    if not any(isinstance(x, str) and x.startswith("TARGET:") for x in expected_ids):
+        errors.append("TARGET_REOPEN_SCOPE_MISSING")
+    if len(expected_ids) != len(set(map(str, expected_ids))):
+        errors.append("DUPLICATE_PLAN_CHECKS")
     actual_ids = [r.get("check_id") for r in rows]
     if len(rows) != len(checks) or len(set(map(str, actual_ids))) != len(actual_ids) or actual_ids != expected_ids:
         errors.append("CHECK_COVERAGE_ORDER_OR_DUPLICATE_FAILURE")
@@ -318,6 +333,14 @@ def build_rollback_terminal_receipt_candidate(
         errors.append("RECOVERY_CONTRACT_REQUIRED")
     if recovery.get("journal_plan_digest") != p.get("journal_plan_digest") or recovery.get("installation_id") != p.get("installation_id"):
         errors.append("RECOVERY_PLAN_MISMATCH")
+    recovery_material = {key: recovery.get(key) for key in (
+        "journal_plan_digest", "operation_observation_digest", "installation_id",
+        "failed_or_unknown_sequence", "rollback_sequences",
+        "journal_reopen_policy_digest", "filesystem_readback_policy_digest",
+        "rollback_executor_manifest_digest",
+    )}
+    if not _sha(recovery.get("recovery_contract_digest")) or recovery.get("recovery_contract_digest") != _digest(recovery_material):
+        errors.append("RECOVERY_CONTRACT_DIGEST_MISMATCH")
     n = recovery.get("failed_or_unknown_sequence")
     expected = list(range(n, 0, -1)) if type(n) is int and 1 <= n <= len(_rows(p.get("operations"))) else []
     if not expected or recovery.get("rollback_sequences") != expected:
@@ -399,6 +422,8 @@ def build_terminal_install_receipt_candidate(
             or v.get("completion_gate_digest") != gate.get("completion_gate_digest")
             or v.get("journal_plan_digest") != gate.get("journal_plan_digest")
             or not _sha(v.get("verification_evidence_candidate_digest"))
+            or gate.get("journal_complete_shape_only") is not True
+            or v.get("all_checks_shape_matched") is not True
             or r or f):
             errors.append("EXHAUSTIVE_POSTINSTALL_REOPEN_PROOF_SHAPE_REQUIRED")
         disposition = SUCCESS_CANDIDATE
@@ -411,6 +436,8 @@ def build_terminal_install_receipt_candidate(
         if (not _sha(f.get("authoritative_failure_receipt_digest"))
             or not _sha(f.get("independent_no_write_evidence_digest"))
             or not _sha(f.get("no_residual_changes_reopen_receipt_digest"))
+            or f.get("installation_id") != installation_id
+            or not _sha(f.get("install_commitment_digest"))
             or f.get("failure_before_first_mutation") is not True
             or f.get("no_write_authoritatively_proven") is not True
             or f.get("no_residual_changes_after_reopen") is not True
@@ -426,6 +453,7 @@ def build_terminal_install_receipt_candidate(
         "requested_disposition": requested,
         "candidate_disposition": disposition if not errors else UNKNOWN,
         "completion_gate_digest": _sha(gate.get("completion_gate_digest")),
+        "journal_plan_digest": _sha(gate.get("journal_plan_digest")) or _sha(r.get("journal_plan_digest")) or _sha(f.get("journal_plan_digest")),
         "postinstall_evidence_digest": _sha(v.get("verification_evidence_candidate_digest")),
         "rollback_receipt_digest": _sha(r.get("rollback_receipt_candidate_digest")),
         "failure_evidence_digest": _digest(f) if f else "",
