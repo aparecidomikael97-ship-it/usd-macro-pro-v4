@@ -1,0 +1,109 @@
+name: AION Windows CI Authenticode Binary Integrity Preflight V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_ci_authenticode_integrity_preflight_v1.py"
+      - "tests/test_atlasquant_aion_windows_ci_authenticode_integrity_preflight_v1.py"
+      - "scripts/aion_windows_ci_authenticode_integrity_fixture_v1.ps1"
+      - "docs/aion/AION_WINDOWS_CI_AUTHENTICODE_BINARY_INTEGRITY_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-windows-ci-authenticode-integrity-preflight-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-authenticode-test-only:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate CI-hosted Windows scope and compile
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, sys
+          assert os.name == "nt" and sys.platform == "win32"
+          assert sys.version_info[:2] == (3, 12)
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["RUNNER_OS"] == "Windows"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.path.isdir(os.environ["RUNNER_TEMP"])
+          PY
+          python -m py_compile \
+            atlasquant_aion_windows_ci_authenticode_integrity_preflight_v1.py \
+            tests/test_atlasquant_aion_windows_ci_authenticode_integrity_preflight_v1.py
+
+      - name: Collect signed OS binary and one-byte tamper control
+        shell: pwsh
+        env:
+          AION_CI_AUTHENTICODE_FIXTURE: "1"
+        run: |
+          & "./scripts/aion_windows_ci_authenticode_integrity_fixture_v1.ps1"
+
+      - name: Run CI signed system binary and tamper adversarial tests
+        shell: bash
+        env:
+          AION_CI_AUTHENTICODE_FIXTURE: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_ci_authenticode_integrity_preflight_v1.py'
+
+      - name: Assert no production install, mutating Windows API or false trust
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_windows_ci_authenticode_integrity_preflight_v1.py").read_text("utf-8")
+          fixture = Path("scripts/aion_windows_ci_authenticode_integrity_fixture_v1.ps1").read_text("utf-8")
+          forbidden_python = (
+              "import subprocess", "import socket", "import requests",
+              "import winreg", "import ctypes", "from ctypes",
+              "os.system(", "os.exec", "Path.write_bytes(", "Path.write_text(",
+          )
+          forbidden_ps = (
+              "Start-Process ", "Invoke-WebRequest ", "Invoke-RestMethod ",
+              "Set-Acl ", "New-Service ", "Set-Service ", "Set-ItemProperty ",
+              "Set-AuthenticodeSignature ", "Restart-Computer ",
+              "Stop-Computer ", "New-ScheduledTask ", "Register-ScheduledTask ",
+              "Start-Service ", "Set-ExecutionPolicy ",
+          )
+          for s in forbidden_python: assert s not in source, s
+          for s in forbidden_ps: assert s not in fixture, s
+          from atlasquant_aion_windows_ci_authenticode_integrity_preflight_v1 import ci_authenticode_policy
+          p = ci_authenticode_policy()
+          assert p["ci_only"] is True
+          for name in (
+              "observed_signature_is_owner_attestation", "ci_binary_is_aion_artifact",
+              "ci_signer_is_aion_publisher", "get_authenticode_status_is_authoritative_release_pin",
+              "tampered_copy_executed", "owner_device_accessed", "aion_installed",
+              "signer_certificate_is_aion_pinned",
+              "physical_aion_signature_verified",
+              "trusted_independent_attestation_issued", "release_can_install",
+              "owner_token_consumed", "install_token_consumed",
+              "registry_changed", "acl_changed", "startup_changed",
+              "worker_activated", "deploy_executed",
+          ):
+              assert p[name] is False, name
+          PY
+
+      - name: Remove all ephemeral signer fixtures
+        if: always()
+        shell: pwsh
+        run: |
+          $root = $env:AION_AUTHENTICODE_FIXTURE_ROOT
+          if ($root -and (Test-Path -LiteralPath $root)) {
+            $parent = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\','/')
+            $resolved = [IO.Path]::GetFullPath($root)
+            if ($resolved.StartsWith($parent + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
+                ([IO.Path]::GetFileName($resolved) -like 'aion-wintrust-ci-*')) {
+              Remove-Item -LiteralPath $resolved -Recurse -Force
+            } else {
+              throw 'UNSAFE_SCRATCH_CLEANUP_PATH_REJECTED'
+            }
+          }
