@@ -1,0 +1,87 @@
+name: AION Voice Hotword Runtime V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_voice_hotword_runtime_v1.py"
+      - "tests/test_atlasquant_aion_voice_hotword_runtime_v1.py"
+      - "docs/aion/AION_VOICE_HOTWORD_RUNTIME_V1.md"
+      - ".github/workflows/aion-voice-hotword-runtime-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  aion-voice-hotword-runtime-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile voice runtime
+        run: |
+          python -m py_compile \
+            atlasquant_aion_voice_hotword_runtime_v1.py \
+            tests/test_atlasquant_aion_voice_hotword_runtime_v1.py
+
+      - name: Run voice runtime tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_voice_hotword_runtime_v1.py'
+
+      - name: Assert non-executing voice boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_voice_hotword_runtime_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import pyaudio",
+              "import sounddevice",
+              "import speech_recognition",
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import requests",
+              "urllib.request",
+              "win32api",
+              "win32com",
+              "ctypes",
+              "psutil",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              'HOTWORD = "AION"',
+              '"hotword_is_authentication": False',
+              '"wake_word_grants_authority": False',
+              '"background_listening_supported_v1": False',
+              '"raw_audio_persistence_allowed": False',
+              '"raw_transcript_persistence_allowed": False',
+              '"generic_device_tts_fallback_allowed": False',
+              '"trading_order_authority": False',
+              '"payment_authority": False',
+              '"microphone_opened": False',
+              '"hotword_listener_started": False',
+              '"asr_provider_called": False',
+              '"tts_provider_called": False',
+              '"audio_playback_started": False',
+              '"background_worker_started": False',
+              '"network_called": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
