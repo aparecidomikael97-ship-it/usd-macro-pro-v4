@@ -74,6 +74,30 @@ REVIEW_DENIALS = (
     "owner_device_accessed", "production_key_generated",
     "package_installed", "worker_activated", "deploy_executed",
 )
+REGISTRY_REQUIRED_TRUE = ("ci_signature_verified_against_supplied_root",)
+REGISTRY_REQUIRED_FALSE = (
+    "publisher_registry_root_trusted",
+    "registry_antirollback_authoritatively_persisted",
+    "real_publisher_key_approved",
+    "revocation_checked_against_real_authority",
+    "owner_install_authorization_consumed",
+    "worker_activated", "deploy_executed",
+)
+WITNESS_REQUIRED_TRUE = ("witness_signed_by_supplied_separate_ci_key",)
+WITNESS_REQUIRED_FALSE = (
+    "external_build_witness_identity_trusted",
+    "witness_identity_verified_independent",
+    "real_slsa_attestation_verified",
+    "real_release_authorized",
+    "replay_protection_authoritative",
+    "owner_device_accessed", "worker_activated", "deploy_executed",
+)
+REGISTRY_PROOF_KEYS = set(REGISTRY_PROOF_FIELDS) | {
+    "schema", "state", "blockers", "registry_proof_candidate_digest",
+} | set(REGISTRY_REQUIRED_TRUE) | set(REGISTRY_REQUIRED_FALSE)
+WITNESS_PROOF_KEYS = set(WITNESS_PROOF_FIELDS) | {
+    "schema", "state", "blockers", "witness_proof_candidate_digest",
+} | set(WITNESS_REQUIRED_TRUE) | set(WITNESS_REQUIRED_FALSE)
 
 def _canonical_bytes(o: Any) -> bytes:
     return json.dumps(o, sort_keys=True, separators=(",", ":"),
@@ -366,10 +390,38 @@ def build_ci_publisher_and_build_review(
 ) -> dict[str, Any]:
     g, w, r = map(_map, (registry_proof, witness_proof, release_candidate))
     errors = []
+    if set(g) != REGISTRY_PROOF_KEYS:
+        errors.append("EXACT_REGISTRY_PROOF_FIELDS_REQUIRED")
+    if set(w) != WITNESS_PROOF_KEYS:
+        errors.append("EXACT_WITNESS_PROOF_FIELDS_REQUIRED")
     if g.get("schema") != SCHEMA or g.get("state") != REGISTRY_READY or g.get("blockers") != []:
         errors.append("REGISTRY_PROOF_SHAPE_REQUIRED")
     if w.get("schema") != SCHEMA or w.get("state") != WITNESS_READY or w.get("blockers") != []:
         errors.append("WITNESS_PROOF_SHAPE_REQUIRED")
+    for name in REGISTRY_REQUIRED_TRUE:
+        if g.get(name) is not True:
+            errors.append("REGISTRY_POSITIVE_SHAPE_REQUIRED:" + name)
+    for name in REGISTRY_REQUIRED_FALSE:
+        if g.get(name) is not False:
+            errors.append("PROOF_SELF_TRUST_PROMOTION_FORBIDDEN:" + name)
+    for name in WITNESS_REQUIRED_TRUE:
+        if w.get(name) is not True:
+            errors.append("WITNESS_POSITIVE_SHAPE_REQUIRED:" + name)
+    for name in WITNESS_REQUIRED_FALSE:
+        if w.get(name) is not False:
+            errors.append("PROOF_SELF_TRUST_PROMOTION_FORBIDDEN:" + name)
+    if set(r) != VERIFICATION_KEYS or r.get("schema") != RELEASE_SCHEMA or r.get("state") != RELEASE_READY or r.get("blockers") != []:
+        errors.append("CI_RELEASE_EVIDENCE_FIELDS_INVALID")
+    if r.get("candidate_evidence_digest") != _digest({
+        name: r.get(name) for name in EVIDENCE_KEYS
+    }):
+        errors.append("CI_RELEASE_EVIDENCE_DIGEST_INVALID")
+    for name in VERIFICATION_DENIAL_FLAGS:
+        if r.get(name) is not False:
+            errors.append("CI_RELEASE_TRUST_PROMOTION_FORBIDDEN:" + name)
+    for name in VERIFICATION_TRUTH_FLAGS:
+        if r.get(name) is not True:
+            errors.append("CI_RELEASE_SHAPE_REQUIRED:" + name)
     if g.get("registry_proof_candidate_digest") != _digest({
         name: g.get(name) for name in REGISTRY_PROOF_FIELDS
     }):
