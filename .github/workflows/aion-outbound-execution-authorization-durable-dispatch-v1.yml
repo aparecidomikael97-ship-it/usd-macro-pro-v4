@@ -1,0 +1,90 @@
+name: AION Outbound Execution Authorization Durable Dispatch V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py"
+      - "tests/test_atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py"
+      - "docs/aion/AION_OUTBOUND_EXECUTION_AUTHORIZATION_DURABLE_DISPATCH_V1.md"
+      - ".github/workflows/aion-outbound-execution-authorization-durable-dispatch-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  outbound-execution-authorization-durable-dispatch-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile outbound execution contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py \
+            tests/test_atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py
+
+      - name: Run outbound execution tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py'
+
+      - name: Assert no-write no-provider boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_outbound_execution_authorization_durable_dispatch_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import sqlite3",
+              "from sqlite3",
+              "import smtplib",
+              "import requests",
+              "urllib.request",
+              "import socket",
+              "import subprocess",
+              "from subprocess",
+              "import win32com",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"authorization_persisted": False',
+              '"persistence_attested": False',
+              '"authorization_persisted_by_this_module": False',
+              '"raw_recipient_included": False',
+              '"raw_endpoint_included": False',
+              '"raw_credential_included": False',
+              '"raw_payload_included": False',
+              '"authorization_persistence_attestation_required": True',
+              '"authorization_consumption_required_atomically_with_write": True',
+              '"durable_store_write_required": True',
+              '"outcome_unknown_automatic_retry_allowed": False',
+              '"outcome_unknown_requires_explicit_reconciliation": True',
+              '"provider_call_allowed_after_this_module": False',
+              '"dispatch_record_written": False',
+              '"authorization_consumed": False',
+              '"provider_called": False',
+              '"network_called": False',
+              '"message_sent": False',
+              '"contract_exported": False',
+              '"signature_requested": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
