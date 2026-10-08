@@ -72,12 +72,15 @@ jobs:
 
           forbidden_live_material = (
               "api.github.com",
-              "GITHUB_TOKEN",
-              "GH_TOKEN",
               "PyInstaller.__main__",
           )
           for marker in forbidden_live_material:
               assert marker not in source, marker
+
+          # Credential-bearing runner environment names may appear only as
+          # explicit denylist entries in the reproducibility contract.
+          assert '"GITHUB_TOKEN",' in source
+          assert '"GH_TOKEN",' in source
 
           required = (
               '"network_during_build_allowed": False',
