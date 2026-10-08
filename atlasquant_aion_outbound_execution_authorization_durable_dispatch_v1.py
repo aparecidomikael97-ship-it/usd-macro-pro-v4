@@ -244,9 +244,93 @@ def build_fresh_outbound_execution_authorization(
     }
 
 
+def build_authorization_persistence_attestation(
+    authorization: Mapping[str, Any] | None,
+    *,
+    persisted_record_digest: Any,
+    writer_attestation_digest: Any,
+    persisted_at: Any,
+    read_after_write_verified: bool,
+    atomic_write_or_cas_verified: bool,
+    writer_identity_verified: bool,
+    now: Any,
+) -> dict[str, Any]:
+    """Represent external proof that fresh authorization was durably stored."""
+    auth = dict(authorization or {})
+    blockers: list[str] = []
+
+    if auth.get("schema") != AUTH_SCHEMA:
+        blockers.append("AUTHORIZATION_SCHEMA_MISMATCH")
+    if auth.get("state") != "FRESH_EXECUTION_INTENT_VERIFIED":
+        blockers.append("FRESH_EXECUTION_INTENT_REQUIRED")
+    if auth.get("fresh_execution_intent_verified") is not True:
+        blockers.append("FRESH_EXECUTION_INTENT_FLAG_REQUIRED")
+    if auth.get("authorization_consumed") is not False:
+        blockers.append("AUTHORIZATION_ALREADY_CONSUMED")
+
+    auth_digest = _sha256(auth.get("authorization_digest"))
+    record_digest = _sha256(persisted_record_digest)
+    writer_digest = _sha256(writer_attestation_digest)
+    if not auth_digest:
+        blockers.append("AUTHORIZATION_DIGEST_REQUIRED")
+    if not record_digest:
+        blockers.append("PERSISTED_RECORD_DIGEST_REQUIRED")
+    if not writer_digest:
+        blockers.append("WRITER_ATTESTATION_DIGEST_REQUIRED")
+    if read_after_write_verified is not True:
+        blockers.append("READ_AFTER_WRITE_VERIFICATION_REQUIRED")
+    if atomic_write_or_cas_verified is not True:
+        blockers.append("ATOMIC_WRITE_OR_CAS_REQUIRED")
+    if writer_identity_verified is not True:
+        blockers.append("WRITER_IDENTITY_VERIFICATION_REQUIRED")
+
+    try:
+        persisted = _aware(persisted_at, "persisted_at")
+        current = _aware(now, "now")
+        issued = _aware(auth.get("issued_at"), "authorization_issued_at")
+        expires = _aware(auth.get("expires_at"), "authorization_expires_at")
+        if persisted < issued:
+            blockers.append("AUTHORIZATION_PERSISTED_BEFORE_ISSUE")
+        if persisted > expires:
+            blockers.append("AUTHORIZATION_PERSISTED_AFTER_EXPIRY")
+        if current < persisted:
+            blockers.append("PERSISTENCE_ATTESTATION_FROM_FUTURE")
+        if current > expires:
+            blockers.append("AUTHORIZATION_EXPIRED_AFTER_PERSISTENCE")
+    except ValueError:
+        persisted = None
+        blockers.append("AUTHORIZATION_PERSISTENCE_TIME_INVALID")
+
+    blockers = list(dict.fromkeys(blockers))
+    material = {
+        "authorization_digest": auth_digest,
+        "persisted_record_digest": record_digest,
+        "writer_attestation_digest": writer_digest,
+        "persisted_at": persisted.isoformat() if persisted else "",
+        "read_after_write_verified": read_after_write_verified is True,
+        "atomic_write_or_cas_verified": atomic_write_or_cas_verified is True,
+        "writer_identity_verified": writer_identity_verified is True,
+    }
+    return {
+        "schema": AUTH_PERSISTENCE_SCHEMA,
+        "state": "PERSISTED_AUTHORIZATION_ATTESTED" if not blockers else "BLOCKED",
+        "blockers": blockers,
+        **material,
+        "persistence_attestation_digest": _digest(material) if not blockers else "",
+        "authorization_persisted_by_this_module": False,
+        "authorization_consumed": False,
+        "dispatch_record_written": False,
+        "provider_called": False,
+        "network_called": False,
+        "external_action_executed": False,
+        "executes_action": False,
+    }
+
+
 def build_sealed_payload_attestation(
     bridge: Mapping[str, Any] | None,
     authorization: Mapping[str, Any] | None,
+    authorization_persistence: Mapping[str, Any] | None,
     *,
     payload_digest: Any,
     payload_schema_ref: Any,
@@ -263,6 +347,7 @@ def build_sealed_payload_attestation(
     """Bind opaque digests for a future wire payload without exposing secrets."""
     bridge_row = dict(bridge or {})
     auth = dict(authorization or {})
+    persistence = dict(authorization_persistence or {})
     blockers: list[str] = []
 
     if verify_outbound_dispatch_bridge(bridge_row).get("valid") is not True:
@@ -279,6 +364,17 @@ def build_sealed_payload_attestation(
         bridge_row.get("bridge_digest")
     ):
         blockers.append("AUTHORIZATION_BRIDGE_DIGEST_MISMATCH")
+
+    if persistence.get("schema") != AUTH_PERSISTENCE_SCHEMA:
+        blockers.append("AUTHORIZATION_PERSISTENCE_SCHEMA_MISMATCH")
+    if persistence.get("state") != "PERSISTED_AUTHORIZATION_ATTESTED":
+        blockers.append("PERSISTED_AUTHORIZATION_ATTESTATION_REQUIRED")
+    if _sha256(persistence.get("authorization_digest")) != _sha256(
+        auth.get("authorization_digest")
+    ):
+        blockers.append("PERSISTED_AUTHORIZATION_DIGEST_MISMATCH")
+    if not _sha256(persistence.get("persistence_attestation_digest")):
+        blockers.append("AUTHORIZATION_PERSISTENCE_ATTESTATION_DIGEST_REQUIRED")
 
     payload = _sha256(payload_digest)
     recipient = _sha256(recipient_resolution_digest)
@@ -325,6 +421,9 @@ def build_sealed_payload_attestation(
     material = {
         "bridge_digest": _sha256(bridge_row.get("bridge_digest")),
         "authorization_digest": _sha256(auth.get("authorization_digest")),
+        "authorization_persistence_attestation_digest": _sha256(
+            persistence.get("persistence_attestation_digest")
+        ),
         "subject_digest": _sha256(bridge_row.get("subject_digest")),
         "requested_action": _clean(
             bridge_row.get("requested_action"), 80
@@ -365,6 +464,7 @@ def build_sealed_payload_attestation(
 def build_durable_dispatch_record_candidate(
     bridge: Mapping[str, Any] | None,
     authorization: Mapping[str, Any] | None,
+    authorization_persistence: Mapping[str, Any] | None,
     payload_attestation: Mapping[str, Any] | None,
     *,
     execution_id: Any,
@@ -377,6 +477,7 @@ def build_durable_dispatch_record_candidate(
     """Prepare exact durable-record material. Does not write the record."""
     bridge_row = dict(bridge or {})
     auth = dict(authorization or {})
+    persistence = dict(authorization_persistence or {})
     payload = dict(payload_attestation or {})
     blockers: list[str] = []
 
@@ -389,9 +490,20 @@ def build_durable_dispatch_record_candidate(
     if auth.get("fresh_execution_intent_verified") is not True:
         blockers.append("FRESH_EXECUTION_INTENT_FLAG_REQUIRED")
     if auth.get("authorization_persisted") is not False:
-        blockers.append("AUTHORIZATION_PERSISTENCE_MUST_BE_SEPARATE")
+        blockers.append("AUTHORIZATION_OBJECT_MUST_NOT_SELF_CLAIM_PERSISTENCE")
     if auth.get("authorization_consumed") is not False:
         blockers.append("AUTHORIZATION_ALREADY_CONSUMED")
+
+    if persistence.get("schema") != AUTH_PERSISTENCE_SCHEMA:
+        blockers.append("AUTHORIZATION_PERSISTENCE_SCHEMA_MISMATCH")
+    if persistence.get("state") != "PERSISTED_AUTHORIZATION_ATTESTED":
+        blockers.append("PERSISTED_AUTHORIZATION_ATTESTATION_REQUIRED")
+    if _sha256(persistence.get("authorization_digest")) != _sha256(
+        auth.get("authorization_digest")
+    ):
+        blockers.append("PERSISTED_AUTHORIZATION_DIGEST_MISMATCH")
+    if persistence.get("authorization_consumed") is not False:
+        blockers.append("PERSISTED_AUTHORIZATION_ALREADY_CONSUMED")
 
     if payload.get("schema") != PAYLOAD_ATTESTATION_SCHEMA:
         blockers.append("PAYLOAD_ATTESTATION_SCHEMA_MISMATCH")
@@ -402,6 +514,9 @@ def build_durable_dispatch_record_candidate(
 
     bridge_digest = _sha256(bridge_row.get("bridge_digest"))
     auth_digest = _sha256(auth.get("authorization_digest"))
+    persistence_attestation_digest = _sha256(
+        persistence.get("persistence_attestation_digest")
+    )
     payload_attestation_digest = _sha256(
         payload.get("payload_attestation_digest")
     )
@@ -411,6 +526,10 @@ def build_durable_dispatch_record_candidate(
         blockers.append("PAYLOAD_BRIDGE_DIGEST_MISMATCH")
     if _sha256(payload.get("authorization_digest")) != auth_digest:
         blockers.append("PAYLOAD_AUTHORIZATION_DIGEST_MISMATCH")
+    if _sha256(payload.get("authorization_persistence_attestation_digest")) != (
+        persistence_attestation_digest
+    ):
+        blockers.append("PAYLOAD_AUTHORIZATION_PERSISTENCE_DIGEST_MISMATCH")
     if _sha256(payload.get("subject_digest")) != _sha256(
         bridge_row.get("subject_digest")
     ):
@@ -467,6 +586,9 @@ def build_durable_dispatch_record_candidate(
         "step_id": step,
         "bridge_digest": bridge_digest,
         "authorization_digest": auth_digest,
+        "authorization_persistence_attestation_digest": (
+            persistence_attestation_digest
+        ),
         "payload_attestation_digest": payload_attestation_digest,
         "subject_digest": _sha256(bridge_row.get("subject_digest")),
         "approval_packet_digest": _sha256(
@@ -515,6 +637,7 @@ def build_durable_dispatch_record_candidate(
         "outcome_unknown_automatic_retry_allowed": False,
         "outcome_unknown_requires_explicit_reconciliation": True,
         "outcome_receipt_required": True,
+        "authorization_persistence_attestation_required": True,
         "authorization_consumption_required_atomically_with_write": True,
         "durable_store_write_required": True,
         "dispatch_record_written": False,
@@ -557,6 +680,7 @@ def verify_durable_dispatch_record_candidate(
         "post_record_ambiguous_ack_becomes_outcome_unknown",
         "outcome_unknown_requires_explicit_reconciliation",
         "outcome_receipt_required",
+        "authorization_persistence_attestation_required",
         "authorization_consumption_required_atomically_with_write",
         "durable_store_write_required",
     ):
@@ -601,6 +725,7 @@ def outbound_execution_dispatch_policy() -> dict[str, Any]:
         "authorization_must_match_exact_bridge_digest": True,
         "authorization_is_provider_call": False,
         "authorization_persistence_separate": True,
+        "authorization_persistence_attestation_required": True,
         "sealed_payload_attestation_required": True,
         "sealed_payload_max_age_seconds": MAX_PAYLOAD_ATTESTATION_AGE_SECONDS,
         "raw_recipient_in_control_plane": False,
@@ -632,6 +757,7 @@ def outbound_execution_dispatch_policy() -> dict[str, Any]:
 __all__ = [
     "SCHEMA",
     "AUTH_SCHEMA",
+    "AUTH_PERSISTENCE_SCHEMA",
     "PAYLOAD_ATTESTATION_SCHEMA",
     "DISPATCH_SCHEMA",
     "VERIFY_SCHEMA",
@@ -642,6 +768,7 @@ __all__ = [
     "MAX_AUTHORIZATION_WINDOW_SECONDS",
     "MAX_PAYLOAD_ATTESTATION_AGE_SECONDS",
     "build_fresh_outbound_execution_authorization",
+    "build_authorization_persistence_attestation",
     "build_sealed_payload_attestation",
     "build_durable_dispatch_record_candidate",
     "verify_durable_dispatch_record_candidate",
