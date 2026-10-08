@@ -274,7 +274,7 @@ class SyntheticDurableStoreRebootHarnessV1Tests(unittest.TestCase):
 
     def test_simulated_harness_review_never_authorizes_real_install(self):
         review = synthetic_harness_review(
-            test_cases_passed=24, test_cases_expected=24,
+            test_cases_passed=26, test_cases_expected=26,
             source_digest=D("1"), test_digest=D("2"),
         )
         self.assertEqual(review["state"], READY)
@@ -282,7 +282,7 @@ class SyntheticDurableStoreRebootHarnessV1Tests(unittest.TestCase):
         self.assertFalse(review["physical_durable_store_used"])
         self.assertFalse(review["worker_activated"])
         self.assertEqual(synthetic_harness_review(
-            test_cases_passed=23, test_cases_expected=24,
+            test_cases_passed=25, test_cases_expected=26,
             source_digest=D("1"), test_digest=D("2"),
         )["state"], BLOCKED)
 
