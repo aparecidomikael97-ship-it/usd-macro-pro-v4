@@ -151,7 +151,10 @@ def owner_stack_policy_snapshot() -> dict[str, Any]:
         schema = _clean(policy.get("schema"), 180)
         if not schema:
             blockers.append("POLICY_SCHEMA_MISSING:" + dimension)
-        if policy.get("executes_action") is not False:
+        if (
+            "executes_action" in policy
+            and policy.get("executes_action") is not False
+        ):
             blockers.append("POLICY_EXECUTION_BOUNDARY_INVALID:" + dimension)
 
         violations = [
@@ -170,7 +173,8 @@ def owner_stack_policy_snapshot() -> dict[str, Any]:
                 "schema": schema,
                 "policy_digest": _digest(policy),
                 "forbidden_true_violations": violations,
-                "executes_action": policy.get("executes_action"),
+                "executes_action_declared": "executes_action" in policy,
+                "executes_action": policy.get("executes_action", False),
             }
         )
 
