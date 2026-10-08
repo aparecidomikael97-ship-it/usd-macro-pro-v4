@@ -65,6 +65,7 @@ def _commit_allowed_navigation(
     session_state: dict[str, Any],
     staged: dict[str, Any],
     target: Any,
+    original_mode: str,
 ) -> str:
     """Apply only expected keys after a fully successful signed route.
 
@@ -78,6 +79,37 @@ def _commit_allowed_navigation(
     actual = set(staged) - {"atlasquant_experience_mode"}
     if actual != expected or not actual.issubset(_NAV_PENDING_KEYS):
         return "UNREVIEWED_ROUTE_STATE_MUTATION"
+    if staged.get("atlasquant_experience_mode") != original_mode:
+        return "UNREVIEWED_ROUTE_MODE_MUTATION"
+    # A compromised downstream UI must not sneak an executable request into
+    # an otherwise legitimate signed internal navigation.
+    if "atlasquant_guided_revalidation_request" in expected:
+        pending = staged.get("atlasquant_guided_revalidation_request")
+        expected_surface = {
+            "trader": ("home_radar", "advanced_radar"),
+            "aion": ("aion",),
+            "negocios": ("aion",),
+            "investimentos": ("investments",),
+        }.get(target, ())
+        expected_state = {
+            "trader": "REQUESTED",
+            "aion": "RETURN_REQUESTED",
+            "negocios": "RETURN_REQUESTED",
+            "investimentos": "INVESTMENTS_PAGE_REQUESTED",
+        }.get(target)
+        if (
+            type(pending) is not dict
+            or pending.get("surface") not in expected_surface
+            or pending.get("state") != expected_state
+            or pending.get("explicit_user_action") is not True
+            or pending.get("executes_action") is not False
+            or pending.get("real_orders_enabled") is not False
+            or any(type(k) is not str for k in pending)
+        ):
+            return "UNSAFE_NAVIGATION_REQUEST_CONTENT"
+    if "aion_admin_workspace_jump" in expected:
+        if staged.get("aion_admin_workspace_jump") != "💼 Negócios":
+            return "UNSAFE_BUSINESS_WORKSPACE_NAVIGATION"
     if staged.get("atlasquant_central_choice") != target:
         # "central" is the only special root target; the resolver uses
         # an internal string constant for its visible label.
@@ -241,6 +273,7 @@ def request_rooted_owner_navigation(
         return _blocked("SIGNED_OWNER_INTENT_OR_NAVIGATION_REJECTED")
     commit_reason = _commit_allowed_navigation(
         session_state, staged, result.get("target"),
+        session_state.get("atlasquant_experience_mode", ""),
     )
     if commit_reason:
         return _blocked(commit_reason)
