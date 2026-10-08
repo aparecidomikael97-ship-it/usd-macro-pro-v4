@@ -14,8 +14,8 @@ OWNER_FUNDED_INITIAL_CAP_CENTS = 20_000
 MIN_PAID_MONTHS = 2
 MAX_PROPOSAL_STEP_MULTIPLIER = 2
 MAX_AMOUNT_CENTS = 10**12
-MONTH_RE = re.compile(r"20[0-9]{2}-(?:0[1-9]|1[0-2])\\Z")
-CUSTOMER_KEY_RE = re.compile(r"[0-9a-f]{64}\\Z")
+MONTH_RE = re.compile(r"20[0-9]{2}-(?:0[1-9]|1[0-2])\Z")
+CUSTOMER_KEY_RE = re.compile(r"[0-9a-f]{64}\Z")
 MONTH_FIELDS = {
     "month", "customer_payment_received_cents", "fully_loaded_costs_and_taxes_cents",
     "payments_reconciled", "costs_and_taxes_reconciled", "paying_customer_keys",
