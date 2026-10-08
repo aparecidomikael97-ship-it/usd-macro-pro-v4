@@ -1,0 +1,75 @@
+name: AION Windows Collector Crypto Provider Compatibility CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_crypto_provider_enrollment_compatibility_v1.py"
+      - "tests/test_atlasquant_aion_windows_crypto_provider_enrollment_compatibility_v1.py"
+      - "docs/aion/AION_WINDOWS_COLLECTOR_CRYPTO_PROVIDER_COMPATIBILITY_V1.md"
+      - ".github/workflows/aion-windows-collector-crypto-provider-compatibility-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  custody-compatibility:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce disposable PR CI
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.getenv("GITHUB_ACTIONS") == "true"
+          assert os.getenv("RUNNER_OS") in ("Windows","Linux")
+          PY
+      - name: Compile compatibility preflight
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_crypto_provider_enrollment_compatibility_v1.py \
+            tests/test_atlasquant_aion_windows_crypto_provider_enrollment_compatibility_v1.py
+      - name: Run adversarial design-only compatibility checks
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_crypto_provider_enrollment_compatibility_v1.py'
+      - name: Guard against OS interaction and permanent authority
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("atlasquant_aion_windows_crypto_provider_enrollment_compatibility_v1.py").read_text("utf-8")
+          tree=ast.parse(s)
+          forbidden={"subprocess","socket","ctypes","winreg","requests","urllib",
+                     "httpx","shutil","tempfile","os","pathlib"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  for name in node.names:
+                      assert name.name.split(".")[0] not in forbidden
+              if isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+          for flag in (
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+              '"collector_key_enrolled": False',
+              '"private_key_created": False',
+              '"host_security_state_modified": False',
+              '"hardware_protected_collector_private_key_verified": False',
+          ):
+              assert flag in s,flag
+          PY
