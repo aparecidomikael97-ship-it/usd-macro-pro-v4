@@ -1,0 +1,96 @@
+name: AION Windows Local AI Readonly Hardware Sizing V1
+
+on:
+  pull_request:
+    paths:
+      - "scripts/aion_local_ai_windows_readonly_hardware_probe_v1.ps1"
+      - "atlasquant_aion_local_ai_hardware_readonly_capacity_v1.py"
+      - "tests/test_atlasquant_aion_local_ai_hardware_readonly_capacity_v1.py"
+      - "docs/aion/AION_WINDOWS_LOCAL_AI_READONLY_HARDWARE_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-windows-local-ai-readonly-hardware-sizing-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  local-first-sizing-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile and test read-only local model capacity contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_local_ai_hardware_readonly_capacity_v1.py \
+            tests/test_atlasquant_aion_local_ai_hardware_readonly_capacity_v1.py
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_local_ai_hardware_readonly_capacity_v1.py'
+
+      - name: Verify no unauthorized hardware access, network, install or spending
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          code=Path("atlasquant_aion_local_ai_hardware_readonly_capacity_v1.py").read_text("utf-8")
+          script=Path("scripts/aion_local_ai_windows_readonly_hardware_probe_v1.ps1").read_text("utf-8")
+          for forbidden in (
+              "import socket","import requests","import httpx","from subprocess",
+              "import winreg","import ctypes","Path.write_text(","Path.write_bytes(",
+              "Set-ExecutionPolicy","Invoke-WebRequest","Invoke-RestMethod",
+              "Start-Process","Get-Process ","Set-ItemProperty",
+              "SerialNumber","MachineGuid","Get-NetIPAddress",
+          ):
+              assert forbidden not in code+script,forbidden
+          from atlasquant_aion_local_ai_hardware_readonly_capacity_v1 import hardware_probe_policy
+          p=hardware_probe_policy()
+          assert p["read_only_owner_explicit_consent_required"] is True
+          for name in (
+              "real_owner_pc_measured","real_dedicated_gpu_vram_verified",
+              "real_local_inference_started","model_binary_downloaded",
+              "driver_changed","device_modified","data_uploaded",
+              "cloud_api_call_made","owner_paid_spend_authorized",
+              "install_deployed","worker_activated",
+          ):
+              assert p[name] is False,name
+          PY
+
+      - name: Execute non-admin read-only CIM probe on hosted Windows runner only
+        if: runner.os == 'Windows'
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          pwsh -NoProfile -File scripts/aion_local_ai_windows_readonly_hardware_probe_v1.ps1 -CIProbe > "$RUNNER_TEMP/aion-local-ai-ci-report.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from atlasquant_aion_local_ai_hardware_readonly_capacity_v1 import review_local_model_hardware_report
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"aion-local-ai-ci-report.json").read_text("utf-8-sig"))
+          assert report["source"] == "CI_EPHEMERAL"
+          result=review_local_model_hardware_report(report)
+          assert result["state"]=="READ_ONLY_CAPACITY_ADVISORY_UNTRUSTED",result
+          assert result["actual_owner_device_verified"] is False
+          print("Windows CI-only read-only resource sizing passed; no owner workstation measured.")
+          PY
+
+      - name: Negative test rejects probe without owner consent
+        if: runner.os == 'Windows'
+        run: |
+          pwsh -NoProfile -Command '
+            try {
+              & ./scripts/aion_local_ai_windows_readonly_hardware_probe_v1.ps1 | Out-Null
+              throw "UNAUTHORIZED_PROBE_UNEXPECTEDLY_ALLOWED"
+            } catch {
+              if ($_.Exception.Message -notmatch "EXPLICIT_READ_ONLY_CONSENT_REQUIRED") { throw }
+              Write-Output "Owner consent gate denies implicit invocation"
+            }
+          '
