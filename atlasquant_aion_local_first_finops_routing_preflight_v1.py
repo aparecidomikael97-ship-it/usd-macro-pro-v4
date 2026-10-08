@@ -68,7 +68,7 @@ ASSESSMENT_FALSE = (
     "model_package_trust_established", "local_execution_authorized",
     "paid_provider_execution_authorized", "production_model_router_active",
     "owner_device_accessed", "data_transferred", "deploy_executed",
-    "worker_activated",
+    "worker_activated", "owner_approval_consumed",
 )
 ASSESSMENT_FIELDS = set(ASSESSMENT_MATERIAL) | {
     "schema", "state", "blockers", "assessment_digest",
