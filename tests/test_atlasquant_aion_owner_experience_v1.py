@@ -90,6 +90,7 @@ class AionOwnerExperienceV1Tests(unittest.TestCase):
             ("AION entra no AtlasQuant", "central"),
             ("AION, abre Negócios", "negocios"),
             ("AION, abre Investimentos", "investimentos"),
+            ("AION, abre AION", "aion"),
         )
         for message, target in cases:
             with self.subTest(message=message):
