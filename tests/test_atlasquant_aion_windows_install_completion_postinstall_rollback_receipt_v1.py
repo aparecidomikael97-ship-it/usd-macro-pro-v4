@@ -274,6 +274,9 @@ class InstallCompletionPostinstallRollbackReceiptTests(unittest.TestCase):
     def test_terminal_failure_requires_authoritative_no_write_and_clean_reopen(self):
         p, _, _ = self.fixture()
         fail = {
+            "installation_id": p["installation_id"],
+            "install_commitment_digest": p["install_commitment_digest"],
+            "journal_plan_digest": p["journal_plan_digest"],
             "authoritative_failure_receipt_digest": D("1"),
             "independent_no_write_evidence_digest": D("2"),
             "no_residual_changes_reopen_receipt_digest": D("3"),
@@ -295,6 +298,43 @@ class InstallCompletionPostinstallRollbackReceiptTests(unittest.TestCase):
             independent_final_attestor_digest=D("5"),
         )
         self.assertEqual(out["terminal_outcome"], UNKNOWN)
+
+    def test_forged_verification_plan_cannot_remove_required_health_check(self):
+        _, _, _, _, plan, rows, _ = self.verified_fixture()
+        fake = copy.deepcopy(plan)
+        fake["checks"] = [c for c in fake["checks"] if c["check_kind"] != "AION_RUNTIME_HEALTH_REOPEN"]
+        fake["verification_plan_digest"] = _digest({
+            k: fake.get(k) for k in (
+                "installation_id", "journal_plan_digest", "completion_gate_digest",
+                "reopen_policy_digest", "health_policy_digest",
+                "independent_verifier_manifest_digest", "checks",
+            )
+        })
+        fake_rows = [r for r in rows if "AION_RUNTIME_HEALTH_REOPEN" not in r["check_id"]]
+        outcome = validate_postinstall_evidence_shape(fake, fake_rows)
+        self.assertEqual(outcome["state"], BLOCKED)
+        self.assertIn("MANDATORY_GLOBAL_REOPEN_SCOPE_MISSING", outcome["blockers"])
+
+    def test_replayed_failure_evidence_from_another_installation_blocks(self):
+        p, _, _ = self.fixture()
+        fake = {
+            "installation_id": "unrelated-install",
+            "install_commitment_digest": p["install_commitment_digest"],
+            "authoritative_failure_receipt_digest": D("1"),
+            "independent_no_write_evidence_digest": D("2"),
+            "no_residual_changes_reopen_receipt_digest": D("3"),
+            "failure_before_first_mutation": True,
+            "no_write_authoritatively_proven": True,
+            "no_residual_changes_after_reopen": True,
+            "ambiguity_detected": False,
+        }
+        receipt = build_terminal_install_receipt_candidate(
+            installation_id=p["installation_id"], requested_disposition="TERMINAL_FAILURE",
+            failure_evidence=fake, terminal_reopen_receipt_digest=D("4"),
+            independent_final_attestor_digest=D("5"),
+        )
+        self.assertEqual(receipt["state"], BLOCKED)
+        self.assertEqual(receipt["terminal_outcome"], UNKNOWN)
 
     def test_implementation_review_does_not_install_or_deploy(self):
         _, _, _, gate, plan, _, _ = self.verified_fixture()
