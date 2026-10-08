@@ -98,10 +98,16 @@ class SignedOwnerIntentTests(unittest.TestCase):
         p = self.proof if proof is None else proof
         i = self.intent(proof=p) if intent is None else intent
         state = {}
+        if intent_sig is None:
+            try:
+                intent_sig = self.intent_signature(i)
+            except (ValueError, TypeError):
+                # Reject malformed envelope at verifier, not at test signer.
+                intent_sig = self.intent_signature()
         result = request_intent_bound_navigation(
             state, self.access if access is None else access,
             p, self.proof_signature(p) if proof_sig is None else proof_sig,
-            i, self.intent_signature(i) if intent_sig is None else intent_sig,
+            i, intent_sig,
             policy=self.policy if policy is None else policy,
             now_epoch=self.now + 10 if now is None else now,
             text=text,
@@ -228,7 +234,7 @@ class SignedOwnerIntentTests(unittest.TestCase):
 
     def test_absent_or_extra_fields_denied(self):
         i = self.intent()
-        variants = (None, {k: v for k, v in i.items() if k != "scope"}, {**i, "authorizes_deploy": True})
+        variants = ({}, {k: v for k, v in i.items() if k != "scope"}, {**i, "authorizes_deploy": True})
         for item in variants:
             with self.subTest(item=str(item)[:60]):
                 state, r = self.nav(intent=item)
