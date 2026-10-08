@@ -34,7 +34,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from atlasquant_aion_repository_mutation_offline_runtime_v1 import (
     PROVIDER_IDENTITY,
     LocalRepositoryMutationStore,
+    OfflineRepositoryMutationRuntime,
     OfflineRuntimeError,
+    SyntheticRepositoryMutationAdapter,
     owner_public_key_fingerprint,
 )
 
@@ -614,6 +616,84 @@ class HardenedLocalRepositoryMutationStore(LocalRepositoryMutationStore):
         }
 
 
+class HardenedOfflineRepositoryMutationRuntime:
+    """Identity-bound wrapper around the synthetic offline runtime.
+
+    The receipt, verified signature and enrolled device key must all identify
+    the same HUMAN_OWNER key before the base runtime may consume authorization.
+    """
+
+    def __init__(
+        self,
+        *,
+        store: HardenedLocalRepositoryMutationStore,
+        adapter: SyntheticRepositoryMutationAdapter,
+    ):
+        self.store = store
+        self.adapter = adapter
+        self._base = OfflineRepositoryMutationRuntime(store=store, adapter=adapter)
+
+    def execute_once(
+        self,
+        *,
+        authorization_receipt: Mapping[str, Any] | None,
+        owner_signature_attestation: Mapping[str, Any] | None,
+        runtime_nonce_scope: Any,
+        runtime_nonce_digest: Any,
+        attempt_id: Any,
+        behavior: Any,
+        now: Any,
+    ) -> dict[str, Any]:
+        receipt = dict(authorization_receipt or {})
+        signature = dict(owner_signature_attestation or {})
+        enrolled = self.store.get_active_owner_key()
+
+        enrolled_fingerprint = _sha256(enrolled.get("public_key_fingerprint"))
+        receipt_fingerprint = _sha256(receipt.get("owner_key_fingerprint"))
+        signature_fingerprint = _sha256(signature.get("owner_key_fingerprint"))
+        if not enrolled_fingerprint:
+            raise OfflineRuntimeError("ENROLLED_OWNER_KEY_FINGERPRINT_REQUIRED")
+        if receipt_fingerprint != enrolled_fingerprint:
+            raise OfflineRuntimeError("RECEIPT_OWNER_KEY_NOT_ENROLLED_KEY")
+        if signature_fingerprint != enrolled_fingerprint:
+            raise OfflineRuntimeError("SIGNATURE_OWNER_KEY_NOT_ENROLLED_KEY")
+        if receipt.get("owner_subject") != enrolled.get("owner_subject"):
+            raise OfflineRuntimeError("RECEIPT_OWNER_SUBJECT_NOT_ENROLLED_OWNER")
+        if _sha256(receipt.get("owner_binding_digest")) != _sha256(
+            enrolled.get("owner_binding_digest")
+        ):
+            raise OfflineRuntimeError("RECEIPT_OWNER_BINDING_NOT_ENROLLED_BINDING")
+
+        out = self._base.execute_once(
+            authorization_receipt=receipt,
+            owner_signature_attestation=signature,
+            runtime_nonce_scope=runtime_nonce_scope,
+            runtime_nonce_digest=runtime_nonce_digest,
+            attempt_id=attempt_id,
+            behavior=behavior,
+            now=now,
+        )
+        return {
+            **out,
+            "hardened_owner_key_binding_verified": True,
+            "enrolled_owner_key_fingerprint": enrolled_fingerprint,
+            "live_repository_mutation_authorized": False,
+            "live_repository_mutation_performed": False,
+        }
+
+    def reconcile_unknown(self, *, attempt_id: Any, reconciled_at: Any) -> dict[str, Any]:
+        return self._base.reconcile_unknown(
+            attempt_id=attempt_id,
+            reconciled_at=reconciled_at,
+        )
+
+    def persist_terminal_audit(self, *, attempt_id: Any, persisted_at: Any) -> dict[str, Any]:
+        return self._base.persist_terminal_audit(
+            attempt_id=attempt_id,
+            persisted_at=persisted_at,
+        )
+
+
 def build_kill_switch_control_challenge(
     store: HardenedLocalRepositoryMutationStore,
     *,
@@ -855,6 +935,9 @@ def local_runtime_hardening_policy() -> dict[str, Any]:
         "single_sqlite_runtime_truth": True,
         "second_runtime_database_forbidden": True,
         "owner_public_key_enrollment_implemented": True,
+        "hardened_execution_requires_enrolled_key_binding": True,
+        "receipt_signature_enrollment_fingerprint_must_match": True,
+        "receipt_owner_subject_and_binding_must_match_enrollment": True,
         "single_active_owner_key_v1": True,
         "owner_key_rotation_implemented": False,
         "owner_private_key_generated": False,
@@ -914,6 +997,7 @@ __all__ = [
     "resolve_windows_runtime_layout",
     "build_windows_owner_acl_attestation",
     "HardenedLocalRepositoryMutationStore",
+    "HardenedOfflineRepositoryMutationRuntime",
     "build_kill_switch_control_challenge",
     "verify_and_apply_signed_kill_switch_change",
     "local_runtime_hardening_policy",
