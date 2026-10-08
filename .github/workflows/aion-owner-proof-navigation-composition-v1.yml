@@ -43,7 +43,7 @@ jobs:
           python -m py_compile \
             atlasquant_aion_owner_proof_navigation_composition_v1.py \
             tests/test_atlasquant_aion_owner_proof_navigation_composition_v1.py
-      - name: Execute 16 offline adversarial composition tests
+      - name: Execute 17 offline adversarial composition tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
