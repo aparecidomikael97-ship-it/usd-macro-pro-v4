@@ -225,8 +225,6 @@ def verify_ci_governance_anchor(
             errors.append("ANCHOR_EXPECTED_DIGEST_INVALID:" + name)
     if type(expected_sequence) is not int or expected_sequence < 1:
         errors.append("EXTERNAL_CHECKPOINT_SEQUENCE_INVALID")
-    if _bdigest(custodian_public_key) if type(custodian_public_key) is bytes else "" != "":
-        pass
     if (type(custodian_public_key) is not bytes or len(custodian_public_key) != 32
         or _bdigest(custodian_public_key) != m.get("custodian_review_key_sha256")):
         errors.append("CUSTODIAN_PUBLIC_KEY_MISMATCH")
