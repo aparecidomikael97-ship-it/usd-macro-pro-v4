@@ -1,0 +1,89 @@
+name: AION Contract Communication Draft Approval V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_contract_communication_draft_approval_v1.py"
+      - "tests/test_atlasquant_aion_contract_communication_draft_approval_v1.py"
+      - "docs/aion/AION_CONTRACT_COMMUNICATION_DRAFT_APPROVAL_V1.md"
+      - ".github/workflows/aion-contract-communication-draft-approval-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract-communication-draft-approval-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile draft approval contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_contract_communication_draft_approval_v1.py \
+            tests/test_atlasquant_aion_contract_communication_draft_approval_v1.py
+
+      - name: Run draft approval contract tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_contract_communication_draft_approval_v1.py'
+
+      - name: Assert no-send no-sign boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_contract_communication_draft_approval_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import smtplib",
+              "import requests",
+              "urllib.request",
+              "import socket",
+              "from gmail",
+              "import gmail",
+              "import subprocess",
+              "from subprocess",
+              "import win32com",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"contract_is_final_legal_document": False',
+              '"legal_advice_issued": False',
+              '"binding_commitment_created": False',
+              '"contract_signed": False',
+              '"signature_requested": False',
+              '"signature_collected": False',
+              '"recipient_address_resolved": False',
+              '"recipient_phone_resolved": False',
+              '"approval_required": True',
+              '"approved": False',
+              '"approval_decision_recorded": False',
+              '"approval_receipt_verified": False',
+              '"execution_authorized": False',
+              '"approval_is_execution": False',
+              '"message_sent": False',
+              '"provider_called": False',
+              '"network_called": False',
+              '"crm_written": False',
+              '"memory_written": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
