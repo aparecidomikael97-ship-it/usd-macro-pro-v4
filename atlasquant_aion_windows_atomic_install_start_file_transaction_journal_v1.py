@@ -344,9 +344,10 @@ def build_journal_entry_candidate(
     journal_plan:Mapping[str,Any]|None,
     *,
     sequence:int,
-    previous_entry_digest:Any,
+    previous_entry:Mapping[str,Any]|None=None,
+    previous_entry_digest:Any="",
 )->dict[str,Any]:
-    plan=dict(journal_plan or {});blockers=[]
+    plan=dict(journal_plan or {});prior=dict(previous_entry or {});blockers=[]
     if plan.get("state")!=READY_JOURNAL_PLAN_STATE:blockers.append("READY_INSTALL_JOURNAL_PLAN_REQUIRED")
     try:
         seq=int(sequence)
@@ -355,11 +356,30 @@ def build_journal_entry_candidate(
     ops=list(plan.get("operations") or [])
     if seq<1 or seq>len(ops):blockers.append("JOURNAL_ENTRY_SEQUENCE_INVALID")
     op=ops[seq-1] if 1<=seq<=len(ops) else {}
-    prev=_sha256(previous_entry_digest)
-    expected_prev=_sha256(plan.get("journal_genesis_digest")) if seq==1 else prev
-    if not prev:blockers.append("PREVIOUS_JOURNAL_ENTRY_DIGEST_REQUIRED")
-    if seq==1 and prev!=_sha256(plan.get("journal_genesis_digest")):
-        blockers.append("FIRST_JOURNAL_ENTRY_MUST_BIND_GENESIS")
+    if seq==1:
+        prev=_sha256(previous_entry_digest)
+        expected_prev=_sha256(plan.get("journal_genesis_digest"))
+        if prior:
+            blockers.append("FIRST_JOURNAL_ENTRY_MUST_NOT_HAVE_PRIOR_ENTRY")
+        if prev!=expected_prev:
+            blockers.append("FIRST_JOURNAL_ENTRY_MUST_BIND_GENESIS")
+    else:
+        if prior.get("schema")!=JOURNAL_ENTRY_SCHEMA:
+            blockers.append("PRIOR_JOURNAL_ENTRY_SCHEMA_REQUIRED")
+        if prior.get("state")!=READY_JOURNAL_ENTRY_STATE:
+            blockers.append("READY_PRIOR_JOURNAL_ENTRY_REQUIRED")
+        if prior.get("installation_id")!=plan.get("installation_id"):
+            blockers.append("PRIOR_JOURNAL_ENTRY_INSTALLATION_MISMATCH")
+        if _sha256(prior.get("journal_plan_digest"))!=_sha256(plan.get("journal_plan_digest")):
+            blockers.append("PRIOR_JOURNAL_ENTRY_PLAN_MISMATCH")
+        if int(prior.get("sequence") or -1)!=seq-1:
+            blockers.append("PRIOR_JOURNAL_ENTRY_SEQUENCE_MISMATCH")
+        expected_prev=_sha256(prior.get("journal_entry_digest"))
+        prev=_sha256(previous_entry_digest) or expected_prev
+        if not expected_prev:
+            blockers.append("PRIOR_JOURNAL_ENTRY_DIGEST_REQUIRED")
+        if prev!=expected_prev:
+            blockers.append("PREVIOUS_JOURNAL_ENTRY_DIGEST_MISMATCH")
     material={
         "journal_plan_digest":_sha256(plan.get("journal_plan_digest")),
         "installation_id":plan.get("installation_id"),
