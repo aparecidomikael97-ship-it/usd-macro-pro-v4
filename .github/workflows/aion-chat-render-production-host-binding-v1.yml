@@ -1,0 +1,74 @@
+name: AION Chat Render Production Host Binding V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - impl/aion-chat-render-production-composition-v1-20261007
+    paths:
+      - "atlasquant_aion_chat_render_production_host_v1.py"
+      - "atlasquant_aion_chat_render_production_composition_v1.py"
+      - "usd_macro_pro_v4_cloud.py"
+      - "tests/test_atlasquant_aion_chat_render_production_host_v1.py"
+      - "docs/aion/AION_CHAT_RENDER_PRODUCTION_HOST_BINDING_V1.md"
+      - ".github/workflows/aion-chat-render-production-host-binding-v1.yml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  render-production-host-binding-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned PostgreSQL driver
+        run: |
+          grep -Fx "psycopg[binary]==3.3.6" requirements.txt
+          python -m pip install pip==26.2.1
+          python -m pip install "psycopg[binary]==3.3.6"
+          python -m pip check
+
+      - name: Compile host binding
+        run: |
+          python -m py_compile             atlasquant_aion_chat_render_production_composition_v1.py             atlasquant_aion_chat_render_production_host_v1.py             usd_macro_pro_v4_cloud.py             tests/test_atlasquant_aion_chat_render_production_host_v1.py
+
+      - name: Run production host-binding tests
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_render_production_host_v1.py'
+
+      - name: Assert activation is fail-closed and production precedence is explicit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          host = Path(
+              "atlasquant_aion_chat_render_production_host_v1.py"
+          ).read_text(encoding="utf-8")
+          shell = Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
+
+          assert "AION_CHAT_PRODUCTION_PERSISTENCE_ENABLED" not in host or (
+              "ENABLED_KEY" in host
+          )
+          assert "production_feature_enabled" in host
+          assert "build_streamlit_production_binding" in shell
+          assert "build_streamlit_staged_binding" in shell
+          assert shell.index("build_streamlit_production_binding") < shell.index(
+              "build_streamlit_staged_binding"
+          )
+
+          for marker in (
+              '"provider_called": False',
+              '"worker_armed": False',
+              '"external_action_executed": False',
+              '"core_checkpoint_write": False',
+          ):
+              assert marker in host, marker
+          PY
