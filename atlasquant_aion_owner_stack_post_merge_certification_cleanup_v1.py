@@ -170,8 +170,8 @@ def build_post_merge_main_certification(
         ("FULL_STACK_CERTIFICATION_MUST_RUN_ON_MAIN", full_stack_certification_on_main),
         ("ALL_PRODUCT_PRS_MUST_BE_CONFIRMED_IN_MAIN", all_expected_prs_confirmed_in_main),
         ("FROZEN_CORE_INTEGRITY_REQUIRED", frozen_core_integrity_verified),
-        ("UNRESOLVED_MERGE_CONFLICT_PRESENT", not no_unresolved_merge_conflicts),
-        ("UNEXPECTED_MAIN_DRIFT_PRESENT", not no_unexpected_main_drift),
+        ("NO_UNRESOLVED_MERGE_CONFLICTS_REQUIRED", no_unresolved_merge_conflicts),
+        ("NO_UNEXPECTED_MAIN_DRIFT_REQUIRED", no_unexpected_main_drift),
     ):
         if flag is not True:
             blockers.append(label)
