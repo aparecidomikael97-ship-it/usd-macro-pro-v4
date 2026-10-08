@@ -1,0 +1,91 @@
+name: AION Windows Signed Release Provenance CI Fixture V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_signed_release_provenance_ci_fixture_v1.py"
+      - "tests/test_atlasquant_aion_windows_signed_release_provenance_ci_fixture_v1.py"
+      - "docs/aion/AION_WINDOWS_SIGNED_RELEASE_PROVENANCE_CI_FIXTURE_V1.md"
+      - ".github/workflows/aion-windows-signed-release-provenance-ci-fixture-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-ed25519-ci-release-fixture:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify test-only toolchain
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys, os, cryptography
+          assert sys.version_info[:2] == (3, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows", "Linux")
+          PY
+
+      - name: Compile CI release signature contract and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_signed_release_provenance_ci_fixture_v1.py \
+            tests/test_atlasquant_aion_windows_signed_release_provenance_ci_fixture_v1.py
+
+      - name: Check Ed25519 ephemeral signing, tampering and publisher-trust ceilings
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_signed_release_provenance_ci_fixture_v1.py'
+
+      - name: Assert no real AION signing, installation or device integration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_windows_signed_release_provenance_ci_fixture_v1.py").read_text("utf-8")
+          forbidden = (
+              "Ed25519PrivateKey", "generate_private_key", "import subprocess",
+              "from subprocess", "import socket", "from socket",
+              "import requests", "from requests", "urllib.request",
+              "import httpx", "import winreg", "from winreg",
+              "import ctypes", "from ctypes", "import sqlite3",
+              "os.system(", "os.exec", "Path.write_bytes(", "Path.write_text(",
+              "open(", "os.startfile(", "Start-Process ",
+          )
+          for marker in forbidden:
+              assert marker not in source, marker
+          from atlasquant_aion_windows_signed_release_provenance_ci_fixture_v1 import provenance_policy
+          p = provenance_policy()
+          assert p["fixture_only"] is True
+          assert p["ephemeral_ci_private_keys_only"] is True
+          for field in (
+              "ci_key_proves_authorized_publisher",
+              "matching_source_commit_proves_build_integrity",
+              "signature_without_key_registry_is_trusted",
+              "signature_matching_aion_release_is_known",
+              "manifest_without_artifact_bytes_is_sufficient",
+              "extra_artifacts_allowed", "unsafe_windows_paths_allowed",
+              "self_attested_builder_allowed", "automatic_install_on_crypto_success",
+              "owner_device_accessed", "owner_authorization_consumed",
+              "install_token_consumed", "production_signing_key_generated",
+              "production_signed_release_created", "package_installed",
+              "deploy_executed", "worker_activated",
+          ):
+              assert p[field] is False, (field, p[field])
+          PY
