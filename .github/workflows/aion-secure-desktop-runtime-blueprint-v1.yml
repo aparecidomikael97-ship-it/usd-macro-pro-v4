@@ -1,0 +1,88 @@
+name: AION Secure Desktop Runtime Blueprint V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_secure_desktop_runtime_blueprint_v1.py"
+      - "tests/test_atlasquant_aion_secure_desktop_runtime_blueprint_v1.py"
+      - "docs/aion/AION_SECURE_DESKTOP_RUNTIME_BLUEPRINT_V1.md"
+      - ".github/workflows/aion-secure-desktop-runtime-blueprint-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  secure-desktop-runtime-blueprint-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile desktop runtime blueprint
+        run: |
+          python -m py_compile \
+            atlasquant_aion_secure_desktop_runtime_blueprint_v1.py \
+            tests/test_atlasquant_aion_secure_desktop_runtime_blueprint_v1.py
+
+      - name: Run desktop runtime blueprint tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_secure_desktop_runtime_blueprint_v1.py'
+
+      - name: Assert planning-only boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_secure_desktop_runtime_blueprint_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import os",
+              "from os ",
+              "import socket",
+              "import requests",
+              "urllib.request",
+              "psutil",
+              "win32api",
+              "win32com",
+              "ctypes",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              'AGENT_MODEL = "PER_USER_DESKTOP_AGENT"',
+              'RUNTIME_IDENTITY = "CURRENT_USER"',
+              '"physical_install_started": False',
+              '"runtime_process_started": False',
+              '"startup_entry_created": False',
+              '"ipc_endpoint_created": False',
+              '"application_launched": False',
+              '"runs_as_system": False',
+              '"requires_runtime_elevation": False',
+              '"remote_listener_allowed": False',
+              '"lan_listener_allowed": False',
+              '"arbitrary_executable_allowed": False',
+              '"shell_allowed": False',
+              '"commands_generated": False',
+              '"installer_generated": False',
+              '"evidence_gathered_by_this_module": False',
+              '"installation_performed_by_this_module": False',
+              '"runtime_started_by_this_module": False',
+              '"external_action_executed_by_this_module": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
