@@ -1,0 +1,85 @@
+name: AION Windows Network Denial Evidence Gate V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_network_deny_evidence_gate_v1.py"
+      - "tests/test_atlasquant_aion_windows_network_deny_evidence_gate_v1.py"
+      - "scripts/aion_windows_network_readonly_capabilities_v1.py"
+      - "docs/aion/AION_WINDOWS_NETWORK_DENY_EVIDENCE_GATE_V1.md"
+      - ".github/workflows/aion-windows-network-deny-evidence-gate-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-network-denial-contract:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify isolated PR-only context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv("GITHUB_ACTIONS") == "true"
+          assert os.getenv("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.getenv("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile pure network policy and read-only inventory
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_network_deny_evidence_gate_v1.py \
+            tests/test_atlasquant_aion_windows_network_deny_evidence_gate_v1.py \
+            scripts/aion_windows_network_readonly_capabilities_v1.py
+      - name: Run adversarial deny-matrix tests (no sockets or filters)
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_network_deny_evidence_gate_v1.py'
+      - name: Run read-only platform API capability inventory
+        run: |
+          python scripts/aion_windows_network_readonly_capabilities_v1.py
+      - name: Explicitly forbid host policy mutation APIs in this PR
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          files = [
+              "atlasquant_aion_windows_network_deny_evidence_gate_v1.py",
+              "scripts/aion_windows_network_readonly_capabilities_v1.py",
+          ]
+          prohibited_calls = {
+              "CreateAppContainerProfile", "DeleteAppContainerProfile",
+              "FwpmFilterAdd0", "FwpmFilterDeleteById0",
+              "NetworkIsolationSetAppContainerConfig", "Set-NetFirewallRule",
+              "New-NetFirewallRule", "netsh", "subprocess", "socket",
+              "CreateProcessAsUserW",
+          }
+          for file in files:
+              tree = ast.parse(Path(file).read_text("utf-8"))
+              for node in ast.walk(tree):
+                  if isinstance(node, (ast.Import, ast.ImportFrom)):
+                      names = (
+                          [a.name for a in node.names]
+                          if isinstance(node, ast.Import) else [node.module or ""]
+                      )
+                      assert all(name.split(".")[0] not in ("socket", "subprocess") for name in names), file
+                  if isinstance(node, ast.Attribute):
+                      assert node.attr not in prohibited_calls, (file, node.attr)
+          from atlasquant_aion_windows_network_deny_evidence_gate_v1 import network_denial_plan
+          report=network_denial_plan()
+          assert report["physical_proof_verified"] is False
+          assert report["network_deny_verified"] is False
+          assert report["build_authorized"] is False
+          assert report["package_install_authorized"] is False
+          PY
