@@ -325,8 +325,31 @@ class AionRepositoryMutationOfflineRuntimeV1Tests(unittest.TestCase):
                 behavior="SUCCESS",
                 now="2026-10-08T10:00:11+00:00",
             )
-        self.assertEqual(ctx.exception.code, "AUTHORIZATION_ALREADY_CONSUMED")
+        self.assertEqual(ctx.exception.code, "AUTHORIZATION_CONSUMPTION_CONFLICT")
         self.assertEqual(self.store.counts()["attempts"], 1)
+
+    def test_identical_consumption_digest_replay_is_already_consumed(self):
+        self.open_kill_switch()
+        receipt = self.receipt()
+        signature = self.sign_receipt(receipt)
+        persisted = self.store.persist_authorization_once(
+            receipt=receipt,
+            signature_attestation=signature,
+            persisted_at="2026-10-08T10:00:05+00:00",
+        )
+        consumption_digest = D("f")
+        self.store.consume_authorization_once(
+            receipt_digest=persisted["receipt_digest"],
+            consumption_digest=consumption_digest,
+            consumed_at="2026-10-08T10:00:10+00:00",
+        )
+        with self.assertRaises(OfflineRuntimeError) as ctx:
+            self.store.consume_authorization_once(
+                receipt_digest=persisted["receipt_digest"],
+                consumption_digest=consumption_digest,
+                consumed_at="2026-10-08T10:00:11+00:00",
+            )
+        self.assertEqual(ctx.exception.code, "AUTHORIZATION_ALREADY_CONSUMED")
 
     def test_terminal_failure_records_no_synthetic_effect(self):
         self.open_kill_switch()
