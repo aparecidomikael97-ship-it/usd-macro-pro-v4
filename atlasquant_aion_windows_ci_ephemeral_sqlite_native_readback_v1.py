@@ -12,11 +12,11 @@ Environment guards are test isolation checks, NOT a security authority.
 """
 from __future__ import annotations
 
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, contextmanager
 from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 import json
 import os
 import sqlite3
@@ -27,7 +27,7 @@ from atlasquant_aion_windows_synthetic_durable_store_reboot_harness_v1 import (
     _valid_intent,
 )
 from atlasquant_aion_windows_terminal_receipt_persistence_postreboot_health_v1 import (
-    INTENT_READY, _digest, _sha,
+    INTENT_SCHEMA, INTENT_READY, _digest, _sha,
     validate_terminal_persistence_attestation_shape,
 )
 
@@ -163,16 +163,20 @@ class WindowsCIEphemeralSQLite(AbstractContextManager):
                 (initial_revision, store_identity_digest),
             )
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         if self._closed:
             raise RuntimeError(CLOSED)
-        # Reopen independent SQLite handles for all reads/writes.
+        # Every usage owns a new connection and closes the Windows file handle.
         con = sqlite3.connect(str(self._db), isolation_level=None, timeout=1.0)
-        con.row_factory = sqlite3.Row
-        con.execute("PRAGMA journal_mode=DELETE")
-        con.execute("PRAGMA synchronous=FULL")
-        con.execute("PRAGMA busy_timeout=1000")
-        return con
+        try:
+            con.row_factory = sqlite3.Row
+            con.execute("PRAGMA journal_mode=DELETE")
+            con.execute("PRAGMA synchronous=FULL")
+            con.execute("PRAGMA busy_timeout=1000")
+            yield con
+        finally:
+            con.close()
 
     def read_reopen(self, installation_id: str) -> dict[str, Any] | None:
         with self._connect() as con:
@@ -191,7 +195,8 @@ class WindowsCIEphemeralSQLite(AbstractContextManager):
     def commit(self, intent: Mapping[str, Any], *, fault: str = "none") -> dict[str, Any]:
         if fault not in ("none", "before_commit", "after_commit_ack_loss"):
             return _outcome(CAS_REJECTED, "UNKNOWN_FAULT")
-        if not _valid_intent(intent) or intent.get("durable_store_identity_digest") != self.identity:
+        if (intent.get("schema") != INTENT_SCHEMA or not _valid_intent(intent)
+                or intent.get("durable_store_identity_digest") != self.identity):
             return _outcome(CAS_REJECTED, "INVALID_OR_FOREIGN_INTENT")
         install_id = intent["installation_id"]
         if install_id in self._unknown_ids:
@@ -278,7 +283,14 @@ class WindowsCIEphemeralSQLite(AbstractContextManager):
         if outcome.get("state") != CAS_APPLIED or not _sha(synthetic_verifier_manifest_digest):
             return {"state": READBACK_UNKNOWN, "trusted": False}
         record = self.read_reopen(intent["installation_id"])
-        if record is None or record.get("record_digest") != outcome.get("record_digest"):
+        if (
+            record is None
+            or record.get("record_digest") != outcome.get("record_digest")
+            or record.get("record_digest") != _digest({
+                col: record[col] for col in _COLUMNS[:-1]
+            })
+            or record.get("write_intent_digest") != intent.get("write_intent_digest")
+        ):
             return {"state": READBACK_UNKNOWN, "trusted": False}
         payload = {
             "observed_record_digest": record["record_digest"],
