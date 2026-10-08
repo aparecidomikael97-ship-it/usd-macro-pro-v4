@@ -63,6 +63,16 @@ GATE_FLAGS = (
     "automatic_paid_fallback_enabled", "worker_activated",
     "deploy_executed", "owner_device_accessed",
 )
+INVENTORY_OUTPUT_KEYS = {
+    "schema", "state", "blockers", "owner_id", "month",
+    "expected_provider_ids", "monthly_total_brl_cents", "rows",
+    "inventory_digest", "real_provider_bills_verified",
+} | set(INVENTORY_FLAGS)
+RECON_OUTPUT_KEYS = {
+    "schema", "state", "blockers", "owner_id", "month",
+    "inventory_digest", "claimed_invoices_digest",
+    "claimed_total_raw_brl_cents", "invoices_checked", "claimed_rows",
+} | set(RECON_FLAGS)
 
 def _is_id(s: Any) -> bool:
     return type(s) is str and bool(IDENTITY.fullmatch(s))
@@ -279,7 +289,7 @@ def reconcile_claimed_owner_invoices(
         inventory_digest=inv.get("inventory_digest"),
         claimed_invoices_digest=_safe_digest(material) if not errors else "",
         claimed_total_raw_brl_cents=declared_total,
-        invoices_checked=len(checked),
+        invoices_checked=len(checked), claimed_rows=checked,
         **{flag:False for flag in RECON_FLAGS},
     )
 
@@ -298,6 +308,10 @@ def dry_run_ci_provider_execution_boundary(
     req=_row_dict(request)
     if set(req) != BOUNDARY_FIELDS:
         errors.append("BOUNDARY_EXACT_FIELDS_REQUIRED")
+    if set(inv) != INVENTORY_OUTPUT_KEYS:
+        errors.append("BOUNDARY_INVENTORY_EXACT_FIELDS_REQUIRED")
+    if set(rec) != RECON_OUTPUT_KEYS:
+        errors.append("BOUNDARY_RECON_EXACT_FIELDS_REQUIRED")
     for name in ("reservation_id","tenant_id","provider_id","owner_id"):
         if not _is_id(req.get(name)):
             errors.append("BOUNDARY_ID_INVALID:"+name)
@@ -325,12 +339,30 @@ def dry_run_ci_provider_execution_boundary(
         or req.get("reconciliation_digest") != rec.get("claimed_invoices_digest")
         or not rec.get("claimed_invoices_digest")):
         errors.append("BOUNDARY_CLAIMED_RECON_INVALID")
+    declared_rows=rec.get("claimed_rows")
+    if type(declared_rows) is not list or not all(type(r) is dict for r in declared_rows):
+        errors.append("BOUNDARY_CLAIMED_ROWS_REQUIRED")
+    else:
+        recheck_input=[{
+            "invoice_id":r.get("invoice_id"),"obligation_id":r.get("obligation_id"),
+            "provider_id":r.get("provider_id"),"owner_id":req.get("owner_id"),
+            "month":req.get("month"),"claimed_charge_brl_cents":r.get("claimed_charge_brl_cents"),
+            "evidence":r.get("evidence"),
+        } for r in declared_rows]
+        fresh=reconcile_claimed_owner_invoices(inv,recheck_input,
+            expected_owner_id=req.get("owner_id"), expected_month=req.get("month"))
+        if (fresh.get("state")!=RECONCILED
+            or fresh.get("claimed_invoices_digest")!=rec.get("claimed_invoices_digest")
+            or fresh.get("claimed_total_raw_brl_cents")!=rec.get("claimed_total_raw_brl_cents")
+            or fresh.get("invoices_checked")!=rec.get("invoices_checked")
+            or fresh.get("claimed_rows")!=declared_rows):
+            errors.append("BOUNDARY_RECON_RECEIPT_REHASH_FAILED")
     for proof, names in ((inv,INVENTORY_FLAGS),(rec,RECON_FLAGS)):
         for flag in names:
             if proof.get(flag) is not False:
                 errors.append("FALSE_EXTERNAL_FINANCIAL_TRUST_REQUIRED:"+flag)
     if req.get("provider_id") not in (
-        [r["provider_id"] for r in inv.get("rows",[]) if type(r) is dict]
+        [r.get("provider_id") for r in inv.get("rows",[]) if type(r) is dict]
         if type(inv.get("rows")) is list else []
     ):
         errors.append("BOUNDARY_PROVIDER_NOT_IN_INVENTORY")
