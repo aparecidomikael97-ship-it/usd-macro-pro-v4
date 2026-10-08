@@ -228,6 +228,31 @@ class OwnerBRL200FinOpsCeilingV1Tests(unittest.TestCase):
             with self.subTest(b=b):
                 self.assertEqual(admission(b)["decision"],"BLOCK_PAID")
 
+    def test_paid_call_denied_when_budget_total_tampered(self):
+        b=dict(snapshot(),forecast_brl_cents=0)
+        a=admission(b)
+        self.assertEqual(a["decision"],"BLOCK_PAID")
+        self.assertIn("BUDGET_SNAPSHOT_TAMPERED",a["blockers"])
+
+    def test_paid_call_denied_when_snapshot_hash_missing(self):
+        b=dict(snapshot())
+        del b["forecast_snapshot_digest"]
+        a=admission(b)
+        self.assertEqual(a["decision"],"BLOCK_PAID")
+        self.assertIn("BUDGET_SNAPSHOT_TAMPERED",a["blockers"])
+
+    def test_malicious_unhashable_status_category_and_evidence_fail_closed(self):
+        for field in ("status","category","evidence"):
+            item=row()
+            item[field]=["forged"]
+            r=snapshot([item])
+            self.assertEqual(r["state"],"BLOCKED",field)
+
+    def test_paid_quote_unhashable_cost_type_fails_closed(self):
+        q=quote()
+        q["cost_type"]=["PAID_EXTERNAL"]
+        self.assertEqual(admission(q=q)["decision"],"BLOCK_PAID")
+
     def test_customer_positive_margin_is_estimate_not_proof(self):
         r=minimum_customer_monthly_margin(revenue_brl_cents=10000,operating_cost_brl_cents=7500)
         self.assertEqual(r["state"],"ESTIMATED_POSITIVE_MARGIN")
