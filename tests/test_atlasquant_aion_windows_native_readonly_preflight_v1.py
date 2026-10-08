@@ -81,6 +81,20 @@ class WindowsNativeReadOnlyPreflightV1Tests(unittest.TestCase):
             expected_verifier_source_digest=self.source,
         )["state"], BLOCKED)
 
+    def test_raw_identifiers_injected_as_extra_fields_are_blocked(self):
+        for key in ("raw_sid", "raw_sddl", "hostname", "startup_command"):
+            x = self.altered(**{key: "FORBIDDEN_RAW_VALUE"})
+            result = self.review(x)
+            self.assertEqual(result["state"], BLOCKED, key)
+            self.assertIn("UNEXPECTED_OBSERVATION_FIELDS", result["blockers"])
+
+    def test_deleted_even_false_safety_flag_is_blocked(self):
+        x = copy.deepcopy(self.observation)
+        del x["aion_installed"]
+        result = self.review(x)
+        self.assertEqual(result["state"], BLOCKED)
+        self.assertIn("MISSING_REQUIRED_OBSERVATION_FIELDS", result["blockers"])
+
     def test_wrong_challenge_blocks_replay(self):
         self.assertEqual(self.review(challenge=D("d"))["state"], BLOCKED)
 
