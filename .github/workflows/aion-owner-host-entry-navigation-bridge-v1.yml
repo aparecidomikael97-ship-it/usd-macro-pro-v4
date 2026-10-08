@@ -1,0 +1,66 @@
+name: AION Owner Host Entry Navigation Bridge V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_host_entry_navigation_bridge_v1.py"
+      - "tests/test_atlasquant_aion_owner_host_entry_navigation_bridge_v1.py"
+      - "docs/aion/AION_OWNER_HOST_ENTRY_NAVIGATION_BRIDGE_V1.md"
+      - ".github/workflows/aion-owner-host-entry-navigation-bridge-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-host-navigation-offline:
+    runs-on: \${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify isolated PR test context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.getenv("GITHUB_ACTIONS") == "true"
+          assert os.getenv("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile bridge and suite
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_host_entry_navigation_bridge_v1.py \
+            tests/test_atlasquant_aion_owner_host_entry_navigation_bridge_v1.py
+      - name: Verify owner entry and internal navigation
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_host_entry_navigation_bridge_v1.py'
+      - name: Verify bridge imports no unsafe executor
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path("atlasquant_aion_owner_host_entry_navigation_bridge_v1.py").read_text("utf-8"))
+          forbidden = {"subprocess", "socket", "requests", "httpx", "urllib", "ctypes",
+                       "winreg", "sqlite3", "os", "pathlib", "shutil", "streamlit"}
+          for item in ast.walk(tree):
+              if isinstance(item, ast.Import):
+                  assert all(x.name.split(".")[0] not in forbidden for x in item.names)
+              if isinstance(item, ast.ImportFrom):
+                  assert (item.module or "").split(".")[0] not in forbidden
+          from atlasquant_aion_owner_host_entry_navigation_bridge_v1 import prepare_owner_host_entry, route_owner_text_navigation
+          assert prepare_owner_host_entry({}, {}, trusted_host_owner=False)["state"] == "BLOCKED"
+          assert route_owner_text_navigation({}, {}, {}, trusted_host_owner=False,
+                      text="AION abre Trader", device="DESKTOP")["state"] == "BLOCKED"
+          PY
