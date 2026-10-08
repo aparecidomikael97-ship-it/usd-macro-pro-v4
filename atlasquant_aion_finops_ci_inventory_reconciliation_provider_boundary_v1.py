@@ -194,8 +194,8 @@ def build_declared_owner_inventory(
         errors.append("INVENTORY_NONJSON_DATA")
     return _base_response(
         INVENTORY_READY if not errors else BLOCKED, errors,
-        **envelope, "inventory_digest":digest if not errors else "",
-        "real_provider_bills_verified":False,
+        **envelope, inventory_digest=digest if not errors else "",
+        real_provider_bills_verified=False,
         **{flag: False for flag in INVENTORY_FLAGS},
     )
 
@@ -275,11 +275,11 @@ def reconcile_claimed_owner_invoices(
     }
     return _base_response(
         RECONCILED if not errors else BLOCKED, errors,
-        "owner_id":expected_owner_id, "month":expected_month,
-        "inventory_digest":inv.get("inventory_digest"),
-        "claimed_invoices_digest":_safe_digest(material) if not errors else "",
-        "claimed_total_raw_brl_cents":declared_total,
-        "invoices_checked":len(checked),
+        owner_id=expected_owner_id, month=expected_month,
+        inventory_digest=inv.get("inventory_digest"),
+        claimed_invoices_digest=_safe_digest(material) if not errors else "",
+        claimed_total_raw_brl_cents=declared_total,
+        invoices_checked=len(checked),
         **{flag:False for flag in RECON_FLAGS},
     )
 
@@ -361,10 +361,10 @@ def dry_run_ci_provider_execution_boundary(
             errors.append("CI_STORE_ACCOUNTING_OR_SCOPE_ERROR")
     return _base_response(
         DRY_READY if not errors else BLOCKED, errors,
-        "request_digest":_safe_digest(req) if not errors else "",
-        "inventory_digest":inv.get("inventory_digest"),
-        "reconciliation_digest":rec.get("claimed_invoices_digest"),
-        "quoted_brl_cents":req.get("quoted_brl_cents")
+        request_digest=_safe_digest(req) if not errors else "",
+        inventory_digest=inv.get("inventory_digest"),
+        reconciliation_digest=rec.get("claimed_invoices_digest"),
+        quoted_brl_cents=req.get("quoted_brl_cents")
             if _is_cent(req.get("quoted_brl_cents")) else None,
         **{flag:False for flag in GATE_FLAGS},
     )
