@@ -123,7 +123,10 @@ def _verify_lineage(
 
     if auth.get("schema") != AUTH_RECEIPT_SCHEMA:
         blockers.append("AUTHORIZATION_RECEIPT_SCHEMA_MISMATCH")
-    if verify_repository_mutation_authorization_receipt(auth).get("valid") is not True:
+    if verify_repository_mutation_authorization_receipt(
+        auth,
+        now=auth.get("verified_at"),
+    ).get("valid") is not True:
         blockers.append("VALID_AUTHORIZATION_RECEIPT_REQUIRED")
 
     auth_digest = _sha256(auth.get("authorization_receipt_digest"))
