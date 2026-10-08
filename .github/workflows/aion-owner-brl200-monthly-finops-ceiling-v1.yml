@@ -1,0 +1,78 @@
+name: AION Owner BRL200 Monthly FinOps Ceiling V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_brl200_finops_ceiling_v1.py"
+      - "tests/test_atlasquant_aion_owner_brl200_finops_ceiling_v1.py"
+      - "docs/aion/AION_OWNER_BRL200_FINOPS_COST_CEILING_V1.md"
+      - ".github/workflows/aion-owner-brl200-monthly-finops-ceiling-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-brl200-planning-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Assert isolated pull request test context
+        run: |
+          python - <<'PY'
+          import os, sys
+          assert sys.version_info[:2] == (3,12)
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows", "Linux")
+          PY
+
+      - name: Compile BRL monthly ceiling and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_brl200_finops_ceiling_v1.py \
+            tests/test_atlasquant_aion_owner_brl200_finops_ceiling_v1.py
+
+      - name: Exercise cap FX buffer tenant margin and fail-closed rules
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_brl200_finops_ceiling_v1.py'
+
+      - name: Refuse billing, networking and automatic provider purchase
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path("atlasquant_aion_owner_brl200_finops_ceiling_v1.py").read_text("utf-8")
+          forbidden=(
+              "import requests","urllib.request","import httpx",
+              "import subprocess","import socket","import sqlite3",
+              "import winreg","import ctypes","os.system(","os.exec",
+              "open(","Path.write_bytes(","Path.write_text(",
+              "stripe.","requests.post(","requests.get(",
+          )
+          for item in forbidden:
+              assert item not in source,item
+          from atlasquant_aion_owner_brl200_finops_ceiling_v1 import owner_budget_policy
+          p=owner_budget_policy()
+          assert p["hard_cap_brl_cents"]==20000
+          assert p["currency"]=="BRL"
+          for key in (
+              "production_enforcement_active","real_billing_sources_connected",
+              "automatic_provider_purchase","automatic_paid_fallback",
+              "automatic_customer_charge","merges_or_deploys",
+          ):
+              assert p[key] is False,key
+          PY
