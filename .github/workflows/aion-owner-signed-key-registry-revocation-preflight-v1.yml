@@ -1,0 +1,65 @@
+name: AION Owner Signed Key Registry Revocation Preflight V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_signed_key_registry_preflight_v1.py"
+      - "tests/test_atlasquant_aion_owner_signed_key_registry_preflight_v1.py"
+      - "docs/aion/AION_OWNER_SIGNED_KEY_REGISTRY_REVOCATION_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-owner-signed-key-registry-revocation-preflight-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  root-signed-owner-registry-offline:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce isolated PR CI runner
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in {"Linux", "Windows"}
+          PY
+      - name: Install test-only cryptography
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+      - name: Syntax compile offline registry verifier
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_signed_key_registry_preflight_v1.py \
+            tests/test_atlasquant_aion_owner_signed_key_registry_preflight_v1.py
+      - name: Exercise 36 adversarial root-signed registry scenarios
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_signed_key_registry_preflight_v1.py'
+      - name: Check no OS mutation or network provider imports
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path("atlasquant_aion_owner_signed_key_registry_preflight_v1.py").read_text("utf-8"))
+          blocked = {"subprocess","socket","requests","httpx","urllib",
+                     "winreg","ctypes","streamlit","boto3","sqlite3","os","shutil"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(alias.name.split(".")[0] not in blocked for alias in node.names)
+              if isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in blocked
+          PY
