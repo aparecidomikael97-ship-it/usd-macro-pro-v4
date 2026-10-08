@@ -35,6 +35,8 @@ jobs:
           assert os.getenv("GITHUB_ACTIONS") == "true"
           assert os.getenv("RUNNER_OS") in ("Windows", "Linux")
           PY
+      - name: Install UI dependency used by existing navigation bridge
+        run: python -m pip install --disable-pip-version-check "streamlit==1.64.0"
       - name: Compile bridge and suite
         run: |
           python -m py_compile \
