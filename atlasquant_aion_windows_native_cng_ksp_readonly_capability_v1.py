@@ -79,7 +79,8 @@ def _status(status: Any) -> str:
 
 def _load_ncrypt() -> Any:
     """Local trusted-system DLL name, no caller-supplied path or provider."""
-    dll = ctypes.WinDLL("ncrypt.dll")
+    # LOAD_LIBRARY_SEARCH_SYSTEM32 avoids user-controlled DLL search paths.
+    dll = ctypes.WinDLL("ncrypt.dll", winmode=0x00000800)
     dll.NCryptOpenStorageProvider.argtypes = (
         ctypes.POINTER(ctypes.c_void_p), ctypes.c_wchar_p, ctypes.c_uint32)
     dll.NCryptOpenStorageProvider.restype = ctypes.c_long
