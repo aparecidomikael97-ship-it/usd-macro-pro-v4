@@ -56,6 +56,7 @@ class NativeCNGStatusDiagnosticTests(unittest.TestCase):
             0x80090020: "NTE_FAIL",
             0x80090008: "NTE_BAD_ALGID",
             0x8009002D: "NTE_INTERNAL_ERROR",
+            0x80090030: "NTE_DEVICE_NOT_READY",
         }
         for code, name in known.items():
             with self.subTest(name=name):
