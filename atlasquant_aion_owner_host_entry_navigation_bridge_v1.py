@@ -23,11 +23,10 @@ SCHEMA = "ATLASQUANT_AION_OWNER_HOST_ENTRY_NAVIGATION_BRIDGE_V1"
 _NAVIGATION = re.compile(
     r"(?:aion[\s,]+)?(?:abre|abrir|entra|entrar|vai|ir)\s+"
     r"(?:(?:a aba|a|o|na|no|para|pra)\s+)?"
-    r"(?P<target>central|atlasquant|trader|negocios|negócios|investimentos|aion)"
+    r"(?P<target>atlasquant|trader|negocios|negócios|investimentos|aion)"
     r"\s*\Z", re.IGNORECASE,
 )
 _TARGETS = {
-    "central": "central",
     "atlasquant": "central",
     "trader": "trader",
     "negocios": "negocios",
