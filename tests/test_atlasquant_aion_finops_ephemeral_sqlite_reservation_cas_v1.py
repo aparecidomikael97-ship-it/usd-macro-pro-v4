@@ -4,7 +4,7 @@ This test fixture writes only inside GitHub-hosted RUNNER_TEMP on pull_request.
 It does not use a REAL billing provider, real owner approval or production DB.
 """
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 import os
 from pathlib import Path
 import sqlite3
@@ -188,7 +188,7 @@ class AIONFinOpsEphemeralSQLiteReservationsV1Tests(unittest.TestCase):
 
     def test_above_remaining_balance_rejected(self):
         self.start()
-        self.assert_block(self.reserve(amount=8001),"ATOMIC_OWNER_HARD_CAP_EXCEEDED")
+        self.assert_block(self.reserve(amount=8001),"PROJECTED_OWNER_CAP_EXCEEDED")
         self.assertEqual(self.report()["reserved_cents"],0)
 
     def test_two_serial_reservations_no_double_spend(self):
@@ -277,8 +277,9 @@ class AIONFinOpsEphemeralSQLiteReservationsV1Tests(unittest.TestCase):
     def test_database_liability_counter_tamper_blocks_reuse(self):
         self.start()
         self.reserve()
-        with sqlite3.connect(self.path) as conn:
-            conn.execute("UPDATE month_state SET total_reserved_cents=0")
+        with closing(sqlite3.connect(self.path)) as conn:
+            with conn:
+                conn.execute("UPDATE month_state SET total_reserved_cents=0")
         self.assert_block(self.reserve(rid="ci-finops-req002"),
                           "CI_DATABASE_OR_ACCOUNTING_ERROR")
         self.assert_block(self.report(),"CI_DATABASE_OR_ACCOUNTING_ERROR")
