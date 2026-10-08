@@ -26,6 +26,7 @@ from atlasquant_aion_sealed_provider_outcome_reconciliation_v1 import (
     build_reconciliation_authorization,
     build_sealed_provider_call_boundary,
     outcome_chain_policy,
+    verify_outcome_chain_record,
 )
 
 
@@ -522,6 +523,58 @@ class AionSealedProviderOutcomeReconciliationV1Tests(unittest.TestCase):
             reconciliation["reconciled_outcome_state"],
             "STILL_OUTCOME_UNKNOWN",
         )
+
+    def test_record_verifier_detects_bound_field_and_boundary_tampering(self):
+        candidate, dispatch, runtime, boundary = self.boundary()
+        self.assertTrue(verify_outcome_chain_record(dispatch)["valid"])
+        self.assertTrue(verify_outcome_chain_record(runtime)["valid"])
+        self.assertTrue(verify_outcome_chain_record(boundary)["valid"])
+
+        tampered_binding = copy.deepcopy(boundary)
+        tampered_binding["provider_request_correlation_digest"] = D("0")
+        verified_binding = verify_outcome_chain_record(tampered_binding)
+        self.assertFalse(verified_binding["valid"])
+        self.assertIn("RECORD_DIGEST_MISMATCH", verified_binding["blockers"])
+
+        tampered_boundary = copy.deepcopy(boundary)
+        tampered_boundary["provider_called"] = True
+        verified_boundary = verify_outcome_chain_record(tampered_boundary)
+        self.assertFalse(verified_boundary["valid"])
+        self.assertIn(
+            "RECORD_BOUNDARY_INVALID:provider_called",
+            verified_boundary["blockers"],
+        )
+
+        receipt = self.unknown_receipt()
+        self.assertTrue(verify_outcome_chain_record(receipt)["valid"])
+        auth = self.reconciliation_auth(receipt)
+        self.assertTrue(verify_outcome_chain_record(auth)["valid"])
+
+        reconciliation = build_outcome_reconciliation(
+            receipt,
+            auth,
+            reconciliation_id="recon-verify",
+            evidence_class="PROVIDER_SIGNED_EVENT_OR_RECEIPT",
+            evidence_source_digest=RECON_SOURCE,
+            evidence_record_digest=RECON_RECORD,
+            provider_identity_match=True,
+            execution_id_match=True,
+            trace_id_match=True,
+            provider_request_correlation_match=True,
+            idempotency_key_match=True,
+            effect_key_match=True,
+            evidence_source_attested=True,
+            evidence_schema_valid=True,
+            evidence_authenticity_verified=True,
+            evidence_freshness_verified=True,
+            evidence_sequence_monotonic=True,
+            success_evidence_complete=True,
+            expected_postcondition_match=True,
+            terminal_failure_or_no_effect_evidence_complete=False,
+            conflicting_evidence_present=False,
+            observed_at=RECON_OBSERVED,
+        )
+        self.assertTrue(verify_outcome_chain_record(reconciliation)["valid"])
 
     def test_policy_is_fail_closed(self):
         policy = outcome_chain_policy()
