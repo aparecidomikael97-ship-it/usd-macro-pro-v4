@@ -1,0 +1,87 @@
+name: AION Repository Mutation Executor Boundary V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_repository_mutation_executor_boundary_v1.py"
+      - "tests/test_atlasquant_aion_repository_mutation_executor_boundary_v1.py"
+      - "docs/aion/AION_REPOSITORY_MUTATION_EXECUTOR_BOUNDARY_V1.md"
+      - ".github/workflows/aion-repository-mutation-executor-boundary-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  repository-mutation-executor-boundary-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile repository mutation executor boundary
+        run: |
+          python -m py_compile \
+            atlasquant_aion_repository_mutation_executor_boundary_v1.py \
+            tests/test_atlasquant_aion_repository_mutation_executor_boundary_v1.py
+
+      - name: Run repository mutation executor boundary tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_repository_mutation_executor_boundary_v1.py'
+
+      - name: Assert boundary cannot call GitHub
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_repository_mutation_executor_boundary_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import git",
+              "from git",
+              "import requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"authorization_consumed_by_this_module": False',
+              '"repository_mutation_request_generated": False',
+              '"repository_mutation_authorized_by_candidate": False',
+              '"repository_switch_allowed": False',
+              '"pr_switch_allowed": False',
+              '"mutation_switch_allowed": False',
+              '"scope_expansion_allowed": False',
+              '"api_request_generated": False',
+              '"api_method_selected": False',
+              '"api_endpoint_included": False',
+              '"credential_material_included": False',
+              '"github_api_called": False',
+              '"network_called": False',
+              '"repository_mutation_performed": False',
+              '"merge_executed": False',
+              '"retarget_executed": False',
+              '"draft_transition_executed": False',
+              '"branch_deleted": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
