@@ -1,0 +1,130 @@
+name: AION Windows Atomic Install Start File Transaction Journal V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_atomic_install_start_file_transaction_journal_v1.py"
+      - "tests/test_atlasquant_aion_windows_atomic_install_start_file_transaction_journal_v1.py"
+      - "docs/aion/AION_WINDOWS_ATOMIC_INSTALL_START_FILE_TRANSACTION_JOURNAL_V1.md"
+      - ".github/workflows/aion-windows-atomic-install-start-file-transaction-journal-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-atomic-install-start-file-transaction-journal-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile atomic install journal contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_atomic_install_start_file_transaction_journal_v1.py \
+            tests/test_atlasquant_aion_windows_atomic_install_start_file_transaction_journal_v1.py
+
+      - name: Run atomic install journal tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_atomic_install_start_file_transaction_journal_v1.py'
+
+      - name: Assert mutation layer remains design-only and non-installing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_atomic_install_start_file_transaction_journal_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import sqlite3",
+              "from sqlite3",
+              "import subprocess",
+              "from subprocess",
+              "import shutil",
+              "from shutil",
+              "import socket",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import httpx",
+              "win32file",
+              "win32process",
+              "win32service",
+              "win32security",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"write_ahead_install_commit_required":True',
+              '"owner_authorization_and_token_consumed_in_same_cas_required":True',
+              '"filesystem_mutation_in_database_transaction_claim_allowed":False',
+              '"journal_append_only_required":True',
+              '"journal_sequence_strict_required":True',
+              '"operation_reorder_allowed":False',
+              '"operation_delete_allowed":False',
+              '"operation_replace_allowed":False',
+              '"one_mutation_at_a_time_required":True',
+              '"before_state_capture_required":True',
+              '"after_state_readback_required":True',
+              '"rollback_binding_required_for_every_mutation":True',
+              '"automatic_forward_retry_after_unknown_allowed":False',
+              '"automatic_forward_continue_after_unknown_allowed":False',
+              '"unknown_requires_reconciliation":True',
+              '"unknown_requires_rollback_review":True',
+              '"terminal_failure_requires_authoritative_evidence":True',
+              '"ambiguity_overrides_requested_success":True',
+              '"rollback_reverse_order_required":True',
+              '"generic_chat_is_install_mutation_authority":False',
+              '"install_commit_writer_implemented":False',
+              '"journal_writer_implemented":False',
+              '"mutation_executor_implemented":False',
+              '"recovery_reconciler_implemented":False',
+              '"install_commitment_written":False',
+              '"owner_install_authorization_consumed":False',
+              '"install_token_consumed":False',
+              '"journal_persisted":False',
+              '"installation_started":False',
+              '"files_copied":False',
+              '"filesystem_modified":False',
+              '"windows_acl_modified":False',
+              '"windows_registry_modified":False',
+              '"startup_entry_created":False',
+              '"scheduled_task_installed":False',
+              '"windows_service_installed":False',
+              '"rollback_performed":False',
+              '"package_installed":False',
+              '"process_spawned":False',
+              '"network_called":False',
+              '"github_api_called":False',
+              '"live_repository_mutation_authorized":False',
+              '"live_repository_mutation_performed":False',
+              '"production_repository_mutation_performed":False',
+              '"deploy_executed":False',
+              '"worker_activated":False',
+              '"provider_activated":False',
+              '"production_persistence_activated":False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
