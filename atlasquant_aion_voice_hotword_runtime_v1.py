@@ -359,7 +359,7 @@ def voice_state_transition(
     if action in {"ENABLE", "START_LISTENING", "WAKE_DETECTED", "PUSH_TO_TALK"}:
         if microphone_permission is not True:
             blockers.append("MICROPHONE_PERMISSION_REQUIRED")
-        if action != "PUSH_TO_TALK" and app_active is not True:
+        if app_active is not True:
             blockers.append("APP_ACTIVE_REQUIRED")
         if privacy_pause is True:
             blockers.append("PRIVACY_PAUSE_ACTIVE")
