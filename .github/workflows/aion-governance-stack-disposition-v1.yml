@@ -1,0 +1,82 @@
+name: AION Governance Stack Disposition V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_governance_stack_disposition_v1.py"
+      - "tests/test_atlasquant_aion_governance_stack_disposition_v1.py"
+      - "docs/aion/AION_GOVERNANCE_STACK_DISPOSITION_V1.md"
+      - ".github/workflows/aion-governance-stack-disposition-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  governance-stack-disposition-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile governance disposition contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_governance_stack_disposition_v1.py \
+            tests/test_atlasquant_aion_governance_stack_disposition_v1.py
+
+      - name: Run governance disposition tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_governance_stack_disposition_v1.py'
+
+      - name: Assert no governance mutation authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_governance_stack_disposition_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import git",
+              "from git",
+              "import requests",
+              "urllib.request",
+              "import socket",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"skip_middle_pr_allowed": False',
+              '"close_current_governance_pr_unmerged_allowed": False',
+              '"governance_merge_authorized": False',
+              '"pr_close_authorized": False',
+              '"retarget_authorized": False',
+              '"rebase_authorized": False',
+              '"branch_delete_authorized": False',
+              '"automatic_merge_allowed": False',
+              '"automatic_close_allowed": False',
+              '"automatic_retarget_allowed": False',
+              '"automatic_rebase_allowed": False',
+              '"automatic_branch_delete_allowed": False',
+              '"automatic_deploy_allowed": False',
+              '"worker_activation_allowed": False',
+              '"provider_activation_allowed": False',
+              '"production_persistence_activation_allowed": False',
+              '"repository_mutation_performed": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
