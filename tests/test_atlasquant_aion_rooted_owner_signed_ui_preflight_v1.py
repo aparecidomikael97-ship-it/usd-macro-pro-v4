@@ -165,10 +165,13 @@ class RootedOwnerSignedUIIntegrationTests(TestCase):
         p = self.make_proof(signer=s) if proof is None else proof
         command = "" if kind == "greeting" else text
         requested_scope = SCOPE_GREETING if kind == "greeting" else SCOPE_NAV
-        signable_command = command if type(command) is str and len(command) <= 160 else "AION, abre Trader"
+        signable_command = command if type(command) is str and 1 <= len(command) <= 160 else "AION, abre Trader"
+        if kind == "greeting":
+            signable_command = ""
+        signable_device = h.device_kind if isinstance(h, HostEvidence) and h.device_kind in ("DESKTOP", "MOBILE") else "DESKTOP"
         intent_obj = self.make_intent(
             p, text=signable_command, scope=requested_scope,
-            device=h.device_kind if isinstance(h, HostEvidence) else "DESKTOP",
+            device=signable_device,
         ) if intent is None else intent
         root_signature = self.reg_sig(reg) if reg_sig is None else reg_sig
         owner_signature = self.proof_sig(p, signer=s) if proof_sig is None else proof_sig
