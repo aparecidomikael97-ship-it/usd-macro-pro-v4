@@ -1,0 +1,102 @@
+name: AION Native CNG Status Diagnostics V2 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_native_cng_status_diagnostic_v2.py"
+      - "tests/test_atlasquant_aion_native_cng_status_diagnostic_v2.py"
+      - "docs/aion/AION_NATIVE_CNG_STATUS_DIAGNOSTIC_V2.md"
+      - ".github/workflows/aion-native-cng-status-diagnostic-ci-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native-status-codes-only:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Ensure ephemeral PR CI only
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          PY
+      - name: Compile schema and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_native_cng_status_diagnostic_v2.py \
+            tests/test_atlasquant_aion_native_cng_status_diagnostic_v2.py
+      - name: Run exact-status negative and Windows-native unit tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_native_cng_status_diagnostic_v2.py'
+      - name: Sanitized disposable Windows KSP status taxonomy
+        if: runner.os == 'Windows'
+        run: |
+          python - <<'PY'
+          import json,secrets
+          from atlasquant_aion_native_cng_status_diagnostic_v2 import (
+              probe_native_platform_provider_status_codes_readonly)
+          r=probe_native_platform_provider_status_codes_readonly(secrets.token_hex(32))
+          print(json.dumps({
+              "state":r["state"], "reason":r["reason"],
+              "provider_opened":r["provider_opened"],
+              "open_status":r["open_status"],
+              "algorithm_statuses":r["algorithm_statuses"],
+              "release_confirmed":r["handle_release_confirmed"],
+              "private_key_created":r["private_key_created"],
+              "installer_authorized":r["installer_authorized"],
+              "system_security_state_modified":r["system_security_state_modified"],
+          },sort_keys=True))
+          assert not r["private_key_created"]
+          assert not r["installer_authorized"]
+          assert not r["system_security_state_modified"]
+          PY
+      - name: Deny imports of OS mutation and unapproved native key operations
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          p=Path("atlasquant_aion_native_cng_status_diagnostic_v2.py")
+          t=p.read_text("utf-8")
+          tree=ast.parse(t)
+          banned={"subprocess","socket","winreg","requests","urllib","httpx",
+                  "os","pathlib","shutil","tempfile"}
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Import):
+                  assert all(x.name.split(".")[0] not in banned for x in node.names)
+              if isinstance(node,ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in banned
+              if isinstance(node,ast.Attribute) and node.attr.startswith("NCrypt"):
+                  assert node.attr in {
+                      "NCryptOpenStorageProvider", "NCryptIsAlgSupported",
+                      "NCryptFreeObject"
+                  }
+          for literal in (
+              '"private_key_created": False',
+              '"private_key_opened": False',
+              '"private_key_enrolled": False',
+              '"system_security_state_modified": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert literal in t,literal
+          PY
