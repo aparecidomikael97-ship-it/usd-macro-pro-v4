@@ -1,0 +1,80 @@
+name: AION GitHub Mutation Outcome Reconciliation V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_github_mutation_outcome_reconciliation_v1.py"
+      - "tests/test_atlasquant_aion_github_mutation_outcome_reconciliation_v1.py"
+      - "docs/aion/AION_GITHUB_MUTATION_OUTCOME_RECONCILIATION_V1.md"
+      - ".github/workflows/aion-github-mutation-outcome-reconciliation-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  github-mutation-outcome-reconciliation-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile GitHub mutation outcome reconciliation contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_github_mutation_outcome_reconciliation_v1.py \
+            tests/test_atlasquant_aion_github_mutation_outcome_reconciliation_v1.py
+
+      - name: Run GitHub mutation outcome reconciliation tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_github_mutation_outcome_reconciliation_v1.py'
+
+      - name: Assert reconciliation never retries or mutates
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_github_mutation_outcome_reconciliation_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import git",
+              "from git",
+              "import requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"authorization_reuse_allowed": False',
+              '"provider_query_authorized_by_this_module": False',
+              '"github_query_performed_by_this_module": False',
+              '"network_called_by_this_module": False',
+              '"original_receipt_mutated": False',
+              '"retry_authorized": False',
+              '"new_attempt_authorized": False',
+              '"reconciliation_is_retry": False',
+              '"repository_mutation_replayed": False',
+              '"automatic_retry_allowed": False',
+              '"retry_scheduled": False',
+              '"retry_performed": False',
+              '"authorization_consumed_by_this_module": False',
+              '"evidence_queried_by_this_module": False',
+              '"repository_mutation_performed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
