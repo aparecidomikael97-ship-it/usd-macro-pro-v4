@@ -49,7 +49,12 @@ not directly from untrusted claimant fields.
   storage design with ACL, recovery, TPM/protected-monotonic-anchor validation,
   rollback/fork handling, durable attestation and explicit owner enrollment.
 - Approved binary/manifest digests in policy do NOT prove physical executable
-  measurement or physical collector neutrality.
+  measurement or physical collector neutrality. This gate separately requires
+  external binary and manifest observation digests with strict syntax and exact
+  match to the signed approved values. Those measurements must be supplied
+  by an independently trusted measurement source; a pure Python function
+  cannot authenticate that source or turn synthetic CI measurements into
+  actual physical provenance.
 - No proof that holder of an Ed25519 private key is a specific human,
   no actual enrollment, and no physical 12/12 #1049, 16/16 #1087 network proofs.
 - A coherent synthetic signed snapshot is just a coherent signed snapshot;
