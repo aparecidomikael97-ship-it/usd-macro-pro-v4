@@ -1,12 +1,8 @@
 name: AION Owner Raw API Import Boundary V1
 
+# No paths filter: any future PR changing Python app/host code must run this.
 on:
   pull_request:
-    paths:
-      - "atlasquant_aion_owner_raw_api_import_gate_v1.py"
-      - "tests/test_atlasquant_aion_owner_raw_api_import_gate_v1.py"
-      - "docs/aion/AION_OWNER_RAW_API_IMPORT_BOUNDARY_V1.md"
-      - ".github/workflows/aion-owner-raw-api-import-boundary-v1.yml"
 
 permissions:
   contents: read
