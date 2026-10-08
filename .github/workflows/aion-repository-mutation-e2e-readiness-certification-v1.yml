@@ -1,0 +1,85 @@
+name: AION Repository Mutation E2E Readiness Certification V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_repository_mutation_e2e_readiness_certification_v1.py"
+      - "tests/test_atlasquant_aion_repository_mutation_e2e_readiness_certification_v1.py"
+      - "docs/aion/AION_REPOSITORY_MUTATION_E2E_READINESS_CERTIFICATION_V1.md"
+      - ".github/workflows/aion-repository-mutation-e2e-readiness-certification-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  repository-mutation-e2e-readiness-certification-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile E2E readiness certification
+        run: |
+          python -m py_compile \
+            atlasquant_aion_repository_mutation_e2e_readiness_certification_v1.py \
+            tests/test_atlasquant_aion_repository_mutation_e2e_readiness_certification_v1.py
+
+      - name: Run E2E readiness certification tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_repository_mutation_e2e_readiness_certification_v1.py'
+
+      - name: Assert contract readiness is not live mutation readiness
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_repository_mutation_e2e_readiness_certification_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import git",
+              "from git",
+              "import requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"ready_for_live_repository_mutation": False',
+              '"ready_for_production_repository_mutation": False',
+              '"real_owner_signature_verified": False',
+              '"physical_runtime_components_implemented": False',
+              '"live_github_mutation_adapter_installed": False',
+              '"runtime_credentials_bound": False',
+              '"durable_replay_and_persistence_bound": False',
+              '"live_github_state_reader_bound": False',
+              '"live_network_mutation_path_tested": False',
+              '"live_repository_mutation_authorized": False',
+              '"repository_mutation_performed": False',
+              '"merge_executed": False',
+              '"retarget_executed": False',
+              '"draft_transition_executed": False',
+              '"branch_deleted": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
