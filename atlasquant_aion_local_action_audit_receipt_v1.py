@@ -199,6 +199,18 @@ def _dispatch_digest(dispatch: Mapping[str, Any]) -> str:
     return _digest(dict(dispatch))
 
 
+def local_action_set_digest(request: Mapping[str, Any] | None) -> str:
+    """Canonical logical action-set digest for the future signed adapter."""
+    return _action_set_digest(dict(request or {}))
+
+
+def dispatch_readiness_digest(
+    dispatch_readiness: Mapping[str, Any] | None,
+) -> str:
+    """Canonical digest of the non-executing dispatch-readiness decision."""
+    return _dispatch_digest(dict(dispatch_readiness or {}))
+
+
 def _validate_dispatch(
     request: Mapping[str, Any],
     dispatch_readiness: Mapping[str, Any] | None,
@@ -621,6 +633,8 @@ __all__ = [
     "ACTION_OUTCOME_STATES",
     "AMBIGUITY_TRIGGERS",
     "EVIDENCE_KINDS",
+    "local_action_set_digest",
+    "dispatch_readiness_digest",
     "build_local_action_audit_receipt",
     "verify_local_action_audit_receipt",
     "local_action_audit_policy",
