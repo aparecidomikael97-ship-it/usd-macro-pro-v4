@@ -1,0 +1,96 @@
+name: AION Sealed Provider Outcome Reconciliation V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py"
+      - "tests/test_atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py"
+      - "docs/aion/AION_SEALED_PROVIDER_OUTCOME_RECONCILIATION_V1.md"
+      - ".github/workflows/aion-sealed-provider-outcome-reconciliation-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sealed-provider-outcome-reconciliation-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile outcome chain contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py \
+            tests/test_atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py
+
+      - name: Run outcome chain tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py'
+
+      - name: Assert no-call no-retry boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_sealed_provider_outcome_reconciliation_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import socket",
+              "import requests",
+              "urllib.request",
+              "import smtplib",
+              "import subprocess",
+              "from subprocess",
+              "import sqlite3",
+              "from sqlite3",
+              "import win32com",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"dispatch_written_by_this_module": False',
+              '"authorization_consumed_by_this_module": False',
+              '"raw_endpoint_included": False',
+              '"raw_credential_included": False',
+              '"secret_material_included": False',
+              '"exactly_one_call_attempt_allowed": True',
+              '"provider_switch_allowed": False',
+              '"endpoint_switch_allowed": False',
+              '"credential_switch_allowed": False',
+              '"payload_mutation_allowed": False',
+              '"success_inferred_from_silence": False',
+              '"failure_inferred_from_silence": False',
+              '"outcome_unknown_automatic_retry_allowed": False',
+              '"outcome_unknown_requires_separate_reconciliation": True',
+              '"original_receipt_mutable": False',
+              '"retry_executed": False',
+              '"original_receipt_mutated": False',
+              '"reconciliation_is_retry": False',
+              '"external_effect_replayed": False',
+              '"automatic_retry_allowed": False',
+              '"new_attempt_authorized": False',
+              '"provider_called": False',
+              '"network_called": False',
+              '"message_sent": False',
+              '"contract_exported": False',
+              '"signature_requested": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
