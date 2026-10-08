@@ -1,0 +1,89 @@
+name: AION Windows Native Readonly Verifier Preflight V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_native_readonly_preflight_v1.py"
+      - "tests/test_atlasquant_aion_windows_native_readonly_preflight_v1.py"
+      - "docs/aion/AION_WINDOWS_NATIVE_READONLY_VERIFIER_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-windows-native-readonly-verifier-preflight-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-native-readonly-preflight:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Assert isolated Windows PR runner context
+        run: |
+          python - <<'PY'
+          import os, sys
+          assert os.name == "nt", os.name
+          assert sys.platform == "win32", sys.platform
+          assert sys.version_info[:2] == (3, 12), sys.version
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["RUNNER_OS"] == "Windows"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.path.isdir(os.environ["RUNNER_TEMP"])
+          PY
+
+      - name: Compile Windows native read-only module and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_native_readonly_preflight_v1.py \
+            tests/test_atlasquant_aion_windows_native_readonly_preflight_v1.py
+
+      - name: Test native read-only Windows observations and trust ceilings
+        env:
+          AION_NATIVE_READONLY_PREFLIGHT: "1"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_native_readonly_preflight_v1.py'
+
+      - name: Static boundary and explicit non-actions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_windows_native_readonly_preflight_v1.py").read_text(encoding="utf-8")
+          forbidden = (
+              "import subprocess", "from subprocess", "import socket",
+              "from socket", "import requests", "urllib.request",
+              "import httpx", "import win32service", "import win32process",
+              "winreg.SetValue", "winreg.CreateKey", "winreg.DeleteKey",
+              "os.startfile(", "os.system(", "os.exec",
+              "shutil.copy", "shutil.move", "Path.write_bytes(",
+              "Path.write_text(", "CreateServiceW", "SetNamedSecurityInfoW",
+              "RegSetValue", "RegCreateKey", "RegDeleteKey",
+              "ShellExecuteW", "CreateProcessW",
+          )
+          for marker in forbidden:
+              assert marker not in source, marker
+          from atlasquant_aion_windows_native_readonly_preflight_v1 import native_preflight_policy
+          p = native_preflight_policy()
+          assert p["test_only"] is True
+          assert p["native_windows_readonly_api_calls"] is True
+          for key in (
+              "physical_ci_disk_writes_performed", "owner_pc_read_or_written",
+              "human_owner_sid_verified", "aion_installed",
+              "aion_binary_or_signer_verified", "aion_startup_entry_verified",
+              "aion_owner_acl_verified", "aion_process_running_verified",
+              "real_boot_transition_proven", "actual_reboot_performed",
+              "aion_runtime_health_verified", "independent_attestor_authenticated",
+              "trusted_evidence_issued", "owner_auth_consumed",
+              "install_token_consumed", "registry_modified", "acl_modified",
+              "startup_modified", "service_created", "package_installed",
+              "deploy_executed", "worker_activated",
+          ):
+              assert p[key] is False, key
+          PY
