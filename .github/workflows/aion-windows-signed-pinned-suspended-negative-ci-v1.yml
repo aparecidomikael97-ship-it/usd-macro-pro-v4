@@ -1,0 +1,94 @@
+name: AION Windows Signed Pinned Suspended Binary Negative CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_signed_binary_ci_negative_intent_v1.py"
+      - "atlasquant_aion_windows_pinned_suspended_ci_negative_v1.py"
+      - "tests/test_atlasquant_aion_windows_signed_pinned_ci_negative_v1.py"
+      - "docs/aion/AION_WINDOWS_SIGNED_PINNED_SUSPENDED_BINARY_NEGATIVE_CI_V1.md"
+      - ".github/workflows/aion-windows-signed-pinned-suspended-negative-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  signed-executable-negative-gate:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce pull request CI scope
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS")=="true"
+          assert os.environ.get("GITHUB_EVENT_NAME")=="pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          assert os.environ.get("GITHUB_RUN_ID")
+          PY
+      - name: Install pinned Ed25519 verification runtime only in CI runner
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+          python - <<'PY'
+          import cryptography
+          assert cryptography.__version__ == "50.0.2",cryptography.__version__
+          PY
+      - name: Compile signed manifest and Windows negative harness
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_signed_binary_ci_negative_intent_v1.py \
+            atlasquant_aion_windows_pinned_suspended_ci_negative_v1.py \
+            tests/test_atlasquant_aion_windows_signed_pinned_ci_negative_v1.py
+      - name: Run Ed25519 adversarial security cases and Win32 negative probe
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_signed_pinned_ci_negative_v1.py'
+      - name: Repeat native negative fixture on fresh Windows CI scratch
+        if: runner.os == 'Windows'
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python atlasquant_aion_windows_pinned_suspended_ci_negative_v1.py
+      - name: Guard against unsafe native process resume or production authority
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          files=[
+            "atlasquant_aion_windows_signed_binary_ci_negative_intent_v1.py",
+            "atlasquant_aion_windows_pinned_suspended_ci_negative_v1.py",
+          ]
+          prohibited={
+            "ResumeThread","NtResumeProcess",
+            "CreateAppContainerProfile","DeleteAppContainerProfile",
+            "FwpmFilterAdd0","FwpmFilterDeleteById0",
+            "SetTokenInformation","NetworkIsolationSetAppContainerConfig",
+          }
+          for path in files:
+            tree=ast.parse(Path(path).read_text("utf-8"))
+            for node in ast.walk(tree):
+              if isinstance(node,ast.Attribute):
+                assert node.attr not in prohibited,(path,node.attr)
+              if isinstance(node,ast.Call) and isinstance(node.func,ast.Name):
+                assert node.func.id not in prohibited,(path,node.func.id)
+          from atlasquant_aion_windows_signed_binary_ci_negative_intent_v1 import check_signed_ci_negative_intent
+          r=check_signed_ci_negative_intent({},b"",b"",observed_image_path="",observed_image_sha256="",now=0)
+          assert r["safe_to_resume"] is False
+          assert r["installer_authorized"] is False
+          assert r["build_authorized"] is False
+          assert r["deploy_authorized"] is False
+          assert r["network_deny_verified"] is False
+          PY
