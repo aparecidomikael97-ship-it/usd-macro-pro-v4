@@ -349,7 +349,7 @@ class RootSignedOwnerRegistryPreflightTests(TestCase):
         ), "REGISTRY_MALFORMED")
 
     def test_canonical_base64_enforced_on_root_signature(self):
-        for sig in ("invalid!", "AAAA", "A"*200, "", True, None):
+        for sig in ("invalid!", "AAAA", "A"*200, "", True, 42):
             with self.subTest(sig=str(sig)[:10]):
                 self.assert_rejected(
                     self.evaluate(signature=sig), "REGISTRY_SIGNATURE_INVALID"
