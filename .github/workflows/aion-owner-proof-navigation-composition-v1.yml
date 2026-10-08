@@ -1,0 +1,66 @@
+name: AION Owner Proof Navigation Composition V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_proof_navigation_composition_v1.py"
+      - "tests/test_atlasquant_aion_owner_proof_navigation_composition_v1.py"
+      - "docs/aion/AION_OWNER_PROOF_NAVIGATION_COMPOSITION_V1.md"
+      - ".github/workflows/aion-owner-proof-navigation-composition-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-signed-navigation-offline:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify PR-only scratch runner
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv('GITHUB_EVENT_NAME') == 'pull_request'
+          assert os.getenv('RUNNER_OS') in ('Windows', 'Linux')
+          assert os.getenv('GITHUB_ACTIONS') == 'true'
+          PY
+      - name: Pin ephemeral test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+      - name: Compile proof-to-navigation composition and test fixtures
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_proof_navigation_composition_v1.py \
+            tests/test_atlasquant_aion_owner_proof_navigation_composition_v1.py
+      - name: Execute 16 offline adversarial composition tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_proof_navigation_composition_v1.py'
+      - name: Static guard no subprocess or provider/network imports
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          target = Path('atlasquant_aion_owner_proof_navigation_composition_v1.py')
+          tree = ast.parse(target.read_text('utf-8'))
+          forbidden = {'subprocess','socket','requests','httpx','urllib','ctypes',
+                       'winreg','streamlit','boto3','shutil','os'}
+          for n in ast.walk(tree):
+              if isinstance(n, ast.Import):
+                  assert all(a.name.split('.')[0] not in forbidden for a in n.names)
+              if isinstance(n, ast.ImportFrom):
+                  assert (n.module or '').split('.')[0] not in forbidden
+          PY
