@@ -1,0 +1,67 @@
+name: AION Trusted Owner Session Crypto Proof V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_trusted_owner_host_crypto_proof_v1.py"
+      - "tests/test_atlasquant_aion_trusted_owner_host_crypto_proof_v1.py"
+      - "docs/aion/AION_TRUSTED_OWNER_HOST_CRYPTO_PROOF_V1.md"
+      - ".github/workflows/aion-trusted-owner-host-crypto-proof-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-owner-crypto:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify PR and scratch runner boundary
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          assert os.getenv("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.getenv("GITHUB_ACTIONS") == "true"
+          assert os.getenv("RUNNER_OS") in ("Windows", "Linux")
+          assert Path(os.environ["RUNNER_TEMP"]).is_dir()
+          PY
+      - name: Pin isolated cryptographic test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2" "streamlit==1.64.0"
+      - name: Compile owner verifier and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_trusted_owner_host_crypto_proof_v1.py \
+            tests/test_atlasquant_aion_trusted_owner_host_crypto_proof_v1.py
+      - name: Verify ephemeral Ed25519 proof and durable replay
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_trusted_owner_host_crypto_proof_v1.py'
+      - name: Static guard no process, provider or Windows mutation APIs
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          module = ast.parse(Path("atlasquant_aion_trusted_owner_host_crypto_proof_v1.py").read_text("utf-8"))
+          forbidden = {"subprocess", "socket", "requests", "httpx", "urllib",
+                       "ctypes", "winreg", "boto3", "shutil", "streamlit"}
+          for node in ast.walk(module):
+              if isinstance(node, ast.Import):
+                  assert all(alias.name.split(".")[0] not in forbidden for alias in node.names)
+              elif isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+          PY
