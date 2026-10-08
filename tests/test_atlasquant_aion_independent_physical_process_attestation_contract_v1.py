@@ -236,7 +236,7 @@ class IndependentPhysicalProcessAttestationTests(unittest.TestCase):
                 td, challenge=challenge, attestation=attestation,
                 signature=signature,
             )
-        self.assertEqual(result["reason"], "")
+        self.assertEqual(result["reason"], "COLLECTOR_SIGNATURE_INVALID")
         self.assertEqual(result["state"], "BLOCKED")
         self.assert_no_physical_authority(result)
 
