@@ -200,6 +200,11 @@ def _forbidden_command_marker(text: str) -> str:
     return ""
 
 
+def _command_targets(command_text: str) -> list[str]:
+    folded = command_text.casefold()
+    return [app_id for app_id in APP_REGISTRY if app_id in folded]
+
+
 def _media_query(command_text: str, target: str) -> str:
     if target != "spotify":
         return ""
@@ -298,6 +303,12 @@ def build_local_action_request(
 
     if not command:
         blockers.append("COMMAND_TEXT_REQUIRED")
+    else:
+        mentioned_targets = _command_targets(command)
+        if target and target not in mentioned_targets:
+            blockers.append("PLANNED_TARGET_NOT_PRESENT_IN_COMMAND")
+        if len(mentioned_targets) != 1:
+            blockers.append("COMMAND_TARGET_AMBIGUOUS")
     if not subject:
         blockers.append("OWNER_SUBJECT_REQUIRED")
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", binding_digest):
