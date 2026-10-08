@@ -1,0 +1,87 @@
+name: AION Outbound Terminal Audit Certificate V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_outbound_terminal_audit_certificate_v1.py"
+      - "tests/test_atlasquant_aion_outbound_terminal_audit_certificate_v1.py"
+      - "docs/aion/AION_OUTBOUND_TERMINAL_AUDIT_CERTIFICATE_V1.md"
+      - ".github/workflows/aion-outbound-terminal-audit-certificate-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  outbound-terminal-audit-certificate-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile terminal chain contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_outbound_terminal_audit_certificate_v1.py \
+            tests/test_atlasquant_aion_outbound_terminal_audit_certificate_v1.py
+
+      - name: Run terminal chain tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_outbound_terminal_audit_certificate_v1.py'
+
+      - name: Assert terminal read-only boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_outbound_terminal_audit_certificate_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import socket",
+              "import requests",
+              "urllib.request",
+              "import smtplib",
+              "import sqlite3",
+              "from sqlite3",
+              "import subprocess",
+              "from subprocess",
+              "import win32com",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"unknown_outcome_can_be_finalized": False',
+              '"still_unknown_outcome_can_be_finalized": False',
+              '"finalization_is_retry": False',
+              '"execution_reopen_allowed": False',
+              '"audit_seal_is_immutable": True',
+              '"audit_seal_is_append_only": True',
+              '"audit_seal_creates_execution_authority": False',
+              '"terminal_certificate_is_read_only": True',
+              '"terminal_certificate_is_execution_authorization": False',
+              '"terminal_certificate_authorizes_retry": False',
+              '"terminal_certificate_authorizes_reopen": False',
+              '"terminal_certificate_is_real_signature": False',
+              '"provider_called": False',
+              '"network_called": False',
+              '"message_sent": False',
+              '"contract_exported": False',
+              '"signature_requested": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
