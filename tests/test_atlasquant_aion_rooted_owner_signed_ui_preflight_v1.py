@@ -165,8 +165,9 @@ class RootedOwnerSignedUIIntegrationTests(TestCase):
         p = self.make_proof(signer=s) if proof is None else proof
         command = "" if kind == "greeting" else text
         requested_scope = SCOPE_GREETING if kind == "greeting" else SCOPE_NAV
+        signable_command = command if type(command) is str and len(command) <= 160 else "AION, abre Trader"
         intent_obj = self.make_intent(
-            p, text=command, scope=requested_scope,
+            p, text=signable_command, scope=requested_scope,
             device=h.device_kind if isinstance(h, HostEvidence) else "DESKTOP",
         ) if intent is None else intent
         root_signature = self.reg_sig(reg) if reg_sig is None else reg_sig
@@ -348,7 +349,9 @@ class RootedOwnerSignedUIIntegrationTests(TestCase):
         self.blocked(state, r, "SIGNED_OWNER_INTENT_OR_NAVIGATION_REJECTED")
 
     def test_signed_command_swap_rejected(self):
-        state, r = self.invoke(text="AION, abre Investimentos")
+        proof = self.make_proof()
+        signed_trader_intent = self.make_intent(proof)
+        state, r = self.invoke(text="AION, abre Investimentos", intent=signed_trader_intent)
         self.blocked(state, r, "SIGNED_OWNER_INTENT_OR_NAVIGATION_REJECTED")
 
     def test_greeting_scope_signature_not_usable_for_nav(self):
