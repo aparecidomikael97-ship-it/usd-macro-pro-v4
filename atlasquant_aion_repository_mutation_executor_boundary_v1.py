@@ -244,6 +244,7 @@ def build_authorization_consumption_candidate(
         "authorization_persistence_attestation_digest": _sha256(
             persistence.get("persistence_attestation_digest")
         ),
+        "authorization_expires_at": auth.get("expires_at"),
         "execution_time_preflight_digest": _sha256(
             rebuilt.get("preflight_digest")
         ),
@@ -332,6 +333,12 @@ def build_atomic_consumption_attestation(
 
     try:
         consumed = _aware(consumed_at, "consumed_at")
+        expires = _aware(
+            candidate.get("authorization_expires_at"),
+            "authorization_expires_at",
+        )
+        if consumed > expires:
+            blockers.append("AUTHORIZATION_CONSUMED_AFTER_EXPIRY")
     except ValueError:
         consumed = None
         blockers.append("CONSUMPTION_TIME_INVALID")
@@ -342,6 +349,7 @@ def build_atomic_consumption_attestation(
         "authorization_receipt_digest": _sha256(
             candidate.get("authorization_receipt_digest")
         ),
+        "authorization_expires_at": candidate.get("authorization_expires_at"),
         "execution_attempt_id": candidate.get("execution_attempt_id"),
         "pr_number": candidate.get("pr_number"),
         "requested_mutation": candidate.get("requested_mutation"),
@@ -442,11 +450,17 @@ def build_repository_mutation_executor_boundary(
     try:
         checked = _aware(checked_at, "checked_at")
         current = _aware(now, "now")
+        consumed_at_dt = _aware(consumed.get("consumed_at"), "consumed_at")
         age = (current - checked).total_seconds()
+        consumption_age = (current - consumed_at_dt).total_seconds()
         if age < 0:
             blockers.append("ADAPTER_PREFLIGHT_FROM_FUTURE")
         if age > MAX_EXECUTION_PREFLIGHT_AGE_SECONDS:
             blockers.append("ADAPTER_PREFLIGHT_STALE")
+        if consumption_age < 0:
+            blockers.append("AUTHORIZATION_CONSUMPTION_FROM_FUTURE")
+        if consumption_age > MAX_EXECUTION_PREFLIGHT_AGE_SECONDS:
+            blockers.append("AUTHORIZATION_CONSUMPTION_STALE")
     except ValueError:
         checked = None
         blockers.append("ADAPTER_PREFLIGHT_TIME_INVALID")
@@ -460,6 +474,7 @@ def build_repository_mutation_executor_boundary(
         "consumption_attestation_digest": _sha256(
             consumed.get("consumption_attestation_digest")
         ),
+        "authorization_consumed_at": consumed.get("consumed_at"),
         "repository_ref_digest": _sha256(
             candidate.get("repository_ref_digest")
         ),
@@ -552,6 +567,7 @@ def verify_executor_boundary(
             "execution_attempt_id",
             "authorization_receipt_digest",
             "consumption_attestation_digest",
+            "authorization_consumed_at",
             "repository_ref_digest",
             "pr_number",
             "requested_mutation",
