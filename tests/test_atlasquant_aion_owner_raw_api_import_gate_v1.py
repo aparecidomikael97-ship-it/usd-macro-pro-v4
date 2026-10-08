@@ -89,6 +89,44 @@ class OwnerRawImportBoundaryTest(TestCase):
         violations = self.find(f'importlib.import_module(name="{ROOTED}")')
         self.assertEqual(violations[0].module, ROOTED)
 
+    def test_run_path_literal_file_loading_is_blocked(self):
+        violation = self.find(
+            f'import runpy\nrunpy.run_path("native/{ROOTED}.py")'
+        )
+        self.assertEqual(violation[0].module, ROOTED)
+
+    def test_run_path_windows_file_loading_is_blocked(self):
+        violation = self.find(
+            f'import runpy\nrunpy.run_path(r"C:\\atlasquant\\{PROOF}.py")'
+        )
+        self.assertEqual(violation[0].module, PROOF)
+
+    def test_file_location_literal_is_blocked(self):
+        violation = self.find(
+            f'import importlib.util\n'
+            f'importlib.util.spec_from_file_location("helper", "{REGISTRY}.py")'
+        )
+        self.assertEqual(violation[0].module, REGISTRY)
+
+    def test_literal_exec_code_with_protected_import_is_blocked(self):
+        violation = self.find(
+            f'exec("from {INTENT} import request_intent_bound_navigation")'
+        )
+        self.assertEqual(violation[0].module, INTENT)
+
+    def test_unrelated_exec_literal_remains_unrestricted_by_this_policy(self):
+        self.assertEqual(self.find('exec("x = 4")'), [])
+
+    def test_unfiltered_pr_workflow_is_protected_against_regression(self):
+        # Test reads only the workflow file present in the scratch CI checkout.
+        path = Path(".github/workflows/aion-owner-raw-api-import-boundary-v1.yml")
+        if not path.exists():
+            self.skipTest("workflow file not part of isolated fixture run")
+        workflow = path.read_text(encoding="utf-8")
+        self.assertIn("on:\n  pull_request:", workflow)
+        self.assertNotIn("\n    paths:", workflow)
+        self.assertNotIn("\n    paths-ignore:", workflow)
+
     def test_package_relative_import_cannot_bypass(self):
         violations = self.find(f"from . import {REGISTRY}")
         self.assertEqual(violations[0].module, REGISTRY)
