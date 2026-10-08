@@ -1,0 +1,77 @@
+name: AION Windows Installation Completion Postinstall Rollback Receipt V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_install_completion_postinstall_rollback_receipt_v1.py"
+      - "tests/test_atlasquant_aion_windows_install_completion_postinstall_rollback_receipt_v1.py"
+      - "docs/aion/AION_WINDOWS_INSTALL_COMPLETION_POSTINSTALL_VERIFICATION_ROLLBACK_RECEIPT_V1.md"
+      - ".github/workflows/aion-windows-install-completion-postinstall-rollback-receipt-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-install-completion-postinstall-rollback-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2"
+          PY
+
+      - name: Compile standalone contract and test
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_install_completion_postinstall_rollback_receipt_v1.py \
+            tests/test_atlasquant_aion_windows_install_completion_postinstall_rollback_receipt_v1.py
+
+      - name: Run adversarial completion and rollback tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_install_completion_postinstall_rollback_receipt_v1.py'
+
+      - name: Assert design-only and non-installing boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("atlasquant_aion_windows_install_completion_postinstall_rollback_receipt_v1.py").read_text(encoding="utf-8")
+          forbidden_imports = (
+              "import sqlite3", "from sqlite3", "import subprocess", "from subprocess",
+              "import shutil", "from shutil", "import socket", "from socket",
+              "import requests", "from requests", "urllib.request",
+              "import httpx", "win32file", "win32process", "win32service",
+              "win32security", "winreg", "os.system", "os.exec", "pathlib.Path.write",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+          from atlasquant_aion_windows_install_completion_postinstall_rollback_receipt_v1 import completion_policy
+          p = completion_policy()
+          required_false = (
+              "journal_finished_means_installed", "success_on_missing_health_allowed",
+              "success_on_missing_reopen_allowed", "terminal_failure_with_possible_write_allowed",
+              "ambiguity_is_terminal_success", "automatic_forward_retry_after_unknown_allowed",
+              "automatic_forward_continue_after_unknown_allowed", "shape_validation_is_physical_truth",
+              "installation_started", "filesystem_modified", "rollback_performed",
+              "package_installed", "terminal_receipt_persisted", "deploy_executed",
+              "worker_activated",
+          )
+          for key in required_false:
+              assert p[key] is False, (key, p[key])
+          assert p["design_only"] is True
+          assert p["independent_terminal_attestation_required"] is True
+          assert p["runtime_health_after_reopen_required"] is True
+          PY
