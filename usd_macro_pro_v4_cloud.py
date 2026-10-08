@@ -521,17 +521,26 @@ def _render_atlasquant_central_hub(*, active_index=None, stop_for_shell=False):
         requested = _central_request_for_render(active_index=active_index)
         _aion_chat_binding = None
         if str(requested or "").strip().casefold() == "aion":
-            from atlasquant_aion_chat_host_staging import (
-                build_streamlit_staged_binding,
+            from atlasquant_aion_chat_render_production_host_v1 import (
+                build_streamlit_production_binding,
             )
-            _aion_chat_binding = build_streamlit_staged_binding(
+            _aion_chat_binding = build_streamlit_production_binding(
                 st,
                 _ATLASQUANT_ACCESS,
                 environment=ATLASQUANT_ENVIRONMENT,
             )
+            if _aion_chat_binding is None:
+                from atlasquant_aion_chat_host_staging import (
+                    build_streamlit_staged_binding,
+                )
+                _aion_chat_binding = build_streamlit_staged_binding(
+                    st,
+                    _ATLASQUANT_ACCESS,
+                    environment=ATLASQUANT_ENVIRONMENT,
+                )
         if _aion_chat_binding is None:
-            # Preserve the canonical production/default path byte-for-byte when
-            # the staging feature is disabled.
+            # Preserve the canonical default path byte-for-byte when production
+            # persistence and staging persistence are both disabled.
             resolved = render_central_hub(_ATLASQUANT_ACCESS, requested, defer_aion_home=(active_index == 21))
         else:
             resolved = render_central_hub(
