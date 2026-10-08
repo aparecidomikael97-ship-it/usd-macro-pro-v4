@@ -175,7 +175,7 @@ def _check_raw_bundle(raw: bytes, *, expected_challenge_digest: str,
         if positive == negative:
             raise ValueError("RAW_POSITIVE_NEGATIVE_NOT_DISTINCT")
         signed = bound[index]
-        if (type(signed) is not dict or signed.get("sequence") != index + 1
+        if (type(signed) is not dict or type(signed.get("sequence")) is not int\n            or signed.get("sequence") != index + 1
             or signed.get("requirement") != name
             or signed.get("positive_evidence_digest") != _digest(positive)
             or signed.get("negative_evidence_digest") != _digest(negative)):
