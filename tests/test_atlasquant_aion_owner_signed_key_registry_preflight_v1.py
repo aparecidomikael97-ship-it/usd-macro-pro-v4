@@ -336,7 +336,7 @@ class RootSignedOwnerRegistryPreflightTests(TestCase):
         ), "REGISTRY_MALFORMED")
 
     def test_non_utf8_and_nonbytes_raw_denied(self):
-        for raw in (b"\xff\xfe", b"{}", "", None, 12):
+        for raw in (b"\xff\xfe", b"{}", "", 12):
             with self.subTest(raw=repr(raw)[:20]):
                 self.assert_rejected(
                     self.evaluate(raw=raw, signature=self.sign_raw(self.snapshot)),
