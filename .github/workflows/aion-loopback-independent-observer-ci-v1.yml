@@ -1,0 +1,82 @@
+name: AION Loopback Independent Observer CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_loopback_observer_classifier_v1.py"
+      - "atlasquant_aion_windows_loopback_ci_collector_v1.py"
+      - "tests/test_atlasquant_aion_windows_loopback_observer_v1.py"
+      - "docs/aion/AION_LOOPBACK_INDEPENDENT_OBSERVER_CLASSIFIER_CI_V1.md"
+      - ".github/workflows/aion-loopback-independent-observer-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  localhost-observer-diagnostic:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Ensure ephemeral CI not owner Windows
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv("GITHUB_ACTIONS") == "true"
+          assert os.getenv("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.getenv("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile witness, classifier and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_loopback_observer_classifier_v1.py \
+            atlasquant_aion_windows_loopback_ci_collector_v1.py \
+            tests/test_atlasquant_aion_windows_loopback_observer_v1.py
+      - name: Run 127.0.0.1-only positive control and adversarial tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_loopback_observer_v1.py'
+      - name: Run standalone scratch loopback CI collector once
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python atlasquant_aion_windows_loopback_ci_collector_v1.py
+      - name: Assert no AppContainer or Windows firewall or external-target API
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          files=[
+              "atlasquant_aion_windows_loopback_observer_classifier_v1.py",
+              "atlasquant_aion_windows_loopback_ci_collector_v1.py",
+          ]
+          prohibited={"CreateAppContainerProfile","DeleteAppContainerProfile",
+                     "CreateProcessAsUserW","FwpmFilterAdd0","FwpmFilterDeleteById0",
+                     "NetworkIsolationSetAppContainerConfig","WinDLL","ctypes",
+                     "netsh","requests","httpx","urllib","ftplib","paramiko"}
+          for filename in files:
+              tree=ast.parse(Path(filename).read_text("utf-8"))
+              for node in ast.walk(tree):
+                  if isinstance(node,ast.Import):
+                      assert all(a.name.split(".")[0] not in prohibited for a in node.names)
+                  if isinstance(node,ast.ImportFrom):
+                      assert (node.module or "").split(".")[0] not in prohibited
+                  if isinstance(node,ast.Attribute):
+                      assert node.attr not in prohibited,(filename,node.attr)
+          from atlasquant_aion_windows_loopback_observer_classifier_v1 import classify_localhost_receipt
+          response=classify_localhost_receipt({})
+          assert response["physical_network_denial_verified"] is False
+          assert response["installer_authorized"] is False
+          PY
