@@ -57,36 +57,6 @@ class RenderProductionCompositionV1Tests(unittest.TestCase):
                 "atlasquant-render-production-composition-ci-cursor-key-v1"
             ),
         }
-        # The service database name is normalized to the production name so the
-        # tested composition cannot silently accept another database.
-        conn = cls.admin_connect()
-        try:
-            conn.autocommit = True
-            with conn.cursor() as cur:
-                current = conn.info.dbname
-                if current != production.EXPECTED_DATABASE:
-                    cur.execute(
-                        sql.SQL("ALTER DATABASE {} RENAME TO {}").format(
-                            sql.Identifier(current),
-                            sql.Identifier(production.EXPECTED_DATABASE),
-                        )
-                    )
-        finally:
-            conn.close()
-
-        # Rebuild admin DSN against renamed database.
-        admin_params["dbname"] = production.EXPECTED_DATABASE
-        cls._admin_dsn = make_conninfo(**admin_params)
-
-        def renamed_admin_connect():
-            return psycopg.connect(
-                cls._admin_dsn,
-                autocommit=False,
-                connect_timeout=5,
-                application_name="atlasquant-production-composition-admin-ci",
-            )
-
-        cls.admin_connect = staticmethod(renamed_admin_connect)
 
     @classmethod
     def tearDownClass(cls):
