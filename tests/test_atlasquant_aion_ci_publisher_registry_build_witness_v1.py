@@ -492,6 +492,30 @@ class AIONPublisherRegistryBuildWitnessV1Tests(unittest.TestCase):
         self.assert_blocked(self.review(witness=w),
                             "PROOF_SELF_TRUST_PROMOTION_FORBIDDEN:real_slsa_attestation_verified")
 
+    def test_review_rejects_injected_registry_trust_claim(self):
+        g = dict(self.registry_proof)
+        g["external_publisher_approved"] = True
+        self.assert_blocked(self.review(registry=g),
+                            "EXACT_REGISTRY_PROOF_FIELDS_REQUIRED")
+
+    def test_review_rejects_missing_witness_denial(self):
+        w = dict(self.witness_proof)
+        del w["external_build_witness_identity_trusted"]
+        self.assert_blocked(self.review(witness=w),
+                            "EXACT_WITNESS_PROOF_FIELDS_REQUIRED")
+
+    def test_review_rejects_replaced_release_receipt(self):
+        r = dict(self.release)
+        r["release_id"] = "ci-aion-other-release"
+        self.assert_blocked(self.review(release=r),
+                            "CI_RELEASE_EVIDENCE_DIGEST_INVALID")
+
+    def test_review_rejects_forged_release_owner_token(self):
+        r = dict(self.release)
+        r["owner_authorization_consumed"] = True
+        self.assert_blocked(self.review(release=r),
+                            "CI_RELEASE_TRUST_PROMOTION_FORBIDDEN:owner_authorization_consumed")
+
     def test_review_rejects_failure_shaped_witness(self):
         w = dict(self.witness_proof)
         w["state"] = BLOCKED
