@@ -1,0 +1,65 @@
+name: AION Rooted Owner Signed UI Preflight V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_rooted_owner_signed_ui_preflight_v1.py"
+      - "tests/test_atlasquant_aion_rooted_owner_signed_ui_preflight_v1.py"
+      - "docs/aion/AION_ROOTED_OWNER_SIGNED_UI_PREFLIGHT_V1.md"
+      - ".github/workflows/aion-rooted-owner-signed-ui-preflight-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rooted-owner-ui-chain-offline:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify ephemeral PR context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("RUNNER_OS") in ("Linux", "Windows")
+          PY
+      - name: Pin CI-only crypto and navigation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2" "streamlit==1.64.0"
+      - name: Compile chain and fixtures
+        run: |
+          python -m py_compile \
+            atlasquant_aion_rooted_owner_signed_ui_preflight_v1.py \
+            tests/test_atlasquant_aion_rooted_owner_signed_ui_preflight_v1.py
+      - name: Verify full rooted owner signature chain
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_rooted_owner_signed_ui_preflight_v1.py'
+      - name: Refuse direct OS, provider and PC executor APIs
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          tree = ast.parse(Path("atlasquant_aion_rooted_owner_signed_ui_preflight_v1.py").read_text("utf-8"))
+          forbidden = {"subprocess","socket","requests","httpx","urllib","ctypes",
+                       "winreg","boto3","shutil","os","sqlite3","streamlit"}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  assert all(a.name.split(".")[0] not in forbidden for a in node.names)
+              elif isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+          PY
