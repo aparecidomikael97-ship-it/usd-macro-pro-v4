@@ -168,6 +168,12 @@ def _verify_advisor(
     if verified.get("valid") is not True:
         blockers.append("ADVISOR_ASSESSMENT_INVALID")
         return "", blockers, risk_ids
+    if raw.get("state") not in {
+        "READY_FOR_HUMAN_REVIEW",
+        "RISK_REVIEW_REQUIRED",
+    }:
+        blockers.append("ADVISOR_ASSESSMENT_NOT_REVIEWABLE")
+        return "", blockers, risk_ids
 
     digest = _sha256(raw.get("assessment_digest"))
     if not digest:
