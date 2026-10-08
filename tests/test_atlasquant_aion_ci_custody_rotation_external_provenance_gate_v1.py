@@ -387,6 +387,21 @@ class AIONCustodyRotationProvenanceV1Tests(unittest.TestCase):
                     provenance=dict(self.provenance, **{name:True})),
                     "PROVENANCE_FALSE_TRUST_REQUIRED:" + name)
 
+    def test_review_rejects_rehashed_new_root_reusing_builder_key(self):
+        c = dict(self.custody, new_root_key_sha256=self.builder["builder_public_key_sha256"])
+        c["candidate_digest"] = _digest({k: c.get(k) for k in CUSTODY_EVIDENCE})
+        self.blocked(self.check_review(custody=c), "EIGHT_CI_KEY_ROLES_MUST_BE_DISTINCT")
+
+    def test_review_rejects_rehashed_old_root_reusing_witness_key(self):
+        c = dict(self.custody, old_root_key_sha256=self.builder["witness_key_sha256"])
+        c["candidate_digest"] = _digest({k: c.get(k) for k in CUSTODY_EVIDENCE})
+        self.blocked(self.check_review(custody=c), "EIGHT_CI_KEY_ROLES_MUST_BE_DISTINCT")
+
+    def test_review_rejects_rehashed_provenance_signer_reusing_root(self):
+        p = dict(self.provenance, fixture_signer_key_sha256=self.custody["new_root_key_sha256"])
+        p["candidate_digest"] = _digest({k: p.get(k) for k in PROVENANCE_EVIDENCE})
+        self.blocked(self.check_review(provenance=p), "EIGHT_CI_KEY_ROLES_MUST_BE_DISTINCT")
+
     def test_review_minimum_external_epoch_and_policy_shapes(self):
         self.blocked(self.check_review(expect={"minimum_expected_custody_epoch":13}),
                      "CUSTODY_EPOCH_BELOW_EXPECTED_MINIMUM")
