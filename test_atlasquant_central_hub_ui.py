@@ -16,6 +16,7 @@ from atlasquant_central_hub_ui import (
     CENTRAL_ROOT,
     DEFAULT_TIMEZONE,
     LOGIN_GREETING_KEY,
+    HUMAN_OWNER_ID,
     acknowledge_login_greeting,
     aion_home_claims,
     aion_home_viewer_html,
@@ -32,6 +33,7 @@ from atlasquant_central_hub_ui import (
     ecosystem_rail_html,
     greeting_period,
     login_greeting,
+    owner_session_context,
     request_central_destination,
     resolve_central_area,
     sync_central_choice,
@@ -391,6 +393,53 @@ class LoginGreetingTests(unittest.TestCase):
         self.assertNotIn("atlasquant_advanced_area", state)
         self.assertNotIn(CENTRAL_CHOICE_KEY, state)
 
+    def test_human_owner_context_requires_bound_authenticated_owner_session(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        owner = self._admin()
+        context = owner_session_context(owner)
+        self.assertTrue(context["is_human_owner"])
+        self.assertTrue(context["session_bound"])
+        self.assertEqual(context["owner_id"], HUMAN_OWNER_ID)
+        self.assertEqual(context["name"], "Mikael")
+
+        greeting = login_greeting(owner, now=now)
+        self.assertEqual(greeting["owner_id"], HUMAN_OWNER_ID)
+        self.assertTrue(greeting["is_human_owner"])
+        self.assertIn("Contexto HUMAN_OWNER reconhecido nesta sessão.", greeting["text"])
+        presence = aion_login_presence_html(owner, now=now)
+        self.assertIn('data-owner-context="HUMAN_OWNER"', presence)
+        self.assertIn("HUMAN_OWNER · sessão autenticada", presence)
+
+    def test_other_admin_never_falls_back_to_mikael_or_human_owner(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        other = self._admin(username="ops.admin")
+        context = owner_session_context(other)
+        self.assertFalse(context["is_human_owner"])
+        self.assertEqual(context["owner_id"], "")
+        greeting = login_greeting(other, now=now)
+        self.assertEqual(greeting["name"], "ops.admin")
+        self.assertNotIn("HUMAN_OWNER", greeting["text"])
+        self.assertNotIn("Mikael", greeting["text"])
+
+        nameless = _access(
+            "ADMIN",
+            session={"role": "ADMIN", "authenticated_at": 10},
+        )
+        nameless_greeting = login_greeting(nameless, now=now)
+        self.assertEqual(nameless_greeting["name"], "Administrador")
+        self.assertNotIn("Mikael", nameless_greeting["text"])
+        self.assertFalse(nameless_greeting["is_human_owner"])
+
+    def test_owner_alias_without_authenticated_admin_binding_is_not_human_owner(self):
+        candidates = (
+            {"allowed": True, "mode": "OPEN", "role": "ADMIN", "session": {"username": "mikael", "role": "ADMIN", "authenticated_at": 10}},
+            {"allowed": True, "mode": "AUTHENTICATED", "role": "ADMIN", "session": {"username": "mikael", "role": "USER", "authenticated_at": 10}},
+            {"allowed": True, "mode": "AUTHENTICATED", "role": "ADMIN", "session": {"username": "mikael", "role": "ADMIN"}},
+        )
+        for candidate in candidates:
+            with self.subTest(candidate=candidate):
+                self.assertFalse(owner_session_context(candidate)["is_human_owner"])
+
     def test_period_follows_the_application_clock(self):
         admin = self._admin()
         morning = login_greeting(admin, now=datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc))
@@ -516,6 +565,15 @@ class LoginGreetingTests(unittest.TestCase):
         self.assertIn("Sessão autenticada.", confirmed)
         self.assertIn('data-confirmed="sessao"', confirmed)
         self.assertIn("O que você gostaria de saber ou fazer?", confirmed)
+
+    def test_central_render_mounts_visible_owner_presence_without_opening_aion(self):
+        source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
+        render = source[source.index("def render_central_hub"):]
+        self.assertIn("presence_html = aion_login_presence_html(", render)
+        self.assertIn("st.markdown(_CENTRAL_CSS + presence_html, unsafe_allow_html=True)", render)
+        self.assertIn("acknowledge_login_greeting(", render)
+        self.assertNotIn("request_return_to_aion(st.session_state)", render)
+        self.assertNotIn("provider_configured=True", render)
 
     def test_greeting_does_not_open_aion_or_write_memory(self):
         source = Path("atlasquant_central_hub_ui.py").read_text(encoding="utf-8")
