@@ -1,0 +1,108 @@
+name: AION Windows Build Completion Package Attestation Handoff V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_build_completion_package_attestation_handoff_v1.py"
+      - "tests/test_atlasquant_aion_windows_build_completion_package_attestation_handoff_v1.py"
+      - "docs/aion/AION_WINDOWS_BUILD_COMPLETION_PACKAGE_ATTESTATION_HANDOFF_V1.md"
+      - ".github/workflows/aion-windows-build-completion-package-attestation-handoff-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-build-completion-package-attestation-handoff-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile build completion handoff contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_build_completion_package_attestation_handoff_v1.py \
+            tests/test_atlasquant_aion_windows_build_completion_package_attestation_handoff_v1.py
+
+      - name: Run build completion handoff tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_build_completion_package_attestation_handoff_v1.py'
+
+      - name: Assert terminal build layer remains non-executing and non-installing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_build_completion_package_attestation_handoff_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import sqlite3",
+              "from sqlite3",
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import httpx",
+              "win32process",
+              "win32job",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"success_requires_exit_code_zero":True',
+              '"success_requires_complete_artifact_set":True',
+              '"terminal_failure_requires_authoritative_failure_evidence":True',
+              '"ambiguity_overrides_requested_success":True',
+              '"automatic_retry_after_ambiguous_completion_allowed":False',
+              '"unknown_requires_separate_reconciliation":True',
+              '"unknown_allows_artifact_promotion":False',
+              '"failure_allows_artifact_promotion":False',
+              '"successful_build_is_not_package_attestation":True',
+              '"package_attestation_is_not_install_authorization":True',
+              '"generic_chat_is_install_authority":False',
+              '"build_observer_implemented":False',
+              '"artifact_collector_implemented":False',
+              '"build_completion_observed":False',
+              '"completion_receipt_persisted":False',
+              '"artifact_set_collected":False',
+              '"package_attestation_executed":False',
+              '"package_attested":False',
+              '"installation_authorized":False',
+              '"package_installed":False',
+              '"filesystem_modified":False',
+              '"network_called":False',
+              '"github_api_called":False',
+              '"live_repository_mutation_authorized":False',
+              '"live_repository_mutation_performed":False',
+              '"production_repository_mutation_performed":False',
+              '"deploy_executed":False',
+              '"worker_activated":False',
+              '"provider_activated":False',
+              '"production_persistence_activated":False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
