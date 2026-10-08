@@ -1,0 +1,90 @@
+name: AION Offline Local Model Benchmark Evidence Kit V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_offline_local_model_benchmark_evidence_v1.py"
+      - "scripts/aion_offline_model_benchmark_review_v1.py"
+      - "tests/test_atlasquant_aion_offline_model_benchmark_evidence_v1.py"
+      - "docs/aion/AION_OFFLINE_LOCAL_MODEL_BENCHMARK_EVIDENCE_KIT_V1.md"
+      - ".github/workflows/aion-offline-local-model-benchmark-kit-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-benchmark-protocol-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Assert GitHub temporary PR runner and standard library
+        run: |
+          python - <<'PY'
+          import os,sys
+          assert sys.version_info[:2] == (3,12)
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows","Linux")
+          PY
+
+      - name: Compile offline evidence contract and review CLI
+        run: |
+          python -m py_compile \
+            atlasquant_aion_offline_local_model_benchmark_evidence_v1.py \
+            scripts/aion_offline_model_benchmark_review_v1.py \
+            tests/test_atlasquant_aion_offline_model_benchmark_evidence_v1.py
+
+      - name: Test privacy, negative cases, p95, manual scoring and CLI
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_offline_model_benchmark_evidence_v1.py'
+
+      - name: Block actual model loading, paid APIs, network and privileged actions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          scripts=[
+            Path("atlasquant_aion_offline_local_model_benchmark_evidence_v1.py").read_text("utf-8"),
+            Path("scripts/aion_offline_model_benchmark_review_v1.py").read_text("utf-8"),
+          ]
+          combined="\n".join(scripts)
+          forbidden=(
+            "import requests","import httpx","urllib.request",
+            "import socket","from socket","import winreg","from winreg",
+            "import ctypes","from ctypes","import torch",
+            "from transformers","from openai","from anthropic",
+            "import ollama","from llama_cpp","huggingface_hub",
+            "hf_hub_download","AutoModel.from_pretrained",
+            "os.system(","os.exec","os.startfile(","requests.post(",
+            "Path.write_bytes(","Path.write_text(",
+            "Set-ExecutionPolicy","Start-Process","Registry",
+          )
+          for term in forbidden:
+            assert term not in combined,term
+          from atlasquant_aion_offline_local_model_benchmark_evidence_v1 import benchmark_protocol_policy
+          policy=benchmark_protocol_policy()
+          assert policy["no_install_or_download_step"]
+          assert policy["no_automatic_provider_api_call"]
+          assert policy["contains_no_private_prompt_or_response_text"]
+          for flag in (
+            "independent_model_quality_certified","real_owner_pc_benchmarked",
+            "offline_inference_proven","actual_model_artifact_authenticated",
+            "true_vram_or_power_usage_verified","production_router_enabled",
+            "paid_fallback_enabled","worker_activated",
+          ):
+            assert policy[flag] is False,flag
+          PY
