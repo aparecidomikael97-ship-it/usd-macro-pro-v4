@@ -1,0 +1,96 @@
+name: AION Windows Local Agent Reproducible Build Contract V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_local_agent_reproducible_build_contract_v1.py"
+      - "tests/test_atlasquant_aion_windows_local_agent_reproducible_build_contract_v1.py"
+      - "docs/aion/AION_WINDOWS_LOCAL_AGENT_REPRODUCIBLE_BUILD_CONTRACT_V1.md"
+      - ".github/workflows/aion-windows-local-agent-reproducible-build-contract-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-local-agent-reproducible-build-contract-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile reproducible build contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_local_agent_reproducible_build_contract_v1.py \
+            tests/test_atlasquant_aion_windows_local_agent_reproducible_build_contract_v1.py
+
+      - name: Run reproducible build contract tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_local_agent_reproducible_build_contract_v1.py'
+
+      - name: Assert reproducible build layer cannot build production or call network
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_local_agent_reproducible_build_contract_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+              "from github",
+              "import github",
+              "import git",
+              "from git",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          forbidden_live_material = (
+              "api.github.com",
+              "GITHUB_TOKEN",
+              "GH_TOKEN",
+              "PyInstaller.__main__",
+          )
+          for marker in forbidden_live_material:
+              assert marker not in source, marker
+
+          required = (
+              '"network_during_build_allowed": False',
+              '"dependency_resolution_during_build_allowed": False',
+              '"dependency_upgrade_during_build_allowed": False',
+              '"production_package_built_by_this_module": False',
+              '"package_installed": False',
+              '"release_authorized": False',
+              '"installation_authorized": False',
+              '"subprocess_spawned": False',
+              '"filesystem_modified": False',
+              '"private_signing_key_loaded": False',
+              '"credential_material_loaded": False',
+              '"network_called": False',
+              '"github_api_called": False',
+              '"live_repository_mutation_authorized": False',
+              '"live_repository_mutation_performed": False',
+              '"production_repository_mutation_performed": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
