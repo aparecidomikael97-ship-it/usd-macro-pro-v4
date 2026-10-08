@@ -1,0 +1,89 @@
+name: AION Windows Suspended Child Quarantine CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_suspended_child_quarantine_contract_v1.py"
+      - "atlasquant_aion_windows_suspended_child_quarantine_ci_v1.py"
+      - "tests/test_atlasquant_aion_windows_suspended_child_quarantine_v1.py"
+      - "docs/aion/AION_WINDOWS_SUSPENDED_CHILD_QUARANTINE_CI_V1.md"
+      - ".github/workflows/aion-windows-suspended-child-quarantine-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  suspended-child-negative-test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Confirm CI-only running context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ["GITHUB_ACTIONS"]=="true"
+          assert os.environ["GITHUB_EVENT_NAME"]=="pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows","Linux")
+          assert os.environ.get("GITHUB_RUN_ID")
+          PY
+      - name: Compile pure decision and native negative runner
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_suspended_child_quarantine_contract_v1.py \
+            atlasquant_aion_windows_suspended_child_quarantine_ci_v1.py \
+            tests/test_atlasquant_aion_windows_suspended_child_quarantine_v1.py
+      - name: Run adversarial security suite and Windows native negative probe
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_suspended_child_quarantine_v1.py'
+      - name: Explicit Windows real suspended negative probe
+        if: runner.os == 'Windows'
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python atlasquant_aion_windows_suspended_child_quarantine_ci_v1.py
+      - name: Static interlock - no resume or privileged transition
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          files=(
+            "atlasquant_aion_windows_suspended_child_quarantine_contract_v1.py",
+            "atlasquant_aion_windows_suspended_child_quarantine_ci_v1.py",
+          )
+          forbidden={
+            "ResumeThread", "NtResumeProcess", "CreateAppContainerProfile",
+            "DeleteAppContainerProfile", "SetTokenInformation",
+            "FwpmFilterAdd0", "FwpmFilterDeleteById0",
+            "NetworkIsolationSetAppContainerConfig", "ShellExecuteW",
+          }
+          for file in files:
+            code=Path(file).read_text("utf-8")
+            tree=ast.parse(code)
+            for node in ast.walk(tree):
+              if isinstance(node,ast.Attribute):
+                assert node.attr not in forbidden,(file,node.attr)
+              if isinstance(node,ast.Call) and isinstance(node.func,ast.Name):
+                assert node.func.id not in forbidden,(file,node.func.id)
+              if isinstance(node,ast.Import):
+                assert all(a.name.split(".")[0] not in ("socket","requests","httpx","urllib") for a in node.names)
+          from atlasquant_aion_windows_suspended_child_quarantine_contract_v1 import classify_quarantine_observation
+          r=classify_quarantine_observation({})
+          assert r["safe_to_resume_appcontainer"] is False
+          assert r["installer_authorized"] is False
+          assert r["network_deny_verified"] is False
+          assert r["physical_sandbox_verified"] is False
+          PY
