@@ -1,6 +1,6 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-08T09:53:32.984638+00:00",
+  "generated_at": "2026-10-08T10:25:34.574244+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
@@ -37,7 +37,7 @@
       "Score final": 82.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": -18.0,
+      "Dif. macro": -23.0,
       "Índice ranking": 85.7
     },
     {
@@ -73,7 +73,7 @@
       "Score final": 52.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -14.3,
+      "Dif. macro": -15.5,
       "Índice ranking": 67.9
     }
   ],
@@ -481,14 +481,14 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 62.5,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
         "juros": 2.98,
         "inflacao": 2.5,
         "pib": 1.6,
-        "sentimento": 100.0,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "BRL": {
@@ -576,19 +576,19 @@
         "juros": 4.5,
         "inflacao": 2.7,
         "pib": 2.1,
-        "sentimento": 62.5,
+        "sentimento": 50.0,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Dólar Australiano",
         "juros_reais": 1.8,
         "n_juros": 28.98896661469615,
         "n_inflacao": 49.66887417218545,
         "n_pib": 70.40481809880697,
-        "n_sentimento": 62.5,
+        "n_sentimento": 50.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 50.1,
+        "Pontuação_Macro": 48.8,
         "Influência_Fed": -3.9,
-        "Pontuação_Final": 46.1,
+        "Pontuação_Final": 44.9,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 5.79779332293923,
@@ -596,50 +596,15 @@
             "PIB": 10.560722714821045,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 6.25
+            "Sentimento": 5.0
           },
           "fed": -3.9204,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 46.13844716358809
+          "unrounded_final": 44.88844716358809
         },
         "Posição": 3
-      },
-      {
-        "Código": "NZD",
-        "juros": 3.0,
-        "inflacao": 2.5,
-        "pib": 1.6,
-        "sentimento": 100.0,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Dólar Neozelandês",
-        "juros_reais": 0.5,
-        "n_juros": 16.755200500388625,
-        "n_inflacao": 43.046357615894046,
-        "n_pib": 43.57794731826098,
-        "n_sentimento": 100.0,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 46.3,
-        "Influência_Fed": -3.9,
-        "Pontuação_Final": 42.4,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 3.351040100077725,
-            "Inflação": 6.456953642384106,
-            "PIB": 6.536692097739147,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 10.0
-          },
-          "fed": -3.9204,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 42.42428584020098
-        },
-        "Posição": 4
       },
       {
         "Código": "CHF",
@@ -674,7 +639,7 @@
           },
           "unrounded_final": 41.92001956666712
         },
-        "Posição": 5
+        "Posição": 4
       },
       {
         "Código": "EUR",
@@ -709,7 +674,7 @@
           },
           "unrounded_final": 41.22658448879038
         },
-        "Posição": 6
+        "Posição": 5
       },
       {
         "Código": "CAD",
@@ -743,6 +708,41 @@
             "Limite da escala 0–100": 0.0
           },
           "unrounded_final": 38.284387637326496
+        },
+        "Posição": 6
+      },
+      {
+        "Código": "NZD",
+        "juros": 3.0,
+        "inflacao": 2.5,
+        "pib": 1.6,
+        "sentimento": 50.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Dólar Neozelandês",
+        "juros_reais": 0.5,
+        "n_juros": 16.755200500388625,
+        "n_inflacao": 43.046357615894046,
+        "n_pib": 43.57794731826098,
+        "n_sentimento": 50.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 41.3,
+        "Influência_Fed": -3.9,
+        "Pontuação_Final": 37.4,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 3.351040100077725,
+            "Inflação": 6.456953642384106,
+            "PIB": 6.536692097739147,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 5.0
+          },
+          "fed": -3.9204,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 37.42428584020098
         },
         "Posição": 7
       },
