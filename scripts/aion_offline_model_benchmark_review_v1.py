@@ -13,6 +13,12 @@ import json
 from pathlib import Path
 import sys
 
+# Permit the documented direct invocation from within the checked-out
+# repository without pip install, PYTHONPATH or admin changes.
+repo_root = str(Path(__file__).resolve().parents[1])
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
 from atlasquant_aion_offline_local_model_benchmark_evidence_v1 import (
     SCHEMA, TASKS, SCENARIOS, scenario_pack, scenario_pack_digest,
     review_offline_model_benchmark,
