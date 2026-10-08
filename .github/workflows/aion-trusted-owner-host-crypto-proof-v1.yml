@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   ephemeral-owner-crypto:
-    runs-on: \${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
