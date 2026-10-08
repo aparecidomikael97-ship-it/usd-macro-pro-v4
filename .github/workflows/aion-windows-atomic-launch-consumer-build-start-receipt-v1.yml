@@ -1,0 +1,117 @@
+name: AION Windows Atomic Launch Consumer Build Start Receipt V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_atomic_launch_consumer_build_start_receipt_v1.py"
+      - "tests/test_atlasquant_aion_windows_atomic_launch_consumer_build_start_receipt_v1.py"
+      - "docs/aion/AION_WINDOWS_ATOMIC_LAUNCH_CONSUMER_BUILD_START_RECEIPT_V1.md"
+      - ".github/workflows/aion-windows-atomic-launch-consumer-build-start-receipt-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-atomic-launch-consumer-build-start-receipt-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile atomic launch contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_atomic_launch_consumer_build_start_receipt_v1.py \
+            tests/test_atlasquant_aion_windows_atomic_launch_consumer_build_start_receipt_v1.py
+
+      - name: Run atomic launch contract tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_atomic_launch_consumer_build_start_receipt_v1.py'
+
+      - name: Assert launch layer remains non-executing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_atomic_launch_consumer_build_start_receipt_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import sqlite3",
+              "from sqlite3",
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import httpx",
+              "win32process",
+              "win32job",
+              "win32security",
+              "winreg",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"write_ahead_launch_commit_required":True',
+              '"owner_authorization_and_token_consumed_in_same_cas_required":True',
+              '"os_spawn_in_database_transaction_claim_allowed":False',
+              '"single_spawn_attempt_required":True',
+              '"automatic_retry_after_commit_allowed":False',
+              '"post_commit_crash_becomes_unknown":True',
+              '"post_commit_timeout_becomes_unknown":True',
+              '"post_commit_ambiguous_spawn_becomes_unknown":True',
+              '"separate_reconciliation_required":True',
+              '"start_success_requires_positive_process_evidence":True',
+              '"terminal_failure_requires_authoritative_no_process_evidence":True',
+              '"ambiguity_wins_over_requested_success":True',
+              '"generic_chat_is_launch_authority":False',
+              '"launch_writer_implemented":False',
+              '"launch_consumer_implemented":False',
+              '"start_observer_implemented":False',
+              '"reconciliation_implemented":False',
+              '"launch_commitment_written":False',
+              '"owner_authorization_consumed":False',
+              '"build_token_consumed":False',
+              '"spawn_attempted":False',
+              '"process_spawned":False',
+              '"build_started":False',
+              '"start_receipt_issued":False',
+              '"start_receipt_persisted":False',
+              '"build_authorized":False',
+              '"package_built":False',
+              '"package_installed":False',
+              '"filesystem_modified":False',
+              '"network_called":False',
+              '"github_api_called":False',
+              '"live_repository_mutation_authorized":False',
+              '"live_repository_mutation_performed":False',
+              '"production_repository_mutation_performed":False',
+              '"deploy_executed":False',
+              '"worker_activated":False',
+              '"provider_activated":False',
+              '"production_persistence_activated":False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
