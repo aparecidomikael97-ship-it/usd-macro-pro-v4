@@ -187,7 +187,13 @@ def _expected_actions(request: Mapping[str, Any]) -> list[dict[str, str]]:
             return []
         if not identity["logical_app_id"]:
             return []
-        out.append(identity)
+        parameters = row.get("parameters")
+        if not isinstance(parameters, Mapping):
+            return []
+        out.append({
+            **identity,
+            "parameters_digest": _digest(dict(parameters)),
+        })
     return out
 
 
@@ -197,6 +203,13 @@ def _action_set_digest(request: Mapping[str, Any]) -> str:
 
 def _dispatch_digest(dispatch: Mapping[str, Any]) -> str:
     return _digest(dict(dispatch))
+
+
+def local_action_bindings(
+    request: Mapping[str, Any] | None,
+) -> list[dict[str, str]]:
+    """Safe per-action bindings, including a digest of bounded parameters."""
+    return [dict(row) for row in _expected_actions(dict(request or {}))]
 
 
 def local_action_set_digest(request: Mapping[str, Any] | None) -> str:
@@ -260,6 +273,11 @@ def _validate_action_result(
     if observed_id != expected_id:
         blockers.append("ACTION_IDENTITY_MISMATCH")
 
+    expected_parameters_digest = _sha256(expected.get("parameters_digest"))
+    observed_parameters_digest = _sha256(observed.get("parameters_digest"))
+    if not expected_parameters_digest or observed_parameters_digest != expected_parameters_digest:
+        blockers.append("ACTION_PARAMETERS_DIGEST_MISMATCH")
+
     state = _clean(observed.get("outcome_state"), 60).upper()
     if state not in ACTION_OUTCOME_STATES:
         blockers.append("ACTION_OUTCOME_INVALID")
@@ -301,6 +319,7 @@ def _validate_action_result(
 
     projection = {
         **expected_id,
+        "parameters_digest": expected_parameters_digest,
         "outcome_state": state,
         "evidence_kind": evidence_kind,
         "evidence_digest": evidence_digest,
@@ -633,6 +652,7 @@ __all__ = [
     "ACTION_OUTCOME_STATES",
     "AMBIGUITY_TRIGGERS",
     "EVIDENCE_KINDS",
+    "local_action_bindings",
     "local_action_set_digest",
     "dispatch_readiness_digest",
     "build_local_action_audit_receipt",
