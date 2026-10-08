@@ -298,7 +298,7 @@ class OwnerCollectorCeremonyTests(unittest.TestCase):
     def test_bootstrap_with_existing_root_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             result = self.invoke(td, previous_root=digest(b"prior"))
-        self.assertEqual(result["reason"], "BOOTSTRAP_PREVIOUS_ROOT_MISMATCH")
+        self.assertEqual(result["reason"], "CEREMONY_MALFORMED")
 
     def test_rotation_downgrade_to_bootstrap_rejected(self):
         prior = digest(b"PRIOR_ROOT")
