@@ -286,7 +286,10 @@ class IndependentPhysicalProcessAttestationTests(unittest.TestCase):
             observed_image_path_digest=digest(b"other-path"),
         )
         with tempfile.TemporaryDirectory() as td:
-            result = self.call(td, challenge=challenge, attestation=attestation)
+            result = self.call(
+                td, challenge=challenge, attestation=attestation,
+                signature=b64(b"x" * 64),
+            )
         self.assertEqual(result["reason"], "OBSERVED_IMAGE_PATH_MISMATCH")
 
     def test_observed_image_sha_must_match_challenge(self):
@@ -296,7 +299,10 @@ class IndependentPhysicalProcessAttestationTests(unittest.TestCase):
             observed_image_sha256="0" * 64,
         )
         with tempfile.TemporaryDirectory() as td:
-            result = self.call(td, challenge=challenge, attestation=attestation)
+            result = self.call(
+                td, challenge=challenge, attestation=attestation,
+                signature=b64(b"x" * 64),
+            )
         self.assertEqual(result["reason"], "OBSERVED_IMAGE_SHA256_MISMATCH")
 
     def test_missing_requirement_is_rejected(self):
@@ -401,10 +407,14 @@ class IndependentPhysicalProcessAttestationTests(unittest.TestCase):
 
     def test_challenge_rejects_fake_authority_fields(self):
         challenge = self.challenge()
+        attestation = self.attestation(challenge)
         mutated = deepcopy(challenge)
         mutated["installer_authorized"] = True
         with tempfile.TemporaryDirectory() as td:
-            result = self.call(td, challenge=mutated)
+            result = self.call(
+                td, challenge=mutated, attestation=attestation,
+                signature=b64(b"x" * 64),
+            )
         self.assertEqual(result["reason"], "TRUSTED_CHALLENGE_INVALID")
         self.assert_no_physical_authority(result)
 
