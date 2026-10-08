@@ -1,0 +1,86 @@
+name: AION FinOps CI Inventory and Provider Dry Run V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_finops_ci_inventory_reconciliation_provider_boundary_v1.py"
+      - "tests/test_atlasquant_aion_finops_ci_inventory_reconciliation_provider_boundary_v1.py"
+      - "docs/aion/AION_FINOPS_CI_INVENTORY_RECON_PROVIDER_BOUNDARY_V1.md"
+      - ".github/workflows/aion-finops-ci-inventory-provider-dryrun-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  declared-bills-and-provider-boundary:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Enforce temporary pull request CI context
+        run: |
+          python - <<'PY'
+          import os,sys
+          assert sys.version_info[:2] == (3,12)
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["RUNNER_OS"] in ("Windows","Linux")
+          assert os.environ["RUNNER_TEMP"]
+          PY
+
+      - name: Compile inventory reconciliation and simulated paid-provider boundary
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_brl200_finops_ceiling_v1.py \
+            atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py \
+            atlasquant_aion_finops_ci_inventory_reconciliation_provider_boundary_v1.py \
+            tests/test_atlasquant_aion_finops_ci_inventory_reconciliation_provider_boundary_v1.py
+
+      - name: Adversarial declared invoice inventory and pre-provider dry run
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          AION_FINOPS_CI_EPHEMERAL: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_finops_ci_inventory_reconciliation_provider_boundary_v1.py'
+
+      - name: Assert no real paid provider, bank, Windows or deploy activity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path("atlasquant_aion_finops_ci_inventory_reconciliation_provider_boundary_v1.py").read_text("utf-8")
+          forbidden=(
+              "import requests","urllib.request","import httpx",
+              "import subprocess","import socket","import winreg","import ctypes",
+              "os.system(","os.exec","os.startfile(","stripe.",
+              "requests.post(","requests.get(","from anthropic",
+              "from openai","Path.write_bytes(","Path.write_text(",
+          )
+          for token in forbidden:
+              assert token not in source,token
+          from atlasquant_aion_finops_ci_inventory_reconciliation_provider_boundary_v1 import boundary_policy
+          p=boundary_policy()
+          assert p["synthetic_ci_inventory_only"] is True
+          assert p["no_real_provider_requests"] is True
+          assert p["monthly_owner_cap_brl_cents"]==20000
+          for flag in (
+              "all_provider_bills_discovered","real_invoices_authenticated",
+              "real_subscription_inventory_complete",
+              "real_provider_boundary_enforcing",
+              "real_owner_approval_consumed",
+              "production_payment_or_provider_call_allowed",
+              "production_deploy_enabled","worker_activated",
+          ):
+              assert p[flag] is False,flag
+          PY
