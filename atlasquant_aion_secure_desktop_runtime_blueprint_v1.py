@@ -508,8 +508,15 @@ def evaluate_installed_runtime_attestation(
         blockers.append("INSTALLED_PROTOCOL_VERSION_MISMATCH")
 
     binary_digest = _sha256(evidence.get("binary_digest"))
+    evidence_bundle_digest = _sha256(evidence.get("evidence_bundle_digest"))
     if not binary_digest:
         blockers.append("INSTALLED_BINARY_DIGEST_REQUIRED")
+    if not evidence_bundle_digest:
+        blockers.append("INSTALLED_EVIDENCE_BUNDLE_DIGEST_REQUIRED")
+    if not _identity(evidence.get("attestor_identity"), 200):
+        blockers.append("INSTALLED_ATTESTOR_IDENTITY_REQUIRED")
+    if evidence.get("attestor_signature_verified") is not True:
+        blockers.append("INSTALLED_ATTESTOR_SIGNATURE_NOT_VERIFIED")
     if evidence.get("code_signature_verified") is not True:
         blockers.append("INSTALLED_CODE_SIGNATURE_NOT_VERIFIED")
     if not _identity(evidence.get("publisher_identity"), 200):
@@ -524,6 +531,19 @@ def evaluate_installed_runtime_attestation(
         blockers.append("INSTALLED_LAN_LISTENER_FORBIDDEN")
     if evidence.get("local_channel_access_control_verified") is not True:
         blockers.append("INSTALLED_LOCAL_CHANNEL_ACL_NOT_VERIFIED")
+
+    bridge = raw_plan.get("bridge_strategy")
+    if bridge == "LOOPBACK_BRIDGE":
+        if evidence.get("loopback_only_verified") is not True:
+            blockers.append("INSTALLED_LOOPBACK_ONLY_NOT_VERIFIED")
+        if evidence.get("strict_origin_allowlist_verified") is not True:
+            blockers.append("INSTALLED_ORIGIN_ALLOWLIST_NOT_VERIFIED")
+    elif bridge == "CUSTOM_URI_SIGNED_ENVELOPE":
+        if evidence.get("signed_uri_envelope_verified") is not True:
+            blockers.append("INSTALLED_SIGNED_URI_ENVELOPE_NOT_VERIFIED")
+    elif bridge == "NATIVE_SHELL_IPC":
+        if evidence.get("native_shell_channel_verified") is not True:
+            blockers.append("INSTALLED_NATIVE_SHELL_CHANNEL_NOT_VERIFIED")
     if evidence.get("owner_verification_bridge_verified") is not True:
         blockers.append("INSTALLED_OWNER_VERIFICATION_BRIDGE_NOT_VERIFIED")
     if evidence.get("durable_replay_registry_verified") is not True:
@@ -557,6 +577,8 @@ def evaluate_installed_runtime_attestation(
         "blockers": blockers,
         "plan_digest": _clean(raw_plan.get("plan_digest"), 90),
         "binary_digest": binary_digest,
+        "evidence_bundle_digest": evidence_bundle_digest,
+        "attestor_identity": _clean(evidence.get("attestor_identity"), 200),
         "evidence_gathered_by_this_module": False,
         "installation_performed_by_this_module": False,
         "runtime_started_by_this_module": False,
