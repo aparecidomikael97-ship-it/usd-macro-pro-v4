@@ -1,14 +1,14 @@
 {
   "version": "V10.7_FAST_BOOT_1",
-  "generated_at": "2026-10-08T02:49:27.494579+00:00",
+  "generated_at": "2026-10-08T03:24:07.873885+00:00",
   "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
   "core_evidence": [
     {
       "claim": "build",
-      "value": "6096e5685c17522e",
+      "value": "ce4704eee83467d1",
       "truth_state": "CONFIRMED",
       "source": "AtlasQuant runtime identity",
-      "source_ref": "runtime-build:6096e5685c17522e",
+      "source_ref": "runtime-build:ce4704eee83467d1",
       "time_sensitive": false
     }
   ],
@@ -19,7 +19,7 @@
       "Score final": 87.0,
       "Qualidade": 91.0,
       "Confluência": "ALTA",
-      "Dif. macro": 22.2,
+      "Dif. macro": 18.5,
       "Índice ranking": 88.4
     },
     {
@@ -46,7 +46,7 @@
       "Score final": 87.0,
       "Qualidade": 84.0,
       "Confluência": "ALTA",
-      "Dif. macro": 29.0,
+      "Dif. macro": 30.3,
       "Índice ranking": 85.6
     },
     {
@@ -55,7 +55,7 @@
       "Score final": 88.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -23.1,
+      "Dif. macro": -18.8,
       "Índice ranking": 80.6
     },
     {
@@ -64,7 +64,7 @@
       "Score final": 75.0,
       "Qualidade": 70.0,
       "Confluência": "MODERADA",
-      "Dif. macro": -22.9,
+      "Dif. macro": -19.2,
       "Índice ranking": 73.3
     },
     {
@@ -73,7 +73,7 @@
       "Score final": 52.0,
       "Qualidade": 91.0,
       "Confluência": "BAIXA",
-      "Dif. macro": -16.3,
+      "Dif. macro": -14.3,
       "Índice ranking": 67.9
     }
   ],
@@ -299,7 +299,8 @@
       "forca": 0.484,
       "titulos": [
         "Federal Reserve interest rate decision looms as inflation worries persist - Fox Business",
-        "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - ABC News - Breaking News, Latest News and Videos",
+        "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - KTVN",
+        "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - Bozeman Daily Chronicle",
         "Minneapolis Federal Reserve President Neel Kashkari sees one more rate hike this year - CNBC",
         "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - San Bernardino Sun",
         "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - News-Herald",
@@ -308,8 +309,7 @@
         "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - Sun Sentinel",
         "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - Colorado Hometown Weekly",
         "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - Times Union",
-        "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - The Press-Enterprise",
-        "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - Norwalk Hour"
+        "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - AP News"
       ],
       "analisadas": [
         {
@@ -323,9 +323,19 @@
           "explicacao": "A manchete não traz sinal claro de alta ou corte de juros."
         },
         {
-          "titulo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - ABC News - Breaking News, Latest News and Videos",
-          "corpo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - ABC News",
-          "fonte": "Breaking News, Latest News and Videos",
+          "titulo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - KTVN",
+          "corpo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes",
+          "fonte": "KTVN",
+          "relevancia_pontos": 6,
+          "relevancia": "Alta",
+          "impacto": 0.55,
+          "direcao": "🟢 Favorável ao USD",
+          "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
+        },
+        {
+          "titulo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - Bozeman Daily Chronicle",
+          "corpo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes",
+          "fonte": "Bozeman Daily Chronicle",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.55,
@@ -413,19 +423,9 @@
           "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
         },
         {
-          "titulo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - The Press-Enterprise",
-          "corpo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes",
-          "fonte": "The Press-Enterprise",
-          "relevancia_pontos": 6,
-          "relevancia": "Alta",
-          "impacto": 0.55,
-          "direcao": "🟢 Favorável ao USD",
-          "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
-        },
-        {
-          "titulo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes - Norwalk Hour",
-          "corpo": "Federal Reserve officials expect another rate hike will be needed this year, according to minutes",
-          "fonte": "Norwalk Hour",
+          "titulo": "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - AP News",
+          "corpo": "Fed minutes: Another rate hike likely coming this year to combat persistent inflation",
+          "fonte": "AP News",
           "relevancia_pontos": 6,
           "relevancia": "Alta",
           "impacto": 0.55,
@@ -460,7 +460,7 @@
         "juros": 1.45845,
         "inflacao": 2.8,
         "pib": 0.72665,
-        "sentimento": 50.0,
+        "sentimento": 0.0,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "CHF": {
@@ -481,7 +481,7 @@
         "juros": 4.51,
         "inflacao": 2.7,
         "pib": 2.13764,
-        "sentimento": 66.66666666666666,
+        "sentimento": 62.5,
         "fonte": "FRED + transformação anual + fallback parcial"
       },
       "NZD": {
@@ -512,12 +512,12 @@
         "n_juros": 100.0,
         "n_inflacao": 100.0,
         "n_pib": 83.49591589284022,
-        "n_sentimento": 12.499999999999995,
+        "n_sentimento": 50.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 68.8,
+        "Pontuação_Macro": 72.5,
         "Influência_Fed": -5.2,
-        "Pontuação_Final": 63.5,
+        "Pontuação_Final": 67.3,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 20.0,
@@ -525,13 +525,13 @@
             "PIB": 12.524387383926031,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
+            "Sentimento": 5.0
           },
           "fed": -5.2272,
           "other": {
             "Limite da escala 0–100": 1.4210854715202004e-14
           },
-          "unrounded_final": 63.547187383926044
+          "unrounded_final": 67.29718738392604
         },
         "Posição": 1
       },
@@ -547,7 +547,7 @@
         "n_juros": 65.888,
         "n_inflacao": 62.67743,
         "n_pib": 73.09578815534078,
-        "n_sentimento": 22.222222222222218,
+        "n_sentimento": 55.55555555555556,
         "n_emprego": 44.675,
         "n_atividade": 52.0,
         "Pontuação_Macro": 57.7,
@@ -576,19 +576,19 @@
         "juros": 4.5,
         "inflacao": 2.7,
         "pib": 2.1,
-        "sentimento": 66.7,
+        "sentimento": 62.5,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Dólar Australiano",
         "juros_reais": 1.8,
         "n_juros": 28.98896661469615,
         "n_inflacao": 49.66887417218545,
         "n_pib": 70.40481809880697,
-        "n_sentimento": 41.66666666666664,
+        "n_sentimento": 62.5,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 48.0,
+        "Pontuação_Macro": 50.1,
         "Influência_Fed": -3.9,
-        "Pontuação_Final": 44.1,
+        "Pontuação_Final": 46.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 5.79779332293923,
@@ -596,13 +596,13 @@
             "PIB": 10.560722714821045,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 4.166666666666664
+            "Sentimento": 6.25
           },
           "fed": -3.9204,
           "other": {
             "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 44.055113830254754
+          "unrounded_final": 46.13844716358809
         },
         "Posição": 3
       },
@@ -642,6 +642,111 @@
         "Posição": 4
       },
       {
+        "Código": "CHF",
+        "juros": -0.0,
+        "inflacao": 1.2,
+        "pib": 2.7,
+        "sentimento": 50.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Franco Suíço",
+        "juros_reais": -1.2,
+        "n_juros": 0.8880978333356321,
+        "n_inflacao": 0.0,
+        "n_pib": 100.0,
+        "n_sentimento": 50.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 40.2,
+        "Influência_Fed": 1.7,
+        "Pontuação_Final": 41.9,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 0.17761956666712642,
+            "Inflação": 0.0,
+            "PIB": 15.0,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 5.0
+          },
+          "fed": 1.7424,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 41.92001956666712
+        },
+        "Posição": 5
+      },
+      {
+        "Código": "EUR",
+        "juros": 2.5,
+        "inflacao": 3.2,
+        "pib": 1.7,
+        "sentimento": 42.9,
+        "fonte": "FRED + transformação anual",
+        "Moeda": "Euro",
+        "juros_reais": -0.7,
+        "n_juros": 5.657886869857563,
+        "n_inflacao": 67.10099337748345,
+        "n_pib": 46.58676419956989,
+        "n_sentimento": 42.85714285714286,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 42.5,
+        "Influência_Fed": -0.9,
+        "Pontuação_Final": 41.6,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 1.1315773739715127,
+            "Inflação": 10.065149006622518,
+            "PIB": 6.988014629935484,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 4.2857142857142865
+          },
+          "fed": -0.8712,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 41.5992552962438
+        },
+        "Posição": 6
+      },
+      {
+        "Código": "GBP",
+        "juros": 4.0,
+        "inflacao": 3.2,
+        "pib": 1.1,
+        "sentimento": 50.0,
+        "fonte": "FRED + transformação anual + fallback parcial",
+        "Moeda": "Libra Esterlina",
+        "juros_reais": 0.8,
+        "n_juros": 19.698663024131786,
+        "n_inflacao": 66.22516556291392,
+        "n_pib": 18.629216959148952,
+        "n_sentimento": 50.0,
+        "n_emprego": 50.0,
+        "n_atividade": 50.0,
+        "Pontuação_Macro": 41.7,
+        "Influência_Fed": -0.4,
+        "Pontuação_Final": 41.2,
+        "strength_attribution": {
+          "factors": {
+            "Juros / Treasury": 3.9397326048263572,
+            "Inflação": 9.933774834437086,
+            "PIB": 2.794382543872343,
+            "Emprego": 10.0,
+            "Atividade": 10.0,
+            "Sentimento": 5.0
+          },
+          "fed": -0.4356,
+          "other": {
+            "Limite da escala 0–100": 0.0
+          },
+          "unrounded_final": 41.232289983135786
+        },
+        "Posição": 7
+      },
+      {
         "Código": "CAD",
         "juros": 2.3,
         "inflacao": 2.3,
@@ -674,111 +779,6 @@
           },
           "unrounded_final": 38.284387637326496
         },
-        "Posição": 5
-      },
-      {
-        "Código": "CHF",
-        "juros": -0.0,
-        "inflacao": 1.2,
-        "pib": 2.7,
-        "sentimento": 50.0,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Franco Suíço",
-        "juros_reais": -1.2,
-        "n_juros": 0.8880978333356321,
-        "n_inflacao": 0.0,
-        "n_pib": 100.0,
-        "n_sentimento": 12.499999999999995,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 36.4,
-        "Influência_Fed": 1.7,
-        "Pontuação_Final": 38.2,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 0.17761956666712642,
-            "Inflação": 0.0,
-            "PIB": 15.0,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
-          },
-          "fed": 1.7424,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 38.17001956666712
-        },
-        "Posição": 6
-      },
-      {
-        "Código": "GBP",
-        "juros": 4.0,
-        "inflacao": 3.2,
-        "pib": 1.1,
-        "sentimento": 50.0,
-        "fonte": "FRED + transformação anual + fallback parcial",
-        "Moeda": "Libra Esterlina",
-        "juros_reais": 0.8,
-        "n_juros": 19.698663024131786,
-        "n_inflacao": 66.22516556291392,
-        "n_pib": 18.629216959148952,
-        "n_sentimento": 12.499999999999995,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 37.9,
-        "Influência_Fed": -0.4,
-        "Pontuação_Final": 37.5,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 3.9397326048263572,
-            "Inflação": 9.933774834437086,
-            "PIB": 2.794382543872343,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
-          },
-          "fed": -0.4356,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 37.482289983135786
-        },
-        "Posição": 7
-      },
-      {
-        "Código": "EUR",
-        "juros": 2.5,
-        "inflacao": 3.2,
-        "pib": 1.7,
-        "sentimento": 42.9,
-        "fonte": "FRED + transformação anual",
-        "Moeda": "Euro",
-        "juros_reais": -0.7,
-        "n_juros": 5.657886869857563,
-        "n_inflacao": 67.10099337748345,
-        "n_pib": 46.58676419956989,
-        "n_sentimento": 0.0,
-        "n_emprego": 50.0,
-        "n_atividade": 50.0,
-        "Pontuação_Macro": 38.2,
-        "Influência_Fed": -0.9,
-        "Pontuação_Final": 37.3,
-        "strength_attribution": {
-          "factors": {
-            "Juros / Treasury": 1.1315773739715127,
-            "Inflação": 10.065149006622518,
-            "PIB": 6.988014629935484,
-            "Emprego": 10.0,
-            "Atividade": 10.0,
-            "Sentimento": 0.0
-          },
-          "fed": -0.8712,
-          "other": {
-            "Limite da escala 0–100": 0.0
-          },
-          "unrounded_final": 37.31354101052951
-        },
         "Posição": 8
       },
       {
@@ -786,19 +786,19 @@
         "juros": 1.5,
         "inflacao": 2.8,
         "pib": 0.7,
-        "sentimento": 50.0,
+        "sentimento": 0.0,
         "fonte": "FRED + transformação anual + fallback parcial",
         "Moeda": "Iene Japonês",
         "juros_reais": -1.3,
         "n_juros": 0.0,
         "n_inflacao": 52.980132450331126,
         "n_pib": 0.0,
-        "n_sentimento": 12.499999999999995,
+        "n_sentimento": 0.0,
         "n_emprego": 50.0,
         "n_atividade": 50.0,
-        "Pontuação_Macro": 29.2,
+        "Pontuação_Macro": 27.9,
         "Influência_Fed": 2.2,
-        "Pontuação_Final": 31.4,
+        "Pontuação_Final": 30.1,
         "strength_attribution": {
           "factors": {
             "Juros / Treasury": 0.0,
@@ -806,13 +806,13 @@
             "PIB": 0.0,
             "Emprego": 10.0,
             "Atividade": 10.0,
-            "Sentimento": 1.2499999999999996
+            "Sentimento": 0.0
           },
           "fed": 2.178,
           "other": {
-            "Limite da escala 0–100": 3.552713678800501e-15
+            "Limite da escala 0–100": 0.0
           },
-          "unrounded_final": 31.37501986754967
+          "unrounded_final": 30.12501986754967
         },
         "Posição": 9
       }
