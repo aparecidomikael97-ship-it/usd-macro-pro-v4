@@ -1,0 +1,75 @@
+name: AION Cognitive Memory Continuity V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_cognitive_continuity_v1.py"
+      - "tests/test_atlasquant_aion_cognitive_continuity_v1.py"
+      - "docs/aion/AION_COGNITIVE_MEMORY_CONTINUITY_V1.md"
+      - ".github/workflows/aion-cognitive-memory-continuity-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cognitive-memory-continuity-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile integration contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_cognitive_continuity_v1.py \
+            tests/test_atlasquant_aion_cognitive_continuity_v1.py
+
+      - name: Run cognitive continuity tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_cognitive_continuity_v1.py'
+
+      - name: Assert integration-only boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_cognitive_continuity_v1.py"
+          ).read_text(encoding="utf-8")
+
+          banned = (
+              "subprocess.",
+              "socket.",
+              "requests.",
+              "urllib.request",
+              "psycopg",
+              "sqlite3",
+              "os.getenv(",
+              "os.environ",
+              "streamlit.secrets",
+          )
+          for marker in banned:
+              assert marker not in source, marker
+
+          required = (
+              'from atlasquant_aion_memory_layers import recall',
+              'from aion_core.memory_architecture import list_history',
+              'from atlasquant_aion_continuity import continuity_briefing, continuity_digest',
+              'from atlasquant_aion_owner_experience_v1 import continuity_handoff',
+              '"creates_second_memory_database": False',
+              '"cross_device_authentication_transfer": False',
+              '"target_reauthentication_required": True',
+              '"automatic_memory_promotion": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
