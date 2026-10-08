@@ -1,0 +1,81 @@
+name: AION Owner Cosigned Collector Root Ceremony CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_cosigned_collector_root_ceremony_v1.py"
+      - "tests/test_atlasquant_aion_owner_cosigned_collector_root_ceremony_v1.py"
+      - "docs/aion/AION_OWNER_COSIGNED_COLLECTOR_ROOT_CEREMONY_V1.md"
+      - ".github/workflows/aion-owner-cosigned-collector-root-ceremony-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-only-owner-ceremony:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce PR-only CI environment
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          PY
+      - name: Install pinned test-only crypto dependency
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+      - name: Validate compilation
+        run: |
+          python -m py_compile \
+            atlasquant_aion_owner_cosigned_collector_root_ceremony_v1.py \
+            tests/test_atlasquant_aion_owner_cosigned_collector_root_ceremony_v1.py
+      - name: Run synthetic adversarial enrollment-preparation tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_cosigned_collector_root_ceremony_v1.py'
+      - name: Block host mutation, process, network and authority escalation
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          source=Path("atlasquant_aion_owner_cosigned_collector_root_ceremony_v1.py").read_text("utf-8")
+          tree=ast.parse(source)
+          forbidden={"subprocess","socket","ctypes","winreg","requests",
+                     "urllib","httpx","shutil","tempfile"}
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Import):
+                  assert all(item.name.split(".")[0] not in forbidden for item in node.names)
+              elif isinstance(node,ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+          for literal in (
+              '"trusted_host_policy_mutated": False',
+              '"root_enrolled_in_production": False',
+              '"collector_enrolled_in_production": False',
+              '"collector_launch_authorized": False',
+              '"physical_attestation_verified": False',
+              '"network_deny_verified": False',
+              '"installer_authorized": False',
+              '"build_authorized": False', '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert literal in source,literal
+          assert "CreateProcessW" not in source
+          assert "SetTokenInformation" not in source
+          assert "FwpmFilterAdd0" not in source
+          PY
