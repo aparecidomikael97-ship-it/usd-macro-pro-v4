@@ -24,6 +24,7 @@ from typing import Any, Mapping
 from atlasquant_aion_sealed_provider_outcome_reconciliation_v1 import (
     OUTCOME_RECEIPT_SCHEMA,
     RECONCILIATION_SCHEMA,
+    verify_outcome_chain_record,
 )
 
 
@@ -98,6 +99,9 @@ def _terminal_outcome(
     if raw.get("state") != "OUTCOME_RECEIPT_READY":
         blockers.append("VALID_OUTCOME_RECEIPT_REQUIRED")
         return "", "", "", blockers
+    if verify_outcome_chain_record(raw).get("valid") is not True:
+        blockers.append("OUTCOME_RECEIPT_VERIFICATION_FAILED")
+        return "", "", "", blockers
 
     receipt_digest = _sha256(raw.get("outcome_receipt_digest"))
     if not receipt_digest:
@@ -118,6 +122,9 @@ def _terminal_outcome(
         return outcome, receipt_digest, reconciliation_digest, blockers
     if recon.get("state") != "RECONCILIATION_RECORD_READY":
         blockers.append("VALID_RECONCILIATION_REQUIRED")
+        return outcome, receipt_digest, reconciliation_digest, blockers
+    if verify_outcome_chain_record(recon).get("valid") is not True:
+        blockers.append("RECONCILIATION_VERIFICATION_FAILED")
         return outcome, receipt_digest, reconciliation_digest, blockers
     if _sha256(recon.get("original_outcome_receipt_digest")) != receipt_digest:
         blockers.append("RECONCILIATION_RECEIPT_BINDING_MISMATCH")
