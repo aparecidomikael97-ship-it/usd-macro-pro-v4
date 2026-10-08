@@ -46,6 +46,30 @@ jobs:
         run: |
           python -m unittest discover -v -s tests \
             -p 'test_atlasquant_aion_windows_host_anchor_readonly_inventory_v1.py'
+      - name: Sanitized Windows native host-anchor status (negative only)
+        if: runner.os == 'Windows'
+        run: |
+          python - <<'PY'
+          import json
+          import secrets
+          from atlasquant_aion_windows_host_anchor_readonly_inventory_v1 import (
+              observe_owner_windows_host_anchor_readonly,
+          )
+          result = observe_owner_windows_host_anchor_readonly(secrets.token_hex(32))
+          # Only present state/reason and permanent denial flags. No registry
+          # bytes, host SID, public keys, user path or raw policy digest.
+          print(json.dumps({
+              "state": result["state"],
+              "reason": result["reason"],
+              "registry_read_completed": result["native_registry_read_completed"],
+              "anchor_security_verified": result["host_anchor_is_protected"],
+              "installer_authorized": result["installer_authorized"],
+              "registry_modified": result["system_registry_modified"],
+          }, sort_keys=True))
+          assert result["host_anchor_is_protected"] is False
+          assert result["installer_authorized"] is False
+          assert result["system_registry_modified"] is False
+          PY
       - name: Static guard for no registry write/network/OS privilege mutation
         run: |
           python - <<'PY'
