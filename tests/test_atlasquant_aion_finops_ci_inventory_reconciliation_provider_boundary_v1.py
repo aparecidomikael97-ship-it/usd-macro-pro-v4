@@ -5,6 +5,7 @@ writes only the GitHub Actions RUNNER_TEMP SQLite file via upstream #1071.
 No API credentials, billing accounts, payment providers or AION owner PC.
 """
 import os
+from contextlib import closing
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -286,6 +287,28 @@ class FinOpsInventoryReconciliationAndBoundaryV1Tests(unittest.TestCase):
         self.blocked(self.gate(request=req,inventory=inv,reconciliation=rec),
                      "BOUNDARY_BUDGET_INVENTORY_BASELINE_MISMATCH")
 
+    def test_gate_changed_invoice_receipt_claimed_total_blocks(self):
+        rec=dict(self.rec,claimed_total_raw_brl_cents=0)
+        self.blocked(self.gate(reconciliation=rec),
+                     "BOUNDARY_RECON_RECEIPT_REHASH_FAILED")
+
+    def test_gate_changed_invoice_rows_blocks_even_with_same_header_digest(self):
+        rec=dict(self.rec,claimed_rows=[
+            dict(self.rec["claimed_rows"][0],claimed_charge_brl_cents=1)
+        ])
+        self.blocked(self.gate(reconciliation=rec),
+                     "BOUNDARY_RECON_RECEIPT_REHASH_FAILED")
+
+    def test_gate_removed_invoice_rows_blocks_even_if_header_unchanged(self):
+        rec=dict(self.rec,claimed_rows=[])
+        self.blocked(self.gate(reconciliation=rec),
+                     "BOUNDARY_RECON_RECEIPT_REHASH_FAILED")
+
+    def test_gate_injected_fake_bank_trust_claim_blocks(self):
+        rec=dict(self.rec,bank_debit_authoritative=True)
+        self.blocked(self.gate(reconciliation=rec),
+                     "BOUNDARY_RECON_EXACT_FIELDS_REQUIRED")
+
     def test_gate_settled_reservation_does_not_simulate_unspent_call(self):
         result=self.store.settle(owner_id=OWNER,month=MONTH,
             reservation_id="ci-finops-call001",measured_actual_cents=1000)
@@ -293,8 +316,9 @@ class FinOpsInventoryReconciliationAndBoundaryV1Tests(unittest.TestCase):
         self.blocked(self.gate(),"ATOMIC_RESERVATION_MISSING_OR_MISMATCHED")
 
     def test_gate_db_tamper_blocks(self):
-        with sqlite3.connect(self.store.path) as conn:
-            conn.execute("UPDATE month_state SET total_reserved_cents=0")
+        with closing(sqlite3.connect(self.store.path)) as conn:
+            with conn:
+                conn.execute("UPDATE month_state SET total_reserved_cents=0")
         self.blocked(self.gate(),"CI_STORE_ACCOUNTING_OR_SCOPE_ERROR")
 
     def test_gate_hostile_types_fail_closed(self):
