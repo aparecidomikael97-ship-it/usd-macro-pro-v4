@@ -1,0 +1,114 @@
+name: AION Windows Build Input Offline Cache Attestation V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_build_input_offline_cache_attestation_v1.py"
+      - "tests/test_atlasquant_aion_windows_build_input_offline_cache_attestation_v1.py"
+      - "docs/aion/AION_WINDOWS_BUILD_INPUT_OFFLINE_CACHE_ATTESTATION_V1.md"
+      - ".github/workflows/aion-windows-build-input-offline-cache-attestation-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-build-input-offline-cache-attestation-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12.12"
+
+      - name: Prepare exact contract import dependency
+        run: |
+          python -m pip install --disable-pip-version-check "pip==26.2.1" "cryptography==50.0.2"
+          python - <<'PY'
+          import sys
+          import cryptography
+          assert sys.version_info[:3] == (3, 12, 12), sys.version
+          assert cryptography.__version__ == "50.0.2", cryptography.__version__
+          PY
+
+      - name: Compile offline cache attestation
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_build_input_offline_cache_attestation_v1.py \
+            tests/test_atlasquant_aion_windows_build_input_offline_cache_attestation_v1.py
+
+      - name: Run offline cache attestation tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_build_input_offline_cache_attestation_v1.py'
+
+      - name: Assert cache layer cannot download install build or call network
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_windows_build_input_offline_cache_attestation_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+              "from github",
+              "import github",
+              "import git",
+              "from git",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          forbidden_live_material = (
+              "api.github.com",
+              "pypi.org",
+              "python.org/ftp",
+          )
+          for marker in forbidden_live_material:
+              assert marker not in source, marker
+
+          required = (
+              '"sdist_allowed": False',
+              '"build_from_source_allowed": False',
+              '"extra_cache_files_allowed": False',
+              '"cache_read_only_after_attestation": True',
+              '"symlinks_allowed": False',
+              '"reparse_points_allowed": False',
+              '"alternate_data_streams_allowed": False',
+              '"network_during_cache_attestation_allowed": False',
+              '"network_during_reproducible_build_allowed": False',
+              '"cache_mutation_after_attestation_allowed": False',
+              '"artifact_downloaded_by_this_module": False',
+              '"dependency_resolved_by_this_module": False',
+              '"files_copied_by_this_module": False',
+              '"packages_installed": False',
+              '"build_authorized": False',
+              '"build_started": False',
+              '"package_built": False',
+              '"package_installed": False',
+              '"private_signing_key_loaded": False',
+              '"credential_material_loaded": False',
+              '"network_called": False',
+              '"github_api_called": False',
+              '"live_repository_mutation_authorized": False',
+              '"live_repository_mutation_performed": False',
+              '"production_repository_mutation_performed": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
