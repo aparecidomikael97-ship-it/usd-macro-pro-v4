@@ -32,6 +32,8 @@ in 0xXXXXXXXX hexadecimal, with recognized reasons:
 - NTE_BAD_ALGID: 0x80090008
 - NTE_FAIL: 0x80090020
 - NTE_INTERNAL_ERROR: 0x8009002D
+- NTE_DEVICE_NOT_READY: 0x80090030 (confirmed on GitHub Windows
+  runner; does not imply the owner PC has this error)
 - Any other code: UNKNOWN_NATIVE_STATUS / INCONCLUSIVE.
 
 Normalizes signed and unsigned SECURITY_STATUS; malformed types fail closed.
