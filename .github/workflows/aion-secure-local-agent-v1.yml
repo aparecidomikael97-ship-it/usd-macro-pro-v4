@@ -1,0 +1,85 @@
+name: AION Secure Local Agent V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_secure_local_agent_v1.py"
+      - "tests/test_atlasquant_aion_secure_local_agent_v1.py"
+      - "docs/aion/AION_SECURE_LOCAL_AGENT_V1.md"
+      - ".github/workflows/aion-secure-local-agent-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  secure-local-agent-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile secure local agent contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_secure_local_agent_v1.py \
+            tests/test_atlasquant_aion_secure_local_agent_v1.py
+
+      - name: Run secure local agent tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_secure_local_agent_v1.py'
+
+      - name: Assert non-executing desktop boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_secure_local_agent_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import os",
+              "from os ",
+              "import socket",
+              "import requests",
+              "urllib.request",
+              "psutil",
+              "win32api",
+              "win32com",
+              "ctypes",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"physical_binding_included": False',
+              '"executable_path_included": False',
+              '"launch_command_included": False',
+              '"shell_command_generated": False',
+              '"execution_command_generated": False',
+              '"physical_execution_performed": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+              '"arbitrary_app_launch": False',
+              '"shell_execution": False',
+              '"credential_access": False',
+              '"send_message": False',
+              '"purchase_or_payment": False',
+              '"trading_order": False',
+              '"microphone_started": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
