@@ -1,0 +1,121 @@
+name: AION Chat Production Schema Binding CI V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - impl/aion-chat-postgres-migration-rls-restore-ci-v1-20261007
+    paths:
+      - "atlasquant_aion_chat_ephemeral_postgres_v1.py"
+      - "atlasquant_aion_chat_production_schema_binding_ci_v1.py"
+      - "atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
+      - "migrations/aion_chat_postgres_v1/0001_initial.sql"
+      - "tests/test_atlasquant_aion_chat_ephemeral_postgres_v1.py"
+      - "tests/test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py"
+      - "tests/test_atlasquant_aion_chat_production_schema_binding_ci_v1.py"
+      - "docs/aion/AION_CHAT_PRODUCTION_SCHEMA_BINDING_CI_V1.md"
+      - ".github/workflows/aion-chat-production-schema-binding-ci-v1.yml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  production-schema-binding-ci-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aion_chat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aion_chat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      AION_CHAT_EPHEMERAL_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
+      AION_CHAT_MIGRATION_CI_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
+      AION_CHAT_PRODUCTION_SCHEMA_CI_PG_DSN: postgresql://postgres:postgres@127.0.0.1:5432/aion_chat_test?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned PostgreSQL driver
+        run: |
+          grep -Fx "psycopg[binary]==3.3.6" requirements.txt
+          python -m pip install pip==26.2.1
+          python -m pip install "psycopg[binary]==3.3.6"
+          python -m pip check
+
+      - name: Compile binding chain
+        run: |
+          python -m py_compile             atlasquant_aion_chat_postgres_store_adapter_fake_v1.py             atlasquant_aion_chat_ephemeral_postgres_v1.py             atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             atlasquant_aion_chat_production_schema_binding_ci_v1.py             tests/test_atlasquant_aion_chat_ephemeral_postgres_v1.py             tests/test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py             tests/test_atlasquant_aion_chat_production_schema_binding_ci_v1.py
+
+      - name: Verify migration checksum
+        run: |
+          printf '%s  %s\n'             "7dd72d75365862f54c81110027430011f8ac8f81ce629f500cbbd9aa0c00c50c"             "migrations/aion_chat_postgres_v1/0001_initial.sql"             | sha256sum --check --strict
+
+      - name: Run fake-adapter regression
+        run: |
+          python -m unittest -v             test_atlasquant_aion_chat_postgres_store_adapter_fake_v1.py
+
+      - name: Run original real ephemeral PostgreSQL regression
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_ephemeral_postgres_v1.py'
+
+      - name: Run migration RLS restore-policy regression
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_postgres_migration_rls_restore_ci_v1.py'
+
+      - name: Run production-schema adapter binding tests
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_chat_production_schema_binding_ci_v1.py'
+
+      - name: Assert production authority remains absent
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path("atlasquant_aion_chat_production_schema_binding_ci_v1.py"),
+              Path("atlasquant_aion_chat_ephemeral_postgres_v1.py"),
+          ]
+          source = "\n".join(path.read_text(encoding="utf-8") for path in files)
+
+          for banned in (
+              "os.getenv(",
+              "os.environ",
+              "streamlit.secrets",
+              "render.com",
+              "api.openai.com",
+          ):
+              assert banned not in source, banned
+
+          binding = Path(
+              "atlasquant_aion_chat_production_schema_binding_ci_v1.py"
+          ).read_text(encoding="utf-8")
+
+          for marker in (
+              '"production_allowed": False',
+              '"production_connection_allowed": False',
+              '"provider_called": False',
+              '"billing_executed": False',
+              '"deploy_executed": False',
+              '"worker_armed": False',
+              '"external_action_executed": False',
+              '"core_checkpoint_write": False',
+          ):
+              assert marker in binding, marker
+          PY
