@@ -1,0 +1,89 @@
+name: AION Presentation Artifact Control V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_presentation_artifact_control_v1.py"
+      - "tests/test_atlasquant_aion_presentation_artifact_control_v1.py"
+      - "docs/aion/AION_PRESENTATION_ARTIFACT_CONTROL_V1.md"
+      - ".github/workflows/aion-presentation-artifact-control-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  presentation-artifact-control-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile presentation contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_presentation_artifact_control_v1.py \
+            tests/test_atlasquant_aion_presentation_artifact_control_v1.py
+
+      - name: Run presentation contract tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_presentation_artifact_control_v1.py'
+
+      - name: Assert non-executing presentation boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_presentation_artifact_control_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "from pptx",
+              "import pptx",
+              "import subprocess",
+              "from subprocess",
+              "import pyautogui",
+              "import win32com",
+              "import win32api",
+              "import matplotlib",
+              "import requests",
+              "urllib.request",
+              "import socket",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"macros_allowed": False',
+              '"vba_allowed": False',
+              '"external_links_allowed": False',
+              '"external_relationships_allowed": False',
+              '"embedded_ole_objects_allowed": False',
+              '"remote_fetch_during_presentation_allowed": False',
+              '"credentials_allowed": False',
+              '"real_customer_data_allowed": False',
+              '"artifact_file_created": False',
+              '"charts_rendered": False',
+              '"powerpoint_opened": False',
+              '"presentation_started": False',
+              '"keyboard_event_sent": False',
+              '"mouse_event_sent": False',
+              '"subprocess_called": False',
+              '"provider_called": False',
+              '"network_called": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
