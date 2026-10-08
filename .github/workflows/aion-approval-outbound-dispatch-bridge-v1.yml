@@ -1,0 +1,89 @@
+name: AION Approval Outbound Dispatch Bridge V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_approval_outbound_dispatch_bridge_v1.py"
+      - "tests/test_atlasquant_aion_approval_outbound_dispatch_bridge_v1.py"
+      - "docs/aion/AION_APPROVAL_OUTBOUND_DISPATCH_BRIDGE_V1.md"
+      - ".github/workflows/aion-approval-outbound-dispatch-bridge-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  approval-outbound-dispatch-bridge-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile outbound bridge contract
+        run: |
+          python -m py_compile \
+            atlasquant_aion_approval_outbound_dispatch_bridge_v1.py \
+            tests/test_atlasquant_aion_approval_outbound_dispatch_bridge_v1.py
+
+      - name: Run outbound bridge tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_approval_outbound_dispatch_bridge_v1.py'
+
+      - name: Assert non-dispatch boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_approval_outbound_dispatch_bridge_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import smtplib",
+              "import requests",
+              "urllib.request",
+              "import socket",
+              "import subprocess",
+              "from subprocess",
+              "import win32com",
+              "from gmail",
+              "import gmail",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          required = (
+              '"approval_is_execution_authorization": False',
+              '"execution_authorized": False',
+              '"approval_consumed_by_this_module": False',
+              '"single_use_execution_authorization_still_required": True',
+              '"durable_dispatch_record_still_required": True',
+              '"pre_dispatch_revalidation_still_required": True',
+              '"outcome_receipt_still_required": True',
+              '"approval_consumed": False',
+              '"execution_authorization_issued": False',
+              '"dispatch_record_written": False',
+              '"recipient_resolved": False',
+              '"endpoint_resolved": False',
+              '"credentials_loaded": False',
+              '"payload_materialized": False',
+              '"provider_called": False',
+              '"network_called": False',
+              '"message_sent": False',
+              '"contract_exported": False',
+              '"signature_requested": False',
+              '"worker_armed": False',
+              '"deploy_executed": False',
+              '"core_checkpoint_write": False',
+              '"external_action_executed": False',
+              '"executes_action": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
