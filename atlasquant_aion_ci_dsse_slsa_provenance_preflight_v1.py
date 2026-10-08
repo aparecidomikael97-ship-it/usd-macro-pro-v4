@@ -49,12 +49,14 @@ PARAM_FIELDS = {
     "sourceCommit", "repository", "workflowRef", "issuer", "audience",
     "challengeDigest", "anchorDigest", "registryDigest",
     "custodyCandidateDigest", "builderProofDigest",
+    "artifactSubjectDigest", "releaseManifestSha256",
 }
 EXPECTED_FIELDS = {
     "subject_name", "subject_sha256", "source_commit", "repository",
     "workflow_ref", "issuer", "audience", "builder_id", "build_type",
     "run_id", "challenge_digest", "anchor_digest", "registry_digest",
     "custody_candidate_digest", "builder_proof_digest",
+    "artifact_subject_digest", "release_manifest_sha256",
     "expected_signer_key_sha256", "external_policy_digest",
 }
 CRYPTO_EVIDENCE_FIELDS = (
@@ -62,8 +64,9 @@ CRYPTO_EVIDENCE_FIELDS = (
     "signature_sha256", "subject_name", "subject_sha256", "source_commit",
     "run_id", "builder_id", "build_type", "repository", "workflow_ref",
     "issuer", "audience", "anchor_digest", "registry_digest",
-    "custody_candidate_digest", "builder_proof_digest", "challenge_digest",
-    "external_policy_digest",
+    "custody_candidate_digest", "builder_proof_digest",
+    "artifact_subject_digest", "release_manifest_sha256",
+    "challenge_digest", "external_policy_digest",
 )
 DENIAL_FIELDS = (
     "real_attestor_identity_verified", "authorized_aion_publisher_verified",
@@ -168,6 +171,7 @@ def verify_ci_dsse_slsa_subset(
             errors.append("SUBJECT_SHA256_FORMAT_INVALID")
     for field in ("challenge_digest", "anchor_digest", "registry_digest",
                   "custody_candidate_digest", "builder_proof_digest",
+                  "artifact_subject_digest", "release_manifest_sha256",
                   "external_policy_digest"):
         if not _sha(ex.get(field)):
             errors.append("EXTERNAL_DIGEST_INVALID:" + field)
@@ -198,7 +202,7 @@ def verify_ci_dsse_slsa_subset(
             statement = parsed
             if _canonical(statement) != payload:
                 errors.append("FIXTURE_NONCANONICAL_JSON_BYTES")
-        except (UnicodeError, ValueError, TypeError):
+        except (UnicodeError, ValueError, TypeError, RecursionError):
             errors.append("DSSE_PAYLOAD_JSON_INVALID")
     else:
         errors.append("DSSE_PAYLOAD_MISSING")
@@ -238,6 +242,8 @@ def verify_ci_dsse_slsa_subset(
         "anchorDigest": "anchor_digest", "registryDigest": "registry_digest",
         "custodyCandidateDigest": "custody_candidate_digest",
         "builderProofDigest": "builder_proof_digest",
+        "artifactSubjectDigest": "artifact_subject_digest",
+        "releaseManifestSha256": "release_manifest_sha256",
     }
     for p, e in pairs.items():
         if params.get(p) != ex.get(e):
@@ -271,6 +277,7 @@ def verify_ci_dsse_slsa_subset(
             "builder_id", "build_type", "repository", "workflow_ref",
             "issuer", "audience", "anchor_digest", "registry_digest",
             "custody_candidate_digest", "builder_proof_digest",
+            "artifact_subject_digest", "release_manifest_sha256",
             "challenge_digest", "external_policy_digest",
         )},
     }
@@ -328,6 +335,9 @@ def review_ci_attestation_trust_handoff(
         errors.append("BUILDER_CHAIN_MISMATCH")
     if v.get("source_commit") != p.get("source_commit") or v.get("run_id") != p.get("build_run_id"):
         errors.append("BUILD_RUN_SOURCE_MISMATCH")
+    if (v.get("artifact_subject_digest") != p.get("artifact_subject_digest") or
+        v.get("release_manifest_sha256") != p.get("release_manifest_sha256")):
+        errors.append("RELEASE_SUBJECT_AND_MANIFEST_CHAIN_MISMATCH")
     if v.get("external_policy_digest") != expected_issuer_policy_digest or not _sha(expected_issuer_policy_digest):
         errors.append("EXTERNAL_POLICY_BINDING_MISMATCH")
     if (type(expected_minimum_rotation_epoch) is not int
