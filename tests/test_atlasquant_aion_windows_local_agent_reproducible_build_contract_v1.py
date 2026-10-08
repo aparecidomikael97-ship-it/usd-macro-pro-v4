@@ -1,5 +1,8 @@
-import copy
+import hashlib
+import io
 import unittest
+import zipfile
+from datetime import datetime, timezone
 
 from atlasquant_aion_windows_installation_manifest_package_attestation_v1 import (
     REQUIRED_PACKAGE_ROLES,
@@ -129,6 +132,61 @@ class AionWindowsLocalAgentReproducibleBuildContractV1Tests(unittest.TestCase):
         kwargs.update(changes)
         return build_observation(**kwargs)
 
+
+    def deterministic_fixture_zip(self, epoch, reverse=False):
+        rows = self.entries()
+        contents = {
+            row["path"]: (
+                ("synthetic|" + row["role"] + "|v1\n").encode("utf-8")
+            )
+            for row in rows
+        }
+        ordered = sorted(
+            rows,
+            key=lambda row: row["path"].encode("utf-8"),
+            reverse=reverse,
+        )
+        # Input order may differ, but recipe order is always normalized again.
+        ordered = sorted(
+            ordered,
+            key=lambda row: row["path"].encode("utf-8"),
+        )
+        stamp = datetime.fromtimestamp(epoch, tz=timezone.utc)
+        date_time = (
+            stamp.year,
+            stamp.month,
+            stamp.day,
+            stamp.hour,
+            stamp.minute,
+            stamp.second,
+        )
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(
+            buffer,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+            compresslevel=9,
+        ) as archive:
+            for row in ordered:
+                info = zipfile.ZipInfo(
+                    filename=row["path"],
+                    date_time=date_time,
+                )
+                info.create_system = 3
+                info.compress_type = zipfile.ZIP_DEFLATED
+                mode = 0o755 if row["role"] == "AGENT_ENTRYPOINT" else 0o644
+                info.external_attr = (mode & 0xFFFF) << 16
+                info.extra = b""
+                info.comment = b""
+                archive.writestr(
+                    info,
+                    contents[row["path"]],
+                    compress_type=zipfile.ZIP_DEFLATED,
+                    compresslevel=9,
+                )
+        payload = buffer.getvalue()
+        return "sha256:" + hashlib.sha256(payload).hexdigest(), payload
+
     def test_dependency_lock_is_exact_and_minimal(self):
         lock = build_dependency_lock()
         self.assertEqual(lock["state"], "BUILD_DEPENDENCY_LOCK_READY")
@@ -237,6 +295,25 @@ class AionWindowsLocalAgentReproducibleBuildContractV1Tests(unittest.TestCase):
         )
         self.assertEqual(recipe["state"], "BLOCKED")
         self.assertIn("SOURCE_DATE_EPOCH_OUT_OF_RANGE", recipe["blockers"])
+
+
+    def test_synthetic_twin_zip_builds_are_bit_for_bit_deterministic(self):
+        first_digest, first_bytes = self.deterministic_fixture_zip(
+            1791446400,
+            reverse=False,
+        )
+        second_digest, second_bytes = self.deterministic_fixture_zip(
+            1791446400,
+            reverse=True,
+        )
+        self.assertEqual(first_digest, second_digest)
+        self.assertEqual(first_bytes, second_bytes)
+
+        changed_epoch_digest, _ = self.deterministic_fixture_zip(
+            1791446460,
+            reverse=True,
+        )
+        self.assertNotEqual(first_digest, changed_epoch_digest)
 
     def test_two_independent_observations_match_despite_different_observation_time(self):
         _, _, _, recipe = self.recipe()
