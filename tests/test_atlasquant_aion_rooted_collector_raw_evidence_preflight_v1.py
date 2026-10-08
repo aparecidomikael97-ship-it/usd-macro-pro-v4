@@ -284,7 +284,9 @@ class CollectorRawEvidenceTests(unittest.TestCase):
     def test_raw_bytes_tampered_after_signing_rejected(self):
         ch = self.challenge()
         raw, att = self.bundle_and_attestation(ch)
-        edited = raw.replace(b"POS-", b"FAKE", 1)
+        bundle = json.loads(raw)
+        bundle["entries"][0]["positive_evidence_b64"] = b64(b"FAKE-POSITIVE-BYTES")
+        edited = canonical(bundle)
         with tempfile.TemporaryDirectory() as td:
             result = self.invoke(td, raw=edited, attestation=att)
         self.assertEqual(result["reason"], "RAW_BUNDLE_SHA256_MISMATCH")
