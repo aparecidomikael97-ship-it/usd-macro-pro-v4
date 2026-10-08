@@ -40,7 +40,11 @@ class InstallCompletionPostinstallRollbackReceiptTests(unittest.TestCase):
             "atomic_install_contract_digest": D("1"),
             "install_commitment_digest": D("2"),
             "installation_id": "install-synthetic-only-001",
-            "journal_genesis_digest": D("3"),
+            "journal_genesis_digest": _digest({
+                "installation_id": "install-synthetic-only-001",
+                "install_commitment_digest": D("2"),
+                "journal_kind": "WINDOWS_INSTALL_FILE_TRANSACTION_V1",
+            }),
             "operation_count": len(ops),
             "operations": ops,
         }
