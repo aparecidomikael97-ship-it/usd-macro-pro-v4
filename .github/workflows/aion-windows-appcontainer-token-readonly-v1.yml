@@ -1,0 +1,87 @@
+name: AION Windows AppContainer Token Read-Only V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_appcontainer_token_readonly_v1.py"
+      - "tests/test_atlasquant_aion_windows_appcontainer_token_readonly_v1.py"
+      - "docs/aion/AION_WINDOWS_APPCONTAINER_TOKEN_READONLY_V1.md"
+      - ".github/workflows/aion-windows-appcontainer-token-readonly-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native-token-readonly-preflight:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Require an ephemeral PR runner
+        run: |
+          python - <<'PY'
+          import os
+          assert os.getenv("GITHUB_ACTIONS") == "true"
+          assert os.getenv("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.getenv("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile and run 20 adversarial read-only tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_appcontainer_token_readonly_v1.py \
+            tests/test_atlasquant_aion_windows_appcontainer_token_readonly_v1.py
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_appcontainer_token_readonly_v1.py'
+      - name: Enforce read-only Windows API surface
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          path = Path("atlasquant_aion_windows_appcontainer_token_readonly_v1.py")
+          tree = ast.parse(path.read_text(encoding="utf-8"))
+          forbidden = {
+              "CreateAppContainerProfile", "DeleteAppContainerProfile",
+              "CreateProcessW", "CreateProcessAsUserW",
+              "SetTokenInformation", "AdjustTokenPrivileges",
+              "FwpmFilterAdd0", "FwpmFilterDeleteById0",
+              "NetworkIsolationSetAppContainerConfig",
+              "socket", "subprocess", "requests", "urllib",
+          }
+          for n in ast.walk(tree):
+              if isinstance(n, (ast.Import, ast.ImportFrom)):
+                  packages = (
+                      [a.name for a in n.names] if isinstance(n, ast.Import)
+                      else [n.module or ""]
+                  )
+                  assert not any(name.split(".")[0] in forbidden for name in packages), packages
+              elif isinstance(n, ast.Attribute):
+                  assert n.attr not in forbidden, n.attr
+          from atlasquant_aion_windows_appcontainer_token_readonly_v1 import evaluate_untrusted_token_readback
+          r=evaluate_untrusted_token_readback(
+              profile_name="AtlasQuantAIONProbe5cee68653592",
+              appcontainer_flag=True, sid_matches=True,
+              capability_count=0, all_queries_succeeded=True,
+          )
+          assert r["state"] == "NATIVE_TOKEN_IDENTITY_CANDIDATE_UNTRUSTED"
+          assert not any(r[key] for key in (
+              "physical_attestation_verified",
+              "real_host_identity_verified",
+              "process_handle_origin_verified",
+              "network_deny_verified",
+              "installer_authorized",
+              "build_authorized",
+              "deploy_authorized",
+          ))
+          PY
