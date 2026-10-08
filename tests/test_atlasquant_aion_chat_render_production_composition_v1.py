@@ -52,7 +52,7 @@ class RenderProductionCompositionV1Tests(unittest.TestCase):
             production.DATABASE_KEY: production.EXPECTED_DATABASE,
             production.USER_KEY: production.EXPECTED_USER,
             production.PASSWORD_KEY: APP_PASSWORD,
-            production.SSLMODE_KEY: "verify-full",
+            production.SSLMODE_KEY: "require",
             production.CURSOR_KEY: (
                 "atlasquant-render-production-composition-ci-cursor-key-v1"
             ),
