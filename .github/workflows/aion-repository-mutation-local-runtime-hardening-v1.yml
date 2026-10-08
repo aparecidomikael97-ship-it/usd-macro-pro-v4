@@ -1,0 +1,110 @@
+name: AION Repository Mutation Local Runtime Hardening V1
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_aion_repository_mutation_local_runtime_hardening_v1.py"
+      - "tests/test_atlasquant_aion_repository_mutation_local_runtime_hardening_v1.py"
+      - "docs/aion/AION_REPOSITORY_MUTATION_LOCAL_RUNTIME_HARDENING_OWNER_KEY_V1.md"
+      - ".github/workflows/aion-repository-mutation-local-runtime-hardening-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  repository-mutation-local-runtime-hardening-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned crypto runtime dependency
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+
+      - name: Compile local runtime hardening
+        run: |
+          python -m py_compile \
+            atlasquant_aion_repository_mutation_local_runtime_hardening_v1.py \
+            tests/test_atlasquant_aion_repository_mutation_local_runtime_hardening_v1.py
+
+      - name: Run local runtime hardening tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_repository_mutation_local_runtime_hardening_v1.py'
+
+      - name: Assert hardening remains local and live-GitHub-free
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "atlasquant_aion_repository_mutation_local_runtime_hardening_v1.py"
+          ).read_text(encoding="utf-8")
+
+          forbidden_imports = (
+              "import subprocess",
+              "from subprocess",
+              "import requests",
+              "from requests",
+              "urllib.request",
+              "import socket",
+              "import httpx",
+              "from github",
+              "import github",
+              "import git",
+              "from git",
+          )
+          for marker in forbidden_imports:
+              assert marker not in source, marker
+
+          forbidden_live_material = (
+              "api.github.com",
+              "GITHUB_TOKEN",
+              "GH_TOKEN",
+          )
+          for marker in forbidden_live_material:
+              assert marker not in source, marker
+
+          required = (
+              '"real_windows_acl_modified_by_this_module": False',
+              '"windows_service_installed": False',
+              '"second_runtime_database_forbidden": True',
+              '"owner_public_key_enrollment_implemented": True',
+              '"hardened_execution_requires_enrolled_key_binding": True',
+              '"receipt_signature_enrollment_fingerprint_must_match": True',
+              '"owner_key_rotation_implemented": False',
+              '"owner_private_key_generated": False',
+              '"owner_private_key_stored": False',
+              '"signed_kill_switch_control_implemented": True',
+              '"kill_switch_change_requires_owner_signature": True',
+              '"kill_switch_change_requires_single_use_nonce": True',
+              '"restart_recovery_scan_is_read_only": True',
+              '"consumed_without_attempt_never_auto_released": True',
+              '"outcome_unknown_never_auto_retried": True',
+              '"automatic_retry_allowed": False',
+              '"repository_mutation_replay_allowed": False',
+              '"live_github_state_reader_implemented": False',
+              '"live_github_adapter_implemented": False',
+              '"runtime_credential_broker_implemented": False',
+              '"real_github_credentials_loaded": False',
+              '"real_github_network_path_enabled": False',
+              '"github_api_called": False',
+              '"network_called": False',
+              '"live_repository_mutation_authorized": False',
+              '"live_repository_mutation_performed": False',
+              '"production_repository_mutation_performed": False',
+              '"deploy_executed": False',
+              '"worker_activated": False',
+              '"provider_activated": False',
+              '"production_persistence_activated": False',
+          )
+          for marker in required:
+              assert marker in source, marker
+          PY
