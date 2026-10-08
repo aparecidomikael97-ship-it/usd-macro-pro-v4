@@ -363,7 +363,7 @@ class AionOwnerStackIntegrationCertificationV1Tests(unittest.TestCase):
 
     def test_policy_snapshot_covers_all_owner_stack_layers(self):
         snapshot = owner_stack_policy_snapshot()
-        self.assertEqual(snapshot["state"], "VALID")
+        self.assertEqual(snapshot["state"], "VALID", snapshot["blockers"])
         self.assertEqual(
             snapshot["policy_count"],
             snapshot["expected_policy_count"],
@@ -415,6 +415,7 @@ class AionOwnerStackIntegrationCertificationV1Tests(unittest.TestCase):
         self.assertEqual(
             result["state"],
             "SYNTHETIC_OWNER_STACK_CERTIFICATION_CANDIDATE",
+            result["blockers"],
         )
         self.assertEqual(
             result["dimension_count"],
