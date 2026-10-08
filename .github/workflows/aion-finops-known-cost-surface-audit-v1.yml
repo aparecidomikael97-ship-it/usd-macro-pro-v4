@@ -1,0 +1,89 @@
+name: AION FinOps Known Cost Surface Audit V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_finops_known_cost_surface_audit_v1.py"
+      - "scripts/aion_finops_known_cost_surface_audit_v1.py"
+      - "tests/test_atlasquant_aion_finops_known_cost_surface_audit_v1.py"
+      - "docs/aion/AION_FINOPS_KNOWN_COST_SURFACE_STATIC_AUDIT_V1.md"
+      - ".github/workflows/aion-finops-known-cost-surface-audit-v1.yml"
+      - "atlasquant_aion_provider.py"
+      - "atlasquant_aion_model_gateway_v2.py"
+      - "atlasquant_aion_finops_metering.py"
+      - "atlasquant_aion_owner_brl200_finops_ceiling_v1.py"
+      - "atlasquant_aion_finops_ephemeral_sqlite_reservation_cas_v1.py"
+      - "atlasquant_aion_chat_render_production_composition_v1.py"
+      - "render.yaml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  known-billable-code-surfaces:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify isolated pull request context
+        run: |
+          python - <<'PY'
+          import os,sys
+          assert os.environ.get("GITHUB_ACTIONS")=="true"
+          assert os.environ.get("GITHUB_EVENT_NAME")=="pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          assert sys.version_info[:2]==(3,12)
+          PY
+
+      - name: Compile known source gap audit and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_finops_known_cost_surface_audit_v1.py \
+            scripts/aion_finops_known_cost_surface_audit_v1.py \
+            tests/test_atlasquant_aion_finops_known_cost_surface_audit_v1.py
+
+      - name: Test existing real code and fail closed on source drift
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_finops_known_cost_surface_audit_v1.py'
+
+      - name: Scan known source files without secrets or provider calls
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python scripts/aion_finops_known_cost_surface_audit_v1.py
+
+      - name: Prove audit code never imports live runtime or billing SDK
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=(Path("atlasquant_aion_finops_known_cost_surface_audit_v1.py").read_text("utf-8")
+               +Path("scripts/aion_finops_known_cost_surface_audit_v1.py").read_text("utf-8"))
+          forbidden=(
+            "import requests","import httpx","urllib.request","import socket",
+            "import winreg","import ctypes","os.system(","os.exec",
+            "from openai","from anthropic","import psycopg",
+            "Path.write_text(","Path.write_bytes(","requests.post(",
+            "openai.ChatCompletion","requests.get(","import subprocess",
+            "os.environ[","os.getenv(","from atlasquant_aion_provider import",
+          )
+          for marker in forbidden:
+              assert marker not in source,marker
+          from atlasquant_aion_finops_known_cost_surface_audit_v1 import FLAG_FIELDS
+          assert "owner_brl200_cap_enforced_on_actual_openai_post" in FLAG_FIELDS
+          assert "cloud_service_billing_proven_zero" in FLAG_FIELDS
+          PY
