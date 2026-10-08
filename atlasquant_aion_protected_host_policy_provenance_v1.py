@@ -209,6 +209,8 @@ def verify_anchored_host_policy_and_collector_ceremony(
     protected_exact_policy_epoch: int,
     # An independently pinned owner registry root must match signed policy:
     independently_pinned_owner_registry_root_public_key: bytes,
+    independently_observed_collector_binary_digest: str,
+    independently_observed_collector_manifest_digest: str,
     now: int,
     ceremony_nonce_store: SQLiteCollectorChallengeReplay | None,
 ) -> dict[str, Any]:
@@ -225,6 +227,8 @@ def verify_anchored_host_policy_and_collector_ceremony(
         or protected_exact_policy_epoch < 1
         or not _digest(expected_policy_authority_fingerprint)
         or not _digest(protected_exact_policy_digest)
+        or not _digest(independently_observed_collector_binary_digest)
+        or not _digest(independently_observed_collector_manifest_digest)
         or type(now) is not int):
         return _blocked("PREEXISTING_HOST_PINS_REQUIRED")
     if _sha(independently_pinned_policy_authority_public_key) != expected_policy_authority_fingerprint:
@@ -238,6 +242,9 @@ def verify_anchored_host_policy_and_collector_ceremony(
         return _blocked("HOST_POLICY_STALE")
     if _sha(independently_pinned_owner_registry_root_public_key) != policy["owner_registry_root_fingerprint"]:
         return _blocked("OWNER_REGISTRY_ROOT_NOT_IN_SIGNED_POLICY")
+    if (independently_observed_collector_binary_digest != policy["approved_collector_binary_digest"]
+        or independently_observed_collector_manifest_digest != policy["approved_collector_manifest_digest"]):
+        return _blocked("INDEPENDENT_COLLECTOR_MEASUREMENT_MISMATCH")
     witness = _decode_key(policy["witness_public_key_b64"])
     if len({
         independently_pinned_policy_authority_public_key,
@@ -274,8 +281,8 @@ def verify_anchored_host_policy_and_collector_ceremony(
         expected_independent_witness_fingerprint=policy["witness_fingerprint"],
         protected_previous_collector_epoch=policy["protected_collector_epoch"],
         pinned_previous_collector_root_fingerprint=policy["previous_collector_root_fingerprint"],
-        independently_observed_collector_binary_digest=policy["approved_collector_binary_digest"],
-        independently_observed_collector_manifest_digest=policy["approved_collector_manifest_digest"],
+        independently_observed_collector_binary_digest=independently_observed_collector_binary_digest,
+        independently_observed_collector_manifest_digest=independently_observed_collector_manifest_digest,
         now=now,
         nonce_store=ceremony_nonce_store,
     )
