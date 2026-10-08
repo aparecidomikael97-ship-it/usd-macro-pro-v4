@@ -1,0 +1,99 @@
+name: AION Independent Physical Process Attestation Contract V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_independent_physical_process_attestation_contract_v1.py"
+      - "tests/test_atlasquant_aion_independent_physical_process_attestation_contract_v1.py"
+      - "docs/aion/AION_INDEPENDENT_PHYSICAL_PROCESS_ATTESTATION_CONTRACT_V1.md"
+      - ".github/workflows/aion-independent-physical-process-attestation-contract-v1.yml"
+      - "atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1.py"
+
+permissions:
+  contents: read
+
+jobs:
+  independent-attestation-contract:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce pull-request CI scope
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_OS") in ("Windows", "Linux")
+          assert os.environ.get("GITHUB_RUN_ID")
+          PY
+      - name: Install pinned Ed25519 verification dependency in runner only
+        run: |
+          python -m pip install --disable-pip-version-check "cryptography==50.0.2"
+          python - <<'PY'
+          import cryptography
+          assert cryptography.__version__ == "50.0.2"
+          PY
+      - name: Compile contract and tests
+        run: |
+          python -m py_compile             atlasquant_aion_independent_physical_process_attestation_contract_v1.py             tests/test_atlasquant_aion_independent_physical_process_attestation_contract_v1.py
+      - name: Run adversarial attestation contract tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests             -p 'test_atlasquant_aion_independent_physical_process_attestation_contract_v1.py'
+      - name: Enforce canonical 12 physical requirements and no OS execution surface
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from atlasquant_aion_windows_sandbox_physical_probe_plan_evidence_v1 import PROBE_REQUIREMENTS
+
+          assert len(PROBE_REQUIREMENTS) == 12
+          assert PROBE_REQUIREMENTS[0] == "WINDOWS_RESTRICTED_TOKEN_PROOF_REQUIRED"
+          assert PROBE_REQUIREMENTS[-1] == "RESOURCE_LIMITS_PHYSICAL_PROOF_REQUIRED"
+
+          path = Path("atlasquant_aion_independent_physical_process_attestation_contract_v1.py")
+          source = path.read_text("utf-8")
+          tree = ast.parse(source)
+          forbidden_imports = {
+              "subprocess", "socket", "ctypes", "requests", "urllib", "httpx",
+              "win32api", "win32process",
+          }
+          forbidden_calls = {
+              "CreateProcessW", "ResumeThread", "NtResumeProcess",
+              "CreateAppContainerProfile", "DeleteAppContainerProfile",
+              "FwpmFilterAdd0", "FwpmFilterDeleteById0",
+          }
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  for alias in node.names:
+                      assert alias.name.split(".")[0] not in forbidden_imports, alias.name
+              if isinstance(node, ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden_imports, node.module
+              if isinstance(node, ast.Attribute):
+                  assert node.attr not in forbidden_calls, node.attr
+              if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                  assert node.func.id not in forbidden_calls, node.func.id
+
+          for literal in (
+              '"physical_probe_executed": False',
+              '"physical_attestation_verified": False',
+              '"network_deny_verified": False',
+              '"safe_to_resume": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+          ):
+              assert literal in source, literal
+          PY
