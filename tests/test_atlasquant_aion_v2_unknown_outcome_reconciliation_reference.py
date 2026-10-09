@@ -295,6 +295,17 @@ class UnknownOutcomeReconciliationReferenceTests(unittest.TestCase):
         self.assertEqual(self.provider_check(obs)["reason"],
                          "UNCONFIRMED_OBSERVATION_CANNOT_ASSERT_CHARGE_OR_RESPONSE")
 
+    def test_reported_usage_above_signed_max_is_manual_incident_not_settlement(self):
+        obs=self.observation(cost=101)
+        obs["signature_hex"]=self.provider.sign(
+            canonical_provider_observation(obs["payload"])
+        ).hex()
+        out=self.provider_check(obs)
+        self.assertEqual(out["state"],"BLOCKED")
+        self.assertEqual(out["reason"],
+                         "PROVIDER_CLAIM_EXCEEDS_SIGNED_MAX_MANUAL_INCIDENT")
+        self.assertFalse(out["billing_settlement_verified"])
+
     def test_modified_journal_without_new_dual_heads_fails(self):
         obs=self.observation()
         self.assertEqual(self.provider_check(obs)["state"],PROVIDER_CANDIDATE)
