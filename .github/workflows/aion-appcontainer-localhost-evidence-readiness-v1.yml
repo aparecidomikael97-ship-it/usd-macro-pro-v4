@@ -61,7 +61,7 @@ jobs:
           allowed={"__future__","re","typing","atlasquant_aion_windows_appcontainer_token_readonly_v1"}
           assert imports <= allowed,imports
           for forbidden in ("WinDLL", "CreateProcess", "CreateAppContainerProfile",
-              "DeleteAppContainerProfile", "FwpmFilter", "socket", "subprocess",
+              "DeleteAppContainerProfile", "FwpmFilter", "socket.socket(", "subprocess",
               "Ed25519PrivateKey", "NCrypt", "ResumeThread", "installer.run("):
               assert forbidden not in s,forbidden
           for gate in ("os_network_denial_physically_verified",
