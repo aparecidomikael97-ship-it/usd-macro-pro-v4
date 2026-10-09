@@ -213,6 +213,7 @@ def persist_research_evidence(
     incoming=[dict(x) for x in records]
     attempts=2 if retry_conflict_once else 1
     for attempt in range(attempts):
+        write_attempted = False
         try:
             existing,remote_sha=_fetch(repo,safe,token,timeout)
             merged,added=merge_evidence_records(existing,incoming,max_records=max_records)
@@ -230,6 +231,8 @@ def persist_research_evidence(
             }
             if remote_sha:
                 payload["sha"]=remote_sha
+            # Conservative: from here a network failure can conceal a commit.
+            write_attempted = True
             response=reject_github_write_unexpected_status(requests.put(
                 guard_github_write_destination(_url(repo)),
                 headers=_headers(token),
@@ -237,23 +240,39 @@ def persist_research_evidence(
                 timeout=timeout,
                 allow_redirects=False,
             ),"contents_put")
-            if response.status_code in (409,422) and attempt+1<attempts:
-                continue
+            if response.status_code in (409,422):
+                if attempt+1<attempts:
+                    continue  # Only a reported CAS conflict can enter bounded retry.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"CONFLICT","error":"CAS_REJECTED",
+                    "write_outcome":"REJECTED_CONFLICT",
+                    "reconciliation_required":False,"safe_to_retry":False,
+                    "branch":safe,
+                }
             response.raise_for_status()
             return {
                 "ok":True,"added":added,"records":len(merged),
                 "reason":"SAVED","error":"","branch":safe,
             }
         except ValueError as exc:
-            return {
-                "ok":False,"added":0,"records":0,
-                "reason":"CORRUPT_REMOTE","error":str(exc),"branch":safe,
-            }
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,"branch":safe,
+                }
+            return {"ok":False,"added":0,"records":0,"reason":"CORRUPT_REMOTE","error":str(exc),"branch":safe}
         except Exception as exc:
-            return {
-                "ok":False,"added":0,"records":0,
-                "reason":"IO_ERROR","error":f"{type(exc).__name__}: {exc}","branch":safe,
-            }
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,"branch":safe,
+                }
+            return {"ok":False,"added":0,"records":0,"reason":"IO_ERROR","error":f"{type(exc).__name__}: {exc}","branch":safe}
     return {
         "ok":False,"added":0,"records":0,
         "reason":"CONFLICT","error":"Concurrent update conflict","branch":safe,
