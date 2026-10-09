@@ -112,6 +112,14 @@ def observe_silent_signature_algorithms_ci_only(challenge_nonce: str) -> dict[st
         return _base("CHALLENGE_REQUIRED")
     if not _ci_only():
         return _base("DISPOSABLE_GITHUB_WINDOWS_PR_CI_REQUIRED")
+    return _probe_silent_signature_algorithms_native_core()
+
+
+def _probe_silent_signature_algorithms_native_core() -> dict[str, Any]:
+    """Fixed native read-only core; caller MUST separately gate device scope.
+
+    Never an authorization source. Used only after CI or owner-scoped gate.
+    """
     out = _base("")
     try:
         api = _load_ncrypt()
