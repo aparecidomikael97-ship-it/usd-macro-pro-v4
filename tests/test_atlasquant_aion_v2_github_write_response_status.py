@@ -8,6 +8,7 @@ import unittest
 
 from atlasquant_aion_v2_github_write_response_guard import (
     reject_github_write_unexpected_status, MODE_SUCCESS, MODE_CONFLICT,
+    GitHubWriteOutcomeUnconfirmedError,
 )
 from atlasquant_aion_v2_github_write_response_audit import (
     PASS,BLOCK,audit_github_write_response_status,
@@ -58,7 +59,7 @@ class GitHubWriteResponseTests(unittest.TestCase):
             for code in range(300,400):
                 with self.subTest(mode=mode,code=code):
                     obj=SimpleNamespace(status_code=code,json=lambda:{"commit":{"sha":"FAKE"}})
-                    with self.assertRaisesRegex(ValueError,"NO_RETRY_AUTHORITY"):
+                    with self.assertRaisesRegex(GitHubWriteOutcomeUnconfirmedError,"NO_RETRY_AUTHORITY"):
                         reject_github_write_unexpected_status(obj,mode)
 
     def test_ambiguous_success_and_wrong_operation_status_block(self):
@@ -66,25 +67,37 @@ class GitHubWriteResponseTests(unittest.TestCase):
             for code in (None,True,False,"201",0,100,202,203,204,205,206,207,299,400,401,403,405,429,500,502,503,599):
                 if type(code) is int and (code in MODE_SUCCESS[mode] or code in MODE_CONFLICT[mode]):
                     continue
-                with self.subTest(mode=mode,code=code),self.assertRaises(ValueError):
+                with self.subTest(mode=mode,code=code),self.assertRaises(GitHubWriteOutcomeUnconfirmedError):
                     reject_github_write_unexpected_status(SimpleNamespace(status_code=code),mode)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GitHubWriteOutcomeUnconfirmedError):
             reject_github_write_unexpected_status(SimpleNamespace(status_code=201),"unreviewed_mode")
 
     def test_variable_delete_fallback_404_compatible_but_not_success(self):
         obj=SimpleNamespace(status_code=404)
         self.assertIs(reject_github_write_unexpected_status(obj,"variable_patch"),obj)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GitHubWriteOutcomeUnconfirmedError):
             reject_github_write_unexpected_status(obj,"variable_post")
-        with self.assertRaises(ValueError):
+        with self.assertRaises(GitHubWriteOutcomeUnconfirmedError):
             reject_github_write_unexpected_status(obj,"contents_put")
 
     def test_malicious_204_on_file_write_is_rejected_before_legacy_raise_for_status(self):
         forged=SimpleNamespace(status_code=204,raise_for_status=lambda:None)
         with patch("requests.put",return_value=forged):
             import requests
-            with self.assertRaises(ValueError):
+            with self.assertRaises(GitHubWriteOutcomeUnconfirmedError):
                 reject_github_write_unexpected_status(requests.put("https://example.invalid"),"contents_put")
+
+    def test_unconfirmed_write_is_not_misclassified_as_corrupt_remote_json(self):
+        # Legacy flight/research/shadow stores catch ValueError as remote
+        # content corruption; the new transport outcome must bypass that.
+        self.assertTrue(issubclass(GitHubWriteOutcomeUnconfirmedError,RuntimeError))
+        self.assertFalse(issubclass(GitHubWriteOutcomeUnconfirmedError,ValueError))
+        try:
+            reject_github_write_unexpected_status(SimpleNamespace(status_code=302),"contents_put")
+        except ValueError:
+            self.fail("Transport uncertainty must not be labeled corrupt JSON")
+        except GitHubWriteOutcomeUnconfirmedError:
+            pass
 
     def test_synthetic_fixture_pinned(self):
         self.assertEqual(self.report()["state"],PASS)

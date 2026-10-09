@@ -20,6 +20,9 @@ MODE_CONFLICT={
     # disabled flag when PATCH /actions/variables/NAME returns 404.
     "variable_patch":frozenset((404,)),
 }
+class GitHubWriteOutcomeUnconfirmedError(RuntimeError):
+    """A sent HTTP write did not produce a trustworthy success result."""
+
 def reject_github_write_unexpected_status(response:object,mode:str)->object:
     """Only pass documented success or caller-handled conflict/not-found.
 
@@ -27,12 +30,12 @@ def reject_github_write_unexpected_status(response:object,mode:str)->object:
     ambiguous/FAILED, never proof of no side effect or safe-to-retry.
     """
     if type(mode) is not str or mode not in MODE_SUCCESS:
-        raise ValueError("BLOCKED_GITHUB_WRITE_UNKNOWN_OPERATION")
+        raise GitHubWriteOutcomeUnconfirmedError("BLOCKED_GITHUB_WRITE_UNKNOWN_OPERATION")
     status=getattr(response,"status_code",None)
     if type(status) is not int or status not in (
         MODE_SUCCESS[mode] | MODE_CONFLICT[mode]
     ):
-        raise ValueError("GITHUB_WRITE_OUTCOME_NOT_CONFIRMED_NO_RETRY_AUTHORITY")
+        raise GitHubWriteOutcomeUnconfirmedError("GITHUB_WRITE_OUTCOME_NOT_CONFIRMED_NO_RETRY_AUTHORITY")
     return response
 
-__all__=["reject_github_write_unexpected_status"]
+__all__=["reject_github_write_unexpected_status","GitHubWriteOutcomeUnconfirmedError"]
