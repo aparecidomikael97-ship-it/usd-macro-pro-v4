@@ -58,12 +58,12 @@ class GitHubReadNoRedirectTests(unittest.TestCase):
         self.assertFalse(result["network_called"])
         self.assertFalse(result["safe_to_deploy"])
 
-    def test_actual_branch_enforces_27_github_token_gets(self):
+    def test_actual_branch_enforces_28_github_token_gets(self):
         root=Path(__file__).resolve().parents[1]
         result=audit_token_github_read_sites(root)
         self.assertEqual(result["state"],PASS,str(result["findings"]))
-        self.assertEqual(result["expected_token_github_get_sites"],27)
-        self.assertEqual(result["exact_url_guard_and_no_redirect_sites"],27)
+        self.assertEqual(result["expected_token_github_get_sites"],28)
+        self.assertEqual(result["exact_url_guard_and_no_redirect_sites"],28)
         self.assertEqual(result["production_files_reviewed"],12)
         self.assertTrue(result["token_redirects_disabled_in_source"])
         self.assertFalse(result["paid_dispatch_authorized"])
