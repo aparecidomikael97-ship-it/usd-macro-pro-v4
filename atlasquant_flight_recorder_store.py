@@ -142,6 +142,7 @@ def persist_records(
     attempts=2 if retry_conflict_once else 1
 
     for attempt in range(attempts):
+        write_attempted = False
         try:
             existing,sha=_fetch_remote(repo,safe_branch,token,timeout)
             merged,added=merge_unique_records(existing,incoming,max_records=max_records)
@@ -157,6 +158,8 @@ def persist_records(
             if sha:
                 payload["sha"]=sha
 
+            # Conservative: from here a network failure can conceal a commit.
+            write_attempted = True
             r=reject_github_write_unexpected_status(requests.put(
                 guard_github_write_destination(_contents_url(repo)),
                 headers=_headers(token),
@@ -164,14 +167,41 @@ def persist_records(
                 timeout=timeout,
                 allow_redirects=False,
             ),"contents_put")
-            if r.status_code in (409,422) and attempt+1<attempts:
-                continue
+            if r.status_code == 422:
+                # 422 may be a validation error, not CAS conflict: never replay.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"VALIDATION_REJECTED","error":"REPORTED_HTTP_422",
+                    "write_outcome":"REPORTED_HTTP_422",
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
+            if r.status_code == 409:
+                if attempt+1<attempts:
+                    continue  # Bounded re-read only for reported HTTP 409.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"CONFLICT","error":"REPORTED_HTTP_409",
+                    "write_outcome":"REPORTED_CAS_CONFLICT",
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
             r.raise_for_status()
             return {"ok":True,"added":added,"records":len(merged),"reason":"SAVED","error":""}
         except ValueError as exc:
-            # Corrupt remote JSONL: never overwrite it.
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
             return {"ok":False,"added":0,"records":0,"reason":"CORRUPT_REMOTE","error":str(exc)}
         except Exception as exc:
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
             return {"ok":False,"added":0,"records":0,"reason":"IO_ERROR","error":f"{type(exc).__name__}: {exc}"}
-
     return {"ok":False,"added":0,"records":0,"reason":"CONFLICT","error":"Concurrent update conflict"}
