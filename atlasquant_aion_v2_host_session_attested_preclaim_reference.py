@@ -171,7 +171,8 @@ def _math_verify(
         or p["full_provider_request_sha256"]!=intent.get("full_provider_request_sha256")
         or p["challenge_nonce_hex"]!=challenge_nonce_hex):
         return "HOST_ATTESTATION_REBOUND_TO_OTHER_ACCESS_OR_REQUEST"
-    if (p["session_epoch"]!=expected_session_epoch
+    if (not _int(p["session_epoch"],1,2**31-1)
+        or p["session_epoch"]!=expected_session_epoch
         or not _int(p["revocation_generation"],1,2**31-1)
         or p["revocation_generation"]<revocation_generation_floor):
         return "SIGNED_SESSION_EPOCH_REVOKED_OR_ROLLBACK"
