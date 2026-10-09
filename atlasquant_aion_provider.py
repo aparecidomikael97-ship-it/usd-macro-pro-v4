@@ -37,7 +37,7 @@ from atlasquant_aion_memory_reliability import assess_canonical_memory_hits
 SCHEMA="ATLASQUANT_AION_PROVIDER_V1"
 REQUEST_BOUNDARY_SCHEMA="ATLASQUANT_AION_PROVIDER_FULL_REQUEST_BOUNDARY_V1"
 _REQUEST_DOMAIN=b"ATLASQUANT_AION_PROVIDER_FULL_REQUEST_V1\x00"
-_HEX64=re.compile(r"[0-9a-f]{64}\\Z")
+_HEX64=re.compile(r"[0-9a-f]{64}\Z")
 OPENAI_RESPONSES_URL="https://api.openai.com/v1/responses"
 MAX_PROMPT_CHARS=40000
 DEFAULT_TIMEOUT_SECONDS=45.0
