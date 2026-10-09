@@ -9,6 +9,7 @@ Combina, sem alterar o motor base:
 O Índice Integrado é apenas um ranking operacional. Não é probabilidade de lucro.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from html import escape
@@ -104,7 +105,7 @@ def _load_state() -> dict[str, Any]:
     url = f"https://api.github.com/repos/{repo}/contents/{MASTER_PATH}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     try:
-        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        r = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False)
         if r.status_code == 404:
             return state
         r.raise_for_status()
@@ -128,7 +129,7 @@ def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
     url = f"https://api.github.com/repos/{repo}/contents/{MASTER_PATH}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     try:
-        current = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        current = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False)
         sha = current.json().get("sha", "") if current.status_code == 200 else ""
         clean = {k: v for k, v in dict(state).items() if not str(k).startswith("_")}
         payload = {
