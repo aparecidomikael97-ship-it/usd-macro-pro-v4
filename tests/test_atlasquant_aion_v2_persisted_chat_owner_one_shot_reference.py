@@ -6,6 +6,7 @@ global exactly-once or permission for a paid request.
 from __future__ import annotations
 from copy import deepcopy
 from hashlib import sha256
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -277,10 +278,22 @@ class PersistedSignedOneShotTests(unittest.TestCase):
         )["stored_reference_state"],"PREPARED")
 
     def test_pending_metadata_elevation_blocks(self):
+        # Change the actual serialized SQLite metadata, not a substring
+        # that may not appear due to JSON separators/formatting.
+        old=self.store.db.execute(
+            "SELECT data FROM messages WHERE id=?",(self.mid,),
+        ).fetchone()[0]
+        data=json.loads(old)
+        self.assertEqual(data["metadata"]["approval_state"],"PENDING")
+        data["metadata"]["approval_state"]="APPROVED"
         self.store.db.execute(
-            "UPDATE messages SET data=replace(data, ?, ?) WHERE id=?",
-            ('"approval_state": "PENDING"',
-             '"approval_state": "APPROVED"',self.mid),
+            "UPDATE messages SET data=? WHERE id=?",
+            (json.dumps(data,ensure_ascii=False),self.mid),
+        )
+        self.assertEqual(
+            self.store.get_message(self.scope,self.cid,self.mid)
+                .metadata["approval_state"],
+            "APPROVED",
         )
         self.assertEqual(self.burn()["state"],"BLOCKED")
 
