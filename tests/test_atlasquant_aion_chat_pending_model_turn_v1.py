@@ -4,7 +4,6 @@ No provider, external network, production database, host PC or paid API.
 """
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
@@ -203,7 +202,8 @@ class StageTests(unittest.TestCase):
         page = self.store.list_messages(self.scope, self.cid)
         self.assertEqual(len(page.items), 1)
         self.assertEqual(page.items[0].role, "user")
-        self.assertNotIn("model", page.items[0].provenance["source"].lower() if False else "none")
+        self.assertEqual(page.items[0].metadata["approval_state"], "PENDING")
+        self.assertIs(page.items[0].metadata["model_invocation_authorized"], False)
 
     def test_failed_store_write_does_not_claim_success(self):
         class FailWrite:
