@@ -320,7 +320,14 @@ EVIDÊNCIAS DE MEMÓRIA AUDITÁVEL DISPONÍVEIS:
 PERGUNTA DO ADMINISTRADOR:
 {q}
 """
-    return prompt[:MAX_PROMPT_CHARS]
+    # The caller must review/sign the ENTIRE final provider input. Silently
+    # slicing here can omit evidence or policy after a consented prefix.
+    # Normalize this builder's framing BEFORE a future authorization, never
+    # mutate the already approved input in execute_openai_answer.
+    final_prompt=prompt.strip()
+    if len(final_prompt)>MAX_PROMPT_CHARS:
+        raise ValueError("Provider prompt too long: complete context cannot be transmitted.")
+    return final_prompt
 
 
 def _extract_text(payload:Mapping[str,Any])->str:
@@ -391,12 +398,19 @@ def execute_openai_answer(
             "schema":SCHEMA,"state":"BLOCKED_PROMPT_TYPE","called":False,
             "reason":"Only a text prompt may be sent to a provider.",
         }
-    clean_prompt=prompt.strip()
-    if not clean_prompt:
+    if not prompt.strip():
         return {
             "schema":SCHEMA,"state":"BLOCKED_EMPTY_PROMPT","called":False,
             "reason":"Empty prompt; no provider call allowed.",
         }
+    # A future owner consent is a signature over the EXACT final bytes.
+    # Stripping an approved payload here silently mutates what is transmitted.
+    if prompt!=prompt.strip():
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_PROMPT_MUTATION","called":False,
+            "reason":"The provider input is not canonical; no trim after consent.",
+        }
+    clean_prompt=prompt
     if len(clean_prompt)>MAX_PROMPT_CHARS:
         return {
             "schema":SCHEMA,"state":"BLOCKED_PROMPT_TOO_LONG","called":False,
