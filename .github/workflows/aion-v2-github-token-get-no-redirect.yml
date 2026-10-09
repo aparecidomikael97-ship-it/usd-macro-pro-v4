@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   github-credential-read:
-    name: 27 GitHub token GET paths pinned, no auto redirect / ${{ matrix.os }}
+    name: 28 GitHub token GET paths pinned, no auto redirect / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     strategy:
@@ -34,7 +34,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181283ba90b1 # v7
         with:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -47,7 +47,7 @@ jobs:
       - name: Compile all twelve GET modules, guard and adversarial fixtures
         run: |
           python -m py_compile atlasquant_aion_v2_github_write_url_guard.py atlasquant_aion_v2_github_token_read_no_redirect_audit.py tests/test_atlasquant_aion_v2_github_token_read_no_redirect.py atlasquant_aion_memory.py atlasquant_flight_recorder_store.py atlasquant_research_evidence_store.py atlasquant_shadow_store.py autopilot_v107.py currency_news_v1061.py currency_news_v1062.py currency_news_v107.py market_map_v10.py master_panel_v102.py twelve_budget_v1108.py usd_macro_pro_v4_cloud.py
-      - name: Fail closed on 27 unguarded token-bearing GitHub GET requests
+      - name: Fail closed on 28 unguarded token-bearing GitHub GET requests
         run: |
           python atlasquant_aion_v2_github_token_read_no_redirect_audit.py
       - name: Recheck all 21 GitHub writes, no redirects
