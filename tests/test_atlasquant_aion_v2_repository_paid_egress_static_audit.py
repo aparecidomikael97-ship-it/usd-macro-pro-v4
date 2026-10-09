@@ -27,12 +27,22 @@ def execute_openai_answer():
     return client.post("https://fixture.invalid")
 '''
 
+TTS_SEALED = """
+_PAID_TTS_DISPATCH_HARD_DENY=True
+
+def generate_neural_speech():
+    if _PAID_TTS_DISPATCH_HARD_DENY is True:
+        raise RuntimeError("billable speech blocked")
+    return requests.post("https://fixture.invalid")
+"""
+
 
 class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.root=Path(self.temp.name)
         self.write("atlasquant_aion_provider.py",SEALED)
+        self.write("atlasquant_neural_tts.py",TTS_SEALED)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -43,7 +53,9 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
         p.write_text(content,encoding="utf-8")
 
     def scan(self):
-        result=audit_python_paid_egress(self.root)
+        result=audit_python_paid_egress(
+            self.root,require_existing_inventory=False,
+        )
         self.assertEqual(result["schema"],SCHEMA)
         self.assertFalse(result["network_called"])
         self.assertFalse(result["real_provider_called"])
@@ -61,9 +73,35 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
     def test_only_explicit_sealed_locked_provider_site_passes(self):
         r=self.scan()
         self.assertEqual(r["state"],STATE_PASS)
-        self.assertEqual(r["expected_sealed_send_site_count"],1)
-        self.assertEqual(r["recognized_potential_send_sites"],1)
-        self.assertEqual(r["production_python_files_scanned"],1)
+        self.assertEqual(r["expected_sealed_send_site_count"],2)
+        self.assertEqual(r["recognized_potential_send_sites"],2)
+        self.assertEqual(r["production_python_files_scanned"],2)
+
+    def test_disabling_tts_source_lock_fails(self):
+        self.write("atlasquant_neural_tts.py",TTS_SEALED.replace(
+            "_PAID_TTS_DISPATCH_HARD_DENY=True",
+            "_PAID_TTS_DISPATCH_HARD_DENY=False",
+        ))
+        self.fail("TTS_HARD_DENY_NOT_LITERAL_TRUE")
+
+    def test_deleting_tts_source_gate_fails(self):
+        self.write("atlasquant_neural_tts.py",TTS_SEALED.replace(
+            "if _PAID_TTS_DISPATCH_HARD_DENY is True:",
+            "if external_flag is True:",
+        ))
+        self.fail("TTS_SOURCE_HARD_DENY_GUARD_INVALID")
+
+    def test_tts_gate_must_raise_without_condition(self):
+        self.write("atlasquant_neural_tts.py",TTS_SEALED.replace(
+            'raise RuntimeError("billable speech blocked")',
+            "return b'audio'",
+        ))
+        self.fail("TTS_HARD_DENY_MUST_UNCONDITIONALLY_RAISE")
+
+    def test_third_paid_vendor_speech_post_outside_tts_fails(self):
+        self.write("atlasquant_audio_alt.py",
+                   "def bypass():\n    return requests.post('https://api.openai.com')\n")
+        self.fail("POTENTIAL_HTTP_SEND_METHOD")
 
     def test_new_direct_post_in_second_module_fails(self):
         self.write("atlasquant_aion_new_adapter.py",
@@ -122,7 +160,7 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
         self.write("atlasquant_aion_provider.py",
                    SEALED+"\ndef bypass():\n    return client.post('https://x.invalid')\n")
         r=self.fail("POTENTIAL_HTTP_SEND_METHOD")
-        self.assertEqual(r["expected_sealed_send_site_count"],1)
+        self.assertEqual(r["expected_sealed_send_site_count"],2)
 
     def test_turning_literal_hard_lock_false_blocks(self):
         self.write("atlasquant_aion_provider.py",
@@ -194,7 +232,7 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
         result=audit_python_paid_egress(repo)
         self.assertGreater(result["production_python_files_scanned"],500)
         self.assertEqual(result["state"],STATE_PASS,repr(result["violations"][:20]))
-        self.assertEqual(result["expected_sealed_send_site_count"],1)
+        self.assertEqual(result["expected_sealed_send_site_count"],2)
         self.assertFalse(result["runtime_dynamic_imports_verified"])
         self.assertFalse(result["javascript_typescript_scanned"])
         self.assertFalse(result["third_party_dependencies_scanned"])
