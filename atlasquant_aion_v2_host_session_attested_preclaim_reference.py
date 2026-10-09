@@ -106,7 +106,8 @@ def _access_consistency(access:Any,scope:Any)->tuple[str,str]|None:
         or type(session["credential_fingerprint"]) is not str
         or not 1<=len(session["credential_fingerprint"])<=FPRINT_MAX
         or type(session["permissions"]) is not list
-        or session["permissions"]!=["aion:admin","app:read"]):
+        or any(type(p) is not str for p in session["permissions"])
+        or sorted(session["permissions"])!=["aion:admin","app:read"]):
         return None
     return (
         sha256(session["credential_fingerprint"].encode()).hexdigest(),
