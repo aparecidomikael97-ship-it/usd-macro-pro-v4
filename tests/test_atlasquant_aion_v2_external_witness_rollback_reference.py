@@ -1,6 +1,7 @@
 """Adversarial fake independent witness protocol for AION V2; NO live witness."""
 from __future__ import annotations
 
+from contextlib import closing
 from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
@@ -199,7 +200,7 @@ class ExternalWitnessRollbackReferenceTests(unittest.TestCase):
         self.add_hold("request-0001", "Explique juros", "ab"*32)
         old_receipt = self.witness(seq=1)
         backup_path = Path(self.tmp.name) / "older.db"
-        with sqlite3.connect(str(backup_path)) as backup:
+        with closing(sqlite3.connect(str(backup_path))) as backup:
             self.ledger.db.backup(backup)
         self.add_hold("request-0002", "Explique inflação", "bc"*32)
         latest = self.witness(seq=2, previous=signed_receipt_sha256(old_receipt))
