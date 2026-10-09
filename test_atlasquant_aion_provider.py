@@ -374,6 +374,70 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
                 self.assertFalse(result["called"])
                 self.assertEqual(session.calls,[])
 
+    def test_executor_never_trims_signed_input_or_transports_changed_bytes(self):
+        cases = (" leading", "trailing ", "\nleading", "trailing\n",
+                 "\twords\t", " words \n", "\u00a0texto", "texto\u00a0")
+        for prompt in cases:
+            with self.subTest(prompt=repr(prompt)):
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    prompt,lane="EXTERNAL_FAST",
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=self._env(),session=session,
+                )
+                self.assertEqual(result["state"],"BLOCKED_PROMPT_MUTATION")
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+                self.assertNotIn(prompt,str(result))
+
+    def test_executor_preserves_exact_canonical_unicode_bytes_in_mock_transport(self):
+        prompt="AION: acentuação, 😀 e mudança de linha\nsegunda linha"
+        session=_FakeSession(_FakeResponse(200,{"output_text":"texto exemplo"}))
+        result=execute_openai_answer(
+            prompt,lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertTrue(result["called"])
+        self.assertEqual(len(session.calls),1)
+        self.assertEqual(session.calls[0]["json"]["input"].encode("utf-8"),
+                         prompt.encode("utf-8"))
+        self.assertEqual(session.calls[0]["json"]["max_output_tokens"],500)
+        self.assertEqual(session.calls[0]["json"]["model"],"fast-model")
+        self.assertEqual(result["truth_state"],"MODEL_OUTPUT_UNVERIFIED")
+
+    def test_builder_returns_complete_preconsent_input_no_silent_slice(self):
+        from unittest.mock import patch
+        import atlasquant_aion_provider
+        prompt=build_provider_prompt("pergunta neutra")
+        self.assertEqual(prompt,prompt.strip())
+        self.assertIn("PERGUNTA DO ADMINISTRADOR:",prompt)
+        self.assertIn("pergunta neutra",prompt)
+        self.assertTrue(len(prompt)<40000)
+        # A low fixture limit forces the prior silently-truncated branch.
+        with patch.object(atlasquant_aion_provider,"MAX_PROMPT_CHARS",100):
+            with self.assertRaisesRegex(ValueError,"complete context"):
+                build_provider_prompt("pergunta neutra")
+
+    def test_upstream_overflow_does_not_produce_partial_provider_message(self):
+        from unittest.mock import patch
+        import atlasquant_aion_provider
+        with patch.object(atlasquant_aion_provider,"MAX_PROMPT_CHARS",50):
+            with self.assertRaisesRegex(ValueError,"too long"):
+                build_provider_prompt("quantos pares de Forex?")
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "  mensagem",
+            lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertEqual(result["state"],"BLOCKED_PROMPT_MUTATION")
+        self.assertEqual(session.calls,[])
+
     def test_provider_config_repr_redacts_api_key(self):
         secret="synthetic-redteam-value-not-a-real-credential"
         cfg=ProviderConfig(
