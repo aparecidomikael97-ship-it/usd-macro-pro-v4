@@ -81,6 +81,7 @@ jobs:
       - name: Run new adversarial suite and exact three-role mathematical regressions
         env:
           PYTHONDONTWRITEBYTECODE: "1"
+          TESTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           python - <<'PY'
           import json, os, sys, unittest
@@ -100,9 +101,10 @@ jobs:
             reports.append({"suite":pattern,"os":os.environ["RUNNER_OS"],
               "tests":result.testsRun,"failures":len(result.failures),
               "errors":len(result.errors),"skipped":len(result.skipped)})
-            all_ok=all_ok and result.wasSuccessful()
+            all_ok=all_ok and result.wasSuccessful() and result.testsRun > 0
+            if pattern == patterns[-1]: all_ok=all_ok and result.testsRun >= 40
           Path("replay-reference-results.json").write_text(json.dumps({
-            "head":os.environ["GITHUB_SHA"],"os":os.environ["RUNNER_OS"],"suites":reports,
+            "head":os.environ["TESTED_HEAD"],"os":os.environ["RUNNER_OS"],"suites":reports,
             "private_material_exported":False,"owner_device_accessed":False},indent=2))
           print("REFERENCE_TEST_COUNTS",json.dumps(reports))
           assert all_ok
