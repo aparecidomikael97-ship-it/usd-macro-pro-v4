@@ -490,6 +490,30 @@ class LifecycleTests(unittest.TestCase):
         with self.assertRaises(ValueError):v3.transition_message(changed,"owner")
 
 
+    def test_missing_required_field_not_defaulted(self):
+        request=self.request();del request["transition"]["transaction_id"]
+        self.blocked(self.run_request(request));self.assertIsNone(self.witness.state.pending)
+
+    def test_extra_authorization_field_in_transition_rejected(self):
+        request=self.request();request["transition"]["installer_authorized"]=True
+        self.blocked(self.run_request(request))
+
+    def test_expiration_wrong_prior_state_cannot_resurrect_terminal(self):
+        self.issue();request=self.request("EXPIRE_CHALLENGE")
+        self.confirmed(self.run_request(self.request("REVOKE_CHALLENGE")))
+        self.blocked(self.run_request(request))
+        self.assertEqual(self.store.inspect()["states"][NONCE],"REVOKED")
+
+    def test_pending_prepare_reply_loss_blocks_without_original_ticket(self):
+        request=self.request();original=self.witness.prepare
+        def lost(**kwargs):
+            original(**kwargs);raise OSError("prepare reply lost")
+        with patch.object(self.witness,"prepare",side_effect=lost):out=self.run_request(request)
+        self.blocked(out);self.assertIsNone(out["ticket"])
+        self.assertIsNotNone(self.witness.state.pending)
+        self.assertEqual(self.store.inspect()["states"],{})
+        self.blocked(self.adapter.recover(request=request,ticket=None))
+
 def terminal_attack(operation):
     def test(self):
         self.issue();self.confirmed(self.run_request(self.request(operation)))
@@ -542,7 +566,28 @@ def purpose_swap(target):
         body["previous_state"]="ISSUED";body["next_state"]=v3.NEXT[target]
         # Shape/domain are valid, but signature is from ISSUE and MUST fail.
         if target in ("CONSUME_CHALLENGE","EXPIRE_CHALLENGE"):request["v1_request"]=self.fixture.payload()
+        with self.assertRaisesRegex(ValueError,"TRANSITION_SIGNATURE_INVALID"):
+            v3.verify_request(request,self.scope)
         self.blocked(self.run_request(request));self.assertEqual(self.store.inspect()["states"],{})
     return test
 for op in v3.OPERATIONS[1:]:
     setattr(LifecycleTests,"test_issue_signature_not_"+op.lower(),purpose_swap(op))
+
+
+def signed_forgery(field,value):
+    def test(self):
+        body=self.request()["transition"];body[field]=value
+        request=self.sign(body)
+        self.assertEqual(v3.verify_request(request,self.scope),request)
+        self.blocked(self.run_request(request))
+        self.assertEqual(self.store.inspect()["states"],{})
+        self.assertIsNone(self.witness.state.pending)
+    return test
+for name,field,value in (
+    ("next_hash","ledger_state_sha256","sha256:"+"f"*64),
+    ("prior_hash","previous_ledger_sha256","sha256:"+"f"*64),
+    ("next_sequence","checkpoint_sequence",2),
+    ("prior_checkpoint","previous_checkpoint_sha256","sha256:"+"f"*64),
+    ("global_policy","policy_sha256","sha256:"+"f"*64),
+):
+    setattr(LifecycleTests,"test_math_valid_target_forgery_"+name,signed_forgery(field,value))
