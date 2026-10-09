@@ -76,7 +76,7 @@ class DualEd25519MathematicalBridgeTests(unittest.TestCase):
         }
 
     def payload(self, *, nonce=NONCE, proposal=None):
-        proposal = self.proposal if proposal is None else proposal
+        proposal = copy.deepcopy(self.proposal) if proposal is None else copy.deepcopy(proposal)
         plan=build_unsigned_three_role_challenge(proposal,nonce)
         self.assertEqual(plan["state"],"THREE_UNSIGNED_ROLE_CHALLENGES_UNTRUSTED")
         return {
