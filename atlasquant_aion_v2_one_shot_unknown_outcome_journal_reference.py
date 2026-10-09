@@ -268,7 +268,7 @@ class ReferenceOneShotUnknownOutcomeJournal:
                 raise ValueError("duplicate nonce")
             seen.add(event["nonce_hex"])
         evidence = self.db.execute(
-            "SELECT nonce_hex,evidence_sha256 FROM aion_dispatch_evidence"
+            "SELECT nonce_hex,evidence_sha256,created_sequence FROM aion_dispatch_evidence"
         ).fetchall()
         for item in evidence:
             if (not _hash(item["evidence_sha256"])
