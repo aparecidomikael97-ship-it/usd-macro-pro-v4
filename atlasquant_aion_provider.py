@@ -511,6 +511,16 @@ def _sealed_provider_transport()->requests.Session:
     return client
 
 
+# Production admission remains blocked until separately enrolled HUMAN_OWNER,
+# independent session issuer, protected one-shot remote CAS and independently
+# rooted witnesses are implemented, reviewed and explicitly authorized.
+# This is a source-level fail-closed lock, NOT a secret or anti-tamper defense.
+# No environment variable, legacy approval bool, request digest, budget
+# override, caller session or fixture may release it.
+# Legacy transport regressions may patch it in isolated CI only.
+_PAID_MODEL_DISPATCH_HARD_DENY = True
+
+
 def execute_openai_answer(
     prompt:Any,
     *,
@@ -624,6 +634,22 @@ def execute_openai_answer(
         return {
             "schema":SCHEMA,"state":"BLOCKED_REQUEST_BINDING","called":False,
             "reason":"Full resolved provider request does not match reviewed digest.",
+        }
+    # The historical request_approved=True / allow_paid=True values are
+    # NOT independently attested HUMAN_OWNER authorization. Even a matching
+    # full-request digest and valid API key must stop before HTTP. Removing
+    # this lock requires a NEW separately reviewed owner-approved admission
+    # implementation and new cryptographic request review (not toggling env).
+    if _PAID_MODEL_DISPATCH_HARD_DENY is True:
+        return {
+            "schema":SCHEMA,
+            "state":"BLOCKED_INDEPENDENT_TRUST_NOT_ENROLLED",
+            "called":False,
+            "reason":"Real owner/session roots and remote one-shot CAS are not enrolled.",
+            "safe_to_retry":False,
+            "paid_dispatch_authorized":False,
+            "model_invocation_authorized":False,
+            "provider_called":False,
         }
     # Never allow caller-injected HTTP sessions/SDK clients to hide POST
     # retries, proxy credentials, redirects, or overridden methods.
