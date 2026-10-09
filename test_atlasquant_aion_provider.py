@@ -7,6 +7,7 @@ from atlasquant_aion_provider import (
     execute_openai_answer,
     provider_config,
     provider_configuration_status,
+    preview_openai_request_binding,
 )
 
 
@@ -36,7 +37,7 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
     def _env(self):
         return {
             "AION_MODEL_PROVIDER":"openai",
-            "OPENAI_API_KEY":"sk-test-secret-value",
+            "OPENAI_API_KEY":"ci-placeholder-noncredential-value",
             "AION_OPENAI_FAST_MODEL":"fast-model",
             "AION_OPENAI_REASONING_MODEL":"reasoning-model",
             "AION_OPENAI_INPUT_USD_PER_MTOK":"1.0",
@@ -236,6 +237,10 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
             request_approved=True,
             values=self._env(),
             session=session,
+            expected_request_sha256=preview_openai_request_binding(
+                "pergunta normal sem dados sensíveis",
+                lane="EXTERNAL_REASONING",values=self._env(),
+            )["request_sha256"],
         )
         self.assertTrue(result["called"])
         self.assertEqual(result["state"],"ANSWER_READY")
@@ -245,7 +250,7 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertFalse(result["real_orders_enabled"])
         self.assertEqual(session.calls[0]["json"]["model"],"reasoning-model")
         self.assertIn("Authorization",session.calls[0]["headers"])
-        self.assertNotIn("sk-test-secret-value",str(result))
+        self.assertNotIn("ci-placeholder-noncredential-value",str(result))
 
     def test_budget_blocks_call_before_network(self):
         session=_FakeSession(_FakeResponse())
@@ -399,6 +404,9 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
             budget={"allow_paid":True,"monthly_limit_usd":10},
             external_feature_enabled=True,request_approved=True,
             values=self._env(),session=session,
+            expected_request_sha256=preview_openai_request_binding(
+                prompt,lane="EXTERNAL_FAST",values=self._env(),
+            )["request_sha256"],
         )
         self.assertTrue(result["called"])
         self.assertEqual(len(session.calls),1)
