@@ -82,7 +82,7 @@ class TriRoleCustodyContractTests(unittest.TestCase):
         for key, value in (
             ("private_key", "SENSITIVE"), ("owner_signature","hexbytes"),
             ("auto_install",True), ("hardware_attestation",True),
-            ("operator_token","secret"), ("key_material","test"),
+            ("operator_token","secret"), ("key_material","RAW_KEY_SENTINEL_Q7Z_20261008"),
         ):
             x=sample()
             x[key]=value
