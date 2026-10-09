@@ -5,6 +5,7 @@ network/service/TPM/owner device. Public count artifacts only.
 """
 from __future__ import annotations
 import copy
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
@@ -335,24 +336,24 @@ class IndependentWitnessTests(unittest.TestCase):
             self.witness.state.confirm(transaction_id="ac"*32,ledger_state_sha256=prepared["ledger_state_sha256"])
 
     def test_partial_db_record_fail_closed(self):
-        with sqlite3.connect(self.path) as conn:
+        with closing(sqlite3.connect(self.path)) as conn, conn:
             conn.execute("UPDATE challenges SET body='{}'")
         self.blocked(self.run_flow())
 
     def test_audit_tamper_fails_closed(self):
-        with sqlite3.connect(self.path) as conn:
+        with closing(sqlite3.connect(self.path)) as conn, conn:
             conn.execute("UPDATE evidence SET digest=?",("sha256:"+"f"*64,))
         self.blocked(self.run_flow())
 
     def test_receipt_tamper_after_consume_no_confirmation(self):
         prepared=self.prepare()
         self.store.consume(request=self.request["v1_request"],now_ts=NOW)
-        with sqlite3.connect(self.path) as conn:
+        with closing(sqlite3.connect(self.path)) as conn, conn:
             conn.execute("UPDATE challenges SET receipt='{}'")
         self.blocked(self.adapter.recover(prepared=prepared))
 
     def test_unissued_extra_record_makes_validated_snapshot_block(self):
-        with sqlite3.connect(self.path) as conn:
+        with closing(sqlite3.connect(self.path)) as conn, conn:
             conn.execute("INSERT INTO challenges VALUES(?,?,'ISSUED',NULL)",("ac"*32,"{}"))
         self.blocked(self.run_flow())
 
