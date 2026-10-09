@@ -22,6 +22,8 @@ from atlasquant_aion_chat_signed_turn_review_v1 import (
     canonical_approval_message, review_signed_pending_model_turn,
 )
 
+_UNSET_ENVELOPE = object()
+
 
 def access(username="owner", *, allowed=True, role="ADMIN"):
     return {
@@ -85,10 +87,11 @@ class SignedReviewTests(unittest.TestCase):
                     canonical_approval_message(payload)
                 ).hex()}
 
-    def review(self,envelope=None,**overrides):
+    def review(self,envelope=_UNSET_ENVELOPE,**overrides):
         x={"store":self.store,"scope":self.scope,"access":access(),
            "conversation_id":self.cid,"message_id":self.pending["message_id"],
-           "final_prompt":self.prompt,"envelope":self.signed() if envelope is None else envelope,
+           "final_prompt":self.prompt,
+           "envelope":self.signed() if envelope is _UNSET_ENVELOPE else envelope,
            "host_public_pin":self.pin,"expected_policy_generation":7}
         x.update(overrides)
         r=review_signed_pending_model_turn(
