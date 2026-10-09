@@ -87,6 +87,7 @@ def _valid_capture(v: Any) -> bool:
     if type(v) is not dict or set(v)!=_CAPTURE_KEYS:
         return False
     if (v["schema"]!=CAPTURE_SCHEMA or v["source_kind"]!=_CAPTURE_SOURCE
+        or type(v["mode"]) is not str
         or v["mode"] not in _ALLOWED_MODES
         or type(v["claim_sequence"]) is not int or v["claim_sequence"]<2
         or type(v["documented_retention_opt_in"]) is not bool
