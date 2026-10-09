@@ -1,0 +1,96 @@
+name: AION Dual Ed25519 Mathematical Owner Collector Bridge V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_dual_ed25519_public_crypto_bridge_v1.py"
+      - "tests/test_atlasquant_aion_dual_ed25519_public_crypto_bridge_v1.py"
+      - "docs/aion/AION_DUAL_ED25519_PUBLIC_CRYPTO_BRIDGE_V1.md"
+      - ".github/workflows/aion-dual-ed25519-public-crypto-bridge-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-dual-ed25519:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Require disposable GitHub pull-request environment
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          PY
+      - name: Install pinned cryptography on ephemeral CI ONLY
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: cryptography==50.0.2
+      - name: Verify exact package version
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+          assert version("cryptography") == "50.0.2"
+          PY
+      - name: Compile source and CI-only key generation test
+        run: |
+          python -m py_compile \
+            atlasquant_aion_dual_ed25519_public_crypto_bridge_v1.py \
+            tests/test_atlasquant_aion_dual_ed25519_public_crypto_bridge_v1.py
+      - name: Run ephemeral two-signature test plus adversarial matrix
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_dual_ed25519_public_crypto_bridge_v1.py'
+      - name: Production module never creates keys or grants activation
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("atlasquant_aion_dual_ed25519_public_crypto_bridge_v1.py").read_text("utf-8")
+          t=ast.parse(s)
+          imports=set()
+          for n in ast.walk(t):
+              if isinstance(n,ast.Import):
+                  imports.update(x.name.split(".")[0] for x in n.names)
+              if isinstance(n,ast.ImportFrom):
+                  imports.add((n.module or "").split(".")[0])
+          assert imports <= {"__future__","hashlib","hmac","re","typing",
+                              "atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1",
+                              "atlasquant_aion_ed25519_public_verify_p256_attestation_review_v1"}
+          for token in ("Ed25519PrivateKey", ".sign(", "NCrypt", "WinDLL",
+                        "subprocess", "winreg", "socket",
+                        "generate_private_key(", "open(", "requests"):
+              assert token not in s,token
+          for flag in (
+              '"trusted_owner_public_key_pinned": False',
+              '"trusted_collector_public_key_pinned": False',
+              '"owner_authorization_for_execution": False',
+              '"independent_signer_custody_verified": False',
+              '"durable_nonce_issued_and_consumed": False',
+              '"replay_protection_verified": False',
+              '"p256_tpm_origin_attested": False',
+              '"physical_sandbox_12_of_12_verified": False',
+              '"physical_network_deny_16_of_16_verified": False',
+              '"key_creation_authorized": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert flag in s,flag
+          PY
