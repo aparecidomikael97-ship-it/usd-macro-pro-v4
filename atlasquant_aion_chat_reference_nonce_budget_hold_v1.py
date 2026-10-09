@@ -214,8 +214,13 @@ class ReferenceNonceBudgetLedger:
         'verified' flag. Holds the entire SIGNED maximum, not a low quote.
         A repeated request can observe its old hold, never recreate it.
         """
-        if (not _strict_int(host_quote_micro_usd,1,2_000_000_000)
-            or _pin_digest(host_public_pin) != self.pin_digest):
+        if not _strict_int(host_quote_micro_usd,1,2_000_000_000):
+            return _result("BLOCKED","TRUSTED_REFERENCE_PIN_OR_QUOTE_INVALID")
+        try:
+            supplied_pin_digest = _pin_digest(host_public_pin)
+        except (ValueError,TypeError):
+            return _result("BLOCKED","TRUSTED_REFERENCE_PIN_OR_QUOTE_INVALID")
+        if supplied_pin_digest != self.pin_digest:
             return _result("BLOCKED","TRUSTED_REFERENCE_PIN_OR_QUOTE_INVALID")
         review = review_signed_pending_model_turn(
             chat_store,self.scope,access,
