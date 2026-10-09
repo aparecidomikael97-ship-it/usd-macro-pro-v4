@@ -1,4 +1,4 @@
-"""Audit all 27 known token-bearing GitHub GET read/preflight sites.
+"""Audit all 28 known token-bearing GitHub GET read/preflight sites.
 
 Pure source AST. The protection itself is the runtime URL validator and
 Requests' explicit allow_redirects=False; this audit keeps it enforced.
