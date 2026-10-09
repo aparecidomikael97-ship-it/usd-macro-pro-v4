@@ -338,12 +338,11 @@ class HTTPRetryRedirectAuditTests(unittest.TestCase):
         result=audit_existing_provider_source(code)
         self.no_authority(result)
         self.assertEqual(result["state"],AUDIT)
-        self.assertIn("POST_REDIRECT_POLICY_NOT_EXPLICITLY_DISABLED",
-                      result["findings"])
-        self.assertIn("CALLER_SESSION_RETRY_ADAPTER_NOT_ATTESTED",
-                      result["findings"])
-        self.assertNotIn("FULL_PROVIDER_REQUEST_DIGEST_NOT_FOUND",
-                         result["findings"])
+        self.assertEqual(result["findings"],[
+            "STATIC_POST_SITE_LOOKS_BOUND_BUT_NOT_LIVE_ATTESTED",
+        ])
+        self.assertFalse(result["verified_live_sdk_config"])
+        self.assertFalse(result["verified_network_retry_disabled"])
 
     def test_ast_source_malformed_closed_no_exec(self):
         for content in (None,"def nope(): pass","def execute_openai_answer(",42):
