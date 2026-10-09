@@ -48,11 +48,15 @@ def execute_openai_answer(*args,session=None,**kwargs):
     This fake is installed exclusively via a unittest patch, never supplied
     to execute_openai_answer's runtime Session argument.
     """
-    if session is None:
-        return _production_execute_openai_answer(*args,**kwargs)
-    with patch("atlasquant_aion_provider._sealed_provider_transport",
-               return_value=session):
-        return _production_execute_openai_answer(*args,**kwargs)
+    # The old provider regressions are explicitly LAB-ONLY: suspend the
+    # newly added immutable production source lock only inside this test
+    # process. There is no host/env/user option to disable it.
+    with patch("atlasquant_aion_provider._PAID_MODEL_DISPATCH_HARD_DENY",False):
+        if session is None:
+            return _production_execute_openai_answer(*args,**kwargs)
+        with patch("atlasquant_aion_provider._sealed_provider_transport",
+                   return_value=session):
+            return _production_execute_openai_answer(*args,**kwargs)
 
 
 class AtlasQuantAionProviderTests(unittest.TestCase):
