@@ -266,6 +266,20 @@ class UnknownOutcomeReconciliationReferenceTests(unittest.TestCase):
         self.assertEqual(self.owner_check(obs,review)["reason"],
                          "OWNER_REVIEW_SIGNATURE_INVALID")
 
+    def test_same_private_key_for_provider_and_owner_review_is_forbidden(self):
+        obs=self.observation()
+        fake_provider_pin=pin(self.owner,"provider-fixture")
+        obs["signature_hex"]=self.owner.sign(
+            canonical_provider_observation(obs["payload"])
+        ).hex()
+        review=self.review_envelope(obs)
+        o=self.owner_check(
+            obs,review,provider_public_pin=fake_provider_pin,
+        )
+        self.assertEqual(o["state"],"BLOCKED")
+        self.assertEqual(o["reason"],
+                         "PROVIDER_OWNER_REVIEW_KEY_REUSE_FORBIDDEN")
+
     def test_owner_review_challenge_replay_blocks_new_expected_nonce(self):
         obs=self.observation()
         review=self.review_envelope(obs)
