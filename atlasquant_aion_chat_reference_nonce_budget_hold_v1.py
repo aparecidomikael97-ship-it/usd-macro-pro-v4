@@ -309,6 +309,9 @@ class ReferenceNonceBudgetLedger:
                 "hold_count":config["hold_count"],
                 "max_micro_usd":self.limit_micro_usd,
                 "period_id":self.period_id,
+                "reference_store_only": True,
+                "single_use_inside_one_sqlite_reference": True,
+                "per_turn_external_execution_authority": False,
                 **_FALSE,
             }
         except (sqlite3.DatabaseError,ValueError):
