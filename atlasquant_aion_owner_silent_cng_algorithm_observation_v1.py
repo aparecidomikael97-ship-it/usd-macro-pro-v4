@@ -11,6 +11,8 @@ from #1103, with no key enumeration, no file writes, no zero-flags retry.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import sys
 from typing import Any
@@ -20,6 +22,8 @@ from atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1 import (
 )
 
 PHYSICAL_SCOPE = "OWNER_APPROVED_SINGLE_READONLY_SILENT_SIGNATURE_ENUM_V1"
+RECEIPT_SCHEMA = "AION_OWNER_CNG_READONLY_NON_AUTHORITY_CORRELATION_RECEIPT_V1"
+_RECEIPT_DOMAIN = b"ATLASQUANT:AION:READONLY_CNG_CHALLENGE_RECEIPT:V1\\x00"
 _NONCE = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -39,9 +43,37 @@ def observe_owner_silent_signature_algorithms_readonly(
         return _base("EXPLICIT_256_BIT_CHALLENGE_REQUIRED")
     # Reuse the exact native code approved by CI without spoofing GitHub
     # environment variables or disabling #1103's CI-only wrapper.
-    return _probe_silent_signature_algorithms_native_core()
+    observation = _probe_silent_signature_algorithms_native_core()
+    # The read-only observation is wholly sanitized before receipt creation;
+    # no raw algorithm names, pointers or private key material may enter it.
+    canonical = json.dumps(
+        observation, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        allow_nan=False,
+    ).encode("ascii")
+    snapshot_bytes = hashlib.sha256(canonical).digest()
+    correlation_bytes = hashlib.sha256(
+        _RECEIPT_DOMAIN + bytes.fromhex(challenge_nonce) + snapshot_bytes
+    ).digest()
+    observation["diagnostic_correlation_receipt"] = {
+        "schema": RECEIPT_SCHEMA,
+        "scope": PHYSICAL_SCOPE,
+        "challenge_nonce": challenge_nonce,
+        "sanitized_observation_sha256": "sha256:" + snapshot_bytes.hex(),
+        "challenge_binding_sha256": "sha256:" + correlation_bytes.hex(),
+        "receipt_signed": False,
+        "independently_witnessed": False,
+        "owner_identity_attested": False,
+        "physical_device_attested": False,
+        "replay_prevention_verified": False,
+        "trusted_host_anchor_verified": False,
+        "physical_sandbox_approved": False,
+        "installer_authorized": False,
+        "safe_to_resume": False,
+    }
+    return observation
 
 
 __all__ = (
-    "PHYSICAL_SCOPE", "observe_owner_silent_signature_algorithms_readonly",
+    "PHYSICAL_SCOPE", "RECEIPT_SCHEMA",
+    "observe_owner_silent_signature_algorithms_readonly",
 )
