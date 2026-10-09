@@ -1,0 +1,11 @@
+# AION V2 — no 3xx/ambiguous response accepted as authenticated GitHub content
+
+**9 October 2026. Stacked Draft above #1150. Strict NO-GO; no owner-device, credential or real vendor tests.**
+
+#1150 secured the final URL of 28 known token-bearing GitHub `requests.get` calls and specified `allow_redirects=False`, but Requests' `raise_for_status()` does not reject HTTP 3xx. A synthetic redirect with JSON-shaped content must never be interpreted as an AION checkpoint, historical data, preflight SHA or stored evidence. There is **no evidence that any real GitHub response was forged or redirected**.
+
+This change wraps **the actual results of all 28 GETs** in **12 existing application Python modules** as `reject_github_read_unexpected_status(requests.get(...))`, retaining original URL, Authorization headers, `ref`, timeout, no-auto-redirect and every existing 404 branch. A response is forwarded unchanged only for HTTP **200** (GitHub content) or **404** (missing file/create preflight). All **3xx**, other 2xx (201/204/206), unexpected 4xx/5xx and malformed status types raise a controlled `ValueError` before caller response parsing. Status checks do not create retries, credentials, payments or network calls.
+
+A pure AST CI gate checks the direct result wrapper on all exact 28 file/function sites; adversarial tests inject 301–399 responses with forged `json()` content, malformed status fields and mutations of import/wrapper/call cardinality. CI runs Windows and Linux with inherited #1149 21 write guards, #1150 28 GET URL/redirect guards, both blocked OpenAI text/TTS paid POSTs and AION signed owner/witness/TLS reference suites.
+
+**Limits:** 200 or 404 returned from an untrusted proxy could still be malicious; response signing, provenance, credential custody, proxy/DNS/TLS behavior and real owner/IdP/TPM verification remain unproven. Some legacy non-200/404 error messages may now be caught at a different layer and need compatibility review before release. Global Worker, paid model/audio and any remote protected write are still NO-GO. No real network action was performed. No merge, deploy, secret, owner PC, cloud provisioning or expenses; Core V1/main unchanged. Formal physical gate #1117 remains open.

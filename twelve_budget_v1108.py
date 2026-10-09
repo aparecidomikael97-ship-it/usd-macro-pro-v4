@@ -1,4 +1,5 @@
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 """Persistent reservations for the sole Twelve Data collector.
 
@@ -56,9 +57,9 @@ class GitHubStore:
     def load(self):
         if not self.token or not self.repo:
             raise BudgetUnavailable('Persistência do orçamento não configurada')
-        r=requests.get(guard_github_token_read_destination(f'https://api.github.com/repos/{self.repo}/contents/{self.path}'),
+        r=reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(f'https://api.github.com/repos/{self.repo}/contents/{self.path}'),
                        headers={'Authorization':f'Bearer {self.token}'}, params={'ref':self.branch}, timeout=20,
-            allow_redirects=False,)
+            allow_redirects=False,))
         if r.status_code==404: return {}, None
         if r.status_code!=200: raise BudgetUnavailable(f'Leitura do orçamento: HTTP {r.status_code}')
         data=r.json()

@@ -1,4 +1,5 @@
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 # ============================================================
 # USD MACRO PRO V10.2.1 — ESTABILIDADE VISUAL · PAINEL MESTRE V10.2 · MOTOR BASE V9.3.9.2
@@ -3548,7 +3549,7 @@ def _github_get_json_v937(path: str, default):
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        r = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         if r.status_code == 404:
             return default, f"Arquivo ausente em {branch}"
         r.raise_for_status()
@@ -3575,7 +3576,7 @@ def _github_ler_csv_v84():
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        r = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         if r.status_code == 404:
             return pd.DataFrame()
         r.raise_for_status()
@@ -3601,7 +3602,7 @@ def _github_salvar_csv_v84(df):
         }
 
         # Descobre SHA atual para atualização segura.
-        atual = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False)
+        atual = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = None
         if atual.status_code == 200:
             sha = atual.json().get("sha")
@@ -4447,7 +4448,7 @@ def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bo
         url = f"https://api.github.com/repos/{repo}/contents/{path_repo}"
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
                    "X-GitHub-Api-Version": "2022-11-28"}
-        old = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False)
+        old = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = old.json().get("sha") if old.status_code == 200 else None
         if old.status_code not in (200, 404):
             old.raise_for_status()
@@ -4469,7 +4470,7 @@ def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_na
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
                    "X-GitHub-Api-Version": "2022-11-28"}
-        current = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False)
+        current = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = None
         if current.status_code == 200:
             body = current.json()
@@ -4607,7 +4608,7 @@ def _autopilot_save_inputs_v107():
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        cur = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False)
+        cur = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
         payload = {
             "message": "V10.7 Autopilot: snapshot da matriz",
@@ -8276,7 +8277,7 @@ def _config_ler_v937():
         "X-GitHub-Api-Version": "2022-11-28",
     }
     try:
-        r = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         if r.status_code == 404:
             return pd.DataFrame(columns=cols), ""
         r.raise_for_status()
@@ -8310,7 +8311,7 @@ def _config_salvar_v937(df):
         "X-GitHub-Api-Version": "2022-11-28",
     }
     try:
-        atual = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False)
+        atual = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         sha = atual.json().get("sha", "") if atual.status_code == 200 else ""
         if atual.status_code not in (200, 404):
             atual.raise_for_status()
@@ -8731,7 +8732,7 @@ def _scanner_load_v934():
     url = f"https://api.github.com/repos/{repo}/contents/{_SCANNER_GH_PATH_V934}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     try:
-        r = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         if r.status_code == 404:
             return vazio
         r.raise_for_status()
