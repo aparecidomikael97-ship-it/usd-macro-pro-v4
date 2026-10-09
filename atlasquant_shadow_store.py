@@ -4,6 +4,7 @@ from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_de
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
+from atlasquant_aion_v2_legacy_github_contents_readback import verify_legacy_jsonl_readback
 
 import base64
 import json
@@ -123,9 +124,10 @@ def persist_shadow_samples(
             merged,added=merge_unique_samples(existing,incoming,max_samples=max_samples)
             if added==0:
                 return {"ok":True,"added":0,"samples":len(merged),"reason":"ALREADY_PRESENT","error":""}
+            serialized=serialize_samples(merged)
             payload={
                 "message":"AtlasQuant: persist Shadow Mode samples",
-                "content":base64.b64encode(serialize_samples(merged).encode("utf-8")).decode("ascii"),
+                "content":base64.b64encode(serialized.encode("utf-8")).decode("ascii"),
                 "branch":safe,
             }
             if sha: payload["sha"]=sha
@@ -149,7 +151,13 @@ def persist_shadow_samples(
                     "reconciliation_required":True,"safe_to_retry":False,
                 }
             r.raise_for_status()
-            return {"ok":True,"added":added,"samples":len(merged),"reason":"SAVED","error":""}
+            verification=verify_legacy_jsonl_readback(
+                response=r,
+                expected_text=serialized,
+                readback=lambda: _fetch(repo,safe,token,timeout),
+                serialize=serialize_samples,
+            )
+            return {"ok":True,"added":added,"samples":len(merged),"reason":"SAVED","error":"",**verification}
         except ValueError as exc:
             if write_attempted:
                 return {

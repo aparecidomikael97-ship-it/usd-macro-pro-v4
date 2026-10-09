@@ -9,6 +9,7 @@ from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_de
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
+from atlasquant_aion_v2_legacy_github_contents_readback import verify_legacy_jsonl_readback
 
 import base64
 from hashlib import sha256
@@ -224,10 +225,11 @@ def persist_research_evidence(
                     "ok":True,"added":0,"records":len(merged),
                     "reason":"ALREADY_PRESENT","error":"","branch":safe,
                 }
+            serialized=serialize_evidence_records(merged)
             payload={
                 "message":"AtlasQuant: persist operational research evidence",
                 "content":base64.b64encode(
-                    serialize_evidence_records(merged).encode("utf-8")
+                    serialized.encode("utf-8")
                 ).decode("ascii"),
                 "branch":safe,
             }
@@ -261,9 +263,15 @@ def persist_research_evidence(
                     "branch":safe,
                 }
             response.raise_for_status()
+            verification=verify_legacy_jsonl_readback(
+                response=response,
+                expected_text=serialized,
+                readback=lambda: _fetch(repo,safe,token,timeout),
+                serialize=serialize_evidence_records,
+            )
             return {
                 "ok":True,"added":added,"records":len(merged),
-                "reason":"SAVED","error":"","branch":safe,
+                "reason":"SAVED","error":"","branch":safe,**verification,
             }
         except ValueError as exc:
             if write_attempted:
