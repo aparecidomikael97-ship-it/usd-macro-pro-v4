@@ -180,7 +180,7 @@ class V2NonceCostHoldTests(unittest.TestCase):
         self.assertEqual(self.reserve(second)["state"], REFERENCE_HELD)
         third = self.make_intent("request-0003", "Explique emprego",
                                  "ef"*32, cap=30)
-        self.assertEqual(self.reserve(third)["reason"], "REFERENCE_BUDGET_EXCEEDED")
+        self.assertEqual(self.reserve(third, quote=20)["reason"], "REFERENCE_BUDGET_EXCEEDED")
         self.assertEqual(self.ledger.reference_snapshot()["held_micro_usd"], 210)
 
     def test_no_host_quote_higher_than_signed_cost(self):
