@@ -41,14 +41,17 @@ class NoRetryPostHardeningTests(unittest.TestCase):
         review=provider.preview_openai_request_binding(
             "Texto público de teste",lane="EXTERNAL_FAST",values=values,
         )
-        return provider.execute_openai_answer(
-            "Texto público de teste",lane="EXTERNAL_FAST",
-            budget={"allow_paid":True,"monthly_limit_usd":10},
-            external_feature_enabled=True,request_approved=True,
-            values=values,
-            expected_request_sha256=review["request_sha256"] if sha is None else sha,
-            session=session,
-        )
+        # This test is a sealed transport laboratory, not a production
+        # dispatch authorization. Production code always hard-denies.
+        with patch.object(provider,"_PAID_MODEL_DISPATCH_HARD_DENY",False):
+            return provider.execute_openai_answer(
+                "Texto público de teste",lane="EXTERNAL_FAST",
+                budget={"allow_paid":True,"monthly_limit_usd":10},
+                external_feature_enabled=True,request_approved=True,
+                values=values,
+                expected_request_sha256=review["request_sha256"] if sha is None else sha,
+                session=session,
+            )
 
     def check_safe_configuration(self,s):
         self.assertIs(type(s),requests.sessions.Session)
