@@ -5,6 +5,7 @@ branch, never to main/dev. The store is append/merge oriented and does not
 change strategy parameters, gates, permissions or trading execution.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
@@ -159,10 +160,11 @@ def _url(repo:str)->str:
 
 def _fetch(repo:str,branch:str,token:str,timeout:int)->tuple[list[dict[str,Any]],str]:
     response=requests.get(
-        _url(repo),
+        guard_github_token_read_destination(_url(repo)),
         headers=_headers(token),
         params={"ref":branch},
         timeout=timeout,
+        allow_redirects=False,
     )
     if response.status_code==404:
         return [],""
