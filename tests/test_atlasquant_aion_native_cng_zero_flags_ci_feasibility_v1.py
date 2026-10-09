@@ -20,13 +20,11 @@ CI_ENV = {
 
 
 class ZeroFlagsCIOnlyTests(unittest.TestCase):
-    def run_fake(self, fake=None, env=None, osname="win32", nonce=None):
+    def run_fake(self, fake=None, env=None, osname="win32", nonce="bd" * 32):
         if fake is None:
             fake = FakeNCrypt()
         if env is None:
             env = CI_ENV
-        if nonce is None:
-            nonce = "bd" * 32
         with patch.object(z.sys, "platform", osname), patch.dict(
             os.environ, env, clear=True
         ), patch.object(z, "_load_ncrypt", return_value=fake) as loader:
