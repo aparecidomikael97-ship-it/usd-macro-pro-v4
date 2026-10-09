@@ -16,6 +16,41 @@ STATE_PASS="EXPLICIT_PYTHON_EGRESS_BOUNDARY_STATICALLY_INTACT_NOT_AUTHORIZED"
 STATE_FAIL="BLOCKED_PYTHON_PROVIDER_EGRESS_BYPASS_OR_LOCK_MUTATION"
 PROVIDER_PATH="atlasquant_aion_provider.py"
 GATE="_PAID_MODEL_DISPATCH_HARD_DENY"
+TTS_PATH="atlasquant_neural_tts.py"
+TTS_GATE="_PAID_TTS_DISPATCH_HARD_DENY"
+# All existing direct HTTP mutations outside provider inference must be
+# pinned by exact (module,function,call). They are NOT certified vendor-safe:
+# a separate egress review is needed before any live release. Unknown/new
+# calls or duplicate occurrences are rejected.
+LEGACY_OTHER_NETWORK_WRITE_SITES={
+    ("atlasquant_aion_global_worker.py",
+     "_persist_runtime_checkpoint_cas","requests.put"),
+    ("atlasquant_aion_global_worker_activation.py",
+     "write_repository_feature_flag_enabled","requests.post"),
+    ("atlasquant_aion_global_worker_activation.py",
+     "write_repository_feature_flag_enabled","requests.patch"),
+    ("atlasquant_aion_global_worker_activation.py",
+     "force_disable_repository_feature_flag","requests.patch"),
+    ("atlasquant_aion_global_worker_activation.py",
+     "force_disable_repository_feature_flag","requests.post"),
+    ("atlasquant_aion_memory.py","save_runtime_checkpoint","requests.put"),
+    ("atlasquant_flight_recorder_store.py","persist_records","requests.put"),
+    ("atlasquant_research_evidence_store.py",
+     "persist_research_evidence","requests.put"),
+    ("atlasquant_shadow_store.py","persist_shadow_samples","requests.put"),
+    ("autopilot_v107.py","gh_put_bytes","requests.put"),
+    ("currency_news_v1061.py","_gh_write_csv_v1061","requests.put"),
+    ("currency_news_v1062.py","_gh_write_csv_v1061","requests.put"),
+    ("currency_news_v107.py","_gh_write_csv_v1061","requests.put"),
+    ("market_map_v10.py","_save_snapshot","requests.put"),
+    ("master_panel_v102.py","_save_state","requests.put"),
+    ("twelve_budget_v1108.py","save","requests.put"),
+    ("usd_macro_pro_v4_cloud.py","_github_salvar_csv_v84","requests.put"),
+    ("usd_macro_pro_v4_cloud.py","_github_put_bytes_v104","requests.put"),
+    ("usd_macro_pro_v4_cloud.py","_salvar_feedback_v104","requests.put"),
+    ("usd_macro_pro_v4_cloud.py","_autopilot_save_inputs_v107","requests.put"),
+    ("usd_macro_pro_v4_cloud.py","_config_salvar_v937","requests.put"),
+}
 VENDOR_MODULES={
     "openai","anthropic","litellm","cohere","groq",
     "google.generativeai","google.genai","mistralai",
@@ -25,9 +60,12 @@ NETWORK_MODULES={
 }
 EXCLUDES={".git",".venv","venv","__pycache__","node_modules",
           ".pytest_cache",".tox","build","dist","site-packages"}
-# This allowlist is ONE exact source location/function. A new path, even
-# with the same endpoint or signature, is a failure needing human review.
-ALLOWED_SOURCE_SINK=(PROVIDER_PATH,"execute_openai_answer","client.post")
+# EXACT two independently blocked vendor POST sinks. Any third paid route
+# or a second same callsite is forbidden until separately reviewed.
+ALLOWED_SOURCE_SINKS={
+    (PROVIDER_PATH,"execute_openai_answer","client.post"),
+    (TTS_PATH,"generate_neural_speech","requests.post"),
+}
 DANGEROUS_METHODS={
     "post","request","send","create","acreate","generate_content",
     "generate_content_async","generate","responses_create",
@@ -99,15 +137,18 @@ def _function_for(call:ast.AST,parents:dict[int,ast.AST])->str:
 def _risk_class(name:str,resolved:str,imports:set[str])->str:
     # Resolve `from requests import request as invoke` before classifying.
     end=resolved.rsplit(".",1)[-1]
-    if end in HTTP_METHODS:
-        # Calls on caller-controlled methods like client.post must be
-        # inventoried even when their object type is not statically known.
-        if end in {"post","request"}:
-            return "POTENTIAL_HTTP_SEND_METHOD"
-        if (resolved.startswith(tuple(x+"." for x in NETWORK_MODULES))
-            or any(x in imports for x in NETWORK_MODULES)
-            and end in {"send","put","patch","delete"}):
-            return "POTENTIAL_HTTP_TRANSPORT_METHOD"
+    if end=="post":
+        # Any new .post is suspicious, even if client type is unresolved.
+        return "POTENTIAL_HTTP_SEND_METHOD"
+    if end=="request" and (
+        resolved.startswith(("requests.","httpx.","urllib3."))
+        or name.startswith(("client.","session.","http_client."))
+    ):
+        return "POTENTIAL_HTTP_SEND_METHOD"
+    if end in {"send","put","patch","delete"} and (
+        resolved.startswith(("requests.","httpx.","urllib3.","urllib.request."))
+    ):
+        return "NON_AI_NETWORK_WRITE_UNPROVEN_ENDPOINT"
     if (resolved.split(".",1)[0] in {"openai","anthropic","cohere","groq",
                                        "litellm","mistralai"}
         or resolved.startswith("google.genai")
