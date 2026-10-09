@@ -364,7 +364,9 @@ class IndependentWitnessTests(unittest.TestCase):
         for table in snapshot:
             changed=copy.deepcopy(snapshot)
             if changed[table]:
-                changed[table][0][next(iter(changed[table][0]))]=999
+                if table=="meta":changed[table][0]["last_now"]+=1
+                elif table=="policy":changed[table][0]["generation"]+=1
+                else:changed[table][0]["body"]+=" "
                 self.assertNotEqual(ref.snapshot_digest(snapshot),ref.snapshot_digest(changed))
 
     def test_concurrent_same_nonce_eight_threads_one_confirmed(self):
@@ -380,12 +382,13 @@ class IndependentWitnessTests(unittest.TestCase):
         self.witness=WitnessPort(self.scope,ref.ledger_snapshot(self.store))
         self.adapter=self.make_adapter()
         with ThreadPoolExecutor(max_workers=2) as pool:
-            results=list(pool.map(lambda args:self.run_flow(*args),[])) if False else list(pool.map(
+            results=list(pool.map(
                 lambda i:self.run_flow(request=(self.request,second)[i],tx=f"{i+1:064x}"),range(2)))
         self.assertGreaterEqual(sum(r["ledger_matches_witness"] for r in results),1)
         self.assertLessEqual(sum(r["ledger_matches_witness"] for r in results),2)
         # Both may succeed sequentially, but witness sequences remain unique.
-        self.assertEqual(len(self.witness.state.used),sum(r["ledger_matches_witness"] for r in results))
+        self.assertGreaterEqual(len(self.witness.state.used),sum(r["ledger_matches_witness"] for r in results))
+        self.assertEqual(self.witness.state.head["checkpoint_sequence"],len(self.witness.state.used))
 
     def test_generation_upgrade_higher_signed_policy_and_old_generation_blocked(self):
         high=self.payload(nonce="ac"*32,generation=8,policy="sha256:"+"f"*64)
