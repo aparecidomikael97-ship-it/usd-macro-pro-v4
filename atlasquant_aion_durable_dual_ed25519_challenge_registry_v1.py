@@ -18,7 +18,7 @@ import tempfile
 
 from atlasquant_aion_nonce_registry import _parse_ts, _epoch_us
 from atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1 import (
-    build_unsigned_three_role_challenge, PURPOSE,
+    build_unsigned_three_role_challenge, PURPOSE, BINDING_SCHEMA, _DOMAINS,
 )
 from atlasquant_aion_dual_ed25519_public_crypto_bridge_v1 import (
     verify_dual_ed25519_public_signatures_untrusted, CANDIDATE, _FALSE_GATES,
@@ -128,6 +128,37 @@ def _binding(proposal, nonce):
         "collector_binary_sha256": proposal["collector_binary_sha256"],
         "canonical_transcript_sha256": plan["transcript_sha256"],
     }
+
+
+
+def _valid_binding(binding):
+    fields = {"nonce","purpose","role_domains","role_public_key_sha256",
+              "policy_sha256","policy_generation","collector_binary_sha256",
+              "canonical_transcript_sha256"}
+    pattern = re.compile(r"sha256:[0-9a-f]{64}\Z")
+    if type(binding) is not dict or set(binding) != fields:
+        return False
+    if (type(binding["nonce"]) is not str or not NONCE.fullmatch(binding["nonce"])
+            or binding["purpose"] != PURPOSE or binding["role_domains"] != _DOMAINS
+            or type(binding["policy_generation"]) is not int
+            or not 0 <= binding["policy_generation"] <= MAX_GENERATION):
+        return False
+    keys = binding["role_public_key_sha256"]
+    if type(keys) is not dict or set(keys) != {"owner","collector","host"}:
+        return False
+    for value in [*keys.values(),binding["policy_sha256"],binding["collector_binary_sha256"],binding["canonical_transcript_sha256"]]:
+        if type(value) is not str or not pattern.fullmatch(value):
+            return False
+    if len(set(keys.values())) != 3:
+        return False
+    core = {"schema":BINDING_SCHEMA,"purpose":PURPOSE,"nonce":binding["nonce"],
+            "policy_generation":binding["policy_generation"],
+            "collector_binary_sha256":binding["collector_binary_sha256"],
+            "policy_sha256":binding["policy_sha256"],
+            "role_public_key_sha256":keys}
+    transcript = "sha256:" + sha256(b"ATLASQUANT:AION:TRIROLE_TRANSCRIPT:V1\x00"
+                                    + _json(core).encode("ascii")).hexdigest()
+    return transcript == binding["canonical_transcript_sha256"]
 
 
 def _result(reason, *, math=False, consumed=False, receipt=None):
@@ -252,7 +283,8 @@ class ReferenceChallengeRegistry:
         policies = self._rows(conn, "policy", 1)
         rows = self._rows(conn, "challenges", MAX_RECORDS)
         events = sorted(self._rows(conn, "evidence", MAX_EVENTS), key=lambda r:r["sequence"])
-        if len(meta) != 1 or meta[0]["id"] != 1 or meta[0]["version"] != 1:
+        if (len(meta) != 1 or meta[0]["id"] != 1 or meta[0]["version"] != 1
+                or type(meta[0]["last_now"]) is not int):
             raise ReferenceStoreError("META_INVALID")
         records = {}
         for row in rows:
@@ -265,9 +297,7 @@ class ReferenceChallengeRegistry:
             if not 0 < expires-issued <= MAX_WINDOW_US:
                 raise ReferenceStoreError("RECORD_TIME_INVALID")
             b = body["binding"]
-            if (type(b["policy_generation"]) is not int
-                    or not 0 <= b["policy_generation"] <= MAX_GENERATION
-                    or b["purpose"] != PURPOSE or not NONCE.fullmatch(b["nonce"])):
+            if not _valid_binding(b):
                 raise ReferenceStoreError("RECORD_BINDING_INVALID")
             records[row["nonce"]] = (row, body)
         states, receipts, policy, clock, previous = {}, {}, None, 0, GENESIS
