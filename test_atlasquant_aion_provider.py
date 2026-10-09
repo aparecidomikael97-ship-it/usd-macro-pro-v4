@@ -262,6 +262,88 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertEqual(result["state"],"BLOCKED_BUDGET")
         self.assertEqual(session.calls,[])
 
+    def test_oversized_prompt_is_rejected_before_provider_transport(self):
+        from atlasquant_aion_provider import MAX_PROMPT_CHARS
+        session=_FakeSession(_FakeResponse())
+        prompt="a"*(MAX_PROMPT_CHARS+1)
+        result=execute_openai_answer(
+            prompt,lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertEqual(result["state"],"BLOCKED_PROMPT_TOO_LONG")
+        self.assertFalse(result["called"])
+        self.assertEqual(result["max_prompt_chars"],MAX_PROMPT_CHARS)
+        self.assertEqual(session.calls,[])
+        self.assertNotIn(prompt[:64],str(result))
+
+    def test_sensitive_tail_is_not_silently_cut_and_sent(self):
+        from atlasquant_aion_provider import MAX_PROMPT_CHARS
+        session=_FakeSession(_FakeResponse())
+        prompt="a"*MAX_PROMPT_CHARS+" minha senha=segredo"
+        result=execute_openai_answer(
+            prompt,lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertFalse(result["called"])
+        self.assertEqual(result["state"],"BLOCKED_PROMPT_TOO_LONG")
+        self.assertEqual(session.calls,[])
+        self.assertNotIn("segredo",str(result))
+
+    def test_empty_or_nonstring_prompt_fails_closed_without_transport(self):
+        for prompt,expected in (
+            ("","BLOCKED_EMPTY_PROMPT"),
+            (" \n  ","BLOCKED_EMPTY_PROMPT"),
+            (None,"BLOCKED_PROMPT_TYPE"),
+            (False,"BLOCKED_PROMPT_TYPE"),
+            (b"hello","BLOCKED_PROMPT_TYPE"),
+            ({"text":"hello"},"BLOCKED_PROMPT_TYPE"),
+        ):
+            with self.subTest(kind=type(prompt).__name__):
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    prompt,lane="EXTERNAL_FAST",
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=self._env(),session=session,
+                )
+                self.assertEqual(result["state"],expected)
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+
+    def test_prompt_exactly_at_limit_remains_untruncated(self):
+        from atlasquant_aion_provider import MAX_PROMPT_CHARS
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "a"*MAX_PROMPT_CHARS,lane="EXTERNAL_FAST",
+            budget={"allow_paid":False,"monthly_limit_usd":0},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertEqual(result["state"],"BLOCKED_BUDGET")
+        self.assertEqual(session.calls,[])
+
+    def test_micro_positive_cost_rounds_up_instead_of_zero(self):
+        env=self._env()
+        env["AION_OPENAI_INPUT_USD_PER_MTOK"]="0.000001"
+        env["AION_OPENAI_OUTPUT_USD_PER_MTOK"]="0.000001"
+        estimate=estimate_request_cost("oi",config=provider_config(env))
+        self.assertTrue(estimate["estimable"])
+        self.assertEqual(estimate["estimated_max_cost_usd"],0.000001)
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "oi",lane="EXTERNAL_FAST",
+            budget={"allow_paid":False,"monthly_limit_usd":0},
+            external_feature_enabled=True,request_approved=True,
+            values=env,session=session,
+        )
+        self.assertFalse(result["called"])
+        self.assertEqual(result["state"],"BLOCKED_BUDGET")
+        self.assertEqual(session.calls,[])
+
     def test_provider_config_repr_redacts_api_key(self):
         secret="synthetic-redteam-value-not-a-real-credential"
         cfg=ProviderConfig(
