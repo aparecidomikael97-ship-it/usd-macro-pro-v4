@@ -218,6 +218,33 @@ class JournalDualWitnessTests(unittest.TestCase):
                          "NOT_DISPATCH_CLAIMED_OR_UNKNOWN")
         self.assertFalse(self.verify(p,pr,a,ar)["public_keys_enrolled"])
 
+    def test_restored_claimed_journal_with_both_stale_signed_heads_can_pass_math(self):
+        # NEGATIVE CONTROL: no real independent fresh head was fetched.
+        self.journal.claim_reference_only(intent=self.intent)
+        stale_p,stale_pr,stale_a,stale_ar=self.pair()
+        backup=Path(self.tmp.name)/"old-claimed-snapshot.db"
+        with closing(sqlite3.connect(str(backup))) as db:
+            self.journal.db.backup(db)
+        # Honest latest operation advances journal and SHOULD invalidate old heads.
+        self.journal.mark_unknown_reference_only(
+            nonce_hex=self.intent["nonce_hex"])
+        latest_p,latest_pr,latest_a,latest_ar=self.pair()
+        self.assertEqual(self.verify(latest_p,latest_pr,latest_a,latest_ar)[
+            "state"],MATCH)
+        self.journal.close()
+        shutil.copyfile(backup,self.path)
+        self.journal=self.open_journal()
+        mathematically_valid_stale=self.verify(
+            stale_p,stale_pr,stale_a,stale_ar)
+        self.assertEqual(mathematically_valid_stale["state"],MATCH)
+        self.assertEqual(mathematically_valid_stale[
+            "matching_reference_head"]["intent_state"],STATE_CLAIMED)
+        self.assertFalse(mathematically_valid_stale[
+            "two_independent_head_freshness_verified"])
+        self.assertFalse(mathematically_valid_stale["paid_request_authorized"])
+        self.assertTrue(mathematically_valid_stale[
+            "must_not_automatically_retry"])
+
     def test_signed_same_sequence_different_snapshot_detected(self):
         self.journal.claim_reference_only(intent=self.intent)
         p,pr,a,ar=self.pair()
