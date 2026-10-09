@@ -1,0 +1,121 @@
+name: AION Independent Monotonic Witness Reference V2
+on:
+  pull_request:
+    branches: [impl/aion-durable-dual-ed25519-replay-policy-v1-20261008]
+    paths:
+      - "atlasquant_aion_independent_monotonic_witness_reference_v2.py"
+      - "atlasquant_aion_independent_monotonic_witness_reference_v2.py"
+      - "tests/test_atlasquant_aion_independent_monotonic_witness_reference_v2.py"
+      - "docs/aion/AION_INDEPENDENT_MONOTONIC_WITNESS_REFERENCE_V2.md"
+      - ".github/workflows/aion-independent-monotonic-witness-reference-v2.yml"
+permissions:
+  contents: read
+jobs:
+  disposable-reference:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Require disposable hosted runners before any key-generating test import
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS")=="true"
+          assert os.environ.get("GITHUB_EVENT_NAME")=="pull_request"
+          assert os.environ.get("RUNNER_ENVIRONMENT")=="github-hosted"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          assert os.environ.get("GITHUB_REPOSITORY")=="aparecidomikael97-ship-it/usd-macro-pro-v4"
+          PY
+      - name: Install existing crypto pin and isolated YAML parser
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: cryptography==50.0.2 PyYAML==6.0.3
+      - name: Compile and audit source and workflow
+        run: |
+          python - <<'PY'
+          import ast, py_compile, yaml
+          from pathlib import Path
+          from importlib.metadata import version
+          assert version("cryptography")=="50.0.2"
+          files=(
+            "atlasquant_aion_independent_monotonic_witness_reference_v2.py",
+            "atlasquant_aion_independent_monotonic_witness_reference_v2.py",
+            "tests/test_atlasquant_aion_independent_monotonic_witness_reference_v2.py",
+          )
+          for file in files: py_compile.compile(file,doraise=True)
+          yaml.safe_load(Path(".github/workflows/aion-independent-monotonic-witness-reference-v2.yml").read_text())
+          for file in files[:1]:
+            source=Path(file).read_text()
+            tree=ast.parse(source)
+            for n in ast.walk(tree):
+              if isinstance(n,(ast.Import,ast.ImportFrom)):
+                names=[n.module] if isinstance(n,ast.ImportFrom) else [x.name for x in n.names]
+                for name in names:
+                  assert not any(x in (name or "") for x in ("requests","httpx","subprocess","socket","winreg","ctypes","installer","worker")),name
+              if isinstance(n,ast.Attribute):
+                assert n.attr not in ("sign","generate","private_bytes","generate_private_key","write_text","write_bytes","unlink","rename","replace"),n.attr
+            assert "Ed25519PrivateKey" not in source
+          PY
+      - name: Inventory existing nonce CAS generation and decision components
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          names=[]
+          for path in Path(".").glob("atlasquant_aion_*.py"):
+            text=path.read_text(encoding="utf-8")
+            if any(marker in text for marker in ("BEGIN IMMEDIATE","expected_revision","policy_generation","nonce_claims")):
+              names.append(path.name)
+          print("Existing nonce/CAS/generation inventory:",", ".join(sorted(names)))
+          PY
+      - name: Run new adversarial suite and exact three-role mathematical regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          TESTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python - <<'PY'
+          import json, os, sys, unittest
+          from pathlib import Path
+          sys.path.insert(0,"tests")
+          patterns=(
+            "test_atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1.py",
+            "test_atlasquant_aion_rfc8032_ed25519_p256_attestation_review_v1.py",
+            "test_atlasquant_aion_dual_ed25519_public_crypto_bridge_v1.py",
+            "test_atlasquant_aion_durable_dual_ed25519_replay_reference_v1.py",
+            "test_atlasquant_aion_independent_monotonic_witness_reference_v2.py",
+          )
+          reports=[]
+          all_ok=True
+          for pattern in patterns:
+            suite=unittest.TestLoader().discover("tests",pattern=pattern)
+            result=unittest.TextTestRunner(verbosity=2).run(suite)
+            reports.append({"suite":pattern,"os":os.environ["RUNNER_OS"],
+              "tests":result.testsRun,"failures":len(result.failures),
+              "errors":len(result.errors),"skipped":len(result.skipped)})
+            all_ok=all_ok and result.wasSuccessful() and result.testsRun > 0
+            if pattern == patterns[-1]: all_ok=all_ok and result.testsRun >= 80
+          Path("witness-reference-results.json").write_text(json.dumps({
+            "head":os.environ["TESTED_HEAD"],"os":os.environ["RUNNER_OS"],"suites":reports,
+            "private_material_exported":False,"owner_device_accessed":False},indent=2))
+          print("REFERENCE_TEST_COUNTS",json.dumps(reports))
+          assert all_ok
+          PY
+      - name: Upload public counts only, never DB/key/signature artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: witness-reference-counts-${{ matrix.os }}
+          path: witness-reference-results.json
+          if-no-files-found: warn
+          retention-days: 14
