@@ -1,0 +1,40 @@
+name: AION Chat Nonce Budget Reference Hold CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_chat_reference_nonce_budget_hold_v1.py"
+      - "tests/test_atlasquant_aion_chat_reference_nonce_budget_hold_v1.py"
+      - "docs/aion/AION_CHAT_NONCE_BUDGET_HOLD_REFERENCE_V1.md"
+      - ".github/workflows/aion-chat-nonce-budget-reference-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  nonce-budget-reference:
+    name: SQLite atomic ref hold / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install repository and test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Compile & static non-execution guard
+        run: |
+          python -m py_compile atlasquant_aion_chat_reference_nonce_budget_hold_v1.py tests/test_atlasquant_aion_chat_reference_nonce_budget_hold_v1.py
+          python -c "from pathlib import Path; s=Path('atlasquant_aion_chat_reference_nonce_budget_hold_v1.py').read_text(); assert all(x not in s for x in ['requests.post(', 'subprocess.Popen(', 'Ed25519PrivateKey(', 'execute_openai_answer(', 'socket.socket(', 'CreateProcessW('])"
+      - name: Run new atomic/nonce/budget tests and inherited signed-turn/provider regressions
+        run: |
+          python -m pytest -q tests/test_atlasquant_aion_chat_reference_nonce_budget_hold_v1.py tests/test_atlasquant_aion_chat_signed_turn_review_v1.py tests/test_atlasquant_aion_chat_pending_model_turn_v1.py test_atlasquant_aion_chat_product_bridge.py test_atlasquant_aion_provider.py test_atlasquant_aion_model_router.py
