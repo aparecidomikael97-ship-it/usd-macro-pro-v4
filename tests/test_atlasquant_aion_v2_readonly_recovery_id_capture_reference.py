@@ -264,13 +264,20 @@ class RecoveryCaptureAdapterTests(unittest.TestCase):
 
     def test_concurrent_identical_capture_only_one_write(self):
         def work(_):
-            inst=self.open_capture()
+            independent_journal=ReferenceOneShotUnknownOutcomeJournal(
+                self.journal_path,config=self.config,
+            )
+            inst=ReferenceDurableRecoveryIdCapture(
+                self.capture_path,journal=independent_journal,
+            )
             try:
                 return inst.capture_reference_only(
-                    journal=self.journal,intent=self.intent,
+                    journal=independent_journal,intent=self.intent,
                     observed_capture=self.cap,
                 )["state"]
-            finally:inst.close()
+            finally:
+                inst.close()
+                independent_journal.close()
         with ThreadPoolExecutor(max_workers=5) as pool:
             results=list(pool.map(work,range(10)))
         self.assertEqual(results.count(CAPTURED),1)
