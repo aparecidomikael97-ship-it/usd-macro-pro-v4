@@ -362,15 +362,24 @@ def _out(reason, *, consumed=False, verified=False, matches=False, checkpoint=No
 class ReferenceWitnessAdapter:
     """Explicit fixture calls only. SQLite and witness are NOT one ACID unit.
 
-    Witness port is the CI test double, never a provider/executor. Verification
+    Witness port is the CI test double, never a provider/executor. The separately
+    supplied live state is the SAME independent CI witness, not a second store.
+    An untrusted port response cannot select the expected monotonic head.
+    Verification
     independently checks the separately supplied pin and exact prepared target.
     Restart recovery requires the original prepared intent; losing it blocks.
     """
-    def __init__(self, *, store, witness, scope, trusted_witness_public_key_hex):
+    def __init__(self, *, store, witness, scope, trusted_witness_public_key_hex,
+                 trusted_witness_state):
         if type(store) is not ledger.ReferenceChallengeRegistry:
             raise ValueError("STORE_INVALID")
+        if type(trusted_witness_state) is not ReferenceWitnessState:
+            raise ValueError("INDEPENDENT_LIVE_STATE_REQUIRED")
         self.store, self.witness = store,witness
         self.scope = _scope(scope)
+        if trusted_witness_state.scope != self.scope:
+            raise ValueError("INDEPENDENT_STATE_SCOPE_MISMATCH")
+        self.trusted_state = trusted_witness_state
         self.pin = trusted_witness_public_key_hex
 
     def prepare(self, *, request, transaction_id, now_ts):
@@ -379,7 +388,7 @@ class ReferenceWitnessAdapter:
             raise ValueError("TRANSACTION_INVALID")
         before = ledger_snapshot(self.store)
         target = expected_consumption(self.store,before,raw,now_ts)
-        head = self.witness.expected_head()
+        head = self.trusted_state.expected_head()
         candidate = _checkpoint({"schema":SCHEMA,"version":2,"purpose":PURPOSE,
             "phase":"PREPARED",**self.scope,"generation":raw["proposal"]["policy_generation"],
             "policy_sha256":raw["proposal"]["policy_sha256"],
@@ -420,7 +429,7 @@ class ReferenceWitnessAdapter:
             verified = verify_checkpoint(envelope,trusted_public_key_hex=self.pin,expected=expected)
             if not verified["external_witness_checkpoint_verified"]:
                 return _out("CONFIRM_NOT_AUTHENTICATED")
-            head = self.witness.expected_head()
+            head = self.trusted_state.expected_head()
             if head != {"sequence":expected["checkpoint_sequence"],"digest":checkpoint_digest(expected)}:
                 return _out("NOT_LATEST_INDEPENDENT_WITNESS_HEAD")
             return _out("",consumed=True,verified=True,matches=True,checkpoint=expected)
