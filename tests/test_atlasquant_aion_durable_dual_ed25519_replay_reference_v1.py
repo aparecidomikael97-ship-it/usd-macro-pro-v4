@@ -279,27 +279,28 @@ class DurableReplayReferenceTests(unittest.TestCase):
     def test_same_generation_same_policy_different_nonce_is_allowed(self):
         self.issue();self.consume()
         request=self.request(nonce="bc"*32)
-        self.assertEqual(self.issue(request)["state"],"ISSUED")
+        self.assertEqual(self.issue(request,issued_at=NOW)["state"],"ISSUED")
         self.assertTrue(self.consume(request)["nonce_transaction_consumed"])
 
     def test_same_generation_different_policy_is_rejected(self):
         self.issue();self.consume()
         request=self.request(nonce="bc"*32,policy="sha256:"+"f"*64)
-        self.assertEqual(self.issue(request)["state"],"BLOCKED")
+        self.assertEqual(self.issue(request,issued_at=NOW)["state"],"BLOCKED")
 
     def test_older_generation_rejected(self):
         self.issue();self.consume()
-        self.assertEqual(self.issue(self.request(nonce="bc"*32,generation=6))["state"],"BLOCKED")
+        self.assertEqual(self.issue(self.request(nonce="bc"*32,generation=6),issued_at=NOW)["state"],"BLOCKED")
 
     def test_higher_issuance_alone_does_not_advance_generation(self):
         self.issue();self.consume()
-        self.issue(self.request(nonce="bc"*32,generation=8,policy="sha256:"+"f"*64))
+        self.assertEqual(self.issue(self.request(nonce="bc"*32,generation=8,policy="sha256:"+"f"*64),issued_at=NOW)["state"],"ISSUED")
         self.assertEqual(self.store.inspect()["policy"]["generation"],7)
 
     def test_advance_requires_both_valid_role_signatures(self):
         self.issue();self.consume()
         request=self.request(nonce="bc"*32,generation=8,policy="sha256:"+"f"*64)
-        self.issue(request);request["collector_signature_hex"]="00"*64
+        self.assertEqual(self.issue(request,issued_at=NOW)["state"],"ISSUED")
+        request["collector_signature_hex"]="00"*64
         self.assertFalse(self.consume(request)["nonce_transaction_consumed"])
         self.assertEqual(self.store.inspect()["policy"]["generation"],7)
 
