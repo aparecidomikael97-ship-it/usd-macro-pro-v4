@@ -248,6 +248,15 @@ class RecoveryCaptureAdapterTests(unittest.TestCase):
         x["source_kind"]="REAL_PROVIDER_SIGNED_RECEIPT"  # forged claim
         self.assertEqual(self.capture(x)["state"],"BLOCKED")
 
+    def test_unhashable_or_nontext_mode_fails_closed_without_exception(self):
+        for value in (["OPENAI_RESPONSES_BACKGROUND"],{"mode":"openai"},True,None,42):
+            with self.subTest(value=repr(value)):
+                candidate=deepcopy(self.cap)
+                candidate["mode"]=value
+                result=self.capture(candidate)
+                self.assertEqual(result["state"],"BLOCKED")
+                self.assertEqual(result["reason"],"INVALID_CAPTURABLE_ID_OBSERVATION")
+
     def test_unsupported_method_or_unexpected_field_cannot_be_persisted(self):
         x=deepcopy(self.cap)
         x["method"]="POST"
