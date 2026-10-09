@@ -287,7 +287,9 @@ def _tts_source_lock(tree:ast.Module)->list[str]:
     return issues
 
 
-def audit_python_paid_egress(\n    root:Path,*,require_existing_inventory:bool=True,\n)->dict[str,Any]:
+def audit_python_paid_egress(
+    root:Path,*,require_existing_inventory:bool=True,
+)->dict[str,Any]:
     root=Path(root).resolve()
     violations=[]
     approved=[]
