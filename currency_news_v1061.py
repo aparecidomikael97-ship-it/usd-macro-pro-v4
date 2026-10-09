@@ -19,6 +19,7 @@ ou histórico oficial. A V10.6.1 calibra duplicidade global, separa cobertura de
 e registra/valida snapshots em 1H, 4H e 24H antes de qualquer integração ao Score Mestre.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
@@ -989,7 +990,7 @@ def _gh_write_csv_v1061(path: str, df: pd.DataFrame, message: str) -> tuple[bool
         }
         if sha:
             payload["sha"] = sha
-        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r = requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False)
         r.raise_for_status()
         return True, ""
     except Exception as exc:
