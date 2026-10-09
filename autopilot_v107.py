@@ -184,38 +184,46 @@ def gh_get_bytes(path: str) -> tuple[bytes | None, str]:
         return None, f"{type(exc).__name__}: {exc}"
 
 def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
+    """One GitHub PUT attempt maximum; never infer replay permission from 409.
+
+    Returned errors never certify remote side effects. A later separate call
+    requires external reconciliation and independent authorization.
+    """
     if not TOKEN or not REPO:
         return False, "GitHub token/repo ausente."
     url = f"https://api.github.com/repos/{REPO}/contents/{path}"
     h = gh_headers()
-    last_error = ""
-    # Runtime writers share one data branch. A concurrent commit between GET
-    # and PUT can make the blob SHA stale and GitHub returns HTTP 409. Re-read
-    # the current SHA and retry a small bounded number of times.
-    for attempt in range(3):
-        try:
-            cur = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=h, params={"ref": BRANCH}, timeout=20, allow_redirects=False))
-            sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
-            if cur.status_code not in (200, 404):
-                cur.raise_for_status()
-            payload = {
-                "message": message,
-                "content": base64.b64encode(raw).decode("ascii"),
-                "branch": BRANCH,
-            }
-            if sha:
-                payload["sha"] = sha
-            r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=h, json=payload, timeout=30, allow_redirects=False),"contents_put")
-            if r.status_code == 409 and attempt < 2:
-                last_error = "HTTP 409: conflito de escrita concorrente"
-                time.sleep(0.20 * (attempt + 1))
-                continue
-            r.raise_for_status()
-            return True, ""
-        except Exception as exc:
-            last_error = f"{type(exc).__name__}: {exc}"
-            return False, last_error
-    return False, last_error or "HTTP 409: conflito de escrita concorrente"
+    write_attempted = False
+    try:
+        # A fresh read prepares SHA/branch parameters; it is not a retry grant.
+        cur = reject_github_read_unexpected_status(requests.get(
+            guard_github_token_read_destination(url),
+            headers=h, params={"ref": BRANCH}, timeout=20, allow_redirects=False,
+        ))
+        sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
+        payload = {
+            "message": message,
+            "content": base64.b64encode(raw).decode("ascii"),
+            "branch": BRANCH,
+        }
+        if sha:
+            payload["sha"] = sha
+        # If an exception happens below, the actual remote outcome is unknown.
+        write_attempted = True
+        r = reject_github_write_unexpected_status(requests.put(
+            guard_github_write_destination(url), headers=h,
+            json=payload, timeout=30, allow_redirects=False,
+        ), "contents_put")
+        if r.status_code == 409:
+            return False, "REPORTED_GITHUB_HTTP_409_NO_AUTORETRY_RECONCILE_FIRST"
+        if r.status_code == 422:
+            return False, "REPORTED_GITHUB_HTTP_422_VALIDATION_NO_AUTORETRY_RECONCILE_FIRST"
+        r.raise_for_status()
+        return True, ""
+    except Exception as exc:
+        if write_attempted:
+            return False, f"UNKNOWN_GITHUB_WRITE_OUTCOME_RECONCILE_NO_RETRY:{type(exc).__name__}"
+        return False, f"PRE_WRITE_GITHUB_READ_OR_VALIDATION_FAILED:{type(exc).__name__}"
 
 def gh_get_json(path: str, default: Any = None) -> tuple[Any, str]:
     raw, err = gh_get_bytes(path)

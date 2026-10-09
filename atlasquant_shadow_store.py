@@ -113,7 +113,9 @@ def persist_shadow_samples(
         return {"ok":False,"added":0,"samples":0,"reason":"NOT_CONFIGURED","error":""}
 
     incoming=[dict(x) for x in samples]
-    attempts=2 if retry_conflict_once else 1
+    # Legacy retry_conflict_once is accepted for caller compatibility, but
+    # cannot grant another HTTP PUT without independently trusted CAS evidence.
+    attempts=1
     for attempt in range(attempts):
         write_attempted = False
         try:
@@ -139,8 +141,7 @@ def persist_shadow_samples(
                     "reconciliation_required":True,"safe_to_retry":False,
                 }
             if r.status_code == 409:
-                if attempt+1<attempts:
-                    continue  # Bounded re-read only for reported HTTP 409.
+                # A reported conflict alone is not trusted permission to replay.
                 return {
                     "ok":False,"added":0,"samples":0,
                     "reason":"CONFLICT","error":"REPORTED_HTTP_409",

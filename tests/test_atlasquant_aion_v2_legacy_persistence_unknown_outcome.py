@@ -61,7 +61,7 @@ class LegacyPersistenceUnknownOutcomeTests(unittest.TestCase):
                 self.assertEqual(put.call_count,1)
                 self.assertEqual(read.call_count,1)
 
-    def test_known_409_is_bounded_and_never_becomes_success(self):
+    def test_known_409_stops_without_replay_even_if_retry_enabled(self):
         for module,method,reader,data,_ in CASES:
             with self.subTest(module=module.__name__), \
                  patch.object(module,reader,return_value=([],"")) as read, \
@@ -71,8 +71,8 @@ class LegacyPersistenceUnknownOutcomeTests(unittest.TestCase):
                 self.assertEqual(outcome["write_outcome"],"REPORTED_CAS_CONFLICT")
                 self.assertIs(outcome["safe_to_retry"],False)
                 self.assertIs(outcome["reconciliation_required"],True)
-                self.assertEqual(put.call_count,2)
-                self.assertEqual(read.call_count,2)
+                self.assertEqual(put.call_count,1)
+                self.assertEqual(read.call_count,1)
 
     def test_http_422_validation_error_cannot_trigger_second_put(self):
         for module,method,reader,data,_ in CASES:
@@ -133,6 +133,8 @@ class LegacyPersistenceUnknownOutcomeTests(unittest.TestCase):
             self.assertIn('"safe_to_retry":False',source)
             self.assertIn('"write_outcome":"REPORTED_CAS_CONFLICT"',source)
             self.assertIn('"write_outcome":"REPORTED_HTTP_422"',source)
+            self.assertIn("attempts=1",source)
+            self.assertNotIn("continue  # Bounded re-read",source)
 
 if __name__=="__main__":
     unittest.main()
