@@ -11,6 +11,7 @@ publishing, deploys, provider calls and shell/subprocess execution remain
 blocked by the executor contract.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -1212,10 +1213,11 @@ def _persist_runtime_checkpoint_cas(
     try:
         write_attempted = True
         response = requests.put(
-            _contents_url(config),
+            guard_github_write_destination(_contents_url(config)),
             headers=_headers(config.token),
             json=body,
             timeout=timeout,
+            allow_redirects=False,
         )
         if response.status_code in {409, 422}:
             write_receipt = _runtime_write_receipt(

@@ -146,10 +146,15 @@ def _url_source_ok(expr:ast.AST,fn:ast.FunctionDef,tree:ast.Module,
 
 def review_legacy_github_write_destinations(
     root:Path,*,sites:frozenset[tuple[str,str,str]]|None=None,
+    require_runtime_guards:bool|None=None,
 )->dict[str,Any]:
     """Full baseline by default, limited injected baseline in mutation tests."""
     root=Path(root).resolve()
     expected=KNOWN_SITES if sites is None else frozenset(sites)
+    # Prior #1148 synthetic source fixtures isolate destination provenance;
+    # full checked-out production scan MUST require real redirect/URL guards.
+    enforce_guards=(sites is None if require_runtime_guards is None
+                    else require_runtime_guards)
     findings=[]
     checked=0
     seen_files={}
@@ -191,15 +196,38 @@ def review_legacy_github_write_destinations(
                              "reason":"NO_POSITIONAL_DESTINATION"})
             continue
         expected_route=_type_for((path,fn_name,call_name))
-        if not _url_source_ok(call.args[0],fn,tree,call.lineno,expected_route):
+        url_expr=call.args[0]
+        if (isinstance(url_expr,ast.Call)
+            and _dotted(url_expr.func)=="guard_github_write_destination"
+            and len(url_expr.args)==1 and not url_expr.keywords):
+            url_expr=url_expr.args[0]
+        elif enforce_guards:
+            findings.append({"path":path,"function":fn_name,
+                             "reason":"REQUIRED_RUNTIME_GITHUB_DESTINATION_GUARD_MISSING"})
+            continue
+        if enforce_guards:
+            imported=[
+                item for statement in tree.body
+                if isinstance(statement,ast.ImportFrom)
+                and statement.module=="atlasquant_aion_v2_github_write_url_guard"
+                for item in statement.names
+                if item.name=="guard_github_write_destination"
+                and item.asname is None
+            ]
+            if len(imported)!=1:
+                findings.append({"path":path,"function":fn_name,
+                                 "reason":"GITHUB_WRITE_GUARD_IMPORT_NOT_TRUSTED"})
+                continue
+        if not _url_source_ok(url_expr,fn,tree,call.lineno,expected_route):
             findings.append({"path":path,"function":fn_name,
                              "reason":"DESTINATION_NOT_GITHUB_SOURCE_BOUND"})
             continue
-        # If caller explicit redirection is enabled, there is no assurance
-        # of remaining on the verified GitHub origin.
-        if any(k.arg=="allow_redirects" and
-               not (isinstance(k.value,ast.Constant) and k.value.value is False)
-               for k in call.keywords):
+        # For real source, Requests defaults are not accepted: require
+        # explicit FALSE. For old mutation fixtures, still reject true.
+        redirects=[k for k in call.keywords if k.arg=="allow_redirects"]
+        if ((enforce_guards and len(redirects)!=1)
+            or any(not (isinstance(k.value,ast.Constant)
+                        and k.value.value is False) for k in redirects)):
             findings.append({"path":path,"function":fn_name,
                              "reason":"EXPLICIT_REDIRECT_POLICY_UNSAFE"})
             continue
@@ -218,6 +246,9 @@ def review_legacy_github_write_destinations(
         "unknown_destination_source_count":len(findings),
         "findings":findings,
         "source_static_only":True,
+        "write_sites_require_guard_and_no_redirect":enforce_guards,
+        "write_redirects_explicitly_disabled":enforce_guards and not findings,
+        "runtime_destination_guard_present_in_source":enforce_guards and not findings,
         "redirect_chain_verified_closed":False,
         "interpolated_repo_and_path_sanitized":False,
         "real_dns_tls_cert_validated":False,

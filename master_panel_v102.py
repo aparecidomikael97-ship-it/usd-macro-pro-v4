@@ -9,6 +9,7 @@ Combina, sem alterar o motor base:
 O Índice Integrado é apenas um ranking operacional. Não é probabilidade de lucro.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from html import escape
 import base64
@@ -137,7 +138,7 @@ def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
         }
         if sha:
             payload["sha"] = sha
-        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r = requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False)
         r.raise_for_status()
         return True, ""
     except Exception as exc:

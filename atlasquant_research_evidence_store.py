@@ -5,6 +5,7 @@ branch, never to main/dev. The store is append/merge oriented and does not
 change strategy parameters, gates, permissions or trading execution.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
 from hashlib import sha256
@@ -226,10 +227,11 @@ def persist_research_evidence(
             if remote_sha:
                 payload["sha"]=remote_sha
             response=requests.put(
-                _url(repo),
+                guard_github_write_destination(_url(repo)),
                 headers=_headers(token),
                 json=payload,
                 timeout=timeout,
+                allow_redirects=False,
             )
             if response.status_code in (409,422) and attempt+1<attempts:
                 continue

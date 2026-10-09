@@ -5,6 +5,7 @@ adds W1/D1 context, liquidity, Quarterly Theory time scaffolding, ICT-style
 killzones and an ADR14 exhaustion filter.  It does not mutate Score Mestre or the existing signal history.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
 import io
@@ -126,7 +127,7 @@ def _save_snapshot(snapshot: dict) -> tuple[bool, str, bool]:
         }
         if sha:
             put_payload["sha"] = sha
-        saved = requests.put(url, headers=headers, json=put_payload, timeout=25)
+        saved = requests.put(guard_github_write_destination(url), headers=headers, json=put_payload, timeout=25, allow_redirects=False)
         saved.raise_for_status()
         return True, "Snapshot salvo em dados/market_map_v10.csv.", True
     except Exception as exc:

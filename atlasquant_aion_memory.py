@@ -8,6 +8,7 @@ This module never silently claims persistence. Every load/save returns a
 truthful status with provenance.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -2320,10 +2321,11 @@ def save_runtime_checkpoint(
         import requests
         write_attempted = True
         response = requests.put(
-            _contents_url(cfg),
+            guard_github_write_destination(_contents_url(cfg)),
             headers=_headers(cfg.token),
             json=body,
             timeout=timeout,
+            allow_redirects=False,
         )
         if response.status_code in {409, 422}:
             write_receipt = _runtime_write_receipt(

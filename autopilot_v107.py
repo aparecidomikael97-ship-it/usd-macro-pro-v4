@@ -16,6 +16,7 @@ Automatiza:
 O Score Mestre NÃO é alterado pela camada de notícias.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
 import io
@@ -201,7 +202,7 @@ def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
             }
             if sha:
                 payload["sha"] = sha
-            r = requests.put(url, headers=h, json=payload, timeout=30)
+            r = requests.put(guard_github_write_destination(url), headers=h, json=payload, timeout=30, allow_redirects=False)
             if r.status_code == 409 and attempt < 2:
                 last_error = "HTTP 409: conflito de escrita concorrente"
                 time.sleep(0.20 * (attempt + 1))

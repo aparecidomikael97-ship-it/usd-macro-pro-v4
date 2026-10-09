@@ -4,6 +4,7 @@ Stores deduplicated decision snapshots on the dedicated runtime-data branch.
 This module is fail-closed for code branches and never changes trading logic.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
 import json
@@ -153,10 +154,11 @@ def persist_records(
                 payload["sha"]=sha
 
             r=requests.put(
-                _contents_url(repo),
+                guard_github_write_destination(_contents_url(repo)),
                 headers=_headers(token),
                 json=payload,
                 timeout=timeout,
+                allow_redirects=False,
             )
             if r.status_code in (409,422) and attempt+1<attempts:
                 continue
