@@ -15,3 +15,6 @@
 `UNKNOWN_OUTCOME` is conservative: entering the call expression does not prove any bytes reached the network. An HTTP 200/201 is still not an independently authenticated durable receipt; these stores retain legacy `SAVED` on that status without remote read-after-write, so it is **NOT a certification of persistence**. A caller could still invoke the function again separately; this PR labels it unsafe but does not implement a global protected one-shot journal or trusted monotonic CAS. Even conflict codes rely on an unproven response origin. No independent enrolled HUMAN_OWNER, real external witness roots, FIDO2/TPM custody, physical sandbox, FinOps settlement, provider idempotency, live network/DNS/proxy assurance or deployment approval exists.
 
 **No real application GitHub HTTP send, paid API call, new secrets, owner device access, merge, deploy, Worker activation, purchase or spend. Core V1/main untouched; first-install gate #1117 stays HARD NO-GO.**
+
+### Superseded by next stacked Draft
+#1154 eliminates automatic 409 replay in these three writers and the Autopilot; earlier bounded 409 retries documented here describe #1153, not the new effective #1154 branch.

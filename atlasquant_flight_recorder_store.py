@@ -139,7 +139,9 @@ def persist_records(
         return {"ok":False,"added":0,"records":0,"reason":"NOT_CONFIGURED","error":""}
 
     incoming=[dict(x) for x in records]
-    attempts=2 if retry_conflict_once else 1
+    # Legacy retry_conflict_once is accepted for caller compatibility, but
+    # cannot grant another HTTP PUT without independently trusted CAS evidence.
+    attempts=1
 
     for attempt in range(attempts):
         write_attempted = False
@@ -176,8 +178,7 @@ def persist_records(
                     "reconciliation_required":True,"safe_to_retry":False,
                 }
             if r.status_code == 409:
-                if attempt+1<attempts:
-                    continue  # Bounded re-read only for reported HTTP 409.
+                # A reported conflict alone is not trusted permission to replay.
                 return {
                     "ok":False,"added":0,"records":0,
                     "reason":"CONFLICT","error":"REPORTED_HTTP_409",
