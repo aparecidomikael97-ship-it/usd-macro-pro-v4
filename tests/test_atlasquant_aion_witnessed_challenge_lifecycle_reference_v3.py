@@ -514,6 +514,21 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.store.inspect()["states"],{})
         self.blocked(self.adapter.recover(request=request,ticket=None))
 
+    def test_confirmed_result_exports_verifiable_reference_receipt(self):
+        _,out=self.issue()
+        self.assertIn("receipt",out)
+        self.assertTrue(v3.verify_checkpoint(out["receipt"],pin=self.witness.pair.public_hex,
+            expected=self.witness.state.head))
+        before=copy.deepcopy(self.witness.state.history)
+        out["receipt"]["checkpoint"]["generation"]=0
+        self.assertEqual(before,self.witness.state.history)
+
+    def test_original_request_digest_is_authenticated_in_signed_history(self):
+        self.issue()
+        self.witness.state.history[0]["request_digest"]="sha256:"+"f"*64
+        with self.assertRaises(v2.ReferenceWitnessError):
+            self.witness.state.validate_history()
+
 def terminal_attack(operation):
     def test(self):
         self.issue();self.confirmed(self.run_request(self.request(operation)))
