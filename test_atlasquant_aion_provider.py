@@ -1,10 +1,11 @@
 import unittest
+from unittest.mock import patch
 
 from atlasquant_aion_provider import (
     ProviderConfig,
     build_provider_prompt,
     estimate_request_cost,
-    execute_openai_answer,
+    execute_openai_answer as _production_execute_openai_answer,
     provider_config,
     provider_configuration_status,
     preview_openai_request_binding,
@@ -23,7 +24,15 @@ class _FakeSession:
     def __init__(self,response):
         self.response=response
         self.calls=[]
-    def post(self,url,headers=None,json=None,timeout=None):
+    def __enter__(self):
+        return self
+
+    def __exit__(self,*args):
+        return False
+
+    def post(self,url,headers=None,json=None,timeout=None,allow_redirects=None):
+        if allow_redirects is not False:
+            raise AssertionError("redirects must be blocked")
         self.calls.append({
             "url":url,
             "headers":dict(headers or {}),
@@ -31,6 +40,19 @@ class _FakeSession:
             "timeout":timeout,
         })
         return self.response
+
+
+def execute_openai_answer(*args,session=None,**kwargs):
+    """Fixture-only boundary: production rejects arbitrary injected sessions.
+
+    This fake is installed exclusively via a unittest patch, never supplied
+    to execute_openai_answer's runtime Session argument.
+    """
+    if session is None:
+        return _production_execute_openai_answer(*args,**kwargs)
+    with patch("atlasquant_aion_provider._sealed_provider_transport",
+               return_value=session):
+        return _production_execute_openai_answer(*args,**kwargs)
 
 
 class AtlasQuantAionProviderTests(unittest.TestCase):
