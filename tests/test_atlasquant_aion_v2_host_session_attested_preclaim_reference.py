@@ -228,6 +228,13 @@ class HostAttestedOneShotTests(unittest.TestCase):
                          "BLOCKED")
         self.assertEqual(self.review()["state"],MATCH)
 
+    def test_boolean_signed_epoch_is_rejected(self):
+        p=deepcopy(self.host_payload)
+        p['session_epoch']=True
+        observed=self.consume(host_envelope=self.sign(p),expected_session_epoch=1)
+        self.assertEqual(observed['state'],'BLOCKED')
+        self.assertEqual(self.review()['state'],MATCH)
+
     def test_challenge_replay_with_changed_expected_nonce_blocks(self):
         self.assertEqual(self.consume(challenge_nonce_hex="8"*64)["state"],
                          "BLOCKED")
