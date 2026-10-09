@@ -214,6 +214,42 @@ class SignedCaptureReferenceTests(unittest.TestCase):
         self.assertFalse(x["capture_external_cas_performed"])
         self.assertFalse(x["secondary_external_cas_performed"])
 
+    def test_later_nonce_capture_monotonic_fence_N_to_N_plus_one_math(self):
+        # Synthetic role signatures can represent a later global capture
+        # sequence where this nonce had no capture yet, but other IDs did.
+        oldp,oldpr,olda,oldar=self.pair()
+        self.capture_once()
+        newp,newpr,newa,newar=self.pair()
+        for role,payload,prior,new_hash in (
+            ("PRIMARY_WITNESS",oldpr,5,"1"*64),
+            ("SECONDARY_ANCHOR",oldar,5,"1"*64),
+            ("PRIMARY_WITNESS",newpr,6,"2"*64),
+            ("SECONDARY_ANCHOR",newar,6,"2"*64),
+        ):
+            payload["payload"]["capture_sequence"]=prior
+            payload["payload"]["capture_snapshot_sha256"]=new_hash
+            payload["signature_hex"]=self.keys[role].sign(
+                canonical_capture_witness_read(payload["payload"])).hex()
+        args=dict(
+            old_primary_query=oldp,old_primary_read=oldpr,
+            old_anchor_query=olda,old_anchor_read=oldar,
+            new_primary_query=newp,new_primary_read=newpr,
+            new_anchor_query=newa,new_anchor_read=newar,
+            primary_pin=self.pins["PRIMARY_WITNESS"],
+            anchor_pin=self.pins["SECONDARY_ANCHOR"],
+        )
+        self.assertEqual(review_one_step_capture_anchor_preflight(
+            **args)["state"],FENCE)
+        # A missing global event sequence must never be treated as a CAS.
+        newpr["payload"]["capture_sequence"]=7
+        newar["payload"]["capture_sequence"]=7
+        for role,payload in (("PRIMARY_WITNESS",newpr),
+                             ("SECONDARY_ANCHOR",newar)):
+            payload["signature_hex"]=self.keys[role].sign(
+                canonical_capture_witness_read(payload["payload"])).hex()
+        self.assertEqual(review_one_step_capture_anchor_preflight(
+            **args)["state"],"BLOCKED")
+
     def test_same_capture_as_old_and_new_cannot_fence_again(self):
         self.capture_once()
         p,pr,a,ar=self.pair()
