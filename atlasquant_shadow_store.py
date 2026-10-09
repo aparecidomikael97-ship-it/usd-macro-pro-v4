@@ -1,5 +1,6 @@
 """Persistent AtlasQuant Shadow Mode sample store."""
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
@@ -73,7 +74,7 @@ def _url(repo: str) -> str:
 
 
 def _fetch(repo: str, branch: str, token: str, timeout: int):
-    r=requests.get(_url(repo),headers=_headers(token),params={"ref":branch},timeout=timeout)
+    r=requests.get(guard_github_token_read_destination(_url(repo)),headers=_headers(token),params={"ref":branch},timeout=timeout, allow_redirects=False)
     if r.status_code==404:
         return [],""
     r.raise_for_status()

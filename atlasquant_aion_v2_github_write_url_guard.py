@@ -53,4 +53,18 @@ def guard_github_write_destination(url:object)->str:
     raise ValueError("GitHub write URL route not allowlisted")
 
 
-__all__=["guard_github_write_destination","GITHUB_ORIGIN"]
+def guard_github_token_read_destination(url:object)->str:
+    """Validate an authenticated GitHub GET's base URL before sending.
+
+    Reuses exactly the same fixed-host/allowlisted REST route grammar as
+    the write guard. The caller must separately set allow_redirects=False.
+    This is NOT a proof that the authentication token is valid or scoped.
+    """
+    return guard_github_write_destination(url)
+
+
+__all__=[
+    "guard_github_write_destination",
+    "guard_github_token_read_destination",
+    "GITHUB_ORIGIN",
+]
