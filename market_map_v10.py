@@ -6,6 +6,7 @@ killzones and an ADR14 exhaustion filter.  It does not mutate Score Mestre or th
 """
 from __future__ import annotations
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
@@ -103,7 +104,7 @@ def _save_snapshot(snapshot: dict) -> tuple[bool, str, bool]:
         "X-GitHub-Api-Version": "2022-11-28",
     }
     try:
-        current = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False)
+        current = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         sha = ""
         if current.status_code == 200:
             payload = current.json()

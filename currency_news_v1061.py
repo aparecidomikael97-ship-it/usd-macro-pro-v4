@@ -20,6 +20,7 @@ e registra/valida snapshots em 1H, 4H e 24H antes de qualquer integração ao Sc
 """
 from __future__ import annotations
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -963,7 +964,7 @@ def _gh_read_csv_v1061(path: str) -> tuple[pd.DataFrame, str]:
         return pd.DataFrame(), "GitHub persistente não configurado."
     try:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
-        r = requests.get(guard_github_token_read_destination(url), headers=_gh_headers_v1061(token), params={"ref": branch}, timeout=20, allow_redirects=False)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=_gh_headers_v1061(token), params={"ref": branch}, timeout=20, allow_redirects=False))
         if r.status_code == 404:
             return pd.DataFrame(), ""
         r.raise_for_status()
@@ -980,7 +981,7 @@ def _gh_write_csv_v1061(path: str, df: pd.DataFrame, message: str) -> tuple[bool
     try:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
         headers = _gh_headers_v1061(token)
-        current = requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False)
+        current = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         sha = current.json().get("sha", "") if current.status_code == 200 else ""
         if current.status_code not in (200, 404):
             current.raise_for_status()
@@ -1004,7 +1005,7 @@ def _gh_read_json_v1061(path: str) -> tuple[dict[str, Any], str]:
         return {}, "GitHub persistente não configurado."
     try:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
-        r = requests.get(guard_github_token_read_destination(url), headers=_gh_headers_v1061(token), params={"ref": branch}, timeout=20, allow_redirects=False)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=_gh_headers_v1061(token), params={"ref": branch}, timeout=20, allow_redirects=False))
         if r.status_code == 404:
             return {}, "Arquivo não encontrado."
         r.raise_for_status()
