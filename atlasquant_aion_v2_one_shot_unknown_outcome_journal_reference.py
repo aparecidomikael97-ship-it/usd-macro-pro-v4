@@ -191,6 +191,7 @@ class ReferenceOneShotUnknownOutcomeJournal:
                 CREATE TABLE IF NOT EXISTS aion_dispatch_evidence (
                   nonce_hex TEXT NOT NULL,
                   evidence_sha256 TEXT NOT NULL,
+                  created_sequence INTEGER NOT NULL UNIQUE,
                   PRIMARY KEY(nonce_hex,evidence_sha256),
                   FOREIGN KEY(nonce_hex)
                     REFERENCES aion_dispatch_intents(nonce_hex)
@@ -267,11 +268,14 @@ class ReferenceOneShotUnknownOutcomeJournal:
                 raise ValueError("duplicate nonce")
             seen.add(event["nonce_hex"])
         evidence = self.db.execute(
-            "SELECT nonce_hex,evidence_sha256 FROM aion_dispatch_evidence"
+            "SELECT nonce_hex,evidence_sha256,created_sequence FROM aion_dispatch_evidence"
         ).fetchall()
         for item in evidence:
-            if not _hash(item["evidence_sha256"]) or item["nonce_hex"] not in seen:
+            if (not _hash(item["evidence_sha256"])
+                or item["nonce_hex"] not in seen
+                or not _int(item["created_sequence"],1,2**63-1)):
                 raise ValueError("invalid unknown-outcome evidence")
+            seqs.append(item["created_sequence"])
         if (not _int(row["sequence"], 0, 2**63-1)
             or row["sequence"] != len(seqs)
             or sorted(seqs) != list(range(1,len(seqs)+1))):
@@ -427,13 +431,14 @@ class ReferenceOneShotUnknownOutcomeJournal:
                 return _out("EVIDENCE_DIGEST_ALREADY_NOTED_REFERENCE_ONLY",
                     "EVIDENCE_CANNOT_AUTHORIZE_RETRY",
                     stored=row["state"],journal_seq=seq)
+            n=self._next(seq)
             self.db.execute(
-                "INSERT INTO aion_dispatch_evidence VALUES (?,?)",
-                (nonce_hex,evidence_sha256),
+                "INSERT INTO aion_dispatch_evidence VALUES (?,?,?)",
+                (nonce_hex,evidence_sha256,n),
             )
             return _out("EVIDENCE_DIGEST_NOTED_UNTRUSTED",
                 "OBSERVATION_HASH_NOT_PAYMENT_SETTLEMENT_OR_SUCCESS",
-                stored=row["state"],journal_seq=seq)
+                stored=row["state"],journal_seq=n)
         return self._transaction(do)
 
     def read_reference_only(self, *, nonce_hex: Any) -> dict[str, Any]:
