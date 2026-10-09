@@ -512,6 +512,61 @@ class IndependentWitnessTests(unittest.TestCase):
         self.assertEqual(self.store.inspect()["states"][NONCE],"ISSUED")
         self.assertIsNone(self.witness.state.head)
 
+    def test_untrusted_port_head_is_never_authority(self):
+        with patch.object(self.witness,"expected_head",side_effect=AssertionError("untrusted head queried")):
+            out=self.run_flow()
+        self.assertTrue(out["ledger_matches_witness"]);self.gates(out)
+
+    def test_trusted_state_cannot_be_supplied_as_dict_claim(self):
+        with self.assertRaises(ValueError):
+            ref.ReferenceWitnessAdapter(store=self.store,witness=self.witness,scope=self.scope,
+                trusted_witness_public_key_hex=self.witness.pair.public_hex,
+                trusted_witness_state={"verified":True,"sequence":0})
+
+    def test_trusted_state_wrong_installation_rejected_before_io(self):
+        other={**self.scope,"installation_id":"other-install-001"}
+        with self.assertRaises(ValueError):
+            ref.ReferenceWitnessAdapter(store=self.store,witness=self.witness,scope=other,
+                trusted_witness_public_key_hex=self.witness.pair.public_hex,
+                trusted_witness_state=self.witness.state)
+
+    def test_no_trusted_state_argument_cannot_select_port_state(self):
+        with self.assertRaises(TypeError):
+            ref.ReferenceWitnessAdapter(store=self.store,witness=self.witness,scope=self.scope,
+                trusted_witness_public_key_hex=self.witness.pair.public_hex)
+
+    def test_pending_intent_binding_mutation_blocks_recovery(self):
+        prepared=self.prepare()
+        self.store.consume(request=self.request["v1_request"],now_ts=NOW)
+        prepared["challenge_id"]="ac"*32
+        self.blocked(self.adapter.recover(prepared=prepared))
+        self.assertEqual(self.witness.state.head["challenge_id"],NONCE)
+        self.assertEqual(len(self.witness.state.used),1)
+
+    def test_post_prepare_bypass_ledger_write_diverges_and_requires_supervision(self):
+        prepared=self.prepare()
+        self.store.consume(request=self.request["v1_request"],now_ts=NOW)
+        extra=self.payload(nonce="ac"*32)
+        raw=extra["v1_request"]
+        self.assertEqual(self.store.issue(proposal=raw["proposal"],nonce=raw["nonce"],
+            issued_at=NOW,expires_at=EXPIRES)["state"],"ISSUED")
+        self.blocked(self.adapter.recover(prepared=prepared))
+        self.assertIsNone(self.witness.state.head)
+        self.assertIsNotNone(self.witness.state.pending)
+
+    def test_v2_budget_contract_zero_and_200_bound_not_authority(self):
+        original=ref.build_v2_binding(self.fixture.proposal,NONCE)
+        proposal=copy.deepcopy(self.fixture.proposal);proposal["estimated_monthly_brl"]=200
+        changed=ref.build_v2_binding(proposal,NONCE)
+        self.assertNotEqual(original["transcript_sha256"],changed["transcript_sha256"])
+        for out in (original,changed):
+            for key in ref.FALSE_GATES:self.assertIs(out[key],False)
+
+    def test_v2_budget_bool_and_201_never_coerced(self):
+        for value in (True,False,201,-1,200.0,"200"):
+            proposal=copy.deepcopy(self.fixture.proposal);proposal["estimated_monthly_brl"]=value
+            with self.assertRaises(ValueError):ref.build_v2_binding(proposal,NONCE)
+
 # Every generated case is independently collected and counted, not a hidden
 # subTest loop. Re-signed malformed or wrong-scope checkpoints still cannot
 # satisfy the separately fixed expected checkpoint.

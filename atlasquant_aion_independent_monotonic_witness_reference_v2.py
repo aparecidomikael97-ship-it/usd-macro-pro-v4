@@ -344,6 +344,11 @@ class ReferenceWitnessState:
                 raise ReferenceWitnessError("SUPERVISED_RECOVERY_REQUIRED")
             return deepcopy(self.head)
 
+    def matches_pending(self, candidate):
+        candidate = _checkpoint(candidate)
+        with self.lock:
+            return self.pending == candidate
+
     def expected_head(self):
         with self.lock:
             return {"sequence":self.head["checkpoint_sequence"] if self.head else 0,
@@ -397,7 +402,8 @@ class ReferenceWitnessAdapter:
             "previous_checkpoint_sha256":head["digest"],"transaction_id":transaction_id,
             "challenge_id":raw["nonce"],"observed_at":now_ts,"clock_trusted":False})
         envelope = self.witness.prepare(before_snapshot=before,request=_plain(request),candidate=candidate)
-        if not verify_checkpoint(envelope,trusted_public_key_hex=self.pin,expected=candidate)["external_witness_checkpoint_verified"]:
+        if (not verify_checkpoint(envelope,trusted_public_key_hex=self.pin,expected=candidate)["external_witness_checkpoint_verified"]
+                or not self.trusted_state.matches_pending(candidate)):
             raise ReferenceWitnessError("PREPARE_NOT_AUTHENTICATED")
         return deepcopy(candidate)
 

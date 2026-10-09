@@ -4,7 +4,6 @@ on:
     branches: [impl/aion-durable-dual-ed25519-replay-policy-v1-20261008]
     paths:
       - "atlasquant_aion_independent_monotonic_witness_reference_v2.py"
-      - "atlasquant_aion_independent_monotonic_witness_reference_v2.py"
       - "tests/test_atlasquant_aion_independent_monotonic_witness_reference_v2.py"
       - "docs/aion/AION_INDEPENDENT_MONOTONIC_WITNESS_REFERENCE_V2.md"
       - ".github/workflows/aion-independent-monotonic-witness-reference-v2.yml"
@@ -50,7 +49,6 @@ jobs:
           from importlib.metadata import version
           assert version("cryptography")=="50.0.2"
           files=(
-            "atlasquant_aion_independent_monotonic_witness_reference_v2.py",
             "atlasquant_aion_independent_monotonic_witness_reference_v2.py",
             "tests/test_atlasquant_aion_independent_monotonic_witness_reference_v2.py",
           )
@@ -104,7 +102,7 @@ jobs:
               "tests":result.testsRun,"failures":len(result.failures),
               "errors":len(result.errors),"skipped":len(result.skipped)})
             all_ok=all_ok and result.wasSuccessful() and result.testsRun > 0
-            if pattern == patterns[-1]: all_ok=all_ok and result.testsRun >= 80
+            if pattern == patterns[-1]: all_ok=all_ok and result.testsRun >= 100
           Path("witness-reference-results.json").write_text(json.dumps({
             "head":os.environ["TESTED_HEAD"],"os":os.environ["RUNNER_OS"],"suites":reports,
             "private_material_exported":False,"owner_device_accessed":False},indent=2))

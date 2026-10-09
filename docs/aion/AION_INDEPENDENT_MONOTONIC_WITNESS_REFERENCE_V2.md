@@ -46,7 +46,8 @@ complete ledger state and checkpoint digest.
    itself and recomputes that target, checks baseline hash, fixed scope, prior
    sequence/hash, monotonic policy and unique transaction, then reserves ONE
    pending transition. Only the disposable test wrapper signs its prepare
-   checkpoint. Adapter verifies separately fixed witness pin and exact target.
+   checkpoint. Adapter verifies separately fixed witness pin, exact target and the live
+   independent pending reservation before touching the nonce.
 2. CONSUME: invoke unchanged SQLite transaction. Nonce+receipt+policy+audit commit
    atomically within SQLite ONLY. Witness and SQLite have no shared transaction.
    A pending reservation is not a confirmed checkpoint and never executable.
@@ -84,7 +85,11 @@ persistence and antirollback/recovery controls in a real system.
 
 A static signed checkpoint alone does not prove latest state. Expected sequence,
 previous hash and target must be obtained from the independent state protocol.
-The test port is a live controlled object, not an authenticated remote transport.
+The test signer/port is separate from the independently supplied live
+ReferenceWitnessState. Adapter NEVER derives the expected head from the port;
+it checks the exact reservation in that same independent state. This direct
+live-state access is a controlled simulation assumption, not authenticated
+remote transport or a production storage API.
 No claim of network freshness, cryptographic remote attestation, availability
 under malicious transport or protection against restored witness state is made.
 The plain state-machine class is not a signer or access-control boundary. Its
@@ -174,12 +179,45 @@ physical phase. Consider hybrid after independent attestation and custody proof;
 do not choose/install a TPM/HSM/service merely because a public API exists.
 Proposed architecture, simulated proof and absent physical proof remain distinct.
 
+## Post-green adversarial diff audit: reproduced bugs and minimal fixes
+
+After initial full-green 90-case CI, additional executable attacks found:
+1. Replayed old PREPARED/CONFIRMED signed replies plus fake port head hid a
+   restored DB from an intact witness. Reproduction checkpoint commit
+   9164757b6d7372d96b26cedef447aab70653a78c; run 37904437213 failed the new
+   test on both OS while original 182 tests stayed green.
+   Minimal fix: require separately supplied exact live ReferenceWitnessState,
+   whose scope/head is independent of port replies. It is the SAME witness,
+   not a duplicated nonce store or authority. Real protected transport remains
+   absent; an untrusted transport cannot supply this simulation trust root.
+2. Valid signed prepare without its live reservation could consume SQLite,
+   although final checkpoint stayed BLOCKED. Reproduction checkpoint
+   967be4721f9a3aa968d390035350ecebf3f80149; run 37904669035 failed the new
+   test on both OS. Minimal fix: matches_pending under witness lock before
+   SQLite consumption. No fallback/reset or new authorization.
+
+Two regression tests remain mandatory and unchanged after reproduction.
+All gates stayed false even in the failing reference observation/consumption.
+These were NEW reference-adapter bugs, not silent patches to V1 or production.
+
+First run 37904119178: Linux all 272 passed; Windows old182 passed and new90
+had 4 cleanup errors caused by test SQLite context managers not closing handles.
+Explicit closing fixes fixture cleanup without loosening corruption asserts.
+Run37904261968: bothOS272 passed.
+Intermediate run37904534544: source constructor change preceded fixture change
+in separate API commits, producing 91 fixture TypeErrors perOS; original182
+passed. Run37904542033: old182 passed, new91 had one BOTH-restore fixture
+failure because the independently fixed state reference had not also been
+restored; the test now explicitly reconstructs the adapter after restoring BOTH.
+This preserves and accurately demonstrates the loss-of-guarantee scenario.
+Final changes use one Git-data tree commit for coordinated files.
+
 ## CI and adversarial audit
 
 Dedicated new Windows/Linux hosted workflow, exact PR SHA, read-only checkout
 credentials, pinned actions and dependency versions. Hosted guard runs before
 ephemeral private-key fixture imports. Existing 35/27/33/87 cases unchanged;
-new suite individually collects >=80 cases plus faults/concurrency/determinism.
+new suite individually collects 100 cases plus faults/concurrency/determinism.
 Compile/YAML/AST forbids signing/key generation/network/native/installer/worker/
 filesystem writes in new reference source. Runtime mocks deny socket/subprocess
 during full flow and all Python file opens during pure public verification.
