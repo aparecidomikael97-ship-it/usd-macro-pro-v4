@@ -1,0 +1,85 @@
+name: AION Windows Dual Root Custody Proof Plan V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_windows_dual_root_custody_proof_plan_v1.py"
+      - "tests/test_atlasquant_aion_windows_dual_root_custody_proof_plan_v1.py"
+      - "docs/aion/AION_WINDOWS_DUAL_ROOT_CUSTODY_PROOF_PLAN_V1.md"
+      - ".github/workflows/aion-windows-dual-root-custody-proof-plan-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  untrusted-custody-review:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Enforce ephemeral CI pull request
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          PY
+      - name: Compile pure architectural model and adversarial tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_windows_dual_root_custody_proof_plan_v1.py \
+            tests/test_atlasquant_aion_windows_dual_root_custody_proof_plan_v1.py
+      - name: Run Ed25519 and P256 role isolation adversarial suite
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_windows_dual_root_custody_proof_plan_v1.py'
+      - name: Ensure no private-key, TPM, OS or network effects in model
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("atlasquant_aion_windows_dual_root_custody_proof_plan_v1.py").read_text("utf-8")
+          tree=ast.parse(s)
+          imports=set()
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Import):
+                  imports.update(x.name.split(".")[0] for x in node.names)
+              if isinstance(node,ast.ImportFrom):
+                  imports.add((node.module or "").split(".")[0])
+          allowed={"__future__","hashlib","json","re","typing"}
+          assert imports <= allowed, imports-allowed
+          for name in (
+              '"owner_ed25519_signature_verified": False',
+              '"p256_private_key_generated": False',
+              '"p256_private_key_nonexportable_verified": False',
+              '"p256_tpm_origin_attested": False',
+              '"rsa_only_enterprise_ca_attests_p256": False',
+              '"host_binding_bridge_implemented": False',
+              '"nonce_uniqueness_durable_verified": False',
+              '"physical_sandbox_12_of_12_verified": False',
+              '"physical_network_deny_16_of_16_verified": False',
+              '"key_enrollment_authorized": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+              '"host_security_state_modified": False',
+          ):
+              assert name in s,name
+          assert 'NCryptCreatePersistedKey' not in s
+          assert 'NCryptSignHash' not in s
+          PY
