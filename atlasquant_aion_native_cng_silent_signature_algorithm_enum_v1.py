@@ -50,6 +50,7 @@ def _base(reason: str) -> dict[str, Any]:
         "buffer_free_status": None,
         "provider_free_status": None,
         "algorithm_name_count": None,
+        "enumeration_failure_category": None,
         "target_algorithm_names": {x: "NOT_QUERIED" for x in TARGET_NAMES},
         "provider_handle_released": False,
         "result_buffer_released": False,
@@ -89,20 +90,29 @@ def _ci_only() -> bool:
     )
 
 
+class _AlgorithmShapeError(ValueError):
+    """Bounded code only, never expose raw native provider data."""
+
+
 def _classify_names(
     records: list[tuple[Any, Any, Any]],
 ) -> dict[str, str]:
     """Validate small, well-formed signature-only result; expose targets only."""
-    if not isinstance(records, list) or len(records) > MAX_ALG_COUNT:
-        raise ValueError("ENUM_COUNT_INVALID")
+    if type(records) is not list or len(records) > MAX_ALG_COUNT:
+        raise _AlgorithmShapeError("EXCESSIVE_OR_MALFORMED_RECORD_COUNT")
     names: set[str] = set()
-    for name, alg_class, alg_operations in records:
-        if (type(name) is not str or not _ALLOWED_NAME.fullmatch(name)
-            or type(alg_class) is not int or type(alg_operations) is not int
-            or alg_class != 5
-            or not alg_operations & SIGNATURE_OPERATION
-            or name in names):
-            raise ValueError("ENUM_RECORD_MALFORMED")
+    for record in records:
+        if type(record) is not tuple or len(record) != 3:
+            raise _AlgorithmShapeError("RECORD_TUPLE_INVALID")
+        name, alg_class, alg_operations = record
+        if type(name) is not str or not _ALLOWED_NAME.fullmatch(name):
+            raise _AlgorithmShapeError("ALGORITHM_NAME_SHAPE_INVALID")
+        if type(alg_class) is not int or alg_class != 5:
+            raise _AlgorithmShapeError("SIGNATURE_CLASS_MISMATCH")
+        if type(alg_operations) is not int or not alg_operations & SIGNATURE_OPERATION:
+            raise _AlgorithmShapeError("SIGNATURE_OPERATION_MISMATCH")
+        if name in names:
+            raise _AlgorithmShapeError("DUPLICATE_ALGORITHM_NAME")
         names.add(name)
     return {x: ("LISTED" if x in names else "NOT_LISTED") for x in TARGET_NAMES}
 
@@ -161,18 +171,24 @@ def _probe_silent_signature_algorithms_native_core() -> dict[str, Any]:
                 out["reason"] = "SILENT_ENUM_FAILED"
             elif count.value > MAX_ALG_COUNT:
                 out["reason"] = "SILENT_ENUM_EXCESSIVE_COUNT"
+                out["enumeration_failure_category"] = "EXCESSIVE_OR_MALFORMED_RECORD_COUNT"
             elif count.value and not bool(alg_ptr):
                 out["reason"] = "SILENT_ENUM_NULL_LIST"
+                out["enumeration_failure_category"] = "NULL_ALGORITHM_ARRAY"
             else:
+                out["algorithm_name_count"] = count.value
                 rows = [
                     (alg_ptr[i].pszName, int(alg_ptr[i].dwClass),
                      int(alg_ptr[i].dwAlgOperations))
                     for i in range(count.value)
                 ]
                 out["target_algorithm_names"] = _classify_names(rows)
-                out["algorithm_name_count"] = count.value
-        except (OSError, TypeError, ValueError, IndexError):
+        except _AlgorithmShapeError as exc:
             out["reason"] = "SILENT_ENUM_INVALID_RESULT"
+            out["enumeration_failure_category"] = str(exc)
+        except (OSError, TypeError, ValueError, UnicodeError, IndexError):
+            out["reason"] = "SILENT_ENUM_INVALID_RESULT"
+            out["enumeration_failure_category"] = "NATIVE_POINTER_OR_DECODING_EXCEPTION"
         finally:
             if bool(alg_ptr):
                 try:
