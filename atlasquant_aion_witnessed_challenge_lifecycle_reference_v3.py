@@ -86,10 +86,12 @@ def transition_message(transition,role):
 
 def _checkpoint(value):
     value=v2._plain(value)
-    if (type(value) is not dict or set(value)!=_FIELDS|{"checkpoint_schema","phase"}
+    if (type(value) is not dict or set(value)!=_FIELDS|{"checkpoint_schema","phase","request_sha256"}
             or value["checkpoint_schema"]!=CHECKPOINT_SCHEMA
             or value["phase"] not in ("PREPARED","CONFIRMED")):
         raise ValueError("CHECKPOINT_SCHEMA_INVALID")
+    if type(value["request_sha256"]) is not str or not v2._HEX.fullmatch(value["request_sha256"]):
+        raise ValueError("REQUEST_DIGEST_INVALID")
     _transition({k:value[k] for k in _FIELDS})
     return value
 
@@ -281,7 +283,8 @@ class LifecycleWitnessState(v2.ReferenceWitnessState):
                         or cp["transaction_id"] in used
                         or not verify_checkpoint(entry["envelope"],pin=self.pin,expected=cp)
                         or type(entry["request_digest"]) is not str
-                        or not v2._HEX.fullmatch(entry["request_digest"])):
+                        or not v2._HEX.fullmatch(entry["request_digest"])
+                        or cp["request_sha256"]!=entry["request_digest"]):
                     raise v2.ReferenceWitnessError("HISTORY_INTEGRITY_INVALID")
                 candidate={"generation":cp["generation"],"digest":cp["policy_sha256"]}
                 if (candidate["generation"]<policy["generation"]
@@ -300,7 +303,8 @@ class LifecycleWitnessState(v2.ReferenceWitnessState):
                         or cp["previous_checkpoint_sha256"]!=prior_hash
                         or cp["previous_ledger_sha256"]!=prior_ledger
                         or cp["transaction_id"] in used or {k:cp[k] for k in v2._SCOPE}!=self.scope
-                        or self.pending_request_digest is None):
+                        or self.pending_request_digest is None
+                        or cp["request_sha256"]!=self.pending_request_digest):
                     raise v2.ReferenceWitnessError("PENDING_INTEGRITY_INVALID")
             elif self.pending_request_digest is not None:
                 raise v2.ReferenceWitnessError("PENDING_ORPHAN")
@@ -330,7 +334,8 @@ class LifecycleWitnessState(v2.ReferenceWitnessState):
                     or body["ledger_state_sha256"]!=v2.snapshot_digest(target)
                     or body["generation"]!=after["generation"] or body["policy_sha256"]!=after["digest"]):
                 raise v2.ReferenceWitnessError("TARGET_NOT_RECOMPUTED")
-            self.pending={**body,"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"PREPARED"}
+            self.pending={**body,"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"PREPARED",
+                          "request_sha256":request_digest(request)}
             self.pending_request_digest=request_digest(request)
             return deepcopy(self.pending)
 
@@ -343,7 +348,8 @@ class LifecycleWitnessState(v2.ReferenceWitnessState):
         request=verify_request(request,self.scope)
         with self.lock:
             self.validate_history()
-            cp={**request["transition"],"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"CONFIRMED"}
+            cp={**request["transition"],"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"CONFIRMED",
+                "request_sha256":request_digest(request)}
             if cp["ledger_state_sha256"]!=ledger_state_sha256:
                 raise v2.ReferenceWitnessError("LEDGER_DIVERGENCE")
             digest=request_digest(request)
@@ -371,13 +377,13 @@ class LifecycleWitnessState(v2.ReferenceWitnessState):
             return deepcopy(envelope)
 
 
-def _result(reason,*,math=False,reserved=False,committed=False,checkpoint=False,matches=False,ticket=None):
+def _result(reason,*,math=False,reserved=False,committed=False,checkpoint=False,matches=False,ticket=None,receipt=None):
     return {"schema":SCHEMA,"state":"REFERENCE_TRANSITION_CONFIRMED" if matches else "BLOCKED",
         "reason":reason,"transition_mathematically_verified":math,
         "transition_reserved_by_reference_witness":reserved,"sqlite_transition_committed":committed,
         "checkpoint_mathematically_verified":checkpoint,"reference_ledger_matches_witness":matches,
         "distributed_atomicity_verified":False,"exactly_once_external_execution_verified":False,
-        "reference_only":True,"ticket":deepcopy(ticket),**FALSE_GATES}
+        "reference_only":True,"ticket":deepcopy(ticket),"receipt":deepcopy(receipt),**FALSE_GATES}
 
 
 _ERRORS=(ValueError,TypeError,KeyError,OverflowError,RecursionError,OSError,sqlite3.Error,
@@ -397,7 +403,8 @@ class LifecycleAdapter:
         request=verify_request(request,self.state.scope)
         body=request["transition"]
         before=v2.ledger_snapshot(self.store)
-        expected={**body,"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"PREPARED"}
+        expected={**body,"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"PREPARED",
+                  "request_sha256":request_digest(request)}
         ticket=self.witness.prepare(before_snapshot=before,request=request)
         if (not verify_checkpoint(ticket,pin=self.pin,expected=expected)
                 or not self.state.matches_pending(expected)):
@@ -433,7 +440,8 @@ class LifecycleAdapter:
         try:
             request=verify_request(request,self.state.scope);mathematical=True
             body=request["transition"]
-            prepared={**body,"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"PREPARED"}
+            prepared={**body,"checkpoint_schema":CHECKPOINT_SCHEMA,"phase":"PREPARED",
+                      "request_sha256":request_digest(request)}
             if not verify_checkpoint(ticket,pin=self.pin,expected=prepared):
                 raise v2.ReferenceWitnessError("ORIGINAL_SIGNED_PREPARE_REQUIRED")
             current=v2.snapshot_digest(v2.ledger_snapshot(self.store))
@@ -447,7 +455,8 @@ class LifecycleAdapter:
             head=self.state.expected_head()
             matches=verified and head=={"sequence":body["checkpoint_sequence"],"digest":checkpoint_digest(expected)}
             return _result("" if matches else "NOT_LATEST_CONFIRMED_WITNESS",math=True,
-                reserved=True,committed=True,checkpoint=verified,matches=matches,ticket=ticket)
+                reserved=True,committed=True,checkpoint=verified,matches=matches,ticket=ticket,
+                receipt=v2._plain(envelope) if verified else None)
         except _ERRORS:
             return _result("RECOVERY_BLOCKED_NO_REPAIR_OR_FALLBACK",math=mathematical,
                            reserved=reserved,committed=committed,ticket=ticket)

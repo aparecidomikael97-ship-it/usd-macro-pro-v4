@@ -59,7 +59,9 @@ required for explicit supervised recovery, no automatic retry/repair/fallback.
 Exact schema/version=3, operation and its fixed REFERENCE_NOT_AUTHORIZATION
 purpose. Domain-separated operation+role intents; ISSUE signatures CANNOT
 verify CONSUME/EXPIRE/REVOKE messages. Witness signatures separately bind
-operation and PREPARED/CONFIRMED phase, canonical sorted ASCII JSON.
+operation and PREPARED/CONFIRMED phase PLUS request_sha256 of the entire verified
+original request, canonical sorted ASCII JSON. Request digest is recomputed;
+an unsigned metadata digest cannot substitute for that authenticated binding.
 
 Body binds installation/trust-chain/witness, 256-bit lower-hex nonce, transaction
 ID, checkpoint sequence, full before/expected-after ledger hashes, previous
@@ -247,6 +249,29 @@ arbitrary resync, stale phase/intent, pending ambiguity, altered signed history,
 unproven custody/hardware/time, unavailable witness or automatic repair/retry.
 No physical gates are approved in this PR. Integration with #1114 is separate.
 
+## Post-green adversarial review and reproduced corrections
+
+First run37907650216 at07c7f590b3aa3c1e9156651cb82eb0dc59b461b3:
+Windows/Linux each99 new +282 regressions =381 passed,0 errors/failures/skips.
+After that green run the full diff review found two gaps:
+1. Successful output exposed only PREPARED ticket, not a CONFIRMED verifiable
+   receipt. Reproduction test_confirmed_result_exports_verifiable_reference_receipt.
+   Minimal fix returns a deep-copied validated public CONFIRMED envelope.
+2. Original-intent request digest in witness history was format-checked but not
+   included in checkpoint signature. Changing it passed history validation.
+   Reproduction test_original_request_digest_is_authenticated_in_signed_history.
+   Minimal fix binds recomputed request_sha256 into BOTH signed checkpoint phases,
+   requires equality in history/pending and checks it on prepare/recovery.
+
+Reproduction commit e387245119d3b0e1fd8046d53a8f0985863571e7;
+run37907893972 bothOS:101 new tests with2 failures, old282 pass,0errors/skips.
+Original failing tests retained; receipt-key assertion inspects keys instead of
+printing the synthetic public signed payload on failure, same semantic assert.
+No private or real owner key was ever logged/exported. No V1/V2 test or source
+was changed to accommodate V3; fixes are confined to this new reference contract.
+Additional cases cover missing signed request digest and tampered pending digest.
+The final coordinated source/test/doc change uses one Git tree commit.
+
 ## CI and audit evidence
 
 New dedicated Windows/Linux hosted workflow, exact PR head, pinned actions,
@@ -255,7 +280,10 @@ Runs new V3 suite plus UNCHANGED100 #1115,87 #1113,35 #1109,27 #1110,33 #1111.
 Compile/YAML/static safety/old CAS inventory. Runtime mocks deny socket/subprocess
 during the full chain and file opens in pure public verification. Explicit
 temp-fixture SQLite writes are intentional; no claim of zero ALL filesystem I/O.
-Public counts/head artifacts only, no DB/private keys/signatures/payload export.
+Successful output includes the public CONFIRMED receipt envelope, independently
+verifiable against the separate TEST pin and exact expected checkpoint; PREPARED
+ticket is separate. Both returned artifacts are deep copied. CI artifact uploads
+contain counts/head ONLY, no DB/private key/signature/payload files.
 Final measured counts/run links, failures and corrections belong in PR report.
 
 Implementation exclusively GitHub APIs, tests exclusively disposable hosted CI.

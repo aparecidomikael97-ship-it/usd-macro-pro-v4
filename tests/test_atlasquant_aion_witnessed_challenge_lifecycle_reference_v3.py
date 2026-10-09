@@ -375,7 +375,8 @@ class LifecycleTests(unittest.TestCase):
         request=self.request()
         class FakePort:
             def prepare(_,**kwargs):
-                cp={**request["transition"],"checkpoint_schema":v3.CHECKPOINT_SCHEMA,"phase":"PREPARED"}
+                cp={**request["transition"],"checkpoint_schema":v3.CHECKPOINT_SCHEMA,"phase":"PREPARED",
+                    "request_sha256":v3.request_digest(request)}
                 return self.witness.wrap(cp)
             def recover(_,**kwargs):raise AssertionError("must not consume")
         out=self.run_request(request,adapter=self.make_adapter(witness=FakePort()));self.blocked(out)
@@ -516,7 +517,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_confirmed_result_exports_verifiable_reference_receipt(self):
         _,out=self.issue()
-        self.assertIn("receipt",out)
+        self.assertIn("receipt",out.keys())
         self.assertTrue(v3.verify_checkpoint(out["receipt"],pin=self.witness.pair.public_hex,
             expected=self.witness.state.head))
         before=copy.deepcopy(self.witness.state.history)
@@ -528,6 +529,25 @@ class LifecycleTests(unittest.TestCase):
         self.witness.state.history[0]["request_digest"]="sha256:"+"f"*64
         with self.assertRaises(v2.ReferenceWitnessError):
             self.witness.state.validate_history()
+
+    def test_receipt_binds_original_complete_request_digest(self):
+        request,out=self.issue()
+        cp=out["receipt"]["checkpoint"]
+        self.assertEqual(cp["request_sha256"],v3.request_digest(request))
+        self.assertEqual(out["ticket"]["checkpoint"]["request_sha256"],cp["request_sha256"])
+
+    def test_checkpoint_without_original_intent_digest_never_verifies(self):
+        _,out=self.issue();envelope=copy.deepcopy(out["receipt"])
+        del envelope["checkpoint"]["request_sha256"]
+        self.assertFalse(v3.verify_checkpoint(envelope,pin=self.witness.pair.public_hex,
+            expected=self.witness.state.head))
+
+    def test_pending_intent_digest_tamper_fail_closed(self):
+        request=self.request();ticket=self.adapter.prepare(request=request)
+        self.witness.state.pending_request_digest="sha256:"+"f"*64
+        self.apply(request)
+        self.blocked(self.adapter.recover(request=request,ticket=ticket))
+        self.assertIsNone(self.witness.state.head)
 
 def terminal_attack(operation):
     def test(self):
