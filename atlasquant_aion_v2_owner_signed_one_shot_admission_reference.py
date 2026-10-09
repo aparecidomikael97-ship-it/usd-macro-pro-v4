@@ -29,8 +29,7 @@ from atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference import (
     _valid_intent,
 )
 from atlasquant_aion_v2_dispatch_journal_dual_witness_reference import (
-    MATCH as JOURNAL_MATCH, review_dual_witnessed_journal,
-    local_journal_intent_commitment,
+    _two_signed, local_journal_intent_commitment,
 )
 
 SCHEMA="ATLASQUANT_AION_V2_COMPOSED_OWNER_ONE_SHOT_REFERENCE_V1"
@@ -185,18 +184,38 @@ def review_owner_signed_preclaim_reference(
     # The source journal must remain PREPARED when both signed READs match.
     # No network, witness signer, nonce-consumption, remote CAS is performed.
     try:
-        review=review_dual_witnessed_journal(
-            journal,intent=intent,**witness_heads,
+        # #1134's public read reviewer deliberately rejects PREPARED: it
+        # governs post-claim recovery. Here we are the *preclaim* phase.
+        # Verify the same two strict signed READ envelopes, then compare
+        # every signed snapshot field against the local PREPARED journal.
+        # This does not establish trust/enrollment or independent freshness.
+        reason,head=_two_signed(
+            witness_heads["primary_read"],
+            witness_heads["primary_pin"],
+            witness_heads["primary_query"],
+            witness_heads["anchor_read"],
+            witness_heads["anchor_pin"],
+            witness_heads["anchor_query"],
         )
         local=local_journal_intent_commitment(
             journal,intent=intent,
         )
     except (ValueError,TypeError,OverflowError,AttributeError,KeyError):
         return _out("BLOCKED","DISPATCH_JOURNAL_WITNESSES_UNAVAILABLE")
-    if (review.get("state")!=JOURNAL_MATCH
+    q=witness_heads["primary_query"]
+    if (reason or type(head) is not dict
+        or type(q) is not dict
+        or any(q.get(k)!=journal.config[k] for k in (
+            "owner_id","tenant_id","workspace_id",
+            "period_id","policy_generation"
+        ))
+        or q.get("key_registry_roster_sha256")!=intent["key_registry_roster_sha256"]
+        or q.get("nonce_hex")!=intent["nonce_hex"]
         or local["intent_state"]!=STATE_PREPARED
         or local["claim_sequence"]!=0
-        or review.get("matching_reference_head",{}).get("intent_state")!=STATE_PREPARED
+        or head["intent_state"]!=STATE_PREPARED
+        or head["claim_sequence"]!=0
+        or any(local[k]!=head[k] for k in local)
         or local["signed_v2_intent_sha256"]!=digest
         or local["full_provider_request_sha256"]!=preview["request_sha256"]):
         return _out("BLOCKED","NO_FRESH_PREPARED_TWO_WITNESS_REFERENCE")
