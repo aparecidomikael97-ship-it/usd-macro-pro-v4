@@ -324,9 +324,11 @@ class HoldTests(unittest.TestCase):
 
     def test_no_provider_network_calls_or_subprocess(self):
         import requests,subprocess,socket
-        with patch.object(requests.sessions.Session,"request",side_effect=AssertionError),
-             patch.object(subprocess,"Popen",side_effect=AssertionError),
-             patch.object(socket,"socket",side_effect=AssertionError):
+        with (
+            patch.object(requests.sessions.Session,"request",side_effect=AssertionError),
+            patch.object(subprocess,"Popen",side_effect=AssertionError),
+            patch.object(socket,"socket",side_effect=AssertionError),
+        ):
             self.assertEqual(self._reserve()["state"],REFERENCE_HELD)
         self.assert_no_authority(self.ledger.reference_snapshot())
 
