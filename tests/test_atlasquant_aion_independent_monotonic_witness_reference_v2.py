@@ -84,7 +84,8 @@ class IndependentWitnessTests(unittest.TestCase):
     def make_adapter(self,witness=None,scope=None,pin="default"):
         return ref.ReferenceWitnessAdapter(store=self.store,witness=witness or self.witness,
             scope=scope or self.scope,
-            trusted_witness_public_key_hex=self.witness.pair.public_hex if pin=="default" else pin)
+            trusted_witness_public_key_hex=self.witness.pair.public_hex if pin=="default" else pin,
+            trusted_witness_state=self.witness.state)
 
     def prepare(self,request=None,tx=TX):
         return self.adapter.prepare(request=request or self.request,transaction_id=tx,now_ts=NOW)
