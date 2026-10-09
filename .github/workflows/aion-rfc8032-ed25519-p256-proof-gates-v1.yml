@@ -1,0 +1,94 @@
+name: AION RFC8032 Ed25519 Public Verify + P256 Attestation Stop V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_ed25519_public_verify_p256_attestation_review_v1.py"
+      - "tests/test_atlasquant_aion_rfc8032_ed25519_p256_attestation_review_v1.py"
+      - "docs/aion/AION_RFC8032_ED25519_VERIFY_P256_PROOF_GATES_V1.md"
+      - ".github/workflows/aion-rfc8032-ed25519-p256-proof-gates-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  public-verification:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Require ephemeral GitHub PR
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          assert os.environ.get("RUNNER_OS") in ("Windows","Linux")
+          PY
+      - name: Install pinned verification-only dependency (CI only)
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: cryptography==50.0.2
+      - name: Confirm exact verifier dependency version
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+          assert version("cryptography") == "50.0.2"
+          PY
+      - name: Compile public verification and RFC tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_ed25519_public_verify_p256_attestation_review_v1.py \
+            tests/test_atlasquant_aion_rfc8032_ed25519_p256_attestation_review_v1.py
+      - name: Run official RFC8032 and forged-signature tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_rfc8032_ed25519_p256_attestation_review_v1.py'
+      - name: No secret keys, signing, TPM operations or install authority
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("atlasquant_aion_ed25519_public_verify_p256_attestation_review_v1.py").read_text("utf-8")
+          t=ast.parse(s)
+          imports=set()
+          for n in ast.walk(t):
+              if isinstance(n,ast.Import):
+                  imports.update(a.name.split(".")[0] for a in n.names)
+              if isinstance(n,ast.ImportFrom):
+                  imports.add((n.module or "").split(".")[0])
+          assert imports <= {"__future__","hashlib","hmac","re","typing","cryptography"}
+          banned=(
+              "Ed25519PrivateKey", "generate_private_key",
+              "NCryptCreatePersistedKey", "NCryptOpenKey", "NCryptSignHash",
+              "NCryptEnumKeys", "WinDLL", "subprocess", "socket",
+              "winreg", "TPM2_Certify(", "send_command(", ".sign(",
+          )
+          for x in banned:
+              assert x not in s,x
+          assert "Ed25519PublicKey.from_public_bytes(pub).verify(signature, message)" in s
+          for stop in (
+              '"owner_identity_authenticated": False',
+              '"collector_identity_authenticated": False',
+              '"public_key_pinning_trusted": False',
+              '"host_p256_tpm_origin_attested": False',
+              '"owner_approval_authorized": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert stop in s,stop
+          PY
