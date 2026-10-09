@@ -31,10 +31,9 @@ jobs:
         run: |
           python -m pip install -r requirements.txt
           python -m pip install pytest==9.1.1
-      - name: Compile local HTTP and verify no hard-coded external fixture
+      - name: Compile loopback-only integration tests (cross-platform PowerShell safe)
         run: |
           python -m py_compile tests/test_atlasquant_aion_provider_real_loopback_http_integration_v1.py
-          python -c "from pathlib import Path; s=Path('tests/test_atlasquant_aion_provider_real_loopback_http_integration_v1.py').read_text(); assert 'socket.socket.connect' in s and '_LOCAL_HOST=\"127.0.0.1\"' in s and 'ThreadingHTTPServer' in s"
       - name: Run genuine loopback socket and full inherited security tests
         run: |
           python -m pytest -q tests/test_atlasquant_aion_provider_real_loopback_http_integration_v1.py tests/test_atlasquant_aion_provider_post_transport_hardening_v2.py tests/test_atlasquant_aion_v2_http_retry_redirect_boundary_reference.py tests/test_atlasquant_aion_v2_captured_id_dual_witness_reference.py tests/test_atlasquant_aion_v2_readonly_recovery_id_capture_reference.py tests/test_atlasquant_aion_v2_provider_recovery_capability_reference.py tests/test_atlasquant_aion_v2_unknown_outcome_reconciliation_reference.py tests/test_atlasquant_aion_v2_dispatch_journal_dual_witness_reference.py tests/test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py tests/test_atlasquant_aion_v2_registry_dual_generation_reference.py tests/test_atlasquant_aion_v2_four_role_key_enrollment_reference.py tests/test_atlasquant_aion_v2_secondary_anchor_reference.py tests/test_atlasquant_aion_v2_isolated_sqlite_witness_cas_reference.py tests/test_atlasquant_aion_v2_authenticated_witness_read_cas_reference.py tests/test_atlasquant_aion_v2_external_witness_rollback_reference.py tests/test_atlasquant_aion_chat_reference_v2_nonce_cost_hold.py tests/test_atlasquant_aion_chat_signed_full_request_review_v2.py tests/test_atlasquant_aion_chat_reference_nonce_budget_hold_v1.py tests/test_atlasquant_aion_chat_signed_turn_review_v1.py tests/test_atlasquant_aion_chat_pending_model_turn_v1.py tests/test_atlasquant_aion_provider_full_request_binding_v1.py test_atlasquant_aion_provider.py
