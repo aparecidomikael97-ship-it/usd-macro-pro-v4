@@ -8,6 +8,7 @@ This module never silently claims persistence. Every load/save returns a
 truthful status with provenance.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from copy import deepcopy
@@ -1784,10 +1785,11 @@ def load_runtime_checkpoint(
     try:
         import requests
         response = requests.get(
-            _contents_url(cfg),
+            guard_github_token_read_destination(_contents_url(cfg)),
             headers=_headers(cfg.token),
             params={"ref": cfg.branch},
             timeout=timeout,
+            allow_redirects=False,
         )
         if response.status_code == 404:
             return {
