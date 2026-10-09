@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import islice
+from hashlib import sha256
+import re
 from typing import Any, Mapping, Sequence
 import json
 import math
@@ -33,6 +35,9 @@ from atlasquant_aion_observability import redact_text
 from atlasquant_aion_memory_reliability import assess_canonical_memory_hits
 
 SCHEMA="ATLASQUANT_AION_PROVIDER_V1"
+REQUEST_BOUNDARY_SCHEMA="ATLASQUANT_AION_PROVIDER_FULL_REQUEST_BOUNDARY_V1"
+_REQUEST_DOMAIN=b"ATLASQUANT_AION_PROVIDER_FULL_REQUEST_V1\x00"
+_HEX64=re.compile(r"[0-9a-f]{64}\\Z")
 OPENAI_RESPONSES_URL="https://api.openai.com/v1/responses"
 MAX_PROMPT_CHARS=40000
 DEFAULT_TIMEOUT_SECONDS=45.0
@@ -138,6 +143,99 @@ def provider_configuration_status(values:Mapping[str,Any]|None=None)->dict[str,A
         "max_output_tokens":cfg.max_output_tokens,
         "automatic_billing":False,
         "api_key_exposed":False,
+    }
+
+
+
+def _full_request_material(prompt:str,lane:str,cfg:ProviderConfig)->dict[str,Any]:
+    """One closed contract shared by owner-review preview and HTTP dispatch.
+
+    The digest binds the actual resolved provider, endpoint, HTTP method,
+    lane, JSON body, content type and timeout. Authentication secrets are
+    intentionally excluded, as are HTTP transport serializer details.
+    """
+    if (type(prompt) is not str or not prompt or prompt != prompt.strip()
+        or len(prompt)>MAX_PROMPT_CHARS or privacy_sensitive(prompt)
+        or type(lane) is not str
+        or lane not in {"EXTERNAL_FAST","EXTERNAL_REASONING"}
+        or cfg.provider!="openai"
+        or type(cfg.max_output_tokens) is not int
+        or not 1<=cfg.max_output_tokens<=8192
+        or not math.isfinite(cfg.timeout_seconds)
+        or not 5.0<=cfg.timeout_seconds<=120.0):
+        raise ValueError("provider request shape not canonical")
+    model=cfg.model_for_lane(lane)
+    if type(model) is not str or not model:
+        raise ValueError("provider model is not configured")
+    return {
+        "schema":REQUEST_BOUNDARY_SCHEMA,
+        "provider":cfg.provider,
+        "method":"POST",
+        "endpoint":OPENAI_RESPONSES_URL,
+        "content_type":"application/json",
+        "lane":lane,
+        "timeout_seconds":cfg.timeout_seconds,
+        "body":{
+            "model":model,
+            "input":prompt,
+            "max_output_tokens":cfg.max_output_tokens,
+        },
+    }
+
+
+def _full_request_sha256(material:Mapping[str,Any])->str:
+    encoded=json.dumps(
+        material,sort_keys=True,ensure_ascii=False,
+        separators=(",",":"),allow_nan=False,
+    ).encode("utf-8")
+    return sha256(_REQUEST_DOMAIN+encoded).hexdigest()
+
+
+def preview_openai_request_binding(
+    prompt:Any,*,lane:Any,values:Mapping[str,Any]|None=None,
+)->dict[str,Any]:
+    """Pure local pre-consent preview; NOT an owner signature or spend permit.
+
+    This preview is deliberately generated from the SAME material-building
+    function used by execute_openai_answer. It neither reads the API key out
+    to the caller nor performs network I/O.
+    """
+    cfg=provider_config(values)
+    status=provider_configuration_status(values)
+    if not status["ready"]:
+        return {
+            "schema":REQUEST_BOUNDARY_SCHEMA,
+            "state":"BLOCKED_PROVIDER_CONFIG",
+            "model_invocation_authorized":False,
+        }
+    try:
+        material=_full_request_material(prompt,lane,cfg)
+        digest=_full_request_sha256(material)
+    except (ValueError,TypeError,OverflowError):
+        return {
+            "schema":REQUEST_BOUNDARY_SCHEMA,
+            "state":"BLOCKED_REQUEST_SHAPE",
+            "model_invocation_authorized":False,
+        }
+    return {
+        "schema":REQUEST_BOUNDARY_SCHEMA,
+        "state":"BOUND_REQUEST_PREVIEW_UNTRUSTED",
+        "request_sha256":digest,
+        "final_prompt_sha256":sha256(prompt.encode("utf-8")).hexdigest(),
+        "provider":material["provider"],
+        "method":material["method"],
+        "endpoint":material["endpoint"],
+        "content_type":material["content_type"],
+        "lane":material["lane"],
+        "resolved_model":material["body"]["model"],
+        "max_output_tokens":material["body"]["max_output_tokens"],
+        "timeout_seconds":material["timeout_seconds"],
+        "api_key_exposed":False,
+        "human_owner_identity_verified":False,
+        "signed_request_verified":False,
+        "independent_witness_verified":False,
+        "budget_reserved":False,
+        "model_invocation_authorized":False,
     }
 
 
@@ -386,6 +484,7 @@ def execute_openai_answer(
     request_approved:bool,
     values:Mapping[str,Any]|None=None,
     session:requests.Session|None=None,
+    expected_request_sha256:Any=None,
 )->dict[str,Any]:
     """Call the configured provider only after every preflight gate passes."""
     cfg=provider_config(values)
@@ -471,11 +570,26 @@ def execute_openai_answer(
             "reason":"Modelo da rota não foi configurado.",
         }
 
-    body={
-        "model":model,
-        "input":clean_prompt,
-        "max_output_tokens":cfg.max_output_tokens,
-    }
+    # A caller-controlled boolean cannot bind an approved set of HTTP options.
+    # Require an exact digest even in existing tests and legacy invocation.
+    # This is only a shape/integrity guard; the caller's digest does NOT prove
+    # independently enrolled HUMAN_OWNER authorization or nonce consumption.
+    try:
+        material=_full_request_material(clean_prompt,lane,cfg)
+        actual_digest=_full_request_sha256(material)
+    except (ValueError,TypeError,OverflowError):
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_REQUEST_SHAPE","called":False,
+            "reason":"Resolved provider request is not canonical.",
+        }
+    if (type(expected_request_sha256) is not str
+        or not _HEX64.fullmatch(expected_request_sha256)
+        or expected_request_sha256!=actual_digest):
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_REQUEST_BINDING","called":False,
+            "reason":"Full resolved provider request does not match reviewed digest.",
+        }
+    body=material["body"]
     headers={
         "Authorization":f"Bearer {cfg.api_key}",
         "Content-Type":"application/json",
@@ -483,10 +597,10 @@ def execute_openai_answer(
     client=session or requests
     try:
         response=client.post(
-            OPENAI_RESPONSES_URL,
+            material["endpoint"],
             headers=headers,
             json=body,
-            timeout=cfg.timeout_seconds,
+            timeout=material["timeout_seconds"],
         )
     except Exception as exc:
         return {
@@ -543,4 +657,5 @@ def execute_openai_answer(
 __all__=[
     "SCHEMA","ProviderConfig","provider_config","provider_configuration_status",
     "estimate_request_cost","build_provider_prompt","execute_openai_answer",
+    "REQUEST_BOUNDARY_SCHEMA","preview_openai_request_binding",
 ]
