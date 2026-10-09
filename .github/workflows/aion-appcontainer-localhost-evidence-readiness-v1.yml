@@ -1,0 +1,97 @@
+name: AION AppContainer Localhost Evidence Readiness V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_appcontainer_localhost_evidence_readiness_v1.py"
+      - "tests/test_atlasquant_aion_appcontainer_localhost_evidence_readiness_v1.py"
+      - "docs/aion/AION_APPCONTAINER_LOCALHOST_EVIDENCE_READINESS_V1.md"
+      - ".github/workflows/aion-appcontainer-localhost-evidence-readiness-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-structural-review:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify isolated hosted PR CI
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          assert os.environ.get("RUNNER_OS") in ("Windows", "Linux")
+          PY
+      - name: Compile and static safety checks
+        run: |
+          python - <<'PY'
+          import ast,py_compile
+          from pathlib import Path
+          files=[
+              "atlasquant_aion_appcontainer_localhost_evidence_readiness_v1.py",
+              "tests/test_atlasquant_aion_appcontainer_localhost_evidence_readiness_v1.py",
+          ]
+          for f in files: py_compile.compile(f,doraise=True)
+          s=Path(files[0]).read_text("utf-8")
+          tree=ast.parse(s)
+          imports=set()
+          for node in ast.walk(tree):
+              if isinstance(node,ast.Import):
+                  imports.update(n.name.split(".")[0] for n in node.names)
+              if isinstance(node,ast.ImportFrom):
+                  imports.add((node.module or "").split(".")[0])
+          allowed={"__future__","re","typing","atlasquant_aion_windows_appcontainer_token_readonly_v1"}
+          assert imports <= allowed,imports
+          for forbidden in ("WinDLL", "CreateProcess", "CreateAppContainerProfile",
+              "DeleteAppContainerProfile", "FwpmFilter", "socket", "subprocess",
+              "Ed25519PrivateKey", "NCrypt", "ResumeThread", "installer.run("):
+              assert forbidden not in s,forbidden
+          for gate in ("os_network_denial_physically_verified",
+              "all_16_network_surfaces_verified",
+              "physical_sandbox_12_of_12_verified",
+              "network_deny_verified","installer_authorized",
+              "safe_to_resume"):
+              assert '"'+gate+'": False' in s, gate
+          PY
+      - name: Adversarial structural contract plus inherited network gate regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python - <<'PY'
+          import unittest
+          pats=[
+              "test_atlasquant_aion_appcontainer_localhost_evidence_readiness_v1.py",
+              "test_atlasquant_aion_windows_network_deny_evidence_gate_v1.py",
+              "test_atlasquant_aion_windows_loopback_observer_v1.py",
+              "test_atlasquant_aion_windows_appcontainer_token_readonly_v1.py",
+          ]
+          total=0
+          for pat in pats:
+              suite=unittest.TestLoader().discover("tests", pattern=pat)
+              result=unittest.TextTestRunner(verbosity=2).run(suite)
+              assert result.wasSuccessful() and result.testsRun > 0,pat
+              total+=result.testsRun
+              print("SUITE",pat,"TESTED",result.testsRun,
+                    "FAILED",len(result.failures),"ERRORS",len(result.errors),
+                    "SKIPPED",len(result.skipped))
+          assert total >= 100,total
+          print("TOTAL_TESTS",total)
+          PY
