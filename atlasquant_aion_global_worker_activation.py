@@ -10,6 +10,7 @@ and a final confirmation. A successful flag write is reported only as
 ACTIVATED_PENDING_LIVE_EVIDENCE; it never proves that a worker heartbeat ran.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -620,17 +621,19 @@ def write_repository_feature_flag_enabled(
     try:
         if state == "UNSET":
             response = requests.post(
-                _variable_collection_url(config),
+                guard_github_write_destination(_variable_collection_url(config)),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
                 timeout=timeout,
+                allow_redirects=False,
             )
         else:
             response = requests.patch(
-                _variable_url(config),
+                guard_github_write_destination(_variable_url(config)),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
                 timeout=timeout,
+                allow_redirects=False,
             )
         response.raise_for_status()
         return {
@@ -666,17 +669,19 @@ def force_disable_repository_feature_flag(
     headers = _headers(config.token)
     try:
         response = requests.patch(
-            _variable_url(config),
+            guard_github_write_destination(_variable_url(config)),
             headers=headers,
             json={"name": FEATURE_FLAG_NAME, "value": DISABLED_VALUE},
             timeout=timeout,
+            allow_redirects=False,
         )
         if response.status_code == 404:
             response = requests.post(
-                _variable_collection_url(config),
+                guard_github_write_destination(_variable_collection_url(config)),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": DISABLED_VALUE},
                 timeout=timeout,
+                allow_redirects=False,
             )
         response.raise_for_status()
         return {
