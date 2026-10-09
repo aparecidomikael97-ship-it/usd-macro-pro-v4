@@ -1,0 +1,93 @@
+name: AION Owner Scoped Windows Silent CNG Readonly CI V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py"
+      - "atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py"
+      - "tests/test_atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py"
+      - "tests/test_atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py"
+      - "docs/aion/AION_OWNER_SILENT_CNG_READONLY_PHYSICAL_V1.md"
+      - ".github/workflows/aion-owner-silent-cng-readonly-physical-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-silent-enum:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify disposable PR context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          PY
+      - name: Compile modules and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py \
+            atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py \
+            tests/test_atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py \
+            tests/test_atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py
+      - name: Existing #1103 native and synthetic tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py'
+      - name: New owner-gate synthetic-only adversarial tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py'
+      - name: Static no-private-key and CI-scope preservation guard
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          main = Path("atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py").read_text()
+          wrapper = Path("atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py").read_text()
+          for s in (main,wrapper):
+              t=ast.parse(s)
+              for n in ast.walk(t):
+                  if isinstance(n,ast.Attribute) and n.attr.startswith("NCrypt"):
+                      assert n.attr in {
+                          "NCryptOpenStorageProvider","NCryptEnumAlgorithms",
+                          "NCryptFreeBuffer","NCryptFreeObject"
+                      },n.attr
+          assert 'NCRYPT_SILENT_FLAG' in main
+          assert 'SIGNATURE_OPERATION = 0x00000010' in main
+          assert 'if not _ci_only():' in main
+          assert 'return _probe_silent_signature_algorithms_native_core()' in main
+          assert 'explicit_owner_authorization_for_this_probe is not True' in wrapper
+          assert 'authorized_device_scope != PHYSICAL_SCOPE' in wrapper
+          assert 'NCryptEnumKeys(' not in main and 'NCryptEnumKeys(' not in wrapper
+          assert 'NCryptCreatePersistedKey(' not in main
+          assert 'NCryptOpenKey(' not in main
+          for flag in (
+              '"actual_no_ui_physically_verified": False',
+              '"owner_pc_execution_authorized_by_code": False',
+              '"private_key_created": False',
+              '"private_key_opened": False',
+              '"private_key_enumerated": False',
+              '"private_key_enrolled": False',
+              '"host_security_state_modified": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert flag in main,flag
+          PY
