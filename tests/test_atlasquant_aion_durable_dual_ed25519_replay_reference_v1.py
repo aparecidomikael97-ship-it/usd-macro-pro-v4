@@ -471,6 +471,39 @@ class DurableReplayReferenceTests(unittest.TestCase):
                 self.false_gates(out)
 
 
+    def test_rehashed_partial_record_binding_is_still_invalid(self):
+        self.issue()
+        conn=sqlite3.connect(self.path)
+        try:
+            record=json.loads(conn.execute("SELECT body FROM challenges").fetchone()[0])
+            del record["binding"]["role_domains"]
+            record["record_digest"]=ledger._hash({k:v for k,v in record.items() if k!="record_digest"})
+            conn.execute("UPDATE challenges SET body=?",(json.dumps(record),))
+            event=json.loads(conn.execute("SELECT body FROM evidence").fetchone()[0])
+            event["record_digest"]=record["record_digest"]
+            digest=ledger._hash({"sequence":1,"previous_digest":ledger.GENESIS,"body":event})
+            conn.execute("UPDATE evidence SET body=?,digest=?",(json.dumps(event),digest))
+            conn.commit()
+        finally:conn.close()
+        self.assertFalse(self.consume()["nonce_transaction_consumed"])
+
+    def test_rehashed_wrong_transcript_binding_is_invalid(self):
+        self.issue()
+        conn=sqlite3.connect(self.path)
+        try:
+            record=json.loads(conn.execute("SELECT body FROM challenges").fetchone()[0])
+            record["binding"]["canonical_transcript_sha256"]="sha256:"+"f"*64
+            record["record_digest"]=ledger._hash({k:v for k,v in record.items() if k!="record_digest"})
+            event=json.loads(conn.execute("SELECT body FROM evidence").fetchone()[0])
+            event["record_digest"]=record["record_digest"]
+            conn.execute("UPDATE challenges SET body=?",(json.dumps(record),))
+            conn.execute("UPDATE evidence SET body=?,digest=?",(json.dumps(event),
+                ledger._hash({"sequence":1,"previous_digest":ledger.GENESIS,"body":event})))
+            conn.commit()
+        finally:conn.close()
+        self.assertFalse(self.consume()["nonce_transaction_consumed"])
+
+
 def add_case(name,fn):
     fn.__name__="test_"+name
     setattr(DurableReplayReferenceTests,fn.__name__,fn)
