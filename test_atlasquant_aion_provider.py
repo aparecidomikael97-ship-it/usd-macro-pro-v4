@@ -344,6 +344,36 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertEqual(result["state"],"BLOCKED_BUDGET")
         self.assertEqual(session.calls,[])
 
+    def test_local_or_unknown_route_never_transports_to_external_model(self):
+        for lane in ("LOCAL_DETERMINISTIC","OFFLINE","",None,True,"external_fast"):
+            with self.subTest(lane=lane):
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    "explique a situação",lane=lane,
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=self._env(),session=session,
+                )
+                self.assertEqual(result["state"],"BLOCKED_ROUTE")
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+
+    def test_nonfinite_pricing_must_fail_before_network(self):
+        for price in ("inf","1e309"):
+            with self.subTest(price=price):
+                env=self._env()
+                env["AION_OPENAI_INPUT_USD_PER_MTOK"]=price
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    "pergunta neutra",lane="EXTERNAL_FAST",
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=env,session=session,
+                )
+                self.assertEqual(result["state"],"BLOCKED_COST_UNKNOWN")
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+
     def test_provider_config_repr_redacts_api_key(self):
         secret="synthetic-redteam-value-not-a-real-credential"
         cfg=ProviderConfig(
