@@ -1,0 +1,35 @@
+name: AION Login Greeting Identity Separation CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_central_hub_ui.py"
+      - "test_atlasquant_central_hub_ui.py"
+      - "docs/aion/AION_GREETING_IDENTITY_SEPARATION_V1.md"
+      - ".github/workflows/aion-login-greeting-identity-separation-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  owner-greeting-identity:
+    name: Greeting identity regression / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned repository dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile updated UI and test
+        run: python -m py_compile atlasquant_central_hub_ui.py test_atlasquant_central_hub_ui.py
+      - name: Verify session identity and nearby UI/security regressions
+        run: python -m unittest -v test_atlasquant_central_hub_ui test_atlasquant_navigation_bridge test_atlasquant_access_panel
