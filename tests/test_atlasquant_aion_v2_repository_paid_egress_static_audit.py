@@ -63,7 +63,7 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
         self.assertFalse(result["safe_to_merge_or_deploy"])
         return result
 
-    def fail(self,code):
+    def expect_violation(self,code):
         report=self.scan()
         self.assertEqual(report["state"],STATE_FAIL)
         self.assertIn(code,
@@ -82,119 +82,119 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
             "_PAID_TTS_DISPATCH_HARD_DENY=True",
             "_PAID_TTS_DISPATCH_HARD_DENY=False",
         ))
-        self.fail("TTS_HARD_DENY_NOT_LITERAL_TRUE")
+        self.expect_violation("TTS_HARD_DENY_NOT_LITERAL_TRUE")
 
     def test_deleting_tts_source_gate_fails(self):
         self.write("atlasquant_neural_tts.py",TTS_SEALED.replace(
             "if _PAID_TTS_DISPATCH_HARD_DENY is True:",
             "if external_flag is True:",
         ))
-        self.fail("TTS_SOURCE_HARD_DENY_GUARD_INVALID")
+        self.expect_violation("TTS_SOURCE_HARD_DENY_GUARD_INVALID")
 
     def test_tts_gate_must_raise_without_condition(self):
         self.write("atlasquant_neural_tts.py",TTS_SEALED.replace(
             'raise RuntimeError("billable speech blocked")',
             "return b'audio'",
         ))
-        self.fail("TTS_HARD_DENY_MUST_UNCONDITIONALLY_RAISE")
+        self.expect_violation("TTS_HARD_DENY_MUST_UNCONDITIONALLY_RAISE")
 
     def test_third_paid_vendor_speech_post_outside_tts_fails(self):
         self.write("atlasquant_audio_alt.py",
                    "def bypass():\n    return requests.post('https://api.openai.com')\n")
-        self.fail("POTENTIAL_HTTP_SEND_METHOD")
+        self.expect_violation("POTENTIAL_HTTP_SEND_METHOD")
 
     def test_new_direct_post_in_second_module_fails(self):
         self.write("atlasquant_aion_new_adapter.py",
                    "def bypass():\n    return client.post('https://unused.invalid')\n")
-        r=self.fail("POTENTIAL_HTTP_SEND_METHOD")
+        r=self.expect_violation("POTENTIAL_HTTP_SEND_METHOD")
         self.assertEqual(r["violations"][0]["path"],
                          "atlasquant_aion_new_adapter.py")
 
     def test_new_requests_post_alias_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "import requests as req\ndef f():\n    return req.post('https://x.invalid')\n")
-        self.fail("POTENTIAL_HTTP_SEND_METHOD")
+        self.expect_violation("POTENTIAL_HTTP_SEND_METHOD")
 
     def test_new_requests_request_alias_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "from requests import request as invoke\ndef f():\n"
                    "    return invoke('POST','https://x.invalid')\n")
-        self.fail("POTENTIAL_HTTP_SEND_METHOD")
+        self.expect_violation("POTENTIAL_HTTP_SEND_METHOD")
 
     def test_new_requests_session_send_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "import requests\ndef f():\n    return requests.Session().send(None)\n")
-        self.fail("POTENTIAL_HTTP_TRANSPORT_METHOD")
+        self.expect_violation("POTENTIAL_HTTP_TRANSPORT_METHOD")
 
     def test_unscoped_openai_client_creation_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "from openai import OpenAI as Vendor\ndef f():\n"
                    "    return Vendor(api_key='INERT')\n")
-        self.fail("VENDOR_SDK_CREATION_OR_MODEL_CALL")
+        self.expect_violation("VENDOR_SDK_CREATION_OR_MODEL_CALL")
 
     def test_anthropic_messages_create_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "def f(client):\n    return client.messages.create()\n")
-        self.fail("UNSCOPED_MODEL_SDK_CALL")
+        self.expect_violation("UNSCOPED_MODEL_SDK_CALL")
 
     def test_google_genai_request_client_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "import google.generativeai as g\ndef f():\n"
                    "    return g.GenerativeModel('fake')\n")
-        self.fail("VENDOR_SDK_CREATION_OR_MODEL_CALL")
+        self.expect_violation("VENDOR_SDK_CREATION_OR_MODEL_CALL")
 
     def test_unscoped_fallback_urllib_urlopen_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "import urllib.request as url\ndef f():\n"
                    "    return url.urlopen('https://x.invalid')\n")
-        self.fail("POTENTIAL_RAW_HTTP_CLIENT")
+        self.expect_violation("POTENTIAL_RAW_HTTP_CLIENT")
 
     def test_httpx_async_post_fails(self):
         self.write("atlasquant_aion_alt.py",
                    "import httpx\nasync def f():\n"
                    "    async with httpx.AsyncClient() as client:\n"
                    "        return await client.post('https://x.invalid')\n")
-        self.fail("POTENTIAL_HTTP_SEND_METHOD")
+        self.expect_violation("POTENTIAL_HTTP_SEND_METHOD")
 
     def test_provider_second_post_site_blocks(self):
         self.write("atlasquant_aion_provider.py",
                    SEALED+"\ndef bypass():\n    return client.post('https://x.invalid')\n")
-        r=self.fail("POTENTIAL_HTTP_SEND_METHOD")
+        r=self.expect_violation("POTENTIAL_HTTP_SEND_METHOD")
         self.assertEqual(r["expected_sealed_send_site_count"],2)
 
     def test_turning_literal_hard_lock_false_blocks(self):
         self.write("atlasquant_aion_provider.py",
                    SEALED.replace("_PAID_MODEL_DISPATCH_HARD_DENY = True",
                                   "_PAID_MODEL_DISPATCH_HARD_DENY = False"))
-        self.fail("PROVIDER_LOCK_NOT_LITERAL_TRUE")
+        self.expect_violation("PROVIDER_LOCK_NOT_LITERAL_TRUE")
 
     def test_second_reassignment_of_lock_blocks(self):
         self.write("atlasquant_aion_provider.py",
                    SEALED+"\n_PAID_MODEL_DISPATCH_HARD_DENY = False\n")
-        self.fail("PROVIDER_LOCK_NOT_EXACT_SINGLE_ASSIGNMENT")
+        self.expect_violation("PROVIDER_LOCK_NOT_EXACT_SINGLE_ASSIGNMENT")
 
     def test_deleting_guard_blocks(self):
         self.write("atlasquant_aion_provider.py",
                    SEALED.replace("if _PAID_MODEL_DISPATCH_HARD_DENY is True:",
                                   "if other_flag is True:"))
-        self.fail("REAL_PROVIDER_LOCK_GUARD_MISSING_OR_DUPLICATED")
+        self.expect_violation("REAL_PROVIDER_LOCK_GUARD_MISSING_OR_DUPLICATED")
 
     def test_replacing_return_state_blocks(self):
         self.write("atlasquant_aion_provider.py",
                    SEALED.replace("BLOCKED_INDEPENDENT_TRUST_NOT_ENROLLED",
                                   "ALLOWED_PAID_POST"))
-        self.fail("LOCK_RETURN_STATE_CHANGED")
+        self.expect_violation("LOCK_RETURN_STATE_CHANGED")
 
     def test_changing_called_to_true_blocks(self):
         self.write("atlasquant_aion_provider.py",
                    SEALED.replace('"called":False','"called":True'))
-        self.fail("LOCK_RETURN_AUTHORITY_FLAG_NOT_FALSE:called")
+        self.expect_violation("LOCK_RETURN_AUTHORITY_FLAG_NOT_FALSE:called")
 
     def test_turning_authorization_flag_true_blocks(self):
         self.write("atlasquant_aion_provider.py",
                    SEALED.replace('"paid_dispatch_authorized":False',
                                   '"paid_dispatch_authorized":True'))
-        self.fail("LOCK_RETURN_AUTHORITY_FLAG_NOT_FALSE:paid_dispatch_authorized")
+        self.expect_violation("LOCK_RETURN_AUTHORITY_FLAG_NOT_FALSE:paid_dispatch_authorized")
 
     def test_moving_post_before_gate_blocks(self):
         self.write("atlasquant_aion_provider.py",
@@ -202,7 +202,7 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
                        '    if _PAID_MODEL_DISPATCH_HARD_DENY is True:',
                        '    client.post("https://fixture.invalid")\n'
                        '    if _PAID_MODEL_DISPATCH_HARD_DENY is True:'))
-        self.fail("REAL_PROVIDER_POST_SITE_UNEXPECTED")
+        self.expect_violation("REAL_PROVIDER_POST_SITE_UNEXPECTED")
 
     def test_tests_and_fixtures_never_count_as_production(self):
         self.write("tests/test_bypass.py",
@@ -220,12 +220,12 @@ class StaticPaidEgressRepositoryAuditTests(unittest.TestCase):
 
     def test_invalid_production_python_is_not_ignored(self):
         self.write("atlasquant_aion_alt.py","def wrong(\n")
-        self.fail("UNREADABLE_OR_INVALID_PYTHON_SOURCE")
+        self.expect_violation("UNREADABLE_OR_INVALID_PYTHON_SOURCE")
 
     def test_no_source_lock_provider_file_blocks_even_without_network(self):
         self.write("atlasquant_aion_provider.py",
                    "def execute_openai_answer():\n    return {}\n")
-        self.fail("PROVIDER_LOCK_NOT_EXACT_SINGLE_ASSIGNMENT")
+        self.expect_violation("PROVIDER_LOCK_NOT_EXACT_SINGLE_ASSIGNMENT")
 
     def test_regression_audits_entire_actual_repository_branch(self):
         repo=Path(__file__).resolve().parents[1]
