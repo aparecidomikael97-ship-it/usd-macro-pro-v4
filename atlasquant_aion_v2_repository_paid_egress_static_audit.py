@@ -235,11 +235,65 @@ def _source_lock(tree:ast.Module)->list[str]:
     return issues
 
 
+def _tts_source_lock(tree:ast.Module)->list[str]:
+    """Verify the SECOND real billable API: neural speech is fixed NO-GO."""
+    issues=[]
+    assignments=[
+        n for n in ast.walk(tree)
+        if isinstance(n,ast.Assign)
+        and any(isinstance(t,ast.Name) and t.id==TTS_GATE
+                for t in n.targets)
+    ]
+    if len(assignments)!=1:
+        return ["TTS_HARD_DENY_NOT_EXACT_SINGLE_ASSIGNMENT"]
+    if (not isinstance(assignments[0].value,ast.Constant)
+        or assignments[0].value.value is not True):
+        issues.append("TTS_HARD_DENY_NOT_LITERAL_TRUE")
+    functions=[
+        n for n in tree.body if isinstance(n,ast.FunctionDef)
+        and n.name=="generate_neural_speech"
+    ]
+    if len(functions)!=1:
+        return issues+["TTS_BILLABLE_ENTRYPOINT_MISSING_OR_DUPLICATE"]
+    fn=functions[0]
+    gates=[
+        n for n in ast.walk(fn)
+        if isinstance(n,ast.If)
+        and isinstance(n.test,ast.Compare)
+        and isinstance(n.test.left,ast.Name)
+        and n.test.left.id==TTS_GATE
+        and len(n.test.ops)==1
+        and isinstance(n.test.ops[0],ast.Is)
+        and len(n.test.comparators)==1
+        and isinstance(n.test.comparators[0],ast.Constant)
+        and n.test.comparators[0].value is True
+    ]
+    posts=[
+        n for n in ast.walk(fn)
+        if isinstance(n,ast.Call) and _dotted(n.func)=="requests.post"
+    ]
+    if len(gates)!=1:
+        issues.append("TTS_SOURCE_HARD_DENY_GUARD_INVALID")
+    if len(posts)!=1:
+        issues.append("TTS_SOURCE_EXPECTED_SINGLE_PAID_POST_INVALID")
+    if len(gates)==1:
+        gate=gates[0]
+        if (len(gate.body)!=1
+            or not isinstance(gate.body[0],ast.Raise)
+            or gate.body[0].exc is None):
+            issues.append("TTS_HARD_DENY_MUST_UNCONDITIONALLY_RAISE")
+        if len(posts)==1 and gate.lineno>=posts[0].lineno:
+            issues.append("TTS_PAID_POST_BEFORE_SOURCE_LOCK")
+    return issues
+
+
 def audit_python_paid_egress(root:Path)->dict[str,Any]:
     root=Path(root).resolve()
     violations=[]
     approved=[]
     candidates=[]
+    legacy_network=[]
+    seen_sites={}
     files=0
     for path in sorted(root.rglob("*.py")):
         if not _is_prod(path,root):
@@ -260,6 +314,9 @@ def audit_python_paid_egress(root:Path)->dict[str,Any]:
         if relative==PROVIDER_PATH:
             for issue in _source_lock(tree):
                 violations.append({"path":relative,"line":0,"reason":issue})
+        if relative==TTS_PATH:
+            for issue in _tts_source_lock(tree):
+                violations.append({"path":relative,"line":0,"reason":issue})
         for node in ast.walk(tree):
             if isinstance(node,ast.Call):
                 raw=_dotted(node.func)
@@ -271,15 +328,32 @@ def audit_python_paid_egress(root:Path)->dict[str,Any]:
                 entry={"path":relative,"line":node.lineno,
                        "function":current,"call":raw,"reason":reason}
                 candidates.append(entry)
-                if (relative,current,raw)==ALLOWED_SOURCE_SINK:
+                site=(relative,current,raw)
+                seen_sites[site]=seen_sites.get(site,0)+1
+                if site in ALLOWED_SOURCE_SINKS:
                     approved.append(entry)
+                elif site in LEGACY_OTHER_NETWORK_WRITE_SITES:
+                    # Existing non-inference persistence/GitHub actions;
+                    # still networked and NOT certified endpoint-safe.
+                    legacy_network.append(entry)
                 else:
                     violations.append(entry)
     if files==0:
         violations.append({"path":"","line":0,"reason":"NO_PRODUCTION_PYTHON_SCANNED"})
-    if len(approved)!=1:
-        violations.append({"path":PROVIDER_PATH,"line":0,
-                           "reason":"EXPECTED_SINGLE_SEALED_PROVIDER_POST_NOT_FOUND"})
+    for site in sorted(ALLOWED_SOURCE_SINKS):
+        if seen_sites.get(site)!=1:
+            violations.append({
+                "path":site[0],"line":0,
+                "reason":"EXPECTED_SINGLE_LOCKED_VENDOR_POST_NOT_FOUND",
+                "site_function":site[1],
+            })
+    for site in sorted(LEGACY_OTHER_NETWORK_WRITE_SITES):
+        if seen_sites.get(site)!=1:
+            violations.append({
+                "path":site[0],"line":0,
+                "reason":"LEGACY_NETWORK_WRITE_INVENTORY_CHANGED_REVIEW_REQUIRED",
+                "site_function":site[1],
+            })
     # Never emit source contents, token strings, stack traces or secrets.
     return {
         "schema":SCHEMA,
@@ -288,6 +362,9 @@ def audit_python_paid_egress(root:Path)->dict[str,Any]:
         "production_python_files_scanned":files,
         "recognized_potential_send_sites":len(candidates),
         "expected_sealed_send_site_count":len(approved),
+        "locked_paid_provider_send_sites":len(approved),
+        "preexisting_other_network_writes_unproven_vendor_safe":len(legacy_network),
+        "unreviewed_dynamic_endpoint_change_possible":True,
         "violations":violations[:200],
         "violations_total":len(violations),
         "paid_dispatch_authorized":False,
