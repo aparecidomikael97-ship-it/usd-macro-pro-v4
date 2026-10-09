@@ -225,10 +225,12 @@ class LocalRealTLSTransportTests(unittest.TestCase):
                 lane="EXTERNAL_FAST",values=self.values,
             )
             self.assertEqual(preview["state"],"BOUND_REQUEST_PREVIEW_UNTRUSTED")
-            kw={"_sealed_provider_transport":local_cert_authority}
             with self.guarded_socket():
                 if trust_local_ca:
-                    with patch.object(provider,**kw):
+                    with patch.object(
+                        provider,"_sealed_provider_transport",
+                        local_cert_authority,
+                    ):
                         return provider.execute_openai_answer(
                             "Pedido sintético TLS sem provedor",
                             lane="EXTERNAL_FAST",
