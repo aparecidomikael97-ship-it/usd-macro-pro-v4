@@ -225,7 +225,8 @@ class LocalRealTLSTransportTests(unittest.TestCase):
                 lane="EXTERNAL_FAST",values=self.values,
             )
             self.assertEqual(preview["state"],"BOUND_REQUEST_PREVIEW_UNTRUSTED")
-            with self.guarded_socket():
+            with self.guarded_socket(), \
+                 patch.object(provider,"_PAID_MODEL_DISPATCH_HARD_DENY",False):
                 if trust_local_ca:
                     with patch.object(
                         provider,"_sealed_provider_transport",
