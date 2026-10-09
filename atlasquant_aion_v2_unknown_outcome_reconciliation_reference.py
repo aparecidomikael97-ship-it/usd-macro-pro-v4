@@ -212,6 +212,8 @@ def review_provider_outcome_observation(
         or type(p["journal_sequence"]) is not int
         or type(p["claim_sequence"]) is not int):
         return _out("BLOCKED","PROVIDER_OBSERVATION_JOURNAL_REBOUND")
+    if p["reported_micro_usd"] > intent["max_cost_micro_usd"]:
+        return _out("BLOCKED","PROVIDER_CLAIM_EXCEEDS_SIGNED_MAX_MANUAL_INCIDENT")
     if p["observation_status"] not in (
         STATUS_PROCESSED,STATUS_NOT_FOUND,STATUS_UNCERTAIN
     ):
