@@ -153,6 +153,26 @@ def ledger_snapshot(store):
 
 
 def snapshot_digest(snapshot):
+    fields = {"meta":{"id","version","last_now"},"policy":{"id","generation","digest"},
+              "challenges":{"nonce","body","state","receipt"},
+              "evidence":{"sequence","previous_digest","body","digest"}}
+    bounds = {"meta":1,"policy":1,"challenges":ledger.MAX_RECORDS,"evidence":ledger.MAX_EVENTS}
+    if type(snapshot) is not dict or set(snapshot) != set(fields):
+        raise ValueError("SNAPSHOT_INVALID")
+    for table, rows in snapshot.items():
+        if type(rows) is not list or len(rows) > bounds[table]:
+            raise ValueError("SNAPSHOT_BOUND")
+        for row in rows:
+            if type(row) is not dict or set(row) != fields[table]:
+                raise ValueError("SNAPSHOT_INVALID")
+            for key, value in row.items():
+                if key in ("id","version","last_now","generation","sequence"):
+                    if type(value) is not int or not 0 <= value < 2**63:
+                        raise ValueError("SNAPSHOT_TYPE")
+                elif value is None and key == "receipt":
+                    pass
+                elif type(value) is not str or len(value) > 8192:
+                    raise ValueError("SNAPSHOT_TYPE")
     return _digest("AION:COMPLETE_LEDGER_STATE:V2",snapshot)
 
 
@@ -180,7 +200,7 @@ def expected_consumption(store, before, raw, now_ts):
             and policy_after["digest"] != policy_before["digest"]):
         raise ValueError("POLICY_ROLLBACK")
     seq = len(target["evidence"])+1
-    receipt = store._receipt(nonce,record,now_ts=now_ts,sequence=seq)
+    receipt = ledger.ReferenceChallengeRegistry._receipt(None,nonce,record,now_ts=now_ts,sequence=seq)
     row["state"],row["receipt"] = "CONSUMED",ledger._json(receipt)
     target["policy"] = [{"id":1,**policy_after}]
     target["meta"][0]["last_now"] = now
@@ -275,8 +295,17 @@ class ReferenceWitnessState:
         self.used = set()
         self.lock = RLock()
 
-    def prepare(self, *, before_sha256, candidate):
+    def prepare(self, *, before_snapshot, request, candidate):
         candidate = _checkpoint(candidate)
+        # Authenticate V2 role intents independently; never trust adapter claims.
+        raw = verify_v2_request(request,self.scope)
+        before_sha256 = snapshot_digest(before_snapshot)
+        target = expected_consumption(None,before_snapshot,raw,candidate["observed_at"])
+        if (candidate["ledger_state_sha256"] != snapshot_digest(target)
+                or candidate["challenge_id"] != raw["nonce"]
+                or candidate["generation"] != raw["proposal"]["policy_generation"]
+                or candidate["policy_sha256"] != raw["proposal"]["policy_sha256"]):
+            raise ReferenceWitnessError("TARGET_NOT_RECOMPUTED_FROM_SIGNED_REQUEST")
         with self.lock:
             if (self.pending is not None or len(self.used) >= _LIMIT
                     or {k:candidate[k] for k in _SCOPE} != self.scope
@@ -358,7 +387,7 @@ class ReferenceWitnessAdapter:
             "checkpoint_sequence":head["sequence"]+1,
             "previous_checkpoint_sha256":head["digest"],"transaction_id":transaction_id,
             "challenge_id":raw["nonce"],"observed_at":now_ts,"clock_trusted":False})
-        envelope = self.witness.prepare(before_sha256=snapshot_digest(before),candidate=candidate)
+        envelope = self.witness.prepare(before_snapshot=before,request=_plain(request),candidate=candidate)
         if not verify_checkpoint(envelope,trusted_public_key_hex=self.pin,expected=candidate)["external_witness_checkpoint_verified"]:
             raise ReferenceWitnessError("PREPARE_NOT_AUTHENTICATED")
         return deepcopy(candidate)
