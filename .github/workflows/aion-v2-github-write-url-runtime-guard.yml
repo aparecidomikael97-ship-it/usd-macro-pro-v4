@@ -1,0 +1,60 @@
+name: AION V2 Runtime GitHub Write URL and No Redirect CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_v2_github_write_url_guard.py"
+      - "atlasquant_aion_v2_legacy_github_destination_source_review.py"
+      - "tests/test_atlasquant_aion_v2_github_write_url_runtime_guard_v1.py"
+      - "atlasquant_aion_global_worker.py"
+      - "atlasquant_aion_global_worker_activation.py"
+      - "atlasquant_aion_memory.py"
+      - "atlasquant_flight_recorder_store.py"
+      - "atlasquant_research_evidence_store.py"
+      - "atlasquant_shadow_store.py"
+      - "autopilot_v107.py"
+      - "currency_news_v1061.py"
+      - "currency_news_v1062.py"
+      - "currency_news_v107.py"
+      - "market_map_v10.py"
+      - "master_panel_v102.py"
+      - "twelve_budget_v1108.py"
+      - "usd_macro_pro_v4_cloud.py"
+      - "docs/aion/AION_V2_GITHUB_WRITE_URL_RUNTIME_GUARD.md"
+      - ".github/workflows/aion-v2-github-write-url-runtime-guard.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  github-write-runtime-guard:
+    name: 21 actual write URL guards and no redirects / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned repository and test requirements
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Compile runtime guard, 14 real caller modules and adversarial tests
+        run: |
+          python -m py_compile atlasquant_aion_v2_github_write_url_guard.py atlasquant_aion_v2_legacy_github_destination_source_review.py tests/test_atlasquant_aion_v2_github_write_url_runtime_guard_v1.py atlasquant_aion_global_worker.py atlasquant_aion_global_worker_activation.py atlasquant_aion_memory.py atlasquant_flight_recorder_store.py atlasquant_research_evidence_store.py atlasquant_shadow_store.py autopilot_v107.py currency_news_v1061.py currency_news_v1062.py currency_news_v107.py market_map_v10.py master_panel_v102.py twelve_budget_v1108.py usd_macro_pro_v4_cloud.py
+      - name: All 21 actual GitHub write callsites must validate destination and disable redirects
+        run: |
+          python atlasquant_aion_v2_legacy_github_destination_source_review.py
+      - name: Paid text and neural voice POST must remain hard denied
+        run: |
+          python atlasquant_aion_v2_repository_paid_egress_static_audit.py
+      - name: New URL injection tests, prior destination mutations and inherited trust/transport suites
+        run: |
+          python -m pytest -q tests/test_atlasquant_aion_v2_github_write_url_runtime_guard_v1.py tests/test_atlasquant_aion_v2_legacy_github_destination_source_review.py tests/test_atlasquant_aion_v2_repository_paid_egress_static_audit.py tests/test_atlasquant_neural_tts_paid_post_hard_deny_v2.py tests/test_atlasquant_aion_provider_paid_post_production_lock_v2.py tests/test_atlasquant_aion_v2_host_session_attested_preclaim_reference.py tests/test_atlasquant_aion_v2_persisted_chat_owner_one_shot_reference.py tests/test_atlasquant_aion_v2_owner_signed_one_shot_admission_reference.py tests/test_atlasquant_aion_chat_signed_full_request_review_v2.py tests/test_atlasquant_aion_provider_tls_loopback_integration_v2.py tests/test_atlasquant_aion_provider_real_loopback_http_integration_v1.py tests/test_atlasquant_aion_provider_post_transport_hardening_v2.py tests/test_atlasquant_aion_v2_http_retry_redirect_boundary_reference.py tests/test_atlasquant_aion_v2_captured_id_dual_witness_reference.py tests/test_atlasquant_aion_v2_readonly_recovery_id_capture_reference.py tests/test_atlasquant_aion_v2_provider_recovery_capability_reference.py tests/test_atlasquant_aion_v2_unknown_outcome_reconciliation_reference.py tests/test_atlasquant_aion_v2_dispatch_journal_dual_witness_reference.py tests/test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py tests/test_atlasquant_aion_v2_registry_dual_generation_reference.py tests/test_atlasquant_aion_v2_four_role_key_enrollment_reference.py tests/test_atlasquant_aion_v2_secondary_anchor_reference.py tests/test_atlasquant_aion_v2_isolated_sqlite_witness_cas_reference.py tests/test_atlasquant_aion_v2_authenticated_witness_read_cas_reference.py tests/test_atlasquant_aion_v2_external_witness_rollback_reference.py tests/test_atlasquant_aion_chat_reference_v2_nonce_cost_hold.py tests/test_atlasquant_aion_chat_reference_nonce_budget_hold_v1.py tests/test_atlasquant_aion_chat_signed_turn_review_v1.py tests/test_atlasquant_aion_chat_pending_model_turn_v1.py tests/test_atlasquant_aion_provider_full_request_binding_v1.py test_atlasquant_aion_provider.py
