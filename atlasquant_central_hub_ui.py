@@ -641,21 +641,23 @@ def _session_map(access: Mapping[str, Any] | None) -> Mapping[str, Any]:
 
 
 def _greeting_name(access: Mapping[str, Any]) -> str:
-    """Name already on the authenticated access mapping. Owner aliases stay Mikael."""
+    """Display only the authenticated session's username; never assume HUMAN_OWNER.
+
+    A presentation name is not an owner assertion, even for an ADMIN session.
+    In particular, access/display_name and session/display_name are optional UI
+    labels and cannot override the authenticated principal or impersonate the
+    owner. If the session has no username, return a neutral empty name.
+    """
     session = _session_map(access)
-    for raw in (
-        access.get("display_name"),
-        session.get("display_name"),
-        access.get("username"),
-        session.get("username"),
-    ):
-        name = " ".join(str(raw or "").split())
-        if not name:
-            continue
-        if name.casefold() in {"mikael", "aparecidomikael"}:
-            return "Mikael"
-        return name[:64]
-    return "Mikael"
+    username = " ".join(str(session.get("username") or "").split())[:64]
+    if username.casefold() in {"mikael", "aparecidomikael"}:
+        return "Mikael"
+    return username
+
+
+def _greeting_intro(name: str, period: str) -> str:
+    """A neutral greeting when the authenticated username is unavailable."""
+    return f"{name}, {period}." if name else f"{period.capitalize()}."
 
 
 def _login_mark(access: Mapping[str, Any]) -> str:
@@ -690,13 +692,15 @@ def login_greeting(
         return {"show": False, "text": "", "period": "", "name": "", "status": ""}
     period = greeting_period(now, timezone_name=timezone_name).casefold()
     name = _greeting_name(access)
+    intro = _greeting_intro(name, period)
     text = (
-        f"{name}, {period}. AION ativo. "
+        f"{intro} AION ativo. "
         "Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?"
     )
     return {
         "show": True,
         "text": text,
+        "intro": intro,
         "period": period,
         "name": name,
         "status": confirmed_status_line(confirmed_status),
@@ -732,7 +736,7 @@ def aion_login_presence_html(
         '<section class="aq-aion-presence" data-aion="active">'
         '<p class="aq-aion-presence-kicker">AION</p>'
         '<p class="aq-aion-presence-state"><span class="aq-aion-dot" aria-hidden="true"></span>ATIVO</p>'
-        f'<p class="aq-aion-presence-line">{escape(greeting["name"])}, {escape(greeting["period"])}. AION ativo.</p>'
+        f'<p class="aq-aion-presence-line">{escape(greeting["intro"])} AION ativo.</p>'
         '<p class="aq-aion-presence-line">Bem-vindo ao AtlasQuant. O que você gostaria de saber ou fazer?</p>'
         + status
         + '<p class="aq-central-back">Abrir AION pelos controles de navegação abaixo.</p>'
