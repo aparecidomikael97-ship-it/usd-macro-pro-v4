@@ -252,6 +252,10 @@ def review_manual_reconciliation_candidate(
     )
     if observation["state"]!=PROVIDER_CANDIDATE:
         return _out("BLOCKED","PROVIDER_OBSERVATION_NOT_VERIFIED_MATH")
+    if (_pin(owner_review_public_pin) and _pin(provider_public_pin)
+        and owner_review_public_pin["public_key_hex"] ==
+            provider_public_pin["public_key_hex"]):
+        return _out("BLOCKED","PROVIDER_OWNER_REVIEW_KEY_REUSE_FORBIDDEN")
     if (not _pin(owner_review_public_pin)
         or not _hex(expected_new_challenge_nonce_hex)
         or expected_new_challenge_nonce_hex==ZERO
