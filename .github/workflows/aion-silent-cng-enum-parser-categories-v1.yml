@@ -1,0 +1,82 @@
+name: AION Silent CNG Enum Parser Sanitized Categories V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py"
+      - "tests/test_atlasquant_aion_silent_cng_enum_parser_categories_v1.py"
+      - "docs/aion/AION_SILENT_CNG_ENUM_PARSER_CATEGORIES_V1.md"
+      - ".github/workflows/aion-silent-cng-enum-parser-categories-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  parser-diagnostic-categories:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Ensure ephemeral PR CI environment
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+          assert os.environ["GITHUB_ACTIONS"] == "true"
+          assert os.environ["GITHUB_REPOSITORY"] == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          PY
+      - name: Compile parser and test modules
+        run: |
+          python -m py_compile \
+            atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py \
+            atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py \
+            tests/test_atlasquant_aion_silent_cng_enum_parser_categories_v1.py
+      - name: Original #1103 CNG native/synthetic regression
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py'
+      - name: Original #1104 owner scope regression
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py'
+      - name: New sanitized parser diagnosis
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_silent_cng_enum_parser_categories_v1.py'
+      - name: Enforce no provider secret disclosure or key API
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path("atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py").read_text()
+          assert '"enumeration_failure_category": None' in s
+          assert '"NATIVE_POINTER_OR_DECODING_EXCEPTION"' in s
+          assert 'NCRYPT_SILENT_FLAG' in s
+          assert 'SIGNATURE_OPERATION = 0x00000010' in s
+          for name in (
+              "NCryptEnumKeys(","NCryptOpenKey(",
+              "NCryptCreatePersistedKey(","NCryptExportKey(",
+              "NCryptFinalizeKey(","NCryptSignHash(",
+              "NCryptSetProperty(",
+          ):
+              assert "api."+name not in s,name
+          for text in (
+              '"private_key_enumerated": False',
+              '"private_key_opened": False',
+              '"private_key_created": False',
+              '"host_security_state_modified": False',
+              '"installer_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert text in s
+          PY
