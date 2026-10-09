@@ -12,6 +12,7 @@ from #1103, with no key enumeration, no file writes, no zero-flags retry.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 import sys
@@ -73,7 +74,99 @@ def observe_owner_silent_signature_algorithms_readonly(
     return observation
 
 
+
+_RECEIPT_FIELDS = frozenset({
+    "schema", "scope", "challenge_nonce", "sanitized_observation_sha256",
+    "challenge_binding_sha256", "receipt_signed", "independently_witnessed",
+    "owner_identity_attested", "physical_device_attested",
+    "replay_prevention_verified", "trusted_host_anchor_verified",
+    "physical_sandbox_approved", "installer_authorized", "safe_to_resume",
+})
+_SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
+
+
+def verify_diagnostic_correlation_receipt(payload: Any) -> dict[str, Any]:
+    """Check self-consistency only. Caller could forge both report and digest.
+
+    No independent signer, trusted timestamp, nonce registry, real device
+    identity or physical custody is established by this verifier.
+    """
+    result = {
+        "state": "BLOCKED",
+        "reason": "RECEIPT_INVALID",
+        "correlation_recomputed": False,
+        "receipt_is_trusted_evidence": False,
+        "owner_identity_verified": False,
+        "physical_device_verified": False,
+        "replay_prevention_verified": False,
+        "installer_authorized": False,
+        "safe_to_resume": False,
+    }
+    if type(payload) is not dict:
+        return result
+    receipt = payload.get("diagnostic_correlation_receipt")
+    if type(receipt) is not dict or set(receipt) != _RECEIPT_FIELDS:
+        return result
+    if (receipt.get("schema") != RECEIPT_SCHEMA
+        or receipt.get("scope") != PHYSICAL_SCOPE
+        or type(receipt.get("challenge_nonce")) is not str
+        or not _NONCE.fullmatch(receipt["challenge_nonce"])):
+        return result
+    for field in (
+        "receipt_signed", "independently_witnessed", "owner_identity_attested",
+        "physical_device_attested", "replay_prevention_verified",
+        "trusted_host_anchor_verified", "physical_sandbox_approved",
+        "installer_authorized", "safe_to_resume",
+    ):
+        if receipt[field] is not False:
+            return result
+    for field in (
+        "private_key_created", "private_key_opened", "private_key_enumerated",
+        "private_key_enrolled", "host_security_state_modified",
+        "installer_authorized", "build_authorized",
+        "deploy_authorized", "safe_to_resume",
+    ):
+        if payload.get(field) is not False:
+            return result
+    if payload.get("state") not in ("BLOCKED", "SILENT_SIGNATURE_ALGORITHMS_LISTED_UNTRUSTED"):
+        return result
+    if (type(receipt["sanitized_observation_sha256"]) is not str
+        or type(receipt["challenge_binding_sha256"]) is not str
+        or not _SHA256_PATTERN.fullmatch(receipt["sanitized_observation_sha256"])
+        or not _SHA256_PATTERN.fullmatch(receipt["challenge_binding_sha256"])):
+        return result
+    observation = dict(payload)
+    observation.pop("diagnostic_correlation_receipt")
+    try:
+        canonical = json.dumps(
+            observation, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True, allow_nan=False,
+        ).encode("ascii")
+    except (ValueError, TypeError, OverflowError, UnicodeError):
+        return result
+    observation_digest = hashlib.sha256(canonical).digest()
+    binding_digest = hashlib.sha256(
+        _RECEIPT_DOMAIN + bytes.fromhex(receipt["challenge_nonce"])
+        + observation_digest
+    ).digest()
+    if not hmac.compare_digest(
+        receipt["sanitized_observation_sha256"],
+        "sha256:" + observation_digest.hex(),
+    ):
+        return result
+    if not hmac.compare_digest(
+        receipt["challenge_binding_sha256"],
+        "sha256:" + binding_digest.hex(),
+    ):
+        return result
+    result["state"] = "CORRELATION_RECOMPUTED_UNTRUSTED"
+    result["reason"] = ""
+    result["correlation_recomputed"] = True
+    return result
+
+
 __all__ = (
     "PHYSICAL_SCOPE", "RECEIPT_SCHEMA",
     "observe_owner_silent_signature_algorithms_readonly",
+    "verify_diagnostic_correlation_receipt",
 )
