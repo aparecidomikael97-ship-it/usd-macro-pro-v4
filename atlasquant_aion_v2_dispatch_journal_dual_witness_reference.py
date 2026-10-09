@@ -295,6 +295,9 @@ def review_dual_witnessed_journal(
     )
     if reason:
         return _out("BLOCKED",reason)
+    if (type(journal) is not ReferenceOneShotUnknownOutcomeJournal
+        or type(intent) is not dict):
+        return _out("BLOCKED","REFERENCE_JOURNAL_AND_INTENT_REQUIRED")
     if any(primary_query[k]!=journal.config[k] for k in (
         "owner_id","tenant_id","workspace_id","period_id","policy_generation"
     )) or primary_query["key_registry_roster_sha256"]!=intent.get(
@@ -337,10 +340,8 @@ def review_one_step_claim_fence_preflight(
     )
     if reason:
         return _out("BLOCKED","NEW_"+reason)
-    if (old_primary_query["nonce_hex"]!=new_primary_query["nonce_hex"]
-        or old_primary_query["key_registry_roster_sha256"]!=
-           new_primary_query["key_registry_roster_sha256"]
-        or old_primary_query["policy_generation"]!=new_primary_query["policy_generation"]
+    if (any(old_primary_query[k]!=new_primary_query[k]
+            for k in _QUERY_KEYS if k!="challenge_nonce_hex")
         or old["witness_epoch"]!=new["witness_epoch"]
         or old["intent_state"]!=STATE_PREPARED
         or old["claim_sequence"]!=0
