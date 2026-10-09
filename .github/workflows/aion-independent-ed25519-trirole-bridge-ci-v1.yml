@@ -1,0 +1,89 @@
+name: AION Independent Ed25519 Custody Three Role Bridge V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1.py"
+      - "tests/test_atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1.py"
+      - "docs/aion/AION_INDEPENDENT_ED25519_TRIROLE_BRIDGE_V1.md"
+      - ".github/workflows/aion-independent-ed25519-trirole-bridge-ci-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  independent-roles-no-key-ci:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Require ephemeral pull-request CI
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          assert os.environ.get("RUNNER_OS") in ("Linux","Windows")
+          PY
+      - name: Compile structural design and red-team tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1.py \
+            tests/test_atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1.py
+      - name: Run 35 adversarial owner collector host separation tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1.py'
+      - name: Static reject native key, OS mutation and runtime execution APIs
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("atlasquant_aion_independent_ed25519_trirole_bridge_contract_v1.py").read_text("utf-8")
+          t=ast.parse(s)
+          imported=set()
+          for n in ast.walk(t):
+              if isinstance(n,ast.Import):
+                  imported.update(x.name.split(".")[0] for x in n.names)
+              if isinstance(n,ast.ImportFrom):
+                  imported.add((n.module or "").split(".")[0])
+              if isinstance(n,ast.Call) and isinstance(n.func,ast.Name):
+                  assert n.func.id not in {"eval","exec","open","compile"}
+          assert imported <= {"__future__","hashlib","json","re","typing"},imported
+          for string in (
+              '"ed25519_owner_private_key_custody_verified": False',
+              '"ed25519_collector_private_key_custody_verified": False',
+              '"owner_signature_cryptographically_verified": False',
+              '"collector_signature_cryptographically_verified": False',
+              '"p256_tpm_origin_independently_verified": False',
+              '"tpm_ek_ak_attestation_verified": False',
+              '"rsa_enterprise_ca_certificate_proves_p256": False',
+              '"durable_nonce_replay_prevention_verified": False',
+              '"physical_sandbox_12_of_12_verified": False',
+              '"network_deny_16_of_16_verified": False',
+              '"key_creation_authorized": False',
+              '"key_enrollment_authorized": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert string in s,string
+          assert "NCryptOpenKey" not in s
+          assert "NCryptCreatePersistedKey" not in s
+          assert "subprocess" not in s
+          assert "WinDLL" not in s
+          PY
