@@ -1,5 +1,6 @@
 """Persistent AtlasQuant Shadow Mode sample store."""
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
 import json
@@ -122,7 +123,7 @@ def persist_shadow_samples(
                 "branch":safe,
             }
             if sha: payload["sha"]=sha
-            r=requests.put(_url(repo),headers=_headers(token),json=payload,timeout=timeout)
+            r=requests.put(guard_github_write_destination(_url(repo)),headers=_headers(token),json=payload,timeout=timeout, allow_redirects=False)
             if r.status_code in (409,422) and attempt+1<attempts:
                 continue
             r.raise_for_status()
