@@ -97,7 +97,8 @@ def _function_for(call:ast.AST,parents:dict[int,ast.AST])->str:
 
 
 def _risk_class(name:str,resolved:str,imports:set[str])->str:
-    # Resolve `from requests import request as invoke` before classifying.\n    end=resolved.rsplit(".",1)[-1]
+    # Resolve `from requests import request as invoke` before classifying.
+    end=resolved.rsplit(".",1)[-1]
     if end in HTTP_METHODS:
         # Calls on caller-controlled methods like client.post must be
         # inventoried even when their object type is not statically known.
