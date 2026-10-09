@@ -14,6 +14,9 @@ from atlasquant_aion_v2_http_retry_redirect_boundary_reference import (
 )
 
 
+_NO_HEAD_ARGUMENT=object()
+
+
 class HTTPRetryRedirectAuditTests(unittest.TestCase):
     def policy(self,**override):
         base={
@@ -45,9 +48,11 @@ class HTTPRetryRedirectAuditTests(unittest.TestCase):
         head.update(override)
         return head
 
-    def plan(self,provider="openai",heads=None,policy=None,timeout=10):
+    def plan(self,provider="openai",heads=_NO_HEAD_ARGUMENT,policy=None,timeout=10):
         result=review_offline_get_transport_shape(
-            capture_witness_review=self.heads(provider) if heads is None else heads,
+            capture_witness_review=(
+                self.heads(provider) if heads is _NO_HEAD_ARGUMENT else heads
+            ),
             provider=provider,
             timeout_seconds=timeout,
             transport_policy=self.policy() if policy is None else policy,
