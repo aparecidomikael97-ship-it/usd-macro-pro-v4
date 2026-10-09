@@ -61,19 +61,31 @@ class LegacyPersistenceUnknownOutcomeTests(unittest.TestCase):
                 self.assertEqual(put.call_count,1)
                 self.assertEqual(read.call_count,1)
 
-    def test_known_409_422_are_bounded_and_never_become_success(self):
+    def test_known_409_is_bounded_and_never_becomes_success(self):
         for module,method,reader,data,_ in CASES:
-            for status in (409,422):
-                with self.subTest(module=module.__name__,status=status), \
-                     patch.object(module,reader,return_value=([],"")) as read, \
-                     patch.object(module.requests,"put",return_value=fake_response(status)) as put:
-                    outcome=getattr(module,method)(data,**ARGS)
-                    self.assertEqual(outcome["reason"],"CONFLICT",outcome)
-                    self.assertEqual(outcome["write_outcome"],"REJECTED_CONFLICT")
-                    self.assertIs(outcome["safe_to_retry"],False)
-                    self.assertIs(outcome["reconciliation_required"],False)
-                    self.assertEqual(put.call_count,2)
-                    self.assertEqual(read.call_count,2)
+            with self.subTest(module=module.__name__), \
+                 patch.object(module,reader,return_value=([],"")) as read, \
+                 patch.object(module.requests,"put",return_value=fake_response(409)) as put:
+                outcome=getattr(module,method)(data,**ARGS)
+                self.assertEqual(outcome["reason"],"CONFLICT",outcome)
+                self.assertEqual(outcome["write_outcome"],"REPORTED_CAS_CONFLICT")
+                self.assertIs(outcome["safe_to_retry"],False)
+                self.assertIs(outcome["reconciliation_required"],True)
+                self.assertEqual(put.call_count,2)
+                self.assertEqual(read.call_count,2)
+
+    def test_http_422_validation_error_cannot_trigger_second_put(self):
+        for module,method,reader,data,_ in CASES:
+            with self.subTest(module=module.__name__), \
+                 patch.object(module,reader,return_value=([],"")) as read, \
+                 patch.object(module.requests,"put",return_value=fake_response(422)) as put:
+                outcome=getattr(module,method)(data,**ARGS)
+                self.assertEqual(outcome["reason"],"VALIDATION_REJECTED",outcome)
+                self.assertEqual(outcome["write_outcome"],"REPORTED_HTTP_422")
+                self.assertTrue(outcome["reconciliation_required"])
+                self.assertIs(outcome["safe_to_retry"],False)
+                self.assertEqual(put.call_count,1)
+                self.assertEqual(read.call_count,1)
 
     def test_pre_send_corrupted_remote_is_not_claimed_as_dispatched(self):
         for module,method,reader,data,_ in CASES:
@@ -119,7 +131,8 @@ class LegacyPersistenceUnknownOutcomeTests(unittest.TestCase):
             self.assertIn('"reason":"UNKNOWN_OUTCOME"',source)
             self.assertIn('"reconciliation_required":True',source)
             self.assertIn('"safe_to_retry":False',source)
-            self.assertIn('"write_outcome":"REJECTED_CONFLICT"',source)
+            self.assertIn('"write_outcome":"REPORTED_CAS_CONFLICT"',source)
+            self.assertIn('"write_outcome":"REPORTED_HTTP_422"',source)
 
 if __name__=="__main__":
     unittest.main()

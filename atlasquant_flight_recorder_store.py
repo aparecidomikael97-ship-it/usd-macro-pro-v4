@@ -167,14 +167,22 @@ def persist_records(
                 timeout=timeout,
                 allow_redirects=False,
             ),"contents_put")
-            if r.status_code in (409,422):
-                if attempt+1<attempts:
-                    continue  # Only a reported CAS conflict can enter bounded retry.
+            if r.status_code == 422:
+                # 422 may be a validation error, not CAS conflict: never replay.
                 return {
                     "ok":False,"added":0,"records":0,
-                    "reason":"CONFLICT","error":"CAS_REJECTED",
-                    "write_outcome":"REJECTED_CONFLICT",
-                    "reconciliation_required":False,"safe_to_retry":False,
+                    "reason":"VALIDATION_REJECTED","error":"REPORTED_HTTP_422",
+                    "write_outcome":"REPORTED_HTTP_422",
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
+            if r.status_code == 409:
+                if attempt+1<attempts:
+                    continue  # Bounded re-read only for reported HTTP 409.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"CONFLICT","error":"REPORTED_HTTP_409",
+                    "write_outcome":"REPORTED_CAS_CONFLICT",
+                    "reconciliation_required":True,"safe_to_retry":False,
                 }
             r.raise_for_status()
             return {"ok":True,"added":added,"records":len(merged),"reason":"SAVED","error":""}
