@@ -111,6 +111,13 @@ def review_offline_get_transport_shape(
     }
     if (type(transport_policy) is not dict
         or set(transport_policy)!=policy_keys
+        or type(transport_policy["max_attempts"]) is not int
+        or type(transport_policy["http_adapter_retry_total"]) is not int
+        or any(type(transport_policy[k]) is not bool for k in (
+            "allow_redirects","trust_env","verify_tls",
+            "sdk_auto_retry_enabled","proxy_configured",
+            "follow_location_header","allow_method_fallback"
+        ))
         or transport_policy!={
             "method":"GET","allow_redirects":False,"trust_env":False,
             "verify_tls":True,"max_attempts":1,
