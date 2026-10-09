@@ -47,7 +47,8 @@ class FullRequestBindingTests(unittest.TestCase):
 
     def execute(self, prompt, lane, env, digest):
         session = FakeSession()
-        with patch.object(provider,"_sealed_provider_transport",
+        with patch.object(provider,"_PAID_MODEL_DISPATCH_HARD_DENY",False), \
+             patch.object(provider,"_sealed_provider_transport",
                           return_value=session):
             result = provider.execute_openai_answer(
                 prompt, lane=lane,
