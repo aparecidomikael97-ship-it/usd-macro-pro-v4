@@ -176,6 +176,7 @@ class ReferenceOneShotUnknownOutcomeJournal:
                 CREATE TABLE IF NOT EXISTS aion_dispatch_intents (
                   nonce_hex TEXT PRIMARY KEY,
                   intent_sha256 TEXT NOT NULL UNIQUE,
+                  signed_v2_intent_sha256 TEXT NOT NULL UNIQUE,
                   conversation_id TEXT NOT NULL,
                   message_id TEXT NOT NULL,
                   intent_json TEXT NOT NULL,
@@ -235,6 +236,7 @@ class ReferenceOneShotUnknownOutcomeJournal:
             if (not _valid_intent(intent, self.config)
                 or event["intent_json"] != _canonical(intent)
                 or event["intent_sha256"] != _digest(intent)
+                or event["signed_v2_intent_sha256"] != intent["signed_v2_intent_sha256"]
                 or event["nonce_hex"] != intent["nonce_hex"]
                 or event["conversation_id"] != intent["conversation_id"]
                 or event["message_id"] != intent["message_id"]
@@ -270,7 +272,9 @@ class ReferenceOneShotUnknownOutcomeJournal:
         for item in evidence:
             if not _hash(item["evidence_sha256"]) or item["nonce_hex"] not in seen:
                 raise ValueError("invalid unknown-outcome evidence")
-        if len(seqs) != len(set(seqs)) or set(seqs) != set(range(1,row["sequence"]+1)):
+        if (not _int(row["sequence"], 0, 2**63-1)
+            or row["sequence"] != len(seqs)
+            or sorted(seqs) != list(range(1,len(seqs)+1))):
             raise ValueError("journal sequence not gap-free or contains rollback")
         return row["sequence"]
 
@@ -301,9 +305,10 @@ class ReferenceOneShotUnknownOutcomeJournal:
         def do(seq):
             old=self.db.execute(
                 "SELECT * FROM aion_dispatch_intents WHERE nonce_hex=?"
-                " OR intent_sha256=? OR (conversation_id=? AND message_id=?)",
-                (intent["nonce_hex"],digest,intent["conversation_id"],
-                 intent["message_id"]),
+                " OR intent_sha256=? OR signed_v2_intent_sha256=?"
+                " OR (conversation_id=? AND message_id=?)",
+                (intent["nonce_hex"],digest,intent["signed_v2_intent_sha256"],
+                 intent["conversation_id"],intent["message_id"]),
             ).fetchall()
             if old:
                 if len(old)==1 and old[0]["intent_sha256"]==digest:
@@ -316,10 +321,10 @@ class ReferenceOneShotUnknownOutcomeJournal:
                 return _out("BLOCKED","NONCE_OR_MESSAGE_REBOUND_DETECTED")
             n=self._next(seq)
             self.db.execute(
-                "INSERT INTO aion_dispatch_intents VALUES (?,?,?,?,?,?,?,?,?)",
-                (intent["nonce_hex"],digest,intent["conversation_id"],
-                 intent["message_id"],_canonical(intent),
-                 STATE_PREPARED,n,None,None),
+                "INSERT INTO aion_dispatch_intents VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (intent["nonce_hex"],digest,intent["signed_v2_intent_sha256"],
+                 intent["conversation_id"],intent["message_id"],
+                 _canonical(intent),STATE_PREPARED,n,None,None),
             )
             return _out("PREPARED_REFERENCE_ONLY","NO_EXECUTION_RIGHT_CREATED",
                         stored=STATE_PREPARED,journal_seq=n)
