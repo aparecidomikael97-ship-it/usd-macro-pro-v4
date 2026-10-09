@@ -11,6 +11,7 @@ from __future__ import annotations
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -2323,13 +2324,13 @@ def save_runtime_checkpoint(
     try:
         import requests
         write_attempted = True
-        response = requests.put(
+        response = reject_github_write_unexpected_status(requests.put(
             guard_github_write_destination(_contents_url(cfg)),
             headers=_headers(cfg.token),
             json=body,
             timeout=timeout,
             allow_redirects=False,
-        )
+        ),"contents_put")
         if response.status_code in {409, 422}:
             write_receipt = _runtime_write_receipt(
                 cfg,

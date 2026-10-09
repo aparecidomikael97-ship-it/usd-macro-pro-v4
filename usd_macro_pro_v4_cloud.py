@@ -1,6 +1,7 @@
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 # ============================================================
 # USD MACRO PRO V10.2.1 — ESTABILIDADE VISUAL · PAINEL MESTRE V10.2 · MOTOR BASE V9.3.9.2
 # Exibe o motivo persistido de falhas por par/timeframe sem
@@ -3618,7 +3619,7 @@ def _github_salvar_csv_v84(df):
         if sha:
             body["sha"] = sha
 
-        resp = requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=20, allow_redirects=False)
+        resp = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=20, allow_redirects=False),"contents_put")
         resp.raise_for_status()
         return True, "Histórico salvo no GitHub"
     except Exception as e:
@@ -4454,7 +4455,7 @@ def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bo
             old.raise_for_status()
         body = {"message": message, "content": base64.b64encode(raw).decode("ascii"), "branch": branch}
         if sha: body["sha"] = sha
-        r = requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=25, allow_redirects=False)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, ""
     except Exception as exc:
@@ -4501,7 +4502,7 @@ def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_na
         body = {"message": "V10.4: registrar feedback de usuário",
                 "content": base64.b64encode(csv_bytes).decode("ascii"), "branch": branch}
         if sha: body["sha"] = sha
-        r = requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=25, allow_redirects=False)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, "Feedback enviado e salvo com sucesso."
     except Exception as exc:
@@ -4619,7 +4620,7 @@ def _autopilot_save_inputs_v107():
         }
         if sha:
             payload["sha"] = sha
-        r = requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, ""
     except Exception as exc:
@@ -8322,7 +8323,7 @@ def _config_salvar_v937(df):
         }
         if sha:
             payload["sha"] = sha
-        r = requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, ""
     except Exception as e:

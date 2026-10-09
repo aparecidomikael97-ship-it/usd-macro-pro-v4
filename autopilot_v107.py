@@ -19,6 +19,7 @@ from __future__ import annotations
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 import base64
 import io
@@ -204,7 +205,7 @@ def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
             }
             if sha:
                 payload["sha"] = sha
-            r = requests.put(guard_github_write_destination(url), headers=h, json=payload, timeout=30, allow_redirects=False)
+            r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=h, json=payload, timeout=30, allow_redirects=False),"contents_put")
             if r.status_code == 409 and attempt < 2:
                 last_error = "HTTP 409: conflito de escrita concorrente"
                 time.sleep(0.20 * (attempt + 1))

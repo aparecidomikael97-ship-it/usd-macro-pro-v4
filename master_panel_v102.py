@@ -12,6 +12,7 @@ from __future__ import annotations
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 from html import escape
 import base64
@@ -140,7 +141,7 @@ def _save_state(state: Mapping[str, Any]) -> tuple[bool, str]:
         }
         if sha:
             payload["sha"] = sha
-        r = requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, ""
     except Exception as exc:
