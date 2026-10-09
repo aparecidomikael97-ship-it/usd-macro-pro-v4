@@ -1,0 +1,99 @@
+name: AION CNG Documented Interface Classes Parser V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py"
+      - "tests/test_atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py"
+      - "tests/test_atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py"
+      - "tests/test_atlasquant_aion_silent_cng_enum_parser_categories_v1.py"
+      - "tests/test_atlasquant_aion_cng_documented_class_parser_v1.py"
+      - "docs/aion/AION_CNG_DOCUMENTED_CLASS_PARSER_V1.md"
+      - ".github/workflows/aion-cng-documented-class-parser-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  documented-native-classes:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Require disposable GitHub PR job
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          PY
+      - name: Compile relevant modules and tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py \
+            atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py \
+            tests/test_atlasquant_aion_cng_documented_class_parser_v1.py
+      - name: Original silent native enumeration tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py'
+      - name: Owner-scoped opt-in regression
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py'
+      - name: Sanitized error category regression
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_silent_cng_enum_parser_categories_v1.py'
+      - name: New documented class/signature-operation adversarial tests
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_cng_documented_class_parser_v1.py'
+      - name: Static verify class bitmap and no-private-key APIs
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py").read_text()
+          t=ast.parse(s)
+          assert 'DOCUMENTED_NCRYPT_CLASSES = frozenset((3, 4, 5))' in s
+          assert 'alg_class not in DOCUMENTED_NCRYPT_CLASSES' in s
+          assert 'not alg_operations & SIGNATURE_OPERATION' in s
+          assert 'NCRYPT_SILENT_FLAG,' in s
+          assert 'SIGNATURE_OPERATION = 0x00000010' in s
+          assert 'if not _ci_only():' in s
+          for node in ast.walk(t):
+              if isinstance(node,ast.Attribute) and node.attr.startswith("NCrypt"):
+                  assert node.attr in {"NCryptOpenStorageProvider",
+                      "NCryptEnumAlgorithms","NCryptFreeBuffer",
+                      "NCryptFreeObject"}
+          for phrase in ('api.NCryptEnumKeys(', 'api.NCryptOpenKey(',
+                         'api.NCryptCreatePersistedKey(', 'api.NCryptSignHash(',
+                         'api.NCryptSetProperty(', 'api.NCryptExportKey('):
+              assert phrase not in s
+          for flag in (
+              '"actual_no_ui_physically_verified": False',
+              '"owner_pc_execution_authorized_by_code": False',
+              '"private_key_created": False',
+              '"private_key_opened": False',
+              '"private_key_enumerated": False',
+              '"private_key_enrolled": False',
+              '"host_security_state_modified": False',
+              '"installer_authorized": False',
+              '"build_authorized": False',
+              '"deploy_authorized": False',
+              '"safe_to_resume": False',
+          ):
+              assert flag in s
+          PY
