@@ -231,7 +231,9 @@ class DurableReplayReferenceTests(unittest.TestCase):
         self.assertFalse(out["nonce_transaction_consumed"]);self.false_gates(out)
 
     def test_schema_version_mismatch_blocks(self):
-        with sqlite3.connect(self.path) as conn:conn.execute("PRAGMA user_version=99")
+        conn=sqlite3.connect(self.path)
+        try:conn.execute("PRAGMA user_version=99");conn.commit()
+        finally:conn.close()
         self.assertFalse(self.consume()["nonce_transaction_consumed"])
 
     def test_extra_table_is_schema_inconsistency(self):
@@ -390,6 +392,82 @@ class DurableReplayReferenceTests(unittest.TestCase):
         self.assertEqual(request,saved)
         out["receipt"]["binding"]["policy_generation"]=0
         self.assertEqual(self.store.inspect()["policy"]["generation"],7)
+
+
+    def test_read_only_sqlite_write_failure_is_denied(self):
+        self.issue()
+        original=self.store._connect
+        def readonly():
+            conn=original()
+            conn.execute("PRAGMA query_only=ON")
+            return conn
+        with patch.object(self.store,"_connect",side_effect=readonly):
+            out=self.consume()
+        self.assertFalse(out["nonce_transaction_consumed"]);self.false_gates(out)
+        self.assertEqual(self.store.inspect()["states"][NONCE],"ISSUED")
+
+    def test_valid_resigned_different_policy_cannot_use_issued_nonce(self):
+        self.issue()
+        changed=self.request(policy="sha256:"+"f"*64)
+        out=self.consume(changed)
+        self.assertTrue(out["signature_mathematically_valid"])
+        self.assertEqual(out["reason"],"ISSUED_BINDING_MISMATCH")
+        self.assertFalse(out["nonce_transaction_consumed"])
+
+    def test_valid_resigned_new_owner_key_cannot_use_issued_nonce(self):
+        self.issue()
+        self.fixture.owner=upstream.DisposablePair()
+        self.fixture.proposal["owner"]["public_key_sha256"]=self.fixture.owner.fingerprint
+        out=self.consume(self.request())
+        self.assertTrue(out["signature_mathematically_valid"])
+        self.assertEqual(out["reason"],"ISSUED_BINDING_MISMATCH")
+
+    def test_valid_resigned_new_collector_key_cannot_use_issued_nonce(self):
+        self.issue()
+        self.fixture.collector=upstream.DisposablePair()
+        self.fixture.proposal["collector"]["public_key_sha256"]=self.fixture.collector.fingerprint
+        out=self.consume(self.request())
+        self.assertTrue(out["signature_mathematically_valid"])
+        self.assertEqual(out["reason"],"ISSUED_BINDING_MISMATCH")
+
+    def test_nonpositive_or_excessive_expiry_window_is_rejected(self):
+        for expiry in (ISSUED,"2026-10-08T11:59:59Z","2026-10-08T12:05:01Z"):
+            with self.subTest(expiry=expiry):
+                self.assertEqual(self.issue(expires_at=expiry)["state"],"BLOCKED")
+        self.assertEqual(self.store.inspect()["event_count"],0)
+
+    def test_revocation_error_rolls_back(self):
+        self.issue()
+        with patch.object(self.store,"_event",side_effect=sqlite3.OperationalError("fault")):
+            self.assertEqual(self.store.revoke(nonce=NONCE,now_ts=NOW)["state"],"BLOCKED")
+        self.assertEqual(self.store.inspect()["states"][NONCE],"ISSUED")
+
+    def test_expiry_commit_error_does_not_leave_partial_transition(self):
+        self.issue()
+        with patch.object(self.store,"_commit",side_effect=sqlite3.OperationalError("fault")):
+            self.assertFalse(self.consume(now=EXPIRES)["nonce_transaction_consumed"])
+        self.assertEqual(self.store.inspect()["states"][NONCE],"ISSUED")
+        self.assertEqual(self.store.inspect()["event_count"],1)
+
+    def test_application_clock_rollback_is_rejected_after_process_restart(self):
+        self.issue();self.consume()
+        reopened=ledger.ReferenceChallengeRegistry(self.path,fixture_root=self.root)
+        self.assertFalse(self.consume(store=reopened,now=ISSUED)["nonce_transaction_consumed"])
+
+    def test_retained_state_has_no_process_local_replay_cache_dependency(self):
+        self.issue()
+        reopened=ledger.ReferenceChallengeRegistry(self.path,fixture_root=self.root)
+        self.assertTrue(self.consume(store=reopened)["nonce_transaction_consumed"])
+        self.assertFalse(self.consume()["nonce_transaction_consumed"])
+
+    def test_huge_or_hostile_input_is_denied_without_coercion(self):
+        class Hostile:
+            def __str__(self):raise AssertionError("coercion")
+        for request in ({"proposal":Hostile()}, {"nonce":"x"*100000}, [0]*100000):
+            with self.subTest(kind=type(request).__name__):
+                out=verify_and_consume_reference(registry=self.store,request=request,now_ts=NOW)
+                self.assertFalse(out["nonce_transaction_consumed"])
+                self.false_gates(out)
 
 
 def add_case(name,fn):
