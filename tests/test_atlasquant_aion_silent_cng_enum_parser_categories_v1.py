@@ -43,9 +43,9 @@ class SilentCNGFailureCategoryTests(unittest.TestCase):
         self.deny_auth(out)
 
     def test_class_error_is_discriminated(self):
-        out = self.call(FakeCNG(rows=[("ECDSA_P256",3,0x10)]))
+        out = self.call(FakeCNG(rows=[("ECDSA_P256",7,0x10)]))
         self.assertEqual(out["enumeration_failure_category"],
-                         "SIGNATURE_CLASS_MISMATCH")
+                         "UNRECOGNIZED_NCRYPT_ALGORITHM_CLASS")
         self.deny_auth(out)
 
     def test_signature_operation_error_is_discriminated(self):
@@ -99,7 +99,7 @@ class SilentCNGFailureCategoryTests(unittest.TestCase):
 
     def test_direct_record_boolean_rejects_bad_class_or_ops(self):
         for rec,code in [
-            (("A",True,16),"SIGNATURE_CLASS_MISMATCH"),
+            (("A",True,16),"UNRECOGNIZED_NCRYPT_ALGORITHM_CLASS"),
             (("A",5,True),"SIGNATURE_OPERATION_MISMATCH"),
         ]:
             with self.subTest(code=code):

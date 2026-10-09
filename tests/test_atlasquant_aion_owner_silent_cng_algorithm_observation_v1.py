@@ -130,7 +130,7 @@ class OwnerScopedSilentCNGTests(unittest.TestCase):
         self.assert_never_authorizes(result)
 
     def test_invalid_signature_interface_fails_closed(self):
-        result, api, _ = self.invoke(api=FakeCNG(rows=[("ED25519", 3, 0x10)]))
+        result, api, _ = self.invoke(api=FakeCNG(rows=[("ED25519", 7, 0x10)]))
         self.assertEqual(result["reason"], "SILENT_ENUM_INVALID_RESULT")
         self.assertTrue(result["provider_handle_released"])
         self.assert_never_authorizes(result)

@@ -197,7 +197,7 @@ class NativeCNGSilentEnumTests(unittest.TestCase):
         self.deny_trust(out)
 
     def test_invalid_signature_class_blocks(self):
-        out, api, _ = self.probe(FakeCNG(rows=[("ED25519", 3, 0x10)]))
+        out, api, _ = self.probe(FakeCNG(rows=[("ED25519", 7, 0x10)]))
         self.assertEqual(out["reason"], "SILENT_ENUM_INVALID_RESULT")
         self.deny_trust(out)
 
