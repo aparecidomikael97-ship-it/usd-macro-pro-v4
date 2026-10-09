@@ -155,7 +155,9 @@ def _valid_head(h:Any)->bool:
         or not _hash(h["full_provider_request_sha256"])):
         return False
     if h["capture_state"]==STATE_ABSENT:
-        return h["capture_sequence"]==0 and h["capture_event_sha256"]==ZERO
+        # The target nonce may be absent even when other messages were
+        # captured earlier and the global capture sequence is nonzero.
+        return h["capture_event_sha256"]==ZERO
     return h["capture_sequence"]>=1 and h["capture_event_sha256"]!=ZERO
 
 
@@ -394,10 +396,9 @@ def review_one_step_capture_anchor_preflight(
             _QUERY_KEYS if k!="challenge_nonce_hex")
         or old["witness_epoch"]!=new["witness_epoch"]
         or old["capture_state"]!=STATE_ABSENT
-        or old["capture_sequence"]!=0
         or old["capture_event_sha256"]!=ZERO
         or new["capture_state"]!=STATE_CAPTURED
-        or new["capture_sequence"]!=1
+        or new["capture_sequence"]!=old["capture_sequence"]+1
         or new["capture_event_sha256"]==ZERO
         or old["capture_snapshot_sha256"]==new["capture_snapshot_sha256"]
         or any(old[k]!=new[k] for k in (
