@@ -647,6 +647,25 @@ def execute_openai_answer(
                 timeout=material["timeout_seconds"],
                 allow_redirects=False,
             )
+    except requests.exceptions.TooManyRedirects as exc:
+        # Requests 2.x still prepares Response.next when allow_redirects=False.
+        # With Session.max_redirects=0 it can raise TooManyRedirects after the
+        # FIRST 3xx (without following Location). Keep zero redirects and
+        # classify the original 3xx accurately, never re-POST.
+        rejected=getattr(exc,"response",None)
+        code=int(getattr(rejected,"status_code",0) or 0)
+        if 300<=code<400:
+            return {
+                "schema":SCHEMA,"state":"PROVIDER_REDIRECT_BLOCKED",
+                "called":True,"http_status":code,
+                "reason":"Redirect rejected before any second request.",
+                "model":model,"estimate":estimate,
+            }
+        return {
+            "schema":SCHEMA,"state":"PROVIDER_NETWORK_ERROR","called":True,
+            "reason":"TooManyRedirects","model":model,
+            "estimate":estimate,
+        }
     except Exception as exc:
         return {
             "schema":SCHEMA,"state":"PROVIDER_NETWORK_ERROR","called":True,
