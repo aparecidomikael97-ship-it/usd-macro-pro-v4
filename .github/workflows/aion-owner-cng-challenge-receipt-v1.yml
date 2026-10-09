@@ -1,0 +1,92 @@
+name: AION Owner CNG Unsigned Challenge Receipt V1 CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py"
+      - "tests/test_atlasquant_aion_owner_silent_cng_challenge_receipt_v1.py"
+      - "docs/aion/AION_OWNER_CNG_READONLY_CHALLENGE_RECEIPT_V1.md"
+      - ".github/workflows/aion-owner-cng-challenge-receipt-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic-receipt:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Ensure disposable pull-request context
+        run: |
+          python - <<'PY'
+          import os
+          assert os.environ.get("GITHUB_ACTIONS") == "true"
+          assert os.environ.get("GITHUB_EVENT_NAME") == "pull_request"
+          assert os.environ.get("GITHUB_REPOSITORY") == "aparecidomikael97-ship-it/usd-macro-pro-v4"
+          PY
+      - name: Compile modules and all relevant unit tests
+        run: |
+          python -m py_compile \
+            atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py \
+            atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py \
+            tests/test_atlasquant_aion_owner_silent_cng_challenge_receipt_v1.py
+      - name: Verify original silent enum regression
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_native_cng_silent_signature_algorithm_enum_v1.py'
+      - name: Verify physical-scope wrapper regression
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py'
+      - name: Verify sanitized error taxonomy and class regression
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_silent_cng_enum_parser_categories_v1.py'
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_cng_documented_class_parser_v1.py'
+      - name: Verify unsigned challenge receipt, tamper and false-trust attacks
+        run: |
+          python -m unittest discover -v -s tests \
+            -p 'test_atlasquant_aion_owner_silent_cng_challenge_receipt_v1.py'
+      - name: Enforce no-extra-native-API and never-trusted receipt fields
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          s=Path("atlasquant_aion_owner_silent_cng_algorithm_observation_v1.py").read_text("utf-8")
+          t=ast.parse(s)
+          forbidden={"winreg","socket","subprocess","ctypes","requests",
+                     "urllib","os","pathlib","shutil","tempfile"}
+          for node in ast.walk(t):
+              if isinstance(node,ast.Import):
+                  assert all(x.name.split(".")[0] not in forbidden for x in node.names)
+              if isinstance(node,ast.ImportFrom):
+                  assert (node.module or "").split(".")[0] not in forbidden
+              if isinstance(node,ast.Attribute) and node.attr.startswith("NCrypt"):
+                  raise AssertionError("Owner wrapper must not invoke native CNG functions")
+          for expected in (
+              'explicit_owner_authorization_for_this_probe is not True',
+              'authorized_device_scope != PHYSICAL_SCOPE',
+              '"receipt_signed": False',
+              '"independently_witnessed": False',
+              '"owner_identity_attested": False',
+              '"physical_device_attested": False',
+              '"replay_prevention_verified": False',
+              '"trusted_host_anchor_verified": False',
+              '"installer_authorized": False',
+              '"safe_to_resume": False',
+              'hmac.compare_digest',
+          ):
+              assert expected in s,expected
+          PY
