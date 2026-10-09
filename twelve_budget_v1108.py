@@ -1,6 +1,7 @@
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 """Persistent reservations for the sole Twelve Data collector.
 
 Every attempted single-symbol time_series request costs one reserved credit,
@@ -74,9 +75,9 @@ class GitHubStore:
         body={'message':'V11.0.8: reserva de créditos Twelve Data', 'branch':self.branch,
               'content':base64.b64encode(json.dumps(state,ensure_ascii=False).encode()).decode()}
         if revision: body['sha']=revision
-        r=requests.put(guard_github_write_destination(f'https://api.github.com/repos/{self.repo}/contents/{self.path}'),
+        r=reject_github_write_unexpected_status(requests.put(guard_github_write_destination(f'https://api.github.com/repos/{self.repo}/contents/{self.path}'),
                        headers={'Authorization':f'Bearer {self.token}'},json=body,timeout=25,
-            allow_redirects=False,)
+            allow_redirects=False,),"contents_put")
         if r.status_code in (409,422): return False
         if r.status_code not in (200,201): raise BudgetUnavailable(f'Reserva do orçamento: HTTP {r.status_code}')
         return True

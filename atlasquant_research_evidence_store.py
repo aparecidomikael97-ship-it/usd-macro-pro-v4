@@ -8,6 +8,7 @@ from __future__ import annotations
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 import base64
 from hashlib import sha256
@@ -229,13 +230,13 @@ def persist_research_evidence(
             }
             if remote_sha:
                 payload["sha"]=remote_sha
-            response=requests.put(
+            response=reject_github_write_unexpected_status(requests.put(
                 guard_github_write_destination(_url(repo)),
                 headers=_headers(token),
                 json=payload,
                 timeout=timeout,
                 allow_redirects=False,
-            )
+            ),"contents_put")
             if response.status_code in (409,422) and attempt+1<attempts:
                 continue
             response.raise_for_status()

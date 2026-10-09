@@ -8,6 +8,7 @@ from __future__ import annotations
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 import base64
 import io
@@ -129,7 +130,7 @@ def _save_snapshot(snapshot: dict) -> tuple[bool, str, bool]:
         }
         if sha:
             put_payload["sha"] = sha
-        saved = requests.put(guard_github_write_destination(url), headers=headers, json=put_payload, timeout=25, allow_redirects=False)
+        saved = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=put_payload, timeout=25, allow_redirects=False),"contents_put")
         saved.raise_for_status()
         return True, "Snapshot salvo em dados/market_map_v10.csv.", True
     except Exception as exc:
