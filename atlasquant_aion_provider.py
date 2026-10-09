@@ -167,13 +167,23 @@ def estimate_request_cost(
         }
     cost=(input_tokens/1_000_000.0)*cfg.input_usd_per_mtok
     cost+=(output_tokens/1_000_000.0)*cfg.output_usd_per_mtok
+    if not math.isfinite(cost):
+        return {
+            "schema":SCHEMA,"state":"PRICING_INVALID",
+            "estimable":False,
+            "estimated_input_tokens":input_tokens,
+            "reserved_output_tokens":output_tokens,
+            "estimated_max_cost_usd":None,
+        }
     return {
         "schema":SCHEMA,
         "state":"ESTIMATED",
         "estimable":True,
         "estimated_input_tokens":input_tokens,
         "reserved_output_tokens":output_tokens,
-        "estimated_max_cost_usd":round(cost,6),
+        # Round UP: a positive micro-cost must never become a zero-cost
+        # bypass of allow_paid/monthly budget checks.
+        "estimated_max_cost_usd":math.ceil(cost*1_000_000)/1_000_000,
     }
 
 
@@ -373,7 +383,26 @@ def execute_openai_answer(
     """Call the configured provider only after every preflight gate passes."""
     cfg=provider_config(values)
     status=provider_configuration_status(values)
-    clean_prompt=str(prompt or "").strip()[:MAX_PROMPT_CHARS]
+    # Do not silently truncate user intent: a truncated prompt can be priced,
+    # approved and transmitted with different semantics than the original.
+    # Reject before forming a network request or inspecting secrets.
+    if not isinstance(prompt,str):
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_PROMPT_TYPE","called":False,
+            "reason":"Only a text prompt may be sent to a provider.",
+        }
+    clean_prompt=prompt.strip()
+    if not clean_prompt:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_EMPTY_PROMPT","called":False,
+            "reason":"Empty prompt; no provider call allowed.",
+        }
+    if len(clean_prompt)>MAX_PROMPT_CHARS:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_PROMPT_TOO_LONG","called":False,
+            "reason":"Prompt exceeds the approved length; truncation is forbidden.",
+            "max_prompt_chars":MAX_PROMPT_CHARS,
+        }
 
     if privacy_sensitive(clean_prompt):
         return {
@@ -394,6 +423,13 @@ def execute_openai_answer(
         return {
             "schema":SCHEMA,"state":"BLOCKED_APPROVAL","called":False,
             "reason":"Solicitação externa exige aprovação explícita.",
+        }
+    # A local, unknown or coerced lane must never silently be sent to the
+    # external FAST model (ProviderConfig.model_for_lane defaults to FAST).
+    if type(lane) is not str or lane not in {"EXTERNAL_FAST","EXTERNAL_REASONING"}:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_ROUTE","called":False,
+            "reason":"Only an explicitly selected external model lane is eligible.",
         }
 
     estimate=estimate_request_cost(clean_prompt,config=cfg)
