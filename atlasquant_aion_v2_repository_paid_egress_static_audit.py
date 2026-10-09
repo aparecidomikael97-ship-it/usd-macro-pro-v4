@@ -145,7 +145,14 @@ def _risk_class(name:str,resolved:str,imports:set[str])->str:
         or name.startswith(("client.","session.","http_client."))
     ):
         return "POTENTIAL_HTTP_SEND_METHOD"
-    if end in {"send","put","patch","delete"} and (
+    if end=="send" and (
+        resolved.startswith(("requests.","httpx.","urllib3.","urllib.request."))
+        or ".Session().send" in resolved
+        or ".AsyncClient().send" in resolved
+        or ".Client().send" in resolved
+    ):
+        return "POTENTIAL_HTTP_TRANSPORT_METHOD"
+    if end in {"put","patch","delete"} and (
         resolved.startswith(("requests.","httpx.","urllib3.","urllib.request."))
     ):
         return "NON_AI_NETWORK_WRITE_UNPROVEN_ENDPOINT"
