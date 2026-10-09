@@ -16,6 +16,7 @@ Automatiza:
 O Score Mestre NÃO é alterado pela camada de notícias.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 
 import base64
@@ -172,7 +173,7 @@ def gh_get_bytes(path: str) -> tuple[bytes | None, str]:
         return None, "GitHub token/repo ausente."
     try:
         url = f"https://api.github.com/repos/{REPO}/contents/{path}"
-        r = requests.get(url, headers=gh_headers(), params={"ref": BRANCH}, timeout=20)
+        r = requests.get(guard_github_token_read_destination(url), headers=gh_headers(), params={"ref": BRANCH}, timeout=20, allow_redirects=False)
         if r.status_code == 404:
             return None, ""
         r.raise_for_status()
@@ -191,7 +192,7 @@ def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
     # the current SHA and retry a small bounded number of times.
     for attempt in range(3):
         try:
-            cur = requests.get(url, headers=h, params={"ref": BRANCH}, timeout=20)
+            cur = requests.get(guard_github_token_read_destination(url), headers=h, params={"ref": BRANCH}, timeout=20, allow_redirects=False)
             sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
             if cur.status_code not in (200, 404):
                 cur.raise_for_status()
