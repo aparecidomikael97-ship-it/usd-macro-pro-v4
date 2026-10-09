@@ -41,11 +41,16 @@ SIG3 = (
 )
 
 
+_AUTO_CLAIM = object()
+
+
 def verify(pub=PUB1, sig=SIG1, msg=MSG1,
-           role="HUMAN_OWNER_ED25519", public_claim=None, message_claim=None):
-    if public_claim is None:
+           role="HUMAN_OWNER_ED25519",
+           public_claim=_AUTO_CLAIM, message_claim=_AUTO_CLAIM):
+    # Explicit invalid None MUST NOT be substituted with a valid fixture.
+    if public_claim is _AUTO_CLAIM:
         public_claim="sha256:"+hashlib.sha256(bytes.fromhex(pub)).hexdigest()
-    if message_claim is None:
+    if message_claim is _AUTO_CLAIM:
         message_claim="sha256:"+hashlib.sha256(bytes.fromhex(msg)).hexdigest()
     return mod.verify_ed25519_public_signature(
         role=role, public_key_hex=pub, signature_hex=sig, message_hex=msg,
