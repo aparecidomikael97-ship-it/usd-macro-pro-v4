@@ -503,7 +503,7 @@ def _sealed_provider_transport()->requests.Session:
     client.max_redirects=0
     no_retry=Retry(
         total=0,connect=0,read=0,redirect=0,status=0,other=0,
-        allowed_methods=frozenset(),raise_on_redirect=False,
+        allowed_methods=None,raise_on_redirect=False,
         respect_retry_after_header=False,
     )
     client.mount("https://",HTTPAdapter(max_retries=no_retry))
