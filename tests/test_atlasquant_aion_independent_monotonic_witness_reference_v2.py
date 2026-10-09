@@ -145,6 +145,7 @@ class IndependentWitnessTests(unittest.TestCase):
         shutil.copyfile(backup,self.path)
         # Attacker reset of independent state is OUTSIDE the guarantee.
         self.witness.state=ref.ReferenceWitnessState(scope=self.scope,initial_ledger_sha256=initial_hash)
+        self.adapter=self.make_adapter() # BOTH independent expected state and DB restored
         out=self.run_flow()
         self.assertTrue(out["ledger_matches_witness"])
         self.gates(out)
@@ -500,6 +501,16 @@ class IndependentWitnessTests(unittest.TestCase):
         self.blocked(self.run_flow(adapter=self.make_adapter(witness=ReplayPort())))
         self.assertEqual(self.store.inspect()["states"][NONCE],"ISSUED")
         self.assertEqual(len(self.witness.state.used),1)
+
+    def test_signed_prepare_without_live_reservation_cannot_consume(self):
+        witness=self.witness
+        class UnreservedPort:
+            def expected_head(self):return witness.expected_head()
+            def prepare(self,**kwargs):return witness.wrap(kwargs["candidate"])
+            def recover(self,**kwargs):return witness.recover(**kwargs)
+        self.blocked(self.run_flow(adapter=self.make_adapter(witness=UnreservedPort())))
+        self.assertEqual(self.store.inspect()["states"][NONCE],"ISSUED")
+        self.assertIsNone(self.witness.state.head)
 
 # Every generated case is independently collected and counted, not a hidden
 # subTest loop. Re-signed malformed or wrong-scope checkpoints still cannot
