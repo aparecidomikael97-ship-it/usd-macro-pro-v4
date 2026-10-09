@@ -63,7 +63,7 @@ class NoRetryPostHardeningTests(unittest.TestCase):
             for key in ("total","connect","read","redirect","status","other"):
                 self.assertEqual(getattr(retry,key),0)
                 self.assertIs(type(getattr(retry,key)),int)
-            self.assertEqual(retry.allowed_methods,frozenset())
+            self.assertIsNone(retry.allowed_methods)
             self.assertFalse(retry.respect_retry_after_header)
 
     def test_sealed_http_session_has_no_retries_redirects_or_proxy_env(self):
