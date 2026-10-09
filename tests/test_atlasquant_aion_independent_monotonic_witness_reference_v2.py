@@ -480,6 +480,26 @@ class IndependentWitnessTests(unittest.TestCase):
         self.assertFalse(Path(self.path).exists())
 
 
+    def test_replayed_signed_port_cannot_hide_live_independent_witness_head(self):
+        backup=Path(self.root)/"before.sqlite3"
+        shutil.copyfile(self.path,backup)
+        prepared,confirmed=self.signed()
+        old_prepare=self.witness.wrap(prepared)
+        shutil.copyfile(backup,self.path)
+        final_head=self.witness.expected_head()
+        class ReplayPort:
+            def __init__(self):self.calls=0
+            def expected_head(self):
+                self.calls+=1
+                return {"sequence":0,"digest":ref.ZERO} if self.calls==1 else final_head
+            def prepare(self,**kwargs):return copy.deepcopy(old_prepare)
+            def recover(self,**kwargs):return copy.deepcopy(confirmed)
+        # Original independent witness remains intact and knows TX is consumed.
+        self.assertEqual(self.witness.state.head["checkpoint_sequence"],1)
+        self.blocked(self.run_flow(adapter=self.make_adapter(witness=ReplayPort())))
+        self.assertEqual(self.store.inspect()["states"][NONCE],"ISSUED")
+        self.assertEqual(len(self.witness.state.used),1)
+
 # Every generated case is independently collected and counted, not a hidden
 # subTest loop. Re-signed malformed or wrong-scope checkpoints still cannot
 # satisfy the separately fixed expected checkpoint.
