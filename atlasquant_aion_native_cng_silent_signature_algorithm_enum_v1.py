@@ -24,6 +24,11 @@ from atlasquant_aion_native_cng_status_diagnostic_v2 import decode_status
 SCHEMA = "AION_CNG_SILENT_SIGNATURE_ALGORITHM_ENUM_CI_V1"
 CANDIDATE = "SILENT_SIGNATURE_ALGORITHMS_LISTED_UNTRUSTED"
 SIGNATURE_OPERATION = 0x00000010
+# NCryptAlgorithmName.dwClass documents 3=asymmetric encryption,
+# 4=secret agreement and 5=signature. Class and signature-operation
+# are distinct fields; requesting signature operations may return an
+# algorithm that supports multiple operations, e.g. RSA.
+DOCUMENTED_NCRYPT_CLASSES = frozenset((3, 4, 5))
 MAX_ALG_COUNT = 64
 TARGET_NAMES = ("ECDSA_P256", "ED25519")
 _ALLOWED_NAME = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
@@ -107,8 +112,8 @@ def _classify_names(
         name, alg_class, alg_operations = record
         if type(name) is not str or not _ALLOWED_NAME.fullmatch(name):
             raise _AlgorithmShapeError("ALGORITHM_NAME_SHAPE_INVALID")
-        if type(alg_class) is not int or alg_class != 5:
-            raise _AlgorithmShapeError("SIGNATURE_CLASS_MISMATCH")
+        if type(alg_class) is not int or alg_class not in DOCUMENTED_NCRYPT_CLASSES:
+            raise _AlgorithmShapeError("UNRECOGNIZED_NCRYPT_ALGORITHM_CLASS")
         if type(alg_operations) is not int or not alg_operations & SIGNATURE_OPERATION:
             raise _AlgorithmShapeError("SIGNATURE_OPERATION_MISMATCH")
         if name in names:
