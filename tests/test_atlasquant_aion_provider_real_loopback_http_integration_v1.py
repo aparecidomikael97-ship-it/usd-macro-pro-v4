@@ -157,7 +157,8 @@ class RealLoopbackNoRetryTests(unittest.TestCase):
                 review["state"],"BOUND_REQUEST_PREVIEW_UNTRUSTED",
             )
             sha=review["request_sha256"] if expected_sha is None else expected_sha
-            with self._loopback_only_connect():
+            with self._loopback_only_connect(), \
+                 patch.object(provider,"_PAID_MODEL_DISPATCH_HARD_DENY",False):
                 result=provider.execute_openai_answer(
                     "Solicitação sintética ao loopback",
                     lane="EXTERNAL_FAST",
