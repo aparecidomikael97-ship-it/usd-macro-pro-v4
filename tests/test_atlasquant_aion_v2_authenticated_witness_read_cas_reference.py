@@ -83,6 +83,7 @@ class MockExternalWitness:
             "policy_generation": query["policy_generation"],
             "owner_pin_sha256": query["owner_pin_sha256"],
             "challenge_nonce_hex": query["challenge_nonce_hex"],
+            "minimum_witness_epoch": query["minimum_witness_epoch"],
             "witness_epoch": head["witness_epoch"],
             "head_sequence": head["sequence"],
             "head_receipt_sha256": head["receipt_sha256"],
@@ -384,9 +385,7 @@ class AuthenticatedWitnessReadCasTests(unittest.TestCase):
         self.assertEqual(self.read(signed,q)["reason"],
                          "READ_EPOCH_OR_HEAD_INVALID")
         self.assertEqual(self.read(signed,{**q,"minimum_witness_epoch":3})[
-            "state"], READ_CANDIDATE)
-        self.assertFalse(self.read(signed,{**q,"minimum_witness_epoch":3})[
-            "monotonicity_production_verified"])
+            "reason"], "READ_CHALLENGE_OR_SCOPE_MISMATCH")
 
     def test_new_head_wrong_count_cap_delta_or_previous_digest_rejected(self):
         q,read,next_receipt=self.prepare()
