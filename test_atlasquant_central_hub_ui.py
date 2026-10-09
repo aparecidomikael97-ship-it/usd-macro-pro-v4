@@ -458,6 +458,85 @@ class LoginGreetingTests(unittest.TestCase):
                 self.assertFalse(result["announced"])
                 self.assertNotIn(LOGIN_GREETING_KEY, state)
 
+    def test_delegated_admin_cannot_be_greeted_as_owner_using_display_labels(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        delegated = _access(
+            "ADMIN",
+            display_name="Mikael",
+            username="mikael",
+            session={
+                "role": "ADMIN",
+                "username": "delegado",
+                "display_name": "Mikael",
+                "authenticated_at": 21,
+            },
+        )
+        greeting = login_greeting(delegated, now=now)
+        self.assertTrue(greeting["show"])
+        self.assertEqual(greeting["name"], "delegado")
+        self.assertEqual(greeting["intro"], "delegado, bom dia.")
+        self.assertIn("delegado, bom dia. AION ativo.", greeting["text"])
+        self.assertNotIn("Mikael", greeting["text"])
+        html = aion_login_presence_html(delegated, now=now)
+        self.assertIn("delegado, bom dia. AION ativo.", html)
+        self.assertNotIn("Mikael", html)
+        self.assertNotIn("HUMAN_OWNER", html)
+
+    def test_missing_authenticated_username_is_neutral_not_owner(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        no_identity = _access(
+            "ADMIN",
+            username="mikael",
+            display_name="Mikael",
+            session={
+                "role": "ADMIN",
+                "display_name": "Mikael",
+                "authenticated_at": 22,
+            },
+        )
+        greeting = login_greeting(no_identity, now=now)
+        self.assertTrue(greeting["show"])
+        self.assertEqual(greeting["name"], "")
+        self.assertEqual(greeting["intro"], "Bom dia.")
+        self.assertIn("Bom dia. AION ativo.", greeting["text"])
+        self.assertNotIn("Mikael", greeting["text"])
+        html = aion_login_presence_html(no_identity, now=now)
+        self.assertIn("Bom dia. AION ativo.", html)
+        self.assertNotIn("Mikael", html)
+        self.assertNotIn(", bom dia.", html)
+        self.assertTrue(acknowledge_login_greeting({}, no_identity, now=now)["announced"])
+
+    def test_owner_display_alias_depends_on_session_username_only(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        for username in ("mikael", "aparecidomikael"):
+            with self.subTest(username=username):
+                admin = self._admin(username=username, display_name="outra coisa")
+                greeting = login_greeting(admin, now=now)
+                self.assertEqual(greeting["name"], "Mikael")
+                self.assertEqual(greeting["intro"], "Mikael, bom dia.")
+                self.assertIn("Mikael, bom dia. AION ativo.", greeting["text"])
+
+    def test_session_username_is_escaped_in_visible_html(self):
+        now = datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc)
+        delegated = self._admin(username="<script>alert(1)</script>")
+        greeting = login_greeting(delegated, now=now)
+        self.assertNotIn("Mikael", greeting["text"])
+        html = aion_login_presence_html(delegated, now=now)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;, bom dia.", html)
+        self.assertNotIn("<script>", html)
+
+    def test_no_owner_authority_comes_from_greeting(self):
+        greeting = login_greeting(
+            self._admin(username="delegado", display_name="Mikael"),
+            now=datetime(2026, 9, 27, 11, 0, tzinfo=timezone.utc),
+        )
+        for forbidden_claim in (
+            "grants_authority", "owner_authenticated", "HUMAN_OWNER",
+            "owner_assertion_verified", "installer_authorized", "safe_to_resume",
+        ):
+            self.assertNotIn(forbidden_claim, greeting)
+        self.assertTrue(greeting["show"])
+
     def test_rerun_does_not_announce_twice_and_a_new_login_can(self):
         now = datetime(2026, 9, 27, 17, 0, tzinfo=timezone.utc)
         admin = self._admin()
