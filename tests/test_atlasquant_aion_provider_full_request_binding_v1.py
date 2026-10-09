@@ -16,7 +16,15 @@ class FakeSession:
     def __init__(self):
         self.calls = []
 
-    def post(self, url, headers=None, json=None, timeout=None):
+    def __enter__(self):
+        return self
+
+    def __exit__(self,*args):
+        return False
+
+    def post(self, url, headers=None, json=None, timeout=None, allow_redirects=None):
+        if allow_redirects is not False:
+            raise AssertionError("redirect policy must be disabled")
         self.calls.append({
             "url": url, "headers": dict(headers or {}),
             "json": dict(json or {}), "timeout": timeout,
@@ -39,12 +47,14 @@ class FullRequestBindingTests(unittest.TestCase):
 
     def execute(self, prompt, lane, env, digest):
         session = FakeSession()
-        result = provider.execute_openai_answer(
-            prompt, lane=lane,
-            budget={"allow_paid": True, "monthly_limit_usd": 10},
-            external_feature_enabled=True, request_approved=True,
-            values=env, session=session, expected_request_sha256=digest,
-        )
+        with patch.object(provider,"_sealed_provider_transport",
+                          return_value=session):
+            result = provider.execute_openai_answer(
+                prompt, lane=lane,
+                budget={"allow_paid": True, "monthly_limit_usd": 10},
+                external_feature_enabled=True, request_approved=True,
+                values=env, expected_request_sha256=digest,
+            )
         return result, session.calls
 
     def test_preflight_has_no_permission_and_matches_fake_transport(self):

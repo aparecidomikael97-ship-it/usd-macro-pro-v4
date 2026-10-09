@@ -24,6 +24,8 @@ import math
 import os
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from atlasquant_aion_model_router import (
     budget_decision,
@@ -173,6 +175,18 @@ def _full_request_material(prompt:str,lane:str,cfg:ProviderConfig)->dict[str,Any
         "method":"POST",
         "endpoint":OPENAI_RESPONSES_URL,
         "content_type":"application/json",
+        "transport_policy":{
+            "allow_redirects":False,
+            "trust_env":False,
+            "verify_tls":True,
+            "http_retry_total":0,
+            "http_retry_connect":0,
+            "http_retry_read":0,
+            "http_retry_status":0,
+            "http_retry_other":0,
+            "max_redirects":0,
+            "max_app_attempts":1,
+        },
         "lane":lane,
         "timeout_seconds":cfg.timeout_seconds,
         "body":{
@@ -226,6 +240,7 @@ def preview_openai_request_binding(
         "method":material["method"],
         "endpoint":material["endpoint"],
         "content_type":material["content_type"],
+        "transport_policy":dict(material["transport_policy"]),
         "lane":material["lane"],
         "resolved_model":material["body"]["model"],
         "max_output_tokens":material["body"]["max_output_tokens"],
@@ -475,6 +490,27 @@ def _usage_cost(payload:Mapping[str,Any],cfg:ProviderConfig)->dict[str,Any]:
     }
 
 
+def _sealed_provider_transport()->requests.Session:
+    """Fresh, no ambient proxies, zero retry adapter for ONE allowed POST.
+
+    This is transport-configuration hardening, NOT proof of exactly-once
+    provider execution, authenticated HUMAN_OWNER or billable settlement.
+    Do not accept externally supplied Sessions, mounted adapters, or SDKs.
+    """
+    client=requests.Session()
+    client.trust_env=False
+    client.verify=True
+    client.max_redirects=0
+    no_retry=Retry(
+        total=0,connect=0,read=0,redirect=0,status=0,other=0,
+        allowed_methods=None,raise_on_redirect=False,
+        respect_retry_after_header=False,
+    )
+    client.mount("https://",HTTPAdapter(max_retries=no_retry))
+    client.mount("http://",HTTPAdapter(max_retries=no_retry))
+    return client
+
+
 def execute_openai_answer(
     prompt:Any,
     *,
@@ -589,19 +625,28 @@ def execute_openai_answer(
             "schema":SCHEMA,"state":"BLOCKED_REQUEST_BINDING","called":False,
             "reason":"Full resolved provider request does not match reviewed digest.",
         }
+    # Never allow caller-injected HTTP sessions/SDK clients to hide POST
+    # retries, proxy credentials, redirects, or overridden methods.
+    if session is not None:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_UNVERIFIED_TRANSPORT",
+            "called":False,
+            "reason":"Caller-controlled HTTP Session cannot be trusted for a paid POST.",
+        }
     body=material["body"]
     headers={
         "Authorization":f"Bearer {cfg.api_key}",
         "Content-Type":"application/json",
     }
-    client=session or requests
     try:
-        response=client.post(
-            material["endpoint"],
-            headers=headers,
-            json=body,
-            timeout=material["timeout_seconds"],
-        )
+        with _sealed_provider_transport() as client:
+            response=client.post(
+                material["endpoint"],
+                headers=headers,
+                json=body,
+                timeout=material["timeout_seconds"],
+                allow_redirects=False,
+            )
     except Exception as exc:
         return {
             "schema":SCHEMA,"state":"PROVIDER_NETWORK_ERROR","called":True,
@@ -609,10 +654,14 @@ def execute_openai_answer(
             "estimate":estimate,
         }
 
-    if int(getattr(response,"status_code",0) or 0)>=400:
+    http_status=int(getattr(response,"status_code",0) or 0)
+    if not 200<=http_status<300:
         return {
-            "schema":SCHEMA,"state":"PROVIDER_HTTP_ERROR","called":True,
-            "http_status":int(getattr(response,"status_code",0) or 0),
+            "schema":SCHEMA,
+            "state":("PROVIDER_REDIRECT_BLOCKED" if 300<=http_status<400
+                     else "PROVIDER_HTTP_ERROR"),
+            "called":True,
+            "http_status":http_status,
             "reason":"Provider returned non-success HTTP status.",
             "model":model,"estimate":estimate,
         }
