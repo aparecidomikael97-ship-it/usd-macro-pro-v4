@@ -35,7 +35,7 @@ _READ_KEYS = frozenset({
     "schema", "purpose", "role", "witness_key_id", "witness_service_id",
     "owner_id", "tenant_id", "workspace_id", "period_id",
     "policy_generation", "owner_pin_sha256", "challenge_nonce_hex",
-    "witness_epoch", "head_sequence", "head_receipt_sha256",
+    "minimum_witness_epoch", "witness_epoch", "head_sequence", "head_receipt_sha256",
     "head_snapshot_sha256", "head_hold_count", "head_held_micro_usd",
     "head_limit_micro_usd",
 })
@@ -163,7 +163,7 @@ def _read_check(
     for k in (
         "witness_service_id", "owner_id", "tenant_id", "workspace_id",
         "period_id", "policy_generation", "owner_pin_sha256",
-        "challenge_nonce_hex",
+        "challenge_nonce_hex", "minimum_witness_epoch",
     ):
         if type(p[k]) is not type(expected_query[k]) or p[k] != expected_query[k]:
             return "READ_CHALLENGE_OR_SCOPE_MISMATCH", None
