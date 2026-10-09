@@ -38,7 +38,8 @@ class SilentCNGFailureCategoryTests(unittest.TestCase):
         self.assertEqual(out["enumeration_failure_category"],
                          "ALGORITHM_NAME_SHAPE_INVALID")
         self.assertEqual(out["algorithm_name_count"],1)
-        self.assertNotIn("INVALID",str(out))
+        self.assertNotIn("INVALID\\nNAME",str(out))
+        self.assertNotIn("INVALID\nNAME",str(out))
         self.deny_auth(out)
 
     def test_class_error_is_discriminated(self):
