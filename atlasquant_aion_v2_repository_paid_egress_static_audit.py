@@ -287,7 +287,7 @@ def _tts_source_lock(tree:ast.Module)->list[str]:
     return issues
 
 
-def audit_python_paid_egress(root:Path)->dict[str,Any]:
+def audit_python_paid_egress(\n    root:Path,*,require_existing_inventory:bool=True,\n)->dict[str,Any]:
     root=Path(root).resolve()
     violations=[]
     approved=[]
@@ -347,13 +347,14 @@ def audit_python_paid_egress(root:Path)->dict[str,Any]:
                 "reason":"EXPECTED_SINGLE_LOCKED_VENDOR_POST_NOT_FOUND",
                 "site_function":site[1],
             })
-    for site in sorted(LEGACY_OTHER_NETWORK_WRITE_SITES):
-        if seen_sites.get(site)!=1:
-            violations.append({
-                "path":site[0],"line":0,
-                "reason":"LEGACY_NETWORK_WRITE_INVENTORY_CHANGED_REVIEW_REQUIRED",
-                "site_function":site[1],
-            })
+    if require_existing_inventory:
+        for site in sorted(LEGACY_OTHER_NETWORK_WRITE_SITES):
+            if seen_sites.get(site)!=1:
+                violations.append({
+                    "path":site[0],"line":0,
+                    "reason":"LEGACY_NETWORK_WRITE_INVENTORY_CHANGED_REVIEW_REQUIRED",
+                    "site_function":site[1],
+                })
     # Never emit source contents, token strings, stack traces or secrets.
     return {
         "schema":SCHEMA,
