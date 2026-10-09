@@ -167,6 +167,14 @@ def estimate_request_cost(
         }
     cost=(input_tokens/1_000_000.0)*cfg.input_usd_per_mtok
     cost+=(output_tokens/1_000_000.0)*cfg.output_usd_per_mtok
+    if not math.isfinite(cost):
+        return {
+            "schema":SCHEMA,"state":"PRICING_INVALID",
+            "estimable":False,
+            "estimated_input_tokens":input_tokens,
+            "reserved_output_tokens":output_tokens,
+            "estimated_max_cost_usd":None,
+        }
     return {
         "schema":SCHEMA,
         "state":"ESTIMATED",
@@ -415,6 +423,13 @@ def execute_openai_answer(
         return {
             "schema":SCHEMA,"state":"BLOCKED_APPROVAL","called":False,
             "reason":"Solicitação externa exige aprovação explícita.",
+        }
+    # A local, unknown or coerced lane must never silently be sent to the
+    # external FAST model (ProviderConfig.model_for_lane defaults to FAST).
+    if type(lane) is not str or lane not in {"EXTERNAL_FAST","EXTERNAL_REASONING"}:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_ROUTE","called":False,
+            "reason":"Only an explicitly selected external model lane is eligible.",
         }
 
     estimate=estimate_request_cost(clean_prompt,config=cfg)
