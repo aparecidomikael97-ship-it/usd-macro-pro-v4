@@ -8,6 +8,7 @@ from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_de
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
+from atlasquant_aion_v2_legacy_github_contents_readback import verify_legacy_jsonl_readback
 
 import base64
 import json
@@ -151,7 +152,8 @@ def persist_records(
             if added==0:
                 return {"ok":True,"added":0,"records":len(merged),"reason":"ALREADY_PRESENT","error":""}
 
-            raw=serialize_records(merged).encode("utf-8")
+            serialized=serialize_records(merged)
+            raw=serialized.encode("utf-8")
             payload={
                 "message":"AtlasQuant: persist Flight Recorder snapshots",
                 "content":base64.b64encode(raw).decode("ascii"),
@@ -186,7 +188,13 @@ def persist_records(
                     "reconciliation_required":True,"safe_to_retry":False,
                 }
             r.raise_for_status()
-            return {"ok":True,"added":added,"records":len(merged),"reason":"SAVED","error":""}
+            verification=verify_legacy_jsonl_readback(
+                response=r,
+                expected_text=serialized,
+                readback=lambda: _fetch_remote(repo,safe_branch,token,timeout),
+                serialize=serialize_records,
+            )
+            return {"ok":True,"added":added,"records":len(merged),"reason":"SAVED","error":"",**verification}
         except ValueError as exc:
             if write_attempted:
                 return {
