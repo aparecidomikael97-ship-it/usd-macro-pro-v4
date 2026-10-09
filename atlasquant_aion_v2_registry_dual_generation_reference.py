@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from atlasquant_aion_v2_four_role_key_enrollment_reference import (
     CANDIDATE as ROSTER_CANDIDATE, ROLES, ROSTER_SCHEMA,
+    PURPOSE as ROSTER_PURPOSE,
     review_four_role_roster, roster_sha256,
 )
 
@@ -112,14 +113,40 @@ def _out(state:str,reason:str,*,digest:str="")->dict[str,Any]:
 
 
 def _valid_roster(roster:Any)->bool:
-    if (type(roster) is not dict or roster.get("schema")!=ROSTER_SCHEMA
+    required={
+        "schema","purpose","generation","previous_roster_sha256",
+        "owner_id","tenant_id","workspace_id","challenge_nonce_hex",
+        "pins","admin_domains","revoked_public_key_sha256",
+    }
+    if (type(roster) is not dict or set(roster)!=required
+        or roster.get("schema")!=ROSTER_SCHEMA
+        or roster.get("purpose")!=ROSTER_PURPOSE
         or not _int(roster.get("generation"),1,2**31-1)
         or not all(_token(roster.get(k)) for k in _SCOPE_KEYS)
-        or not _hash(roster.get("previous_roster_sha256"))):
+        or not _hash(roster.get("previous_roster_sha256"))
+        or not _hash(roster.get("challenge_nonce_hex"))
+        or roster["challenge_nonce_hex"]==ZERO):
         return False
-    pins=roster.get("pins")
-    return (type(pins) is dict and set(pins)==set(ROLES)
-            and all(_pin(pins[k]) for k in ROLES))
+    pins=roster["pins"]
+    if (type(pins) is not dict or set(pins)!=set(ROLES)
+        or any(not _pin(pins[k]) for k in ROLES)
+        or len({pins[k]["key_id"] for k in ROLES})!=len(ROLES)
+        or len({pins[k]["public_key_hex"] for k in ROLES})!=len(ROLES)):
+        return False
+    domains=roster["admin_domains"]
+    if (type(domains) is not dict or set(domains)!=set(ROLES)
+        or any(not _token(domains[k]) for k in ROLES)
+        or len(set(domains.values()))!=len(ROLES)):
+        return False
+    try:
+        revoked=roster["revoked_public_key_sha256"]
+        revoked_set_sha256(revoked)
+        if any(sha256(bytes.fromhex(pins[k]["public_key_hex"])).hexdigest()
+               in revoked for k in ROLES):
+            return False
+    except (ValueError,TypeError,OverflowError):
+        return False
+    return True
 
 
 def _read(
