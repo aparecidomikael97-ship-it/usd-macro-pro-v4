@@ -1,0 +1,32 @@
+name: AION V2 Auth Import Fail-Closed V1
+
+on:
+  pull_request:
+    paths:
+      - "usd_macro_pro_v4_cloud.py"
+      - "test_atlasquant_access_fallback_fail_closed.py"
+      - ".github/workflows/aion-v2-auth-import-failclosed.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-only:
+    name: Offline Auth Gate / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile entrypoint and source-only tests
+        run: python -B -m py_compile usd_macro_pro_v4_cloud.py test_atlasquant_access_fallback_fail_closed.py
+      - name: Test fail-closed import fallback (no app boot or network)
+        run: python -B -m unittest test_atlasquant_access_fallback_fail_closed.py
