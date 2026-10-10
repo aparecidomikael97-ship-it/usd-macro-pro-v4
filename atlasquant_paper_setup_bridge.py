@@ -187,8 +187,11 @@ def _load_runtime_csv(
     max_rows:int=DEFAULT_MAX_RUNTIME_ROWS,
 )->tuple[pd.DataFrame,dict[str,Any]]:
     from atlasquant_private_read_gate_v1 import private_read_allowed
+    from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
     if not private_read_allowed():
         return pd.DataFrame(), {"ok":False,"reason":"ACCESS_DENIED","rows":0,"error":""}
+    if not legacy_private_remote_resource_allowed(path):
+        return pd.DataFrame(), {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","rows":0,"error":""}
     try:
         safe=require_runtime_branch(branch)
     except Exception as exc:
