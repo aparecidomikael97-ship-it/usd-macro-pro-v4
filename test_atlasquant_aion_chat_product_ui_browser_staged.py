@@ -184,3 +184,100 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
         assert not errors
         browser.close()
+
+
+def test_browser_duplicate_request_after_store_remount_stays_two(staged_preview):
+    """Real Chromium→Streamlit→SQLite: the same browser request cannot append twice.
+
+    QA injects a stable request ID only around the two submit clicks, not into
+    Streamlit initialization or any production code.
+    """
+    import sqlite3
+
+    url, root = staged_preview
+    request_id = "qa-same-request-after-remount-1198"
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(url)
+        expect(page.locator(".aq-chat-root")).to_be_visible(timeout=30000)
+        expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+
+        def send_with_same_request_id():
+            # Patch only the active QA browser document while the submit event
+            # generates its UUID. Restore it before the next Streamlit rerender.
+            page.evaluate(
+                """rid => {
+                    if (!window.__aionQaOriginalUuid) {
+                        window.__aionQaOriginalUuid = crypto.randomUUID.bind(crypto);
+                    }
+                    Object.defineProperty(crypto, 'randomUUID', {
+                        configurable: true, writable: true, value: () => rid,
+                    });
+                }""",
+                request_id,
+            )
+            try:
+                _send(page, "status geral")
+            finally:
+                page.evaluate("""() => {
+                    if (window.__aionQaOriginalUuid) {
+                        Object.defineProperty(crypto, 'randomUUID', {
+                            configurable: true, writable: true,
+                            value: window.__aionQaOriginalUuid,
+                        });
+                    }
+                }""")
+
+        send_with_same_request_id()
+        expect(page.locator(".aq-chat-message")).to_have_count(2, timeout=30000)
+        expect(
+            page.locator('.aq-chat-message.assistant[data-state="UNKNOWN"]')
+        ).to_have_count(1)
+        conversation_id = page.locator(".aq-chat-id").inner_text().strip()
+        assert conversation_id
+        expect(page.locator(".aq-chat-send")).to_be_enabled(timeout=30000)
+
+        # Remount the real staged host against the same durable DB and browser
+        # session; no new request intent was created.
+        page.get_by_role("button", name="QA · remontar store durável").click()
+        expect(page.get_by_text("remounts=1", exact=False)).to_be_visible(
+            timeout=30000
+        )
+        expect(page.locator(".aq-chat-id")).to_have_text(
+            conversation_id, timeout=30000
+        )
+        expect(page.locator(".aq-chat-message")).to_have_count(2)
+        send_with_same_request_id()
+        expect(page.locator(".aq-chat-live")).to_contain_text(
+            "Histórico local reconciliado", timeout=30000
+        )
+        expect(page.locator(".aq-chat-message")).to_have_count(2)
+        expect(
+            page.locator('.aq-chat-message.assistant[data-state="UNKNOWN"]')
+        ).to_have_count(1)
+        expect(page.locator(".aq-chat-send")).to_be_enabled()
+        expect(page.locator('[data-testid="stException"]')).to_have_count(0)
+        assert not errors
+
+        # Independent SQLite readback verifies the same stable browser request
+        # maps to one recorded pair; this does not reverify answer truth.
+        database_files = list(root.glob("aion-chat-*.sqlite3"))
+        assert database_files
+        with sqlite3.connect(database_files[0]) as db:
+            rows = db.execute(
+                "SELECT conversation_id,state FROM chat_browser_requests "
+                "WHERE request_id=? AND owner=? AND tenant=? AND workspace=?",
+                (request_id, "mikael", "tenant-browser-qa", "aion-browser-qa"),
+            ).fetchall()
+            assert len(rows) == 1
+            assert rows[0][0] == conversation_id
+            assert rows[0][1] in ("COMPLETE", "LOCAL_RECONCILED")
+            message_count = db.execute(
+                "SELECT COUNT(*) FROM messages WHERE cid=?", (conversation_id,)
+            ).fetchone()[0]
+            assert message_count == 2
+        browser.close()
