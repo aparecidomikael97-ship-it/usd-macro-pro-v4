@@ -101,6 +101,9 @@ def main():
         # Historical _fetch tests use synthetic transport and explicitly grant
         # private-read fixture authority; runtime never receives this override.
         guards.enter_context(patch("atlasquant_private_read_gate_v1.private_read_allowed", return_value=True))
+        # Historical protocol simulation only: never bypass this gate in runtime.
+        # All unmocked network and sockets are blocked in this scope.
+        guards.enter_context(patch("atlasquant_legacy_private_resource_gate_v1.require_legacy_private_remote_resource", return_value=None))
         suite = unittest.TestSuite()
         for name in TESTS:
             suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern=name + ".py"))
