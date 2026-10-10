@@ -94,10 +94,18 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
 
         _send(page, "status geral")
         assistant = page.locator(
-            '.aq-chat-message.assistant[data-state="CONFIRMED_SUCCESS"]'
+            '.aq-chat-message.assistant[data-state="UNKNOWN"]'
         )
         expect(assistant).to_have_count(1, timeout=30000)
+        expect(assistant).to_contain_text("AION · histórico local")
+        expect(assistant).to_contain_text("Não reverificado · UNKNOWN")
+        expect(assistant).not_to_contain_text("leitura local verificada")
         expect(page.locator(".aq-chat-message")).to_have_count(2)
+        assistant.locator(".aq-chat-proof summary").click()
+        expect(assistant.locator(".aq-chat-proof")).to_contain_text("NOT_REVERIFIED")
+        expect(assistant.locator(".aq-chat-proof")).to_contain_text("LOCAL_PRESENT")
+        expect(assistant.locator(".aq-chat-proof")).to_contain_text("não foi reverificado")
+        expect(assistant.locator(".aq-chat-proof")).not_to_contain_text("Receipt verificado")
         conversation_id = page.locator(".aq-chat-id").inner_text().strip()
         assert conversation_id
         assert list(root.glob("aion-chat-*.sqlite3"))
@@ -118,10 +126,12 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         )
         expect(page.locator(".aq-chat-message")).to_have_count(2)
         expect(assistant).to_have_count(1)
+        expect(assistant).to_contain_text("AION · histórico local")
 
         _send(page, "status geral")
         expect(page.locator(".aq-chat-message")).to_have_count(4, timeout=30000)
         expect(assistant).to_have_count(2)
+        expect(assistant).to_contain_text("Não reverificado · UNKNOWN")
         expect(page.locator(".aq-chat-id")).to_have_text(conversation_id)
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
 
