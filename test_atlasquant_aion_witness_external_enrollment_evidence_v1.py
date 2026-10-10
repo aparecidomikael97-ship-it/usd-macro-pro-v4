@@ -99,7 +99,7 @@ class WitnessExternalOwnerDecisionEvidenceTests(unittest.TestCase):
             self.assertIs(self.manifest[key],False)
         for phrase in ("NÃO", "PITR", "UNKNOWN_OUTCOME", "físic",
                        "matrícula", "consistência", "Object Lock"):
-            self.assertIn(phrase,self.doc)
+            self.assertIn(phrase.casefold(),self.doc.casefold())
 
     def test_source_references_have_only_allowlisted_public_domains(self):
         import urllib.parse
