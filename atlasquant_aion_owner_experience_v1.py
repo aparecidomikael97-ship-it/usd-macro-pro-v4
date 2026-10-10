@@ -53,6 +53,14 @@ _FORBIDDEN_HANDOFF_KEYS = frozenset({
     "api_key", "apikey", "private_key", "database_url", "dsn",
 })
 _REQUIRED_PERMISSIONS = frozenset({"app:read", "aion:admin"})
+# Only enumerated, low-sensitivity presentation hints may cross devices.
+# Durable chat text and credentials must be fetched AFTER target reauthentication.
+_HANDOFF_CONTEXT_KEYS = frozenset({"mode", "topic", "slide"})
+_HANDOFF_TOPICS = frozenset({
+    "AION", "CRM", "B2B", "NEGOCIOS", "NEGÓCIOS", "TRADER",
+    "INVESTIMENTOS", "MACRO", "FOREX", "SMC", "ICT", "REUNIAO",
+})
+
 
 
 def _clean(value: Any, limit: int = 300) -> str:
@@ -406,17 +414,35 @@ def continuity_handoff(
     subject = _clean(owner_subject, 120)
     conversation = _clean(conversation_id, 160)
     turn = _clean(last_turn_id, 160)
+    if context is not None and not isinstance(context, Mapping):
+        raise ValueError("continuity context must be a mapping")
     safe_context = _mapping(context)
     if not subject or not conversation:
         raise ValueError("owner subject and conversation required")
     if _contains_forbidden_key(safe_context):
         raise ValueError("secret-bearing continuity context forbidden")
-
-    public_context = {
-        str(key)[:80]: value
-        for key, value in safe_context.items()
-        if _clean(key, 120).casefold() not in _FORBIDDEN_HANDOFF_KEYS
-    }
+    # An arbitrary user-supplied "safe" key/value cannot establish that a
+    # credential, private text or nested tenant record was NOT transferred.
+    # Never silently discard unknown fields and then claim a complete handoff.
+    if any(type(key) is not str or key not in _HANDOFF_CONTEXT_KEYS
+           for key in safe_context):
+        raise ValueError("unsupported continuity context field")
+    public_context: dict[str, str | int] = {}
+    if "mode" in safe_context:
+        mode = safe_context["mode"]
+        if type(mode) is not str or mode.strip().upper() not in MODES:
+            raise ValueError("unsupported continuity mode")
+        public_context["mode"] = mode.strip().upper()
+    if "topic" in safe_context:
+        topic = safe_context["topic"]
+        if type(topic) is not str or topic.strip().upper() not in _HANDOFF_TOPICS:
+            raise ValueError("unsupported continuity topic category")
+        public_context["topic"] = topic.strip().upper()
+    if "slide" in safe_context:
+        slide = safe_context["slide"]
+        if type(slide) is not int or not 0 <= slide <= 10_000:
+            raise ValueError("unsupported continuity slide index")
+        public_context["slide"] = slide
     payload = {
         "owner_subject": subject,
         "conversation_id": conversation,
