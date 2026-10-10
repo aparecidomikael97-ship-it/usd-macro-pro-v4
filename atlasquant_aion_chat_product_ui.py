@@ -12,6 +12,10 @@ import json
 from typing import Any, Mapping
 
 from aion_chat.models import Scope
+from atlasquant_aion_chat_request_binding import (
+    request_digests, reserve_request, bind_expected_pair, reconcile_request,
+    finish_without_write,
+)
 from atlasquant_aion_chat_product_bridge import (
     continue_product_read_turn,
     create_product_conversation,
@@ -240,14 +244,7 @@ def submit_product_turn(
 
     request_id = event.get("request_id")
     if not isinstance(request_id, str) or not request_id or len(request_id) > 100:
-        raise ValueError("Identificador de envio inválido.")
-    if request_id in state["requests"]:
-        return {
-            "schema": SCHEMA,
-            "state": "IDEMPOTENT_REQUEST",
-            "request_id": request_id,
-            "external_action_executed": False,
-        }
+        raise ValueError("Identificador de envio invÃ¡lido.")
 
     from atlasquant_aion_chat_surface import MAX_MESSAGE_CHARS
 
@@ -256,7 +253,7 @@ def submit_product_turn(
         raise ValueError("Mensagem vazia.")
     if len(text) > MAX_MESSAGE_CHARS:
         raise ValueError(
-            "Mensagem excede o orçamento técnico de 8.000 caracteres."
+            "Mensagem excede o orÃ§amento tÃ©cnico de 8.000 caracteres."
         )
 
     # Browser file bodies are never accepted here. Durable attachment ingest is
@@ -264,23 +261,27 @@ def submit_product_turn(
     attachments = event.get("attachments")
     if isinstance(attachments, (list, tuple)) and attachments:
         raise ValueError(
-            "Anexos duráveis ainda não estão ativos no modo staged."
+            "Anexos durÃ¡veis ainda nÃ£o estÃ£o ativos no modo staged."
         )
 
     current_cid = _clean(state.get("conversation_id"), 120)
     event_cid = _clean(event.get("conversation_id"), 120)
-    if event_cid != current_cid:
-        raise ValueError("Conversa durável da sessão não corresponde.")
+    input_digest, context_digest = request_digests(scope, access, text)
+    ticket = reserve_request(store, scope, request_id, event_cid, current_cid,
+                             input_digest, context_digest)
+    current_cid = ticket["conversation_id"]
+    state["conversation_id"] = current_cid
+    if not ticket["fresh"]:
+        result = reconcile_request(store.path, scope, ticket)
+        state["requests"].add(request_id)
+        state["ack"] = request_id
+        state["notice"] = ("HistÃ³rico local reconciliado; nenhuma nova gravaÃ§Ã£o."
+                           if result["local_history_persisted"]
+                           else "Pedido incerto: reconciliaÃ§Ã£o necessÃ¡ria; repetiÃ§Ã£o bloqueada.")
+        return result
 
-    if not current_cid:
-        created = create_product_conversation(
-            store,
-            scope,
-            access,
-            title="AION principal",
-        )
-        current_cid = _clean(created.get("conversation_id"), 120)
-        state["conversation_id"] = current_cid
+    def before_append(user, assistant):
+        bind_expected_pair(store.path, scope, ticket, user, assistant)
 
     result = continue_product_read_turn(
         store,
@@ -289,7 +290,16 @@ def submit_product_turn(
         text,
         conversation_id=current_cid,
         runtime_context=runtime_context,
+        bound_turn_index=ticket["turn_index"],
+        before_append=before_append,
     )
+
+    if result.get("state") == "CONFIRMED_AND_PERSISTED":
+        proof = reconcile_request(store.path, scope, ticket, completed=True)
+        if not proof["local_history_persisted"]:
+            result = proof
+    else:
+        finish_without_write(store.path, scope, ticket)
 
     state["requests"].add(request_id)
     state["ack"] = request_id
@@ -300,8 +310,8 @@ def submit_product_turn(
         state["notice"] = ""
     else:
         state["notice"] = (
-            "Turno não persistido: somente leituras locais verificadas "
-            "podem entrar no histórico durável."
+            "Turno nÃ£o persistido: somente leituras locais verificadas "
+            "podem entrar no histÃ³rico durÃ¡vel."
         )
     return result
 

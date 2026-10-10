@@ -183,6 +183,7 @@ def execute_product_read_turn(
     feature_flags: Mapping[str, Any] | None = None,
     hub: Mapping[str, Any] | None = None,
     portable_core: Mapping[str, Any] | None = None,
+    before_append: Any = None,
 ) -> dict[str, Any]:
     """Execute+persist the existing verified local READ/SEARCH Golden Path."""
     binding = _require_binding(access, scope)
@@ -203,6 +204,7 @@ def execute_product_read_turn(
         authenticated_admin=True,
         hub=hub,
         portable_core=portable_core,
+        before_append=before_append,
         conversation_id=conversation_id,
     )
     return {
@@ -386,6 +388,8 @@ def continue_product_read_turn(
     feature_flags: Mapping[str, Any] | None = None,
     hub: Mapping[str, Any] | None = None,
     portable_core: Mapping[str, Any] | None = None,
+    before_append: Any = None,
+    bound_turn_index: int | None = None,
 ) -> dict[str, Any]:
     """Resume durable state first, then append the next verified read-only turn."""
     binding = _require_binding(access, scope)
@@ -420,11 +424,12 @@ def continue_product_read_turn(
         message,
         conversation_id=cid,
         runtime_context=runtime_context,
-        turn_index=prior_count,
+        turn_index=prior_count if bound_turn_index is None else bound_turn_index,
         attachment_ids=attachment_ids,
         feature_flags=feature_flags,
         hub=hub,
         portable_core=portable_core,
+        before_append=before_append,
     )
     after_count = int(store.get_conversation(scope, cid).message_count)
     return {
@@ -462,3 +467,4 @@ __all__ = [
     "read_product_history_page",
     "continue_product_read_turn",
 ]
+
