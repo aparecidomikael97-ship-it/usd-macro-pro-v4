@@ -356,25 +356,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Optional private-access gate. Disabled by default; when required it fails closed.
+# The login subsystem must never fail open when its import or gate fails.
+# A deliberate OPEN decision from the working gate is *application UI* only;
+# it never authorizes reads/writes of private Shadow/Research data.
 if render_access_gate is not None:
-    _ATLASQUANT_ACCESS = render_access_gate()
-    if not bool(_ATLASQUANT_ACCESS.get("allowed",False)):
+    try:
+        _ATLASQUANT_ACCESS = render_access_gate()
+    except Exception:
+        st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
+        st.stop()
+    if not isinstance(_ATLASQUANT_ACCESS, dict) or not bool(_ATLASQUANT_ACCESS.get("allowed", False)):
         st.stop()
 else:
-    try:
-        _auth_required_raw = st.secrets.get(
-            "ATLASQUANT_AUTH_REQUIRED",
-            os.getenv("ATLASQUANT_AUTH_REQUIRED","false"),
-        )
-    except Exception:
-        _auth_required_raw = os.getenv("ATLASQUANT_AUTH_REQUIRED","false")
-    _auth_required_fallback = str(_auth_required_raw or "").strip().lower() in {"1","true","yes","on","sim"}
-    if _auth_required_fallback:
-        st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
-        st.caption(_ATLASQUANT_ACCESS_IMPORT_ERROR)
-        st.stop()
-    _ATLASQUANT_ACCESS = {"allowed":True,"mode":"OPEN","role":"OPEN"}
+    st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
+    st.stop()
 
 from compact_ui_v1107 import apply_compact_theme
 apply_compact_theme()
