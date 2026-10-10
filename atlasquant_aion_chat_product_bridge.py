@@ -306,10 +306,12 @@ def read_product_history_page(
             verification_state = _clean(
                 metadata.get("verification_state"), 60
             ).upper()
+            # The scoped store proves local presence, not historical truth.
+            # Metadata (including receipt claims) is never reverified here.
             public_turns[turn_id] = {
-                "state": "CONFIRMED_SUCCESS",
-                "reason": "",
-                "capability": "Leitura local verificada",
+                "state": "UNKNOWN",
+                "reason": "HISTORICAL_RESULT_NOT_REVERIFIED",
+                "capability": "Histórico local",
                 "policy_state": "READ_ONLY",
                 "blockers": [],
                 "approval": {
@@ -320,23 +322,36 @@ def read_product_history_page(
                 "stages": [
                     {
                         "stage": "VERIFICATION",
-                        "state": verification_state or "CONFIRMED",
+                        "state": "NOT_REVERIFIED",
                     },
                     {
                         "stage": "PERSISTENCE",
-                        "state": "CONFIRMED",
+                        "state": "LOCAL_PRESENT",
                     },
                 ],
                 "evidence": (
-                    "Histórico local durável · escopo autenticado e "
-                    "identidade verificada."
+                    "Mensagem presente no histórico local autenticado. "
+                    "O resultado histórico não foi reverificado."
                 ),
                 "receipt": (
-                    "Receipt verificado · " + receipt_id
+                    "Receipt declarado · " + receipt_id
                     if receipt_id
-                    else "Receipt verificado · identificador não exposto."
+                    else (
+                        "Digest de receipt declarado · não reverificado."
+                        if receipt_digest
+                        else "Receipt não fornecido para reverificação."
+                    )
                 ),
                 "receipt_digest_present": bool(receipt_digest),
+                "declared_verification_state": verification_state or "UNKNOWN",
+                "historical_result_reverified": False,
+                "persistence_state": "LOCAL_PRESENT",
+                "receipt_state": (
+                    "DECLARED_UNVERIFIED"
+                    if receipt_id or receipt_digest
+                    else "NOT_PROVIDED"
+                ),
+                "receipt_verified": False,
             }
 
     return {
