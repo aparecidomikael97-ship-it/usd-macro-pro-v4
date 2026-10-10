@@ -6,6 +6,8 @@ network origin, trusted custody, monotonic witness or remote durability.
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import re
 from collections.abc import Callable, Iterable, Mapping
@@ -18,6 +20,30 @@ def _git_blob_sha(raw:bytes)->str:
     # GitHub Contents 'content.sha' identifies the resulting Git blob.
     # Supports the current SHA-1 repository format only, fail closed otherwise.
     return hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+b"\x00"+raw).hexdigest()
+
+def decode_verified_github_contents(payload:object)->tuple[str,str]:
+    """Bind the GET's raw bytes to its blob SHA before JSON parsing loses data.
+
+    A missing/unsupported content body is not an empty file. This proves only
+    consistency of the response, never independent provenance or durability.
+    """
+    if type(payload) is not dict or payload.get("encoding") != "base64":
+        raise ValueError("GITHUB_BASE64_CONTENT_REQUIRED")
+    content=payload.get("content")
+    sha=payload.get("sha")
+    if type(content) is not str or type(sha) is not str or re.fullmatch(r"[0-9a-f]{40}",sha) is None:
+        raise ValueError("GITHUB_CONTENT_OR_BLOB_SHA_INVALID")
+    try:
+        # Contents API wraps base64 with line breaks; other garbage is invalid.
+        encoded=content.replace("\r","").replace("\n","")
+        raw=base64.b64decode(encoded,validate=True)
+        if base64.b64encode(raw).decode("ascii") != encoded:
+            raise ValueError("NONCANONICAL_BASE64")
+        if _git_blob_sha(raw) != sha:
+            raise ValueError("GITHUB_RAW_BLOB_SHA_MISMATCH")
+        return raw.decode("utf-8"),sha
+    except (ValueError,UnicodeError,binascii.Error):
+        raise ValueError("GITHUB_CONTENT_BYTES_UNVERIFIED") from None
 
 def verify_legacy_jsonl_readback(
     *,
@@ -74,4 +100,5 @@ def verify_legacy_jsonl_readback(
         "safe_to_retry":False,
     }
 
-__all__=["GitHubReadAfterWriteUnconfirmedError","verify_legacy_jsonl_readback"]
+__all__=["GitHubReadAfterWriteUnconfirmedError","verify_legacy_jsonl_readback",
+         "decode_verified_github_contents"]

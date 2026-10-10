@@ -8,7 +8,7 @@ from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_de
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
 from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
-from atlasquant_aion_v2_legacy_github_contents_readback import verify_legacy_jsonl_readback
+from atlasquant_aion_v2_legacy_github_contents_readback import verify_legacy_jsonl_readback, decode_verified_github_contents
 
 import base64
 import json
@@ -101,8 +101,8 @@ def _fetch_remote(repo: str, branch: str, token: str, timeout: int) -> tuple[lis
         return [],""
     r.raise_for_status()
     payload=r.json()
-    raw=base64.b64decode(payload.get("content","")).decode("utf-8")
-    return parse_records(raw),str(payload.get("sha","") or "")
+    raw,sha=decode_verified_github_contents(payload)
+    return parse_records(raw),sha
 
 
 def load_persistent_records(
