@@ -7,10 +7,12 @@ CF Free quotas refer to *this modeled workload*, not account-wide actual use.
 """
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_CEILING
 from typing import Any, Mapping
 
 SCHEMA = "AION_WITNESS_BUDGET_RESEARCH_V1"
+WORKERS_FREE_INBOUND_REQUESTS_PER_DAY = 100_000
+WORKERS_FREE_CPU_MS_PER_INVOCATION = Decimal("10")
 CAP_BRL = Decimal("200")
 DAYS_PER_MONTH = 30
 CF_FREE_LIMITS = {
@@ -26,6 +28,13 @@ PLAN_FIELDS = frozenset({
     "do_rows_read_per_request", "do_rows_written_per_write",
     "do_duration_gb_s_per_request", "do_storage_gb",
     "s3_receipt_bytes", "s3_retention_days",
+})
+# Must not conflate Durable Objects RPCs with inbound Worker requests.
+# This is an optional unverified scenario, not real account-wide metrics.
+WORKER_PROFILE_FIELDS = frozenset({
+    "requests_per_read", "requests_per_write",
+    "other_account_requests_per_day", "cpu_ms_per_invocation",
+    "peak_day_multiplier",
 })
 QUOTE_FIELDS = frozenset({
     "fx_brl_per_usd", "existing_infra_brl_month",
@@ -81,12 +90,15 @@ def _base(status: str, blockers: list[str], **metrics: Any) -> dict[str, Any]:
     }
 
 def model_witness_cost(plan: Mapping[str, Any] | None,
-                       quote: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                       quote: Mapping[str, Any] | None = None,
+                       *, worker_profile: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Check *assumptions* against free quotas and optionally price a quoted basket.
 
     DO capacity is separate from Workers caller requests and other resources.
-    Missing/incomplete vendor quote => no total in BRL. Any positive estimate
-    remains mathematical-only and never certifies the R$200 ceiling.
+    Missing/incomplete vendor quote => no total in BRL. Worker inbound
+    requests/CPU and peak-day traffic require a separately declared profile.
+    The profile is never trusted as real account-wide metering. Any positive
+    estimate remains mathematical-only and never certifies R$200.
     """
     if not isinstance(plan, Mapping) or set(plan) != PLAN_FIELDS:
         return _base("INVALID_PLAN", ["PLAN_FIELDS_INVALID"])
@@ -138,7 +150,67 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
         breaches.append("CF_FREE_DURATION_EXCEEDED")
     if do_storage > CF_FREE_LIMITS["do_stored_gb"]:
         breaches.append("CF_FREE_STORAGE_EXCEEDED")
-    blockers = breaches or ["CF_FREE_ONLY_MODELED_NOT_ACCOUNT_VERIFIED"]
+    # Peak-day and Workers Free gates cannot be assumed from DO mean traffic.
+    # Keep original calculations unchanged for callers that have not provided
+    # a Worker profile, but surface the omission as an explicit blocker.
+    if worker_profile is None:
+        metrics["workers_profile_included"] = False
+        metrics["workers_requests_per_day_modeled"] = None
+        metrics["peak_day_multiplier"] = None
+        workers_blockers = ["WORKERS_FREE_USAGE_AND_PEAK_NOT_MODELED"]
+    elif not isinstance(worker_profile, Mapping) or set(worker_profile) != WORKER_PROFILE_FIELDS:
+        return _base("WORKER_PROFILE_INVALID", breaches + [
+            "WORKER_PROFILE_FIELDS_INVALID"], **metrics)
+    else:
+        try:
+            worker_r = _int(worker_profile["requests_per_read"], "WORKER_REQUESTS_READ", low=0)
+            worker_w = _int(worker_profile["requests_per_write"], "WORKER_REQUESTS_WRITE", low=0)
+            other = _int(worker_profile["other_account_requests_per_day"], "OTHER_ACCOUNT_REQUESTS", low=0)
+            cpu = _dec(worker_profile["cpu_ms_per_invocation"], "WORKER_CPU")
+            peak = _dec(worker_profile["peak_day_multiplier"], "PEAK_MULTIPLIER")
+            if peak < 1 or peak > 100:
+                raise ValueError("PEAK_RANGE")
+            if worker_r + worker_w < 1:
+                raise ValueError("WORKER_TRAFFIC_ABSENT")
+        except ValueError as ex:
+            return _base("WORKER_PROFILE_INVALID", breaches + [
+                "INVALID_" + str(ex)], **metrics)
+        def ceiling(value: Decimal) -> int:
+            return int(value.to_integral_value(rounding=ROUND_CEILING))
+        inbound = daily_reads * worker_r + daily_writes * worker_w
+        workers_peak = ceiling(Decimal(inbound + other) * peak)
+        peak_do = ceiling(Decimal(daily_do) * peak)
+        peak_do_rows_read = ceiling(Decimal(daily_row_read) * peak)
+        peak_do_rows_written = ceiling(Decimal(daily_row_write) * peak)
+        peak_do_duration = daily_duration * peak
+        metrics.update({
+            "workers_profile_included": True,
+            "workers_requests_per_day_modeled": inbound,
+            "workers_other_account_requests_per_day_assumed": other,
+            "workers_total_peak_requests_per_day_modeled": workers_peak,
+            "workers_cpu_ms_per_invocation_assumed": str(cpu),
+            "peak_day_multiplier": str(peak),
+            "do_peak_requests_per_day": peak_do,
+            "do_peak_rows_read_per_day": peak_do_rows_read,
+            "do_peak_rows_written_per_day": peak_do_rows_written,
+            "do_peak_duration_gb_s_per_day": str(peak_do_duration),
+        })
+        workers_blockers = ["WORKERS_FREE_AND_OTHER_ACCOUNT_ONLY_SELF_DECLARED"]
+        if workers_peak > WORKERS_FREE_INBOUND_REQUESTS_PER_DAY:
+            breaches.append("CF_WORKERS_FREE_INBOUND_REQUESTS_EXCEEDED")
+        if cpu > WORKERS_FREE_CPU_MS_PER_INVOCATION:
+            breaches.append("CF_WORKERS_FREE_CPU_PER_INVOCATION_EXCEEDED")
+        if peak_do > CF_FREE_LIMITS["do_requests_per_day"]:
+            breaches.append("CF_DO_PEAK_REQUESTS_EXCEEDED")
+        if peak_do_rows_read > CF_FREE_LIMITS["do_rows_read_per_day"]:
+            breaches.append("CF_DO_PEAK_ROWS_READ_EXCEEDED")
+        if peak_do_rows_written > CF_FREE_LIMITS["do_rows_written_per_day"]:
+            breaches.append("CF_DO_PEAK_ROWS_WRITTEN_EXCEEDED")
+        if peak_do_duration > CF_FREE_LIMITS["do_duration_gb_s_per_day"]:
+            breaches.append("CF_DO_PEAK_DURATION_EXCEEDED")
+    blockers = list(breaches) + workers_blockers + [
+        "CF_FREE_ONLY_MODELED_NOT_ACCOUNT_VERIFIED"
+    ]
     if quote is None:
         return _base("FREE_CAPACITY_EXCEEDED" if breaches else "COST_NOT_QUOTED",
                      blockers + ["AWS_FX_EXISTING_COSTS_NOT_QUOTED"], **metrics)
@@ -152,7 +224,7 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
             raise ValueError("RATE_TOO_HIGH")
     except ValueError as ex:
         return _base("COST_NOT_QUOTED", blockers + ["INVALID_" + str(ex)], **metrics)
-    # Quote values are unverified and omit CF calling Worker/other tenants.
+    # Quote values are unverified, even if an optional Worker profile exists.
     # Do NOT compute a misleading full-stack total or budget approval.
     s3_storage = monthly_storage_gb_lower_bound * amounts["s3_storage_usd_per_gb_month"]
     requests = (
@@ -177,4 +249,5 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
                  **metrics)
 
 __all__ = ["SCHEMA", "PLAN_FIELDS", "QUOTE_FIELDS", "NO_AUTHORITY",
-           "CF_FREE_LIMITS", "model_witness_cost"]
+           "CF_FREE_LIMITS", "WORKER_PROFILE_FIELDS",
+           "WORKERS_FREE_INBOUND_REQUESTS_PER_DAY", "model_witness_cost"]
