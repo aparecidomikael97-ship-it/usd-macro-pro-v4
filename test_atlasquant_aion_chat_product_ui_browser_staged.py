@@ -127,6 +127,9 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
             raise
         expect(assistant).to_contain_text("AION · histórico local")
         expect(assistant).to_contain_text("Não reverificado · UNKNOWN")
+        # A historical UNKNOWN is not an approval request or chat-wide block.
+        expect(page.locator(".aq-chat-turn-notice")).to_be_hidden()
+        expect(page.locator(".aq-chat-send")).to_be_enabled()
         expect(assistant).not_to_contain_text("leitura local verificada")
         expect(page.locator(".aq-chat-message")).to_have_count(2)
         assistant.locator(".aq-chat-proof summary").click()
@@ -161,6 +164,8 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         expect(assistant).to_have_count(2)
         # Multiple assistant turns exist here; test the newest turn explicitly.
         expect(assistant.last).to_contain_text("Não reverificado · UNKNOWN")
+        expect(page.locator(".aq-chat-turn-notice")).to_be_hidden()
+        expect(page.locator(".aq-chat-send")).to_be_enabled()
         expect(page.locator(".aq-chat-id")).to_have_text(conversation_id)
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
 
