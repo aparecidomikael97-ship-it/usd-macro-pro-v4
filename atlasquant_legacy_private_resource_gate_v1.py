@@ -19,6 +19,7 @@ LEGACY_SHARED_PATHS = frozenset({
     "dados/configuracoes_completas_v937.csv",
     "dados/scanner_tecnico_v934.json",
     "dados/autopilot_status_v107.json",
+    "dados/news_nowcast_predictions_v1.csv",
     "dados/paper_trading_summary_v112.json",
     "dados/paper_setup_summary_v114.json",
     "dados/atlasquant_quota_shadow_v1.json",

@@ -18,6 +18,10 @@ import streamlit as st
 from atlasquant_news_nowcast import HistoricalRelease, validate_historical_release
 from atlasquant_live_nowcast import normalize_live_ledger, summarize_live_nowcasts
 from atlasquant_runtime_store import require_runtime_branch
+from atlasquant_private_read_gate_v1 import private_read_allowed
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_news_backtest import (
     monthly_news_scores,
     simple_month_score,
@@ -39,7 +43,6 @@ NEWS_HISTORY_COLUMNS=(
 )
 
 
-@st.cache_data(ttl=300,show_spinner=False)
 def load_live_nowcast_runtime(
     *,
     repo:str,
@@ -47,6 +50,12 @@ def load_live_nowcast_runtime(
     token:str,
     max_rows:int=5000,
 )->tuple[pd.DataFrame,dict[str,Any]]:
+    # A decorated Streamlit cache could return shared rows without running
+    # the authorization body. Do not cache private tenant-unbound results.
+    if not private_read_allowed():
+        return pd.DataFrame(), {"ok":False,"reason":"ACCESS_DENIED","rows":0,"error":""}
+    if not legacy_private_remote_resource_allowed(LIVE_NOWCAST_PATH):
+        return pd.DataFrame(), {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","rows":0,"error":""}
     try:
         safe=require_runtime_branch(branch)
     except Exception as exc:
@@ -61,8 +70,9 @@ def load_live_nowcast_runtime(
             "branch":safe,"error":"",
         }
     try:
-        response=requests.get(
-            f"https://api.github.com/repos/{repo}/contents/{LIVE_NOWCAST_PATH}",
+        url=f"https://api.github.com/repos/{repo}/contents/{LIVE_NOWCAST_PATH}"
+        response=reject_github_read_unexpected_status(requests.get(
+            guard_github_token_read_destination(url),
             headers={
                 "Authorization":f"Bearer {token}",
                 "Accept":"application/vnd.github+json",
@@ -70,7 +80,8 @@ def load_live_nowcast_runtime(
             },
             params={"ref":safe},
             timeout=15,
-        )
+            allow_redirects=False,
+        ))
         if response.status_code==404:
             return pd.DataFrame(),{
                 "ok":True,"reason":"NOT_FOUND","rows":0,
