@@ -57,37 +57,44 @@ binding = build_streamlit_staged_binding(
 if binding is None:
     raise RuntimeError("staged durable chat QA flag is not enabled")
 
-st.session_state.setdefault("atlasquant_experience_mode", "Avançado")
-st.session_state.setdefault(CENTRAL_CHOICE_KEY, "aion")
-
-st.markdown(
-    '<span id="aq-staged-host-marker" '
-    'data-state="STAGED_BOUND" data-production="false" '
-    'data-provider="false" data-network="false" aria-hidden="true"></span>',
-    unsafe_allow_html=True,
-)
-
-if st.button(
-    "QA · remontar store durável",
-    key="qa_remount_staged_chat_store",
-):
+# This QA Streamlit script can be rerun on a different script-runner thread.
+# A SQLite connection is thread-affine: close it in the creating thread before
+# leaving *each* execution, including st.rerun, rather than saving it for a
+# later run and triggering sqlite3.ProgrammingError on Windows.
+try:
+    st.session_state.setdefault("atlasquant_experience_mode", "Avançado")
+    st.session_state.setdefault(CENTRAL_CHOICE_KEY, "aion")
+    
+    st.markdown(
+        '<span id="aq-staged-host-marker" '
+        'data-state="STAGED_BOUND" data-production="false" '
+        'data-provider="false" data-network="false" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    
+    if st.button(
+        "QA · remontar store durável",
+        key="qa_remount_staged_chat_store",
+    ):
+        close_staged_host_store(st.session_state, binding["scope"])
+        st.session_state["qa_staged_store_remounts"] = int(
+            st.session_state.get("qa_staged_store_remounts", 0)
+        ) + 1
+        st.rerun()
+    
+    st.caption(
+        "QA LOCAL · SQLite staged · provider desligado · produção desligada · "
+        f"remounts={int(st.session_state.get('qa_staged_store_remounts', 0))}"
+    )
+    
+    requested = st.session_state.get(CENTRAL_CHOICE_KEY, "aion")
+    if requested == CENTRAL_ROOT:
+        requested = "central"
+    
+    render_central_hub(
+        ACCESS,
+        requested,
+        aion_chat_binding=binding,
+    )
+finally:
     close_staged_host_store(st.session_state, binding["scope"])
-    st.session_state["qa_staged_store_remounts"] = int(
-        st.session_state.get("qa_staged_store_remounts", 0)
-    ) + 1
-    st.rerun()
-
-st.caption(
-    "QA LOCAL · SQLite staged · provider desligado · produção desligada · "
-    f"remounts={int(st.session_state.get('qa_staged_store_remounts', 0))}"
-)
-
-requested = st.session_state.get(CENTRAL_CHOICE_KEY, "aion")
-if requested == CENTRAL_ROOT:
-    requested = "central"
-
-render_central_hub(
-    ACCESS,
-    requested,
-    aion_chat_binding=binding,
-)
