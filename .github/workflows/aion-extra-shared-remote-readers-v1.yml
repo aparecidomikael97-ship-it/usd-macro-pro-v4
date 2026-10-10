@@ -1,0 +1,33 @@
+name: AION Extra Shared Private Remote Readers CI
+
+on:
+  pull_request:
+    paths:
+      - "autopilot_panel_v107.py"
+      - "atlasquant_news_research_panel.py"
+      - "test_atlasquant_extra_shared_remote_readers_v1.py"
+      - ".github/workflows/aion-extra-shared-remote-readers-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tenant-source-deny:
+    name: Unbound remote resources / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile hardened readers and isolated tests
+        run: python -B -m py_compile autopilot_panel_v107.py atlasquant_news_research_panel.py test_atlasquant_extra_shared_remote_readers_v1.py
+      - name: Verify A B unbound source denial and no network
+        run: python -B -m unittest test_atlasquant_extra_shared_remote_readers_v1.py -v
