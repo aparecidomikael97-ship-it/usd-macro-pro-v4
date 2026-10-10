@@ -1494,10 +1494,18 @@ def main() -> int:
             "error":str(journal_read_error or journal_write_error or ""),
             "events":int(event_journal.get("event_count") or 0),
             "heartbeats":int(continuity.get("heartbeat_count") or 0),
-            "watch_state":str(continuity.get("state") or "UNKNOWN"),
-            "continuous_24h_confirmed":bool(
+            "watch_state":(
+                "UNVERIFIED_REMOTE_HISTORY"
+                if str(continuity.get("state") or "").upper()=="CONTINUOUS_24H"
+                else str(continuity.get("state") or "UNKNOWN")
+            ),
+            "reported_watch_state":str(continuity.get("state") or "UNKNOWN"),
+            "continuity_candidate_24h":bool(
                 continuity.get("continuous_24h_confirmed",False)
             ),
+            "continuous_24h_confirmed":False,
+            "independent_history_verified":False,
+            "remote_durability_certified":False,
             "delivery_candidates":int(
                 event_journal.get("delivery_candidate_count") or 0
             ),
