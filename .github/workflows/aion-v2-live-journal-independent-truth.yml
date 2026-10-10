@@ -1,0 +1,37 @@
+name: AION V2 Live Journal safety
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_event_journal.py"
+      - "autopilot_v107.py"
+      - "test_atlasquant_aion_event_journal.py"
+      - "tests/test_atlasquant_aion_event_journal_durable_truth.py"
+      - "docs/aion/AION_V2_LIVE_JOURNAL_INDEPENDENT_TRUTH_GATE.md"
+      - ".github/workflows/aion-v2-live-journal-independent-truth.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  safety:
+    name: Journal continuity / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile source and tests
+        run: python -B -m py_compile atlasquant_aion_event_journal.py autopilot_v107.py test_atlasquant_aion_event_journal.py tests/test_atlasquant_aion_event_journal_durable_truth.py
+      - name: Existing tests
+        run: python -B -m unittest test_atlasquant_aion_event_journal.py
+      - name: Adversarial tests
+        run: python -B -m unittest discover -s tests -p test_atlasquant_aion_event_journal_durable_truth.py

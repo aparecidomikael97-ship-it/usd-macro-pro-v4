@@ -1,0 +1,37 @@
+name: AION V2 Autopilot generic write inventory
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_v2_autopilot_write_inventory_audit.py"
+      - "tests/test_atlasquant_aion_v2_autopilot_write_inventory_audit.py"
+      - "docs/aion/AION_V2_AUTOPILOT_WRITE_INVENTORY_SOURCE_REVIEW.md"
+      - "autopilot_v107.py"
+      - "twelve_budget_v1108.py"
+      - ".github/workflows/aion-v2-autopilot-write-inventory.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-only-inventory:
+    name: Static inventory / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile source-only audit
+        run: python -B -m py_compile atlasquant_aion_v2_autopilot_write_inventory_audit.py tests/test_atlasquant_aion_v2_autopilot_write_inventory_audit.py
+      - name: Audit known sources (not a safety approval)
+        run: python -B atlasquant_aion_v2_autopilot_write_inventory_audit.py
+      - name: Run offline tests
+        run: python -B -m unittest discover -s tests -p test_atlasquant_aion_v2_autopilot_write_inventory_audit.py
