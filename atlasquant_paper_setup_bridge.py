@@ -186,6 +186,9 @@ def _load_runtime_csv(
     timeout:int=15,
     max_rows:int=DEFAULT_MAX_RUNTIME_ROWS,
 )->tuple[pd.DataFrame,dict[str,Any]]:
+    from atlasquant_private_read_gate_v1 import private_read_allowed
+    if not private_read_allowed():
+        return pd.DataFrame(), {"ok":False,"reason":"ACCESS_DENIED","rows":0,"error":""}
     try:
         safe=require_runtime_branch(branch)
     except Exception as exc:

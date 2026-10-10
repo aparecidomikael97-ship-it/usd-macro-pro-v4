@@ -1,3 +1,4 @@
+from atlasquant_private_read_gate_v1 import private_read_allowed
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
@@ -3534,7 +3535,9 @@ def _github_cfg_v84():
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 def _github_get_json_v937(path: str, default):
-    """Read validation/runtime JSON from the dedicated runtime-data branch."""
+    """Read private runtime JSON from the dedicated service-token branch."""
+    if not private_read_allowed():
+        return default, "ACCESS_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return default, "GitHub persistente não configurado"
@@ -3561,6 +3564,8 @@ def _github_get_json_v937(path: str, default):
 
 def _github_ler_csv_v84():
     """Lê dados/sinais_v84.csv do GitHub. Retorna None se não configurado/indisponível."""
+    if not private_read_allowed():
+        return None
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return None
@@ -3585,6 +3590,7 @@ def _github_ler_csv_v84():
 
 def _github_salvar_csv_v84(df):
     """Cria/atualiza o CSV persistente no GitHub. Retorna (ok, mensagem)."""
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "GitHub persistente não configurado"
@@ -4435,6 +4441,7 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 # V10.4 — FEEDBACK PERSISTENTE
 # =========================================================
 def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bool, str]:
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "GitHub persistente não configurado."
@@ -4457,6 +4464,7 @@ def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bo
         return False, f"{type(exc).__name__}: {exc}"
 
 def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_name: str | None) -> tuple[bool, str]:
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "Configure GITHUB_TOKEN_HISTORICO para salvar feedback."
@@ -4518,6 +4526,8 @@ def _refresh_central_v104() -> tuple[bool, str]:
 def _autopilot_save_inputs_v107():
     if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
         return True, "Modo interativo: snapshot automático não necessário."
+    # Do not enable unattended GitHub GET/PUT without independent authority.
+    return False, "HARD_DENIED"
     try:
         if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
             return False, "Matriz V6.1 indisponível no run headless."
@@ -8262,6 +8272,8 @@ def _config_cols_v937():
     ]
 
 def _config_ler_v937():
+    if not private_read_allowed():
+        return pd.DataFrame(columns=_config_cols_v937()), "ACCESS_DENIED"
     token, repo, branch = _gh_cfg_v934()
     cols = _config_cols_v937()
     if not token or not repo:
@@ -8297,6 +8309,8 @@ def _config_ler_v937():
         return pd.DataFrame(columns=cols), f"{type(e).__name__}: {e}"
 
 def _config_salvar_v937(df):
+    # Deny legacy PUT without trustworthy claim/CAS and durable witness.
+    return False, "HARD_DENIED"
     token, repo, branch = _gh_cfg_v934()
     if not token or not repo:
         return False, "GitHub persistente não configurado."
@@ -8720,6 +8734,9 @@ def _gh_cfg_v934():
     return str(token), str(repo), str(branch)
 
 def _scanner_load_v934():
+    if not private_read_allowed():
+        return {"versao":"V9.3.5","lote":0,"ultimo_processamento_ts":0.0,
+                "resultados":{},"_erro":"ACCESS_DENIED"}
     token, repo, branch = _gh_cfg_v934()
     vazio = {"versao": "V9.3.5", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
     if not token or not repo:
@@ -10230,7 +10247,7 @@ if _aq_active_index == 13:
                 _aq_shadow_rows, _aq_shadow_load = ensure_shadow_hydrated()
             else:
                 _aq_shadow_rows, _aq_shadow_load = (
-                    st.session_state.get("atlasquant_shadow_samples", []),
+                    [],
                     {"ok":False,"reason":"HYDRATOR_UNAVAILABLE"},
                 )
             render_shadow_mode_panel(
@@ -10349,6 +10366,8 @@ if _aq_active_index == 13:
                 _aq_setup_summary = {}
                 _aq_quota_store = {}
                 try:
+                    if not private_read_allowed():
+                        raise PermissionError("PRIVATE_READ_DENIED")
                     _aq_runtime_status, _aq_runtime_source = _github_get_json_v937("dados/autopilot_status_v107.json", {})
                     _aq_paper_summary, _aq_paper_source = _github_get_json_v937("dados/paper_trading_summary_v112.json", {})
                     _aq_setup_summary, _aq_setup_source = _github_get_json_v937("dados/paper_setup_summary_v114.json", {})
@@ -10374,7 +10393,7 @@ if _aq_active_index == 13:
                     _aq_quota_rows = _aq_quota_store.get("samples", [])
                     if isinstance(_aq_quota_rows, list):
                         _aq_quota_samples = [x for x in _aq_quota_rows if isinstance(x, dict)]
-                _aq_validation_shadow_rows = st.session_state.get("atlasquant_shadow_samples", [])
+                _aq_validation_shadow_rows = []
                 if ensure_shadow_hydrated is not None:
                     try:
                         _aq_hydrated_shadow_rows, _aq_validation_shadow_load = ensure_shadow_hydrated()
@@ -10404,8 +10423,8 @@ if _aq_active_index == 13:
             st.caption(f"Diagnóstico: {type(_aq_validation_exc).__name__}: {_aq_validation_exc}")
 
     st.divider()
-    if render_private_validation_center is None:
-        st.warning("Validação Privada de Setups indisponível; nenhuma promoção é permitida.")
+    if render_private_validation_center is None or not private_read_allowed():
+        st.warning("Validação Privada de Setups indisponível sem autorização autenticada.")
         if _ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR:
             st.caption(f"Diagnóstico Setup Validation: {_ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR}")
     else:

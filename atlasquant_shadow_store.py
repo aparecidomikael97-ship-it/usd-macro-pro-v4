@@ -77,6 +77,8 @@ def _url(repo: str) -> str:
 
 
 def _fetch(repo: str, branch: str, token: str, timeout: int):
+    from atlasquant_private_read_gate_v1 import require_private_read
+    require_private_read()
     r=reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(_url(repo)),headers=_headers(token),params={"ref":branch},timeout=timeout, allow_redirects=False))
     if r.status_code==404:
         return [],""
@@ -104,6 +106,9 @@ def persist_shadow_samples(
     max_samples: int=DEFAULT_MAX_SAMPLES,
     retry_conflict_once: bool=True,
 ) -> dict[str,Any]:
+    # Hard deny until independent claim/CAS + durable witness exist.
+    return {"ok":False,"reason":"HARD_DENIED","added":0,"samples":0,
+            "reconciliation_required":True,"safe_to_retry":False}
     try:
         safe=require_runtime_branch(branch)
     except Exception as exc:
