@@ -11,7 +11,7 @@ export default function(component) {
   <div class="aq-chat-pagination"><button type="button" class="aq-chat-older">← Mensagens anteriores</button><span class="aq-chat-count"></span><button type="button" class="aq-chat-newer">Mensagens recentes →</button></div>
   <section class="aq-chat-history" aria-label="Histórico da conversa" tabindex="0"></section>
   <button type="button" class="aq-chat-bottom" hidden>Ir para mensagens recentes ↓</button>
-  <form class="aq-chat-composer"><label for="aq-chat-message">Sua mensagem</label><textarea id="aq-chat-message" rows="3" maxlength="8000" placeholder="Pergunte, explore uma ideia ou peça um plano…" aria-describedby="aq-chat-help"></textarea><div class="aq-chat-chips"></div><div class="aq-chat-actions"><label class="aq-chat-attach">＋ Anexar arquivo ou imagem<input class="aq-chat-files" type="file" multiple aria-label="Anexar arquivo ou imagem"></label><span class="aq-chat-keyhint">Enter envia · Shift+Enter quebra linha</span><button type="button" class="aq-chat-stop" hidden>Parar envio visual</button><button type="submit" class="aq-chat-send">Enviar ↑</button></div><small id="aq-chat-help">Anexos: apenas nome, tipo e tamanho. Ingestão segura ainda não ativa.</small></form>
+  <form class="aq-chat-composer"><label for="aq-chat-message">Sua mensagem</label><textarea id="aq-chat-message" rows="3" maxlength="8000" placeholder="Pergunte, explore uma ideia ou peça um plano…" aria-describedby="aq-chat-help"></textarea><div class="aq-chat-chips"></div><div class="aq-chat-actions"><label class="aq-chat-attach">＋ Anexar arquivo ou imagem<input class="aq-chat-files" type="file" multiple aria-label="Anexar arquivo ou imagem"></label><span class="aq-chat-keyhint">Enter envia · Shift+Enter quebra linha</span><button type="button" class="aq-chat-stop" hidden>Parar envio visual</button><button type="submit" class="aq-chat-send">Enviar ↑</button></div><p class="aq-chat-turn-notice" role="status" aria-live="polite" hidden></p><small id="aq-chat-help">Anexos: apenas nome, tipo e tamanho. Ingestão segura ainda não ativa.</small></form>
   <p class="aq-chat-live" role="status" aria-live="polite" aria-atomic="true">Pronto para conversar · planejamento local, sem execução.</p>
   </main></div>`; // Constant markup only. All dynamic content uses textContent.
   root._state={files:[],busy:false,pending:'',lastAck:'',renderKey:'',timer:null,stopped:false};
@@ -21,6 +21,23 @@ export default function(component) {
  q('[data-route="central"]').hidden=!data.central;
  q('.aq-chat-id').textContent=data.conversation_id;
  const live=text=>q('.aq-chat-live').textContent=text;
+ // This is the state of the most recent *turn*, never an execution gate for new messages.
+ const renderTurnNotice=()=>{
+  const note=q('.aq-chat-turn-notice');
+  const last=data.page===0 && !data.notice && Array.isArray(data.entries)
+   ? [...data.entries].reverse().find(entry=>entry.role==='assistant') : null;
+  const turn=last && data.turns ? data.turns[last.turn_id] : null;
+  const waiting=turn?.state==='WAITING_APPROVAL' && turn.approval?.required===true && turn.approval?.granted!==true;
+  const blocked=turn?.state==='BLOCKED';
+  note.hidden=!(waiting||blocked);
+  note.dataset.state=waiting?'WAITING_APPROVAL':blocked?'BLOCKED':'';
+  note.textContent=waiting
+   ? 'O pedido anterior aguarda aprovação humana pelo fluxo autorizado. Nenhuma ação foi executada; você pode continuar conversando.'
+   : blocked
+    ? 'O pedido anterior foi bloqueado pela política, não a conversa. Nenhuma ação foi executada; você pode enviar outra mensagem.'
+    : '';
+ };
+ renderTurnNotice();
  const enabled=()=>{input.disabled=state.busy;q('.aq-chat-send').disabled=state.busy;q('.aq-chat-files').disabled=state.busy;q('.aq-chat-stop').hidden=!state.busy;q('form').setAttribute('aria-busy',String(state.busy));};
  const finish=()=>{state.busy=false;clearTimeout(state.timer);enabled();input.focus({preventScroll:true});};
  const chipList=()=>{q('.aq-chat-chips').replaceChildren();state.files.forEach((f,index)=>{const chip=el('span',`${f.filename} · ${f.size_bytes} bytes`,'aq-chat-chip'),b=el('button','×');b.type='button';b.setAttribute('aria-label',`Remover ${f.filename}`);b.disabled=state.busy;b.onclick=()=>{state.files.splice(index,1);chipList();};chip.append(b);q('.aq-chat-chips').append(chip);});};
@@ -43,8 +60,10 @@ export default function(component) {
     card.append(el('span',statusLabel+' · '+status,'aq-chat-state '+status.toLowerCase()),el('small','Capability · '+turn.capability));
     for(const blocker of turn.blockers||[])card.append(el('small',blocker,'aq-chat-blocker'));
     if(turn.approval?.required){const note=el('div','Aprovação necessária · não concedida. Use o fluxo autorizado quando estiver integrado.','aq-chat-approval');card.append(note);}
+    // A positive approval claim requires an independently verified future contract.
+    const grantEvidence=turn.approval?.granted===false?'False':'NOT_VERIFIED';
     const proof=el('details',undefined,'aq-chat-proof'),summary=el('summary','Proof Mode · contrato e evidência');proof.append(summary);
-    proof.ontoggle=()=>{if(!proof.open||proof.dataset.loaded)return;proof.dataset.loaded='true';proof.append(el('p',`Capability: ${turn.capability} · Policy: ${turn.policy_state} · Approval: ${turn.approval?.state||'NOT_APPLICABLE'} · granted=False`),el('p',turn.evidence),el('p',turn.receipt),el('p','Provider não conectado · modo local. Estado online do runtime não observado.'));
+    proof.ontoggle=()=>{if(!proof.open||proof.dataset.loaded)return;proof.dataset.loaded='true';proof.append(el('p',`Capability: ${turn.capability} · Policy: ${turn.policy_state} · Approval: ${turn.approval?.state||'NOT_APPLICABLE'} · granted=${grantEvidence}`),el('p',turn.evidence),el('p',turn.receipt),el('p','Provider não conectado · modo local. Estado online do runtime não observado.'));
      const stages=el('ol');for(const stage of turn.stages||[])stages.append(el('li',`${stage.stage} · ${stage.state}`));proof.append(stages,el('small',`Turno: ${entry.turn_id}`));};card.append(proof);
    }history.append(card);
   }
