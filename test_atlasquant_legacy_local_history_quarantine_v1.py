@@ -118,7 +118,7 @@ class PrivateParquetQuarantineTests(unittest.TestCase):
                       if isinstance(x, ast.FunctionDef) and x.name == name)
             calls = [x for x in ast.walk(fn)
                      if isinstance(x, ast.Call) and isinstance(x.func, ast.Attribute)
-                     and x.func.attr in ("unlink", "remove", "rmdir", "rename", "replace")]
+                     and x.func.attr in ("unlink", "rmdir", "rename", "write_bytes", "write_text")]
             self.assertEqual(calls, [], name)
 
 
