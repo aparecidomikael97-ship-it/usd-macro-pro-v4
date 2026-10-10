@@ -160,7 +160,8 @@ class PrivateReadNoIoTests(unittest.TestCase):
                 "requests": types.SimpleNamespace(get=network),
             },
         )
-        rows, status = loader(path="dados/private.csv", repo="repo", branch="runtime", token="synthetic")
+        with patch("atlasquant_private_read_gate_v1.private_read_allowed", return_value=False):
+            rows, status = loader(path="dados/private.csv", repo="repo", branch="runtime", token="synthetic")
         self.assertEqual(rows, [])
         self.assertEqual(status["reason"], "ACCESS_DENIED")
         network.assert_not_called()

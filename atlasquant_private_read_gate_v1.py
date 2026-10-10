@@ -100,8 +100,14 @@ def private_read_decision(
 
 def private_read_allowed() -> bool:
     """Revalidate on every read; never trust UI access dictionaries or cache flags."""
-    import streamlit as st
-    state = st.session_state
+    try:
+        import streamlit as st
+    except Exception:
+        return False
+    try:
+        state = st.session_state
+    except Exception:
+        return False
     try:
         from atlasquant_access_panel import (
             access_required, configured_users, current_session,
