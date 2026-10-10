@@ -276,12 +276,23 @@ class RuntimeSourceBoundaryOfflineTests(unittest.TestCase):
         self.denied(reader=None)
 
     def test_no_http_or_write_apis_in_reference(self):
-        with patch("requests.get", side_effect=AssertionError("unexpected GET")) as get, patch(
-            "requests.put", side_effect=AssertionError("unexpected PUT")
-        ) as put:
-            self.denied(source_proof=None)
-        get.assert_not_called()
-        put.assert_not_called()
+        # Network dependencies are deliberately not installed in this isolated CI.
+        # The denied reference read cannot invoke an injected reader.
+        self.denied(source_proof=None)
+        import ast
+        from pathlib import Path
+        source = Path("atlasquant_aion_runtime_source_boundary_ref_v1.py").read_text(
+            encoding="utf-8"
+        )
+        tree = ast.parse(source)
+        network_roots = {"requests", "urllib", "http", "socket", "subprocess"}
+        imported = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported.update(alias.name.split(".")[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module.split(".")[0])
+        self.assertFalse(imported & network_roots)
 
     def test_reader_called_once_only_after_two_independent_signatures(self):
         self.reader.reset_mock()
