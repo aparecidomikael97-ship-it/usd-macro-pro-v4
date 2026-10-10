@@ -3535,7 +3535,9 @@ def _github_cfg_v84():
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 def _github_get_json_v937(path: str, default):
-    """Read validation/runtime JSON from the dedicated runtime-data branch."""
+    """Read private runtime JSON from the dedicated service-token branch."""
+    if not private_read_allowed():
+        return default, "ACCESS_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return default, "GitHub persistente não configurado"
@@ -3562,6 +3564,8 @@ def _github_get_json_v937(path: str, default):
 
 def _github_ler_csv_v84():
     """Lê dados/sinais_v84.csv do GitHub. Retorna None se não configurado/indisponível."""
+    if not private_read_allowed():
+        return None
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return None
@@ -3586,6 +3590,7 @@ def _github_ler_csv_v84():
 
 def _github_salvar_csv_v84(df):
     """Cria/atualiza o CSV persistente no GitHub. Retorna (ok, mensagem)."""
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "GitHub persistente não configurado"
@@ -4436,6 +4441,7 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 # V10.4 — FEEDBACK PERSISTENTE
 # =========================================================
 def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bool, str]:
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "GitHub persistente não configurado."
@@ -4458,6 +4464,7 @@ def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bo
         return False, f"{type(exc).__name__}: {exc}"
 
 def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_name: str | None) -> tuple[bool, str]:
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "Configure GITHUB_TOKEN_HISTORICO para salvar feedback."
@@ -4519,6 +4526,8 @@ def _refresh_central_v104() -> tuple[bool, str]:
 def _autopilot_save_inputs_v107():
     if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
         return True, "Modo interativo: snapshot automático não necessário."
+    # Do not enable unattended GitHub GET/PUT without independent authority.
+    return False, "HARD_DENIED"
     try:
         if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
             return False, "Matriz V6.1 indisponível no run headless."
@@ -8725,6 +8734,9 @@ def _gh_cfg_v934():
     return str(token), str(repo), str(branch)
 
 def _scanner_load_v934():
+    if not private_read_allowed():
+        return {"versao":"V9.3.5","lote":0,"ultimo_processamento_ts":0.0,
+                "resultados":{},"_erro":"ACCESS_DENIED"}
     token, repo, branch = _gh_cfg_v934()
     vazio = {"versao": "V9.3.5", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
     if not token or not repo:

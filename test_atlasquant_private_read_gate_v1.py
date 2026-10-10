@@ -204,6 +204,30 @@ class PrivateReadNoIoTests(unittest.TestCase):
         self.assertEqual(status["reason"], "ACCESS_DENIED")
         network.assert_not_called()
 
+    def test_legacy_github_readers_and_writers_deny_before_token_or_network(self):
+        network = Mock(side_effect=AssertionError("LEGACY GITHUB I/O"))
+        ctx = {
+            "private_read_allowed": lambda: False,
+            "requests": types.SimpleNamespace(get=network, put=network),
+            "os": types.SimpleNamespace(getenv=lambda *args: "1"),
+        }
+        json_read = extracted("usd_macro_pro_v4_cloud.py", "_github_get_json_v937", ctx)
+        self.assertEqual(json_read("dados/autopilot_status_v107.json", {}), ({}, "ACCESS_DENIED"))
+        legacy_csv = extracted("usd_macro_pro_v4_cloud.py", "_github_ler_csv_v84", ctx)
+        self.assertIsNone(legacy_csv())
+        scanner = extracted("usd_macro_pro_v4_cloud.py", "_scanner_load_v934", ctx)
+        self.assertEqual(scanner()["_erro"], "ACCESS_DENIED")
+        for name, args in (
+            ("_github_salvar_csv_v84", ([],)),
+            ("_github_put_bytes_v104", ("dados/private.csv", b"synthetic", "test")),
+            ("_salvar_feedback_v104", ({"synthetic": True}, None, None)),
+            ("_autopilot_save_inputs_v107", ()),
+        ):
+            with self.subTest(writer=name):
+                writer = extracted("usd_macro_pro_v4_cloud.py", name, ctx)
+                self.assertEqual(writer(*args)[0], False)
+        network.assert_not_called()
+
     def test_private_entrypoint_config_read_and_legacy_write_have_zero_io(self):
         network = Mock(side_effect=AssertionError("GITHUB I/O"))
         ctx = {
