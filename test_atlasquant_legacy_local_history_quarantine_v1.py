@@ -106,6 +106,13 @@ class PrivateParquetQuarantineTests(unittest.TestCase):
         self.assertNotIn("pd.read_parquet", SRC)
         self.assertNotIn("pd.DataFrame.to_parquet", SRC)
 
+    def test_ui_never_reports_signal_persisted_after_hard_deny(self):
+        self.assertIn("if _saved_signal:", SRC)
+        self.assertIn('st.warning("🔒 Histórico local bloqueado:', SRC)
+        self.assertIn('return False, "HARD_DENIED: histórico de sinal não foi persistido."', SRC)
+        self.assertIn("if not _salvar_sinais_v82(_df_v873):", SRC)
+        self.assertIn("nenhuma gravação persistente foi confirmada", SRC)
+
     def test_local_files_preserved_and_not_deleted_by_any_quarantine_code(self):
         self.assertIn('HIST_SCORES = "historico_scores_v5.parquet"', SRC)
         self.assertIn('HIST_SINAIS = "historico_sinais_v5.parquet"', SRC)

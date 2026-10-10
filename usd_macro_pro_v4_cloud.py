@@ -3723,7 +3723,9 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
     }
     df = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
     ok = _salvar_sinais_v82(df)
-    return ok, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
+    if not ok:
+        return False, "HARD_DENIED: histórico de sinal não foi persistido."
+    return True, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
 
 
 def _entrada_legada_segura_v1073(r):
@@ -7221,8 +7223,13 @@ if _aq_active_index == 4:
         horizonte = st.selectbox("Tempo para avaliar (horas)", [1,4,8,24,48,72], 3)
         if st.button("Registrar sinal"):
             conf_reg = float(np.clip(0.5 + diferenca/100, 0.01, 0.99))
-            registrar_sinal(f"{base}/{cotada}", conf_reg, score_base, score_cotada, preco, horizonte)
-            st.success("✅ Sinal registrado!")
+            _saved_signal, _signal_reason = registrar_sinal(
+                f"{base}/{cotada}", conf_reg, score_base, score_cotada, preco, horizonte
+            )
+            if _saved_signal:
+                st.success("✅ Sinal registrado!")
+            else:
+                st.warning("🔒 Histórico local bloqueado: " + str(_signal_reason))
 
     st.markdown("---")
     st.markdown("### 🏆 Matriz Inteligente — V9.3.5")
@@ -7355,7 +7362,8 @@ if _aq_active_index == 4:
 
     if _novas_v873:
         _df_v873 = pd.concat([_df_v873, pd.DataFrame(_novas_v873)], ignore_index=True)
-        _salvar_sinais_v82(_df_v873)
+        if not _salvar_sinais_v82(_df_v873):
+            st.caption("🔒 Histórico multipares calculado apenas nesta execução; nenhuma gravação persistente foi confirmada.")
 
     st.caption(
         "🤖 V8.7.3 multipares: usa exatamente a decisão final da Matriz. "
