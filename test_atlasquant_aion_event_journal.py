@@ -111,7 +111,7 @@ class AtlasQuantAionEventJournalTests(unittest.TestCase):
         self.assertFalse(out["automatic_notification_sent"])
         self.assertFalse(out["real_orders_enabled"])
 
-    def test_overlay_only_claims_continuity_from_persisted_summary(self):
+    def test_overlay_does_not_promote_self_reported_continuity(self):
         live={"continuous_runtime_confirmed":False}
         journal={
             "event_count":3,
@@ -128,8 +128,11 @@ class AtlasQuantAionEventJournalTests(unittest.TestCase):
             "delivery_queue":[],
         }
         out=overlay_journal(live,journal)
-        self.assertTrue(out["continuous_runtime_confirmed"])
-        self.assertEqual(out["background_watch_state"],"CONTINUOUS_24H")
+        self.assertFalse(out["continuous_runtime_confirmed"])
+        self.assertTrue(out["background_24h_continuity_candidate"])
+        self.assertFalse(out["independent_runtime_history_verified"])
+        self.assertEqual(out["background_watch_state"],"UNVERIFIED_REMOTE_HISTORY")
+        self.assertEqual(out["reported_background_watch_state"],"CONTINUOUS_24H")
         self.assertEqual(out["journal_event_count"],3)
         self.assertFalse(out["external_delivery_allowed"])
 
