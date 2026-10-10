@@ -48,6 +48,7 @@ class GlobalWorkerReadinessSourceTruthTests(unittest.TestCase):
             "integrity":{"state":"CONFIRMED"},
         }
         self.scope={
+            "Mapping": Mapping,  # Source function extracted by AST: type imported in real module.
             "evaluate_runtime_branch": lambda branch: SimpleNamespace(
                 safe_for_runtime_writes=True, branch="atlasquant-runtime"
             ),
