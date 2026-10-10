@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import requests
+from legacy_protocol_reference_v1 import install_historical_write_protocol_fixture
 import atlasquant_flight_recorder_store as flight
 import atlasquant_research_evidence_store as research
 import atlasquant_shadow_store as shadow
@@ -37,6 +38,7 @@ def contents(raw, claimed_sha=None):
 
 class ClosureAuditRegressions(unittest.TestCase):
     def setUp(self):
+        install_historical_write_protocol_fixture(self)
         self.network = patch("requests.sessions.Session.request",
                              side_effect=AssertionError("UNMOCKED_NETWORK_FORBIDDEN"))
         self.network.start()

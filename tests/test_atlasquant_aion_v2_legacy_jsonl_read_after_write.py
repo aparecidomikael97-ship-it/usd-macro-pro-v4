@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import requests
+from legacy_protocol_reference_v1 import install_historical_write_protocol_fixture
 
 import atlasquant_flight_recorder_store as flight
 import atlasquant_research_evidence_store as research
@@ -46,6 +47,9 @@ def response(status:int,sha:str):
                            raise_for_status=lambda:None)
 
 class LegacyJSONLReadAfterWriteTests(unittest.TestCase):
+    def setUp(self):
+        install_historical_write_protocol_fixture(self)
+
     def test_each_real_writer_requires_two_reads_and_matching_blob_before_saved(self):
         for module,writer,reader,data,serializer,field in CASES:
             with self.subTest(store=module.__name__):

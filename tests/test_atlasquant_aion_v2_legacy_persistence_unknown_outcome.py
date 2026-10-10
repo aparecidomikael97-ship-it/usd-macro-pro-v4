@@ -12,6 +12,7 @@ import ast
 import unittest
 
 import requests
+from legacy_protocol_reference_v1 import install_historical_write_protocol_fixture
 import atlasquant_flight_recorder_store as flight
 import atlasquant_research_evidence_store as research
 import atlasquant_shadow_store as shadow
@@ -30,6 +31,9 @@ def fake_response(status):
     return SimpleNamespace(status_code=status,raise_for_status=raise_status)
 
 class LegacyPersistenceUnknownOutcomeTests(unittest.TestCase):
+    def setUp(self):
+        install_historical_write_protocol_fixture(self)
+
     def test_transport_timeout_after_dispatch_boundary_never_retries(self):
         for module,method,reader,data,field in CASES:
             with self.subTest(module=module.__name__), \
