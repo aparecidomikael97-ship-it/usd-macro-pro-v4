@@ -94,7 +94,12 @@ class AuthImportFailClosedTests(unittest.TestCase):
         self.assertFalse(messages.called)
 
     def test_invalid_gate_returns_fail_closed(self):
-        for invalid in (None, "OPEN", [], True, {}):
+        for invalid in (
+            None, "OPEN", [], True, {},
+            {"allowed": "false", "mode": "AUTHENTICATED"},
+            {"allowed": "true", "mode": "AUTHENTICATED"},
+            {"allowed": 1, "mode": "AUTHENTICATED"},
+        ):
             with self.subTest(value=repr(invalid)):
                 with self.assertRaises(GateStopped):
                     execute_gate(self.source, lambda value=invalid: value)

@@ -365,7 +365,7 @@ if render_access_gate is not None:
     except Exception:
         st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
         st.stop()
-    if not isinstance(_ATLASQUANT_ACCESS, dict) or not bool(_ATLASQUANT_ACCESS.get("allowed", False)):
+    if not isinstance(_ATLASQUANT_ACCESS, dict) or _ATLASQUANT_ACCESS.get("allowed") is not True:
         st.stop()
 else:
     st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
