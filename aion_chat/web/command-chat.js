@@ -14,7 +14,7 @@ export default function(component) {
   <form class="aq-chat-composer"><label for="aq-chat-message">Sua mensagem</label><textarea id="aq-chat-message" rows="3" maxlength="8000" placeholder="Pergunte, explore uma ideia ou peça um plano…" aria-describedby="aq-chat-help"></textarea><div class="aq-chat-chips"></div><div class="aq-chat-actions"><label class="aq-chat-attach">＋ Anexar arquivo ou imagem<input class="aq-chat-files" type="file" multiple aria-label="Anexar arquivo ou imagem"></label><span class="aq-chat-keyhint">Enter envia · Shift+Enter quebra linha</span><button type="button" class="aq-chat-stop" hidden>Parar envio visual</button><button type="submit" class="aq-chat-send">Enviar ↑</button></div><p class="aq-chat-turn-notice" role="status" aria-live="polite" hidden></p><small id="aq-chat-help">Anexos: apenas nome, tipo e tamanho. Ingestão segura ainda não ativa.</small></form>
   <p class="aq-chat-live" role="status" aria-live="polite" aria-atomic="true">Pronto para conversar · planejamento local, sem execução.</p>
   </main></div>`; // Constant markup only. All dynamic content uses textContent.
-  root._state={files:[],busy:false,pending:'',lastAck:'',renderKey:'',timer:null,stopped:false};
+  root._state={files:[],busy:false,pending:'',pendingAttempt:'',renderKey:'',timer:null,stopped:false};
  }
  const state=root._state,q=s=>root.querySelector(s),history=q('.aq-chat-history'),input=q('#aq-chat-message');
  root.dataset.artReady='true';q('main').classList.toggle('ref-detail',data.selected==='chat');q('.aq-chat-home').hidden=data.selected!=='chat';
@@ -75,10 +75,13 @@ export default function(component) {
  q('.aq-chat-older').onclick=()=>setTriggerValue('page','older');q('.aq-chat-newer').onclick=()=>setTriggerValue('page','newer');
  history.onscroll=()=>q('.aq-chat-bottom').hidden=history.scrollHeight-history.scrollTop-history.clientHeight<80;
  q('.aq-chat-bottom').onclick=()=>{history.scrollTop=history.scrollHeight;q('.aq-chat-bottom').hidden=true;};
- if(data.ack&&data.ack===state.pending&&data.ack!==state.lastAck){state.lastAck=data.ack;state.pending='';if(!data.notice){input.value='';state.files=[];chipList();}finish();live(data.notice|| (state.stopped?'Envio visual interrompido · plano registrado, nenhuma ação executada.':'Turno avaliado · nenhuma ação executada.'));}
+ // A request ID intentionally survives replay after a lost response. Never
+ // complete a NEW pending submit from an older ACK carrying that same ID.
+ // Each submit has its own UI-only attempt nonce, echoed by the trusted host.
+ if(state.busy&&state.pending&&state.pendingAttempt&&data.ack===state.pending&&data.ack_attempt_id===state.pendingAttempt){state.pending='';state.pendingAttempt='';if(!data.notice){input.value='';state.files=[];chipList();}finish();live(data.notice|| (state.stopped?'Envio visual interrompido · plano registrado, nenhuma ação executada.':'Turno avaliado · nenhuma ação executada.'));}
  if(data.notice)live(data.notice);
  q('.aq-chat-files').onchange=e=>{const files=Array.from(e.target.files||[]);if(state.files.length+files.length>16){live('Até 16 anexos por turno. Nenhum arquivo enviado.');e.target.value='';return;}for(const file of files)state.files.push({filename:file.name,mime_type:file.type||'application/octet-stream',size_bytes:file.size});chipList();live('Metadata selecionada · conteúdo não enviado nem ingerido.');e.target.value='';};
- q('form').onsubmit=e=>{e.preventDefault();if(state.busy)return;if(!input.value.trim()){live('Escreva uma mensagem para enviar.');input.focus();return;}state.pending=crypto.randomUUID();state.busy=true;state.stopped=false;enabled();chipList();live('Enviando para avaliação local…');setTriggerValue('send',{request_id:state.pending,conversation_id:data.conversation_id,message:input.value,attachments:state.files});
+ q('form').onsubmit=e=>{e.preventDefault();if(state.busy)return;if(!input.value.trim()){live('Escreva uma mensagem para enviar.');input.focus();return;}state.pending=crypto.randomUUID();state.pendingAttempt=crypto.randomUUID();state.busy=true;state.stopped=false;enabled();chipList();live('Enviando para avaliação local…');setTriggerValue('send',{request_id:state.pending,attempt_id:state.pendingAttempt,conversation_id:data.conversation_id,message:input.value,attachments:state.files});
   state.timer=setTimeout(()=>{finish();live('Avaliação sem retorno. Seu texto foi preservado; não há execução ou sucesso confirmado.');},15000);};
  input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();q('form').requestSubmit();}};
  q('.aq-chat-stop').onclick=()=>{state.stopped=true;q('.aq-chat-stop').disabled=true;live('Envio visual interrompido. O preflight local pode terminar; nenhuma execução foi iniciada.');};
