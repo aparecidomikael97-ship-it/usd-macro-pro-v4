@@ -59,6 +59,9 @@ def install_historical_write_protocol_fixture(testcase):
         stack.enter_context(patch(path, side_effect=AssertionError("NETWORK_FORBIDDEN")))
     # This temporary override is strictly test-local, never a production knob.
     stack.enter_context(patch("atlasquant_private_read_gate_v1.private_read_allowed", return_value=True))
+    # Historical protocol simulation only: never bypass this gate in runtime.
+    # All unmocked network and sockets are blocked in this scope.
+    stack.enter_context(patch("atlasquant_legacy_private_resource_gate_v1.require_legacy_private_remote_resource", return_value=None))
     for module_name, symbol in (
         ("atlasquant_research_evidence_store", "persist_research_evidence"),
         ("atlasquant_shadow_store", "persist_shadow_samples"),

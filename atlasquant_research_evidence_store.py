@@ -163,7 +163,9 @@ def _url(repo:str)->str:
 
 def _fetch(repo:str,branch:str,token:str,timeout:int)->tuple[list[dict[str,Any]],str]:
     from atlasquant_private_read_gate_v1 import require_private_read
+    from atlasquant_legacy_private_resource_gate_v1 import require_legacy_private_remote_resource
     require_private_read()
+    require_legacy_private_remote_resource(RESEARCH_EVIDENCE_PATH)
     response=reject_github_read_unexpected_status(requests.get(
         guard_github_token_read_destination(_url(repo)),
         headers=_headers(token),

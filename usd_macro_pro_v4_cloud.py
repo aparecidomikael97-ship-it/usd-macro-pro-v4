@@ -1,3 +1,4 @@
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
 from atlasquant_private_read_gate_v1 import private_read_allowed
 from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
 from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
@@ -3488,9 +3489,11 @@ def _github_cfg_v84():
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 def _github_get_json_v937(path: str, default):
-    """Read private runtime JSON from the dedicated service-token branch."""
+    """Legacy runtime JSON is unscoped: session auth alone cannot identify tenant."""
     if not private_read_allowed():
         return default, "ACCESS_DENIED"
+    if not legacy_private_remote_resource_allowed(path):
+        return default, "TENANT_SOURCE_UNBOUND"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return default, "GitHub persistente não configurado"
@@ -3516,8 +3519,10 @@ def _github_get_json_v937(path: str, default):
 
 
 def _github_ler_csv_v84():
-    """Lê dados/sinais_v84.csv do GitHub. Retorna None se não configurado/indisponível."""
+    """Legacy signals CSV has no resource-to-tenant provenance."""
     if not private_read_allowed():
+        return None
+    if not legacy_private_remote_resource_allowed("dados/sinais_v84.csv"):
         return None
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
@@ -8181,6 +8186,8 @@ def _config_cols_v937():
 def _config_ler_v937():
     if not private_read_allowed():
         return pd.DataFrame(columns=_config_cols_v937()), "ACCESS_DENIED"
+    if not legacy_private_remote_resource_allowed(_CONFIG_GH_PATH_V937):
+        return pd.DataFrame(columns=_config_cols_v937()), "TENANT_SOURCE_UNBOUND"
     token, repo, branch = _gh_cfg_v934()
     cols = _config_cols_v937()
     if not token or not repo:
@@ -8644,6 +8651,9 @@ def _scanner_load_v934():
     if not private_read_allowed():
         return {"versao":"V9.3.5","lote":0,"ultimo_processamento_ts":0.0,
                 "resultados":{},"_erro":"ACCESS_DENIED"}
+    if not legacy_private_remote_resource_allowed(_SCANNER_GH_PATH_V934):
+        return {"versao":"V9.3.5","lote":0,"ultimo_processamento_ts":0.0,
+                "resultados":{},"_erro":"TENANT_SOURCE_UNBOUND"}
     token, repo, branch = _gh_cfg_v934()
     vazio = {"versao": "V9.3.5", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
     if not token or not repo:
