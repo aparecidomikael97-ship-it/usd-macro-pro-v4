@@ -1,3 +1,13 @@
+"""Historical Flight Recorder transport protocol tests -- synthetic only.
+
+The actual production writer is HARD_DENIED. Legacy CAS/HTTP behavior below is
+reconstructed from reviewed unreachable source only inside this network-blocked
+test case. No runtime gate or environment knob is changed.
+"""
+import ast
+from contextlib import ExitStack
+from pathlib import Path
+import atlasquant_flight_recorder_store as _flight_store
 import base64
 import hashlib
 import unittest
@@ -32,6 +42,38 @@ def _contents(raw):
 
 
 class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
+    def setUp(self):
+        # Isolate the historical protocol from the production HARD_DENIED
+        # writer. All unmocked real sockets/HTTP are blocked.
+        stack=ExitStack()
+        self.addCleanup(stack.close)
+        for target in ("socket.socket.connect", "socket.socket.connect_ex",
+                       "socket.create_connection", "requests.sessions.Session.request"):
+            stack.enter_context(patch(target,side_effect=AssertionError("REAL_NETWORK_FORBIDDEN")))
+        stack.enter_context(patch("atlasquant_private_read_gate_v1.require_private_read",return_value=None))
+        stack.enter_context(patch("atlasquant_legacy_private_resource_gate_v1.require_legacy_private_remote_resource",return_value=None))
+        source=Path(_flight_store.__file__).read_text("utf-8")
+        module=ast.parse(source)
+        functions=[n for n in module.body if isinstance(n,ast.FunctionDef)
+                   and n.name=="persist_records"]
+        if len(functions)!=1:
+            raise AssertionError("Legacy Flight Recorder writer source changed")
+        fn=functions[0]
+        if len(fn.body)<2 or not isinstance(fn.body[0],ast.Return):
+            raise AssertionError("Production HARD_DENIED guard missing")
+        if "HARD_DENIED" not in (ast.get_source_segment(source,fn.body[0]) or ""):
+            raise AssertionError("Writer no longer hard denied")
+        if not isinstance(fn.body[1],ast.Try):
+            raise AssertionError("Historic CAS protocol changed; manual review required")
+        fn.body=fn.body[1:]
+        ns=dict(vars(_flight_store))
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[fn],type_ignores=[])),
+                     str(_flight_store.__file__),"exec"),ns)
+        global persist_records
+        original=persist_records
+        persist_records=ns["persist_records"]
+        self.addCleanup(lambda: globals().__setitem__("persist_records",original))
+
     def row(self,fp="a",did="1"):
         return {"_fingerprint":fp,"decision_id":did,"asset":"EUR/USD"}
 

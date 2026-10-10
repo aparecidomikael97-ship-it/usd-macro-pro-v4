@@ -15,6 +15,7 @@ from __future__ import annotations
 LEGACY_SHARED_PATHS = frozenset({
     "dados/atlasquant_shadow_samples.jsonl",
     "dados/atlasquant_operational_evidence_v1.jsonl",
+    "dados/atlasquant_flight_recorder.jsonl",
     "dados/sinais_v84.csv",
     "dados/configuracoes_completas_v937.csv",
     "dados/scanner_tecnico_v934.json",

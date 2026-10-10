@@ -88,6 +88,7 @@ def main():
         guards.enter_context(patch.dict(sys.modules, {"streamlit": ModuleType("streamlit")}))
         shadow_store = importlib.import_module("atlasquant_shadow_store")
         research_store = importlib.import_module("atlasquant_research_evidence_store")
+        flight_store = importlib.import_module("atlasquant_flight_recorder_store")
         shadow_capture = importlib.import_module("atlasquant_shadow_capture")
         research_capture = importlib.import_module("atlasquant_research_evidence_capture")
         for store, capture, name in (
@@ -101,6 +102,10 @@ def main():
             # Only the synthetic, network-blocked protocol reference may pass
             # source provenance to exercise historical CAS/readback behavior.
             guards.enter_context(patch.object(capture, "legacy_private_remote_resource_allowed", return_value=True))
+        # Historical Flight Recorder transport is a protocol reference only.
+        # The actual deployed writer stays unconditionally HARD_DENIED.
+        flight_protocol = legacy_protocol_fixture(flight_store, "persist_records")
+        guards.enter_context(patch.object(flight_store, "persist_records", flight_protocol))
         # Historical _fetch tests use synthetic transport and explicitly grant
         # private-read fixture authority; runtime never receives this override.
         guards.enter_context(patch("atlasquant_private_read_gate_v1.private_read_allowed", return_value=True))
