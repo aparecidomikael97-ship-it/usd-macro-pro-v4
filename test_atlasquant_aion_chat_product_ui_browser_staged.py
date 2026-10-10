@@ -114,6 +114,10 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
                         .map(e => e.getAttribute('data-workspace')),
                     host_marker_count: all('#aq-staged-host-marker').length,
                     st_exception_count: all('[data-testid="stException"]').length,
+                    // QA-only synthetic fixture: display just the error heading,
+                    // never the full traceback, transcript or runtime secrets.
+                    st_exception_heading: (one('[data-testid="stException"]')
+                        ?.innerText ?? 'NONE').split('\\n')[0].slice(0, 240),
                     page_title: document.title,
                 };
             }""")
