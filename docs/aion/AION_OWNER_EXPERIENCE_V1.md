@@ -125,9 +125,15 @@ Cross-device handoff carries only safe conversation context:
 - conversation id;
 - last turn id;
 - interaction mode;
-- bounded non-secret context.
+- **only a strict metadata allowlist**: `mode` (NORMAL/TEACHING/MEETING),
+  `topic` (pre-enumerated generic category such as CRM or TRADER) and
+  `slide` (integer 0–10000); no arbitrary text, nested objects, keys or
+  session material.
 
 It explicitly does not transfer authentication or session credentials.
+Unrecognized context is rejected, never passed through or silently dropped.
+The target must authenticate independently, then fetch any actual conversation
+content through its own scoped, authorized durable history store.
 
 The target device must authenticate independently before consuming the handoff.
 
