@@ -16,6 +16,7 @@ from typing import Any, Mapping, Sequence
 
 import requests
 
+from atlasquant_aion_global_worker_source_gate_v1 import independent_worker_source_preflight
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
     _claim_state,
@@ -367,8 +368,14 @@ def runtime_posture(
                 worker_state = "INVALID"
                 worker_integrity_state = "MISMATCH"
 
+    source_trust = independent_worker_source_preflight(config)
+    source_admitted = (
+        source_trust.get("status") == "VERIFIED"
+        and source_trust.get("source_verified") is True
+    )
     safe = bool(
-        branch.safe_for_runtime_writes
+        source_admitted
+        and branch.safe_for_runtime_writes
         and status == "CONFIRMED"
         and str(result.get("sha") or "").strip()
         and integrity_state in {"CONFIRMED", "MIGRATION_REQUIRED"}
@@ -376,6 +383,8 @@ def runtime_posture(
     )
     return {
         "state": "PASS" if safe else "BLOCKED",
+        "source_trust_state": "VERIFIED" if source_admitted else "UNAVAILABLE",
+        "source_trust_verified": source_admitted,
         "runtime_status": status,
         "runtime_branch": branch.branch,
         "runtime_branch_safe": branch.safe_for_runtime_writes,
@@ -409,6 +418,8 @@ def activation_readiness_snapshot(
     blockers: list[str] = []
     if runtime["state"] != "PASS":
         blockers.append("RUNTIME_POSTURE_NOT_CONFIRMED")
+    if not runtime["source_trust_verified"]:
+        blockers.append("INDEPENDENT_CHECKPOINT_SOURCE_UNAVAILABLE")
     if workflow["state"] != "PASS":
         blockers.append("WORKFLOW_CONTRACT_FAILED")
     if pulse["state"] != "PASS":
