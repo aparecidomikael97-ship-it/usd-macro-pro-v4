@@ -94,10 +94,49 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
 
         _send(page, "status geral")
         assistant = page.locator(
-            '.aq-chat-message.assistant[data-state="CONFIRMED_SUCCESS"]'
+            '.aq-chat-message.assistant[data-state="UNKNOWN"]'
         )
-        expect(assistant).to_have_count(1, timeout=30000)
+        try:
+            expect(assistant).to_have_count(1, timeout=30000)
+        except AssertionError:
+            # Diagnostic-only: preserve the failing assertion and report
+            # QA-host state without dumping message bodies or credentials.
+            snapshot = page.evaluate("""() => {
+                const one = selector => document.querySelector(selector);
+                const all = selector => [...document.querySelectorAll(selector)];
+                return {
+                    root_count: all('.aq-chat-root').length,
+                    total_message_cards: all('.aq-chat-message').length,
+                    assistant_states: all('.aq-chat-message.assistant')
+                        .map(e => e.dataset.state ?? ''),
+                    live_status: one('.aq-chat-live')?.textContent ?? 'NOT_MOUNTED',
+                    workspace_routes: all('[data-workspace]')
+                        .map(e => e.getAttribute('data-workspace')),
+                    host_marker_count: all('#aq-staged-host-marker').length,
+                    st_exception_count: all('[data-testid="stException"]').length,
+                    // QA-only synthetic fixture: display just the error heading,
+                    // never the full traceback, transcript or runtime secrets.
+                    st_exception_heading: (one('[data-testid="stException"]')
+                        ?.innerText ?? 'NONE').split('\\n')[0].slice(0, 240),
+                    page_title: document.title,
+                };
+            }""")
+            snapshot["browser_error_count"] = len(errors)
+            snapshot["sqlite_file_count"] = len(list(root.glob("aion-chat-*.sqlite3")))
+            print("AION_STAGED_FIRST_TURN_DIAGNOSTIC", snapshot)
+            raise
+        expect(assistant).to_contain_text("AION · histórico local")
+        expect(assistant).to_contain_text("Não reverificado · UNKNOWN")
+        # A historical UNKNOWN is not an approval request or chat-wide block.
+        expect(page.locator(".aq-chat-turn-notice")).to_be_hidden()
+        expect(page.locator(".aq-chat-send")).to_be_enabled()
+        expect(assistant).not_to_contain_text("leitura local verificada")
         expect(page.locator(".aq-chat-message")).to_have_count(2)
+        assistant.locator(".aq-chat-proof summary").click()
+        expect(assistant.locator(".aq-chat-proof")).to_contain_text("NOT_REVERIFIED")
+        expect(assistant.locator(".aq-chat-proof")).to_contain_text("LOCAL_PRESENT")
+        expect(assistant.locator(".aq-chat-proof")).to_contain_text("não foi reverificado")
+        expect(assistant.locator(".aq-chat-proof")).not_to_contain_text("Receipt verificado")
         conversation_id = page.locator(".aq-chat-id").inner_text().strip()
         assert conversation_id
         assert list(root.glob("aion-chat-*.sqlite3"))
@@ -118,10 +157,15 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         )
         expect(page.locator(".aq-chat-message")).to_have_count(2)
         expect(assistant).to_have_count(1)
+        expect(assistant).to_contain_text("AION · histórico local")
 
         _send(page, "status geral")
         expect(page.locator(".aq-chat-message")).to_have_count(4, timeout=30000)
         expect(assistant).to_have_count(2)
+        # Multiple assistant turns exist here; test the newest turn explicitly.
+        expect(assistant.last).to_contain_text("Não reverificado · UNKNOWN")
+        expect(page.locator(".aq-chat-turn-notice")).to_be_hidden()
+        expect(page.locator(".aq-chat-send")).to_be_enabled()
         expect(page.locator(".aq-chat-id")).to_have_text(conversation_id)
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
 
