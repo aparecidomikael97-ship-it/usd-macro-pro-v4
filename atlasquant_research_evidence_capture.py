@@ -143,7 +143,9 @@ def capture_research_evidence(
     persist:bool=True,
 )->dict[str,Any]:
     access_ok=private_read_allowed()
-    if persist and not access_ok:
+    # Session-only operational evidence is private too. A denied session must
+    # never repopulate a cache cleared by private_read_allowed().
+    if not access_ok:
         return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
     # Adopt a legacy pending status before a session-only capture can replace it.
     _pending_status()
