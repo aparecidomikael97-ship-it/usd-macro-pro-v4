@@ -214,8 +214,13 @@ def test_browser_duplicate_request_after_store_remount_stays_two(staged_preview)
                     if (!window.__aionQaOriginalUuid) {
                         window.__aionQaOriginalUuid = crypto.randomUUID.bind(crypto);
                     }
+                    let firstCall = true;
                     Object.defineProperty(crypto, 'randomUUID', {
-                        configurable: true, writable: true, value: () => rid,
+                        configurable: true, writable: true,
+                        value: () => {
+                            if (firstCall) { firstCall = false; return rid; }
+                            return window.__aionQaOriginalUuid();
+                        },
                     });
                 }""",
                 request_id,
@@ -255,6 +260,9 @@ def test_browser_duplicate_request_after_store_remount_stays_two(staged_preview)
         expect(page.locator(".aq-chat-live")).to_contain_text(
             "Histórico local reconciliado", timeout=30000
         )
+        # The browser request is intentionally reused; its *UI attempt*
+        # marker must be new to reject stale ACKs without locking the composer.
+        expect(page.locator(".aq-chat-root")).to_have_attribute("data-art-ready", "true")
         expect(page.locator(".aq-chat-message")).to_have_count(2)
         expect(
             page.locator('.aq-chat-message.assistant[data-state="UNKNOWN"]')
