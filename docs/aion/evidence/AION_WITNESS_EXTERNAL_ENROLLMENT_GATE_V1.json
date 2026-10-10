@@ -162,6 +162,24 @@
       "independent_verifier": null
     },
     {
+      "id": "CLOUDFLARE_SECURITY_ROUTE_NO_BYPASS",
+      "evidence_class": "external",
+      "description": "Authenticated provider-side evidence that the security-critical Worker route is Fail Closed (or equivalent no-bypass architecture) on Free quota 1027, including adversarial quota test; never rely on a self-declared flag",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "CLOUDFLARE_DO_SINGLE_OBJECT_STORAGE_HEADROOM",
+      "evidence_class": "external",
+      "description": "Measured largest Durable Object SQLite storage <= 1 GB on Workers Free, distinct from 5 GB account total, with write-failure SQL_FULL quarantine and headroom",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
       "id": "FINANCIAL_SPEND_APPROVAL",
       "evidence_class": "owner_approval",
       "description": "Specific owner approval before creating paid or external cloud resources",
@@ -185,6 +203,8 @@
     "https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/",
     "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html",
     "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-managing.html",
-    "https://aws.amazon.com/s3/pricing/"
+    "https://aws.amazon.com/s3/pricing/",
+    "https://developers.cloudflare.com/workers/platform/limits/",
+    "https://developers.cloudflare.com/durable-objects/platform/limits/"
   ]
 }
