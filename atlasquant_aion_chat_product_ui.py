@@ -244,7 +244,7 @@ def submit_product_turn(
 
     request_id = event.get("request_id")
     if not isinstance(request_id, str) or not request_id or len(request_id) > 100:
-        raise ValueError("Identificador de envio invÃ¡lido.")
+        raise ValueError("Identificador de envio inválido.")
 
     from atlasquant_aion_chat_surface import MAX_MESSAGE_CHARS
 
@@ -253,7 +253,7 @@ def submit_product_turn(
         raise ValueError("Mensagem vazia.")
     if len(text) > MAX_MESSAGE_CHARS:
         raise ValueError(
-            "Mensagem excede o orÃ§amento tÃ©cnico de 8.000 caracteres."
+            "Mensagem excede o orçamento técnico de 8.000 caracteres."
         )
 
     # Browser file bodies are never accepted here. Durable attachment ingest is
@@ -261,7 +261,7 @@ def submit_product_turn(
     attachments = event.get("attachments")
     if isinstance(attachments, (list, tuple)) and attachments:
         raise ValueError(
-            "Anexos durÃ¡veis ainda nÃ£o estÃ£o ativos no modo staged."
+            "Anexos duráveis ainda não estão ativos no modo staged."
         )
 
     current_cid = _clean(state.get("conversation_id"), 120)
@@ -275,9 +275,9 @@ def submit_product_turn(
         result = reconcile_request(store.path, scope, ticket)
         state["requests"].add(request_id)
         state["ack"] = request_id
-        state["notice"] = ("HistÃ³rico local reconciliado; nenhuma nova gravaÃ§Ã£o."
+        state["notice"] = ("Histórico local reconciliado; nenhuma nova gravação."
                            if result["local_history_persisted"]
-                           else "Pedido incerto: reconciliaÃ§Ã£o necessÃ¡ria; repetiÃ§Ã£o bloqueada.")
+                           else "Pedido incerto: reconciliação necessária; repetição bloqueada.")
         return result
 
     def before_append(user, assistant):
@@ -310,8 +310,8 @@ def submit_product_turn(
         state["notice"] = ""
     else:
         state["notice"] = (
-            "Turno nÃ£o persistido: somente leituras locais verificadas "
-            "podem entrar no histÃ³rico durÃ¡vel."
+            "Turno não persistido: somente leituras locais verificadas "
+            "podem entrar no histórico durável."
         )
     return result
 

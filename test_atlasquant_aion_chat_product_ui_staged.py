@@ -168,7 +168,7 @@ class StagedProductUiContinuityTests(unittest.TestCase):
                 self._event(
                     state,
                     "sensitive-1",
-                    message="faÃ§a deploy agora",
+                    message="faça deploy agora",
                 ),
                 self.access,
                 self.scope,
@@ -184,14 +184,14 @@ class StagedProductUiContinuityTests(unittest.TestCase):
                 ).message_count,
                 0,
             )
-            self.assertIn("nÃ£o persistido", state["notice"].lower())
+            self.assertIn("não persistido", state["notice"].lower())
             store.close()
 
     def test_attachment_metadata_cannot_activate_durable_ingest(self):
         with tempfile.TemporaryDirectory() as raw:
             store = self._store(raw)
             state = staged_product_session({}, self.access, self.scope)
-            with self.assertRaisesRegex(ValueError, "Anexos durÃ¡veis"):
+            with self.assertRaisesRegex(ValueError, "Anexos duráveis"):
                 submit_product_turn(
                     state,
                     self._event(

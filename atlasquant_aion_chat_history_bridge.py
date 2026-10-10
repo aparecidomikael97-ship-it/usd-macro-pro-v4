@@ -268,7 +268,7 @@ def _assistant_text(result: Mapping[str, Any]) -> str:
     summary = execution.get("summary")
     if isinstance(summary, str) and summary.strip():
         return summary.strip()[:MAX_ASSISTANT_TEXT]
-    return "Leitura local concluÃƒÂ­da e verificada estruturalmente."
+    return "Leitura local concluída e verificada estruturalmente."
 
 
 def persist_verified_read_result(
