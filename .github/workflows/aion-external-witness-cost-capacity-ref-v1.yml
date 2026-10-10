@@ -5,6 +5,7 @@ on:
     paths:
       - "atlasquant_aion_external_witness_cost_capacity_reference_v1.py"
       - "test_atlasquant_aion_external_witness_cost_capacity_reference_v1.py"
+      - "test_atlasquant_aion_external_witness_workers_peak_v1.py"
       - "docs/aion/AION_EXTERNAL_WITNESS_COST_CAPACITY_20261010.md"
       - ".github/workflows/aion-external-witness-cost-capacity-ref-v1.yml"
 
@@ -28,6 +29,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile budget model and no-go tests
-        run: python -B -m py_compile atlasquant_aion_external_witness_cost_capacity_reference_v1.py test_atlasquant_aion_external_witness_cost_capacity_reference_v1.py
+        run: python -B -m py_compile atlasquant_aion_external_witness_cost_capacity_reference_v1.py test_atlasquant_aion_external_witness_cost_capacity_reference_v1.py test_atlasquant_aion_external_witness_workers_peak_v1.py
       - name: Verify hypothetical cost arithmetic and authorization separation
-        run: python -B -m unittest test_atlasquant_aion_external_witness_cost_capacity_reference_v1.py -v
+        run: python -B -m unittest test_atlasquant_aion_external_witness_cost_capacity_reference_v1.py test_atlasquant_aion_external_witness_workers_peak_v1.py -v

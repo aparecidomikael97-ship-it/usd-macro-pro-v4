@@ -23,7 +23,7 @@ Assumimos **12 verificações/leitura de checkpoint por tenant por dia**, **4 wr
 | Esperado hipotético | 100 | 4.000 | 8.000 | 1.200 | 12.000 | 36.000 |
 | Pico hipotético | 1.000 | 40.000 | 80.000 | 12.000 | 120.000 | 360.000 |
 
-**Importante:** todos os três exemplos ficam matematicamente abaixo dos limites DO Free listados **para essa carga isolada**. Isso **não significa que o plano Free será suficiente** quando somarmos outros Workers, tenants ativos, métricas reais de compute, alarmes, limites globais de conta, retenção, picos e quotas já consumidas. Com 1.000 tenants e 80 gravações/dia/tenant, seriam **240.000 rows-written/dia**, acima da cota Free (100.000), e o simulador deve bloquear o pressuposto de gratuidade.
+**Importante:** todos os três exemplos ficam matematicamente abaixo dos limites **Durable Objects Free** listados **somente para essa carga isolada**. **Ainda não foram incluídos no cálculo acima os limites independentes de requisições e CPU do Worker chamador, nem picos de tráfego**. Isso **não significa que o plano Free será suficiente** quando somarmos outros Workers, tenants ativos, métricas reais de compute, alarmes, limites globais de conta, retenção, picos e quotas já consumidas. Com 1.000 tenants e 80 gravações/dia/tenant, seriam **240.000 rows-written/dia**, acima da cota Free (100.000), e o simulador deve bloquear o pressuposto de gratuidade.
 
 ## O que está comprovado e o que NÃO pode ser inferido
 
@@ -64,3 +64,28 @@ assert model_witness_cost(plan)["worker_authorized"] is False
 5. Só então considerar uma integração revisada; nenhuma Flag/CI ou cálculo aprova merge/deploy/Worker automaticamente.
 
 **Estado:** `PARTIALLY_CLOSED / HARD NO-GO`. Nenhuma compra, assinatura real, deploy ou conta criada. Core V1, main e as proteções #1180–#1182 continuam intactos. P0 #1178 e B2B #1169 permanecem abertos.
+
+## Correção de auditoria: Workers Free e picos (10/10/2026, Draft sucessora)
+
+A primeira calculadora considerava só Durable Objects. A documentação oficial [Cloudflare Workers Pricing](https://developers.cloudflare.com/workers/platform/pricing/) distingue as **requisições de entrada do Worker Free (100.000/dia, compartilhadas no plano/conta)** e o limite **10 ms CPU por invocação** dos pedidos RPC ao Durable Object (limite Free DO de 100.000/dia). Estar abaixo de 100.000 DO RPCs **não garante** caber nas requisições do Worker ou cumprir CPU. Os limites gratuitos são independentes, mas dependem também de outros projetos da conta. Cloudflare Workers Paid (mínimo US$5/mês por conta mais usos) não está autorizado nem inserido como tarifa certificada.
+
+A função pura `model_witness_cost(plan, quote=None, *, worker_profile=None)` mantém as suposições antigas compatíveis e admite um perfil **opcional, autodeclarado, não medido** com:
+
+- `requests_per_read`, `requests_per_write`: requisições inbound ao Worker por operação lógica.
+- `other_account_requests_per_day`: parte de outros Workers na mesma conta, **declarada e não verificada**.
+- `cpu_ms_per_invocation`: CPU por invocação assumida, sem medição.
+- `peak_day_multiplier`: multiplicador hipotético para um dia de pico, aplicado também a requests/linhas/duração de Durable Objects.
+
+**Sem o perfil:** retorna `WORKERS_FREE_USAGE_AND_PEAK_NOT_MODELED`, além das demais lacunas, sem alegar que a cota Free é suficiente.
+
+**Com perfil:** produz `workers_total_peak_requests_per_day_modeled`, `do_peak_requests_per_day` e alertas quando o limite Workers Free de 100.000/dia, o CPU Free de 10 ms/invocação ou alguma cota DO Free é ultrapassada. `WORKERS_FREE_AND_OTHER_ACCOUNT_ONLY_SELF_DECLARED` continua obrigatório. Os limites consideram dia agregado; surtos por minuto, hibernação, CPU real, execução simultânea, outras contas e perfis reais também exigem auditoria posterior.
+
+| Exemplo novo, apenas matemático | DO RPC/d médio | DO RPC/d pico | Worker inbound/d no pico | Estado |
+|---|---:|---:|---:|---|
+| 1 tenant, 1 Worker request por leitura e escrita, pico 1× | 40 | 40 | 16 | Cabe nas cotas listadas isoladamente; **não validado na conta** |
+| 1.000 tenants, 6 inbound/read e 8 inbound/write, pico 1× | 40.000 | 40.000 | 104.000 | **Excede Workers Free**, mesmo abaixo de DO requests Free |
+| 1.000 tenants, 1 inbound/read e 1 inbound/write, pico 3× | 40.000 | 120.000 | 48.000 | **Excede DO Free por pico**, mesmo abaixo de Workers Free |
+
+Esses números não são throughput medido. A comparação **não** substitui métricas reais da conta, invoices, autenticação independente da testemunha ou cálculo completo do custo Cloudflare/AWS. Mesmo um `quoted_partial_brl` hipotético abaixo de R$200 mantém `full_stack_monthly_cost_brl=null`, `budget_certified=false`, `spending_approved=false`, `worker_authorized=false`. Nenhuma conta/deploy/compra foi realizada.
+
+Fontes primárias: [Workers Pricing](https://developers.cloudflare.com/workers/platform/pricing/) (02/10/2026), [Durable Objects Pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/) (30/09/2026). O modelo é uma **revisão conservadora de planejamento** e não uma nova condição positiva no Worker.
