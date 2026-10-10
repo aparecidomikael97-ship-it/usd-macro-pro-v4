@@ -131,7 +131,8 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         _send(page, "status geral")
         expect(page.locator(".aq-chat-message")).to_have_count(4, timeout=30000)
         expect(assistant).to_have_count(2)
-        expect(assistant).to_contain_text("Não reverificado · UNKNOWN")
+        # Multiple assistant turns exist here; test the newest turn explicitly.
+        expect(assistant.last).to_contain_text("Não reverificado · UNKNOWN")
         expect(page.locator(".aq-chat-id")).to_have_text(conversation_id)
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
 
