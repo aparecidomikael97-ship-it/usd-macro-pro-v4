@@ -118,6 +118,7 @@ def staged_product_session(
             "cursor_stack": [],
             "next_cursor": None,
             "ack": "",
+            "ack_attempt_id": "",
             "notice": "",
         }
     state = session[key]
@@ -194,6 +195,7 @@ def view_product_data(
             "has_older": False,
             "has_newer": False,
             "ack": _clean(state.get("ack"), 100),
+            "ack_attempt_id": _clean(state.get("ack_attempt_id"), 100),
             "notice": _clean(state.get("notice"), 500),
             "product_mode": True,
             "durable_history": True,
@@ -221,6 +223,7 @@ def view_product_data(
         "has_older": bool(page.get("next_cursor")),
         "has_newer": bool(state.get("cursor_stack")),
         "ack": _clean(state.get("ack"), 100),
+        "ack_attempt_id": _clean(state.get("ack_attempt_id"), 100),
         "notice": _clean(state.get("notice"), 500),
         "product_mode": True,
         "durable_history": True,
@@ -245,6 +248,11 @@ def submit_product_turn(
     request_id = event.get("request_id")
     if not isinstance(request_id, str) or not request_id or len(request_id) > 100:
         raise ValueError("Identificador de envio inválido.")
+    # Browser attempt nonce is presentation-only, not a durable request key,
+    # credential, approval, or execution authority. Legacy callers may omit it.
+    attempt_id = event.get("attempt_id", "")
+    if not isinstance(attempt_id, str) or len(attempt_id) > 100:
+        raise ValueError("Identificador da tentativa inválido.")
 
     from atlasquant_aion_chat_surface import MAX_MESSAGE_CHARS
 
@@ -276,6 +284,7 @@ def submit_product_turn(
         request_store_path(store)
         state["requests"].add(request_id)
         state["ack"] = request_id
+        state["ack_attempt_id"] = attempt_id
         state["notice"] = ("Histórico local reconciliado; nenhuma nova gravação."
                            if result["local_history_persisted"]
                            else "Pedido incerto: reconciliação necessária; repetição bloqueada.")
@@ -305,6 +314,7 @@ def submit_product_turn(
 
     state["requests"].add(request_id)
     state["ack"] = request_id
+    state["ack_attempt_id"] = attempt_id
     state["cursor"] = None
     state["cursor_stack"] = []
     state["next_cursor"] = None
@@ -403,6 +413,11 @@ def render_product_chat_workspace(
             state["notice"] = str(error)
             state["ack"] = (
                 str(result.send.get("request_id", ""))
+                if isinstance(result.send, Mapping)
+                else ""
+            )
+            state["ack_attempt_id"] = (
+                str(result.send.get("attempt_id", ""))
                 if isinstance(result.send, Mapping)
                 else ""
             )
