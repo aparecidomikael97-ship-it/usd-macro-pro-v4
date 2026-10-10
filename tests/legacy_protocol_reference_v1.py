@@ -65,6 +65,7 @@ def install_historical_write_protocol_fixture(testcase):
     for module_name, symbol in (
         ("atlasquant_research_evidence_store", "persist_research_evidence"),
         ("atlasquant_shadow_store", "persist_shadow_samples"),
+        ("atlasquant_flight_recorder_store", "persist_records"),
     ):
         module = importlib.import_module(module_name)
         reference = _legacy_reference_writer(module, symbol)
