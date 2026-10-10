@@ -180,6 +180,30 @@ class PrivateSessionAppTest(unittest.TestCase):
         self.assertNotIn(PRIVATE_MARKER, self.rendered(at))
         self.assertNotIn("atlasquant_shadow_samples", at.session_state)
 
+    def test_A_tenant_switch_to_B_tenant_denies_old_scope_then_grants_B_clean_scope(self):
+        os.environ["ATLASQUANT_PRIVATE_MEMBERSHIPS_JSON"] = json.dumps({
+            "tenant_one": ["admin.aaa"],
+            "tenant_two": ["admin.bbb"],
+        })
+        at = self.login(self.run_app(), "admin.aaa", PASSWORD_A)
+        self.seed(at)
+        a_scope = at.session_state[SCOPE_KEY]
+        # Switching server-side tenant with A still logged in is never a
+        # migration of cached A data into B's workspace.
+        os.environ["ATLASQUANT_PRIVATE_WORKSPACE_ID"] = "tenant_two"
+        at.run()
+        self.assertFalse(list(at.exception), list(at.exception))
+        self.assertIn("PRIVATE_READ=DENIED", self.rendered(at))
+        self.assertNotIn(PRIVATE_MARKER, self.rendered(at))
+        self.assertNotIn("atlasquant_shadow_samples", at.session_state)
+        self.button(at, "atlasquant_logout").click().run()
+        self.login(at, "admin.bbb", PASSWORD_B)
+        self.assertIn("PRIVATE_READ=ALLOWED", self.rendered(at))
+        self.assertNotIn(PRIVATE_MARKER, self.rendered(at))
+        self.assertNotIn("atlasquant_shadow_samples", at.session_state)
+        self.assertNotEqual(a_scope, at.session_state[SCOPE_KEY])
+
+
 
 if __name__ == "__main__":
     unittest.main()
