@@ -2227,69 +2227,28 @@ def interpretar_conjunto_surpresas(df: pd.DataFrame, score_base_usd: float) -> d
 # HISTÓRICO E TESTE HISTÓRICO
 # =========================================================
 
+# Legacy unscoped Parquet histories were shared by all login sessions.
+# They have no durable tenant identifier, owner proof or access audit. Keep
+# historical files untouched on disk for an explicit supervised migration;
+# never read or modify them from the shared Streamlit application.
 def salvar_snapshot(df):
-    hoje = pd.Timestamp(datetime.now().date())
-    snap = df[["Código", "Pontuação_Macro", "Influência_Fed", "Pontuação_Final"]].copy()
-    snap["data"] = hoje
-    try:
-        hist = pd.read_parquet(HIST_SCORES)
-        if (pd.to_datetime(hist["data"]).dt.date == hoje.date()).any():
-            return "⚠️ Já existe um registro de hoje."
-        hist = pd.concat([hist, snap], ignore_index=True)
-    except Exception:
-        hist = snap
-    hist.to_parquet(HIST_SCORES, index=False)
-    return "✅ Registro salvo."
+    return "🔒 HARD_DENIED: histórico Parquet legado em quarentena."
 
 
 def carregar_snapshots():
-    try:
-        return pd.read_parquet(HIST_SCORES)
-    except Exception:
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 
 def registrar_sinal(par, confianca, s_base, s_cotada, preco, horas):
-    linha = pd.DataFrame([{
-        "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
-        "data": pd.Timestamp.now(),
-        "par": par,
-        "confianca_base": float(confianca),
-        "score_base": float(s_base),
-        "score_cotada": float(s_cotada),
-        "preco_entrada": float(preco),
-        "horizonte": int(horas),
-        "preco_saida": np.nan,
-        "resultado": np.nan,
-    }])
-    try:
-        hist = pd.concat([pd.read_parquet(HIST_SINAIS), linha], ignore_index=True)
-    except Exception:
-        hist = linha
-    hist.to_parquet(HIST_SINAIS, index=False)
+    return False, "HARD_DENIED"
 
 
 def carregar_sinais():
-    try:
-        return pd.read_parquet(HIST_SINAIS)
-    except Exception:
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 
 def atualizar_resultado(id_sinal, saida):
-    hist = carregar_sinais()
-    if hist.empty or id_sinal not in hist["id"].astype(str).values:
-        return "Sinal não encontrado."
-
-    mascara = hist["id"].astype(str) == id_sinal
-    entrada = float(hist.loc[mascara, "preco_entrada"].iloc[0])
-    confianca = float(hist.loc[mascara, "confianca_base"].iloc[0])
-    previsto_alta = confianca >= 0.5
-    realizado_alta = saida > entrada
-    hist.loc[mascara, "preco_saida"] = saida
-    hist.loc[mascara, "resultado"] = 1.0 if previsto_alta == realizado_alta else 0.0
-    hist.to_parquet(HIST_SINAIS, index=False)
-    return "✅ Resultado atualizado."
+    return "🔒 HARD_DENIED: atualização de histórico local indisponível."
 
 
 def metricas_backtest(hist):
@@ -3481,45 +3440,39 @@ def _normalizar_tipos_sinais_v1072(df):
 
 
 def _carregar_sinais_v82():
+    """Load only private-read-authorized GitHub signals.
+
+    Do not fall back to the unscoped on-disk Parquet file even for an admin.
+    That file has no tenant provenance, so its historical rows are quarantined
+    until a separately authorized, tenant-bound migration is designed.
     """
-    V8.7.3 — carrega histórico persistente e separa registros antigos.
-    Tudo que não tiver versão explícita passa a ser LEGADO.
-    """
-    _garantir_pasta_v82()
-
-    def _normalizar_v873(df):
-        df = df.copy()
-        if "versao_coleta" not in df.columns:
-            df["versao_coleta"] = "LEGADO"
-        else:
-            df["versao_coleta"] = df["versao_coleta"].fillna("LEGADO").replace("", "LEGADO")
-        if "dia_coleta" not in df.columns:
-            df["dia_coleta"] = ""
-        else:
-            df["dia_coleta"] = df["dia_coleta"].fillna("").astype(str)
-        return _normalizar_tipos_sinais_v1072(df)
-
-    if "_github_ler_csv_v84" in globals():
-        remoto = _github_ler_csv_v84()
-        if isinstance(remoto, pd.DataFrame) and not remoto.empty:
-            return _normalizar_v873(remoto)
-
-    p = Path(ARQ_SINAIS_V82)
-    if p.exists():
-        try:
-            return _normalizar_v873(pd.read_parquet(p))
-        except Exception:
-            pass
-
     cols = [
         "timestamp","par","direcao","score_mestre","qualidade",
         "score_base","score_cotada","diferenca","fomc_score",
         "fomc_peso","evento","dias_evento","impacto","timing",
         "preco_entrada","data_preco","avaliado","preco_saida",
         "data_saida","retorno_pct","acertou","versao_coleta","dia_coleta",
-        "horizonte_validacao","retorno_direcional_pct","serie_saida"
+        "horizonte_validacao","retorno_direcional_pct","serie_saida",
     ]
+    if not private_read_allowed():
+        return pd.DataFrame(columns=cols)
+
+    if "_github_ler_csv_v84" in globals():
+        remoto = _github_ler_csv_v84()
+        if isinstance(remoto, pd.DataFrame) and not remoto.empty:
+            rows = remoto.copy()
+            if "versao_coleta" not in rows.columns:
+                rows["versao_coleta"] = "LEGADO"
+            else:
+                rows["versao_coleta"] = rows["versao_coleta"].fillna("").replace("", "LEGADO")
+            if "dia_coleta" not in rows.columns:
+                rows["dia_coleta"] = ""
+            else:
+                rows["dia_coleta"] = rows["dia_coleta"].fillna("").astype(str)
+            return _normalizar_tipos_sinais_v1072(rows)
+
     return pd.DataFrame(columns=cols)
+
 
 def _github_cfg_v84():
     """Configuração opcional para persistência do histórico no GitHub."""
@@ -3627,43 +3580,9 @@ def _github_salvar_csv_v84(df):
         return False, f"Falha ao salvar no GitHub: {type(e).__name__}"
 
 def _salvar_sinais_v82(df):
-    """
-    V8.7.3 — persistência segura:
-    - LEGADO permanece guardado, mas separado;
-    - V8.7.3: 1 par + 1 dia de coleta = no máximo 1 fotografia.
-    """
-    _garantir_pasta_v82()
-    df = df.copy()
+    """Hard-deny unscoped local/GitHub history writers, never claim success."""
+    return False
 
-    if "versao_coleta" not in df.columns:
-        df["versao_coleta"] = "LEGADO"
-    df["versao_coleta"] = df["versao_coleta"].fillna("LEGADO").replace("", "LEGADO")
-
-    if "dia_coleta" not in df.columns:
-        df["dia_coleta"] = ""
-    df["dia_coleta"] = df["dia_coleta"].fillna("").astype(str)
-
-    if not df.empty:
-        legados = df[df["versao_coleta"].astype(str) != "V8.7.3"].copy()
-        novos = df[df["versao_coleta"].astype(str) == "V8.7.3"].copy()
-
-        if not novos.empty:
-            novos["par"] = novos["par"].astype(str).str.upper().str.strip()
-            novos = novos.drop_duplicates(
-                subset=["par", "dia_coleta"], keep="first"
-            )
-
-        df = pd.concat([legados, novos], ignore_index=True)
-
-    ok_local = False
-    try:
-        df.to_parquet(ARQ_SINAIS_V82, index=False)
-        ok_local = True
-    except Exception:
-        pass
-
-    ok_git, _ = _github_salvar_csv_v84(df)
-    return bool(ok_local or ok_git)
 
 def _fred_preco_par_v87(par):
     """
@@ -3804,7 +3723,9 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
     }
     df = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
     ok = _salvar_sinais_v82(df)
-    return ok, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
+    if not ok:
+        return False, "HARD_DENIED: histórico de sinal não foi persistido."
+    return True, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
 
 
 def _entrada_legada_segura_v1073(r):
@@ -4045,28 +3966,8 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
         # V8.4.1 — migra o histórico local que existia antes do token.
         if st.button("☁️ Sincronizar histórico com GitHub", key="v841_sync_github"):
-            _hist_local_v841 = None
-            try:
-                _p_v841 = Path(ARQ_SINAIS_V82)
-                if _p_v841.exists():
-                    _hist_local_v841 = pd.read_parquet(_p_v841)
-            except Exception:
-                _hist_local_v841 = None
+            st.error("HARD_DENIED: arquivos Parquet legados sem identidade de tenant; migração bloqueada.")
 
-            if not isinstance(_hist_local_v841, pd.DataFrame) or _hist_local_v841.empty:
-                _hist_local_v841 = _carregar_sinais_v82()
-
-            if isinstance(_hist_local_v841, pd.DataFrame) and not _hist_local_v841.empty:
-                _ok_v841, _msg_v841 = _github_salvar_csv_v84(_hist_local_v841)
-                if _ok_v841:
-                    st.success(
-                        f"☁️ Sincronização concluída: {len(_hist_local_v841)} "
-                        "sinal(is) enviado(s) para dados/sinais_v84.csv."
-                    )
-                else:
-                    st.error(f"Não foi possível sincronizar. {_msg_v841}")
-            else:
-                st.info("Não há histórico local para sincronizar.")
     else:
         st.warning(
             "⚠️ Histórico ainda está apenas no armazenamento temporário do Streamlit. "
@@ -7322,8 +7223,13 @@ if _aq_active_index == 4:
         horizonte = st.selectbox("Tempo para avaliar (horas)", [1,4,8,24,48,72], 3)
         if st.button("Registrar sinal"):
             conf_reg = float(np.clip(0.5 + diferenca/100, 0.01, 0.99))
-            registrar_sinal(f"{base}/{cotada}", conf_reg, score_base, score_cotada, preco, horizonte)
-            st.success("✅ Sinal registrado!")
+            _saved_signal, _signal_reason = registrar_sinal(
+                f"{base}/{cotada}", conf_reg, score_base, score_cotada, preco, horizonte
+            )
+            if _saved_signal:
+                st.success("✅ Sinal registrado!")
+            else:
+                st.warning("🔒 Histórico local bloqueado: " + str(_signal_reason))
 
     st.markdown("---")
     st.markdown("### 🏆 Matriz Inteligente — V9.3.5")
@@ -7456,7 +7362,8 @@ if _aq_active_index == 4:
 
     if _novas_v873:
         _df_v873 = pd.concat([_df_v873, pd.DataFrame(_novas_v873)], ignore_index=True)
-        _salvar_sinais_v82(_df_v873)
+        if not _salvar_sinais_v82(_df_v873):
+            st.caption("🔒 Histórico multipares calculado apenas nesta execução; nenhuma gravação persistente foi confirmada.")
 
     st.caption(
         "🤖 V8.7.3 multipares: usa exatamente a decisão final da Matriz. "
