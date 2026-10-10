@@ -101,19 +101,25 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         except AssertionError:
             # Diagnostic-only: preserve the failing assertion and report
             # QA-host state without dumping message bodies or credentials.
-            print("AION_STAGED_FIRST_TURN_DIAGNOSTIC", {
-                "root_count": page.locator(".aq-chat-root").count(),
-                "total_message_cards": page.locator(".aq-chat-message").count(),
-                "assistant_states": page.locator(
-                    ".aq-chat-message.assistant"
-                ).evaluate_all("els => els.map(e => e.dataset.state)"),
-                "live_status": page.locator(".aq-chat-live").text_content(),
-                "browser_error_count": len(errors),
-                "st_exception_count": page.locator(
-                    '[data-testid="stException"]'
-                ).count(),
-                "sqlite_file_count": len(list(root.glob("aion-chat-*.sqlite3"))),
-            })
+            snapshot = page.evaluate("""() => {
+                const one = selector => document.querySelector(selector);
+                const all = selector => [...document.querySelectorAll(selector)];
+                return {
+                    root_count: all('.aq-chat-root').length,
+                    total_message_cards: all('.aq-chat-message').length,
+                    assistant_states: all('.aq-chat-message.assistant')
+                        .map(e => e.dataset.state ?? ''),
+                    live_status: one('.aq-chat-live')?.textContent ?? 'NOT_MOUNTED',
+                    workspace_routes: all('[data-workspace]')
+                        .map(e => e.getAttribute('data-workspace')),
+                    host_marker_count: all('#aq-staged-host-marker').length,
+                    st_exception_count: all('[data-testid="stException"]').length,
+                    page_title: document.title,
+                };
+            }""")
+            snapshot["browser_error_count"] = len(errors)
+            snapshot["sqlite_file_count"] = len(list(root.glob("aion-chat-*.sqlite3")))
+            print("AION_STAGED_FIRST_TURN_DIAGNOSTIC", snapshot)
             raise
         expect(assistant).to_contain_text("AION · histórico local")
         expect(assistant).to_contain_text("Não reverificado · UNKNOWN")
