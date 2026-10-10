@@ -246,6 +246,23 @@ class SQLiteLifecycleTests(unittest.TestCase):
         with self.assertRaises(StorageUnavailableError):
             store.get_conversation(self.scope, cid)
 
+    def test_missing_or_replaced_database_is_not_silently_recreated(self):
+        for replace in (False, True):
+            with self.subTest(replace=replace):
+                path = self.root / ("replace.sqlite3" if replace else "missing.sqlite3")
+                store = OperationScopedSQLiteChatStore(path)
+                self.addCleanup(store.close)
+                store.create_conversation(self.scope)
+                path.rename(path.with_suffix(".preserved"))
+                if replace:
+                    replacement = SQLiteChatStore(path)
+                    replacement.close()
+                with self.assertRaises(StorageUnavailableError):
+                    store.list_conversations(self.scope)
+                self.assertEqual(store.storage_health()["state"], FAILED)
+                if not replace:
+                    self.assertFalse(path.exists())
+
     def test_corruption_does_not_become_healthy_on_implicit_reopen(self):
         store = self.store()
         store.path.write_bytes(b"not a sqlite database")

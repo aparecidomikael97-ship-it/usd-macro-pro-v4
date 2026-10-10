@@ -1,4 +1,4 @@
-# AION — SQLite staged host lifecycle audit — 2026-10-10
+# AION â€” SQLite staged host lifecycle audit â€” 2026-10-10
 
 Base: main 5744b2b7b17c84331e6f27c569064993ff587782. Separate draft candidate; no Core V1 changes, no production persistence or Worker activation. First install HARD NO-GO.
 Protected #1191/#1192/#1193 branches are not modified. #1193 head inspected: 9086025bba2f05567a562acd0c71ecb0dbbb0019; its preview-harness close-on-run-exit fix is not copied or replaced here.
@@ -32,6 +32,8 @@ Publication/CI results must be recorded on the actual PR; this local result alon
 - Full Chromium/Streamlit integration and production durability/physical-host assurance are not certified by these tests. The #1193 history/UI changes remain a sibling branch, not assumed integrated.
 
 ## Review acceptance
-Dedicated exact-HEAD Windows/Linux suite must pass. Verify diff contains only adapter, host lifecycle, explicit backup compatibility, new tests, dedicated CI, the mandatory quality test registration and this report. Core V1 and #1191–#1193 unchanged. No production flag, provider, Worker, trading, payment, deployment or installation authorization. Review overhead and legacy migration fail-stop before approving any integration. No merge authorized.
+Dedicated exact-HEAD Windows/Linux suite must pass. Verify diff contains only adapter, host lifecycle, explicit backup compatibility, new tests, dedicated CI, the mandatory quality test registration and this report. Core V1 and #1191â€“#1193 unchanged. No production flag, provider, Worker, trading, payment, deployment or installation authorization. Review overhead and legacy migration fail-stop before approving any integration. No merge authorized.
 
 CI follow-up: the initial HEAD passed 36 lifecycle tests on each OS, but broad gates exposed an unpinned CI dependency and missing registration of the new root test in quality-tests.yml. The workflow now uses the repository's exact requests version and action SHAs; the new test is added to the mandatory inventory. Existing tests and assertions were not weakened. Final exact-HEAD results are recorded in the PR description.
+
+Additional lifecycle fence: a bound facade records the local database file identity. A missing/replaced file is rejected and latched rather than silently reopening a new empty database. This is a local filesystem metadata check, not a cryptographic identity or an atomic defense against a malicious concurrent filesystem swap. Fresh-process startup still relies on the existing staging directory and database integrity policy. The added regression renames a real committed DB and tests absent/replaced files. Final local focused/pinning/inventory run: 52 tests passed, including 17 new lifecycle methods.

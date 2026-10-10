@@ -27,6 +27,7 @@ class OperationScopedSQLiteChatStore:
         self._lock = RLock()
         self._closed = False
         self._failure = ""
+        self._file_identity = None
         self.require_healthy()
 
     def close(self):
@@ -50,7 +51,17 @@ class OperationScopedSQLiteChatStore:
                     raise StorageUnavailableError("staged handle unavailable: " + reason)
                 store = None
                 try:
+                    if self._file_identity is not None:
+                        try:
+                            current = self.path.stat()
+                        except OSError as exc:
+                            raise StorageUnavailableError("BOUND_DATABASE_UNAVAILABLE") from exc
+                        if (current.st_dev, current.st_ino) != self._file_identity:
+                            raise StorageUnavailableError("BOUND_DATABASE_REPLACED")
                     store = SQLiteChatStore(self.path)
+                    if self._file_identity is None:
+                        current = self.path.stat()
+                        self._file_identity = (current.st_dev, current.st_ino)
                     return getattr(store, name)(*args, **kwargs)
                 except sqlite3.DatabaseError as exc:
                     # Constraint rejection/busy is not proof of corruption. Other
