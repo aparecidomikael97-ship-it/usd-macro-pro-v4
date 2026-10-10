@@ -71,7 +71,7 @@ class ReadinessNoUnboundNetworkTests(unittest.TestCase):
         self.scope={
             "argparse": argparse,
             "AUTOPILOT_WORKFLOW": ".github/workflows/autopilot-v107.yml",
-            "config_from_mapping": lambda: self.config,
+            "_readiness_source_config": lambda: self.config,
             "independent_worker_source_preflight": self.source_gate,
             "load_runtime_checkpoint": self.runtime_get,
             "fetch_recent_autopilot_pulses": self.pulse_get,
