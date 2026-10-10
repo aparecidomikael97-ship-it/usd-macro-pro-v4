@@ -93,6 +93,17 @@ def _pulses(now=NOW):
 
 
 class GlobalWorkerActivationReadinessTests(unittest.TestCase):
+    def setUp(self):
+        # Historical readiness scenarios explicitly assume an imaginary
+        # enrolled source. The real production source gate denies all access;
+        # this fixture is test-local and cannot activate the Worker.
+        reference_only = patch(
+            "atlasquant_aion_global_worker_readiness.independent_worker_source_preflight",
+            return_value={"status":"VERIFIED","source_verified":True},
+        )
+        reference_only.start()
+        self.addCleanup(reference_only.stop)
+
     def test_feature_flag_state_is_strict(self):
         self.assertEqual(feature_flag_state(""), "UNSET")
         self.assertEqual(feature_flag_state("0"), "DISABLED")
