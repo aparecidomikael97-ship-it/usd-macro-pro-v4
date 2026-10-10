@@ -80,10 +80,16 @@ def test_real_aion_tab_send_multiline_metadata_proof_approval_blocked_keyboard(p
         expect(page.locator('.aq-chat-count')).to_contain_text('8 mensagens')
         # Navigation away/back preserves logical session history and conversation id.
         page.locator('.ref-sidebar [data-route="roles"]').click();expect(page.locator('.final-aion-roles')).to_be_visible()
-        page.locator('.ref-detail [data-route="home"]').click();expect(page.locator('.aq-chat-count')).to_contain_text('8 mensagens')
+        page.locator('.ref-detail [data-route="home"]').click()
+        # Navigation is async: observing the message count alone can match a
+        # stale component while the roles detail is still being unmounted.
+        # Enforce that the previous detail has actually disappeared first.
+        expect(page.locator('.ref-detail')).to_have_count(0,timeout=20000)
+        expect(page.locator('.aq-chat-root')).to_be_visible(timeout=20000)
+        expect(page.locator('.aq-chat-count')).to_contain_text('8 mensagens')
         assert page.locator('.aq-chat-id').text_content()==cid
         page.locator('.ref-sidebar [data-route="chat"]').click()
-        expect(page.locator('.ref-detail h1')).to_have_text('Converse com o AION')
+        expect(page.locator('.ref-detail h1')).to_have_text('Converse com o AION',timeout=20000)
         page.locator('.ref-detail [data-route="home"]').click()
         expect(page.locator('.ref-detail')).to_have_count(0)
         expect(page.locator('.aq-chat-count')).to_contain_text('8 mensagens')
