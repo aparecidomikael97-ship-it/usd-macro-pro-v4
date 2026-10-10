@@ -60,6 +60,7 @@ from atlasquant_signal_lifecycle import (
 )
 from atlasquant_shadow_capture import build_shadow_batch
 from atlasquant_shadow_store import persist_shadow_samples
+from atlasquant_aion_v2_autopilot_evidence_guard import guarded_autopilot_evidence_write
 from atlasquant_flight_recorder_panel import record_from_pack
 from atlasquant_flight_recorder_store import persist_records
 from atlasquant_setup_candidates import build_setup_candidates
@@ -1299,7 +1300,10 @@ def persist_decision_evidence(packs, *, engine_version: str, repo: str, branch: 
     errors=[]
     try:
         shadow_batch=build_shadow_batch(packs,champion_version=engine_version)
-        shadow_status=persist_shadow_samples(shadow_batch,repo=repo,branch=branch,token=token)
+        shadow_status=guarded_autopilot_evidence_write(
+            repo=repo,branch=branch,sink="shadow",
+            write=lambda: persist_shadow_samples(shadow_batch,repo=repo,branch=branch,token=token),
+        )
         if not bool(shadow_status.get("ok",False)):
             reason=str(shadow_status.get("reason","PERSISTENCE_FAILED"))
             detail=str(shadow_status.get("error","") or reason)
@@ -1309,7 +1313,10 @@ def persist_decision_evidence(packs, *, engine_version: str, repo: str, branch: 
         errors.append("Decision evidence Shadow: "+shadow_status["error"])
     try:
         flight_records=[record_from_pack(p,engine_version) for p in packs]
-        flight_status=persist_records(flight_records,repo=repo,branch=branch,token=token)
+        flight_status=guarded_autopilot_evidence_write(
+            repo=repo,branch=branch,sink="flight",
+            write=lambda: persist_records(flight_records,repo=repo,branch=branch,token=token),
+        )
         if not bool(flight_status.get("ok",False)):
             reason=str(flight_status.get("reason","PERSISTENCE_FAILED"))
             detail=str(flight_status.get("error","") or reason)
