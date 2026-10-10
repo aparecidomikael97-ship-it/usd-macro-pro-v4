@@ -141,3 +141,38 @@ def test_long_history_pagination_does_not_erase_earliest_turn_and_smart_scroll(p
         expect(page.locator('.aq-chat-count')).to_contain_text('242 mensagens')
         expect(page.locator('.aq-chat-older')).to_be_visible()
         browser.close()
+
+
+@pytest.mark.parametrize('width,height',[(1440,900),(390,844)])
+def test_last_turn_notice_never_blocks_new_conversation(preview_url,width,height):
+    """Only the assessed turn is blocked/waiting; the next authorized chat input stays usable."""
+    with sync_playwright() as p:
+        browser=p.chromium.launch(headless=True)
+        page=browser.new_page(viewport={'width':width,'height':height})
+        enter(page,preview_url)
+        notice=page.locator('.aq-chat-turn-notice')
+        expect(notice).to_be_hidden()
+
+        send(page,'implementar uma mudança em sandbox','WAITING_APPROVAL')
+        expect(notice).to_be_visible()
+        expect(notice).to_have_attribute('data-state','WAITING_APPROVAL')
+        expect(notice).to_contain_text('aguarda aprovação humana')
+        expect(notice).to_contain_text('pode continuar conversando')
+        expect(page.locator('.aq-chat-send')).to_be_enabled()
+        expect(page.locator('.aq-chat-message.assistant').last).to_contain_text('Aguardando aprovação')
+        page.locator('.aq-chat-proof summary').last.click()
+        expect(page.locator('.aq-chat-proof').last).to_contain_text('granted=False')
+
+        send(page,'faça deploy agora','BLOCKED')
+        expect(notice).to_be_visible()
+        expect(notice).to_have_attribute('data-state','BLOCKED')
+        expect(notice).to_contain_text('bloqueado pela política')
+        expect(notice).to_contain_text('não a conversa')
+        expect(page.locator('.aq-chat-send')).to_be_enabled()
+        assert page.get_by_role('button',name='Aprovar',exact=True).count()==0
+
+        send(page,'Como está o sistema?','PLANNED')
+        expect(notice).to_be_hidden()
+        expect(page.locator('.aq-chat-send')).to_be_enabled()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        browser.close()
