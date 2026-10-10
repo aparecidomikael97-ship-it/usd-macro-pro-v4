@@ -90,6 +90,11 @@ def _contents_url(repo: str) -> str:
 
 
 def _fetch_remote(repo: str, branch: str, token: str, timeout: int) -> tuple[list[dict[str,Any]], str]:
+    # A token/session cannot prove the legacy shared file belongs to a tenant.
+    from atlasquant_private_read_gate_v1 import require_private_read
+    from atlasquant_legacy_private_resource_gate_v1 import require_legacy_private_remote_resource
+    require_private_read()
+    require_legacy_private_remote_resource(FLIGHT_RECORDER_PATH)
     r=reject_github_read_unexpected_status(requests.get(
         guard_github_token_read_destination(_contents_url(repo)),
         headers=_headers(token),
@@ -112,6 +117,10 @@ def load_persistent_records(
     token: str,
     timeout: int = 15,
 ) -> list[dict[str,Any]]:
+    from atlasquant_private_read_gate_v1 import require_private_read
+    from atlasquant_legacy_private_resource_gate_v1 import require_legacy_private_remote_resource
+    require_private_read()
+    require_legacy_private_remote_resource(FLIGHT_RECORDER_PATH)
     safe_branch=require_runtime_branch(branch)
     if not str(token or "").strip() or not str(repo or "").strip():
         raise ValueError("Persistent Flight Recorder requires repo and token")
@@ -129,6 +138,12 @@ def persist_records(
     max_records: int = DEFAULT_MAX_RECORDS,
     retry_conflict_once: bool = True,
 ) -> dict[str,Any]:
+    # Mandatory fail-closed until per-resource tenant provenance and an
+    # independently witnessed CAS receipt exist. Historical protocol code
+    # below is unreachable in production and only synthetic offline tests
+    # can reconstruct it in a network-blocked reference harness.
+    return {"ok":False,"reason":"HARD_DENIED","added":0,"records":0,
+            "reconciliation_required":True,"safe_to_retry":False}
     try:
         safe_branch=require_runtime_branch(branch)
     except Exception as exc:

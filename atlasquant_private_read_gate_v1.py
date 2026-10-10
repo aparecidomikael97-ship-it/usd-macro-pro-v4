@@ -21,6 +21,7 @@ QUARANTINE_KEY = "atlasquant_private_pending_cross_session_quarantine_v1"
 PENDING_KEYS = (
     "atlasquant_shadow_reconciliation_pending",
     "atlasquant_research_evidence_reconciliation_pending",
+    "atlasquant_flight_recorder_reconciliation_pending",
 )
 DISPLAY_KEYS = (
     "atlasquant_shadow_samples",
@@ -37,6 +38,10 @@ DISPLAY_KEYS = (
     "atlasquant_admin_runtime_model_paper_hydrated",
     "atlasquant_last_backtest_intelligence",
     "atlasquant_last_strategy_suite_intelligence",
+    "atlasquant_session_flight_recorder",
+    "atlasquant_flight_recorder_hydrated",
+    "atlasquant_flight_recorder_load_status",
+    "atlasquant_flight_recorder_persistence",
 )
 
 
@@ -47,6 +52,7 @@ def clear_private_ui_state(state: Any) -> None:
     status_pairs = (
         ("atlasquant_shadow_persistence_status", PENDING_KEYS[0]),
         ("atlasquant_research_evidence_status", PENDING_KEYS[1]),
+        ("atlasquant_flight_recorder_persistence", PENDING_KEYS[2]),
     )
     for status_key, pending_key in status_pairs:
         status = state.get(status_key)
