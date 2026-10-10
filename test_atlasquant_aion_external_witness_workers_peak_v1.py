@@ -126,6 +126,40 @@ class WitnessWorkersFreePeakCapacityTests(unittest.TestCase):
         self.assertIn("quoted_partial_brl",x)
         self.assert_never_authority(x)
 
+    def test_missing_single_object_storage_is_not_free_fit_proof(self):
+        x=model_witness_cost(plan(),worker_profile=profile())
+        self.assertIn("CF_DO_SINGLE_OBJECT_STORAGE_NOT_MODELED",x["blockers"])
+        self.assertIsNone(x["do_largest_object_gb_assumed"])
+        self.assert_never_authority(x)
+
+    def test_account_total_below_five_gb_can_still_break_one_gb_single_do(self):
+        p=plan()
+        p["do_storage_gb"]="2.00"
+        x=model_witness_cost(p,worker_profile=profile(),
+                             largest_do_storage_gb="1.50")
+        self.assertEqual(x["status"],"FREE_CAPACITY_EXCEEDED")
+        self.assertIn("CF_DO_FREE_SINGLE_OBJECT_STORAGE_EXCEEDED",x["blockers"])
+        self.assertNotIn("CF_FREE_STORAGE_EXCEEDED",x["blockers"])
+        self.assert_never_authority(x)
+
+    def test_one_gb_per_object_boundary_is_hypothetical_not_attested(self):
+        p=plan()
+        p["do_storage_gb"]="2"
+        x=model_witness_cost(p,worker_profile=profile(),
+                             largest_do_storage_gb="1")
+        self.assertNotIn("CF_DO_FREE_SINGLE_OBJECT_STORAGE_EXCEEDED",x["blockers"])
+        self.assertNotIn("CF_DO_SINGLE_OBJECT_STORAGE_NOT_MODELED",x["blockers"])
+        self.assertIs(x["cloudflare_free_account_usage_verified"],False)
+        self.assert_never_authority(x)
+
+    def test_invalid_per_object_storage_never_unblocks_budget(self):
+        p=plan()
+        for largest in ("NaN","Infinity","-1","0.5",True):
+            with self.subTest(largest=largest):
+                y=model_witness_cost(p,largest_do_storage_gb=largest)
+                self.assertEqual(y["status"],"INVALID_PLAN")
+                self.assert_never_authority(y)
+
     def test_synthetic_budget_below_cap_not_deploy_approval(self):
         x=model_witness_cost(plan(),hypothetical_quote(),worker_profile=profile())
         self.assertEqual(x["status"],"PARTIAL_MATH_NOT_CERTIFIED")

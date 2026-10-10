@@ -89,3 +89,12 @@ A função pura `model_witness_cost(plan, quote=None, *, worker_profile=None)` m
 Esses números não são throughput medido. A comparação **não** substitui métricas reais da conta, invoices, autenticação independente da testemunha ou cálculo completo do custo Cloudflare/AWS. Mesmo um `quoted_partial_brl` hipotético abaixo de R$200 mantém `full_stack_monthly_cost_brl=null`, `budget_certified=false`, `spending_approved=false`, `worker_authorized=false`. Nenhuma conta/deploy/compra foi realizada.
 
 Fontes primárias: [Workers Pricing](https://developers.cloudflare.com/workers/platform/pricing/) (02/10/2026), [Durable Objects Pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/) (30/09/2026). O modelo é uma **revisão conservadora de planejamento** e não uma nova condição positiva no Worker.
+
+
+## Revisão de capacidade por objeto e bypass sob falta de quota (10/10/2026)
+
+**Fonte Cloudflare primária:** [Durable Objects limits](https://developers.cloudflare.com/durable-objects/platform/limits/) estabelece **1 GB de armazenamento por SQLite DO no plano Free**, além dos **5 GB totais por conta**. O cálculo anterior conferia apenas o total da conta e poderia indicar uso grátis com um único objeto de 1,5 GB e conta de 2 GB. O parâmetro opcional `largest_do_storage_gb` cobre a dimensão por objeto. Sem ele, retorna o bloqueio `CF_DO_SINGLE_OBJECT_STORAGE_NOT_MODELED`; se maior que 1 GB, marca `CF_DO_FREE_SINGLE_OBJECT_STORAGE_EXCEEDED` e `FREE_CAPACITY_EXCEEDED`. É input **sintético**, nunca medição de capacidade. Retenções, índices e metadados contam para ocupação real.
+
+**Fonte Cloudflare primária:** [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) mostra que quando o plano gratuito atinge 100.000 requisições/dia, o endpoint configurado como **Fail Open** pode **passar requisições diretamente ao origin**, sem executar o Worker de verificação. Para um Worker de autenticação, exigir rota/endpoint realmente **sem bypass**, com `Fail Closed` quando aplicável e resultado erro 1027. Isso é **gate de segurança da futura infraestrutura**, não algo que a calculadora consiga comprovar por campos autodeclarados. Mesmo worker_profile abaixo do limite, conta e fail mode reais não foram atestados.
+
+Essa descoberta impede usar estimativas hipotéticas como autorização e adiciona dois gates P0 ao manifesto de enrollment da #1185. Ainda não há uma conta de Cloudflare, route, object ID, relatório provider-side ou autorização para testá-los.

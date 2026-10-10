@@ -14,6 +14,7 @@ SCHEMA = "AION_WITNESS_BUDGET_RESEARCH_V1"
 WORKERS_FREE_INBOUND_REQUESTS_PER_DAY = 100_000
 WORKERS_FREE_CPU_MS_PER_INVOCATION = Decimal("10")
 CAP_BRL = Decimal("200")
+CF_DO_FREE_SINGLE_OBJECT_GB = Decimal("1")
 DAYS_PER_MONTH = 30
 CF_FREE_LIMITS = {
     "do_requests_per_day": 100_000,
@@ -91,7 +92,8 @@ def _base(status: str, blockers: list[str], **metrics: Any) -> dict[str, Any]:
 
 def model_witness_cost(plan: Mapping[str, Any] | None,
                        quote: Mapping[str, Any] | None = None,
-                       *, worker_profile: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                       *, worker_profile: Mapping[str, Any] | None = None,
+                       largest_do_storage_gb: str | None = None) -> dict[str, Any]:
     """Check *assumptions* against free quotas and optionally price a quoted basket.
 
     DO capacity is separate from Workers caller requests and other resources.
@@ -118,6 +120,19 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
         retention = _int(plan["s3_retention_days"], "RETENTION", low=1, high=3650)
     except ValueError as ex:
         return _base("INVALID_PLAN", ["INVALID_" + str(ex)])
+    # The account's 5-GB free storage quota is not the per-object 1-GB
+    # hard limit. The latter cannot be deduced from an account-wide total.
+    if largest_do_storage_gb is None:
+        per_object = None
+        object_blockers = ["CF_DO_SINGLE_OBJECT_STORAGE_NOT_MODELED"]
+    else:
+        try:
+            per_object = _dec(largest_do_storage_gb, "DO_SINGLE_OBJECT_STORAGE")
+            if per_object > do_storage:
+                raise ValueError("DO_SINGLE_OBJECT_EXCEEDS_ACCOUNT_TOTAL")
+        except ValueError as ex:
+            return _base("INVALID_PLAN", ["INVALID_" + str(ex)])
+        object_blockers = []
     daily_reads = tenants * reads
     daily_writes = tenants * writes
     daily_do = daily_reads * req_read + daily_writes * req_write
@@ -133,6 +148,7 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
         "do_rows_written_per_day": daily_row_write,
         "do_duration_gb_s_per_day": str(daily_duration),
         "do_stored_gb_assumed": str(do_storage),
+        "do_largest_object_gb_assumed": str(per_object) if per_object is not None else None,
         "s3_put_per_month": daily_writes * DAYS_PER_MONTH,
         "s3_get_per_month": daily_reads * DAYS_PER_MONTH,
         "s3_list_per_month": daily_reads * DAYS_PER_MONTH,
@@ -150,6 +166,8 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
         breaches.append("CF_FREE_DURATION_EXCEEDED")
     if do_storage > CF_FREE_LIMITS["do_stored_gb"]:
         breaches.append("CF_FREE_STORAGE_EXCEEDED")
+    if per_object is not None and per_object > CF_DO_FREE_SINGLE_OBJECT_GB:
+        breaches.append("CF_DO_FREE_SINGLE_OBJECT_STORAGE_EXCEEDED")
     # Peak-day and Workers Free gates cannot be assumed from DO mean traffic.
     # Keep original calculations unchanged for callers that have not provided
     # a Worker profile, but surface the omission as an explicit blocker.
@@ -208,7 +226,7 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
             breaches.append("CF_DO_PEAK_ROWS_WRITTEN_EXCEEDED")
         if peak_do_duration > CF_FREE_LIMITS["do_duration_gb_s_per_day"]:
             breaches.append("CF_DO_PEAK_DURATION_EXCEEDED")
-    blockers = list(breaches) + workers_blockers + [
+    blockers = list(breaches) + workers_blockers + object_blockers + [
         "CF_FREE_ONLY_MODELED_NOT_ACCOUNT_VERIFIED"
     ]
     if quote is None:
@@ -250,4 +268,5 @@ def model_witness_cost(plan: Mapping[str, Any] | None,
 
 __all__ = ["SCHEMA", "PLAN_FIELDS", "QUOTE_FIELDS", "NO_AUTHORITY",
            "CF_FREE_LIMITS", "WORKER_PROFILE_FIELDS",
-           "WORKERS_FREE_INBOUND_REQUESTS_PER_DAY", "model_witness_cost"]
+           "WORKERS_FREE_INBOUND_REQUESTS_PER_DAY",
+           "CF_DO_FREE_SINGLE_OBJECT_GB", "model_witness_cost"]

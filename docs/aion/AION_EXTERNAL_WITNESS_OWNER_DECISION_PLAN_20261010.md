@@ -40,7 +40,7 @@
 
 ## Manifest de evidências
 
-`docs/aion/evidence/AION_WITNESS_EXTERNAL_ENROLLMENT_GATE_V1.json` lista **18 gates BLOCKED**, incluindo IAM/admin, proteção WORM, latest-head, inscrição de chaves, custos completos e aprovações específicas. Os campos `evidence_uri`/`evidence_sha256` são nulos porque **nenhuma prova real foi coletada**. O documento não contém secrets e **não é lido pelo Worker como política**. O script de teste verifica que nenhum desses campos vira autorização acidental.
+`docs/aion/evidence/AION_WITNESS_EXTERNAL_ENROLLMENT_GATE_V1.json` lista **20 gates BLOCKED**, incluindo IAM/admin, proteção WORM, latest-head, inscrição de chaves, custos completos e aprovações específicas. Os campos `evidence_uri`/`evidence_sha256` são nulos porque **nenhuma prova real foi coletada**. O documento não contém secrets e **não é lido pelo Worker como política**. O script de teste verifica que nenhum desses campos vira autorização acidental.
 
 ## Reutilização verificada no repo
 
@@ -50,3 +50,12 @@
 - #1180–#1182: runner fail-closed, readiness `BLOCKED` e **sem GET de dados privados sem prova**. Nenhum caminho de aprovação pode vir deste ADR.
 
 **Status final:** `PARTIALLY_CLOSED / HARD NO-GO`. Não criar contas, contratar plano, iniciar billing, gerar chaves reais, executar Worker/Render, instalar, migrar ou mergear sem novas autorizações do proprietário.
+
+
+## Novo P0 operacional: rota Fail Closed e armazenamento por objeto (10/10/2026)
+
+A documentação oficial da Cloudflare [Workers Limits](https://developers.cloudflare.com/workers/platform/limits/) explica que, ao atingir **100 mil requests/dia no Workers Free**, a rota em modo **Fail Open** pode contornar o Worker completamente, deixando o origin processar sem o código de segurança. Para uma testemunha AION que aplique autenticação/source binding, **isso pode anular toda a política**. É obrigatório comprovar **Fail Closed** na rota efetiva (ou arquitetura equivalente que nunca tenha caminho de bypass ao origin); quota 1027 deve negar acessos, nunca servir dados protegidos. A configuração de rota no Dashboard/API e teste adversarial físico devem fornecer evidência independente: um campo de JSON, workflow verde ou simulação não provam o estado publicado. O tipo real de endpoint (Route, Custom Domain, workers.dev) deve ser verificado antes de aplicar esse controle; não declarar automaticamente que todas as topologias usam a mesma opção de rota.
+
+Conforme [Durable Objects Limits](https://developers.cloudflare.com/durable-objects/platform/limits/), o SQLite-backed DO em Workers Free suporta até **1 GB por Durable Object** e **5 GB por conta**; quando o objeto atinge o limite, operações de escrita falham com SQLITE_FULL, mesmo que a conta inteira ainda esteja abaixo de 5 GB. Falha de gravação do head/witness tem de virar UNKNOWN_OUTCOME/NO-GO com reconciliação independente, não retry cego. Medir maior objeto, total de conta, quotas e margem de crescimento.
+
+O manifest agora contém **20 gates BLOCKED** (incluindo `CLOUDFLARE_SECURITY_ROUTE_NO_BYPASS` e `CLOUDFLARE_DO_SINGLE_OBJECT_STORAGE_HEADROOM`), todos sem evidência de implantação. Não existe endpoint, rota, domínio ou conta Cloudflare criada por este trabalho.

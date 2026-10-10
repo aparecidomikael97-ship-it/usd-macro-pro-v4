@@ -32,6 +32,8 @@ GATES = frozenset({
     "RECOVERY_REVOCATION_BREAK_GLASS",
     "LGPD_RESIDENCY_AND_OPERATORS",
     "FULL_BRL_BUDGET_QUOTE",
+    "CLOUDFLARE_SECURITY_ROUTE_NO_BYPASS",
+    "CLOUDFLARE_DO_SINGLE_OBJECT_STORAGE_HEADROOM",
     "FINANCIAL_SPEND_APPROVAL",
     "RELEASE_MERGE_DEPLOY_APPROVAL",
 })
@@ -70,7 +72,7 @@ class WitnessExternalOwnerDecisionEvidenceTests(unittest.TestCase):
 
     def test_all_independent_enrollment_gates_are_explicitly_unverified(self):
         gates=self.manifest["evidence_gates"]
-        self.assertEqual(len(gates),18)
+        self.assertEqual(len(gates),20)
         self.assertEqual({row["id"] for row in gates},GATES)
         self.assertEqual(len({row["id"] for row in gates}),len(gates))
         for gate in gates:
@@ -84,6 +86,21 @@ class WitnessExternalOwnerDecisionEvidenceTests(unittest.TestCase):
                 self.assertIsNone(gate["evidence_sha256"])
                 self.assertIsNone(gate["independent_verifier"])
                 self.assertTrue(gate["description"])
+
+    def test_new_route_and_storage_gates_cannot_be_falsely_certified(self):
+        gate_by_id={g["id"]:g for g in self.manifest["evidence_gates"]}
+        for key in (
+            "CLOUDFLARE_SECURITY_ROUTE_NO_BYPASS",
+            "CLOUDFLARE_DO_SINGLE_OBJECT_STORAGE_HEADROOM",
+        ):
+            row=gate_by_id[key]
+            self.assertEqual(row["state"],"BLOCKED")
+            self.assertEqual(row["evidence_class"],"external")
+            self.assertIsNone(row["evidence_uri"])
+            self.assertIsNone(row["independent_verifier"])
+            self.assertIsNone(row["evidence_sha256"])
+        self.assertIs(self.manifest["worker_authorized"],False)
+        self.assertIs(self.manifest["owner_approved_deploy"],False)
 
     def test_budget_full_quote_is_not_confused_with_cloudflare_free(self):
         self.assertIs(self.manifest["full_quote_brl_verified"],False)
