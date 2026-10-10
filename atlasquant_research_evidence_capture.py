@@ -9,13 +9,15 @@ import streamlit as st
 
 from atlasquant_research_evidence_store import (
     evidence_record,
+    RESEARCH_EVIDENCE_PATH,
     latest_evidence_by_strategy,
     load_research_evidence,
     merge_evidence_records,
     persist_research_evidence,
 )
 from atlasquant_runtime_store import resolve_runtime_branch
-from atlasquant_private_read_gate_v1 import private_read_allowed
+from atlasquant_private_read_gate_v1 import private_read_allowed, clear_private_ui_state
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
 
 SESSION_KEY="atlasquant_research_evidence_records"
 HYDRATED_KEY="atlasquant_research_evidence_hydrated"
@@ -92,6 +94,10 @@ def hydrate_research_evidence(
 def ensure_research_evidence_hydrated()->tuple[list[dict[str,Any]],dict[str,Any]]:
     if not private_read_allowed():
         return [], {"ok":False,"reason":"ACCESS_DENIED","records":0,"source":"none","error":""}
+    if not legacy_private_remote_resource_allowed(RESEARCH_EVIDENCE_PATH):
+        # Quarantine even a previously cached session value before returning it.
+        clear_private_ui_state(st.session_state)
+        return [], {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","records":0,"source":"none","error":""}
     current=list(st.session_state.get(SESSION_KEY,[]) or [])
     pending=_pending_status()
     if pending is not None:
@@ -147,6 +153,9 @@ def capture_research_evidence(
     # never repopulate a cache cleared by private_read_allowed().
     if not access_ok:
         return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
+    if not legacy_private_remote_resource_allowed(RESEARCH_EVIDENCE_PATH):
+        clear_private_ui_state(st.session_state)
+        return {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","safe_to_retry":False}
     # Adopt a legacy pending status before a session-only capture can replace it.
     _pending_status()
     if persist:
@@ -203,6 +212,9 @@ def capture_research_evidence(
 def persist_session_research_evidence()->dict[str,Any]:
     if not private_read_allowed():
         return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
+    if not legacy_private_remote_resource_allowed(RESEARCH_EVIDENCE_PATH):
+        clear_private_ui_state(st.session_state)
+        return {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","safe_to_retry":False}
     records,_=ensure_research_evidence_hydrated()
     pending=_pending_status()
     if pending is not None:

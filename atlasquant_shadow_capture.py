@@ -7,9 +7,10 @@ import streamlit as st
 
 from atlasquant_challenger_v1 import build_challenger_snapshot, champion_snapshot
 from atlasquant_shadow_mode import compare_shadow_sample, append_shadow_sample
-from atlasquant_shadow_store import load_shadow_samples, persist_shadow_samples
+from atlasquant_shadow_store import SHADOW_PATH, load_shadow_samples, persist_shadow_samples
 from atlasquant_runtime_store import resolve_runtime_branch
-from atlasquant_private_read_gate_v1 import private_read_allowed
+from atlasquant_private_read_gate_v1 import private_read_allowed, clear_private_ui_state
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
 
 
 SESSION_KEY="atlasquant_shadow_samples"
@@ -89,6 +90,10 @@ def hydrate_shadow_samples(
 def ensure_shadow_hydrated() -> tuple[list[dict[str,Any]],dict[str,Any]]:
     if not private_read_allowed():
         return [], {"ok":False,"reason":"ACCESS_DENIED","samples":0,"source":"none","error":""}
+    if not legacy_private_remote_resource_allowed(SHADOW_PATH):
+        # A preexisting hydrated=True flag is not resource provenance.
+        clear_private_ui_state(st.session_state)
+        return [], {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","samples":0,"source":"none","error":""}
     current=list(st.session_state.get(SESSION_KEY,[]) or [])
     pending=_pending_status()
     if pending is not None:
@@ -139,6 +144,9 @@ def capture_shadow_batch(
 ) -> dict[str,Any]:
     if not private_read_allowed():
         return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
+    if not legacy_private_remote_resource_allowed(SHADOW_PATH):
+        clear_private_ui_state(st.session_state)
+        return {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","safe_to_retry":False}
     rows,_=ensure_shadow_hydrated()
     batch=build_shadow_batch(packs,champion_version=champion_version)
 

@@ -98,6 +98,9 @@ def main():
             guards.enter_context(patch.object(store, name, fixture))
             guards.enter_context(patch.object(capture, name, fixture))
             guards.enter_context(patch.object(capture, "private_read_allowed", return_value=True))
+            # Only the synthetic, network-blocked protocol reference may pass
+            # source provenance to exercise historical CAS/readback behavior.
+            guards.enter_context(patch.object(capture, "legacy_private_remote_resource_allowed", return_value=True))
         # Historical _fetch tests use synthetic transport and explicitly grant
         # private-read fixture authority; runtime never receives this override.
         guards.enter_context(patch("atlasquant_private_read_gate_v1.private_read_allowed", return_value=True))
