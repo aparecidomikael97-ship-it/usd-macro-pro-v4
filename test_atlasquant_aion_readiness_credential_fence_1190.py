@@ -55,7 +55,7 @@ class ReadinessCredentialFenceTests(unittest.TestCase):
         tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
         if any(isinstance(n, ast.FunctionDef) and n.name == "_readiness_source_config" for n in tree.body):
             self.scope["_readiness_source_config"] = extract_real("_readiness_source_config", self.scope)
-        for target in ("socket.socket.connect", "socket.socket.connect_ex", "socket.create_connection", "requests.sessions.Session.request"):
+        for target in ("socket.socket.connect", "socket.socket.connect_ex", "socket.create_connection"):
             guard = patch(target, side_effect=AssertionError("NETWORK_FORBIDDEN"));guard.start();self.addCleanup(guard.stop)
 
     def run_cli(self):

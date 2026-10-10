@@ -103,7 +103,15 @@ Existing .github/workflows/aion-global-worker-readiness.yml remains byte-for-byt
 unchanged: set -o pipefail, CLI through tee, no continue-on-error/||true, exit 1
 when BLOCKED. Its red result is intentional operational NO-GO and must stay red.
 Other historical synthetic-readiness jobs are not an operational PASS certificate.
-Exact hosted statuses/URLs are recorded after publication, without claiming all CI
+Initial hosted revision 635d2818a10ea0ed334e93bda6296e206f13a2e2: the new
+workflow failed setup because its optional HTTP mock tried to import requests
+in a stdlib-only environment (Linux: seven setup errors; both jobs failed).
+The harness was corrected to block socket connect/connect_ex/create_connection;
+checkpoint/pulse callbacks still fail on any invocation. No dependency was installed,
+no assertion or production denial was removed. Local python -S also validates
+without site-packages. Operational run 38082294655 independently emitted BLOCKED,
+private_checkpoint_fetch_performed=false, pulse_fetch_performed=false and exited 1.
+Exact final hosted statuses/URLs are recorded after publication, without claiming all CI
 is green. Whole-app/physical tests and full UI are not executed locally.
 
 ## Physical Windows test plan — NOT EXECUTED
