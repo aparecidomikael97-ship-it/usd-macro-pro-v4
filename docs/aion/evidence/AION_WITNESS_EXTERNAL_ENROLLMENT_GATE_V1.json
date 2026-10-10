@@ -1,0 +1,190 @@
+{
+  "schema": "AION_EXTERNAL_CHECKPOINT_WITNESS_EVIDENCE_MANIFEST_V1",
+  "date": "2026-10-10",
+  "baseline_pr": 1184,
+  "baseline_sha": "8d0284eeb44a7f6a8c7cf3b15b7933c01e76e858",
+  "purpose": "PRE-ENROLLMENT PROCUREMENT AND EXTERNAL EVIDENCE TRACKING ONLY",
+  "status": "HARD_NO_GO",
+  "mode": "NO_AUTHORITY",
+  "production_trust_verified": false,
+  "worker_authorized": false,
+  "remote_witness_configured": false,
+  "independent_custody_verified": false,
+  "budget_brl_monthly_cap": 200,
+  "full_quote_brl_verified": false,
+  "provider_approved": false,
+  "owner_approved_spend": false,
+  "owner_approved_deploy": false,
+  "automatic_retry_authorized": false,
+  "evidence_gates": [
+    {
+      "id": "SOURCE_ROOT_ENROLLMENT",
+      "evidence_class": "physical",
+      "description": "Out-of-band trust root and key pins installed on an authorized owner device, independently audited",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "OWNER_IDENTITY_CEREMONY",
+      "evidence_class": "physical",
+      "description": "Owner MFA/biometric ceremony and separate signed authority decision with audit receipt",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "TENANT_RESOURCE_REGISTRY",
+      "evidence_class": "external",
+      "description": "Authoritative revocable owner/tenant/workspace to repo/branch/path binding outside GitHub",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "ADMIN_FAILURE_DOMAIN_SEPARATION",
+      "evidence_class": "external",
+      "description": "Two distinct administrative credential/restore failure domains validated by independent review",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "COORDINATOR_ATOMIC_CAS",
+      "evidence_class": "external",
+      "description": "Provider evidence of serialized monotonic CAS, idempotency and bounded failure semantics",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "COORDINATOR_ROLLBACK_TEST",
+      "evidence_class": "external",
+      "description": "Provider PITR rollback adversarial rehearsal and fail-closed fork detection",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "SECOND_DOMAIN_IMMUTABLE_HISTORY",
+      "evidence_class": "external",
+      "description": "Configured compliant retention and verified immutable append/version history, not only billing claims",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "SECOND_DOMAIN_CURRENT_HEAD",
+      "evidence_class": "external",
+      "description": "Authenticated latest head discovery including pagination/version/delete-marker ambiguity checks",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "FRESH_NONCE_CHALLENGE",
+      "evidence_class": "external",
+      "description": "CSPRNG nonce uniqueness, authenticated challenge response, replay rejection across reconnect/restart",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "INDEPENDENT_KEY_CUSTODY",
+      "evidence_class": "external",
+      "description": "Source and witness private keys held by independently verified custody and rotation/revocation processes",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "CROSS_DOMAIN_PARTIAL_COMMIT",
+      "evidence_class": "external",
+      "description": "Crash between coordinator and append witness yields UNKNOWN_OUTCOME no retry until reconciliation",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "B2B_CROSS_TENANT_NEGATIVE_TESTS",
+      "evidence_class": "ci_and_physical",
+      "description": "A to B isolation and privilege confusion tests including forged ADMIN status and forged scope",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "OWNER_WINDOWS_PHYSICAL_VALIDATION",
+      "evidence_class": "physical",
+      "description": "Authorized local owner environment, secure storage and real attestation verified on Windows",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "RECOVERY_REVOCATION_BREAK_GLASS",
+      "evidence_class": "physical",
+      "description": "Independent multi-party recovery, compromised key revocation, monotonic epoch change with evidence",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "LGPD_RESIDENCY_AND_OPERATORS",
+      "evidence_class": "legal",
+      "description": "Data processing, region, vendor sub-processors and contract risk signed off",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "FULL_BRL_BUDGET_QUOTE",
+      "evidence_class": "finance",
+      "description": "Current priced estimates for all CF Workers/DO, AWS S3, API, retention, egress, logs, taxes and FX within owner cap",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "FINANCIAL_SPEND_APPROVAL",
+      "evidence_class": "owner_approval",
+      "description": "Specific owner approval before creating paid or external cloud resources",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    },
+    {
+      "id": "RELEASE_MERGE_DEPLOY_APPROVAL",
+      "evidence_class": "owner_approval",
+      "description": "Separate owner authorization for merge, deploy, runtime enablement and production migration",
+      "state": "BLOCKED",
+      "evidence_uri": null,
+      "evidence_sha256": null,
+      "independent_verifier": null
+    }
+  ],
+  "factual_references": [
+    "https://developers.cloudflare.com/durable-objects/platform/pricing/",
+    "https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-managing.html",
+    "https://aws.amazon.com/s3/pricing/"
+  ]
+}
