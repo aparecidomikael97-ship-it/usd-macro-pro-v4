@@ -96,6 +96,44 @@ class PrivateReadGateTests(unittest.TestCase):
         self.assertNotIn("atlasquant_shadow_samples", state)
         self.assertNotIn("atlasquant_shadow_hydrated", state)
 
+    def test_legacy_uncertain_display_status_becomes_pending_before_clear(self):
+        for status_key, pending_key in (
+            ("atlasquant_shadow_persistence_status", PENDING_KEYS[0]),
+            ("atlasquant_research_evidence_status", PENDING_KEYS[1]),
+        ):
+            with self.subTest(status_key=status_key):
+                state = {status_key: {"reason": "UNKNOWN_OUTCOME", "write_attempted": True}}
+                clear_private_ui_state(state)
+                self.assertNotIn(status_key, state)
+                self.assertTrue(state[QUARANTINE_KEY])
+                self.assertTrue(state[pending_key]["write_attempted"])
+
+    def test_legacy_private_cache_without_binding_is_dropped_for_valid_admin(self):
+        state = {
+            "atlasquant_shadow_samples": [{"secret": "from-A"}],
+            "atlasquant_shadow_hydrated": True,
+            "atlasquant_research_evidence_records": [{"secret": "from-A"}],
+        }
+        st = types.ModuleType("streamlit")
+        st.session_state = state
+        ap = types.ModuleType("atlasquant_access_panel")
+        ap.access_required = lambda: True
+        ap.current_session = lambda: self.session
+        ap.configured_users = lambda: self.users
+        ap.session_time_status = lambda session, now: {"valid": True}
+        config = {
+            "ATLASQUANT_PRIVATE_MEMBERSHIPS_JSON": '{"tenant_one":["owner.01"]}',
+            "ATLASQUANT_PRIVATE_WORKSPACE_ID": "tenant_one",
+            "ATLASQUANT_PRIVATE_POLICY_GENERATION": "7",
+        }
+        ap._setting = lambda key, default="": config.get(key, default)
+        with patch.dict(sys.modules, {"streamlit": st, "atlasquant_access_panel": ap}):
+            self.assertTrue(private_read_allowed())
+        self.assertNotIn("atlasquant_shadow_samples", state)
+        self.assertNotIn("atlasquant_shadow_hydrated", state)
+        self.assertNotIn("atlasquant_research_evidence_records", state)
+        self.assertEqual(len(state[SCOPE_KEY]), 64)
+
     def test_cross_login_quarantines_pending_without_erasing(self):
         state = {
             SCOPE_KEY: "scope-of-user-A",

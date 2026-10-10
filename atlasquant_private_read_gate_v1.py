@@ -42,6 +42,20 @@ DISPLAY_KEYS = (
 
 def clear_private_ui_state(state: Any) -> None:
     """Remove private presentation only. NEVER erase unresolved write outcomes."""
+    # Legacy code may not have promoted an uncertain status to PENDING_KEY yet.
+    # Promote it before removing the displayed status (logout/role change).
+    status_pairs = (
+        ("atlasquant_shadow_persistence_status", PENDING_KEYS[0]),
+        ("atlasquant_research_evidence_status", PENDING_KEYS[1]),
+    )
+    for status_key, pending_key in status_pairs:
+        status = state.get(status_key)
+        if isinstance(status, Mapping) and (
+            status.get("reason") in {"UNKNOWN_OUTCOME", "CONFLICT", "VALIDATION_REJECTED"}
+            or status.get("reconciliation_required") is True
+        ):
+            if not isinstance(state.get(pending_key), Mapping):
+                state[pending_key] = dict(status)
     if any(bool(state.get(k)) for k in PENDING_KEYS):
         state[QUARANTINE_KEY] = True
     for key in (*DISPLAY_KEYS, SCOPE_KEY):
@@ -130,13 +144,12 @@ def private_read_allowed() -> bool:
             clear_private_ui_state(state)
             return False
         previous = state.get(SCOPE_KEY)
-        if previous is not None and previous != binding:
+        # No binding includes pre-migration sessions: NEVER trust cached private
+        # rows that were hydrated before this gate existed.
+        if previous is None or previous != binding:
             clear_private_ui_state(state)
             if state.get(QUARANTINE_KEY) is True:
                 return False
-        elif previous is None and any(bool(state.get(k)) for k in PENDING_KEYS):
-            clear_private_ui_state(state)
-            return False
         state[SCOPE_KEY] = binding
         return True
     except Exception:
