@@ -210,6 +210,24 @@ class BrowserBindingUnitTests(unittest.TestCase):
             with self.subTest(rid=rid), self.assertRaises(ValueError):
                 self.reserve(rid)
 
+    def test_revoked_facade_cannot_bypass_logout_with_independent_readback(self):
+        ticket = self.reserve()
+        self.persist(self.prepare(ticket))
+        self.store.close()
+        with self.assertRaises(StorageUnavailableError):
+            self.reserve(cid=ticket["conversation_id"])
+        with self.assertRaises(StorageUnavailableError):
+            binding.request_store_path(self.store)
+
+    def test_replaced_database_cannot_bypass_existing_facade_binding(self):
+        ticket = self.reserve()
+        self.persist(self.prepare(ticket))
+        self.path.rename(self.path.with_suffix(".old"))
+        other = OperationScopedSQLiteChatStore(self.path)
+        other.close()
+        with self.assertRaises(StorageUnavailableError):
+            self.reserve(cid=ticket["conversation_id"])
+
     def test_real_process_exit_after_commit_or_before_assistant_commit(self):
         for after_commit in (True, False):
             with self.subTest(after_commit=after_commit):

@@ -14,7 +14,7 @@ from typing import Any, Mapping
 from aion_chat.models import Scope
 from atlasquant_aion_chat_request_binding import (
     request_digests, reserve_request, bind_expected_pair, reconcile_request,
-    finish_without_write,
+    finish_without_write, request_store_path,
 )
 from atlasquant_aion_chat_product_bridge import (
     continue_product_read_turn,
@@ -272,7 +272,8 @@ def submit_product_turn(
     current_cid = ticket["conversation_id"]
     state["conversation_id"] = current_cid
     if not ticket["fresh"]:
-        result = reconcile_request(store.path, scope, ticket)
+        result = reconcile_request(request_store_path(store), scope, ticket)
+        request_store_path(store)
         state["requests"].add(request_id)
         state["ack"] = request_id
         state["notice"] = ("Histórico local reconciliado; nenhuma nova gravação."
@@ -295,7 +296,8 @@ def submit_product_turn(
     )
 
     if result.get("state") == "CONFIRMED_AND_PERSISTED":
-        proof = reconcile_request(store.path, scope, ticket, completed=True)
+        proof = reconcile_request(request_store_path(store), scope, ticket, completed=True)
+        request_store_path(store)
         if not proof["local_history_persisted"]:
             result = proof
     else:

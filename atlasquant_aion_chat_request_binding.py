@@ -88,11 +88,24 @@ def _validate(row, requested_cid, current_cid, input_digest, context_digest):
         raise ValueError("active conversation conflicts with browser request")
 
 
+def request_store_path(store):
+    """Allow diagnostic readback of a failed facade, never a revoked binding."""
+    if getattr(store, "_closed", False) or getattr(store, "db", True) is None:
+        raise StorageUnavailableError("request source was revoked or closed")
+    path = Path(store.path)
+    expected = getattr(store, "_file_identity", None)
+    if expected is not None:
+        observed = path.stat()
+        if (observed.st_dev, observed.st_ino) != expected:
+            raise StorageUnavailableError("request source database replaced")
+    return path
+
+
 def reserve_request(store, scope, rid, requested_cid, current_cid, input_digest, context_digest):
     """Return an existing binding, or atomically reserve exactly one first attempt."""
     if not isinstance(rid, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}", rid):
         raise ValueError("invalid browser request identity")
-    path = store.path
+    path = request_store_path(store)
     with _open(path, readonly=True) as db:
         old = _row(db, scope, rid)
         if old:
