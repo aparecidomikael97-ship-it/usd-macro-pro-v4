@@ -34,12 +34,12 @@ export default function(component) {
    const suggestions=el('div',undefined,'aq-chat-suggestions');for(const text of ['Como está o sistema?','Resumo de tarefas','Explique o contexto']){const b=el('button',text);b.type='button';b.onclick=()=>{input.value=text;input.focus();};suggestions.append(b);}empty.append(suggestions);history.append(empty);}
   for(const entry of data.entries){
    const card=el('article',undefined,'aq-chat-message '+entry.role);card.dataset.turnId=entry.turn_id;
-   const assistantLabel=data.product_mode?'AION · leitura local verificada':'AION · plano local';
+   const assistantLabel=data.product_mode?'AION · histórico local':'AION · plano local';
    card.append(el('strong',entry.role==='user'?'Você':assistantLabel),el('p',entry.display_text??entry.content));
    for(const f of entry.attachments||[])card.append(el('small',`Anexo metadata · ${f.name} · ${f.mime_type} · ${f.size_bytes} bytes`));
    if(entry.role==='assistant'){
     const turn=data.turns[entry.turn_id]||{},status=turn.state||'BLOCKED';card.dataset.state=status;
-    const statusLabel=({PLANNED:'Planejado',WAITING_APPROVAL:'Aguardando aprovação',BLOCKED:'Bloqueado',REJECTED:'Não aceito',CONFIRMED_SUCCESS:'Confirmado'})[status]||status;
+    const statusLabel=({PLANNED:'Planejado',WAITING_APPROVAL:'Aguardando aprovação',BLOCKED:'Bloqueado',REJECTED:'Não aceito',CONFIRMED_SUCCESS:'Confirmado',UNKNOWN:'Não reverificado'})[status]||status;
     card.append(el('span',statusLabel+' · '+status,'aq-chat-state '+status.toLowerCase()),el('small','Capability · '+turn.capability));
     for(const blocker of turn.blockers||[])card.append(el('small',blocker,'aq-chat-blocker'));
     if(turn.approval?.required){const note=el('div','Aprovação necessária · não concedida. Use o fluxo autorizado quando estiver integrado.','aq-chat-approval');card.append(note);}
