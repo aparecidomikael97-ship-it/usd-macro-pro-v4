@@ -52,6 +52,7 @@ from atlasquant_aion_memory import (
     _runtime_write_receipt,
 )
 from atlasquant_runtime_store import require_runtime_branch
+from atlasquant_aion_global_worker_source_gate_v1 import independent_worker_source_preflight
 
 
 SCHEMA = "ATLASQUANT_AION_GLOBAL_DURABLE_WORKER_V1"
@@ -1547,6 +1548,21 @@ def run_global_worker_once(
             "external_action_executed": False,
         }
 
+    # Mandatory source ownership / monotonic witness gate. It is currently
+    # unprovisioned and always denies; a GitHub SHA or admin flag is NOT proof.
+    # Check BEFORE the first checkpoint GET, any CAS claim or executor.
+    origin = independent_worker_source_preflight(cfg)
+    if origin.get("status") != "VERIFIED" or origin.get("source_verified") is not True:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "INDEPENDENT_CHECKPOINT_SOURCE_UNAVAILABLE",
+            "processed": 0,
+            "network_called": False,
+            "external_action_executed": False,
+            "automatic_runtime_checkpoint_persistence": False,
+            "safe_to_retry": False,
+        }
     current = utc(now or _now())
     loaded = load_runtime_checkpoint(cfg, timeout=timeout)
     if loaded.get("status") != "CONFIRMED":
