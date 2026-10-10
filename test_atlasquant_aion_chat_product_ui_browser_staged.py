@@ -193,6 +193,7 @@ def test_browser_duplicate_request_after_store_remount_stays_two(staged_preview)
     Streamlit initialization or any production code.
     """
     import sqlite3
+    from contextlib import closing
 
     url, root = staged_preview
     request_id = "qa-same-request-after-remount-1198"
@@ -275,7 +276,9 @@ def test_browser_duplicate_request_after_store_remount_stays_two(staged_preview)
         # maps to one recorded pair; this does not reverify answer truth.
         database_files = list(root.glob("aion-chat-*.sqlite3"))
         assert database_files
-        with sqlite3.connect(database_files[0]) as db:
+        # sqlite3.Connection's context manager commits/rolls back but does
+        # NOT close its file handle; Windows must release it before temp cleanup.
+        with closing(sqlite3.connect(database_files[0])) as db:
             rows = db.execute(
                 "SELECT conversation_id,state FROM chat_browser_requests "
                 "WHERE request_id=? AND owner=? AND tenant=? AND workspace=?",
