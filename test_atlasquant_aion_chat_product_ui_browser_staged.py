@@ -96,7 +96,25 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         assistant = page.locator(
             '.aq-chat-message.assistant[data-state="UNKNOWN"]'
         )
-        expect(assistant).to_have_count(1, timeout=30000)
+        try:
+            expect(assistant).to_have_count(1, timeout=30000)
+        except AssertionError:
+            # Diagnostic-only: preserve the failing assertion and report
+            # QA-host state without dumping message bodies or credentials.
+            print("AION_STAGED_FIRST_TURN_DIAGNOSTIC", {
+                "root_count": page.locator(".aq-chat-root").count(),
+                "total_message_cards": page.locator(".aq-chat-message").count(),
+                "assistant_states": page.locator(
+                    ".aq-chat-message.assistant"
+                ).evaluate_all("els => els.map(e => e.dataset.state)"),
+                "live_status": page.locator(".aq-chat-live").text_content(),
+                "browser_error_count": len(errors),
+                "st_exception_count": page.locator(
+                    '[data-testid="stException"]'
+                ).count(),
+                "sqlite_file_count": len(list(root.glob("aion-chat-*.sqlite3"))),
+            })
+            raise
         expect(assistant).to_contain_text("AION · histórico local")
         expect(assistant).to_contain_text("Não reverificado · UNKNOWN")
         expect(assistant).not_to_contain_text("leitura local verificada")
