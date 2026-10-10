@@ -559,17 +559,29 @@ def _cli() -> int:
         parser.error("--check-runtime is required")
 
     config = config_from_mapping()
-    runtime = load_runtime_checkpoint(config, timeout=12.0)
-    token = str(
-        os.getenv("GITHUB_TOKEN_HISTORICO", "")
-        or os.getenv("GITHUB_TOKEN", "")
-        or ""
-    ).strip()
-    pulse_result = fetch_recent_autopilot_pulses(
-        config,
-        token=token,
-        timeout=12.0,
+    # The read-only CLI must NOT fetch unbound private checkpoint bytes just
+    # to report a NO-GO. The production source gate has no enrolled provider.
+    # Check before touching a token, checkpoint GET or pulse endpoint.
+    source = independent_worker_source_preflight(config)
+    source_admitted = (
+        source.get("status") == "VERIFIED"
+        and source.get("source_verified") is True
     )
+    if not source_admitted:
+        runtime = {"status": "SOURCE_UNBOUND"}
+        pulse_result = {"status": "SKIPPED_SOURCE_UNBOUND", "runs": []}
+    else:
+        runtime = load_runtime_checkpoint(config, timeout=12.0)
+        token = str(
+            os.getenv("GITHUB_TOKEN_HISTORICO", "")
+            or os.getenv("GITHUB_TOKEN", "")
+            or ""
+        ).strip()
+        pulse_result = fetch_recent_autopilot_pulses(
+            config,
+            token=token,
+            timeout=12.0,
+        )
     workflow_text = Path(args.workflow).read_text(encoding="utf-8")
     report = activation_readiness_snapshot(
         runtime_result=runtime,
@@ -580,6 +592,8 @@ def _cli() -> int:
         now=datetime.now(timezone.utc),
     )
     report["pulse_source_status"] = pulse_result.get("status")
+    report["private_checkpoint_fetch_performed"] = source_admitted
+    report["pulse_fetch_performed"] = source_admitted
     if pulse_result.get("status") != "CONFIRMED":
         report["status"] = "BLOCKED"
         report["activation_stage"] = "BLOCKED"
