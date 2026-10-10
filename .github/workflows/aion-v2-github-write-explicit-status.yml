@@ -3,6 +3,11 @@ name: AION V2 GitHub WRITE Explicit Status Gate CI
 on:
   pull_request:
     paths:
+      - "tests/test_atlasquant_aion_v2_closure_audit_regressions.py"
+      - "scripts/aion1155_closure_audit.py"
+      - "test_atlasquant_flight_recorder_store.py"
+      - "test_atlasquant_shadow_store.py"
+      - ".github/workflows/aion-v2-github-write-explicit-status.yml"
       - "atlasquant_aion_v2_github_write_response_guard.py"
       - "atlasquant_aion_v2_github_write_response_audit.py"
       - "tests/test_atlasquant_aion_v2_github_write_response_status.py"
@@ -61,6 +66,8 @@ jobs:
         run: |
           python -m pip install -r requirements.txt
           python -m pip install pytest==9.1.1
+      - name: Offline closure audit with transport blocked and synthetic fixtures
+        run: python -B scripts/aion1155_closure_audit.py
       - name: Compile all twelve GET modules, guard and adversarial fixtures
         run: |
           python -m py_compile atlasquant_aion_v2_legacy_github_contents_readback.py tests/test_atlasquant_aion_v2_legacy_jsonl_read_after_write.py tests/test_atlasquant_aion_v2_github_write_no_automatic_replay.py tests/test_atlasquant_aion_v2_legacy_persistence_unknown_outcome.py atlasquant_aion_global_worker.py atlasquant_aion_global_worker_activation.py atlasquant_aion_v2_github_write_response_guard.py atlasquant_aion_v2_github_write_response_audit.py tests/test_atlasquant_aion_v2_github_write_response_status.py atlasquant_aion_v2_github_read_response_guard.py atlasquant_aion_v2_github_read_response_audit.py tests/test_atlasquant_aion_v2_github_get_response_status.py atlasquant_aion_v2_github_write_url_guard.py atlasquant_aion_v2_github_token_read_no_redirect_audit.py tests/test_atlasquant_aion_v2_github_token_read_no_redirect.py atlasquant_aion_memory.py atlasquant_flight_recorder_store.py atlasquant_research_evidence_store.py atlasquant_shadow_store.py autopilot_v107.py currency_news_v1061.py currency_news_v1062.py currency_news_v107.py market_map_v10.py master_panel_v102.py twelve_budget_v1108.py usd_macro_pro_v4_cloud.py

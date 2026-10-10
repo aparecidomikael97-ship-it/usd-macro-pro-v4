@@ -78,7 +78,10 @@ class GitHubStore:
         r=reject_github_write_unexpected_status(requests.put(guard_github_write_destination(f'https://api.github.com/repos/{self.repo}/contents/{self.path}'),
                        headers={'Authorization':f'Bearer {self.token}'},json=body,timeout=25,
             allow_redirects=False,),"contents_put")
-        if r.status_code in (409,422): return False
+        if r.status_code in (409,422):
+            # False authorizes Budget._change to send again. An untrusted
+            # HTTP conflict/validation response is not replay authority.
+            raise BudgetUnavailable('REPORTED_GITHUB_HTTP_'+str(r.status_code)+'_RECONCILE_NO_RETRY')
         if r.status_code not in (200,201): raise BudgetUnavailable(f'Reserva do orçamento: HTTP {r.status_code}')
         return True
 

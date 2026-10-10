@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +20,15 @@ class _Resp:
     def raise_for_status(self):
         if self.status_code>=400:
             raise RuntimeError(f"HTTP {self.status_code}")
+
+
+def _blob_sha(raw):
+    return hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+b"\0"+raw).hexdigest()
+
+
+def _contents(raw):
+    return _Resp(200,{"sha":_blob_sha(raw),"encoding":"base64",
+                      "content":base64.b64encode(raw).decode("ascii")})
 
 
 class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
@@ -80,8 +90,9 @@ class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
         get.assert_not_called()
 
     def test_404_creates_new_runtime_file(self):
-        put=_Resp(201,{})
-        with patch("atlasquant_flight_recorder_store.requests.get",return_value=_Resp(404,{})), \
+        raw=serialize_records([self.row()]).encode("utf-8")
+        put=_Resp(201,{"content":{"sha":_blob_sha(raw)}})
+        with patch("atlasquant_flight_recorder_store.requests.get",side_effect=[_Resp(404,{}),_contents(raw)]), \
              patch("atlasquant_flight_recorder_store.requests.put",return_value=put) as p:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
         self.assertTrue(r["ok"])
@@ -92,7 +103,7 @@ class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
 
     def test_existing_duplicate_avoids_put(self):
         raw=serialize_records([self.row()]).encode("utf-8")
-        get=_Resp(200,{"sha":"abc","content":base64.b64encode(raw).decode("ascii")})
+        get=_contents(raw)
         with patch("atlasquant_flight_recorder_store.requests.get",return_value=get), \
              patch("atlasquant_flight_recorder_store.requests.put") as p:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
@@ -110,21 +121,24 @@ class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
 
     def test_corrupt_remote_fails_closed_without_overwrite(self):
         corrupt=b'{"ok":1}\nnot-json\n'
-        get=_Resp(200,{"sha":"abc","content":base64.b64encode(corrupt).decode("ascii")})
+        get=_contents(corrupt)
         with patch("atlasquant_flight_recorder_store.requests.get",return_value=get), patch("atlasquant_flight_recorder_store.requests.put") as put:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
         self.assertFalse(r["ok"])
         self.assertEqual(r["reason"],"CORRUPT_REMOTE")
         put.assert_not_called()
 
-    def test_conflict_retries_once(self):
+    def test_conflict_never_retries(self):
         empty=_Resp(404,{})
         responses=[_Resp(409,{}),_Resp(201,{})]
         with patch("atlasquant_flight_recorder_store.requests.get",side_effect=[empty,empty]), \
              patch("atlasquant_flight_recorder_store.requests.put",side_effect=responses) as p:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
-        self.assertTrue(r["ok"])
-        self.assertEqual(p.call_count,2)
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["reason"],"CONFLICT")
+        self.assertFalse(r["safe_to_retry"])
+        self.assertTrue(r["reconciliation_required"])
+        self.assertEqual(p.call_count,1)
 
 
 if __name__=="__main__":
