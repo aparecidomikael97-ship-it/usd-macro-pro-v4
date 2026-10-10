@@ -9,6 +9,7 @@ from atlasquant_challenger_v1 import build_challenger_snapshot, champion_snapsho
 from atlasquant_shadow_mode import compare_shadow_sample, append_shadow_sample
 from atlasquant_shadow_store import load_shadow_samples, persist_shadow_samples
 from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_private_read_gate_v1 import private_read_allowed
 
 
 SESSION_KEY="atlasquant_shadow_samples"
@@ -86,6 +87,8 @@ def hydrate_shadow_samples(
 
 
 def ensure_shadow_hydrated() -> tuple[list[dict[str,Any]],dict[str,Any]]:
+    if not private_read_allowed():
+        return [], {"ok":False,"reason":"ACCESS_DENIED","samples":0,"source":"none","error":""}
     current=list(st.session_state.get(SESSION_KEY,[]) or [])
     pending=_pending_status()
     if pending is not None:
@@ -134,6 +137,8 @@ def capture_shadow_batch(
     *,
     champion_version: str,
 ) -> dict[str,Any]:
+    if not private_read_allowed():
+        return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
     rows,_=ensure_shadow_hydrated()
     batch=build_shadow_batch(packs,champion_version=champion_version)
 

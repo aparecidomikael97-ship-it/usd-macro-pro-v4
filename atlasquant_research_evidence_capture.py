@@ -15,6 +15,7 @@ from atlasquant_research_evidence_store import (
     persist_research_evidence,
 )
 from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_private_read_gate_v1 import private_read_allowed
 
 SESSION_KEY="atlasquant_research_evidence_records"
 HYDRATED_KEY="atlasquant_research_evidence_hydrated"
@@ -89,6 +90,8 @@ def hydrate_research_evidence(
 
 
 def ensure_research_evidence_hydrated()->tuple[list[dict[str,Any]],dict[str,Any]]:
+    if not private_read_allowed():
+        return [], {"ok":False,"reason":"ACCESS_DENIED","records":0,"source":"none","error":""}
     current=list(st.session_state.get(SESSION_KEY,[]) or [])
     pending=_pending_status()
     if pending is not None:
@@ -139,6 +142,9 @@ def capture_research_evidence(
     captured_at:object|None=None,
     persist:bool=True,
 )->dict[str,Any]:
+    access_ok=private_read_allowed()
+    if persist and not access_ok:
+        return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
     # Adopt a legacy pending status before a session-only capture can replace it.
     _pending_status()
     if persist:
@@ -193,6 +199,8 @@ def capture_research_evidence(
 
 
 def persist_session_research_evidence()->dict[str,Any]:
+    if not private_read_allowed():
+        return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
     records,_=ensure_research_evidence_hydrated()
     pending=_pending_status()
     if pending is not None:

@@ -24,6 +24,7 @@ from atlasquant_paper_setup_bridge import (
     load_model_paper_runtime,
 )
 from atlasquant_shadow_mode import summarize_shadow
+from atlasquant_private_read_gate_v1 import private_read_allowed
 from atlasquant_research_evidence_capture import (
     SESSION_KEY as RESEARCH_SESSION_KEY,
     STATUS_KEY as RESEARCH_STATUS_KEY,
@@ -280,6 +281,9 @@ def render_admin_research_panel(
     last_backtest:Mapping[str,Any]|None=None,
     last_suite:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
+    if not private_read_allowed():
+        st.warning("Histórico operacional privado bloqueado: autorização necessária.")
+        return {"schema":SCHEMA,"allowed":False,"reason":"ACCESS_DENIED"}
     backtest=(
         dict(last_backtest)
         if isinstance(last_backtest,Mapping)
