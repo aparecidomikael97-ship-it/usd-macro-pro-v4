@@ -1,9 +1,11 @@
 """Run only the closure audit's reviewed offline tests and static source audits.
 
-No installer, provider, key generation, subprocess or physical/network probe.
+No installer, provider, real credential or physical/network probe.
+Synthetic reference signing keys and pure Python restart tests are included.
 Run from the repository root with: python -B scripts/aion1155_closure_audit.py
 """
 from pathlib import Path
+from types import ModuleType
 import os
 import socket
 import sys
@@ -24,6 +26,13 @@ TESTS = (
     "test_atlasquant_aion_v2_legacy_github_destination_source_review",
     "test_atlasquant_aion_v2_repository_paid_egress_static_audit",
     "test_atlasquant_aion_v2_closure_audit_regressions",
+    "test_atlasquant_capture_reconciliation",
+    "test_atlasquant_aion_v2_autopilot_evidence_guard",
+    "test_atlasquant_aion_v2_evidence_consolidation",
+    "test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference",
+    "test_atlasquant_aion_v2_dispatch_journal_dual_witness_reference",
+    "test_atlasquant_aion_v2_unknown_outcome_reconciliation_reference",
+    "test_atlasquant_aion_v2_isolated_sqlite_witness_cas_reference",
 )
 
 
@@ -43,9 +52,12 @@ def main():
         suite = unittest.TestSuite()
         for name in TESTS:
             suite.addTests(unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern=name + ".py"))
-        suite.addTests(unittest.defaultTestLoader.loadTestsFromNames((
-            "test_atlasquant_flight_recorder_store", "test_atlasquant_shadow_store",
-        )))
+        # Pure capture/hydration tests need only module definitions, never UI.
+        with patch.dict(sys.modules, {"streamlit": ModuleType("streamlit")}):
+            suite.addTests(unittest.defaultTestLoader.loadTestsFromNames((
+                "test_atlasquant_flight_recorder_store", "test_atlasquant_shadow_store",
+                "test_atlasquant_shadow_persistence", "test_atlasquant_shadow_mode",
+            )))
         result = unittest.TextTestRunner(verbosity=1).run(suite)
     return 0 if result.wasSuccessful() else 1
 

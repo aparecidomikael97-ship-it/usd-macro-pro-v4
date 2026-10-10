@@ -379,6 +379,11 @@ def render_admin_research_panel(
         f"fonte {str(research_status.get('source','session'))} · "
         f"branch {str(research_status.get('branch','—'))}"
     )
+    if research_status.get("reconciliation_required"):
+        st.warning(
+            "Há uma gravação com reconciliação pendente. Os registros podem estar apenas na sessão; "
+            "nova persistência permanece bloqueada."
+        )
 
     if runtime_status.get("reason")=="LOADED" or runtime_model_status.get("reason")=="LOADED":
         st.caption(
@@ -389,7 +394,7 @@ def render_admin_research_panel(
             "Nenhum setup é inferido pelo resultado."
         )
 
-    with st.expander("🗃️ Histórico persistente de evidências",expanded=False):
+    with st.expander("🗃️ Evidências da sessão e histórico remoto",expanded=False):
         history_frame=pd.DataFrame(_research_history_rows(research_records))
         if history_frame.empty:
             st.info("Ainda não há evidência operacional registrada nesta sessão/histórico.")
@@ -415,19 +420,21 @@ def render_admin_research_panel(
         if st.button(
             "💾 Persistir evidências da sessão no Runtime",
             key="atlasquant_admin_persist_research_evidence",
-            disabled=not bool(research_records),
+            disabled=not bool(research_records) or bool(research_status.get("reconciliation_required")),
         ):
             status=persist_session_research_evidence()
             if status.get("ok"):
                 if status.get("reason")=="ALREADY_PRESENT":
-                    st.info("As evidências desta sessão já estão persistidas.")
+                    st.info("Os IDs já constam no Runtime; isso não confirma o conteúdo integral da sessão.")
                 elif status.get("reason")=="NO_RECORDS":
                     st.info("Nenhum registro para persistir.")
-                else:
+                elif status.get("persistence_confirmed"):
                     st.success(
                         f"Evidência persistida na branch runtime. "
                         f"Novos registros: {int(status.get('added',0) or 0)}."
                     )
+                else:
+                    st.warning("Persistência remota integral não confirmada; registros mantidos na sessão.")
             else:
                 st.warning(
                     "Persistência externa não disponível agora; os registros permanecem na sessão. "
