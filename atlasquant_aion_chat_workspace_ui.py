@@ -30,7 +30,7 @@ def session_chat(session, context):
     identity = {key: context.get(key) for key in ("tenant_id", "workspace_id", "actor_id", "role")}
     key = "aq_aion_chat_" + sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     if key not in session:
-        session[key] = {"conversation_id": "AION-UI-" + uuid4().hex, "entries": [], "turns": {}, "requests": set(), "page": 0, "ack": "", "notice": ""}
+        session[key] = {"conversation_id": "AION-UI-" + uuid4().hex, "entries": [], "turns": {}, "requests": set(), "page": 0, "ack": "", "ack_attempt_id": "", "notice": ""}
     return session[key]
 
 
@@ -80,7 +80,12 @@ def submit_turn(chat, event, context):
         raise ValueError("Conversa da sessão não corresponde.")
     request_id = event.get("request_id")
     if not isinstance(request_id, str) or not request_id or len(request_id) > 100: raise ValueError("Identificador de envio inválido.")
-    if request_id in chat["requests"]: return
+    attempt_id = event.get("attempt_id", "")
+    if not isinstance(attempt_id, str) or len(attempt_id) > 100: raise ValueError("Identificador da tentativa inválido.")
+    if request_id in chat["requests"]:
+        chat.update(ack=request_id, ack_attempt_id=attempt_id,
+                    notice="Pedido já avaliado nesta sessão; nenhuma ação adicional executada.")
+        return
     text = event.get("message")
     if not isinstance(text, str) or len(text) > MAX_MESSAGE_CHARS: raise ValueError("Mensagem excede o orçamento técnico de 8.000 caracteres.")
     files = attachment_metadata(event.get("attachments"))
@@ -100,7 +105,7 @@ def submit_turn(chat, event, context):
     chat["entries"].extend(appended)
     chat["turns"][turn["turn_id"]] = turn
     chat["requests"].add(request_id)
-    chat.update(page=0, ack=request_id, notice="")
+    chat.update(page=0, ack=request_id, ack_attempt_id=attempt_id, notice="")
 
 
 def view_data(chat):
@@ -133,6 +138,7 @@ def view_data(chat):
         "has_older": start > 0,
         "has_newer": chat["page"] > 0,
         "ack": chat["ack"],
+        "ack_attempt_id": chat.get("ack_attempt_id", ""),
         "notice": chat["notice"],
         "session_budget": {
             "max_entries": MAX_IN_MEMORY_HISTORY_ENTRIES,
@@ -201,6 +207,7 @@ def render_aion_chat_workspace(
         except (ValueError, TypeError) as error:
             chat["notice"] = str(error)
             chat["ack"] = str(result.send.get("request_id", "")) if isinstance(result.send, dict) else ""
+            chat["ack_attempt_id"] = str(result.send.get("attempt_id", "")) if isinstance(result.send, dict) else ""
         st.rerun()
     if isinstance(result.page, str) and result.page in {"older", "newer"}:
         if result.page == "older" and data["has_older"]: chat["page"] += 1

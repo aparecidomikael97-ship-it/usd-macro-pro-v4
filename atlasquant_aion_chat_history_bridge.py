@@ -277,6 +277,7 @@ def persist_verified_read_result(
     result: Mapping[str, Any],
     *,
     attachment_ids: Sequence[Any] | None = None,
+    before_append: Any = None,
 ) -> dict[str, Any]:
     """Persist a verified user/assistant pair into the existing scoped chat store."""
     validation = validate_verified_read_result(scope, result)
@@ -363,39 +364,49 @@ def persist_verified_read_result(
             attachments=[],
         )
 
+    if before_append is not None and (existing_user is not None or existing_assistant is not None):
+        # A fresh browser reservation must not splice into another writer's pair.
+        return {"schema": SCHEMA, "state": "BLOCKED_RECONCILIATION_REQUIRED",
+                "reason": "EXISTING_PAIR_REQUIRES_BOUND_READBACK",
+                "user_persisted": None, "assistant_persisted": None,
+                "retry_authorized": False, "local_history_persisted": False,
+                "external_action_executed": False, "memory_promoted": False}
+
+    expected_user = Message(
+        cid, "user", user_text, id=user_id, attachments=attachments,
+        metadata=user_metadata,
+        provenance={"source": "AION_CHAT_COMMAND_SURFACE",
+                    "identity_binding_digest": binding_digest, "local_only": True},
+        truth_state="USER_INPUT",
+    )
+    expected_assistant = Message(
+        cid, "assistant", assistant_text, id=assistant_id,
+        metadata=assistant_metadata, provenance=provenance, truth_state="UNKNOWN",
+    )
+    if before_append is not None:
+        before_append(expected_user, expected_assistant)
+
     user_written = False
     assistant_written = False
     if existing_user is None:
         try:
             existing_user = store.append_message(
                 scope,
-                Message(
-                    cid,
-                    "user",
-                    user_text,
-                    id=user_id,
-                    attachments=attachments,
-                    metadata=user_metadata,
-                    provenance={
-                        "source": "AION_CHAT_COMMAND_SURFACE",
-                        "identity_binding_digest": binding_digest,
-                        "local_only": True,
-                    },
-                    truth_state="USER_INPUT",
-                ),
+                expected_user,
             )
             user_written = True
         except Exception as exc:
             return {
                 "schema": SCHEMA,
-                "state": "FAILED_SAFE",
+                "state": "UNKNOWN_OUTCOME" if before_append else "FAILED_SAFE",
                 "reason": "USER_HISTORY_WRITE_FAILED",
                 "error_type": type(exc).__name__,
                 "conversation_id": cid,
                 "turn_id": turn_id,
                 "identity_binding_digest": binding_digest,
-                "user_persisted": False,
-                "assistant_persisted": False,
+                "user_persisted": None if before_append else False,
+                "assistant_persisted": None if before_append else False,
+                "retry_authorized": False,
                 "checkpoint_written": False,
                 "memory_promoted": False,
                 "external_action_executed": False,
@@ -405,21 +416,14 @@ def persist_verified_read_result(
         try:
             existing_assistant = store.append_message(
                 scope,
-                Message(
-                    cid,
-                    "assistant",
-                    assistant_text,
-                    id=assistant_id,
-                    metadata=assistant_metadata,
-                    provenance=provenance,
-                    truth_state="UNKNOWN",
-                ),
+                expected_assistant,
             )
             assistant_written = True
         except Exception as exc:
             return {
                 "schema": SCHEMA,
-                "state": "PARTIAL_PERSISTENCE_RETRY_REQUIRED",
+                "state": ("BLOCKED_RECONCILIATION_REQUIRED" if before_append
+                          else "PARTIAL_PERSISTENCE_RETRY_REQUIRED"),
                 "reason": "ASSISTANT_HISTORY_WRITE_FAILED",
                 "error_type": type(exc).__name__,
                 "conversation_id": cid,
@@ -427,8 +431,9 @@ def persist_verified_read_result(
                 "identity_binding_digest": binding_digest,
                 "user_message_id": user_id,
                 "assistant_message_id": assistant_id,
-                "user_persisted": True,
-                "assistant_persisted": False,
+                "user_persisted": None if before_append else True,
+                "assistant_persisted": None if before_append else False,
+                "retry_authorized": False,
                 "checkpoint_written": False,
                 "memory_promoted": False,
                 "external_action_executed": False,
@@ -476,6 +481,7 @@ def execute_and_persist_readonly(
     authenticated_admin: bool = False,
     hub: Mapping[str, Any] | None = None,
     portable_core: Mapping[str, Any] | None = None,
+    before_append: Any = None,
     conversation_id: Any,
 ) -> dict[str, Any]:
     """Run the verified local read path and persist only its chat history pair."""
@@ -520,6 +526,7 @@ def execute_and_persist_readonly(
         scope,
         result,
         attachment_ids=attachments,
+        before_append=before_append,
     )
     return {
         "schema": SCHEMA,
