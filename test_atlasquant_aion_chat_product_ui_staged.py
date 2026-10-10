@@ -237,7 +237,9 @@ class StagedProductUiContinuityTests(unittest.TestCase):
                 store,
                 self.runtime_context,
             )
-            self.assertEqual(second["state"], "IDEMPOTENT_REQUEST")
+            self.assertEqual(second["state"], "LOCAL_PAIR_RECONCILED")
+            self.assertFalse(second["message_write_attempted"])
+            self.assertFalse(second["retry_authorized"])
             self.assertEqual(
                 store.get_conversation(
                     self.scope,
