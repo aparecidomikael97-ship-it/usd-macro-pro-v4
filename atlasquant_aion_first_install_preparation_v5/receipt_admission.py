@@ -165,6 +165,11 @@ class OfflineWitnessReceiptAdmission:
         except Refusal:
             out=_out("UNKNOWN_OUTCOME" if commit_attempted else "BLOCKED",
                      "LOCAL_PRECONDITION_OR_COMMIT_UNCERTAIN_NO_RESEND")
+        except sqlite3.IntegrityError:
+            # A duplicate key or violated CHECK raised by the write statement
+            # before commit is deterministic refusal, not ambiguous storage.
+            out=_out("UNKNOWN_OUTCOME" if commit_attempted else "BLOCKED",
+                     "SQLITE_CONSTRAINT_DENIED_NO_RETRY")
         except (sqlite3.Error,OSError,ValueError,KeyError,TypeError,OverflowError,RecursionError):
             out=_out("UNKNOWN_OUTCOME" if commit_attempted else "RECONCILIATION_REQUIRED",
                      "LOCAL_PERSISTENCE_UNCERTAIN_NO_RESEND")
