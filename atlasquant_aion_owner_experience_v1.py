@@ -56,6 +56,16 @@ _REQUIRED_PERMISSIONS = frozenset({"app:read", "aion:admin"})
 # Only enumerated, low-sensitivity presentation hints may cross devices.
 # Durable chat text and credentials must be fetched AFTER target reauthentication.
 _HANDOFF_CONTEXT_KEYS = frozenset({"mode", "topic", "slide"})
+# IDs are references, not bearer capabilities. Match only IDs actually emitted
+# by the chat store (uuid4 hex) or its deterministic surface (AION-* digest).
+# The trusted target host MUST still reauthenticate and check tenant membership.
+_HANDOFF_OWNER_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$", re.ASCII)
+_HANDOFF_CONVERSATION_RE = re.compile(
+    r"^(?:[0-9a-f]{32}|AION-CONV-[0-9A-F]{24})$", re.ASCII
+)
+_HANDOFF_TURN_RE = re.compile(
+    r"^(?:[0-9a-f]{32}|AION-TURN-[0-9A-F]{24})$", re.ASCII
+)
 _HANDOFF_TOPICS = frozenset({
     "AION", "CRM", "B2B", "NEGOCIOS", "NEGÓCIOS", "TRADER",
     "INVESTIMENTOS", "MACRO", "FOREX", "SMC", "ICT", "REUNIAO",
@@ -407,18 +417,29 @@ def continuity_handoff(
     last_turn_id: Any = "",
     context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    source = _clean(source_device, 20).upper()
-    target = _clean(target_device, 20).upper()
+    if type(source_device) is not str or type(target_device) is not str:
+        raise ValueError("continuity devices must be strings")
+    source = source_device.strip().upper()
+    target = target_device.strip().upper()
     if source not in DEVICES or target not in DEVICES:
         raise ValueError("unsupported device")
-    subject = _clean(owner_subject, 120)
-    conversation = _clean(conversation_id, 160)
-    turn = _clean(last_turn_id, 160)
+    # Never cast untrusted arbitrary objects or copy arbitrary strings into
+    # a payload that claims no session or secrets were transferred.
+    if (type(owner_subject) is not str or
+        not _HANDOFF_OWNER_RE.fullmatch(owner_subject)):
+        raise ValueError("authenticated owner reference format required")
+    if (type(conversation_id) is not str or
+        not _HANDOFF_CONVERSATION_RE.fullmatch(conversation_id)):
+        raise ValueError("trusted-format conversation reference required")
+    if (type(last_turn_id) is not str or
+        (last_turn_id and not _HANDOFF_TURN_RE.fullmatch(last_turn_id))):
+        raise ValueError("trusted-format turn reference required")
+    subject = owner_subject
+    conversation = conversation_id
+    turn = last_turn_id
     if context is not None and not isinstance(context, Mapping):
         raise ValueError("continuity context must be a mapping")
     safe_context = _mapping(context)
-    if not subject or not conversation:
-        raise ValueError("owner subject and conversation required")
     if _contains_forbidden_key(safe_context):
         raise ValueError("secret-bearing continuity context forbidden")
     # An arbitrary user-supplied "safe" key/value cannot establish that a
@@ -453,9 +474,16 @@ def continuity_handoff(
     }
     return {
         "schema": SCHEMA,
-        "state": "HANDOFF_READY",
+        "state": "HANDOFF_PREPARED_UNVERIFIED",
         **payload,
         "handoff_digest": _canonical_digest(payload),
+        "handoff_digest_is_signature": False,
+        "source_owner_verified": False,
+        "target_owner_verified": False,
+        "tenant_membership_verified": False,
+        "target_device_authenticated": False,
+        "authorization_granted": False,
+        "can_resume_conversation": False,
         "authentication_transferred": False,
         "session_token_transferred": False,
         "secrets_transferred": False,
