@@ -137,6 +137,23 @@ content through its own scoped, authorized durable history store.
 
 The target device must authenticate independently before consuming the handoff.
 
+**Additional P0 source/target reference fence:** the outgoing record accepts only
+a normalized login subject and chat-generated identifier formats: 32-character
+lowercase UUID4 hex, or a deterministic `AION-CONV-`/`AION-TURN-` prefix with
+24 uppercase hex characters. The optional turn identifier may be empty. Arbitrary
+text or objects in `owner_subject`, `conversation_id` and `last_turn_id` are
+rejected; no default string conversion or truncation is allowed.
+
+The state is `HANDOFF_PREPARED_UNVERIFIED`, **not** a signed/authorized
+handoff. The SHA-256 digest is a consistency checksum only, not a signature
+or trusted recipient authorization. The contract explicitly reports
+`source_owner_verified=false`, `target_owner_verified=false`,
+`tenant_membership_verified=false`,
+`target_device_authenticated=false`, `authorization_granted=false`
+and `can_resume_conversation=false`. A future receiver MUST independently
+authenticate, verify owner/device/tenant/workspace and query the scoped store.
+This code does not provide a receiver or transfer network credentials.
+
 ## Explicitly absent
 
 This version does not:
