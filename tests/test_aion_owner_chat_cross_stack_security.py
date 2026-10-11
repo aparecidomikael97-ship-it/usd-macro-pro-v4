@@ -65,6 +65,45 @@ class OwnerChatContractIntegrationTests(unittest.TestCase):
             owner_binding(access, {**self.synthetic_assertion(), "subject": "other-owner"})["bound"]
         )
 
+    def test_registry_password_rotation_changes_owner_binding_digest(self):
+        # Production credential fingerprints derive from the stored password
+        # verifier and are tested through the real synthetic access module.
+        old_access = self.access()
+        assertion = self.synthetic_assertion()
+        first = owner_binding(old_access, assertion)
+        new_password = "synthetic-local-password-rotated"
+        rotated = AccessUser(
+            username="test-owner", role="ADMIN",
+            password_hash=hash_password(
+                new_password, salt=b"synthetic-salt-17", iterations=200000,
+            ),
+        )
+        rotated_registry = {"test-owner": rotated}
+        self.assertFalse(session_is_current(old_access["session"], rotated_registry))
+        new_session = authenticate("test-owner", new_password, rotated_registry)
+        self.assertIsNotNone(new_session)
+        self.assertTrue(session_is_current(new_session, rotated_registry))
+        new_access = {
+            "allowed": True, "mode": "AUTHENTICATED",
+            "role": "ADMIN", "session": new_session,
+        }
+        second = owner_binding(new_access, assertion)
+        self.assertTrue(first["bound"])
+        self.assertTrue(second["bound"])
+        self.assertNotEqual(first["binding_digest"], second["binding_digest"])
+        self.assertEqual(
+            second["binding_digest"],
+            owner_binding(new_access, assertion)["binding_digest"],
+        )
+        for plan in (first, second):
+            self.assertFalse(plan["grants_authority"])
+            self.assertFalse(plan["executes_action"])
+            self.assertNotIn("credential_fingerprint", plan)
+            self.assertNotIn(old_access["session"]["credential_fingerprint"], str(plan))
+            self.assertNotIn(new_session["credential_fingerprint"], str(plan))
+        # Owner contract does not verify a real enrolled issuer, registry
+        # freshness or tenant membership. Only the host can make those checks.
+
     def test_stale_login_or_open_mode_cannot_bind_owner_or_scoped_chat(self):
         access = self.access()
         scope = Scope("test-owner", "synthetic-tenant", "synthetic-workspace")
