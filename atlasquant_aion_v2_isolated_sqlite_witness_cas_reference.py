@@ -124,7 +124,7 @@ def _out(state: str, reason: str, *, head: Any = None,
         "reference_cas_committed": state == COMMITTED,
         "reference_idempotent_read_only": state == REPLAY,
         "current_local_witness_head": head if state != "BLOCKED" else None,
-        "local_reference_appends": count if state != "BLOCKED" else 0,
+        "local_reference_appends": None if state == "UNKNOWN_OUTCOME" else count if state != "BLOCKED" else 0,
         **FALSE_GATES,
     }
 
@@ -322,6 +322,7 @@ class ReferenceIsolatedSqliteWitnessCAS:
             })
         except (ValueError, TypeError, OverflowError):
             return _out("BLOCKED", "REFERENCE_CAS_INPUT_INVALID")
+        commit_attempted = False
         try:
             self.db.execute("BEGIN IMMEDIATE")
             head, count = self._verified_head()
@@ -366,12 +367,20 @@ class ReferenceIsolatedSqliteWitnessCAS:
             verified, updated_count = self._verified_head()
             if verified != next_head or updated_count != count + 1:
                 raise ValueError("atomic witness local ledger divergence")
+            commit_attempted = True
             self.db.commit()
             return _out(COMMITTED, "LOCAL_REFERENCE_CAS_ONLY_NO_AUTHORITY",
                         head=next_head, count=updated_count)
         except (sqlite3.Error, ValueError, TypeError, OverflowError):
-            if self.db.in_transaction:
-                self.db.rollback()
+            try:
+                if self.db.in_transaction:
+                    self.db.rollback()
+            except sqlite3.Error:
+                return _out("UNKNOWN_OUTCOME", "REFERENCE_SQLITE_CAS_RECONCILIATION_REQUIRED")
+            if commit_attempted:
+                # COMMIT may have succeeded before an ACK/driver error. Do not
+                # claim rollback or zero appends; require a fresh independent read.
+                return _out("UNKNOWN_OUTCOME", "REFERENCE_SQLITE_CAS_RECONCILIATION_REQUIRED")
             return _out("BLOCKED", "REFERENCE_SQLITE_CAS_ROLLED_BACK")
 
     def compare_supplied_external_anchor(self, expected_anchor: Any):
