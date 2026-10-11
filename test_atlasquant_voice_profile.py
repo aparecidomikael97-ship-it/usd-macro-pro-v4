@@ -72,26 +72,21 @@ class AtlasQuantNeuralTtsTests(unittest.TestCase):
             transcript_cache_key(text+" Novo dado."),
         )
 
-    def test_generation_uses_fixed_neural_model_voice_and_ptbr_instructions(self):
-        response=Mock()
-        response.status_code=200
-        response.content=b"MP3DATA"
-        response.headers={"content-type":"audio/mpeg"}
-        with patch("atlasquant_neural_tts.requests.post",return_value=response) as post:
-            audio=generate_neural_speech(
-                "Texto exato.",
-                api_key="secret",
-                config=NeuralVoiceConfig(),
-            )
-        self.assertEqual(audio,b"MP3DATA")
-        kwargs=post.call_args.kwargs
-        self.assertNotIn("secret",str(kwargs["json"]))
-        self.assertEqual(kwargs["json"]["model"],"gpt-4o-mini-tts")
-        self.assertEqual(kwargs["json"]["voice"],"cedar")
-        self.assertEqual(kwargs["json"]["input"],"Texto exato.")
-        self.assertEqual(kwargs["json"]["instructions"],VOICE_INSTRUCTIONS)
-        self.assertEqual(kwargs["json"]["response_format"],"mp3")
-        self.assertEqual(kwargs["headers"]["Authorization"],"Bearer secret")
+    def test_fixed_neural_identity_preserved_while_paid_dispatch_is_denied(self):
+        config=NeuralVoiceConfig().validated()
+        self.assertEqual(config.model,"gpt-4o-mini-tts")
+        self.assertEqual(config.voice,"cedar")
+        self.assertEqual(config.response_format,"mp3")
+        self.assertIn("português brasileiro",VOICE_INSTRUCTIONS)
+        self.assertEqual(neural_voice_identity(config)["voice"],"cedar")
+        self.assertEqual(validate_transcript("Texto exato."),"Texto exato.")
+        with patch("atlasquant_neural_tts.requests.post") as post:
+            with self.assertRaisesRegex(RuntimeError,"Voz neural paga bloqueada"):
+                generate_neural_speech(
+                    "Texto exato.",api_key="synthetic-not-real",
+                    config=config,
+                )
+        post.assert_not_called()
 
     def test_missing_provider_never_generates_or_falls_back(self):
         with patch("atlasquant_neural_tts.requests.post") as post:
@@ -99,16 +94,30 @@ class AtlasQuantNeuralTtsTests(unittest.TestCase):
                 generate_neural_speech("Texto.",api_key="")
         post.assert_not_called()
 
-    def test_provider_error_is_sanitized(self):
+    def test_paid_provider_is_not_contacted_even_with_supplied_key(self):
+        # Previously this test mocked a 401 response behind a paid POST.
+        # The real live contract now stops *before* POST, so there can be
+        # no 401/provider response to sanitize. Preserve the stronger
+        # no-egress contract; do not unlock billable network dispatch.
         response=Mock()
         response.status_code=401
         response.content=b'{"error":"sensitive provider detail"}'
         response.headers={"content-type":"application/json"}
-        with patch("atlasquant_neural_tts.requests.post",return_value=response):
-            with self.assertRaisesRegex(RuntimeError,"HTTP 401") as ctx:
-                generate_neural_speech("Texto.",api_key="bad-secret")
+        with patch("atlasquant_neural_tts.requests.post",return_value=response) as post:
+            with self.assertRaisesRegex(RuntimeError,"Voz neural paga bloqueada") as ctx:
+                generate_neural_speech("Texto.",api_key="synthetic-bad-secret")
+        post.assert_not_called()
         self.assertNotIn("sensitive provider detail",str(ctx.exception))
-        self.assertNotIn("bad-secret",str(ctx.exception))
+        self.assertNotIn("synthetic-bad-secret",str(ctx.exception))
+
+    def test_invalid_endpoint_cannot_bypass_paid_voice_gate(self):
+        with patch("atlasquant_neural_tts.requests.post") as post:
+            with self.assertRaisesRegex(ValueError,"endpoint TTS não permitido"):
+                generate_neural_speech(
+                    "Texto.",api_key="synthetic-not-real",
+                    config=NeuralVoiceConfig(endpoint="https://example.invalid"),
+                )
+        post.assert_not_called()
 
 if __name__=="__main__":
     unittest.main()

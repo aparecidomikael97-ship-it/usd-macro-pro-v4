@@ -480,7 +480,9 @@ class AtlasQuantNewsResearchPanelTests(unittest.TestCase):
         self.assertEqual(out["rejected"],1)
         self.assertIn("captured_at histórico deve ser anterior",out["errors"][0])
 
-    def test_live_runtime_loader_reads_runtime_csv_and_latest_table_deduplicates_event(self):
+    def test_offline_live_table_deduplicates_events_without_private_remote_get(self):
+        # Preserve the positive pure-data contract even though unbound
+        # legacy runtime data must no longer be fetched remotely.
         import pandas as pd
         raw=pd.DataFrame([
             {
@@ -500,28 +502,44 @@ class AtlasQuantNewsResearchPanelTests(unittest.TestCase):
                 "nowcast_state":"INSUFFICIENT_HISTORY","closed":False,
             },
         ])
-        response=Mock()
-        response.status_code=200
-        response.raise_for_status.return_value=None
-        response.json.return_value={
-            "content":base64.b64encode(raw.to_csv(index=False).encode("utf-8")).decode("ascii")
-        }
-        load_live_nowcast_runtime.clear()
-        with patch("atlasquant_news_research_panel.requests.get",return_value=response):
-            frame,status=load_live_nowcast_runtime(
-                repo="owner/repo",branch="atlasquant-runtime",token="secret"
-            )
-        self.assertTrue(status["ok"])
-        self.assertEqual(status["reason"],"LOADED")
-        self.assertEqual(len(frame),2)
-        table=live_nowcast_table(frame)
+        with patch("atlasquant_news_research_panel.requests.get") as get:
+            table=live_nowcast_table(raw)
+        get.assert_not_called()
         self.assertEqual(len(table),1)
         self.assertAlmostEqual(float(table.iloc[0]["Score antecedentes"]),0.4)
         self.assertEqual(int(table.iloc[0]["Sinais"]),3)
 
+    def test_live_runtime_loader_private_read_denied_before_network(self):
+        # This function intentionally has no Streamlit .clear() cache surface.
+        with patch("atlasquant_news_research_panel.private_read_allowed",return_value=False), \
+             patch("atlasquant_news_research_panel.requests.get") as get:
+            frame,status=load_live_nowcast_runtime(
+                repo="owner/repo",branch="atlasquant-runtime",token="secret"
+            )
+        self.assertTrue(frame.empty)
+        self.assertFalse(status["ok"])
+        self.assertEqual(status["reason"],"ACCESS_DENIED")
+        get.assert_not_called()
+
+    def test_live_runtime_loader_denies_legacy_unbound_tenant_source(self):
+        # Even a synthetically authorized session cannot bind a shared
+        # legacy CSV to a specific tenant. No data or network side effects.
+        with patch("atlasquant_news_research_panel.private_read_allowed",return_value=True), \
+             patch("atlasquant_news_research_panel.requests.get") as get:
+            frame,status=load_live_nowcast_runtime(
+                repo="owner/repo",branch="atlasquant-runtime",token="secret"
+            )
+        self.assertTrue(frame.empty)
+        self.assertFalse(status["ok"])
+        self.assertEqual(status["reason"],"TENANT_SOURCE_UNBOUND")
+        get.assert_not_called()
+
     def test_live_runtime_loader_rejects_unsafe_code_branch_before_network(self):
-        load_live_nowcast_runtime.clear()
-        with patch("atlasquant_news_research_panel.requests.get") as get:
+        # Synthetic unit-level gate reachability only: main must be refused
+        # if a future independently attested source is ever available.
+        with patch("atlasquant_news_research_panel.private_read_allowed",return_value=True), \
+             patch("atlasquant_news_research_panel.legacy_private_remote_resource_allowed",return_value=True), \
+             patch("atlasquant_news_research_panel.requests.get") as get:
             frame,status=load_live_nowcast_runtime(
                 repo="owner/repo",branch="main",token="secret"
             )
