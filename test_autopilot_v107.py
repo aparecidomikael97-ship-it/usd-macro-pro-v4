@@ -105,72 +105,50 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertIn("persist_records", text)
         self.assertIn("build_pair_intelligence_packs", text)
 
-    def test_shadow_failure_does_not_prevent_flight_persistence(self):
-        packs=[{"pair":"EUR/USD"}]
-        with patch.object(a,"build_shadow_batch",side_effect=RuntimeError("shadow down")), \
-             patch.object(a,"persist_records",return_value={"ok":True,"added":1,"records":1,"reason":"SAVED","error":""}) as flight, \
-             patch.object(a,"record_from_pack",return_value={"decision_id":"d1"}):
-            shadow,flight_status,errors=a.persist_decision_evidence(
-                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
-            )
-        self.assertFalse(shadow["ok"])
-        self.assertEqual(shadow["reason"],"SHADOW_EXCEPTION")
-        self.assertTrue(flight_status["ok"])
-        self.assertEqual(flight.call_count,1)
-        self.assertEqual(len(errors),1)
+    def test_evidence_sinks_require_external_durable_claim_and_never_call_writers(self):
+        # A synthetic process-level success, exception, corrupt payload or
+        # empty batch cannot authorize either durable writer.
+        scenarios=[
+            ("populated", [{"pair":"EUR/USD"}], "t"),
+            ("empty", [], "t"),
+            ("missing_token", [{"pair":"EUR/USD"}], ""),
+        ]
+        for name,packs,token in scenarios:
+            with self.subTest(name=name), \
+                 patch.object(a,"build_shadow_batch",side_effect=AssertionError("shadow builder called")) as shadow_build, \
+                 patch.object(a,"persist_shadow_samples",side_effect=AssertionError("shadow writer called")) as shadow_write, \
+                 patch.object(a,"record_from_pack",side_effect=AssertionError("flight builder called")) as flight_build, \
+                 patch.object(a,"persist_records",side_effect=AssertionError("flight writer called")) as flight_write:
+                shadow,flight,errors=a.persist_decision_evidence(
+                    packs,engine_version="test",repo="o/r",
+                    branch="atlasquant-runtime",token=token,
+                )
+            for status,sink in ((shadow,"shadow"),(flight,"flight")):
+                self.assertFalse(status["ok"])
+                self.assertEqual(status["sink"],sink)
+                self.assertEqual(status["reason"],"DURABLE_CLAIM_REQUIRED")
+                self.assertFalse(status["execution_authorized"])
+                self.assertFalse(status["write_attempted"])
+                self.assertFalse(status["safe_to_retry"])
+                self.assertTrue(status["reconciliation_required"])
+                self.assertFalse(status["external_writer_called"])
+            self.assertEqual(len(errors),2)
+            shadow_build.assert_not_called()
+            shadow_write.assert_not_called()
+            flight_build.assert_not_called()
+            flight_write.assert_not_called()
 
-    def test_flight_failure_preserves_successful_shadow_status(self):
-        packs=[{"pair":"EUR/USD"}]
-        with patch.object(a,"build_shadow_batch",return_value=[{"sample_id":"s1"}]), \
-             patch.object(a,"persist_shadow_samples",return_value={"ok":True,"added":1,"samples":1,"reason":"SAVED","error":""}), \
-             patch.object(a,"record_from_pack",side_effect=RuntimeError("flight down")):
-            shadow,flight_status,errors=a.persist_decision_evidence(
-                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
-            )
-        self.assertTrue(shadow["ok"])
-        self.assertFalse(flight_status["ok"])
-        self.assertEqual(flight_status["reason"],"FLIGHT_EXCEPTION")
-        self.assertEqual(len(errors),1)
+    def test_evidence_guard_rejects_invalid_sink_before_writer(self):
+        from atlasquant_aion_v2_autopilot_evidence_guard import guarded_autopilot_evidence_write
+        calls=[]
+        status=guarded_autopilot_evidence_write(
+            repo="o/r",branch="atlasquant-runtime",sink="not-a-sink",
+            write=lambda: calls.append("called"),
+        )
+        self.assertFalse(status["ok"])
+        self.assertEqual(status["reason"],"INVALID_SINK_IDENTITY")
+        self.assertEqual(calls,[])
 
-    def test_shadow_returned_failure_is_visible_and_flight_still_runs(self):
-        packs=[{"pair":"EUR/USD"}]
-        with patch.object(a,"build_shadow_batch",return_value=[{"sample_id":"s1"}]), \
-             patch.object(a,"persist_shadow_samples",return_value={"ok":False,"added":0,"samples":0,"reason":"CORRUPT_REMOTE","error":""}), \
-             patch.object(a,"record_from_pack",return_value={"decision_id":"d1"}), \
-             patch.object(a,"persist_records",return_value={"ok":True,"added":1,"records":1,"reason":"SAVED","error":""}) as flight:
-            shadow,flight_status,errors=a.persist_decision_evidence(
-                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
-            )
-        self.assertFalse(shadow["ok"])
-        self.assertTrue(flight_status["ok"])
-        self.assertEqual(flight.call_count,1)
-        self.assertTrue(any("CORRUPT_REMOTE" in x for x in errors))
-
-    def test_flight_returned_failure_is_visible_without_erasing_shadow(self):
-        packs=[{"pair":"EUR/USD"}]
-        with patch.object(a,"build_shadow_batch",return_value=[{"sample_id":"s1"}]), \
-             patch.object(a,"persist_shadow_samples",return_value={"ok":True,"added":1,"samples":1,"reason":"SAVED","error":""}), \
-             patch.object(a,"record_from_pack",return_value={"decision_id":"d1"}), \
-             patch.object(a,"persist_records",return_value={"ok":False,"added":0,"records":0,"reason":"NOT_CONFIGURED","error":""}):
-            shadow,flight_status,errors=a.persist_decision_evidence(
-                packs,engine_version="test",repo="o/r",branch="atlasquant-runtime",token=""
-            )
-        self.assertTrue(shadow["ok"])
-        self.assertFalse(flight_status["ok"])
-        self.assertTrue(any("NOT_CONFIGURED" in x for x in errors))
-
-    def test_empty_evidence_batch_is_safe_and_observable(self):
-        with patch.object(a,"build_shadow_batch",return_value=[]), \
-             patch.object(a,"persist_shadow_samples",return_value={"ok":True,"added":0,"samples":0,"reason":"ALREADY_PRESENT","error":""}) as shadow, \
-             patch.object(a,"persist_records",return_value={"ok":True,"added":0,"records":0,"reason":"ALREADY_PRESENT","error":""}) as flight:
-            shadow_status,flight_status,errors=a.persist_decision_evidence(
-                [],engine_version="test",repo="o/r",branch="atlasquant-runtime",token="t"
-            )
-        self.assertTrue(shadow_status["ok"])
-        self.assertTrue(flight_status["ok"])
-        self.assertEqual(errors,[])
-        shadow.assert_called_once()
-        flight.assert_called_once_with([],repo="o/r",branch="atlasquant-runtime",token="t")
 
     def test_main_has_autopilot_serialization_imports(self):
         from pathlib import Path
@@ -228,35 +206,37 @@ class AutopilotV107Tests(unittest.TestCase):
         self.assertTrue(status["healthy"])
 
 
-    def test_github_write_retries_transient_409_with_fresh_sha(self):
-        get1=Mock(status_code=200); get1.json.return_value={"sha":"oldsha"}
-        get2=Mock(status_code=200); get2.json.return_value={"sha":"newsha"}
+    def test_github_write_conflict_never_retries_or_rereads(self):
+        get1=Mock(status_code=200)
+        get1.json.return_value={"sha":"oldsha"}
         put1=Mock(status_code=409)
-        put2=Mock(status_code=200)
-        put2.raise_for_status.return_value=None
-        with patch.object(a,"TOKEN","token"), patch.object(a,"REPO","owner/repo"), patch.object(a,"BRANCH","atlasquant-runtime"), \
-             patch.object(a.requests,"get",side_effect=[get1,get2]) as get_call, \
-             patch.object(a.requests,"put",side_effect=[put1,put2]) as put_call, \
-             patch.object(a.time,"sleep") as sleep_call:
-            ok,err=a.gh_put_bytes("dados/teste.json",b"{}","teste")
-        self.assertTrue(ok)
-        self.assertEqual(err,"")
-        self.assertEqual(get_call.call_count,2)
-        self.assertEqual(put_call.call_count,2)
-        self.assertEqual(put_call.call_args_list[0].kwargs["json"]["sha"],"oldsha")
-        self.assertEqual(put_call.call_args_list[1].kwargs["json"]["sha"],"newsha")
-        sleep_call.assert_called_once()
-
-    def test_github_write_does_not_retry_non_conflict_failure(self):
-        get1=Mock(status_code=200); get1.json.return_value={"sha":"sha"}
-        put1=Mock(status_code=500)
-        put1.raise_for_status.side_effect=RuntimeError("server down")
-        with patch.object(a,"TOKEN","token"), patch.object(a,"REPO","owner/repo"), patch.object(a,"BRANCH","atlasquant-runtime"), \
-             patch.object(a.requests,"get",return_value=get1), patch.object(a.requests,"put",return_value=put1) as put_call, \
+        with patch.object(a,"TOKEN","synthetic"),patch.object(a,"REPO","owner/repo"), \
+             patch.object(a,"BRANCH","atlasquant-runtime"), \
+             patch.object(a.requests,"get",return_value=get1) as get_call, \
+             patch.object(a.requests,"put",return_value=put1) as put_call, \
              patch.object(a.time,"sleep") as sleep_call:
             ok,err=a.gh_put_bytes("dados/teste.json",b"{}","teste")
         self.assertFalse(ok)
-        self.assertIn("server down",err)
+        self.assertEqual(err,"REPORTED_GITHUB_HTTP_409_NO_AUTORETRY_RECONCILE_FIRST")
+        self.assertEqual(get_call.call_count,1)
+        self.assertEqual(put_call.call_count,1)
+        sleep_call.assert_not_called()
+
+    def test_github_write_unknown_outcome_sanitized_and_not_retried(self):
+        get1=Mock(status_code=200)
+        get1.json.return_value={"sha":"sha"}
+        put1=Mock(status_code=500)
+        put1.raise_for_status.side_effect=RuntimeError("server down sensitive detail")
+        with patch.object(a,"TOKEN","synthetic"),patch.object(a,"REPO","owner/repo"), \
+             patch.object(a,"BRANCH","atlasquant-runtime"), \
+             patch.object(a.requests,"get",return_value=get1) as get_call, \
+             patch.object(a.requests,"put",return_value=put1) as put_call, \
+             patch.object(a.time,"sleep") as sleep_call:
+            ok,err=a.gh_put_bytes("dados/teste.json",b"{}","teste")
+        self.assertFalse(ok)
+        self.assertIn("UNKNOWN_GITHUB_WRITE_OUTCOME_RECONCILE_NO_RETRY",err)
+        self.assertNotIn("sensitive detail",err)
+        self.assertEqual(get_call.call_count,1)
         self.assertEqual(put_call.call_count,1)
         sleep_call.assert_not_called()
 
