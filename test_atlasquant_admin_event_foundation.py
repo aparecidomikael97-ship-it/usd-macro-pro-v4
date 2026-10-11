@@ -1,5 +1,6 @@
 import inspect
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -183,13 +184,41 @@ class AdminResearchPanelTests(unittest.TestCase):
         self.assertEqual(rows[0]["evidence_state"],"PAPER_EVIDENCE_PENDING")
         self.assertEqual(rows[0]["evidence_coverage_pct"],60)
 
-    def test_admin_panel_exposes_persistent_history_and_evidence_fusion(self):
+    def test_admin_panel_history_and_evidence_fusion_keep_private_guard(self):
         source=inspect.getsource(render_admin_research_panel)
-        self.assertIn("Histórico persistente de evidências",source)
+        # The old history heading is no longer literal; verify active UI and
+        # guards rather than reintroducing private remote reads to pass CI.
+        self.assertIn("Histórico de pesquisa:",source)
+        self.assertIn("Evidências da sessão e histórico remoto",source)
         self.assertIn("Persistir evidências da sessão no Runtime",source)
         self.assertIn("Cruzar Backtest × Paper/Forward × Shadow",source)
         self.assertIn("fuse_operational_evidence",source)
         self.assertIn("summarize_shadow",source)
+        self.assertLess(
+            source.index("if not private_read_allowed():"),
+            source.index("ensure_research_evidence_hydrated("),
+        )
+        self.assertIn('"reason":"ACCESS_DENIED"',source)
+
+    def test_admin_panel_denies_private_read_before_history_hydration(self):
+        # No session history, private remote GET or write is allowed when the
+        # separate private-resource admission gate is not independently true.
+        with patch("atlasquant_admin_research_panel.private_read_allowed",return_value=False), \
+             patch("atlasquant_admin_research_panel.st.warning") as warning, \
+             patch("atlasquant_admin_research_panel.ensure_research_evidence_hydrated") as hydrate, \
+             patch("atlasquant_admin_research_panel.load_paper_audit_runtime") as paper, \
+             patch("atlasquant_admin_research_panel.load_model_paper_runtime") as model, \
+             patch("atlasquant_admin_research_panel.persist_session_research_evidence") as persist:
+            result=render_admin_research_panel(
+                {"role":"ADMIN","mode":"AUTHENTICATED"}
+            )
+        self.assertEqual(result["reason"],"ACCESS_DENIED")
+        self.assertFalse(result["allowed"])
+        warning.assert_called_once()
+        hydrate.assert_not_called()
+        paper.assert_not_called()
+        model.assert_not_called()
+        persist.assert_not_called()
 
     def test_admin_snapshot_never_promotes_or_changes_strategy(self):
         backtest={
