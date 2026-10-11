@@ -6,6 +6,12 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# Process-scoped Git configuration in disposable CI runners only. Preserve the
+# exact LF bytes of the original manifest; do not normalize/weaken its test.
+env:
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: "false"
 jobs:
   offline-v5:
     name: V5 durable receipt recovery / ${{ matrix.os }}

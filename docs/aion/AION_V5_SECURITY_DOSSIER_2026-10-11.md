@@ -164,6 +164,13 @@ results are recorded in the Draft PR body. Earlier/base CI is never counted as
 candidate validation. Tests/subtests/global counts are separate; discovery and
 global regressions overlap and are not added.
 
+Initial candidate CI: Linux and global Quality passed; Windows failed only the
+strict original-manifest byte hash because Git converted LF to CRLF. The CRLF
+hash was reproduced from the exact unchanged Git bytes. The correction uses
+process-scoped core.autocrlf=false in disposable CI runners. No manifest or test
+assertion was modified; this does not alter owner Git/Windows/security settings.
+All three jobs must pass again on the corrected exact candidate HEAD.
+
 Original manifest digest:
 `b95f4065edfa3d871e40f885d9133954ece871391896bbe3d0344e922ba48516`.
 The companion inventory preserves all 20 BLOCKED requirements byte-for-byte

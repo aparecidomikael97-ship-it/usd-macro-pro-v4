@@ -161,5 +161,19 @@
     "institutional witness/custody",
     "browser ceremony",
     "production installation"
-  ]
+  ],
+  "initial_ci": {
+    "head": "7bc13a3445e072e3c429bc6025fe8e34fe7f0872",
+    "run": 38137983623,
+    "linux": "PASS",
+    "global_linux": {
+      "tests": 6348,
+      "status": "PASS",
+      "duration_seconds": 73.36
+    },
+    "windows": "FAIL: strict manifest byte hash; LF-to-CRLF checkout conversion reproduced",
+    "original_lf_sha256": "b95f4065edfa3d871e40f885d9133954ece871391896bbe3d0344e922ba48516",
+    "converted_crlf_sha256": "3229623a5746f42c3c53c2052f51763f1d710a2c77b8120cfdb06084bab4a4c0",
+    "correction": "Process-scoped Git core.autocrlf=false in disposable CI only; test and manifest unchanged"
+  }
 }
