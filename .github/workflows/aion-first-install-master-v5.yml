@@ -1,0 +1,57 @@
+name: AION First Install V5 Durable Receipt Laboratory
+on:
+  pull_request:
+    branches:
+      - codex/aion-signed-webauthn-anchors-v4-offline-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-v5:
+    name: V5 durable receipt recovery / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Pinned CI dependencies only
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install --no-deps --require-hashes -r requirements-aion-webauthn-reference.txt
+      - name: Offline suites with network forbidden
+        run: python -B tools/aion_first_install_v5_ci.py
+      - name: Original twenty blocked gates
+        run: python -B atlasquant_aion_first_install_plan_v1.py
+      - name: Compile candidate
+        run: python -m compileall -q -x '(^|[\\/])\.git([\\/]|$)' .
+      - name: Exact-base diff check
+        run: git diff --check 8a143ee40b9f6893845817d61b564ccc47611502 HEAD
+  global-quality:
+    name: Exact original Quality / ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+      - name: Original Quality without excluded tests
+        run: python -B .github/scripts/aion_run_exact_quality_step.py "Run quality suite"

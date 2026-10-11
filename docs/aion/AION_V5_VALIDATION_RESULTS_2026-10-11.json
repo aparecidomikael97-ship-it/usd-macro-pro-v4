@@ -1,0 +1,165 @@
+{
+  "status": "HARD_NO_GO",
+  "groups": {
+    "v5_durable_receipts": {
+      "tests": 26,
+      "subtests": 46,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v5_epoch_root_revocation": {
+      "tests": 12,
+      "subtests": 25,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v5_recovery_processes": {
+      "tests": 20,
+      "subtests": 0,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v5_authority_inventory": {
+      "tests": 7,
+      "subtests": 4,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v4_signed_commitments": {
+      "tests": 11,
+      "subtests": 31,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v4_freshness_provenance": {
+      "tests": 7,
+      "subtests": 26,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v4_rollback_fork_causal_processes": {
+      "tests": 24,
+      "subtests": 4,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v3_challenge_consumption": {
+      "tests": 13,
+      "subtests": 30,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v3_registry_counters": {
+      "tests": 12,
+      "subtests": 12,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "v3_sqlite_process_recovery": {
+      "tests": 19,
+      "subtests": 6,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "webauthn": {
+      "tests": 14,
+      "subtests": 61,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "causal_sqlite_processes": {
+      "tests": 17,
+      "subtests": 15,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "dossier_and_metadata": {
+      "tests": 6,
+      "subtests": 26,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    },
+    "unchanged_v1_regressions": {
+      "tests": 246,
+      "subtests": 380,
+      "errors": 0,
+      "failures": 0,
+      "skips": 0,
+      "expected_failures": 0
+    }
+  },
+  "modules": [
+    "tests.test_aion_durable_receipt_admission_v5",
+    "tests.test_aion_epoch_root_revocation_v5",
+    "tests.test_aion_admission_recovery_processes_v5",
+    "tests.test_aion_v5_authority_inventory",
+    "tests.test_aion_signed_commitments_v4",
+    "tests.test_aion_anchor_freshness_v4",
+    "tests.test_aion_anchor_rollback_recovery_v4",
+    "tests.test_aion_webauthn_ledger_v3",
+    "tests.test_aion_webauthn_registry_v3",
+    "tests.test_aion_webauthn_recovery_v3",
+    "tests.test_aion_webauthn_reference_v2",
+    "tests.test_aion_causal_recovery_v2",
+    "tests.test_aion_evidence_dossier_v2",
+    "tests.test_aion_manifest_metadata_v2",
+    "tests.test_aion_first_install_preparation_v1",
+    "tests.test_aion_first_install_reference_processes_v1",
+    "tests.test_aion_first_install_plan_v1",
+    "tests.test_aion_first_install_evidence_no_go_1215",
+    "test_atlasquant_aion_global_worker_source_gate_v1",
+    "test_atlasquant_aion_global_worker_readiness_source_gate_v1",
+    "test_atlasquant_aion_readiness_credential_fence_1190",
+    "test_atlasquant_aion_checkpoint_dual_challenge_reference_v1",
+    "tests.test_atlasquant_aion_v2_isolated_sqlite_witness_cas_reference",
+    "tests.test_atlasquant_aion_v2_external_witness_rollback_reference",
+    "tests.test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference",
+    "tests.test_atlasquant_aion_v2_unknown_outcome_reconciliation_reference",
+    "test_atlasquant_access_fallback_fail_closed",
+    "test_aion_history_truth_preparation",
+    "tests.test_aion_browser_request_binding_units"
+  ],
+  "external_anchor_verified": false,
+  "privileged_joint_restore_detectable": false,
+  "power_loss_physically_tested": false,
+  "browser_tested": false,
+  "base_sha": "8a143ee40b9f6893845817d61b564ccc47611502",
+  "local_environment": "Windows Python 3.12; reference wheel zipimport; no installation",
+  "base_files_verified_unchanged": 1969,
+  "compiled_source_files": 1292,
+  "reverse_patch_whitespace_check": "PASS",
+  "final_candidate_ci": "PENDING_AT_COMMIT; exact HEAD results recorded in Draft PR body",
+  "tests_not_physically_executed": [
+    "power loss",
+    "Windows Hello/FIDO2/TPM enrollment",
+    "institutional witness/custody",
+    "browser ceremony",
+    "production installation"
+  ]
+}
