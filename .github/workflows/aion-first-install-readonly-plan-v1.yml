@@ -1,0 +1,47 @@
+name: AION First Install Readonly Phase Plan
+
+on:
+  pull_request:
+    branches:
+      - audit/aion-first-install-evidence-no-go-20261011
+    paths:
+      - "atlasquant_aion_first_install_plan_v1.py"
+      - "tests/test_aion_first_install_plan_v1.py"
+      - "docs/aion/AION_FIRST_INSTALL_PHYSICAL_EVIDENCE_RUNBOOK_V1.md"
+      - ".github/workflows/aion-first-install-readonly-plan-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan-negative:
+    name: First-install phase plan NO-GO / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact isolated candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Existing dependencies only
+        run: python -m pip install -r requirements.txt
+      - name: Compile pure readiness planner
+        run: python -B -m py_compile atlasquant_aion_first_install_plan_v1.py tests/test_aion_first_install_plan_v1.py
+      - name: Test spoofed receipt and fail-closed phase plan
+        run: python -B -m unittest discover -s tests -p "test_aion_first_install_plan_v1.py" -v
+      - name: Recheck original 20 external evidence gates stay BLOCKED
+        run: python -B -m unittest discover -s tests -p "test_aion_first_install_evidence_no_go_1215.py" -v
+      - name: Check real source trust and no premature credential read
+        run: python -B -m unittest -q test_atlasquant_aion_global_worker_source_gate_v1 test_atlasquant_aion_global_worker_readiness_source_gate_v1 test_atlasquant_aion_readiness_credential_fence_1190
+      - name: Render public NO-GO phase summary with no private data
+        run: python -B atlasquant_aion_first_install_plan_v1.py
