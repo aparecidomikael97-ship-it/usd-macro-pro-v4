@@ -83,8 +83,8 @@ class OwnerChatContractIntegrationTests(unittest.TestCase):
     def test_handoff_contains_only_enumerated_metadata_and_no_session_material(self):
         result = continuity_handoff(
             source_device="desktop", target_device="mobile",
-            owner_subject="test-owner", conversation_id="conv-test-1",
-            last_turn_id="turn-test-1",
+            owner_subject="test-owner", conversation_id="b" * 32,
+            last_turn_id="AION-TURN-" + "B" * 24,
             context={"mode": "teaching", "topic": "CRM", "slide": 7},
         )
         self.assertEqual(
@@ -118,7 +118,7 @@ class OwnerChatContractIntegrationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     continuity_handoff(
                         source_device="desktop", target_device="mobile",
-                        owner_subject="test-owner", conversation_id="conv-test-1",
+                        owner_subject="test-owner", conversation_id="b" * 32,
                         context=context,
                     )
 
