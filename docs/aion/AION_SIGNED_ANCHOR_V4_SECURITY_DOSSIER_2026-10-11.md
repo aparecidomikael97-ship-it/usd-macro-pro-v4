@@ -147,6 +147,14 @@ It now validates the exact read envelope and commitment at ingress. Duplicate
 fields, nonfinite/malformed/oversize JSON are rejected. LOW reference boundary
 gap; no productive authorization existed. No old tests were removed or weakened.
 
+Final static/adversarial review reproduced another LOW context ambiguity: an
+unexpected local leading witness ID could be normalized away during the
+all-domain state comparison. The bridge now validates the original config and
+requires its leading witness to equal the first expected pinned member BEFORE
+any local read. Each member still has its own signed witness ID/parent chain;
+the negative test ensures the local context cannot silently be rebound. The
+previous positive result was untrusted laboratory mathematics, not authority.
+
 ## Trust root, enrollment, custody and exceptional recovery blueprint
 
 New closed JSON schema/example accepts ONLY synthetic root/public pin and UNKNOWN

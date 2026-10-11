@@ -39,6 +39,13 @@ class AnchorRecoveryTests(unittest.TestCase):
         for key in ['root_trust_verified','external_anchor_verified','independent_administrative_domains_verified','latest_head_independently_verified','rollback_protection_production_verified']:
             self.assertFalse(out[key])
 
+    def test_local_leading_witness_context_cannot_be_rebound(self):
+        self.f.consume();members=self.f.members()
+        config={**self.f.config,'witness_id':'fixture-unexpected-leader'}
+        with patch('atlasquant_aion_first_install_preparation_v4.recovery_bridge.capture_ledger_reference',side_effect=AssertionError('NO_READ')) as read:
+            out=reconcile_anchored_operation_reference(self.f.ledger.path,config=config,members=members,causal=self.f.causal,now=1000,revoked_keys=[],revoked_operators=[])
+            self.assertEqual(out['state'],'BLOCKED');read.assert_not_called()
+
     def test_A_complete_local_restore_retained_signed_heads_detected(self):
         self.f.ledger.issue(self.f.request);before=self.backup()
         self.f.ledger.ledger.confirm_assertion_reference(self.f.request,self.f.packet,attempt_id='fixture-attempt',now=1000)

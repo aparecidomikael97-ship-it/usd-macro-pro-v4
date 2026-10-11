@@ -9,7 +9,7 @@ from atlasquant_aion_first_install_preparation.contracts import exact,token
 from .outcomes import result
 from atlasquant_aion_first_install_preparation_v3.ledger_storage import Refusal
 from atlasquant_aion_first_install_preparation_v2.webauthn_reference import _pairs
-from .commitments import capture_ledger_reference,comparable_state,commitment_contract
+from .commitments import capture_ledger_reference,comparable_state,commitment_contract,config_contract
 from .signed_anchors import verify_fresh_read_reference,pin_contract,READ_FIELDS
 
 MEMBER_FIELDS=frozenset({"pin","expected_pin_digest","query","response","floor","consumed_nonces"})
@@ -33,10 +33,13 @@ def compare_anchors_reference(path,*,config,members,now,revoked_keys=None,revoke
     Three is an explicit lab policy, not quorum or proof of three institutions.
     """
     try:
+        config=config_contract(config)
         if type(members) is not list or len(members)!=3:raise Refusal("ALL_THREE_DOMAINS_REQUIRED")
         checked=[];operators=set();domains=set();keys=set();witnesses=set()
         for member in members:
             exact(member,MEMBER_FIELDS);pin=pin_contract(member['pin'])
+            if not checked and pin['witness_id']!=config['witness_id']:
+                raise Refusal('LEADING_WITNESS_CONTEXT_MISMATCH')
             cfg={**config,'witness_id':pin['witness_id']}
             out=verify_fresh_read_reference(member['response'],query=member['query'],pin=pin,
                 expected_pin_digest=member['expected_pin_digest'],config=cfg,floor=member['floor'],now=now,
