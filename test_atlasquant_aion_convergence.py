@@ -66,29 +66,21 @@ def _repository_is_shallow():
 
 
 def _production_base():
-    """Resolve main without requiring a historical SHA in the local clone.
+    """Resolve the *actual* production main, not a stacked PR base branch.
 
-    A full checkout already has origin/main. A shallow Actions checkout does
-    not, so fetch only that branch tip. The tree diff does not need the
-    commits in between.
+    Audit drafts can target a prior audit branch; using GITHUB_BASE_REF would
+    accidentally compare to that branch and miss changes to production paths.
+    Shallow checkout fetches only the actual main tip.
     """
-    base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
-    candidates = []
-    if base_ref:
-        candidates.append(f"origin/{base_ref}")
-    candidates.extend(["origin/main", "main"])
-    for name in candidates:
+    for name in ("origin/main", "main"):
         if _commit_exists(name):
             return name
-    ref = base_ref or "main"
-    destination = f"refs/remotes/origin/{ref}"
     fetched = _git([
         "fetch", "--depth", "1", "origin",
-        f"refs/heads/{ref}:{destination}",
+        "refs/heads/main:refs/remotes/origin/main",
     ])
-    candidate = f"origin/{ref}"
-    if fetched.returncode == 0 and _commit_exists(candidate):
-        return candidate
+    if fetched.returncode == 0 and _commit_exists("origin/main"):
+        return "origin/main"
     detail = (fetched.stderr or fetched.stdout or "git fetch falhou").strip()
     raise AssertionError(
         "Não foi possível obter a base main para a comparação de produção.\n" + detail
@@ -338,11 +330,46 @@ class AionConvergenceTests(unittest.TestCase):
             self.assertIn(marker, admin)
         self.assertIn("durable_task_continuity", (ROOT / "atlasquant_aion_status_board.py").read_text(encoding="utf-8"))
 
+    def test_production_base_is_main_even_when_pr_targets_stacked_audit(self):
+        with mock.patch.dict(os.environ, {
+            "GITHUB_BASE_REF": "audit/aion-composite-full-quality-recheck-20261011",
+        }), mock.patch(
+            __name__ + "._commit_exists",
+            side_effect=lambda rev: rev == "origin/main",
+        ), mock.patch(__name__ + "._git") as git:
+            self.assertEqual(_production_base(), "origin/main")
+            git.assert_not_called()
+
+    def test_shallow_production_lookup_fetches_actual_main_only(self):
+        with mock.patch.dict(os.environ, {
+            "GITHUB_BASE_REF": "audit/stacked-not-production",
+        }), mock.patch(
+            __name__ + "._commit_exists",
+            side_effect=[False, False, True],
+        ), mock.patch(__name__ + "._git") as git:
+            git.return_value.returncode = 0
+            self.assertEqual(_production_base(), "origin/main")
+            git.assert_called_once_with([
+                "fetch", "--depth", "1", "origin",
+                "refs/heads/main:refs/remotes/origin/main",
+            ])
+
+    def test_production_paths_remain_forbidden_even_for_stacked_pr(self):
+        self.assertEqual(
+            _forbidden_production_paths([
+                "docs/aion/notes.md",
+                "render.yaml",
+                "deploy/config.yml",
+                "config/secrets.env",
+            ]),
+            ["render.yaml", "deploy/config.yml", "config/secrets.env"],
+        )
+
     def test_main_and_production_surfaces_stay_untouched(self):
-        base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
-        if base_ref:
-            self.assertEqual(base_ref, "main")
+        # Stacked draft branches are expected; compare to actual main,
+        # never the GitHub PR target (which may be another audit draft).
         base = _production_base()
+        self.assertIn(base, ("origin/main", "main"))
         # Ancestry of the pinned base is enforced only when this clone can
         # actually walk that history. Shallow CI does not have the object.
         if _commit_exists(CANONICAL_MAIN) and not _repository_is_shallow():
