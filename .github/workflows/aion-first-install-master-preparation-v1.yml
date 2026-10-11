@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -37,7 +38,7 @@ jobs:
       - name: Original 20 gates still unresolved
         run: python -B atlasquant_aion_first_install_plan_v1.py
       - name: Diff whitespace
-        run: git diff --check HEAD^ HEAD
+        run: git diff --check 895f3abcd533684ee1eab9b92b6ce9eebf3b74be HEAD
 
   global-quality:
     name: Exact global root Quality / ubuntu-latest
