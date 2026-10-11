@@ -65,7 +65,7 @@ class CausalRecoveryTests(unittest.TestCase):
         self.assertEqual(self.read(minimum_sequence=True)['state'],'BLOCKED')
         self.assertEqual(self.read(expected_query=None)['state'],'BLOCKED')
         self.assertEqual(self.read(expected_query={'large':'x'*33000})['state'],'BLOCKED')
-        self.assertEqual(reconcile_simulated_domains(None)['state'],'UNKNOWN_OUTCOME')
+        self.assertEqual(reconcile_simulated_domains(None,revoked=False)['state'],'UNKNOWN_OUTCOME')
 
     def test_fake_ack_and_precommit_never_confirm(self):
         for fault in ['FAKE_SUCCESS','BEFORE_COMMIT']:
@@ -117,24 +117,25 @@ class CausalRecoveryTests(unittest.TestCase):
                 cas.cas_reference_only(**self.inputs)
             read=read_operation_reference(path,**self.read_options)
             observations.append(dict(domain='fixture-'+str(i),controller='controller-'+str(i),key_pin='key-'+str(i),read=read))
-        out=reconcile_simulated_domains(observations)
+        out=reconcile_simulated_domains(observations,revoked=False)
         self.assertEqual(out['reference_outcome'],'CONFIRMED')
         self.assertFalse(out['independent_administrative_domains_verified'])
         for k in AUTHORITY_FIELDS:self.assertIs(out[k],False)
 
     def test_same_authority_conflict_revocation_unknown(self):
         self.fixture.service.cas_reference_only(**self.inputs)
+        self.assertEqual(reconcile_simulated_domains(self.observations())['state'],'BLOCKED')
         for field in ['domain','controller','key_pin']:
             with self.subTest(field=field):
-                obs=self.observations();obs[1][field]=obs[0][field];self.assertEqual(reconcile_simulated_domains(obs)['state'],'BLOCKED')
+                obs=self.observations();obs[1][field]=obs[0][field];self.assertEqual(reconcile_simulated_domains(obs,revoked=False)['state'],'BLOCKED')
         obs=self.observations();obs[1]['read']['current_head']['sequence']=99
-        self.assertEqual(reconcile_simulated_domains(obs)['state'],'BLOCKED')
+        self.assertEqual(reconcile_simulated_domains(obs,revoked=False)['state'],'BLOCKED')
         for revoked in [True,None]:
             with self.subTest(revoked=revoked):self.assertEqual(reconcile_simulated_domains(self.observations(),revoked=revoked)['state'],'BLOCKED')
         for state in ['UNKNOWN_OUTCOME','RECONCILIATION_REQUIRED','STALE','CONFIRMED','BLOCKED']:
             with self.subTest(state=state):
                 obs=self.observations();obs[0]['read']['state']=state
-                self.assertNotEqual(reconcile_simulated_domains(obs)['state'],'REFERENCE_CONFIRMED_UNTRUSTED')
+                self.assertNotEqual(reconcile_simulated_domains(obs,revoked=False)['state'],'REFERENCE_CONFIRMED_UNTRUSTED')
 
     def test_durable_claim_restart_denies_all_second_writes(self):
         j=journal_fixtures.OneShotUnknownOutcomeTests();j.setUp();self.addCleanup(j.tearDown)

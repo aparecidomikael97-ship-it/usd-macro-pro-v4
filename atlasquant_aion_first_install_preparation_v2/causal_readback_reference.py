@@ -62,7 +62,7 @@ def read_operation_reference(path, *, config, genesis_head, operation_id,
         if connection is not None:
             connection.close()
 
-def reconcile_simulated_domains(observations, *, revoked=False):
+def reconcile_simulated_domains(observations, *, revoked=None):
     """Three fixture domains; separate labels/processes are NOT independence.
 
     Reads are observations, never write authorization. No quorum fallback.
