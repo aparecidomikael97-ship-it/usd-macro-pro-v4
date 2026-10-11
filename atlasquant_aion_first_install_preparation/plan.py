@@ -49,8 +49,11 @@ def collection_layers():
 
 def review_evidence_plan(manifest):
     # Reject before iterating caller collections. Existing V1 remains unchanged.
-    if type(manifest) is not dict or len(manifest) != len(MANIFEST_FIELDS) or set(manifest) != MANIFEST_FIELDS:
+    if (type(manifest) is not dict or len(manifest) != len(MANIFEST_FIELDS)
+            or any(type(k) is not str for k in manifest) or set(manifest) != MANIFEST_FIELDS):
         return result("BLOCKED", "MANIFEST_BOUND_INVALID", unresolved_gate_count=20)
+    if any(type(manifest[k]) is not str or len(manifest[k]) > 512 for k in ("schema", "date", "baseline_sha", "purpose", "status", "mode")):
+        return result("BLOCKED", "MANIFEST_SCALAR_INVALID", unresolved_gate_count=20)
     refs = manifest["factual_references"]
     if type(refs) is not list or len(refs) > 10 or any(type(x) is not str or len(x) > 512 for x in refs):
         return result("BLOCKED", "REFERENCE_LIST_BOUND_INVALID", unresolved_gate_count=20)

@@ -13,7 +13,8 @@ ASSERTION_FIELDS = frozenset({
 
 def prepare_intent(value):
     exact(value, INTENT_FIELDS)
-    if value["schema"] != "AION_OWNER_DEVICE_INTENT_V1" or value["mode"] != MODE:
+    if (type(value["schema"]) is not str or type(value["mode"]) is not str
+            or value["schema"] != "AION_OWNER_DEVICE_INTENT_V1" or value["mode"] != MODE):
         raise ContractError("SIMULATION_ONLY_SCHEMA_REQUIRED")
     bound = binding(value["binding"])
     if (not token(value["request_id"]) or not digest_value(value["nonce"])
@@ -45,6 +46,8 @@ def review_ceremony(intent, assertion, *, expected_binding, now,
         if request["nonce"] in consumed_nonces:
             raise ContractError("NONCE_REPLAY")
         exact(assertion, ASSERTION_FIELDS)
+        if any(type(assertion[k]) is not str or len(assertion[k]) > 512 for k in ASSERTION_FIELDS - {"user_presence", "user_verification", "issued_at"}):
+            raise ContractError("ASSERTION_SCALAR_INVALID")
         if (assertion["schema"] != "AION_OWNER_DEVICE_ASSERTION_FIXTURE_V1"
                 or assertion["mode"] != MODE
                 or assertion["evidence_kind"] != "SIMULATED_NOT_A_SIGNATURE"

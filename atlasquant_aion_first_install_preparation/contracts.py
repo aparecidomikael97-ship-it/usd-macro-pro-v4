@@ -24,7 +24,8 @@ class ContractError(ValueError):
     """Contains fixed reason codes only, never caller data."""
 
 def exact(value, fields):
-    if type(value) is not dict or len(value) != len(fields) or set(value) != fields:
+    if (type(value) is not dict or len(value) != len(fields)
+            or any(type(k) is not str for k in value) or set(value) != fields):
         raise ContractError("CLOSED_SCHEMA_INVALID")
 
 def token(value):
@@ -60,7 +61,7 @@ def binding(value):
                        for x in path.split("/"))):
         raise ContractError("RESOURCE_PATH_INVALID")
     if (not digest_value(value["artifact_sha256"])
-            or value["operation"] not in OPERATIONS
+            or type(value["operation"]) is not str or value["operation"] not in OPERATIONS
             or not tokens(value["permissions"]) or not value["permissions"]
             or not integer(value["policy_generation"], 1)):
         raise ContractError("OPERATION_BINDING_INVALID")

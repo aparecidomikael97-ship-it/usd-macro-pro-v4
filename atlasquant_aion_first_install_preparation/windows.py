@@ -1,5 +1,5 @@
 """Windows pre-install checks as data contracts only. No host probes."""
-from .contracts import MODE, ContractError, binding, digest, exact, integer, result
+from .contracts import MODE, ContractError, binding, digest, digest_value, exact, integer, result
 
 CONTROLS = (
     "OS_ARCH_PREREQUISITES", "INSTALLER_SIGNATURE_INTEGRITY", "DEVICE_OWNER_AUTHORIZATION",
@@ -19,6 +19,9 @@ def review_windows_checks(rows, *, expected_binding, now):
         failed = []
         for row in rows:
             exact(row, FIELDS)
+            if (not digest_value(row["binding_digest"]) or type(row["provenance"]) is not str
+                    or type(row["claim"]) is not str):
+                raise ContractError("CONTROL_SCALAR_INVALID")
             if type(row["id"]) is not str or row["id"] not in CONTROLS or row["id"] in seen:
                 raise ContractError("CONTROL_ID_INVALID_OR_DUPLICATE")
             seen.add(row["id"])

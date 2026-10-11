@@ -305,6 +305,20 @@ class PlanBoundaryTests(NoAuthorityCase):
         out=review_evidence_plan(m);self.check_no_authority(out);self.assertEqual(out["state"],"BLOCKED")
 
 class PhysicalAuthorityFirewallTests(NoAuthorityCase):
+    def test_non_json_scalars_cannot_execute_implicit_callbacks(self):
+        class Bomb:
+            def __eq__(self,_):raise AssertionError('IMPLICIT_CALLBACK_FORBIDDEN')
+            def __ne__(self,_):raise AssertionError('IMPLICIT_CALLBACK_FORBIDDEN')
+            def __hash__(self):raise AssertionError('IMPLICIT_CALLBACK_FORBIDDEN')
+        a=assertion();a['mode']=Bomb()
+        w=windows();w[0]['binding_digest']=Bomb()
+        h=heads();h[0]['outcome']=Bomb()
+        g=governance();g['privacy'][PRIVACY_CONTROLS[0]]=Bomb()
+        m=PlanBoundaryTests().manifest();m['status']=Bomb()
+        calls=[lambda:CeremonyTests().call(a=a),lambda:WindowsPreparationTests().call(w),
+               lambda:RecoveryTests().call(h),lambda:GovernanceTests().call(g),lambda:review_evidence_plan(m)]
+        for i,call in enumerate(calls):
+            with self.subTest(boundary=i):self.assertEqual(call()['state'],'BLOCKED')
     def test_arbitrary_values_environment_and_callbacks_never_unlock(self):
         callback=unittest.mock.Mock(side_effect=AssertionError('MUST_NOT_CALL'))
         with patch.dict(os.environ,{"AION_FIRST_INSTALL_GO":"true","ATLASQUANT_AION_GLOBAL_WORKER_ENABLED":"true"}):

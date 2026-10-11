@@ -29,6 +29,8 @@ def review_recovery(heads, *, expected_binding, operation_id, request_digest,
             raise ContractError("DUAL_HEAD_ABSENT")
         for head in heads:
             exact(head, HEAD_FIELDS)
+            if any(type(head[k]) is not str or len(head[k]) > 512 for k in HEAD_FIELDS - {"epoch", "sequence", "observed_at"}):
+                raise ContractError("HEAD_SCALAR_INVALID")
             if (head["mode"] != MODE or not token(head["domain_id"])
                     or not token(head["credential_id"]) or head["credential_id"] in revoked_credentials):
                 raise ContractError("HEAD_CREDENTIAL_UNTRUSTED_OR_REVOKED")

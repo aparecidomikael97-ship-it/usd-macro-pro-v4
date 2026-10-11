@@ -14,11 +14,14 @@ def review_governance(plan, *, expected_binding, now):
     try:
         scope = binding(expected_binding)
         exact(plan, frozenset({"mode", "binding_digest", "subject", "resource", "costs", "privacy"}))
-        if plan["mode"] != MODE or plan["binding_digest"] != digest(scope) or not integer(now):
+        if (type(plan["mode"]) is not str or type(plan["binding_digest"]) is not str
+                or plan["mode"] != MODE or plan["binding_digest"] != digest(scope) or not integer(now)):
             raise ContractError("GOVERNANCE_SCOPE_INVALID")
         s, r = plan["subject"], plan["resource"]
         exact(s, frozenset({"user_id", "tenant_id", "workspace_id", "role", "permissions"}))
         exact(r, frozenset({"resource_id", "tenant_id", "workspace_id", "required_permission"}))
+        if any(type(s[k]) is not str for k in set(s)-{"permissions"}) or any(type(v) is not str for v in r.values()):
+            raise ContractError("ACCESS_SCALAR_INVALID")
         if (not token(s["user_id"]) or s["role"] not in ("MEMBER_FIXTURE", "ADMIN_FIXTURE", "OWNER_FIXTURE")
                 or not tokens(s["permissions"]) or not token(r["required_permission"])
                 or r["required_permission"] not in s["permissions"] or r["resource_id"] != scope["resource_id"]
@@ -32,6 +35,8 @@ def review_governance(plan, *, expected_binding, now):
         unknown = []
         for row in costs:
             exact(row, frozenset({"category", "currency", "monthly_cents", "provenance", "expires_at"}))
+            if type(row["currency"]) is not str or type(row["provenance"]) is not str:
+                raise ContractError("QUOTE_SCALAR_INVALID")
             category = row["category"]
             if type(category) is not str or category not in COST_CATEGORIES or category in ids:
                 raise ContractError("COST_CATEGORY_DUPLICATE_OR_UNKNOWN")
@@ -49,7 +54,7 @@ def review_governance(plan, *, expected_binding, now):
                 unknown.append(category)
         privacy = plan["privacy"]
         exact(privacy, frozenset(PRIVACY_CONTROLS))
-        if any(privacy[k] not in ("SIMULATED_REVIEW", "UNKNOWN") for k in PRIVACY_CONTROLS):
+        if any(type(privacy[k]) is not str or privacy[k] not in ("SIMULATED_REVIEW", "UNKNOWN") for k in PRIVACY_CONTROLS):
             raise ContractError("LEGAL_APPROVAL_NOT_ESTABLISHED")
         missing = tuple(k for k in PRIVACY_CONTROLS if privacy[k] == "UNKNOWN")
         state = "REFERENCE_GOVERNANCE_CONSISTENT_UNTRUSTED" if not unknown and not missing and total <= 20_000 else "BLOCKED"
