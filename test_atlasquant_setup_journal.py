@@ -156,57 +156,62 @@ class AtlasQuantSetupJournalTests(unittest.TestCase):
         self.assertEqual(out["summary_by_setup"]["fvg"]["forward_samples"],1)
         self.assertFalse(out["setup_inference_used"])
 
-    def test_runtime_loader_rejects_code_branch_before_network(self):
-        with patch("atlasquant_paper_setup_bridge.requests.get") as get:
+    def test_runtime_loader_denies_private_read_before_branch_parsing(self):
+        # With no trusted read authorization the loader must not expose
+        # whether a requested branch is valid, nor make any HTTP request.
+        with patch("atlasquant_private_read_gate_v1.private_read_allowed",return_value=False), \
+             patch("atlasquant_paper_setup_bridge.requests.get") as get:
             frame,status=load_paper_audit_runtime(
-                repo="owner/repo",branch="main",token="secret"
+                repo="owner/repo",branch="main",token="synthetic",
             )
         self.assertTrue(frame.empty)
-        self.assertEqual(status["reason"],"UNSAFE_BRANCH")
+        self.assertFalse(status["ok"])
+        self.assertEqual(status["reason"],"ACCESS_DENIED")
         get.assert_not_called()
 
-    def test_model_paper_runtime_loader_uses_model_ledger_path(self):
-        csv=(
-            "trade_id,setup_id,setup_attribution,pair,status,side,signal_time,"
-            "active_session,d1_regime,entry_price,stop_price,target_price,"
-            "realized_r,data_quality_pct\n"
-            "e1,fvg,SOURCE_MODEL_EXPLICIT,EUR/USD,CLOSED,BUY,2026-09-20T12:00:00Z,"
-            "London,TREND,1.10,1.09,1.12,2.0,95\n"
-        )
-        response=Mock()
-        response.status_code=200
-        response.json.return_value={"content":base64.b64encode(csv.encode("utf-8")).decode("ascii")}
-        response.raise_for_status.return_value=None
-        with patch("atlasquant_paper_setup_bridge.requests.get",return_value=response) as get:
-            frame,status=load_model_paper_runtime(
-                repo="owner/repo",branch="atlasquant-runtime",token="secret"
-            )
-        self.assertTrue(status["ok"])
-        self.assertEqual(len(frame),1)
-        called_url=get.call_args.args[0]
-        self.assertIn("model_paper_trades_v1.csv",called_url)
+    def test_runtime_paper_ledgers_denied_without_private_read(self):
+        # The old successful CSV download tests are unreachable before a
+        # trusted tenant/source binding exists. Never call requests.get.
+        for loader in (load_paper_audit_runtime,load_model_paper_runtime):
+            with self.subTest(loader=loader.__name__), \
+                 patch("atlasquant_private_read_gate_v1.private_read_allowed",return_value=False), \
+                 patch("atlasquant_paper_setup_bridge.requests.get") as get:
+                frame,status=loader(repo="owner/repo",branch="atlasquant-runtime",token="synthetic")
+            self.assertTrue(frame.empty)
+            self.assertFalse(status["ok"])
+            self.assertEqual(status["reason"],"ACCESS_DENIED")
+            self.assertEqual(status["rows"],0)
+            get.assert_not_called()
 
-    def test_runtime_loader_reads_csv_from_safe_runtime_branch(self):
-        csv=(
-            "trade_id,setup_id,setup_attribution,pair,status,side,signal_time,"
-            "active_session,d1_regime,entry_price,stop_price,target_price,"
-            "realized_r,data_quality_pct\n"
-            "t1,fvg,EXPLICIT_INPUT,EUR/USD,CLOSED,BUY,2026-09-20T12:00:00Z,"
-            "London,trend,1.10,1.09,1.12,2.0,100\n"
-        )
-        response=Mock()
-        response.status_code=200
-        response.json.return_value={"content":base64.b64encode(csv.encode("utf-8")).decode("ascii")}
-        response.raise_for_status.return_value=None
-        with patch("atlasquant_paper_setup_bridge.requests.get",return_value=response) as get:
-            frame,status=load_paper_audit_runtime(
-                repo="owner/repo",branch="atlasquant-runtime",token="secret"
-            )
-        self.assertTrue(status["ok"])
-        self.assertEqual(status["reason"],"LOADED")
-        self.assertEqual(len(frame),1)
-        self.assertEqual(frame.iloc[0]["setup_id"],"fvg")
-        get.assert_called_once()
+    def test_runtime_paper_ledgers_refuse_unbound_shared_source_even_if_session_allowed(self):
+        from atlasquant_paper_setup_bridge import PAPER_AUDIT_PATH,MODEL_PAPER_PATH
+        self.assertNotEqual(PAPER_AUDIT_PATH,MODEL_PAPER_PATH)
+        self.assertIn("paper_setup_audit",PAPER_AUDIT_PATH)
+        self.assertIn("model_paper_trades",MODEL_PAPER_PATH)
+        for loader in (load_paper_audit_runtime,load_model_paper_runtime):
+            with self.subTest(loader=loader.__name__), \
+                 patch("atlasquant_paper_setup_bridge.requests.get") as get, \
+                 patch("atlasquant_private_read_gate_v1.private_read_allowed",return_value=True), \
+                 patch("atlasquant_legacy_private_resource_gate_v1.legacy_private_remote_resource_allowed",return_value=False):
+                frame,status=loader(repo="owner/repo",branch="atlasquant-runtime",token="synthetic")
+            self.assertTrue(frame.empty)
+            self.assertFalse(status["ok"])
+            self.assertEqual(status["reason"],"TENANT_SOURCE_UNBOUND")
+            get.assert_not_called()
+
+    def test_runtime_paper_ledgers_refuse_main_when_gates_are_synthetically_reachable(self):
+        # Test the subsequent branch validator in complete isolation, without
+        # weakening either default production authorization gate.
+        for loader in (load_paper_audit_runtime,load_model_paper_runtime):
+            with self.subTest(loader=loader.__name__), \
+                 patch("atlasquant_private_read_gate_v1.private_read_allowed",return_value=True), \
+                 patch("atlasquant_legacy_private_resource_gate_v1.legacy_private_remote_resource_allowed",return_value=True), \
+                 patch("atlasquant_paper_setup_bridge.requests.get") as get:
+                frame,status=loader(repo="owner/repo",branch="main",token="synthetic")
+            self.assertTrue(frame.empty)
+            self.assertFalse(status["ok"])
+            self.assertEqual(status["reason"],"UNSAFE_BRANCH")
+            get.assert_not_called()
 
     def test_setup_aliases_are_canonical_without_guessing_from_components(self):
         self.assertEqual(canonical_setup_id("AMD / PO3"),"amd-po3")
