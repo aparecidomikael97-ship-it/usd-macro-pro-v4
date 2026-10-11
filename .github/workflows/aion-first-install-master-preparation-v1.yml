@@ -32,7 +32,7 @@ jobs:
       - name: CI-only existing pinned dependencies
         run: python -m pip install -r requirements.txt
       - name: Compile all candidate Python
-        run: python -m compileall -q -x '(^|/)\.git(/|$)' .
+        run: python -m compileall -q -x '(^|[\\/])\.git([\\/]|$)' .
       - name: Offline contracts, process crashes, unchanged reference negatives
         run: python -B tools/aion_first_install_preparation_ci.py
       - name: Original 20 gates still unresolved

@@ -3,6 +3,7 @@ import ast
 from copy import deepcopy
 import json
 import os
+import re
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -305,6 +306,13 @@ class PlanBoundaryTests(NoAuthorityCase):
         out=review_evidence_plan(m);self.check_no_authority(out);self.assertEqual(out["state"],"BLOCKED")
 
 class PhysicalAuthorityFirewallTests(NoAuthorityCase):
+    def test_source_compile_excludes_git_reflog_on_windows_and_linux(self):
+        workflow=(ROOT/'.github/workflows/aion-first-install-master-preparation-v1.yml').read_text(encoding='utf-8')
+        pattern=re.search(r"compileall -q -x '([^']+)'",workflow).group(1)
+        for name in ('.git/logs/refs/remotes/origin/autopilot_v107.py',r'.\.git\logs\refs\remotes\origin\autopilot_v107.py'):
+            self.assertIsNotNone(re.search(pattern,name))
+        for name in ('autopilot_v107.py','tests/test_aion_git_store.py',r'.\aion_core\trust_engine.py'):
+            self.assertIsNone(re.search(pattern,name))
     def test_non_json_scalars_cannot_execute_implicit_callbacks(self):
         class Bomb:
             def __eq__(self,_):raise AssertionError('IMPLICIT_CALLBACK_FORBIDDEN')
