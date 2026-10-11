@@ -66,6 +66,9 @@ def verify_locked(db,scope):
     for table,columns in COLUMNS.items():
         if tuple(r[1] for r in db.execute("PRAGMA table_info("+table+")"))!=columns:
             raise Refusal("SCHEMA_COLUMNS_INVALID")
+        ddl=db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone()
+        if ddl is None or ddl[0]!="CREATE TABLE "+table+" ("+TABLES[table]+")":
+            raise Refusal("SCHEMA_CONSTRAINTS_CHANGED")
     config=db.execute("SELECT * FROM config WHERE singleton=1").fetchone()
     if config is None or config["scope_json"]!=canonical(scope):
         raise Refusal("STORE_SCOPE_MISMATCH")

@@ -115,6 +115,19 @@ class RecoveryTests(unittest.TestCase):
                 with closing(sqlite3.connect(self.f.path,isolation_level=None)) as db:db.execute(sql)
                 self.assertEqual(self.read()['state'],'BLOCKED');shutil.copyfile(backup,self.f.path)
 
+    def test_same_columns_removed_primary_key_fail_closed(self):
+        from atlasquant_aion_first_install_preparation_v3.ledger_storage import TABLES
+        self.confirm()
+        with closing(sqlite3.connect(self.f.path,isolation_level=None)) as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('ALTER TABLE credentials RENAME TO old_credentials')
+            ddl=TABLES['credentials'].replace(',PRIMARY KEY(credential_id,generation)','')
+            db.execute('CREATE TABLE credentials ('+ddl+')')
+            db.execute('INSERT INTO credentials SELECT * FROM old_credentials')
+            db.execute('DROP TABLE old_credentials');db.commit()
+        self.assertEqual(self.read()['state'],'BLOCKED')
+        with self.assertRaises(Refusal):ReferenceWebAuthnLedger(self.f.path,scope=self.f.scope)
+
     def test_restored_whole_db_requires_external_floor_known_negative(self):
         backup=Path(self.f.tmp.name)/'old-local.db';shutil.copyfile(self.f.path,backup)
         consumed=self.confirm();floor=consumed['local_head_sequence']

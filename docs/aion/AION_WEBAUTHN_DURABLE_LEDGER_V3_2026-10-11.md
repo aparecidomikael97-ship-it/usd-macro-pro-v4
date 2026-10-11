@@ -60,6 +60,12 @@ Private keys are generated only in test memory. JSON/COSE/type/size contracts
 come from V1/V2. Scope aliases, native timeout (at most two seconds), table and
 column shape, rows (512 per table), materialized row size (32768) and event
 payload (1024) are bounded. Limit exhaustion blocks; there is no pruning/reuse.
+Exact CREATE TABLE DDL (including primary/unique constraints) is pinned, not
+only column names. During final red-team review of the new ledger, removing
+the credential primary key while preserving columns/data reproduced a LOW
+schema-integrity gap: readback still returned a positive local receipt.
+Exact DDL validation and a real SQLite reconstruction regression now reject
+this case; no productive authority bypass existed.
 Ledger metadata and receipts must match a contiguous hash chain and current
 state. This is local integrity, not signing, encryption, WORM or antirollback.
 
@@ -143,7 +149,7 @@ added. This was a new test-harness defect, not an inherited production change.
 ## Validation evidence and limits
 
 Local integrated run: 13 challenge tests/30 subtests, 12 registry tests/12
-subtests, 18 recovery tests/6 subtests; unchanged V2 groups 14/61, 17/15, 6/26;
+subtests, 19 recovery tests/6 subtests; unchanged V2 groups 14/61, 17/15, 6/26;
 unchanged V1 246/380. Zero failures/errors/skips/expected failures. Windows and
 Linux candidate-head CI is required and recorded in the Draft description;
 base #1218 results are not candidate approval. Global root Quality runs its
