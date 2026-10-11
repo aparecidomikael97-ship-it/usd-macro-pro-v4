@@ -156,13 +156,17 @@ class AtlasQuantSetupJournalTests(unittest.TestCase):
         self.assertEqual(out["summary_by_setup"]["fvg"]["forward_samples"],1)
         self.assertFalse(out["setup_inference_used"])
 
-    def test_runtime_loader_rejects_code_branch_before_network(self):
-        with patch("atlasquant_paper_setup_bridge.requests.get") as get:
+    def test_runtime_loader_denies_private_read_before_branch_parsing(self):
+        # With no trusted read authorization the loader must not expose
+        # whether a requested branch is valid, nor make any HTTP request.
+        with patch("atlasquant_private_read_gate_v1.private_read_allowed",return_value=False), \
+             patch("atlasquant_paper_setup_bridge.requests.get") as get:
             frame,status=load_paper_audit_runtime(
-                repo="owner/repo",branch="main",token="secret"
+                repo="owner/repo",branch="main",token="synthetic",
             )
         self.assertTrue(frame.empty)
-        self.assertEqual(status["reason"],"UNSAFE_BRANCH")
+        self.assertFalse(status["ok"])
+        self.assertEqual(status["reason"],"ACCESS_DENIED")
         get.assert_not_called()
 
     def test_runtime_paper_ledgers_denied_without_private_read(self):
