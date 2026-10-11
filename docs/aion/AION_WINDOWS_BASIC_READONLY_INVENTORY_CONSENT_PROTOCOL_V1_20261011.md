@@ -1,7 +1,7 @@
 # AION — proposta de inventário mínimo Windows (P0/P1)
 
-**Data:** 11/10/2026  
-**Base:** Draft #1222 / HEAD `8d12c14b542fd517ef2ae270a16d8ab42f277f84`  
+**Data:** 11/10/2026
+**Base:** Draft #1222 / HEAD `8d12c14b542fd517ef2ae270a16d8ab42f277f84`
 **Status:** PREPARAÇÃO OFFLINE; `FIRST INSTALL = HARD NO-GO`
 
 ## Limites e autorização
