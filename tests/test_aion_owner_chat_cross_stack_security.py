@@ -131,5 +131,67 @@ class OwnerChatContractIntegrationTests(unittest.TestCase):
                 self.assertTrue(plan["requires_explicit_approval"])
 
 
+    def test_identifier_strings_cannot_smuggle_arbitrary_private_text(self):
+        legitimate = {
+            "source_device": "desktop", "target_device": "mobile",
+            "owner_subject": "test-owner", "conversation_id": "a" * 32,
+            "last_turn_id": "AION-TURN-" + "B" * 24,
+            "context": {"mode": "TEACHING", "topic": "CRM", "slide": 7},
+        }
+        invalid_overrides = (
+            {"owner_subject": "Bearer synthetic-owner-token"},
+            {"owner_subject": {"username": "test-owner"}},
+            {"owner_subject": "test-owner\nAuthorization: fake"},
+            {"conversation_id": "Bearer synthetic-secret"},
+            {"conversation_id": {"token": "synthetic-secret"}},
+            {"conversation_id": "conv-test-1"},
+            {"conversation_id": "AION-CONV-" + "Z" * 24},
+            {"conversation_id": "https://example.invalid/private"},
+            {"conversation_id": "a" * 1000},
+            {"last_turn_id": "turn-test-1"},
+            {"last_turn_id": "synthetic-session-token"},
+            {"last_turn_id": {"session": "fake"}},
+            {"last_turn_id": "AION-TURN-" + "Z" * 24},
+            {"last_turn_id": 0},
+            {"source_device": {"device": "DESKTOP"}},
+            {"target_device": ["MOBILE"]},
+        )
+        for override in invalid_overrides:
+            with self.subTest(override=override):
+                with self.assertRaises(ValueError):
+                    continuity_handoff(**{**legitimate, **override})
+
+    def test_real_chat_identifier_forms_are_references_without_authority(self):
+        from aion_chat.models import Conversation, Message
+        conversation = Conversation(
+            owner_id="test-owner",
+            tenant_id="synthetic-tenant",
+            workspace_id="synthetic-workspace",
+        )
+        message = Message(conversation_id=conversation.id, role="user", content="fixture")
+        for conv_id, turn_id in (
+            (conversation.id, message.id),
+            ("AION-CONV-" + "A" * 24, "AION-TURN-" + "B" * 24),
+            (conversation.id, ""),
+        ):
+            with self.subTest(conv=conv_id, turn=turn_id):
+                plan = continuity_handoff(
+                    source_device="desktop", target_device="mobile",
+                    owner_subject="test-owner", conversation_id=conv_id,
+                    last_turn_id=turn_id,
+                    context={"mode": "TEACHING", "topic": "CRM", "slide": 2},
+                )
+                self.assertEqual(plan["state"], "HANDOFF_PREPARED_UNVERIFIED")
+                self.assertFalse(plan["source_owner_verified"])
+                self.assertFalse(plan["target_owner_verified"])
+                self.assertFalse(plan["tenant_membership_verified"])
+                self.assertFalse(plan["target_device_authenticated"])
+                self.assertFalse(plan["authorization_granted"])
+                self.assertFalse(plan["can_resume_conversation"])
+                self.assertFalse(plan["handoff_digest_is_signature"])
+                self.assertTrue(plan["requires_target_reauthentication"])
+                self.assertFalse(plan["executes_action"])
+
+
 if __name__ == "__main__":
     unittest.main()
