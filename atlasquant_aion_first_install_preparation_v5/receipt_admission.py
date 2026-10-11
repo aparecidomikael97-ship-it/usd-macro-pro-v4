@@ -153,28 +153,31 @@ class OfflineWitnessReceiptAdmission:
         return db
 
     def _mutate(self,work):
-        db=None;commit_attempted=False;result=None
+        db=None;commit_attempted=False;out=None
         try:
             db=self._connect();db.execute("BEGIN IMMEDIATE")
             before=_verify(db)
-            result=work(db,before)
+            if before["config"]!=self.config or before["pin"]!=self.pin:
+                raise Refusal("CALLER_BOUND_CONTEXT_MISMATCH")
+            out=work(db,before)
             _verify(db)
             commit_attempted=True;db.commit()
-            return result
         except Refusal:
-            return _out("BLOCKED","LOCAL_PRECONDITION_OR_INTEGRITY_REJECTED")
+            out=_out("UNKNOWN_OUTCOME" if commit_attempted else "BLOCKED",
+                     "LOCAL_PRECONDITION_OR_COMMIT_UNCERTAIN_NO_RESEND")
         except (sqlite3.Error,OSError,ValueError,KeyError,TypeError,OverflowError,RecursionError):
-            return _out("UNKNOWN_OUTCOME" if commit_attempted else "RECONCILIATION_REQUIRED",
-                        "LOCAL_PERSISTENCE_UNCERTAIN_NO_RESEND")
+            out=_out("UNKNOWN_OUTCOME" if commit_attempted else "RECONCILIATION_REQUIRED",
+                     "LOCAL_PERSISTENCE_UNCERTAIN_NO_RESEND")
         finally:
             if db is not None:
                 try:
                     if db.in_transaction:db.rollback()
-                    db.close()
                 except sqlite3.Error:
-                    result=_out("UNKNOWN_OUTCOME","CLOSE_UNCERTAIN_NO_RESEND")
-            # The close override is applied by the caller's readback boundary
-            # for a successful commit; non-returning finally must not fabricate a GO.
+                    out=_out("UNKNOWN_OUTCOME","ROLLBACK_UNCERTAIN_NO_RESEND")
+                try:db.close()
+                except sqlite3.Error:
+                    out=_out("UNKNOWN_OUTCOME","CLOSE_UNCERTAIN_NO_RESEND")
+        return out
 
     def _append(self,db,old,kind,operation_id,nonce,body):
         seq=old["sequence"]+1
@@ -257,16 +260,28 @@ class OfflineWitnessReceiptAdmission:
                 raise Refusal("READ_REQUEST_INVALID")
             db=self._connect(ro=True);db.execute("BEGIN")
             state=_verify(db)
+            if state["config"]!=self.config or state["pin"]!=self.pin:
+                raise Refusal("CALLER_BOUND_CONTEXT_MISMATCH")
             row=db.execute("SELECT * FROM nonces WHERE nonce=?",(nonce,)).fetchone()
             receipt=db.execute("SELECT * FROM receipts WHERE nonce=?",(nonce,)).fetchone()
             if row is None or receipt is None:
                 out=_out("RECONCILIATION_REQUIRED","RECEIPT_ABSENT_NO_RETRY")
-            elif (row["state"]!="CONSUMED" or receipt["receipt_digest"]!=expected_receipt_digest
-                  or row["receipt_digest"]!=expected_receipt_digest
-                  or receipt["commitment_digest"]!=commitment_digest(state["floor"])):
-                out=_out("BLOCKED","CAUSAL_RECEIPT_CONFLICT")
             else:
-                out=_out("REFERENCE_DURABLE_RECEIPT_UNTRUSTED","LOCAL_RECEIPT_NOT_EXTERNAL_FRESHNESS",
+                event=db.execute("SELECT * FROM events WHERE sequence=?",(receipt["sequence"],)).fetchone()
+                expected_body=_sha([receipt["request_digest"],receipt["receipt_digest"],receipt["commitment_digest"]])
+                valid=(row["state"]=="CONSUMED"
+                    and receipt["receipt_digest"]==expected_receipt_digest
+                    and row["receipt_digest"]==expected_receipt_digest
+                    and receipt["operation_id"]==row["operation_id"]
+                    and receipt["request_digest"]==_sha(json.loads(row["query_json"]))
+                    and integer(receipt["sequence"],1,state["sequence"])
+                    and event is not None and event["kind"]=="ADMIT"
+                    and event["operation_id"]==row["operation_id"]
+                    and event["nonce"]==nonce and event["body_digest"]==expected_body)
+                if not valid:
+                    out=_out("BLOCKED","CAUSAL_RECEIPT_CONFLICT")
+                else:
+                    out=_out("REFERENCE_DURABLE_RECEIPT_UNTRUSTED","LOCAL_RECEIPT_NOT_EXTERNAL_FRESHNESS",
                          local_receipt_verified=True,local_sequence=receipt["sequence"],
                          local_head_sequence=state["sequence"],nonce_consumed_locally=True)
         except Refusal:
