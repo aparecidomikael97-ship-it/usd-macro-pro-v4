@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Synthetic private evidence blueprint; no verification authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "mode",
+    "requirements"
+  ],
+  "properties": {
+    "schema": {
+      "const": "AION_PRIVATE_EVIDENCE_BLUEPRINT_V2"
+    },
+    "mode": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_sha256",
+          "attestation_ref",
+          "audit_decision",
+          "block_reason",
+          "experiment_id",
+          "expires_at",
+          "negative_result",
+          "observed_at",
+          "proof_type",
+          "requirement_id",
+          "revocation",
+          "scope_alias",
+          "source_ref",
+          "tenant_alias",
+          "unsatisfied_dependencies",
+          "verifier_alias"
+        ],
+        "properties": {
+          "requirement_id": {
+            "enum": [
+              "OWNER_IDENTITY_CEREMONY",
+              "INDEPENDENT_KEY_CUSTODY",
+              "ADMIN_FAILURE_DOMAIN_SEPARATION",
+              "SOURCE_ROOT_ENROLLMENT",
+              "TENANT_RESOURCE_REGISTRY",
+              "COORDINATOR_ATOMIC_CAS",
+              "COORDINATOR_ROLLBACK_TEST",
+              "SECOND_DOMAIN_IMMUTABLE_HISTORY",
+              "SECOND_DOMAIN_CURRENT_HEAD",
+              "FRESH_NONCE_CHALLENGE",
+              "CROSS_DOMAIN_PARTIAL_COMMIT",
+              "RECOVERY_REVOCATION_BREAK_GLASS",
+              "OWNER_WINDOWS_PHYSICAL_VALIDATION",
+              "B2B_CROSS_TENANT_NEGATIVE_TESTS",
+              "LGPD_RESIDENCY_AND_OPERATORS",
+              "FULL_BRL_BUDGET_QUOTE",
+              "CLOUDFLARE_SECURITY_ROUTE_NO_BYPASS",
+              "CLOUDFLARE_DO_SINGLE_OBJECT_STORAGE_HEADROOM",
+              "FINANCIAL_SPEND_APPROVAL",
+              "RELEASE_MERGE_DEPLOY_APPROVAL"
+            ]
+          },
+          "source_ref": {
+            "type": "string",
+            "pattern": "^fixture://",
+            "maxLength": 160
+          },
+          "revocation": {
+            "enum": [
+              "UNKNOWN",
+              "REVOKED",
+              "SIMULATED_NOT_REVOKED"
+            ]
+          },
+          "negative_result": {
+            "enum": [
+              "UNKNOWN",
+              "SIMULATED_PASS",
+              "SIMULATED_FAIL"
+            ]
+          },
+          "expires_at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "experiment_id": {
+            "type": "string",
+            "pattern": "^fixture-[A-Za-z0-9._:-]+$",
+            "maxLength": 120
+          },
+          "verifier_alias": {
+            "type": "string",
+            "pattern": "^fixture-[A-Za-z0-9._:-]+$",
+            "maxLength": 120
+          },
+          "attestation_ref": {
+            "type": "string",
+            "pattern": "^fixture://",
+            "maxLength": 160
+          },
+          "scope_alias": {
+            "type": "string",
+            "pattern": "^fixture-[A-Za-z0-9._:-]+$",
+            "maxLength": 120
+          },
+          "proof_type": {
+            "enum": [
+              "SIMULATION"
+            ]
+          },
+          "unsatisfied_dependencies": {
+            "type": "array",
+            "maxItems": 20,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          "audit_decision": {
+            "enum": [
+              "BLOCKED"
+            ]
+          },
+          "tenant_alias": {
+            "type": "string",
+            "pattern": "^fixture-[A-Za-z0-9._:-]+$",
+            "maxLength": 120
+          },
+          "artifact_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "block_reason": {
+            "enum": [
+              "INDEPENDENT_PROOF_ABSENT"
+            ]
+          },
+          "observed_at": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    }
+  }
+}
