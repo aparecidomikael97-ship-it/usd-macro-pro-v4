@@ -34,7 +34,7 @@ class WindowsReadOnlyInventoryProtocolTests(unittest.TestCase):
         forbidden=(
             "Get-CimInstance", "Get-WmiObject", "Get-ComputerInfo",
             "Get-Tpm", "Get-BitLockerVolume", "Get-MpComputerStatus",
-            "Get-Item ", "Get-ChildItem", "whoami", "hostname",
+            "Get-Item ", "Get-ChildItem", "whoami",
             "Win32_", "Get-LocalUser", "Get-Process",
             "SerialNumber", "MachineGuid", "ProductId",
             "DigitalProductId", "BIOS", "UserName",
@@ -43,6 +43,11 @@ class WindowsReadOnlyInventoryProtocolTests(unittest.TestCase):
         for term in forbidden:
             with self.subTest(term=term):
                 self.assertNotIn(term.lower(),s.lower())
+        # The inert plan explicitly says hostname is excluded; that plain
+        # word must not be mistaken for actual command execution.
+        self.assertIn("hostname", self.source.lower())
+        self.assertNotRegex(s, r"(?mi)^\s*(?:&\s*)?hostname(?:\.exe)?(?:\s|;|\||$)")
+        self.assertNotRegex(s, r"(?mi)^\s*(?:&\s*)?whoami(?:\.exe)?(?:\s|;|\||$)")
     def test_no_network_or_file_write_execution_commands(self):
         s=self.code
         forbidden=(
