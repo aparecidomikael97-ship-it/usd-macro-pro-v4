@@ -57,6 +57,26 @@ class AionOwnerExperienceV1Tests(unittest.TestCase):
             owner_binding(self.access(role="USER"), self.assertion())["bound"]
         )
 
+    def test_owner_binding_digest_tracks_session_credential_rotation(self):
+        old = owner_binding(self.access(), self.assertion())
+        unchanged = owner_binding(self.access(), self.assertion())
+        new_access = self.access(session={"credential_fingerprint": "different-test-fingerprint"})
+        changed = owner_binding(new_access, self.assertion())
+
+        self.assertTrue(old["bound"])
+        self.assertTrue(changed["bound"])
+        self.assertEqual(old["binding_digest"], unchanged["binding_digest"])
+        self.assertNotEqual(old["binding_digest"], changed["binding_digest"])
+        # Binding is a checksum for the caller-provided trusted-host claim,
+        # never a signature, proof of consent or local app authorization.
+        for result in (old, changed):
+            self.assertFalse(result["grants_authority"])
+            self.assertFalse(result["executes_action"])
+            self.assertNotIn("test-fingerprint", str(result))
+        self.assertEqual(owner_binding(
+            self.access(session={"credential_fingerprint": ""}), self.assertion()
+        )["binding_digest"], "")
+
     def test_greeting_is_prepared_but_not_spoken(self):
         result = owner_greeting_plan(
             self.access(),
