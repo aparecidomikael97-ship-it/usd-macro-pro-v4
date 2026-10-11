@@ -286,6 +286,12 @@ def current_session()->dict[str,Any]|None:
     return dict(raw) if isinstance(raw,dict) else None
 
 def clear_session()->None:
+    # Clear only identity-scoped presentation; unresolved write outcome survives.
+    try:
+        from atlasquant_private_read_gate_v1 import clear_private_ui_state
+        clear_private_ui_state(st.session_state)
+    except Exception:
+        pass
     # Staging chat handles are authentication-scoped resources. Close them before
     # dropping the login session so a logout/user switch cannot retain an old DB handle.
     try:

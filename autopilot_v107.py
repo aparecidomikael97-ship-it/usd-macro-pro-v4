@@ -16,6 +16,10 @@ Automatiza:
 O Score Mestre NÃO é alterado pela camada de notícias.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 import base64
 import io
@@ -56,6 +60,7 @@ from atlasquant_signal_lifecycle import (
 )
 from atlasquant_shadow_capture import build_shadow_batch
 from atlasquant_shadow_store import persist_shadow_samples
+from atlasquant_aion_v2_autopilot_evidence_guard import guarded_autopilot_evidence_write
 from atlasquant_flight_recorder_panel import record_from_pack
 from atlasquant_flight_recorder_store import persist_records
 from atlasquant_setup_candidates import build_setup_candidates
@@ -171,7 +176,7 @@ def gh_get_bytes(path: str) -> tuple[bytes | None, str]:
         return None, "GitHub token/repo ausente."
     try:
         url = f"https://api.github.com/repos/{REPO}/contents/{path}"
-        r = requests.get(url, headers=gh_headers(), params={"ref": BRANCH}, timeout=20)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=gh_headers(), params={"ref": BRANCH}, timeout=20, allow_redirects=False))
         if r.status_code == 404:
             return None, ""
         r.raise_for_status()
@@ -180,38 +185,46 @@ def gh_get_bytes(path: str) -> tuple[bytes | None, str]:
         return None, f"{type(exc).__name__}: {exc}"
 
 def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
+    """One GitHub PUT attempt maximum; never infer replay permission from 409.
+
+    Returned errors never certify remote side effects. A later separate call
+    requires external reconciliation and independent authorization.
+    """
     if not TOKEN or not REPO:
         return False, "GitHub token/repo ausente."
     url = f"https://api.github.com/repos/{REPO}/contents/{path}"
     h = gh_headers()
-    last_error = ""
-    # Runtime writers share one data branch. A concurrent commit between GET
-    # and PUT can make the blob SHA stale and GitHub returns HTTP 409. Re-read
-    # the current SHA and retry a small bounded number of times.
-    for attempt in range(3):
-        try:
-            cur = requests.get(url, headers=h, params={"ref": BRANCH}, timeout=20)
-            sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
-            if cur.status_code not in (200, 404):
-                cur.raise_for_status()
-            payload = {
-                "message": message,
-                "content": base64.b64encode(raw).decode("ascii"),
-                "branch": BRANCH,
-            }
-            if sha:
-                payload["sha"] = sha
-            r = requests.put(url, headers=h, json=payload, timeout=30)
-            if r.status_code == 409 and attempt < 2:
-                last_error = "HTTP 409: conflito de escrita concorrente"
-                time.sleep(0.20 * (attempt + 1))
-                continue
-            r.raise_for_status()
-            return True, ""
-        except Exception as exc:
-            last_error = f"{type(exc).__name__}: {exc}"
-            return False, last_error
-    return False, last_error or "HTTP 409: conflito de escrita concorrente"
+    write_attempted = False
+    try:
+        # A fresh read prepares SHA/branch parameters; it is not a retry grant.
+        cur = reject_github_read_unexpected_status(requests.get(
+            guard_github_token_read_destination(url),
+            headers=h, params={"ref": BRANCH}, timeout=20, allow_redirects=False,
+        ))
+        sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
+        payload = {
+            "message": message,
+            "content": base64.b64encode(raw).decode("ascii"),
+            "branch": BRANCH,
+        }
+        if sha:
+            payload["sha"] = sha
+        # If an exception happens below, the actual remote outcome is unknown.
+        write_attempted = True
+        r = reject_github_write_unexpected_status(requests.put(
+            guard_github_write_destination(url), headers=h,
+            json=payload, timeout=30, allow_redirects=False,
+        ), "contents_put")
+        if r.status_code == 409:
+            return False, "REPORTED_GITHUB_HTTP_409_NO_AUTORETRY_RECONCILE_FIRST"
+        if r.status_code == 422:
+            return False, "REPORTED_GITHUB_HTTP_422_VALIDATION_NO_AUTORETRY_RECONCILE_FIRST"
+        r.raise_for_status()
+        return True, ""
+    except Exception as exc:
+        if write_attempted:
+            return False, f"UNKNOWN_GITHUB_WRITE_OUTCOME_RECONCILE_NO_RETRY:{type(exc).__name__}"
+        return False, f"PRE_WRITE_GITHUB_READ_OR_VALIDATION_FAILED:{type(exc).__name__}"
 
 def gh_get_json(path: str, default: Any = None) -> tuple[Any, str]:
     raw, err = gh_get_bytes(path)
@@ -1286,24 +1299,32 @@ def persist_decision_evidence(packs, *, engine_version: str, repo: str, branch: 
     """Persist Shadow and Flight evidence independently; one sink cannot mask the other."""
     errors=[]
     try:
-        shadow_batch=build_shadow_batch(packs,champion_version=engine_version)
-        shadow_status=persist_shadow_samples(shadow_batch,repo=repo,branch=branch,token=token)
+        shadow_status=guarded_autopilot_evidence_write(
+            repo=repo,branch=branch,sink="shadow",
+            write=lambda: persist_shadow_samples(
+                build_shadow_batch(packs,champion_version=engine_version),
+                repo=repo,branch=branch,token=token),
+        )
         if not bool(shadow_status.get("ok",False)):
             reason=str(shadow_status.get("reason","PERSISTENCE_FAILED"))
             detail=str(shadow_status.get("error","") or reason)
             errors.append("Decision evidence Shadow: "+detail)
     except Exception as exc:
-        shadow_status={"ok":False,"added":0,"samples":0,"reason":"SHADOW_EXCEPTION","error":f"{type(exc).__name__}: {exc}"}
+        shadow_status={"ok":False,"added":0,"samples":0,"reason":"SHADOW_EXCEPTION","error":type(exc).__name__}
         errors.append("Decision evidence Shadow: "+shadow_status["error"])
     try:
-        flight_records=[record_from_pack(p,engine_version) for p in packs]
-        flight_status=persist_records(flight_records,repo=repo,branch=branch,token=token)
+        flight_status=guarded_autopilot_evidence_write(
+            repo=repo,branch=branch,sink="flight",
+            write=lambda: persist_records(
+                [record_from_pack(p,engine_version) for p in packs],
+                repo=repo,branch=branch,token=token),
+        )
         if not bool(flight_status.get("ok",False)):
             reason=str(flight_status.get("reason","PERSISTENCE_FAILED"))
             detail=str(flight_status.get("error","") or reason)
             errors.append("Decision evidence Flight: "+detail)
     except Exception as exc:
-        flight_status={"ok":False,"added":0,"records":0,"reason":"FLIGHT_EXCEPTION","error":f"{type(exc).__name__}: {exc}"}
+        flight_status={"ok":False,"added":0,"records":0,"reason":"FLIGHT_EXCEPTION","error":type(exc).__name__}
         errors.append("Decision evidence Flight: "+flight_status["error"])
     return shadow_status,flight_status,errors
 
@@ -1475,10 +1496,18 @@ def main() -> int:
             "error":str(journal_read_error or journal_write_error or ""),
             "events":int(event_journal.get("event_count") or 0),
             "heartbeats":int(continuity.get("heartbeat_count") or 0),
-            "watch_state":str(continuity.get("state") or "UNKNOWN"),
-            "continuous_24h_confirmed":bool(
+            "watch_state":(
+                "UNVERIFIED_REMOTE_HISTORY"
+                if str(continuity.get("state") or "").upper()=="CONTINUOUS_24H"
+                else str(continuity.get("state") or "UNKNOWN")
+            ),
+            "reported_watch_state":str(continuity.get("state") or "UNKNOWN"),
+            "continuity_candidate_24h":bool(
                 continuity.get("continuous_24h_confirmed",False)
             ),
+            "continuous_24h_confirmed":False,
+            "independent_history_verified":False,
+            "remote_durability_certified":False,
             "delivery_candidates":int(
                 event_journal.get("delivery_candidate_count") or 0
             ),

@@ -6,6 +6,10 @@ import pandas as pd
 import requests
 import streamlit as st
 from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_private_read_gate_v1 import private_read_allowed
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
 
 STATUS_PATH="dados/autopilot_status_v107.json"
 
@@ -22,14 +26,21 @@ def _cfg():
     return str(token),str(repo),str(branch)
 
 def _load_status() -> tuple[dict[str,Any],str]:
+    # A valid ADMIN session still does not prove ownership of a shared file.
+    # Refuse before st.secrets, token/branch lookup, network or data decode.
+    if not private_read_allowed():
+        return {},"ACCESS_DENIED"
+    if not legacy_private_remote_resource_allowed(STATUS_PATH):
+        return {},"TENANT_SOURCE_UNBOUND"
     token,repo,branch=_cfg()
     if not token or not repo: return {},"Persistência GitHub não configurada."
     try:
-        r=requests.get(
-            f"https://api.github.com/repos/{repo}/contents/{STATUS_PATH}",
+        url=f"https://api.github.com/repos/{repo}/contents/{STATUS_PATH}"
+        r=reject_github_read_unexpected_status(requests.get(
+            guard_github_token_read_destination(url),
             headers={"Authorization":f"Bearer {token}","Accept":"application/vnd.github+json"},
-            params={"ref":branch},timeout=15
-        )
+            params={"ref":branch},timeout=15,allow_redirects=False,
+        ))
         if r.status_code==404: return {},"Autopilot ainda não executou."
         r.raise_for_status()
         return json.loads(base64.b64decode(r.json()["content"]).decode("utf-8")),""

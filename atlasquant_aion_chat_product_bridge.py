@@ -183,6 +183,7 @@ def execute_product_read_turn(
     feature_flags: Mapping[str, Any] | None = None,
     hub: Mapping[str, Any] | None = None,
     portable_core: Mapping[str, Any] | None = None,
+    before_append: Any = None,
 ) -> dict[str, Any]:
     """Execute+persist the existing verified local READ/SEARCH Golden Path."""
     binding = _require_binding(access, scope)
@@ -203,6 +204,7 @@ def execute_product_read_turn(
         authenticated_admin=True,
         hub=hub,
         portable_core=portable_core,
+        before_append=before_append,
         conversation_id=conversation_id,
     )
     return {
@@ -306,10 +308,12 @@ def read_product_history_page(
             verification_state = _clean(
                 metadata.get("verification_state"), 60
             ).upper()
+            # The scoped store proves local presence, not historical truth.
+            # Metadata (including receipt claims) is never reverified here.
             public_turns[turn_id] = {
-                "state": "CONFIRMED_SUCCESS",
-                "reason": "",
-                "capability": "Leitura local verificada",
+                "state": "UNKNOWN",
+                "reason": "HISTORICAL_RESULT_NOT_REVERIFIED",
+                "capability": "Histórico local",
                 "policy_state": "READ_ONLY",
                 "blockers": [],
                 "approval": {
@@ -320,23 +324,36 @@ def read_product_history_page(
                 "stages": [
                     {
                         "stage": "VERIFICATION",
-                        "state": verification_state or "CONFIRMED",
+                        "state": "NOT_REVERIFIED",
                     },
                     {
                         "stage": "PERSISTENCE",
-                        "state": "CONFIRMED",
+                        "state": "LOCAL_PRESENT",
                     },
                 ],
                 "evidence": (
-                    "Histórico local durável · escopo autenticado e "
-                    "identidade verificada."
+                    "Mensagem presente no histórico local autenticado. "
+                    "O resultado histórico não foi reverificado."
                 ),
                 "receipt": (
-                    "Receipt verificado · " + receipt_id
+                    "Receipt declarado · " + receipt_id
                     if receipt_id
-                    else "Receipt verificado · identificador não exposto."
+                    else (
+                        "Digest de receipt declarado · não reverificado."
+                        if receipt_digest
+                        else "Receipt não fornecido para reverificação."
+                    )
                 ),
                 "receipt_digest_present": bool(receipt_digest),
+                "declared_verification_state": verification_state or "UNKNOWN",
+                "historical_result_reverified": False,
+                "persistence_state": "LOCAL_PRESENT",
+                "receipt_state": (
+                    "DECLARED_UNVERIFIED"
+                    if receipt_id or receipt_digest
+                    else "NOT_PROVIDED"
+                ),
+                "receipt_verified": False,
             }
 
     return {
@@ -371,6 +388,8 @@ def continue_product_read_turn(
     feature_flags: Mapping[str, Any] | None = None,
     hub: Mapping[str, Any] | None = None,
     portable_core: Mapping[str, Any] | None = None,
+    before_append: Any = None,
+    bound_turn_index: int | None = None,
 ) -> dict[str, Any]:
     """Resume durable state first, then append the next verified read-only turn."""
     binding = _require_binding(access, scope)
@@ -405,11 +424,12 @@ def continue_product_read_turn(
         message,
         conversation_id=cid,
         runtime_context=runtime_context,
-        turn_index=prior_count,
+        turn_index=prior_count if bound_turn_index is None else bound_turn_index,
         attachment_ids=attachment_ids,
         feature_flags=feature_flags,
         hub=hub,
         portable_core=portable_core,
+        before_append=before_append,
     )
     after_count = int(store.get_conversation(scope, cid).message_count)
     return {
@@ -447,3 +467,4 @@ __all__ = [
     "read_product_history_page",
     "continue_product_read_turn",
 ]
+

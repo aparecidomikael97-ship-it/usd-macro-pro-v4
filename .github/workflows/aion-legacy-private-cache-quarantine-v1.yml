@@ -1,0 +1,33 @@
+name: AION Legacy Private Session Cache Quarantine V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_shadow_capture.py"
+      - "atlasquant_research_evidence_capture.py"
+      - "test_atlasquant_legacy_private_cache_quarantine_v1.py"
+      - ".github/workflows/aion-legacy-private-cache-quarantine-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-cache-ejection:
+    name: Private cache proof / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile cache isolation code
+        run: python -B -m py_compile atlasquant_shadow_capture.py atlasquant_research_evidence_capture.py test_atlasquant_legacy_private_cache_quarantine_v1.py
+      - name: Verify cached legacy rows never return without tenant source binding
+        run: python -B -m unittest test_atlasquant_legacy_private_cache_quarantine_v1.py -v

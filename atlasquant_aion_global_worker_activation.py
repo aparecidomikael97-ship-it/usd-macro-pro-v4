@@ -10,6 +10,8 @@ and a final confirmation. A successful flag write is reported only as
 ACTIVATED_PENDING_LIVE_EVIDENCE; it never proves that a worker heartbeat ran.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -619,19 +621,21 @@ def write_repository_feature_flag_enabled(
     headers = _headers(config.token)
     try:
         if state == "UNSET":
-            response = requests.post(
-                _variable_collection_url(config),
+            response = reject_github_write_unexpected_status(requests.post(
+                guard_github_write_destination(_variable_collection_url(config)),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
                 timeout=timeout,
-            )
+                allow_redirects=False,
+            ),"variable_post")
         else:
-            response = requests.patch(
-                _variable_url(config),
+            response = reject_github_write_unexpected_status(requests.patch(
+                guard_github_write_destination(_variable_url(config)),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
                 timeout=timeout,
-            )
+                allow_redirects=False,
+            ),"variable_patch")
         response.raise_for_status()
         return {
             "status": "WRITE_ACCEPTED",
@@ -665,19 +669,21 @@ def force_disable_repository_feature_flag(
         }
     headers = _headers(config.token)
     try:
-        response = requests.patch(
-            _variable_url(config),
+        response = reject_github_write_unexpected_status(requests.patch(
+            guard_github_write_destination(_variable_url(config)),
             headers=headers,
             json={"name": FEATURE_FLAG_NAME, "value": DISABLED_VALUE},
             timeout=timeout,
-        )
+            allow_redirects=False,
+        ),"variable_patch")
         if response.status_code == 404:
-            response = requests.post(
-                _variable_collection_url(config),
+            response = reject_github_write_unexpected_status(requests.post(
+                guard_github_write_destination(_variable_collection_url(config)),
                 headers=headers,
                 json={"name": FEATURE_FLAG_NAME, "value": DISABLED_VALUE},
                 timeout=timeout,
-            )
+                allow_redirects=False,
+            ),"variable_post")
         response.raise_for_status()
         return {
             "status": "DISABLED",

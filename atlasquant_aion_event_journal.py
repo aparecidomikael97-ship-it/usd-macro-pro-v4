@@ -375,13 +375,26 @@ def overlay_journal(
         if isinstance(data.get("continuity"),Mapping)
         else {}
     )
-    live["background_watch_state"]=_clean(continuity.get("state"),80).upper() or "UNKNOWN"
+    # Reported history is not independently attested remote custody.
+    reported_watch_state=_clean(continuity.get("state"),80).upper() or "UNKNOWN"
+    live["reported_background_watch_state"]=reported_watch_state
+    live["background_watch_state"]=(
+        "UNVERIFIED_REMOTE_HISTORY"
+        if reported_watch_state=="CONTINUOUS_24H"
+        else reported_watch_state
+    )
     live["background_heartbeat_count"]=int(_finite(continuity.get("heartbeat_count")) or 0)
     live["background_coverage_minutes"]=_finite(continuity.get("coverage_minutes"))
     live["background_latest_age_minutes"]=_finite(continuity.get("latest_age_minutes"))
     live["background_max_gap_minutes"]=_finite(continuity.get("max_gap_minutes"))
-    live["continuous_runtime_confirmed"]=bool(
+    live["background_24h_continuity_candidate"]=bool(
         continuity.get("continuous_24h_confirmed",False)
+    )
+    # A self-reported digest/heartbeat is not a durable independent witness.
+    live["continuous_runtime_confirmed"]=False
+    live["independent_runtime_history_verified"]=False
+    live["runtime_history_requires_reconciliation"]=bool(
+        live["background_24h_continuity_candidate"]
     )
     live["journal_event_count"]=int(_finite(data.get("event_count")) or 0)
     live["journal_events"]=[

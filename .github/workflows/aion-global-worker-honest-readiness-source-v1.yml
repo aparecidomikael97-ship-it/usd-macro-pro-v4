@@ -1,0 +1,35 @@
+name: AION Global Worker Honest Readiness Source V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_global_worker_readiness.py"
+      - "test_atlasquant_aion_global_worker_readiness.py"
+      - "test_atlasquant_aion_global_worker_readiness_source_gate_v1.py"
+      - ".github/workflows/aion-global-worker-honest-readiness-source-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  readiness-no-go:
+    name: Source trust / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify real readiness boundary with no imports/network needed
+        run: python -B -m unittest test_atlasquant_aion_global_worker_readiness_source_gate_v1.py -v
+      - name: Install pinned dependencies for legacy readiness simulations
+        run: python -m pip install -r requirements.txt
+      - name: Run historical contract tests in synthetic source-only fixture
+        run: python -B -m unittest test_atlasquant_aion_global_worker_readiness.py -v

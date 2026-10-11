@@ -14,7 +14,9 @@ import math
 import streamlit as st
 
 from atlasquant_journal import make_decision_record, make_blocked_record, to_csv
-from atlasquant_flight_recorder_store import persist_records, load_persistent_records
+from atlasquant_flight_recorder_store import FLIGHT_RECORDER_PATH, persist_records, load_persistent_records
+from atlasquant_private_read_gate_v1 import private_read_allowed, clear_private_ui_state
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
 from atlasquant_runtime_store import resolve_runtime_branch
 
 
@@ -149,7 +151,24 @@ def runtime_persistence_config() -> dict[str, str]:
     return {"repo":repo,"branch":branch,"token":token}
 
 
+def _flight_private_denial() -> str:
+    """Prove session AND source before observing cached Flight Recorder data."""
+    try:
+        if not private_read_allowed():
+            clear_private_ui_state(st.session_state)
+            return "ACCESS_DENIED"
+        if not legacy_private_remote_resource_allowed(FLIGHT_RECORDER_PATH):
+            clear_private_ui_state(st.session_state)
+            return "TENANT_SOURCE_UNBOUND"
+    except Exception:
+        return "ACCESS_DENIED"
+    return ""
+
+
 def persist_current_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    reason=_flight_private_denial()
+    if reason:
+        return {"ok":False,"reason":reason,"safe_to_retry":False}
     cfg=runtime_persistence_config()
     return persist_records(
         [record],
@@ -171,6 +190,9 @@ def hydrate_persistent_records(
 
 
 def load_remote_records() -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    reason=_flight_private_denial()
+    if reason:
+        return [],{"ok":False,"reason":reason,"records":0,"error":""}
     cfg=runtime_persistence_config()
     if not cfg["repo"] or not cfg["token"]:
         return [],{"ok":False,"reason":"NOT_CONFIGURED","records":0,"error":""}
@@ -209,6 +231,14 @@ def capture_flight_recorder(
     pack: Mapping[str, Any] | None,
     engine_version: str,
 ) -> dict[str, Any]:
+    reason=_flight_private_denial()
+    if reason:
+        # Reject before reading the old session, fetching private records,
+        # creating/exporting a new record, or attempting a GitHub PUT.
+        return {"current":None,"rows":[],"added":False,
+                "summary":recorder_summary([]),
+                "persistence":{"ok":False,"reason":reason,"safe_to_retry":False},
+                "load_status":{"ok":False,"reason":reason,"records":0,"error":""}}
     key="atlasquant_session_flight_recorder"
     hydrated_key="atlasquant_flight_recorder_hydrated"
     load_status_key="atlasquant_flight_recorder_load_status"
@@ -278,6 +308,11 @@ def render_flight_recorder(
     *,
     capture_result: Mapping[str, Any] | None = None,
 ) -> dict[str, int]:
+    reason=_flight_private_denial()
+    if reason:
+        # Caller-supplied capture_result is untrusted private presentation too.
+        st.warning("🔒 Flight Recorder privado indisponível: " + reason)
+        return recorder_summary([])
     capture=dict(capture_result or capture_flight_recorder(pack,engine_version))
     rows=list(capture.get("rows",[]) or [])
     added=bool(capture.get("added",False))

@@ -4,6 +4,11 @@ Stores deduplicated decision snapshots on the dedicated runtime-data branch.
 This module is fail-closed for code branches and never changes trading logic.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
+from atlasquant_aion_v2_legacy_github_contents_readback import verify_legacy_jsonl_readback, decode_verified_github_contents
 
 import base64
 import json
@@ -85,18 +90,24 @@ def _contents_url(repo: str) -> str:
 
 
 def _fetch_remote(repo: str, branch: str, token: str, timeout: int) -> tuple[list[dict[str,Any]], str]:
-    r=requests.get(
-        _contents_url(repo),
+    # A token/session cannot prove the legacy shared file belongs to a tenant.
+    from atlasquant_private_read_gate_v1 import require_private_read
+    from atlasquant_legacy_private_resource_gate_v1 import require_legacy_private_remote_resource
+    require_private_read()
+    require_legacy_private_remote_resource(FLIGHT_RECORDER_PATH)
+    r=reject_github_read_unexpected_status(requests.get(
+        guard_github_token_read_destination(_contents_url(repo)),
         headers=_headers(token),
         params={"ref":branch},
         timeout=timeout,
-    )
+        allow_redirects=False,
+    ))
     if r.status_code==404:
         return [],""
     r.raise_for_status()
     payload=r.json()
-    raw=base64.b64decode(payload.get("content","")).decode("utf-8")
-    return parse_records(raw),str(payload.get("sha","") or "")
+    raw,sha=decode_verified_github_contents(payload)
+    return parse_records(raw),sha
 
 
 def load_persistent_records(
@@ -106,6 +117,10 @@ def load_persistent_records(
     token: str,
     timeout: int = 15,
 ) -> list[dict[str,Any]]:
+    from atlasquant_private_read_gate_v1 import require_private_read
+    from atlasquant_legacy_private_resource_gate_v1 import require_legacy_private_remote_resource
+    require_private_read()
+    require_legacy_private_remote_resource(FLIGHT_RECORDER_PATH)
     safe_branch=require_runtime_branch(branch)
     if not str(token or "").strip() or not str(repo or "").strip():
         raise ValueError("Persistent Flight Recorder requires repo and token")
@@ -123,6 +138,12 @@ def persist_records(
     max_records: int = DEFAULT_MAX_RECORDS,
     retry_conflict_once: bool = True,
 ) -> dict[str,Any]:
+    # Mandatory fail-closed until per-resource tenant provenance and an
+    # independently witnessed CAS receipt exist. Historical protocol code
+    # below is unreachable in production and only synthetic offline tests
+    # can reconstruct it in a network-blocked reference harness.
+    return {"ok":False,"reason":"HARD_DENIED","added":0,"records":0,
+            "reconciliation_required":True,"safe_to_retry":False}
     try:
         safe_branch=require_runtime_branch(branch)
     except Exception as exc:
@@ -134,16 +155,20 @@ def persist_records(
         return {"ok":False,"added":0,"records":0,"reason":"NOT_CONFIGURED","error":""}
 
     incoming=[dict(x) for x in records]
-    attempts=2 if retry_conflict_once else 1
+    # Legacy retry_conflict_once is accepted for caller compatibility, but
+    # cannot grant another HTTP PUT without independently trusted CAS evidence.
+    attempts=1
 
     for attempt in range(attempts):
+        write_attempted = False
         try:
             existing,sha=_fetch_remote(repo,safe_branch,token,timeout)
             merged,added=merge_unique_records(existing,incoming,max_records=max_records)
             if added==0:
                 return {"ok":True,"added":0,"records":len(merged),"reason":"ALREADY_PRESENT","error":""}
 
-            raw=serialize_records(merged).encode("utf-8")
+            serialized=serialize_records(merged)
+            raw=serialized.encode("utf-8")
             payload={
                 "message":"AtlasQuant: persist Flight Recorder snapshots",
                 "content":base64.b64encode(raw).decode("ascii"),
@@ -152,20 +177,55 @@ def persist_records(
             if sha:
                 payload["sha"]=sha
 
-            r=requests.put(
-                _contents_url(repo),
+            # Conservative: from here a network failure can conceal a commit.
+            write_attempted = True
+            r=reject_github_write_unexpected_status(requests.put(
+                guard_github_write_destination(_contents_url(repo)),
                 headers=_headers(token),
                 json=payload,
                 timeout=timeout,
-            )
-            if r.status_code in (409,422) and attempt+1<attempts:
-                continue
+                allow_redirects=False,
+            ),"contents_put")
+            if r.status_code == 422:
+                # 422 may be a validation error, not CAS conflict: never replay.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"VALIDATION_REJECTED","error":"REPORTED_HTTP_422",
+                    "write_outcome":"REPORTED_HTTP_422",
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
+            if r.status_code == 409:
+                # A reported conflict alone is not trusted permission to replay.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"CONFLICT","error":"REPORTED_HTTP_409",
+                    "write_outcome":"REPORTED_CAS_CONFLICT",
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
             r.raise_for_status()
-            return {"ok":True,"added":added,"records":len(merged),"reason":"SAVED","error":""}
+            verification=verify_legacy_jsonl_readback(
+                response=r,
+                expected_text=serialized,
+                readback=lambda: _fetch_remote(repo,safe_branch,token,timeout),
+                serialize=serialize_records,
+            )
+            return {"ok":True,"added":added,"records":len(merged),"reason":"SAVED","error":"",**verification}
         except ValueError as exc:
-            # Corrupt remote JSONL: never overwrite it.
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
             return {"ok":False,"added":0,"records":0,"reason":"CORRUPT_REMOTE","error":str(exc)}
         except Exception as exc:
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,
+                }
             return {"ok":False,"added":0,"records":0,"reason":"IO_ERROR","error":f"{type(exc).__name__}: {exc}"}
-
     return {"ok":False,"added":0,"records":0,"reason":"CONFLICT","error":"Concurrent update conflict"}

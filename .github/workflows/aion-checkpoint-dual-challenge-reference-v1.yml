@@ -1,0 +1,35 @@
+name: AION Checkpoint Dual Domain Challenge Reference V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_checkpoint_dual_challenge_reference_v1.py"
+      - "test_atlasquant_aion_checkpoint_dual_challenge_reference_v1.py"
+      - "docs/aion/AION_CHECKPOINT_DUAL_CHALLENGE_REFERENCE_20261010.md"
+      - ".github/workflows/aion-checkpoint-dual-challenge-reference-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dual-domain-challenge:
+    name: Dual-head signed challenge math only / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install only pinned offline cryptographic dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Compile reference and adversarial tests
+        run: python -B -m py_compile atlasquant_aion_checkpoint_dual_challenge_reference_v1.py test_atlasquant_aion_checkpoint_dual_challenge_reference_v1.py
+      - name: Verify synthetic dual-domain challenge, fork and no authority
+        run: python -B -m unittest test_atlasquant_aion_checkpoint_dual_challenge_reference_v1.py -v

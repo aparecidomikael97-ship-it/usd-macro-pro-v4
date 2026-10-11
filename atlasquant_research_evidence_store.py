@@ -5,6 +5,11 @@ branch, never to main/dev. The store is append/merge oriented and does not
 change strategy parameters, gates, permissions or trading execution.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
+from atlasquant_aion_v2_legacy_github_contents_readback import verify_legacy_jsonl_readback, decode_verified_github_contents
 
 import base64
 from hashlib import sha256
@@ -157,18 +162,23 @@ def _url(repo:str)->str:
 
 
 def _fetch(repo:str,branch:str,token:str,timeout:int)->tuple[list[dict[str,Any]],str]:
-    response=requests.get(
-        _url(repo),
+    from atlasquant_private_read_gate_v1 import require_private_read
+    from atlasquant_legacy_private_resource_gate_v1 import require_legacy_private_remote_resource
+    require_private_read()
+    require_legacy_private_remote_resource(RESEARCH_EVIDENCE_PATH)
+    response=reject_github_read_unexpected_status(requests.get(
+        guard_github_token_read_destination(_url(repo)),
         headers=_headers(token),
         params={"ref":branch},
         timeout=timeout,
-    )
+        allow_redirects=False,
+    ))
     if response.status_code==404:
         return [],""
     response.raise_for_status()
     payload=response.json()
-    raw=base64.b64decode(payload.get("content","")).decode("utf-8")
-    return parse_evidence_records(raw),str(payload.get("sha","") or "")
+    raw,sha=decode_verified_github_contents(payload)
+    return parse_evidence_records(raw),sha
 
 
 def load_research_evidence(
@@ -195,6 +205,9 @@ def persist_research_evidence(
     max_records:int=DEFAULT_MAX_RECORDS,
     retry_conflict_once:bool=True,
 )->dict[str,Any]:
+    # Hard deny until independent claim/CAS + durable witness exist.
+    return {"ok":False,"reason":"HARD_DENIED","added":0,"records":0,
+            "reconciliation_required":True,"safe_to_retry":False}
     try:
         safe=require_runtime_branch(branch)
     except Exception as exc:
@@ -206,8 +219,11 @@ def persist_research_evidence(
         return {"ok":False,"added":0,"records":0,"reason":"NOT_CONFIGURED","error":""}
 
     incoming=[dict(x) for x in records]
-    attempts=2 if retry_conflict_once else 1
+    # Legacy retry_conflict_once is accepted for caller compatibility, but
+    # cannot grant another HTTP PUT without independently trusted CAS evidence.
+    attempts=1
     for attempt in range(attempts):
+        write_attempted = False
         try:
             existing,remote_sha=_fetch(repo,safe,token,timeout)
             merged,added=merge_evidence_records(existing,incoming,max_records=max_records)
@@ -216,38 +232,72 @@ def persist_research_evidence(
                     "ok":True,"added":0,"records":len(merged),
                     "reason":"ALREADY_PRESENT","error":"","branch":safe,
                 }
+            serialized=serialize_evidence_records(merged)
             payload={
                 "message":"AtlasQuant: persist operational research evidence",
                 "content":base64.b64encode(
-                    serialize_evidence_records(merged).encode("utf-8")
+                    serialized.encode("utf-8")
                 ).decode("ascii"),
                 "branch":safe,
             }
             if remote_sha:
                 payload["sha"]=remote_sha
-            response=requests.put(
-                _url(repo),
+            # Conservative: from here a network failure can conceal a commit.
+            write_attempted = True
+            response=reject_github_write_unexpected_status(requests.put(
+                guard_github_write_destination(_url(repo)),
                 headers=_headers(token),
                 json=payload,
                 timeout=timeout,
-            )
-            if response.status_code in (409,422) and attempt+1<attempts:
-                continue
+                allow_redirects=False,
+            ),"contents_put")
+            if response.status_code == 422:
+                # 422 may be a validation error, not CAS conflict: never replay.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"VALIDATION_REJECTED","error":"REPORTED_HTTP_422",
+                    "write_outcome":"REPORTED_HTTP_422",
+                    "reconciliation_required":True,"safe_to_retry":False,
+                    "branch":safe,
+                }
+            if response.status_code == 409:
+                # A reported conflict alone is not trusted permission to replay.
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"CONFLICT","error":"REPORTED_HTTP_409",
+                    "write_outcome":"REPORTED_CAS_CONFLICT",
+                    "reconciliation_required":True,"safe_to_retry":False,
+                    "branch":safe,
+                }
             response.raise_for_status()
+            verification=verify_legacy_jsonl_readback(
+                response=response,
+                expected_text=serialized,
+                readback=lambda: _fetch(repo,safe,token,timeout),
+                serialize=serialize_evidence_records,
+            )
             return {
                 "ok":True,"added":added,"records":len(merged),
-                "reason":"SAVED","error":"","branch":safe,
+                "reason":"SAVED","error":"","branch":safe,**verification,
             }
         except ValueError as exc:
-            return {
-                "ok":False,"added":0,"records":0,
-                "reason":"CORRUPT_REMOTE","error":str(exc),"branch":safe,
-            }
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,"branch":safe,
+                }
+            return {"ok":False,"added":0,"records":0,"reason":"CORRUPT_REMOTE","error":str(exc),"branch":safe}
         except Exception as exc:
-            return {
-                "ok":False,"added":0,"records":0,
-                "reason":"IO_ERROR","error":f"{type(exc).__name__}: {exc}","branch":safe,
-            }
+            if write_attempted:
+                return {
+                    "ok":False,"added":0,"records":0,
+                    "reason":"UNKNOWN_OUTCOME","error":type(exc).__name__,
+                    "write_outcome":"UNKNOWN","write_attempted":True,
+                    "reconciliation_required":True,"safe_to_retry":False,"branch":safe,
+                }
+            return {"ok":False,"added":0,"records":0,"reason":"IO_ERROR","error":f"{type(exc).__name__}: {exc}","branch":safe}
     return {
         "ok":False,"added":0,"records":0,
         "reason":"CONFLICT","error":"Concurrent update conflict","branch":safe,

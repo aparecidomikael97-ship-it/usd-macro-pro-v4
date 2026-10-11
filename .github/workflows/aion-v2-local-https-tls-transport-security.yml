@@ -1,0 +1,38 @@
+name: AION V2 Local HTTPS TLS Transport Security CI
+
+on:
+  pull_request:
+    paths:
+      - "tests/test_atlasquant_aion_provider_tls_loopback_integration_v2.py"
+      - "docs/aion/AION_V2_LOCAL_HTTPS_TLS_SECURITY.md"
+      - ".github/workflows/aion-v2-local-https-tls-transport-security.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  local-https-tls:
+    name: Real verified TLS certificate and no POST replay / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned repo and test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Compile local TLS test on both operating systems
+        run: |
+          python -m py_compile tests/test_atlasquant_aion_provider_tls_loopback_integration_v2.py
+      - name: Run genuine TLS and HTTPS-only negative controls, plus inherited security
+        run: |
+          python -m pytest -q tests/test_atlasquant_aion_provider_tls_loopback_integration_v2.py tests/test_atlasquant_aion_provider_real_loopback_http_integration_v1.py tests/test_atlasquant_aion_provider_post_transport_hardening_v2.py tests/test_atlasquant_aion_v2_http_retry_redirect_boundary_reference.py tests/test_atlasquant_aion_v2_captured_id_dual_witness_reference.py tests/test_atlasquant_aion_v2_readonly_recovery_id_capture_reference.py tests/test_atlasquant_aion_v2_provider_recovery_capability_reference.py tests/test_atlasquant_aion_v2_unknown_outcome_reconciliation_reference.py tests/test_atlasquant_aion_v2_dispatch_journal_dual_witness_reference.py tests/test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py tests/test_atlasquant_aion_v2_registry_dual_generation_reference.py tests/test_atlasquant_aion_v2_four_role_key_enrollment_reference.py tests/test_atlasquant_aion_v2_secondary_anchor_reference.py tests/test_atlasquant_aion_v2_isolated_sqlite_witness_cas_reference.py tests/test_atlasquant_aion_v2_authenticated_witness_read_cas_reference.py tests/test_atlasquant_aion_v2_external_witness_rollback_reference.py tests/test_atlasquant_aion_chat_reference_v2_nonce_cost_hold.py tests/test_atlasquant_aion_chat_signed_full_request_review_v2.py tests/test_atlasquant_aion_chat_reference_nonce_budget_hold_v1.py tests/test_atlasquant_aion_chat_signed_turn_review_v1.py tests/test_atlasquant_aion_chat_pending_model_turn_v1.py tests/test_atlasquant_aion_provider_full_request_binding_v1.py test_atlasquant_aion_provider.py

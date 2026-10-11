@@ -11,6 +11,8 @@ publishing, deploys, provider calls and shell/subprocess execution remain
 blocked by the executor contract.
 """
 from __future__ import annotations
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -50,6 +52,7 @@ from atlasquant_aion_memory import (
     _runtime_write_receipt,
 )
 from atlasquant_runtime_store import require_runtime_branch
+from atlasquant_aion_global_worker_source_gate_v1 import independent_worker_source_preflight
 
 
 SCHEMA = "ATLASQUANT_AION_GLOBAL_DURABLE_WORKER_V1"
@@ -1211,12 +1214,13 @@ def _persist_runtime_checkpoint_cas(
     write_attempted = False
     try:
         write_attempted = True
-        response = requests.put(
-            _contents_url(config),
+        response = reject_github_write_unexpected_status(requests.put(
+            guard_github_write_destination(_contents_url(config)),
             headers=_headers(config.token),
             json=body,
             timeout=timeout,
-        )
+            allow_redirects=False,
+        ),"contents_put")
         if response.status_code in {409, 422}:
             write_receipt = _runtime_write_receipt(
                 config,
@@ -1544,6 +1548,21 @@ def run_global_worker_once(
             "external_action_executed": False,
         }
 
+    # Mandatory source ownership / monotonic witness gate. It is currently
+    # unprovisioned and always denies; a GitHub SHA or admin flag is NOT proof.
+    # Check BEFORE the first checkpoint GET, any CAS claim or executor.
+    origin = independent_worker_source_preflight(cfg)
+    if origin.get("status") != "VERIFIED" or origin.get("source_verified") is not True:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "INDEPENDENT_CHECKPOINT_SOURCE_UNAVAILABLE",
+            "processed": 0,
+            "network_called": False,
+            "external_action_executed": False,
+            "automatic_runtime_checkpoint_persistence": False,
+            "safe_to_retry": False,
+        }
     current = utc(now or _now())
     loaded = load_runtime_checkpoint(cfg, timeout=timeout)
     if loaded.get("status") != "CONFIRMED":

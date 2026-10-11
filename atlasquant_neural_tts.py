@@ -21,6 +21,10 @@ DEFAULT_MODEL="gpt-4o-mini-tts"
 DEFAULT_VOICE="cedar"
 DEFAULT_ENDPOINT="https://api.openai.com/v1/audio/speech"
 MAX_INPUT_CHARS=4096
+# CI-reviewed source guard: existing neural audio TTS POST is billable.
+# It has no independently enrolled HUMAN_OWNER/FinOps/durable once-only CAS.
+# There is NO environment/user/UI/config override for this lock.
+_PAID_TTS_DISPATCH_HARD_DENY=True
 
 VOICE_INSTRUCTIONS=(
     "Fale em português brasileiro natural. Use voz masculina, adulta, grave e acolhedora. "
@@ -129,6 +133,12 @@ def generate_neural_speech(
     secret=str(api_key or "").strip()
     if not secret:
         raise RuntimeError("provedor neural não configurado")
+
+    # The old TTS endpoint bypassed the model adapter's #1146 hard deny.
+    # Keep playback text available, but never initiate billable speech
+    # without a separate owner-reviewed live admission protocol.
+    if _PAID_TTS_DISPATCH_HARD_DENY is True:
+        raise RuntimeError("Voz neural paga bloqueada: confiança e cobrança não certificadas.")
 
     response=requests.post(
         cfg.endpoint,

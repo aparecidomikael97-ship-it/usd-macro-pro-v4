@@ -16,6 +16,7 @@ from typing import Any, Mapping, Sequence
 
 import requests
 
+from atlasquant_aion_global_worker_source_gate_v1 import independent_worker_source_preflight
 from atlasquant_aion_global_worker import (
     GLOBAL_WORKER_NAMESPACE,
     _claim_state,
@@ -31,11 +32,11 @@ from atlasquant_aion_global_worker_arming import (
 )
 from atlasquant_aion_memory import (
     RuntimeConfig,
+    DEFAULT_RUNTIME_REPO,
     checkpoint_integrity_report,
-    config_from_mapping,
     load_runtime_checkpoint,
 )
-from atlasquant_runtime_store import evaluate_runtime_branch
+from atlasquant_runtime_store import evaluate_runtime_branch, resolve_runtime_branch
 
 
 SCHEMA = "ATLASQUANT_AION_GLOBAL_WORKER_ACTIVATION_READINESS_V1"
@@ -367,8 +368,14 @@ def runtime_posture(
                 worker_state = "INVALID"
                 worker_integrity_state = "MISMATCH"
 
+    source_trust = independent_worker_source_preflight(config)
+    source_admitted = (
+        source_trust.get("status") == "VERIFIED"
+        and source_trust.get("source_verified") is True
+    )
     safe = bool(
-        branch.safe_for_runtime_writes
+        source_admitted
+        and branch.safe_for_runtime_writes
         and status == "CONFIRMED"
         and str(result.get("sha") or "").strip()
         and integrity_state in {"CONFIRMED", "MIGRATION_REQUIRED"}
@@ -376,6 +383,8 @@ def runtime_posture(
     )
     return {
         "state": "PASS" if safe else "BLOCKED",
+        "source_trust_state": "VERIFIED" if source_admitted else "UNAVAILABLE",
+        "source_trust_verified": source_admitted,
         "runtime_status": status,
         "runtime_branch": branch.branch,
         "runtime_branch_safe": branch.safe_for_runtime_writes,
@@ -409,6 +418,8 @@ def activation_readiness_snapshot(
     blockers: list[str] = []
     if runtime["state"] != "PASS":
         blockers.append("RUNTIME_POSTURE_NOT_CONFIRMED")
+    if not runtime["source_trust_verified"]:
+        blockers.append("INDEPENDENT_CHECKPOINT_SOURCE_UNAVAILABLE")
     if workflow["state"] != "PASS":
         blockers.append("WORKFLOW_CONTRACT_FAILED")
     if pulse["state"] != "PASS":
@@ -539,6 +550,18 @@ def fetch_recent_autopilot_pulses(
         }
 
 
+def _readiness_source_config() -> RuntimeConfig:
+    """Describe the destination without resolving any credential before source trust."""
+    return RuntimeConfig(
+        token="",
+        repo=str(os.getenv("GITHUB_REPO_HISTORICO", "") or DEFAULT_RUNTIME_REPO).strip(),
+        branch=resolve_runtime_branch(
+            os.getenv("GITHUB_DATA_BRANCH", ""),
+            os.getenv("GITHUB_BRANCH_HISTORICO", ""),
+        ),
+    )
+
+
 def _cli() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check-runtime", action="store_true")
@@ -547,18 +570,35 @@ def _cli() -> int:
     if not args.check_runtime:
         parser.error("--check-runtime is required")
 
-    config = config_from_mapping()
-    runtime = load_runtime_checkpoint(config, timeout=12.0)
-    token = str(
-        os.getenv("GITHUB_TOKEN_HISTORICO", "")
-        or os.getenv("GITHUB_TOKEN", "")
-        or ""
-    ).strip()
-    pulse_result = fetch_recent_autopilot_pulses(
-        config,
-        token=token,
-        timeout=12.0,
+    config = _readiness_source_config()
+    # The read-only CLI must NOT fetch unbound private checkpoint bytes just
+    # to report a NO-GO. The production source gate has no enrolled provider.
+    # Check before touching a token, checkpoint GET or pulse endpoint.
+    source = independent_worker_source_preflight(config)
+    source_admitted = (
+        source.get("status") == "VERIFIED"
+        and source.get("source_verified") is True
     )
+    if not source_admitted:
+        runtime = {"status": "SOURCE_UNBOUND"}
+        pulse_result = {"status": "SKIPPED_SOURCE_UNBOUND", "runs": []}
+    else:
+        # Preserve the admitted resource descriptor; resolve the checkpoint
+        # credential only here, never via the preflight configuration resolver.
+        checkpoint_token = str(os.getenv("GITHUB_TOKEN_HISTORICO", "") or "").strip()
+        config = RuntimeConfig(token=checkpoint_token, repo=config.repo,
+                               branch=config.branch, path=config.path)
+        runtime = load_runtime_checkpoint(config, timeout=12.0)
+        token = str(
+            checkpoint_token
+            or os.getenv("GITHUB_TOKEN", "")
+            or ""
+        ).strip()
+        pulse_result = fetch_recent_autopilot_pulses(
+            config,
+            token=token,
+            timeout=12.0,
+        )
     workflow_text = Path(args.workflow).read_text(encoding="utf-8")
     report = activation_readiness_snapshot(
         runtime_result=runtime,
@@ -569,6 +609,8 @@ def _cli() -> int:
         now=datetime.now(timezone.utc),
     )
     report["pulse_source_status"] = pulse_result.get("status")
+    report["private_checkpoint_fetch_performed"] = source_admitted
+    report["pulse_fetch_performed"] = source_admitted
     if pulse_result.get("status") != "CONFIRMED":
         report["status"] = "BLOCKED"
         report["activation_stage"] = "BLOCKED"

@@ -1,0 +1,40 @@
+name: AION V2 One Shot UNKNOWN_OUTCOME Journal Reference CI
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py"
+      - "tests/test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py"
+      - "docs/aion/AION_V2_ONE_SHOT_UNKNOWN_OUTCOME_JOURNAL_REFERENCE.md"
+      - ".github/workflows/aion-v2-one-shot-unknown-outcome-journal-reference.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  one-shot-reference:
+    name: One-shot UNKNOWN_OUTCOME and inherited security regressions / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned repository/test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Compile and prohibit live provider, signer or network calls
+        run: |
+          python -m py_compile atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py tests/test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py
+          python -c "from pathlib import Path; s=Path('atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py').read_text(); assert all(x not in s for x in ['requests.post(', 'execute_openai_answer(', 'Ed25519PrivateKey(', 'subprocess.Popen(', 'socket.socket(', 'httpx.post(', 'urllib.request.urlopen('])"
+      - name: Run one-shot journal, witnessed registry, V2/V1 full provider regressions
+        run: |
+          python -m pytest -q tests/test_atlasquant_aion_v2_one_shot_unknown_outcome_journal_reference.py tests/test_atlasquant_aion_v2_registry_dual_generation_reference.py tests/test_atlasquant_aion_v2_four_role_key_enrollment_reference.py tests/test_atlasquant_aion_v2_secondary_anchor_reference.py tests/test_atlasquant_aion_v2_isolated_sqlite_witness_cas_reference.py tests/test_atlasquant_aion_v2_authenticated_witness_read_cas_reference.py tests/test_atlasquant_aion_v2_external_witness_rollback_reference.py tests/test_atlasquant_aion_chat_reference_v2_nonce_cost_hold.py tests/test_atlasquant_aion_chat_signed_full_request_review_v2.py tests/test_atlasquant_aion_chat_reference_nonce_budget_hold_v1.py tests/test_atlasquant_aion_chat_signed_turn_review_v1.py tests/test_atlasquant_aion_chat_pending_model_turn_v1.py tests/test_atlasquant_aion_provider_full_request_binding_v1.py test_atlasquant_aion_provider.py

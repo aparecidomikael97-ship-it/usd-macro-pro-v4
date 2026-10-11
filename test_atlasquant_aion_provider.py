@@ -1,12 +1,14 @@
 import unittest
+from unittest.mock import patch
 
 from atlasquant_aion_provider import (
     ProviderConfig,
     build_provider_prompt,
     estimate_request_cost,
-    execute_openai_answer,
+    execute_openai_answer as _production_execute_openai_answer,
     provider_config,
     provider_configuration_status,
+    preview_openai_request_binding,
 )
 
 
@@ -22,7 +24,15 @@ class _FakeSession:
     def __init__(self,response):
         self.response=response
         self.calls=[]
-    def post(self,url,headers=None,json=None,timeout=None):
+    def __enter__(self):
+        return self
+
+    def __exit__(self,*args):
+        return False
+
+    def post(self,url,headers=None,json=None,timeout=None,allow_redirects=None):
+        if allow_redirects is not False:
+            raise AssertionError("redirects must be blocked")
         self.calls.append({
             "url":url,
             "headers":dict(headers or {}),
@@ -32,11 +42,28 @@ class _FakeSession:
         return self.response
 
 
+def execute_openai_answer(*args,session=None,**kwargs):
+    """Fixture-only boundary: production rejects arbitrary injected sessions.
+
+    This fake is installed exclusively via a unittest patch, never supplied
+    to execute_openai_answer's runtime Session argument.
+    """
+    # The old provider regressions are explicitly LAB-ONLY: suspend the
+    # newly added immutable production source lock only inside this test
+    # process. There is no host/env/user option to disable it.
+    with patch("atlasquant_aion_provider._PAID_MODEL_DISPATCH_HARD_DENY",False):
+        if session is None:
+            return _production_execute_openai_answer(*args,**kwargs)
+        with patch("atlasquant_aion_provider._sealed_provider_transport",
+                   return_value=session):
+            return _production_execute_openai_answer(*args,**kwargs)
+
+
 class AtlasQuantAionProviderTests(unittest.TestCase):
     def _env(self):
         return {
             "AION_MODEL_PROVIDER":"openai",
-            "OPENAI_API_KEY":"sk-test-secret-value",
+            "OPENAI_API_KEY":"ci-placeholder-noncredential-value",
             "AION_OPENAI_FAST_MODEL":"fast-model",
             "AION_OPENAI_REASONING_MODEL":"reasoning-model",
             "AION_OPENAI_INPUT_USD_PER_MTOK":"1.0",
@@ -236,6 +263,10 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
             request_approved=True,
             values=self._env(),
             session=session,
+            expected_request_sha256=preview_openai_request_binding(
+                "pergunta normal sem dados sensíveis",
+                lane="EXTERNAL_REASONING",values=self._env(),
+            )["request_sha256"],
         )
         self.assertTrue(result["called"])
         self.assertEqual(result["state"],"ANSWER_READY")
@@ -245,7 +276,7 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertFalse(result["real_orders_enabled"])
         self.assertEqual(session.calls[0]["json"]["model"],"reasoning-model")
         self.assertIn("Authorization",session.calls[0]["headers"])
-        self.assertNotIn("sk-test-secret-value",str(result))
+        self.assertNotIn("ci-placeholder-noncredential-value",str(result))
 
     def test_budget_blocks_call_before_network(self):
         session=_FakeSession(_FakeResponse())
@@ -260,6 +291,185 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         )
         self.assertFalse(result["called"])
         self.assertEqual(result["state"],"BLOCKED_BUDGET")
+        self.assertEqual(session.calls,[])
+
+    def test_oversized_prompt_is_rejected_before_provider_transport(self):
+        from atlasquant_aion_provider import MAX_PROMPT_CHARS
+        session=_FakeSession(_FakeResponse())
+        prompt="a"*(MAX_PROMPT_CHARS+1)
+        result=execute_openai_answer(
+            prompt,lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertEqual(result["state"],"BLOCKED_PROMPT_TOO_LONG")
+        self.assertFalse(result["called"])
+        self.assertEqual(result["max_prompt_chars"],MAX_PROMPT_CHARS)
+        self.assertEqual(session.calls,[])
+        self.assertNotIn(prompt[:64],str(result))
+
+    def test_sensitive_tail_is_not_silently_cut_and_sent(self):
+        from atlasquant_aion_provider import MAX_PROMPT_CHARS
+        session=_FakeSession(_FakeResponse())
+        prompt="a"*MAX_PROMPT_CHARS+" minha senha=segredo"
+        result=execute_openai_answer(
+            prompt,lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertFalse(result["called"])
+        self.assertEqual(result["state"],"BLOCKED_PROMPT_TOO_LONG")
+        self.assertEqual(session.calls,[])
+        self.assertNotIn("segredo",str(result))
+
+    def test_empty_or_nonstring_prompt_fails_closed_without_transport(self):
+        for prompt,expected in (
+            ("","BLOCKED_EMPTY_PROMPT"),
+            (" \n  ","BLOCKED_EMPTY_PROMPT"),
+            (None,"BLOCKED_PROMPT_TYPE"),
+            (False,"BLOCKED_PROMPT_TYPE"),
+            (b"hello","BLOCKED_PROMPT_TYPE"),
+            ({"text":"hello"},"BLOCKED_PROMPT_TYPE"),
+        ):
+            with self.subTest(kind=type(prompt).__name__):
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    prompt,lane="EXTERNAL_FAST",
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=self._env(),session=session,
+                )
+                self.assertEqual(result["state"],expected)
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+
+    def test_prompt_exactly_at_limit_remains_untruncated(self):
+        from atlasquant_aion_provider import MAX_PROMPT_CHARS
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "a"*MAX_PROMPT_CHARS,lane="EXTERNAL_FAST",
+            budget={"allow_paid":False,"monthly_limit_usd":0},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertEqual(result["state"],"BLOCKED_BUDGET")
+        self.assertEqual(session.calls,[])
+
+    def test_micro_positive_cost_rounds_up_instead_of_zero(self):
+        env=self._env()
+        env["AION_OPENAI_INPUT_USD_PER_MTOK"]="0.000001"
+        env["AION_OPENAI_OUTPUT_USD_PER_MTOK"]="0.000001"
+        estimate=estimate_request_cost("oi",config=provider_config(env))
+        self.assertTrue(estimate["estimable"])
+        self.assertEqual(estimate["estimated_max_cost_usd"],0.000001)
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "oi",lane="EXTERNAL_FAST",
+            budget={"allow_paid":False,"monthly_limit_usd":0},
+            external_feature_enabled=True,request_approved=True,
+            values=env,session=session,
+        )
+        self.assertFalse(result["called"])
+        self.assertEqual(result["state"],"BLOCKED_BUDGET")
+        self.assertEqual(session.calls,[])
+
+    def test_local_or_unknown_route_never_transports_to_external_model(self):
+        for lane in ("LOCAL_DETERMINISTIC","OFFLINE","",None,True,"external_fast"):
+            with self.subTest(lane=lane):
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    "explique a situação",lane=lane,
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=self._env(),session=session,
+                )
+                self.assertEqual(result["state"],"BLOCKED_ROUTE")
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+
+    def test_nonfinite_pricing_must_fail_before_network(self):
+        for price in ("inf","1e309"):
+            with self.subTest(price=price):
+                env=self._env()
+                env["AION_OPENAI_INPUT_USD_PER_MTOK"]=price
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    "pergunta neutra",lane="EXTERNAL_FAST",
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=env,session=session,
+                )
+                self.assertEqual(result["state"],"BLOCKED_COST_UNKNOWN")
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+
+    def test_executor_never_trims_signed_input_or_transports_changed_bytes(self):
+        cases = (" leading", "trailing ", "\nleading", "trailing\n",
+                 "\twords\t", " words \n", "\u00a0texto", "texto\u00a0")
+        for prompt in cases:
+            with self.subTest(prompt=repr(prompt)):
+                session=_FakeSession(_FakeResponse())
+                result=execute_openai_answer(
+                    prompt,lane="EXTERNAL_FAST",
+                    budget={"allow_paid":True,"monthly_limit_usd":10},
+                    external_feature_enabled=True,request_approved=True,
+                    values=self._env(),session=session,
+                )
+                self.assertEqual(result["state"],"BLOCKED_PROMPT_MUTATION")
+                self.assertFalse(result["called"])
+                self.assertEqual(session.calls,[])
+                self.assertNotIn(prompt,str(result))
+
+    def test_executor_preserves_exact_canonical_unicode_bytes_in_mock_transport(self):
+        prompt="AION: acentuação, 😀 e mudança de linha\nsegunda linha"
+        session=_FakeSession(_FakeResponse(200,{"output_text":"texto exemplo"}))
+        result=execute_openai_answer(
+            prompt,lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+            expected_request_sha256=preview_openai_request_binding(
+                prompt,lane="EXTERNAL_FAST",values=self._env(),
+            )["request_sha256"],
+        )
+        self.assertTrue(result["called"])
+        self.assertEqual(len(session.calls),1)
+        self.assertEqual(session.calls[0]["json"]["input"].encode("utf-8"),
+                         prompt.encode("utf-8"))
+        self.assertEqual(session.calls[0]["json"]["max_output_tokens"],500)
+        self.assertEqual(session.calls[0]["json"]["model"],"fast-model")
+        self.assertEqual(result["truth_state"],"MODEL_OUTPUT_UNVERIFIED")
+
+    def test_builder_returns_complete_preconsent_input_no_silent_slice(self):
+        from unittest.mock import patch
+        import atlasquant_aion_provider
+        prompt=build_provider_prompt("pergunta neutra")
+        self.assertEqual(prompt,prompt.strip())
+        self.assertIn("PERGUNTA DO ADMINISTRADOR:",prompt)
+        self.assertIn("pergunta neutra",prompt)
+        self.assertTrue(len(prompt)<40000)
+        # A low fixture limit forces the prior silently-truncated branch.
+        with patch.object(atlasquant_aion_provider,"MAX_PROMPT_CHARS",100):
+            with self.assertRaisesRegex(ValueError,"complete context"):
+                build_provider_prompt("pergunta neutra")
+
+    def test_upstream_overflow_does_not_produce_partial_provider_message(self):
+        from unittest.mock import patch
+        import atlasquant_aion_provider
+        with patch.object(atlasquant_aion_provider,"MAX_PROMPT_CHARS",50):
+            with self.assertRaisesRegex(ValueError,"too long"):
+                build_provider_prompt("quantos pares de Forex?")
+        session=_FakeSession(_FakeResponse())
+        result=execute_openai_answer(
+            "  mensagem",
+            lane="EXTERNAL_FAST",
+            budget={"allow_paid":True,"monthly_limit_usd":10},
+            external_feature_enabled=True,request_approved=True,
+            values=self._env(),session=session,
+        )
+        self.assertEqual(result["state"],"BLOCKED_PROMPT_MUTATION")
         self.assertEqual(session.calls,[])
 
     def test_provider_config_repr_redacts_api_key(self):

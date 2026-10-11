@@ -1,3 +1,9 @@
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
+from atlasquant_private_read_gate_v1 import private_read_allowed
+from atlasquant_aion_v2_github_write_url_guard import guard_github_token_read_destination
+from atlasquant_aion_v2_github_read_response_guard import reject_github_read_unexpected_status
+from atlasquant_aion_v2_github_write_url_guard import guard_github_write_destination
+from atlasquant_aion_v2_github_write_response_guard import reject_github_write_unexpected_status
 # ============================================================
 # USD MACRO PRO V10.2.1 — ESTABILIDADE VISUAL · PAINEL MESTRE V10.2 · MOTOR BASE V9.3.9.2
 # Exibe o motivo persistido de falhas por par/timeframe sem
@@ -352,25 +358,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Optional private-access gate. Disabled by default; when required it fails closed.
+# The login subsystem must never fail open when its import or gate fails.
+# A deliberate OPEN decision from the working gate is *application UI* only;
+# it never authorizes reads/writes of private Shadow/Research data.
 if render_access_gate is not None:
-    _ATLASQUANT_ACCESS = render_access_gate()
-    if not bool(_ATLASQUANT_ACCESS.get("allowed",False)):
+    try:
+        _ATLASQUANT_ACCESS = render_access_gate()
+    except Exception:
+        st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
+        st.stop()
+    if not isinstance(_ATLASQUANT_ACCESS, dict) or _ATLASQUANT_ACCESS.get("allowed") is not True:
         st.stop()
 else:
-    try:
-        _auth_required_raw = st.secrets.get(
-            "ATLASQUANT_AUTH_REQUIRED",
-            os.getenv("ATLASQUANT_AUTH_REQUIRED","false"),
-        )
-    except Exception:
-        _auth_required_raw = os.getenv("ATLASQUANT_AUTH_REQUIRED","false")
-    _auth_required_fallback = str(_auth_required_raw or "").strip().lower() in {"1","true","yes","on","sim"}
-    if _auth_required_fallback:
-        st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
-        st.caption(_ATLASQUANT_ACCESS_IMPORT_ERROR)
-        st.stop()
-    _ATLASQUANT_ACCESS = {"allowed":True,"mode":"OPEN","role":"OPEN"}
+    st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
+    st.stop()
 
 from compact_ui_v1107 import apply_compact_theme
 apply_compact_theme()
@@ -2227,69 +2228,28 @@ def interpretar_conjunto_surpresas(df: pd.DataFrame, score_base_usd: float) -> d
 # HISTÓRICO E TESTE HISTÓRICO
 # =========================================================
 
+# Legacy unscoped Parquet histories were shared by all login sessions.
+# They have no durable tenant identifier, owner proof or access audit. Keep
+# historical files untouched on disk for an explicit supervised migration;
+# never read or modify them from the shared Streamlit application.
 def salvar_snapshot(df):
-    hoje = pd.Timestamp(datetime.now().date())
-    snap = df[["Código", "Pontuação_Macro", "Influência_Fed", "Pontuação_Final"]].copy()
-    snap["data"] = hoje
-    try:
-        hist = pd.read_parquet(HIST_SCORES)
-        if (pd.to_datetime(hist["data"]).dt.date == hoje.date()).any():
-            return "⚠️ Já existe um registro de hoje."
-        hist = pd.concat([hist, snap], ignore_index=True)
-    except Exception:
-        hist = snap
-    hist.to_parquet(HIST_SCORES, index=False)
-    return "✅ Registro salvo."
+    return "🔒 HARD_DENIED: histórico Parquet legado em quarentena."
 
 
 def carregar_snapshots():
-    try:
-        return pd.read_parquet(HIST_SCORES)
-    except Exception:
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 
 def registrar_sinal(par, confianca, s_base, s_cotada, preco, horas):
-    linha = pd.DataFrame([{
-        "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
-        "data": pd.Timestamp.now(),
-        "par": par,
-        "confianca_base": float(confianca),
-        "score_base": float(s_base),
-        "score_cotada": float(s_cotada),
-        "preco_entrada": float(preco),
-        "horizonte": int(horas),
-        "preco_saida": np.nan,
-        "resultado": np.nan,
-    }])
-    try:
-        hist = pd.concat([pd.read_parquet(HIST_SINAIS), linha], ignore_index=True)
-    except Exception:
-        hist = linha
-    hist.to_parquet(HIST_SINAIS, index=False)
+    return False, "HARD_DENIED"
 
 
 def carregar_sinais():
-    try:
-        return pd.read_parquet(HIST_SINAIS)
-    except Exception:
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 
 def atualizar_resultado(id_sinal, saida):
-    hist = carregar_sinais()
-    if hist.empty or id_sinal not in hist["id"].astype(str).values:
-        return "Sinal não encontrado."
-
-    mascara = hist["id"].astype(str) == id_sinal
-    entrada = float(hist.loc[mascara, "preco_entrada"].iloc[0])
-    confianca = float(hist.loc[mascara, "confianca_base"].iloc[0])
-    previsto_alta = confianca >= 0.5
-    realizado_alta = saida > entrada
-    hist.loc[mascara, "preco_saida"] = saida
-    hist.loc[mascara, "resultado"] = 1.0 if previsto_alta == realizado_alta else 0.0
-    hist.to_parquet(HIST_SINAIS, index=False)
-    return "✅ Resultado atualizado."
+    return "🔒 HARD_DENIED: atualização de histórico local indisponível."
 
 
 def metricas_backtest(hist):
@@ -3481,45 +3441,39 @@ def _normalizar_tipos_sinais_v1072(df):
 
 
 def _carregar_sinais_v82():
+    """Load only private-read-authorized GitHub signals.
+
+    Do not fall back to the unscoped on-disk Parquet file even for an admin.
+    That file has no tenant provenance, so its historical rows are quarantined
+    until a separately authorized, tenant-bound migration is designed.
     """
-    V8.7.3 — carrega histórico persistente e separa registros antigos.
-    Tudo que não tiver versão explícita passa a ser LEGADO.
-    """
-    _garantir_pasta_v82()
-
-    def _normalizar_v873(df):
-        df = df.copy()
-        if "versao_coleta" not in df.columns:
-            df["versao_coleta"] = "LEGADO"
-        else:
-            df["versao_coleta"] = df["versao_coleta"].fillna("LEGADO").replace("", "LEGADO")
-        if "dia_coleta" not in df.columns:
-            df["dia_coleta"] = ""
-        else:
-            df["dia_coleta"] = df["dia_coleta"].fillna("").astype(str)
-        return _normalizar_tipos_sinais_v1072(df)
-
-    if "_github_ler_csv_v84" in globals():
-        remoto = _github_ler_csv_v84()
-        if isinstance(remoto, pd.DataFrame) and not remoto.empty:
-            return _normalizar_v873(remoto)
-
-    p = Path(ARQ_SINAIS_V82)
-    if p.exists():
-        try:
-            return _normalizar_v873(pd.read_parquet(p))
-        except Exception:
-            pass
-
     cols = [
         "timestamp","par","direcao","score_mestre","qualidade",
         "score_base","score_cotada","diferenca","fomc_score",
         "fomc_peso","evento","dias_evento","impacto","timing",
         "preco_entrada","data_preco","avaliado","preco_saida",
         "data_saida","retorno_pct","acertou","versao_coleta","dia_coleta",
-        "horizonte_validacao","retorno_direcional_pct","serie_saida"
+        "horizonte_validacao","retorno_direcional_pct","serie_saida",
     ]
+    if not private_read_allowed():
+        return pd.DataFrame(columns=cols)
+
+    if "_github_ler_csv_v84" in globals():
+        remoto = _github_ler_csv_v84()
+        if isinstance(remoto, pd.DataFrame) and not remoto.empty:
+            rows = remoto.copy()
+            if "versao_coleta" not in rows.columns:
+                rows["versao_coleta"] = "LEGADO"
+            else:
+                rows["versao_coleta"] = rows["versao_coleta"].fillna("").replace("", "LEGADO")
+            if "dia_coleta" not in rows.columns:
+                rows["dia_coleta"] = ""
+            else:
+                rows["dia_coleta"] = rows["dia_coleta"].fillna("").astype(str)
+            return _normalizar_tipos_sinais_v1072(rows)
+
     return pd.DataFrame(columns=cols)
+
 
 def _github_cfg_v84():
     """Configuração opcional para persistência do histórico no GitHub."""
@@ -3535,7 +3489,11 @@ def _github_cfg_v84():
     return str(token).strip(), str(repo).strip(), str(branch).strip()
 
 def _github_get_json_v937(path: str, default):
-    """Read validation/runtime JSON from the dedicated runtime-data branch."""
+    """Legacy runtime JSON is unscoped: session auth alone cannot identify tenant."""
+    if not private_read_allowed():
+        return default, "ACCESS_DENIED"
+    if not legacy_private_remote_resource_allowed(path):
+        return default, "TENANT_SOURCE_UNBOUND"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return default, "GitHub persistente não configurado"
@@ -3546,7 +3504,7 @@ def _github_get_json_v937(path: str, default):
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         if r.status_code == 404:
             return default, f"Arquivo ausente em {branch}"
         r.raise_for_status()
@@ -3561,7 +3519,11 @@ def _github_get_json_v937(path: str, default):
 
 
 def _github_ler_csv_v84():
-    """Lê dados/sinais_v84.csv do GitHub. Retorna None se não configurado/indisponível."""
+    """Legacy signals CSV has no resource-to-tenant provenance."""
+    if not private_read_allowed():
+        return None
+    if not legacy_private_remote_resource_allowed("dados/sinais_v84.csv"):
+        return None
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return None
@@ -3573,7 +3535,7 @@ def _github_ler_csv_v84():
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         if r.status_code == 404:
             return pd.DataFrame()
         r.raise_for_status()
@@ -3586,6 +3548,7 @@ def _github_ler_csv_v84():
 
 def _github_salvar_csv_v84(df):
     """Cria/atualiza o CSV persistente no GitHub. Retorna (ok, mensagem)."""
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "GitHub persistente não configurado"
@@ -3599,7 +3562,7 @@ def _github_salvar_csv_v84(df):
         }
 
         # Descobre SHA atual para atualização segura.
-        atual = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        atual = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = None
         if atual.status_code == 200:
             sha = atual.json().get("sha")
@@ -3615,50 +3578,16 @@ def _github_salvar_csv_v84(df):
         if sha:
             body["sha"] = sha
 
-        resp = requests.put(url, headers=headers, json=body, timeout=20)
+        resp = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=20, allow_redirects=False),"contents_put")
         resp.raise_for_status()
         return True, "Histórico salvo no GitHub"
     except Exception as e:
         return False, f"Falha ao salvar no GitHub: {type(e).__name__}"
 
 def _salvar_sinais_v82(df):
-    """
-    V8.7.3 — persistência segura:
-    - LEGADO permanece guardado, mas separado;
-    - V8.7.3: 1 par + 1 dia de coleta = no máximo 1 fotografia.
-    """
-    _garantir_pasta_v82()
-    df = df.copy()
+    """Hard-deny unscoped local/GitHub history writers, never claim success."""
+    return False
 
-    if "versao_coleta" not in df.columns:
-        df["versao_coleta"] = "LEGADO"
-    df["versao_coleta"] = df["versao_coleta"].fillna("LEGADO").replace("", "LEGADO")
-
-    if "dia_coleta" not in df.columns:
-        df["dia_coleta"] = ""
-    df["dia_coleta"] = df["dia_coleta"].fillna("").astype(str)
-
-    if not df.empty:
-        legados = df[df["versao_coleta"].astype(str) != "V8.7.3"].copy()
-        novos = df[df["versao_coleta"].astype(str) == "V8.7.3"].copy()
-
-        if not novos.empty:
-            novos["par"] = novos["par"].astype(str).str.upper().str.strip()
-            novos = novos.drop_duplicates(
-                subset=["par", "dia_coleta"], keep="first"
-            )
-
-        df = pd.concat([legados, novos], ignore_index=True)
-
-    ok_local = False
-    try:
-        df.to_parquet(ARQ_SINAIS_V82, index=False)
-        ok_local = True
-    except Exception:
-        pass
-
-    ok_git, _ = _github_salvar_csv_v84(df)
-    return bool(ok_local or ok_git)
 
 def _fred_preco_par_v87(par):
     """
@@ -3799,7 +3728,9 @@ def _registrar_sinal_v82(par, direcao, score_mestre, qualidade,
     }
     df = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
     ok = _salvar_sinais_v82(df)
-    return ok, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
+    if not ok:
+        return False, "HARD_DENIED: histórico de sinal não foi persistido."
+    return True, f"Sinal registrado em {preco:.5f} (FRED {serie_fred}, {dt_preco})."
 
 
 def _entrada_legada_segura_v1073(r):
@@ -4040,28 +3971,8 @@ def _painel_validacao_v82(par, base, cotada, score_base, score_cotada, diferenca
 
         # V8.4.1 — migra o histórico local que existia antes do token.
         if st.button("☁️ Sincronizar histórico com GitHub", key="v841_sync_github"):
-            _hist_local_v841 = None
-            try:
-                _p_v841 = Path(ARQ_SINAIS_V82)
-                if _p_v841.exists():
-                    _hist_local_v841 = pd.read_parquet(_p_v841)
-            except Exception:
-                _hist_local_v841 = None
+            st.error("HARD_DENIED: arquivos Parquet legados sem identidade de tenant; migração bloqueada.")
 
-            if not isinstance(_hist_local_v841, pd.DataFrame) or _hist_local_v841.empty:
-                _hist_local_v841 = _carregar_sinais_v82()
-
-            if isinstance(_hist_local_v841, pd.DataFrame) and not _hist_local_v841.empty:
-                _ok_v841, _msg_v841 = _github_salvar_csv_v84(_hist_local_v841)
-                if _ok_v841:
-                    st.success(
-                        f"☁️ Sincronização concluída: {len(_hist_local_v841)} "
-                        "sinal(is) enviado(s) para dados/sinais_v84.csv."
-                    )
-                else:
-                    st.error(f"Não foi possível sincronizar. {_msg_v841}")
-            else:
-                st.info("Não há histórico local para sincronizar.")
     else:
         st.warning(
             "⚠️ Histórico ainda está apenas no armazenamento temporário do Streamlit. "
@@ -4436,6 +4347,7 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 # V10.4 — FEEDBACK PERSISTENTE
 # =========================================================
 def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bool, str]:
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "GitHub persistente não configurado."
@@ -4445,19 +4357,20 @@ def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bo
         url = f"https://api.github.com/repos/{repo}/contents/{path_repo}"
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
                    "X-GitHub-Api-Version": "2022-11-28"}
-        old = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        old = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = old.json().get("sha") if old.status_code == 200 else None
         if old.status_code not in (200, 404):
             old.raise_for_status()
         body = {"message": message, "content": base64.b64encode(raw).decode("ascii"), "branch": branch}
         if sha: body["sha"] = sha
-        r = requests.put(url, headers=headers, json=body, timeout=25)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, ""
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
 def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_name: str | None) -> tuple[bool, str]:
+    return False, "HARD_DENIED"
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "Configure GITHUB_TOKEN_HISTORICO para salvar feedback."
@@ -4467,7 +4380,7 @@ def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_na
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
                    "X-GitHub-Api-Version": "2022-11-28"}
-        current = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        current = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = None
         if current.status_code == 200:
             body = current.json()
@@ -4498,7 +4411,7 @@ def _salvar_feedback_v104(payload: dict, attachment: bytes | None, attachment_na
         body = {"message": "V10.4: registrar feedback de usuário",
                 "content": base64.b64encode(csv_bytes).decode("ascii"), "branch": branch}
         if sha: body["sha"] = sha
-        r = requests.put(url, headers=headers, json=body, timeout=25)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=body, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, "Feedback enviado e salvo com sucesso."
     except Exception as exc:
@@ -4519,6 +4432,8 @@ def _refresh_central_v104() -> tuple[bool, str]:
 def _autopilot_save_inputs_v107():
     if os.getenv("USD_MACRO_AUTOPILOT", "") != "1":
         return True, "Modo interativo: snapshot automático não necessário."
+    # Do not enable unattended GitHub GET/PUT without independent authority.
+    return False, "HARD_DENIED"
     try:
         if "matriz_v61" not in globals() or matriz_v61 is None or matriz_v61.empty:
             return False, "Matriz V6.1 indisponível no run headless."
@@ -4605,7 +4520,7 @@ def _autopilot_save_inputs_v107():
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        cur = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+        cur = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=15, allow_redirects=False))
         sha = cur.json().get("sha", "") if cur.status_code == 200 else ""
         payload = {
             "message": "V10.7 Autopilot: snapshot da matriz",
@@ -4616,7 +4531,7 @@ def _autopilot_save_inputs_v107():
         }
         if sha:
             payload["sha"] = sha
-        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, ""
     except Exception as exc:
@@ -7313,8 +7228,13 @@ if _aq_active_index == 4:
         horizonte = st.selectbox("Tempo para avaliar (horas)", [1,4,8,24,48,72], 3)
         if st.button("Registrar sinal"):
             conf_reg = float(np.clip(0.5 + diferenca/100, 0.01, 0.99))
-            registrar_sinal(f"{base}/{cotada}", conf_reg, score_base, score_cotada, preco, horizonte)
-            st.success("✅ Sinal registrado!")
+            _saved_signal, _signal_reason = registrar_sinal(
+                f"{base}/{cotada}", conf_reg, score_base, score_cotada, preco, horizonte
+            )
+            if _saved_signal:
+                st.success("✅ Sinal registrado!")
+            else:
+                st.warning("🔒 Histórico local bloqueado: " + str(_signal_reason))
 
     st.markdown("---")
     st.markdown("### 🏆 Matriz Inteligente — V9.3.5")
@@ -7447,7 +7367,8 @@ if _aq_active_index == 4:
 
     if _novas_v873:
         _df_v873 = pd.concat([_df_v873, pd.DataFrame(_novas_v873)], ignore_index=True)
-        _salvar_sinais_v82(_df_v873)
+        if not _salvar_sinais_v82(_df_v873):
+            st.caption("🔒 Histórico multipares calculado apenas nesta execução; nenhuma gravação persistente foi confirmada.")
 
     st.caption(
         "🤖 V8.7.3 multipares: usa exatamente a decisão final da Matriz. "
@@ -8263,6 +8184,10 @@ def _config_cols_v937():
     ]
 
 def _config_ler_v937():
+    if not private_read_allowed():
+        return pd.DataFrame(columns=_config_cols_v937()), "ACCESS_DENIED"
+    if not legacy_private_remote_resource_allowed(_CONFIG_GH_PATH_V937):
+        return pd.DataFrame(columns=_config_cols_v937()), "TENANT_SOURCE_UNBOUND"
     token, repo, branch = _gh_cfg_v934()
     cols = _config_cols_v937()
     if not token or not repo:
@@ -8274,7 +8199,7 @@ def _config_ler_v937():
         "X-GitHub-Api-Version": "2022-11-28",
     }
     try:
-        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         if r.status_code == 404:
             return pd.DataFrame(columns=cols), ""
         r.raise_for_status()
@@ -8298,6 +8223,8 @@ def _config_ler_v937():
         return pd.DataFrame(columns=cols), f"{type(e).__name__}: {e}"
 
 def _config_salvar_v937(df):
+    # Deny legacy PUT without trustworthy claim/CAS and durable witness.
+    return False, "HARD_DENIED"
     token, repo, branch = _gh_cfg_v934()
     if not token or not repo:
         return False, "GitHub persistente não configurado."
@@ -8308,7 +8235,7 @@ def _config_salvar_v937(df):
         "X-GitHub-Api-Version": "2022-11-28",
     }
     try:
-        atual = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        atual = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         sha = atual.json().get("sha", "") if atual.status_code == 200 else ""
         if atual.status_code not in (200, 404):
             atual.raise_for_status()
@@ -8319,7 +8246,7 @@ def _config_salvar_v937(df):
         }
         if sha:
             payload["sha"] = sha
-        r = requests.put(url, headers=headers, json=payload, timeout=25)
+        r = reject_github_write_unexpected_status(requests.put(guard_github_write_destination(url), headers=headers, json=payload, timeout=25, allow_redirects=False),"contents_put")
         r.raise_for_status()
         return True, ""
     except Exception as e:
@@ -8721,6 +8648,12 @@ def _gh_cfg_v934():
     return str(token), str(repo), str(branch)
 
 def _scanner_load_v934():
+    if not private_read_allowed():
+        return {"versao":"V9.3.5","lote":0,"ultimo_processamento_ts":0.0,
+                "resultados":{},"_erro":"ACCESS_DENIED"}
+    if not legacy_private_remote_resource_allowed(_SCANNER_GH_PATH_V934):
+        return {"versao":"V9.3.5","lote":0,"ultimo_processamento_ts":0.0,
+                "resultados":{},"_erro":"TENANT_SOURCE_UNBOUND"}
     token, repo, branch = _gh_cfg_v934()
     vazio = {"versao": "V9.3.5", "lote": 0, "ultimo_processamento_ts": 0.0, "resultados": {}}
     if not token or not repo:
@@ -8729,7 +8662,7 @@ def _scanner_load_v934():
     url = f"https://api.github.com/repos/{repo}/contents/{_SCANNER_GH_PATH_V934}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     try:
-        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        r = reject_github_read_unexpected_status(requests.get(guard_github_token_read_destination(url), headers=headers, params={"ref": branch}, timeout=20, allow_redirects=False))
         if r.status_code == 404:
             return vazio
         r.raise_for_status()
@@ -10231,7 +10164,7 @@ if _aq_active_index == 13:
                 _aq_shadow_rows, _aq_shadow_load = ensure_shadow_hydrated()
             else:
                 _aq_shadow_rows, _aq_shadow_load = (
-                    st.session_state.get("atlasquant_shadow_samples", []),
+                    [],
                     {"ok":False,"reason":"HYDRATOR_UNAVAILABLE"},
                 )
             render_shadow_mode_panel(
@@ -10350,6 +10283,8 @@ if _aq_active_index == 13:
                 _aq_setup_summary = {}
                 _aq_quota_store = {}
                 try:
+                    if not private_read_allowed():
+                        raise PermissionError("PRIVATE_READ_DENIED")
                     _aq_runtime_status, _aq_runtime_source = _github_get_json_v937("dados/autopilot_status_v107.json", {})
                     _aq_paper_summary, _aq_paper_source = _github_get_json_v937("dados/paper_trading_summary_v112.json", {})
                     _aq_setup_summary, _aq_setup_source = _github_get_json_v937("dados/paper_setup_summary_v114.json", {})
@@ -10375,7 +10310,7 @@ if _aq_active_index == 13:
                     _aq_quota_rows = _aq_quota_store.get("samples", [])
                     if isinstance(_aq_quota_rows, list):
                         _aq_quota_samples = [x for x in _aq_quota_rows if isinstance(x, dict)]
-                _aq_validation_shadow_rows = st.session_state.get("atlasquant_shadow_samples", [])
+                _aq_validation_shadow_rows = []
                 if ensure_shadow_hydrated is not None:
                     try:
                         _aq_hydrated_shadow_rows, _aq_validation_shadow_load = ensure_shadow_hydrated()
@@ -10405,8 +10340,8 @@ if _aq_active_index == 13:
             st.caption(f"Diagnóstico: {type(_aq_validation_exc).__name__}: {_aq_validation_exc}")
 
     st.divider()
-    if render_private_validation_center is None:
-        st.warning("Validação Privada de Setups indisponível; nenhuma promoção é permitida.")
+    if render_private_validation_center is None or not private_read_allowed():
+        st.warning("Validação Privada de Setups indisponível sem autorização autenticada.")
         if _ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR:
             st.caption(f"Diagnóstico Setup Validation: {_ATLASQUANT_SETUP_VALIDATION_IMPORT_ERROR}")
     else:

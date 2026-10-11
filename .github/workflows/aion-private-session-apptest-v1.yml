@@ -1,0 +1,38 @@
+name: AION Private Session Streamlit AppTest V1
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_private_read_gate_v1.py"
+      - "atlasquant_access_panel.py"
+      - "atlasquant_access_control.py"
+      - "atlasquant_research_evidence_capture.py"
+      - "tests/aion_private_streamlit_apptest_app_v1.py"
+      - "tests/test_aion_private_streamlit_apptest_v1.py"
+      - ".github/workflows/aion-private-session-apptest-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-session-e2e:
+    name: Streamlit AppTest / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies for genuine Streamlit AppTest
+        run: python -m pip install -r requirements.txt
+      - name: Compile E2E fixture and hardened Research capture
+        run: python -B -m py_compile tests/aion_private_streamlit_apptest_app_v1.py tests/test_aion_private_streamlit_apptest_v1.py atlasquant_research_evidence_capture.py
+      - name: Run synthetic login logout A to B and auth policy AppTest
+        run: python -B -m unittest discover -s tests -p test_aion_private_streamlit_apptest_v1.py -v

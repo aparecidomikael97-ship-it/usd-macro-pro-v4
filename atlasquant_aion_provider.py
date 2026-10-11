@@ -16,12 +16,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import islice
+from hashlib import sha256
+import re
 from typing import Any, Mapping, Sequence
 import json
 import math
 import os
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from atlasquant_aion_model_router import (
     budget_decision,
@@ -33,6 +37,9 @@ from atlasquant_aion_observability import redact_text
 from atlasquant_aion_memory_reliability import assess_canonical_memory_hits
 
 SCHEMA="ATLASQUANT_AION_PROVIDER_V1"
+REQUEST_BOUNDARY_SCHEMA="ATLASQUANT_AION_PROVIDER_FULL_REQUEST_BOUNDARY_V1"
+_REQUEST_DOMAIN=b"ATLASQUANT_AION_PROVIDER_FULL_REQUEST_V1\x00"
+_HEX64=re.compile(r"[0-9a-f]{64}\Z")
 OPENAI_RESPONSES_URL="https://api.openai.com/v1/responses"
 MAX_PROMPT_CHARS=40000
 DEFAULT_TIMEOUT_SECONDS=45.0
@@ -141,6 +148,112 @@ def provider_configuration_status(values:Mapping[str,Any]|None=None)->dict[str,A
     }
 
 
+
+def _full_request_material(prompt:str,lane:str,cfg:ProviderConfig)->dict[str,Any]:
+    """One closed contract shared by owner-review preview and HTTP dispatch.
+
+    The digest binds the actual resolved provider, endpoint, HTTP method,
+    lane, JSON body, content type and timeout. Authentication secrets are
+    intentionally excluded, as are HTTP transport serializer details.
+    """
+    if (type(prompt) is not str or not prompt or prompt != prompt.strip()
+        or len(prompt)>MAX_PROMPT_CHARS or privacy_sensitive(prompt)
+        or type(lane) is not str
+        or lane not in {"EXTERNAL_FAST","EXTERNAL_REASONING"}
+        or cfg.provider!="openai"
+        or type(cfg.max_output_tokens) is not int
+        or not 1<=cfg.max_output_tokens<=8192
+        or not math.isfinite(cfg.timeout_seconds)
+        or not 5.0<=cfg.timeout_seconds<=120.0):
+        raise ValueError("provider request shape not canonical")
+    model=cfg.model_for_lane(lane)
+    if type(model) is not str or not model:
+        raise ValueError("provider model is not configured")
+    return {
+        "schema":REQUEST_BOUNDARY_SCHEMA,
+        "provider":cfg.provider,
+        "method":"POST",
+        "endpoint":OPENAI_RESPONSES_URL,
+        "content_type":"application/json",
+        "transport_policy":{
+            "allow_redirects":False,
+            "trust_env":False,
+            "verify_tls":True,
+            "http_retry_total":0,
+            "http_retry_connect":0,
+            "http_retry_read":0,
+            "http_retry_status":0,
+            "http_retry_other":0,
+            "max_redirects":0,
+            "max_app_attempts":1,
+        },
+        "lane":lane,
+        "timeout_seconds":cfg.timeout_seconds,
+        "body":{
+            "model":model,
+            "input":prompt,
+            "max_output_tokens":cfg.max_output_tokens,
+        },
+    }
+
+
+def _full_request_sha256(material:Mapping[str,Any])->str:
+    encoded=json.dumps(
+        material,sort_keys=True,ensure_ascii=False,
+        separators=(",",":"),allow_nan=False,
+    ).encode("utf-8")
+    return sha256(_REQUEST_DOMAIN+encoded).hexdigest()
+
+
+def preview_openai_request_binding(
+    prompt:Any,*,lane:Any,values:Mapping[str,Any]|None=None,
+)->dict[str,Any]:
+    """Pure local pre-consent preview; NOT an owner signature or spend permit.
+
+    This preview is deliberately generated from the SAME material-building
+    function used by execute_openai_answer. It neither reads the API key out
+    to the caller nor performs network I/O.
+    """
+    cfg=provider_config(values)
+    status=provider_configuration_status(values)
+    if not status["ready"]:
+        return {
+            "schema":REQUEST_BOUNDARY_SCHEMA,
+            "state":"BLOCKED_PROVIDER_CONFIG",
+            "model_invocation_authorized":False,
+        }
+    try:
+        material=_full_request_material(prompt,lane,cfg)
+        digest=_full_request_sha256(material)
+    except (ValueError,TypeError,OverflowError):
+        return {
+            "schema":REQUEST_BOUNDARY_SCHEMA,
+            "state":"BLOCKED_REQUEST_SHAPE",
+            "model_invocation_authorized":False,
+        }
+    return {
+        "schema":REQUEST_BOUNDARY_SCHEMA,
+        "state":"BOUND_REQUEST_PREVIEW_UNTRUSTED",
+        "request_sha256":digest,
+        "final_prompt_sha256":sha256(prompt.encode("utf-8")).hexdigest(),
+        "provider":material["provider"],
+        "method":material["method"],
+        "endpoint":material["endpoint"],
+        "content_type":material["content_type"],
+        "transport_policy":dict(material["transport_policy"]),
+        "lane":material["lane"],
+        "resolved_model":material["body"]["model"],
+        "max_output_tokens":material["body"]["max_output_tokens"],
+        "timeout_seconds":material["timeout_seconds"],
+        "api_key_exposed":False,
+        "human_owner_identity_verified":False,
+        "signed_request_verified":False,
+        "independent_witness_verified":False,
+        "budget_reserved":False,
+        "model_invocation_authorized":False,
+    }
+
+
 def _estimated_input_tokens(text:Any)->int:
     # Conservative dependency-free approximation for preflight only.
     chars=len(str(text or ""))
@@ -167,13 +280,23 @@ def estimate_request_cost(
         }
     cost=(input_tokens/1_000_000.0)*cfg.input_usd_per_mtok
     cost+=(output_tokens/1_000_000.0)*cfg.output_usd_per_mtok
+    if not math.isfinite(cost):
+        return {
+            "schema":SCHEMA,"state":"PRICING_INVALID",
+            "estimable":False,
+            "estimated_input_tokens":input_tokens,
+            "reserved_output_tokens":output_tokens,
+            "estimated_max_cost_usd":None,
+        }
     return {
         "schema":SCHEMA,
         "state":"ESTIMATED",
         "estimable":True,
         "estimated_input_tokens":input_tokens,
         "reserved_output_tokens":output_tokens,
-        "estimated_max_cost_usd":round(cost,6),
+        # Round UP: a positive micro-cost must never become a zero-cost
+        # bypass of allow_paid/monthly budget checks.
+        "estimated_max_cost_usd":math.ceil(cost*1_000_000)/1_000_000,
     }
 
 
@@ -310,7 +433,14 @@ EVIDÊNCIAS DE MEMÓRIA AUDITÁVEL DISPONÍVEIS:
 PERGUNTA DO ADMINISTRADOR:
 {q}
 """
-    return prompt[:MAX_PROMPT_CHARS]
+    # The caller must review/sign the ENTIRE final provider input. Silently
+    # slicing here can omit evidence or policy after a consented prefix.
+    # Normalize this builder's framing BEFORE a future authorization, never
+    # mutate the already approved input in execute_openai_answer.
+    final_prompt=prompt.strip()
+    if len(final_prompt)>MAX_PROMPT_CHARS:
+        raise ValueError("Provider prompt too long: complete context cannot be transmitted.")
+    return final_prompt
 
 
 def _extract_text(payload:Mapping[str,Any])->str:
@@ -360,6 +490,37 @@ def _usage_cost(payload:Mapping[str,Any],cfg:ProviderConfig)->dict[str,Any]:
     }
 
 
+def _sealed_provider_transport()->requests.Session:
+    """Fresh, no ambient proxies, zero retry adapter for ONE allowed POST.
+
+    This is transport-configuration hardening, NOT proof of exactly-once
+    provider execution, authenticated HUMAN_OWNER or billable settlement.
+    Do not accept externally supplied Sessions, mounted adapters, or SDKs.
+    """
+    client=requests.Session()
+    client.trust_env=False
+    client.verify=True
+    client.max_redirects=0
+    no_retry=Retry(
+        total=0,connect=0,read=0,redirect=0,status=0,other=0,
+        allowed_methods=None,raise_on_redirect=False,
+        respect_retry_after_header=False,
+    )
+    client.mount("https://",HTTPAdapter(max_retries=no_retry))
+    client.mount("http://",HTTPAdapter(max_retries=no_retry))
+    return client
+
+
+# Production admission remains blocked until separately enrolled HUMAN_OWNER,
+# independent session issuer, protected one-shot remote CAS and independently
+# rooted witnesses are implemented, reviewed and explicitly authorized.
+# This is a source-level fail-closed lock, NOT a secret or anti-tamper defense.
+# No environment variable, legacy approval bool, request digest, budget
+# override, caller session or fixture may release it.
+# Legacy transport regressions may patch it in isolated CI only.
+_PAID_MODEL_DISPATCH_HARD_DENY = True
+
+
 def execute_openai_answer(
     prompt:Any,
     *,
@@ -369,11 +530,38 @@ def execute_openai_answer(
     request_approved:bool,
     values:Mapping[str,Any]|None=None,
     session:requests.Session|None=None,
+    expected_request_sha256:Any=None,
 )->dict[str,Any]:
     """Call the configured provider only after every preflight gate passes."""
     cfg=provider_config(values)
     status=provider_configuration_status(values)
-    clean_prompt=str(prompt or "").strip()[:MAX_PROMPT_CHARS]
+    # Do not silently truncate user intent: a truncated prompt can be priced,
+    # approved and transmitted with different semantics than the original.
+    # Reject before forming a network request or inspecting secrets.
+    if not isinstance(prompt,str):
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_PROMPT_TYPE","called":False,
+            "reason":"Only a text prompt may be sent to a provider.",
+        }
+    if not prompt.strip():
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_EMPTY_PROMPT","called":False,
+            "reason":"Empty prompt; no provider call allowed.",
+        }
+    # A future owner consent is a signature over the EXACT final bytes.
+    # Stripping an approved payload here silently mutates what is transmitted.
+    if prompt!=prompt.strip():
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_PROMPT_MUTATION","called":False,
+            "reason":"The provider input is not canonical; no trim after consent.",
+        }
+    clean_prompt=prompt
+    if len(clean_prompt)>MAX_PROMPT_CHARS:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_PROMPT_TOO_LONG","called":False,
+            "reason":"Prompt exceeds the approved length; truncation is forbidden.",
+            "max_prompt_chars":MAX_PROMPT_CHARS,
+        }
 
     if privacy_sensitive(clean_prompt):
         return {
@@ -394,6 +582,13 @@ def execute_openai_answer(
         return {
             "schema":SCHEMA,"state":"BLOCKED_APPROVAL","called":False,
             "reason":"Solicitação externa exige aprovação explícita.",
+        }
+    # A local, unknown or coerced lane must never silently be sent to the
+    # external FAST model (ProviderConfig.model_for_lane defaults to FAST).
+    if type(lane) is not str or lane not in {"EXTERNAL_FAST","EXTERNAL_REASONING"}:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_ROUTE","called":False,
+            "reason":"Only an explicitly selected external model lane is eligible.",
         }
 
     estimate=estimate_request_cost(clean_prompt,config=cfg)
@@ -421,23 +616,82 @@ def execute_openai_answer(
             "reason":"Modelo da rota não foi configurado.",
         }
 
-    body={
-        "model":model,
-        "input":clean_prompt,
-        "max_output_tokens":cfg.max_output_tokens,
-    }
+    # A caller-controlled boolean cannot bind an approved set of HTTP options.
+    # Require an exact digest even in existing tests and legacy invocation.
+    # This is only a shape/integrity guard; the caller's digest does NOT prove
+    # independently enrolled HUMAN_OWNER authorization or nonce consumption.
+    try:
+        material=_full_request_material(clean_prompt,lane,cfg)
+        actual_digest=_full_request_sha256(material)
+    except (ValueError,TypeError,OverflowError):
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_REQUEST_SHAPE","called":False,
+            "reason":"Resolved provider request is not canonical.",
+        }
+    if (type(expected_request_sha256) is not str
+        or not _HEX64.fullmatch(expected_request_sha256)
+        or expected_request_sha256!=actual_digest):
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_REQUEST_BINDING","called":False,
+            "reason":"Full resolved provider request does not match reviewed digest.",
+        }
+    # The historical request_approved=True / allow_paid=True values are
+    # NOT independently attested HUMAN_OWNER authorization. Even a matching
+    # full-request digest and valid API key must stop before HTTP. Removing
+    # this lock requires a NEW separately reviewed owner-approved admission
+    # implementation and new cryptographic request review (not toggling env).
+    if _PAID_MODEL_DISPATCH_HARD_DENY is True:
+        return {
+            "schema":SCHEMA,
+            "state":"BLOCKED_INDEPENDENT_TRUST_NOT_ENROLLED",
+            "called":False,
+            "reason":"Real owner/session roots and remote one-shot CAS are not enrolled.",
+            "safe_to_retry":False,
+            "paid_dispatch_authorized":False,
+            "model_invocation_authorized":False,
+            "provider_called":False,
+        }
+    # Never allow caller-injected HTTP sessions/SDK clients to hide POST
+    # retries, proxy credentials, redirects, or overridden methods.
+    if session is not None:
+        return {
+            "schema":SCHEMA,"state":"BLOCKED_UNVERIFIED_TRANSPORT",
+            "called":False,
+            "reason":"Caller-controlled HTTP Session cannot be trusted for a paid POST.",
+        }
+    body=material["body"]
     headers={
         "Authorization":f"Bearer {cfg.api_key}",
         "Content-Type":"application/json",
     }
-    client=session or requests
     try:
-        response=client.post(
-            OPENAI_RESPONSES_URL,
-            headers=headers,
-            json=body,
-            timeout=cfg.timeout_seconds,
-        )
+        with _sealed_provider_transport() as client:
+            response=client.post(
+                material["endpoint"],
+                headers=headers,
+                json=body,
+                timeout=material["timeout_seconds"],
+                allow_redirects=False,
+            )
+    except requests.exceptions.TooManyRedirects as exc:
+        # Requests 2.x still prepares Response.next when allow_redirects=False.
+        # With Session.max_redirects=0 it can raise TooManyRedirects after the
+        # FIRST 3xx (without following Location). Keep zero redirects and
+        # classify the original 3xx accurately, never re-POST.
+        rejected=getattr(exc,"response",None)
+        code=int(getattr(rejected,"status_code",0) or 0)
+        if 300<=code<400:
+            return {
+                "schema":SCHEMA,"state":"PROVIDER_REDIRECT_BLOCKED",
+                "called":True,"http_status":code,
+                "reason":"Redirect rejected before any second request.",
+                "model":model,"estimate":estimate,
+            }
+        return {
+            "schema":SCHEMA,"state":"PROVIDER_NETWORK_ERROR","called":True,
+            "reason":"TooManyRedirects","model":model,
+            "estimate":estimate,
+        }
     except Exception as exc:
         return {
             "schema":SCHEMA,"state":"PROVIDER_NETWORK_ERROR","called":True,
@@ -445,10 +699,14 @@ def execute_openai_answer(
             "estimate":estimate,
         }
 
-    if int(getattr(response,"status_code",0) or 0)>=400:
+    http_status=int(getattr(response,"status_code",0) or 0)
+    if not 200<=http_status<300:
         return {
-            "schema":SCHEMA,"state":"PROVIDER_HTTP_ERROR","called":True,
-            "http_status":int(getattr(response,"status_code",0) or 0),
+            "schema":SCHEMA,
+            "state":("PROVIDER_REDIRECT_BLOCKED" if 300<=http_status<400
+                     else "PROVIDER_HTTP_ERROR"),
+            "called":True,
+            "http_status":http_status,
             "reason":"Provider returned non-success HTTP status.",
             "model":model,"estimate":estimate,
         }
@@ -493,4 +751,5 @@ def execute_openai_answer(
 __all__=[
     "SCHEMA","ProviderConfig","provider_config","provider_configuration_status",
     "estimate_request_cost","build_provider_prompt","execute_openai_answer",
+    "REQUEST_BOUNDARY_SCHEMA","preview_openai_request_binding",
 ]

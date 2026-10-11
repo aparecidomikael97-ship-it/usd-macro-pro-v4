@@ -82,6 +82,15 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
     def setUp(self):
         self.access = _access()
         self.context = authenticated_context(self.access, Domain.ADMIN)
+        # Historical worker/CAS mechanics under entirely synthetic tests only:
+        # the REAL origin gate is deliberately unprovisioned and ALWAYS denies.
+        # This local patch does not exist in production and grants no authority.
+        local_reference = patch(
+            "atlasquant_aion_global_worker.independent_worker_source_preflight",
+            return_value={"status": "VERIFIED", "source_verified": True},
+        )
+        local_reference.start()
+        self.addCleanup(local_reference.stop)
 
     def schedule(
         self,

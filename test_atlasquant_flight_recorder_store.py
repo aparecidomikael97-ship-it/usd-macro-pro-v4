@@ -1,4 +1,15 @@
+"""Historical Flight Recorder transport protocol tests -- synthetic only.
+
+The actual production writer is HARD_DENIED. Legacy CAS/HTTP behavior below is
+reconstructed from reviewed unreachable source only inside this network-blocked
+test case. No runtime gate or environment knob is changed.
+"""
+import ast
+from contextlib import ExitStack
+from pathlib import Path
+import atlasquant_flight_recorder_store as _flight_store
 import base64
+import hashlib
 import unittest
 from unittest.mock import patch
 
@@ -21,7 +32,48 @@ class _Resp:
             raise RuntimeError(f"HTTP {self.status_code}")
 
 
+def _blob_sha(raw):
+    return hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+b"\0"+raw).hexdigest()
+
+
+def _contents(raw):
+    return _Resp(200,{"sha":_blob_sha(raw),"encoding":"base64",
+                      "content":base64.b64encode(raw).decode("ascii")})
+
+
 class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
+    def setUp(self):
+        # Isolate the historical protocol from the production HARD_DENIED
+        # writer. All unmocked real sockets/HTTP are blocked.
+        stack=ExitStack()
+        self.addCleanup(stack.close)
+        for target in ("socket.socket.connect", "socket.socket.connect_ex",
+                       "socket.create_connection", "requests.sessions.Session.request"):
+            stack.enter_context(patch(target,side_effect=AssertionError("REAL_NETWORK_FORBIDDEN")))
+        stack.enter_context(patch("atlasquant_private_read_gate_v1.require_private_read",return_value=None))
+        stack.enter_context(patch("atlasquant_legacy_private_resource_gate_v1.require_legacy_private_remote_resource",return_value=None))
+        source=Path(_flight_store.__file__).read_text("utf-8")
+        module=ast.parse(source)
+        functions=[n for n in module.body if isinstance(n,ast.FunctionDef)
+                   and n.name=="persist_records"]
+        if len(functions)!=1:
+            raise AssertionError("Legacy Flight Recorder writer source changed")
+        fn=functions[0]
+        if len(fn.body)<2 or not isinstance(fn.body[0],ast.Return):
+            raise AssertionError("Production HARD_DENIED guard missing")
+        if "HARD_DENIED" not in (ast.get_source_segment(source,fn.body[0]) or ""):
+            raise AssertionError("Writer no longer hard denied")
+        if not isinstance(fn.body[1],ast.Try):
+            raise AssertionError("Historic CAS protocol changed; manual review required")
+        fn.body=fn.body[1:]
+        ns=dict(vars(_flight_store))
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[fn],type_ignores=[])),
+                     str(_flight_store.__file__),"exec"),ns)
+        global persist_records
+        original=persist_records
+        persist_records=ns["persist_records"]
+        self.addCleanup(lambda: globals().__setitem__("persist_records",original))
+
     def row(self,fp="a",did="1"):
         return {"_fingerprint":fp,"decision_id":did,"asset":"EUR/USD"}
 
@@ -80,8 +132,9 @@ class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
         get.assert_not_called()
 
     def test_404_creates_new_runtime_file(self):
-        put=_Resp(201,{})
-        with patch("atlasquant_flight_recorder_store.requests.get",return_value=_Resp(404,{})), \
+        raw=serialize_records([self.row()]).encode("utf-8")
+        put=_Resp(201,{"content":{"sha":_blob_sha(raw)}})
+        with patch("atlasquant_flight_recorder_store.requests.get",side_effect=[_Resp(404,{}),_contents(raw)]), \
              patch("atlasquant_flight_recorder_store.requests.put",return_value=put) as p:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
         self.assertTrue(r["ok"])
@@ -92,7 +145,7 @@ class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
 
     def test_existing_duplicate_avoids_put(self):
         raw=serialize_records([self.row()]).encode("utf-8")
-        get=_Resp(200,{"sha":"abc","content":base64.b64encode(raw).decode("ascii")})
+        get=_contents(raw)
         with patch("atlasquant_flight_recorder_store.requests.get",return_value=get), \
              patch("atlasquant_flight_recorder_store.requests.put") as p:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
@@ -110,21 +163,24 @@ class AtlasQuantFlightRecorderStoreTests(unittest.TestCase):
 
     def test_corrupt_remote_fails_closed_without_overwrite(self):
         corrupt=b'{"ok":1}\nnot-json\n'
-        get=_Resp(200,{"sha":"abc","content":base64.b64encode(corrupt).decode("ascii")})
+        get=_contents(corrupt)
         with patch("atlasquant_flight_recorder_store.requests.get",return_value=get), patch("atlasquant_flight_recorder_store.requests.put") as put:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
         self.assertFalse(r["ok"])
         self.assertEqual(r["reason"],"CORRUPT_REMOTE")
         put.assert_not_called()
 
-    def test_conflict_retries_once(self):
+    def test_conflict_never_retries(self):
         empty=_Resp(404,{})
         responses=[_Resp(409,{}),_Resp(201,{})]
         with patch("atlasquant_flight_recorder_store.requests.get",side_effect=[empty,empty]), \
              patch("atlasquant_flight_recorder_store.requests.put",side_effect=responses) as p:
             r=persist_records([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
-        self.assertTrue(r["ok"])
-        self.assertEqual(p.call_count,2)
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["reason"],"CONFLICT")
+        self.assertFalse(r["safe_to_retry"])
+        self.assertTrue(r["reconciliation_required"])
+        self.assertEqual(p.call_count,1)
 
 
 if __name__=="__main__":

@@ -7,13 +7,52 @@ import streamlit as st
 
 from atlasquant_challenger_v1 import build_challenger_snapshot, champion_snapshot
 from atlasquant_shadow_mode import compare_shadow_sample, append_shadow_sample
-from atlasquant_shadow_store import load_shadow_samples, persist_shadow_samples
+from atlasquant_shadow_store import SHADOW_PATH, load_shadow_samples, persist_shadow_samples
 from atlasquant_runtime_store import resolve_runtime_branch
+from atlasquant_private_read_gate_v1 import private_read_allowed, clear_private_ui_state
+from atlasquant_legacy_private_resource_gate_v1 import legacy_private_remote_resource_allowed
 
 
 SESSION_KEY="atlasquant_shadow_samples"
 HYDRATED_KEY="atlasquant_shadow_hydrated"
 STATUS_KEY="atlasquant_shadow_persistence_status"
+PENDING_KEY="atlasquant_shadow_reconciliation_pending"
+
+
+def _pending_status() -> dict[str,Any] | None:
+    """Sticky session quarantine; neither hydration nor dedup reconciles a PUT."""
+    pending=st.session_state.get(PENDING_KEY)
+    previous=st.session_state.get(STATUS_KEY,{}) or {}
+    if pending is None and (previous.get("reason") in {"UNKNOWN_OUTCOME","CONFLICT","VALIDATION_REJECTED"}
+                            or previous.get("reconciliation_required") is True):
+        pending=previous
+    if pending is None:
+        return None
+    status=dict(pending)
+    if status.get("reason") not in {"UNKNOWN_OUTCOME","CONFLICT","VALIDATION_REJECTED"}:
+        status["reason"]="UNKNOWN_OUTCOME"
+    status.update(ok=False,reconciliation_required=True,safe_to_retry=False,
+                  persistence_confirmed=False,verified=False,readback_matching_content=False,
+                  confirmation_scope="NONE",source="session")
+    st.session_state[PENDING_KEY]=dict(status)
+    return status
+
+
+def _remember_status(status: Mapping[str,Any]) -> dict[str,Any]:
+    status=dict(status)
+    status["persistence_confirmed"]=(status.get("reason")=="SAVED" and status.get("verified") is True
+                                     and status.get("readback_matching_content") is True)
+    status["confirmation_scope"]="CURRENT_WRITE_BATCH" if status["persistence_confirmed"] else "NONE"
+    st.session_state[STATUS_KEY]=dict(status)
+    pending=_pending_status()
+    if pending is not None:
+        for key in ("session_samples","local_added"):
+            if key in status:
+                pending[key]=status[key]
+        status=pending
+        st.session_state[PENDING_KEY]=dict(status)
+        st.session_state[STATUS_KEY]=dict(status)
+    return status
 
 
 def _secret_or_env(key: str, default: str="") -> str:
@@ -49,7 +88,17 @@ def hydrate_shadow_samples(
 
 
 def ensure_shadow_hydrated() -> tuple[list[dict[str,Any]],dict[str,Any]]:
+    if not private_read_allowed():
+        return [], {"ok":False,"reason":"ACCESS_DENIED","samples":0,"source":"none","error":""}
+    if not legacy_private_remote_resource_allowed(SHADOW_PATH):
+        # A preexisting hydrated=True flag is not resource provenance.
+        clear_private_ui_state(st.session_state)
+        return [], {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","samples":0,"source":"none","error":""}
     current=list(st.session_state.get(SESSION_KEY,[]) or [])
+    pending=_pending_status()
+    if pending is not None:
+        pending["session_samples"]=len(current)
+        return current,_remember_status(pending)
     if bool(st.session_state.get(HYDRATED_KEY,False)):
         return current,dict(st.session_state.get(STATUS_KEY,{}) or {})
 
@@ -93,6 +142,11 @@ def capture_shadow_batch(
     *,
     champion_version: str,
 ) -> dict[str,Any]:
+    if not private_read_allowed():
+        return {"ok":False,"reason":"ACCESS_DENIED","safe_to_retry":False}
+    if not legacy_private_remote_resource_allowed(SHADOW_PATH):
+        clear_private_ui_state(st.session_state)
+        return {"ok":False,"reason":"TENANT_SOURCE_UNBOUND","safe_to_retry":False}
     rows,_=ensure_shadow_hydrated()
     batch=build_shadow_batch(packs,champion_version=champion_version)
 
@@ -104,15 +158,18 @@ def capture_shadow_batch(
             new.append(sample)
 
     st.session_state[SESSION_KEY]=rows
+    pending=_pending_status()
+    if pending is not None:
+        pending.update(session_samples=len(rows),local_added=len(new))
+        return _remember_status(pending)
     if not new:
-        status={"ok":True,"reason":"ALREADY_PRESENT","added":0,"samples":len(rows),"error":""}
-        st.session_state[STATUS_KEY]=status
-        return status
+        status={"ok":True,"reason":"LOCAL_ALREADY_PRESENT","added":0,"samples":len(rows),
+                "source":"session","error":""}
+        return _remember_status(status)
 
     cfg=shadow_persistence_config()
     status=persist_shadow_samples(
         new,repo=cfg["repo"],branch=cfg["branch"],token=cfg["token"]
     )
     status["session_samples"]=len(rows)
-    st.session_state[STATUS_KEY]=status
-    return status
+    return _remember_status(status)
