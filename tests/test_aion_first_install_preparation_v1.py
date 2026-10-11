@@ -316,6 +316,13 @@ class PhysicalAuthorityFirewallTests(NoAuthorityCase):
             self.assertEqual(production_authority(out)["state"],"BLOCKED")
     def test_fixed_result_authority_fields_cannot_be_overridden(self):
         out=result("REFERENCE_MATCH",**{k:True for k in AUTHORITY_FIELDS});self.check_no_authority(out)
+    def test_status_provenance_and_observation_flags_cannot_be_overridden(self):
+        out=result("REFERENCE_MATCH",status="FIRST_INSTALL_GO",mode="PRODUCTION",schema="REAL",
+                   provenance="INDEPENDENTLY_VERIFIED",network_called=True,physical_checks_performed=True,
+                   real_credentials_created=True)
+        self.check_no_authority(out);self.assertEqual(out['mode'],MODE)
+        self.assertEqual(out['provenance'],'SIMULATED_OR_UNKNOWN_NOT_INDEPENDENT_EVIDENCE')
+        self.assertIs(out['real_credentials_created'],False)
     def test_offline_flows_cannot_call_network(self):
         with patch('socket.socket.connect',side_effect=AssertionError('NO_NETWORK')),patch('socket.socket.connect_ex',side_effect=AssertionError('NO_NETWORK')):
             self.check_no_authority(review_evidence_plan(PlanBoundaryTests().manifest()))

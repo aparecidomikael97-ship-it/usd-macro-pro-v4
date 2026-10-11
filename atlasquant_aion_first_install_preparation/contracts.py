@@ -75,13 +75,14 @@ def digest(value):
 
 def result(state="BLOCKED", *reasons, **details):
     return {
+        **details,
         "schema": "AION_FIRST_INSTALL_PREPARATION_V1", "mode": MODE,
         "status": "HARD_NO_GO", "state": state,
         "provenance": "SIMULATED_OR_UNKNOWN_NOT_INDEPENDENT_EVIDENCE",
         "blockers": tuple(sorted(set(reasons))),
         "network_called": False, "physical_checks_performed": False,
         "real_credentials_created": False,
-        **details, **{field: False for field in AUTHORITY_FIELDS},
+        **{field: False for field in AUTHORITY_FIELDS},
     }
 
 def production_authority(*_args, **_kwargs):
