@@ -164,11 +164,14 @@ class AionOwnerExperienceV1Tests(unittest.TestCase):
             source_device="desktop",
             target_device="mobile",
             owner_subject="mikael",
-            conversation_id="conv-1",
-            last_turn_id="turn-9",
+            conversation_id="a" * 32,
+            last_turn_id="AION-TURN-" + "B" * 24,
             context={"mode": "TEACHING", "topic": "CRM", "slide": 7},
         )
-        self.assertEqual(handoff["state"], "HANDOFF_READY")
+        self.assertEqual(handoff["state"], "HANDOFF_PREPARED_UNVERIFIED")
+        self.assertFalse(handoff["authorization_granted"])
+        self.assertFalse(handoff["can_resume_conversation"])
+        self.assertFalse(handoff["handoff_digest_is_signature"])
         self.assertFalse(handoff["authentication_transferred"])
         self.assertFalse(handoff["session_token_transferred"])
         self.assertFalse(handoff["secrets_transferred"])
