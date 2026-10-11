@@ -133,14 +133,72 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
         self.assertIn('st.form("atlasquant_login_form"',src)
         self.assertIn("authenticate(username,password,users)",src)
 
-    def test_main_app_integrates_gate_and_fail_closed_stop(self):
+    def _main_app_gate_snippet(self):
+        # Execute the *actual* application's early gate in an isolated
+        # namespace, without importing Streamlit, providers, or the app.
+        # An old assertion looked for ATLASQUANT_AUTH_REQUIRED directly in
+        # the main file, although the policy lives in atlasquant_access_panel.
         src=Path("usd_macro_pro_v4_cloud.py").read_text(encoding="utf-8")
         self.assertIn("from atlasquant_access_panel import render_access_gate",src)
-        self.assertIn("ATLASQUANT_AUTH_REQUIRED",src)
-        self.assertIn("st.stop()",src)
-        gate_pos=src.index("render_access_gate()")
-        fred_pos=src.index("def _get(")
-        self.assertLess(gate_pos,fred_pos)
+        gate_start=src.index("if render_access_gate is not None:")
+        gate_end=src.index("from compact_ui_v1107",gate_start)
+        self.assertLess(gate_start,src.index("def _get("))
+        policy=Path("atlasquant_access_panel.py").read_text(encoding="utf-8")
+        self.assertIn("ATLASQUANT_AUTH_REQUIRED",policy)
+        return compile(src[gate_start:gate_end],"<isolated access gate>","exec")
+
+    def test_main_app_gate_stops_on_missing_error_or_denial(self):
+        class StopApp(Exception):
+            pass
+
+        class FakeStreamlit:
+            def __init__(self):
+                self.errors=[]
+                self.stopped=0
+
+            def error(self,message):
+                self.errors.append(message)
+
+            def stop(self):
+                self.stopped+=1
+                raise StopApp()
+
+        gate=self._main_app_gate_snippet()
+        def raises():
+            raise RuntimeError("unavailable")
+        scenarios=[
+            ("missing",None),
+            ("raises",raises),
+            ("none",lambda:None),
+            ("empty",lambda:{}),
+            ("denied",lambda:{"allowed":False}),
+            ("not_boolean",lambda:{"allowed":"true"}),
+            ("integer",lambda:{"allowed":1}),
+        ]
+        for label,handler in scenarios:
+            with self.subTest(scenario=label):
+                fake=FakeStreamlit()
+                with self.assertRaises(StopApp):
+                    exec(gate,{"render_access_gate":handler,"st":fake})
+                self.assertEqual(fake.stopped,1)
+                if label in {"missing","raises"}:
+                    self.assertTrue(fake.errors)
+
+    def test_main_app_gate_allows_only_explicit_true_decision(self):
+        class StopApp(Exception):
+            pass
+
+        class FakeStreamlit:
+            def stop(self):
+                raise StopApp()
+            def error(self,message):
+                raise AssertionError("unexpected access error")
+
+        gate=self._main_app_gate_snippet()
+        context={"render_access_gate":lambda:{"allowed":True,"mode":"AUTHENTICATED"},"st":FakeStreamlit()}
+        exec(gate,context)
+        self.assertIs(context["_ATLASQUANT_ACCESS"]["allowed"],True)
+        self.assertEqual(context["_ATLASQUANT_ACCESS"]["mode"],"AUTHENTICATED")
 
 if __name__=="__main__":
     unittest.main()
