@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Synthetic enrollment blueprint; no independent trust",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "custody_evidence",
+    "exceptional_recovery",
+    "independent_receipt_channel",
+    "institutional_identity",
+    "mode",
+    "operator_separation_evidence",
+    "revocation_channel",
+    "root_id",
+    "root_public_key_hex",
+    "root_rotation",
+    "schema",
+    "witness_authorization"
+  ],
+  "properties": {
+    "schema": {
+      "const": "AION_WITNESS_ENROLLMENT_BLUEPRINT_V4"
+    },
+    "mode": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "witness_authorization": {
+      "const": "UNKNOWN"
+    },
+    "institutional_identity": {
+      "const": "UNKNOWN"
+    },
+    "custody_evidence": {
+      "const": "UNKNOWN"
+    },
+    "independent_receipt_channel": {
+      "const": "UNKNOWN"
+    },
+    "revocation_channel": {
+      "const": "UNKNOWN"
+    },
+    "operator_separation_evidence": {
+      "const": "UNKNOWN"
+    },
+    "root_rotation": {
+      "const": "EXPLICIT_SEPARATE_OWNER_APPROVAL_REQUIRED"
+    },
+    "exceptional_recovery": {
+      "const": "EXPLICIT_SEPARATE_OWNER_APPROVAL_REQUIRED"
+    },
+    "root_id": {
+      "type": "string",
+      "pattern": "^fixture-[A-Za-z0-9._:-]+$",
+      "maxLength": 120
+    },
+    "root_public_key_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
