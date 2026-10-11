@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
@@ -739,19 +740,28 @@ class ResearchEvidenceStoreTests(unittest.TestCase):
         self.assertEqual(len(rows),2)
         self.assertEqual({x["strategy"] for x in rows},{"FVG","OTE"})
 
-    def test_store_refuses_runtime_write_to_main_without_network(self):
+    def test_store_refuses_all_private_remote_writes_without_network(self):
         record=evidence_record(
             strategy="FVG",captured_at="2026-09-20T12:00:00+00:00",
             source="BACKTEST",passport={},evidence={},
         )
-        out=persist_research_evidence(
-            [record],
-            repo="owner/repo",
-            branch="main",
-            token="secret",
-        )
-        self.assertFalse(out["ok"])
-        self.assertEqual(out["reason"],"UNSAFE_BRANCH")
+        # Runtime/other branches, and even a credential-looking value, are
+        # not proof of an independent claim, CAS, or durable witness.
+        for branch in ("main","atlasquant-runtime","test-branch"):
+            with self.subTest(branch=branch), \
+                 patch("atlasquant_research_evidence_store.requests.get") as get, \
+                 patch("atlasquant_research_evidence_store.requests.put") as put:
+                result=persist_research_evidence(
+                    [record],repo="owner/repo",branch=branch,token="synthetic-not-a-token",
+                )
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["reason"],"HARD_DENIED")
+            self.assertTrue(result["reconciliation_required"])
+            self.assertFalse(result["safe_to_retry"])
+            self.assertEqual(result["added"],0)
+            self.assertEqual(result["records"],0)
+            get.assert_not_called()
+            put.assert_not_called()
 
 
 class PostTradeDiagnosisTests(unittest.TestCase):
