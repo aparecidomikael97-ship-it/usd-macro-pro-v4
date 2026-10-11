@@ -1,0 +1,87 @@
+name: AION Windows Readonly Inventory Consent Protocol
+
+on:
+  pull_request:
+    branches:
+      - audit/aion-v1-v5-consolidation-physical-protocol-20261011
+    paths:
+      - "tools/aion_windows_basic_inventory_readonly_v1.ps1"
+      - "tests/test_aion_windows_readonly_inventory_protocol_v1.py"
+      - "docs/aion/AION_WINDOWS_BASIC_READONLY_INVENTORY_CONSENT_PROTOCOL_V1_20261011.md"
+      - ".github/workflows/aion-windows-readonly-inventory-protocol.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-only:
+    name: Inert consent protocol / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout exact isolated candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Static restrictions (never run physical inventory)
+        run: python -B -m unittest -v tests.test_aion_windows_readonly_inventory_protocol_v1
+      - name: Rerun consolidated V6 boundary tests
+        run: python -B -m unittest -v tests.test_aion_v6_consolidation_protocol
+      - name: Rerun 20 evidence HARD NO-GO
+        run: python -B -m unittest discover -s tests -p "test_aion_first_install_evidence_no_go_1215.py" -v
+      - name: Parse Windows PowerShell script without execution
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $path = (Resolve-Path './tools/aion_windows_basic_inventory_readonly_v1.ps1').Path
+          [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+          if ($errors.Count -ne 0) { throw "POWERSHELL_PARSE_FAILED" }
+          Write-Output 'WINDOWS_SCRIPT_PARSE_ONLY_PASS'
+      - name: Verify only the inert default output on disposable runner
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = & './tools/aion_windows_basic_inventory_readonly_v1.ps1'
+          if ($out[0] -ne 'PLAN_ONLY_NO_WINDOWS_READ') { throw 'INERT_PLAN_MISSING' }
+          if ($out[-1] -ne 'FIRST_INSTALL_HARD_NO_GO') { throw 'NO_GO_MISSING' }
+          Write-Output 'INERT_DEFAULT_ONLY_PASS'
+      - name: Compile Python repository code
+        run: python -m compileall -q -x '(^|[\\/])\.git([\\/]|$)' .
+      - name: Confirm diff hygiene
+        run: git diff --check 8d12c14b542fd517ef2ae270a16d8ab42f277f84 HEAD
+
+  global-quality:
+    name: Original global root Quality / ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install official Quality requirements
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+      - name: Exact original root Quality, no skipped modules
+        run: python -B .github/scripts/aion_run_exact_quality_step.py "Run quality suite"
