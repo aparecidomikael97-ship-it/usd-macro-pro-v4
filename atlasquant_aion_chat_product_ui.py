@@ -12,6 +12,10 @@ import json
 from typing import Any, Mapping
 
 from aion_chat.models import Scope
+from atlasquant_aion_chat_request_binding import (
+    request_digests, reserve_request, bind_expected_pair, reconcile_request,
+    finish_without_write, request_store_path,
+)
 from atlasquant_aion_chat_product_bridge import (
     continue_product_read_turn,
     create_product_conversation,
@@ -114,6 +118,7 @@ def staged_product_session(
             "cursor_stack": [],
             "next_cursor": None,
             "ack": "",
+            "ack_attempt_id": "",
             "notice": "",
         }
     state = session[key]
@@ -190,6 +195,7 @@ def view_product_data(
             "has_older": False,
             "has_newer": False,
             "ack": _clean(state.get("ack"), 100),
+            "ack_attempt_id": _clean(state.get("ack_attempt_id"), 100),
             "notice": _clean(state.get("notice"), 500),
             "product_mode": True,
             "durable_history": True,
@@ -217,6 +223,7 @@ def view_product_data(
         "has_older": bool(page.get("next_cursor")),
         "has_newer": bool(state.get("cursor_stack")),
         "ack": _clean(state.get("ack"), 100),
+        "ack_attempt_id": _clean(state.get("ack_attempt_id"), 100),
         "notice": _clean(state.get("notice"), 500),
         "product_mode": True,
         "durable_history": True,
@@ -241,13 +248,11 @@ def submit_product_turn(
     request_id = event.get("request_id")
     if not isinstance(request_id, str) or not request_id or len(request_id) > 100:
         raise ValueError("Identificador de envio inválido.")
-    if request_id in state["requests"]:
-        return {
-            "schema": SCHEMA,
-            "state": "IDEMPOTENT_REQUEST",
-            "request_id": request_id,
-            "external_action_executed": False,
-        }
+    # Browser attempt nonce is presentation-only, not a durable request key,
+    # credential, approval, or execution authority. Legacy callers may omit it.
+    attempt_id = event.get("attempt_id", "")
+    if not isinstance(attempt_id, str) or len(attempt_id) > 100:
+        raise ValueError("Identificador da tentativa inválido.")
 
     from atlasquant_aion_chat_surface import MAX_MESSAGE_CHARS
 
@@ -269,18 +274,24 @@ def submit_product_turn(
 
     current_cid = _clean(state.get("conversation_id"), 120)
     event_cid = _clean(event.get("conversation_id"), 120)
-    if event_cid != current_cid:
-        raise ValueError("Conversa durável da sessão não corresponde.")
+    input_digest, context_digest = request_digests(scope, access, text)
+    ticket = reserve_request(store, scope, request_id, event_cid, current_cid,
+                             input_digest, context_digest)
+    current_cid = ticket["conversation_id"]
+    state["conversation_id"] = current_cid
+    if not ticket["fresh"]:
+        result = reconcile_request(request_store_path(store), scope, ticket)
+        request_store_path(store)
+        state["requests"].add(request_id)
+        state["ack"] = request_id
+        state["ack_attempt_id"] = attempt_id
+        state["notice"] = ("Histórico local reconciliado; nenhuma nova gravação."
+                           if result["local_history_persisted"]
+                           else "Pedido incerto: reconciliação necessária; repetição bloqueada.")
+        return result
 
-    if not current_cid:
-        created = create_product_conversation(
-            store,
-            scope,
-            access,
-            title="AION principal",
-        )
-        current_cid = _clean(created.get("conversation_id"), 120)
-        state["conversation_id"] = current_cid
+    def before_append(user, assistant):
+        bind_expected_pair(store.path, scope, ticket, user, assistant)
 
     result = continue_product_read_turn(
         store,
@@ -289,10 +300,21 @@ def submit_product_turn(
         text,
         conversation_id=current_cid,
         runtime_context=runtime_context,
+        bound_turn_index=ticket["turn_index"],
+        before_append=before_append,
     )
+
+    if result.get("state") == "CONFIRMED_AND_PERSISTED":
+        proof = reconcile_request(request_store_path(store), scope, ticket, completed=True)
+        request_store_path(store)
+        if not proof["local_history_persisted"]:
+            result = proof
+    else:
+        finish_without_write(store.path, scope, ticket)
 
     state["requests"].add(request_id)
     state["ack"] = request_id
+    state["ack_attempt_id"] = attempt_id
     state["cursor"] = None
     state["cursor_stack"] = []
     state["next_cursor"] = None
@@ -391,6 +413,11 @@ def render_product_chat_workspace(
             state["notice"] = str(error)
             state["ack"] = (
                 str(result.send.get("request_id", ""))
+                if isinstance(result.send, Mapping)
+                else ""
+            )
+            state["ack_attempt_id"] = (
+                str(result.send.get("attempt_id", ""))
                 if isinstance(result.send, Mapping)
                 else ""
             )

@@ -219,6 +219,7 @@ class StagedProductUiContinuityTests(unittest.TestCase):
             store = self._store(raw)
             state = staged_product_session({}, self.access, self.scope)
             event = self._event(state, "same-request")
+            event["attempt_id"] = "first-ui-attempt"
             first = submit_product_turn(
                 state,
                 event,
@@ -228,7 +229,9 @@ class StagedProductUiContinuityTests(unittest.TestCase):
                 self.runtime_context,
             )
             self.assertEqual(first["state"], "CONFIRMED_AND_PERSISTED")
+            self.assertEqual(state["ack_attempt_id"], "first-ui-attempt")
             event["conversation_id"] = state["conversation_id"]
+            event["attempt_id"] = "second-ui-attempt"
             second = submit_product_turn(
                 state,
                 event,
@@ -237,7 +240,15 @@ class StagedProductUiContinuityTests(unittest.TestCase):
                 store,
                 self.runtime_context,
             )
-            self.assertEqual(second["state"], "IDEMPOTENT_REQUEST")
+            self.assertEqual(second["state"], "LOCAL_PAIR_RECONCILED")
+            self.assertEqual(state["ack"], "same-request")
+            self.assertEqual(state["ack_attempt_id"], "second-ui-attempt")
+            self.assertEqual(
+                view_product_data(state, self.access, self.scope, store, self.runtime_context)["ack_attempt_id"],
+                "second-ui-attempt",
+            )
+            self.assertFalse(second["message_write_attempted"])
+            self.assertFalse(second["retry_authorized"])
             self.assertEqual(
                 store.get_conversation(
                     self.scope,
