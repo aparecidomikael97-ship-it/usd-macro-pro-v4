@@ -60,6 +60,6 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pytest==9.1.1 playwright==1.63.0
       - name: Compile all Python
-        run: python -m compileall -q .
+        run: python -m compileall -q -x '(^|/)\.git(/|$)' .
       - name: Run exact official root Quality step, no skips
         run: python -B .github/scripts/aion_run_exact_quality_step.py "Run quality suite"
