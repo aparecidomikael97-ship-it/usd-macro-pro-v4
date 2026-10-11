@@ -354,34 +354,60 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
             "ACTIVATION_APPROVAL_RUNTIME_DIGEST_CHANGED",
         )
 
-    def test_writer_creates_when_unset_and_updates_when_disabled(self):
-        create = Mock()
+    def test_writer_accepts_only_documented_stubbed_variable_http_statuses(self):
+        # Pure mocked response-contract test. This does not authorize the
+        # Worker, enroll a checkpoint source, or call any live GitHub endpoint.
+        create = Mock(status_code=201)
         create.raise_for_status.return_value = None
         with patch(
             "atlasquant_aion_global_worker_activation.requests.post",
             return_value=create,
-        ) as post:
-            result = write_repository_feature_flag_enabled(
-                _config(),
-                "UNSET",
-            )
+        ) as post, patch(
+            "atlasquant_aion_global_worker_activation.requests.patch",
+        ) as patch_call:
+            result = write_repository_feature_flag_enabled(_config(), "UNSET")
         post.assert_called_once()
+        patch_call.assert_not_called()
         self.assertEqual(result["status"], "WRITE_ACCEPTED")
         self.assertTrue(result["modified"])
         self.assertFalse(result["raw_value_exposed"])
 
-        update = Mock()
+        update = Mock(status_code=204)
         update.raise_for_status.return_value = None
         with patch(
             "atlasquant_aion_global_worker_activation.requests.patch",
             return_value=update,
-        ) as patch_call:
-            result = write_repository_feature_flag_enabled(
-                _config(),
-                "DISABLED",
-            )
+        ) as patch_call, patch(
+            "atlasquant_aion_global_worker_activation.requests.post",
+        ) as post:
+            result = write_repository_feature_flag_enabled(_config(), "DISABLED")
         patch_call.assert_called_once()
+        post.assert_not_called()
         self.assertEqual(result["status"], "WRITE_ACCEPTED")
+        self.assertTrue(result["modified"])
+
+    def test_writer_rejects_redirect_unexpected_success_and_missing_status(self):
+        # A sent write returning 302/incorrect 2xx/unknown status must
+        # never masquerade as success; no auto-retry or approval implied.
+        scenarios = [
+            ("UNSET", "post", 302),
+            ("UNSET", "post", 200),
+            ("DISABLED", "patch", 201),
+            ("DISABLED", "patch", None),
+        ]
+        for prior, method, status in scenarios:
+            with self.subTest(prior=prior, status=status):
+                response = Mock(status_code=status)
+                response.raise_for_status.return_value = None
+                with patch(
+                    "atlasquant_aion_global_worker_activation.requests." + method,
+                    return_value=response,
+                ) as call:
+                    result = write_repository_feature_flag_enabled(_config(), prior)
+                call.assert_called_once()
+                self.assertEqual(result["status"], "ERROR")
+                self.assertFalse(result["modified"])
+                self.assertFalse(result["raw_value_exposed"])
 
     def test_safety_disabler_falls_back_to_create_disabled_when_missing(self):
         missing = Mock(status_code=404)
@@ -687,7 +713,7 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
         self.assertTrue(result["feature_flag_modified"])
         self.assertFalse(result["global_worker_executed"])
 
-    def test_live_readiness_collector_is_read_only_and_can_return_ready_for_flag_enable(self):
+    def test_live_readiness_collector_blocks_without_independent_checkpoint_source(self):
         workflow = """name: AtlasQuant - Automatic Scanner + Autopilot
 on:
   schedule:
@@ -728,12 +754,21 @@ jobs:
             )
         finally:
             temp.unlink(missing_ok=True)
-        self.assertEqual(result["status"], "PASS")
-        self.assertEqual(result["activation_stage"], READY_STAGE)
+        # A synthetically ARMED checkpoint and fake healthy pulses do NOT
+        # establish independent source trust. Fail closed, even though the
+        # collector only performs read-only in-memory checks.
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["activation_stage"], "BLOCKED")
+        self.assertIn(
+            "INDEPENDENT_CHECKPOINT_SOURCE_UNAVAILABLE",
+            result["blockers"],
+        )
         self.assertTrue(result["read_only"])
         self.assertFalse(result["runtime_modified"])
         self.assertFalse(result["feature_flag_modified"])
         self.assertFalse(result["global_worker_executed"])
+        self.assertFalse(result["worker_armed_by_this_check"])
+        self.assertFalse(result["external_action_executed"])
 
     def test_admin_ui_exposes_guarded_activation_and_safety_stop(self):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
