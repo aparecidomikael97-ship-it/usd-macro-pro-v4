@@ -4,3 +4,8 @@
 @media(max-width:850px){.aq-chat-layout{grid-template-columns:minmax(0,1fr)}.aq-chat-layout aside{display:none}.aq-chat-functions{display:block}.aq-chat-main{padding:14px}.aq-chat-header{padding:10px 14px}.aq-chat-heading h1{font-size:21px}.aq-chat-functions summary{font-size:11px;padding:7px;min-height:36px}.aq-chat-mode{display:none}.aq-chat-message{max-width:96%}.aq-chat-keyhint{display:none}.aq-chat-session .aq-chat-id{max-width:170px}}
 @media(max-height:560px){.aq-chat-header{padding:5px 12px}.aq-chat-heading small,.aq-chat-session,.aq-chat-pagination:has(button[hidden]+span+button[hidden]){display:none}.aq-chat-main{padding:8px 12px;gap:4px}.aq-chat-composer{padding:6px 10px}.aq-chat-composer textarea{height:48px}.aq-chat-heading h1{font-size:18px}.aq-chat-live{font-size:10px}.aq-chat-empty{padding:4px}.aq-chat-empty .aq-chat-orb{display:none}}
 @media(prefers-reduced-motion:reduce){.aq-chat-root *{animation:none!important;transition:none!important;scroll-behavior:auto!important;transform:none!important}}
+
+/* Issue #1189: status of the last assessed turn; never a disabled composer. */
+.aq-chat-turn-notice{margin:8px 0 2px;padding:9px 11px;border-radius:8px;border-left:3px solid #bfa052;background:#6c57252b;color:#ffe0a6;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.aq-chat-turn-notice[data-state="BLOCKED"]{border-left-color:#d18b73;background:#864a3330;color:#ffdbcd}
+@media(max-width:850px){.aq-chat-turn-notice{font-size:12px;padding:8px 10px}}

@@ -92,3 +92,23 @@ def test_shell_import_does_not_load_planning_stack():
     import subprocess, sys
     result=subprocess.run([sys.executable,"-c","import sys; import atlasquant_aion_chat_workspace_ui; assert 'atlasquant_aion_chat_surface' not in sys.modules; assert 'atlasquant_aion_orchestrator' not in sys.modules; print('LIGHT_SHELL_IMPORT')"],capture_output=True,text=True,check=True)
     assert result.stdout.strip()=="LIGHT_SHELL_IMPORT"
+
+
+def test_new_send_attempt_ack_prevents_stale_duplicate_request_response():
+    # Same request ID is intentionally replayed; each UI attempt needs a
+    # different acknowledgment token and must not create another chat turn.
+    c = chat()
+    first = event(c, request_id="browser-request")
+    first["attempt_id"] = "attempt-one"
+    ui.submit_turn(c, first, CONTEXT)
+    assert len(c["entries"]) == 2
+    assert ui.view_data(c)["ack_attempt_id"] == "attempt-one"
+
+    second = event(c, request_id="browser-request")
+    second["attempt_id"] = "attempt-two"
+    ui.submit_turn(c, second, CONTEXT)
+    assert len(c["entries"]) == 2
+    public = ui.view_data(c)
+    assert public["ack"] == "browser-request"
+    assert public["ack_attempt_id"] == "attempt-two"
+    assert "já avaliado" in public["notice"].lower()
