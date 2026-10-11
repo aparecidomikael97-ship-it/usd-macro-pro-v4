@@ -62,25 +62,22 @@ class AtlasQuantShadowPersistenceTests(unittest.TestCase):
         rows,added=merge_unique_samples([sample],[sample])
         self.assertEqual(added,0); self.assertEqual(len(rows),1)
 
-    def test_main_branch_fails_closed(self):
+    def test_remote_shadow_persistence_rejects_main_and_runtime_without_io(self):
         sample=build_shadow_batch([self.pack()],champion_version="v")[0]
-        with patch("atlasquant_shadow_store.requests.get") as g:
-            r=persist_shadow_samples([sample],repo="o/r",branch="main",token="t")
-        self.assertFalse(r["ok"]); self.assertEqual(r["reason"],"UNSAFE_BRANCH"); g.assert_not_called()
-
-    def test_create_remote_file(self):
-        sample=build_shadow_batch([self.pack()],champion_version="v")[0]
-        raw=serialize_samples([sample]).encode("utf-8")
-        sha=hashlib.sha1(b"blob "+str(len(raw)).encode("ascii")+b"\0"+raw).hexdigest()
-        readback={"encoding":"base64","sha":sha,"content":base64.b64encode(raw).decode("ascii")}
-        with patch("atlasquant_shadow_store.requests.get",side_effect=[_Resp(404,{}),_Resp(200,readback)]) as g, \
-             patch("atlasquant_shadow_store.requests.put",return_value=_Resp(201,{"content":{"sha":sha}})) as p:
-            r=persist_shadow_samples([sample],repo="o/r",branch="atlasquant-runtime",token="t")
-        self.assertTrue(r["ok"]); self.assertEqual(r["added"],1)
-        self.assertTrue(r["verified"]); self.assertTrue(r["readback_matching_content"])
-        self.assertEqual((g.call_count,p.call_count),(2,1))
-        raw=base64.b64decode(p.call_args.kwargs["json"]["content"]).decode("utf-8")
-        self.assertEqual(parse_samples(raw)[0]["sample_id"],sample["sample_id"])
+        for branch in ("main","atlasquant-runtime"):
+            with self.subTest(branch=branch), \
+                 patch("atlasquant_shadow_store.requests.get") as get, \
+                 patch("atlasquant_shadow_store.requests.put") as put:
+                result=persist_shadow_samples(
+                    [sample],repo="o/r",branch=branch,token="synthetic",
+                )
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["reason"],"HARD_DENIED")
+                self.assertEqual(result["added"],0)
+                self.assertTrue(result["reconciliation_required"])
+                self.assertFalse(result["safe_to_retry"])
+                get.assert_not_called()
+                put.assert_not_called()
 
     def test_shadow_hydration_source_metadata_is_safe_and_explicit(self):
         import inspect
