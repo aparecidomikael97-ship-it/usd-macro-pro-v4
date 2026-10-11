@@ -54,60 +54,45 @@ class AtlasQuantShadowStoreTests(unittest.TestCase):
         self.assertEqual(added,1)
         self.assertEqual([x["sample_id"] for x in rows],["3","4","5"])
 
-    def test_code_branch_fails_closed_before_io(self):
-        with patch("atlasquant_shadow_store.requests.get") as get:
-            r=persist_shadow_samples([self.row()],repo="o/r",branch="main",token="t")
-        self.assertFalse(r["ok"])
-        self.assertEqual(r["reason"],"UNSAFE_BRANCH")
-        get.assert_not_called()
+    def test_remote_shadow_writer_hard_denies_every_legacy_scenario_without_io(self):
+        # No caller-controlled arguments or synthetic HTTP fixture may enable
+        # this legacy remote writer before an independent durable claim/CAS.
+        scenarios=[
+            ("code_branch", "main", "o/r", "t"),
+            ("runtime_branch", "atlasquant-runtime", "o/r", "t"),
+            ("missing_config", "atlasquant-runtime", "", ""),
+            ("missing_token", "atlasquant-runtime", "o/r", ""),
+        ]
+        for name,branch,repo,token in scenarios:
+            with self.subTest(name=name), \
+                 patch("atlasquant_shadow_store.requests.get") as get, \
+                 patch("atlasquant_shadow_store.requests.put") as put:
+                result=persist_shadow_samples(
+                    [self.row()],repo=repo,branch=branch,token=token,
+                    retry_conflict_once=True,
+                )
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["reason"],"HARD_DENIED")
+                self.assertEqual(result["added"],0)
+                self.assertFalse(result["safe_to_retry"])
+                self.assertTrue(result["reconciliation_required"])
+                get.assert_not_called()
+                put.assert_not_called()
 
-    def test_404_creates_new_runtime_file(self):
-        raw=serialize_samples([self.row()]).encode("utf-8")
-        with patch("atlasquant_shadow_store.requests.get",side_effect=[_Resp(404,{}),_contents(raw)]), \
-             patch("atlasquant_shadow_store.requests.put",return_value=_Resp(201,{"content":{"sha":_blob_sha(raw)}})) as p:
-            r=persist_shadow_samples([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
-        self.assertTrue(r["ok"])
-        self.assertEqual(r["added"],1)
-        decoded=base64.b64decode(p.call_args.kwargs["json"]["content"]).decode("utf-8")
-        self.assertEqual(parse_samples(decoded)[0]["sample_id"],"a")
-
-    def test_existing_duplicate_avoids_put(self):
-        raw=serialize_samples([self.row()]).encode("utf-8")
-        get=_contents(raw)
-        with patch("atlasquant_shadow_store.requests.get",return_value=get), \
-             patch("atlasquant_shadow_store.requests.put") as p:
-            r=persist_shadow_samples([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
-        self.assertTrue(r["ok"])
-        self.assertEqual(r["reason"],"ALREADY_PRESENT")
-        p.assert_not_called()
-
-    def test_missing_configuration_avoids_remote_io(self):
-        with patch("atlasquant_shadow_store.requests.get") as get, patch("atlasquant_shadow_store.requests.put") as put:
-            r=persist_shadow_samples([self.row()],repo="",branch="atlasquant-runtime",token="")
-        self.assertFalse(r["ok"])
-        self.assertEqual(r["reason"],"NOT_CONFIGURED")
-        get.assert_not_called()
-        put.assert_not_called()
-
-    def test_corrupt_remote_fails_closed_without_overwrite(self):
-        corrupt=b'{"ok":1}\nnot-json\n'
-        get=_contents(corrupt)
-        with patch("atlasquant_shadow_store.requests.get",return_value=get), patch("atlasquant_shadow_store.requests.put") as put:
-            r=persist_shadow_samples([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
-        self.assertFalse(r["ok"])
-        self.assertEqual(r["reason"],"CORRUPT_REMOTE")
-        put.assert_not_called()
-
-    def test_conflict_never_retries(self):
-        with patch("atlasquant_shadow_store.requests.get",side_effect=[_Resp(404,{}),_Resp(404,{})]), \
-             patch("atlasquant_shadow_store.requests.put",side_effect=[_Resp(409,{}),_Resp(201,{})]) as p:
-            r=persist_shadow_samples([self.row()],repo="o/r",branch="atlasquant-runtime",token="t")
-        self.assertFalse(r["ok"])
-        self.assertEqual(r["reason"],"CONFLICT")
-        self.assertFalse(r["safe_to_retry"])
-        self.assertTrue(r["reconciliation_required"])
-        self.assertEqual(p.call_count,1)
-
+    def test_remote_shadow_writer_never_executes_mocked_404_409_or_corrupt_payload(self):
+        # A 404 create, 409 retry or corrupt remote read is unreachable:
+        # fail closed before either GET or PUT, not a mocked pseudo-success.
+        for status in (404,409,500):
+            with self.subTest(status=status), \
+                 patch("atlasquant_shadow_store.requests.get",return_value=_Resp(status)) as get, \
+                 patch("atlasquant_shadow_store.requests.put",return_value=_Resp(201)) as put:
+                result=persist_shadow_samples(
+                    [self.row()],repo="o/r",branch="atlasquant-runtime",token="t",
+                )
+                self.assertEqual(result["reason"],"HARD_DENIED")
+                self.assertFalse(result["safe_to_retry"])
+                get.assert_not_called()
+                put.assert_not_called()
 
 if __name__=="__main__":
     unittest.main()
