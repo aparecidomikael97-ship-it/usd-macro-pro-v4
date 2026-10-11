@@ -38,3 +38,27 @@ All test identities, credentials and contexts are synthetic. No real network/ser
 - production voice/hotword/local app launch and secure IPC not implemented, not permitted by this contract.
 
 A passed negative contract test is not `OWNER_ENROLLED`, `WORKER_READY`, `DEVICE_ATTESTED` or `INSTALL_AUTHORIZED`. **First installation HARD NO-GO.**
+
+
+## Subsequent credential-rotation binding audit (isolated Draft)
+
+The original Owner V1 `owner_binding` evidence included only
+`credential_fingerprint_present: true`. Two ADMIN sessions with identical
+synthetic owner assertion, issuer and role but **different current credential
+fingerprints** therefore produced the **same `binding_digest`**. If future
+callers treat that digest as a stable identity/session correlation, a rotated
+or revoked credential could be conflated with the earlier session.
+
+The candidate binding checksum now includes a domain-separated SHA-256 of
+the **exact host-supplied session fingerprint** in its private digest material.
+No raw fingerprint or inner hash is published in the output. The digest changes
+when the registry password verifier/fingerprint changes, remains stable for
+identical input and is empty when the owner contract is blocked.
+
+**Critical limitation:** this binding hash is NOT an authentication token,
+cryptographic proof of owner presence, independently trusted issuer signature,
+source verification, tenant membership check, device attestation or revocation
+decision. The host MUST still call real `session_is_current` against a trusted
+registry and validate independently enrolled HUMAN_OWNER/source + scope/device
+before preparing any privileged action. No automatic acceptance is authorized
+by checksum changes. Source/witness gates remain NO-GO.
