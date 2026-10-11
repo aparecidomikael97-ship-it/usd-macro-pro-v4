@@ -1,0 +1,61 @@
+name: AION Composite Exact Global Quality Recheck
+
+on:
+  pull_request:
+    branches:
+      - audit/aion-admin-research-private-denial-regression-20261011
+    paths:
+      - ".github/workflows/aion-composite-exact-global-quality-recheck.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  complete-quality:
+    name: Complete root Quality + browser suite / ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact isolated candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Setup Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install the official Quality requirements
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+      - name: Compile all Python sources
+        run: python -m compileall -q .
+      - name: Run EXACT root modules listed by official Quality workflow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, sys
+          src = Path(".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
+          marker = "python -m unittest -q "
+          start = src.index(marker)
+          end = src.index("python -m pytest -q -s", start)
+          section = src[start:end]
+          listed = re.findall(r"(?m)^\s+(test_[A-Za-z0-9_]+\.py)\s*\\?$", section)
+          root = {p.name for p in Path(".").glob("test_*.py")}
+          missing = sorted(root - set(listed))
+          print(f"OFFICIAL_QUALITY_MODULES={len(listed)} ROOT_DISCOVERED={len(root)} MISSING={len(missing)}", flush=True)
+          if not listed or missing:
+              print("MISSING_TEST_FILES:", missing, flush=True)
+              sys.exit(2)
+          # Exact test entrypoints from repository's established Quality workflow.
+          # No credentials, deployment, Worker dispatch, or private remote reads.
+          status = subprocess.call([sys.executable, "-B", "-m", "unittest", "-q", *listed])
+          print(f"OFFICIAL_ROOT_QUALITY_EXIT={status}", flush=True)
+          sys.exit(status)
+          PY
+      - name: Run browser tests from official Quality workflow
+        if: always()
+        run: python -m pytest -q -s test_atlasquant_aion_chat_browser.py
