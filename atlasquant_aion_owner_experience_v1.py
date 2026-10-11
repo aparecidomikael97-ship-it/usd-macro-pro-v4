@@ -141,11 +141,20 @@ def owner_binding(
         blockers.append("OWNER_ASSERTION_ISSUER_REQUIRED")
 
     blockers = list(dict.fromkeys(blockers))
+    # A presence-only boolean makes two distinct credentials yield an
+    # identical owner binding digest after password/registry rotation. Bind
+    # the digest to the exact (host-verified) session fingerprint instead.
+    # Only its hash enters the inner evidence, and neither the fingerprint
+    # nor its hash appears in the returned plan.
     evidence = {
+        "binding_domain": "AION_OWNER_SESSION_BINDING_V2",
         "principal": PRINCIPAL,
         "subject": subject,
         "issuer": issuer,
-        "credential_fingerprint_present": bool(fingerprint),
+        "credential_fingerprint_sha256": (
+            hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+            if fingerprint else ""
+        ),
         "permissions_verified": not missing,
     }
     return {
