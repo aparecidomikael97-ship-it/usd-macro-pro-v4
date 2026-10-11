@@ -1,6 +1,7 @@
 """Bounded 20-gate inventory plus an acyclic collection plan; no readiness."""
 from atlasquant_aion_first_install_plan_v1 import PHASES, build_first_install_plan
-from .contracts import result
+from datetime import date
+from .contracts import result, integer
 
 DEPENDENCIES = {
     "OWNER_IDENTITY_CEREMONY": (),
@@ -54,6 +55,15 @@ def review_evidence_plan(manifest):
         return result("BLOCKED", "MANIFEST_BOUND_INVALID", unresolved_gate_count=20)
     if any(type(manifest[k]) is not str or len(manifest[k]) > 512 for k in ("schema", "date", "baseline_sha", "purpose", "status", "mode")):
         return result("BLOCKED", "MANIFEST_SCALAR_INVALID", unresolved_gate_count=20)
+    try:
+        canonical_date = date.fromisoformat(manifest["date"]).isoformat()
+    except ValueError:
+        return result("BLOCKED", "MANIFEST_DATE_INVALID", unresolved_gate_count=20)
+    if (canonical_date != manifest["date"]
+            or not integer(manifest["baseline_pr"], 1, 2**31-1)
+            or type(manifest["budget_brl_monthly_cap"]) is not int
+            or not 0 <= manifest["budget_brl_monthly_cap"] <= 200):
+        return result("BLOCKED", "MANIFEST_METADATA_INVALID", unresolved_gate_count=20)
     refs = manifest["factual_references"]
     if type(refs) is not list or len(refs) > 10 or any(type(x) is not str or len(x) > 512 for x in refs):
         return result("BLOCKED", "REFERENCE_LIST_BOUND_INVALID", unresolved_gate_count=20)
