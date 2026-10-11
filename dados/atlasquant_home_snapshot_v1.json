@@ -1,11 +1,11 @@
 {
   "schema": "ATLASQUANT_HOME_SNAPSHOT_V1",
-  "generated_at": "2026-10-11T08:50:55.100423+00:00",
-  "runtime_generated_at": "2026-10-11T08:51:21.135868+00:00",
+  "generated_at": "2026-10-11T09:22:49.416605+00:00",
+  "runtime_generated_at": "2026-10-11T09:23:08.785825+00:00",
   "engine_version": "V11.0.8 / AtlasQuant Runtime",
   "inputs": {
     "version": "V10.7_FAST_BOOT_1",
-    "generated_at": "2026-10-11T08:50:55.100423+00:00",
+    "generated_at": "2026-10-11T09:22:49.416605+00:00",
     "app_version": "11.0.8 — STRENGTH ATTRIBUTION + AUDIT INTEGRITY · MOTOR BASE V9.3.9.2",
     "core_evidence": [
       {
@@ -24,7 +24,7 @@
         "Score final": 87.0,
         "Qualidade": 91.0,
         "Confluência": "ALTA",
-        "Dif. macro": 13.0,
+        "Dif. macro": 13.1,
         "Índice ranking": 88.4
       },
       {
@@ -51,7 +51,7 @@
         "Score final": 87.0,
         "Qualidade": 84.0,
         "Confluência": "ALTA",
-        "Dif. macro": 30.0,
+        "Dif. macro": 29.8,
         "Índice ranking": 85.6
       },
       {
@@ -60,7 +60,7 @@
         "Score final": 88.0,
         "Qualidade": 70.0,
         "Confluência": "MODERADA",
-        "Dif. macro": -12.1,
+        "Dif. macro": -12.6,
         "Índice ranking": 80.6
       },
       {
@@ -69,7 +69,7 @@
         "Score final": 75.0,
         "Qualidade": 70.0,
         "Confluência": "MODERADA",
-        "Dif. macro": -22.8,
+        "Dif. macro": -22.6,
         "Índice ranking": 73.3
       },
       {
@@ -78,15 +78,15 @@
         "Score final": 52.0,
         "Qualidade": 91.0,
         "Confluência": "BAIXA",
-        "Dif. macro": -10.3,
+        "Dif. macro": -11.1,
         "Índice ranking": 67.9
       }
     ],
     "macro_context": {
-      "usd_score": 58.27515924615385,
+      "usd_score": 58.09054386153846,
       "usd_quality": 90.0,
       "fed_tone": "Restritivo",
-      "fed_strength": 0.27461538461538465,
+      "fed_strength": 0.2561538461538462,
       "trend": {
         "score": 38.0,
         "CPI": {
@@ -301,13 +301,13 @@
       },
       "fed": {
         "tom": "Restritivo",
-        "forca": 0.27461538461538465,
+        "forca": 0.2561538461538462,
         "titulos": [
           "Federal Reserve interest rate decision looms as inflation worries persist - Fox Business",
           "Watch BlackRock’s Rieder on Yield Curve, Federal Reserve Rate Hikes - Bloomberg.com",
-          "BlackRock’s Rieder on Yield Curve, Federal Reserve Rate Hikes - Bloomberg.com",
           "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - AP News",
           "Federal Reserve Warns: Another Rate Hike Coming this Year - RVBusiness",
+          "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - WREG.com",
           "New York Federal Reserve says inflation on everyday items is because of tariffs - WSMH",
           "Federal Reserve aims to avoid 1980s-style inflation, Stuart Kaiser warns - Fox Business",
           "Discussing Consumer Price Index numbers, inflation and Federal Reserve's decision-making process - 11Alive.com",
@@ -338,16 +338,6 @@
             "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
           },
           {
-            "titulo": "BlackRock’s Rieder on Yield Curve, Federal Reserve Rate Hikes - Bloomberg.com",
-            "corpo": "BlackRock’s Rieder on Yield Curve, Federal Reserve Rate Hikes",
-            "fonte": "Bloomberg.com",
-            "relevancia_pontos": 6,
-            "relevancia": "Alta",
-            "impacto": 0.75,
-            "direcao": "🟢 Favorável ao USD",
-            "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
-          },
-          {
             "titulo": "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - AP News",
             "corpo": "Fed minutes: Another rate hike likely coming this year to combat persistent inflation",
             "fonte": "AP News",
@@ -361,6 +351,16 @@
             "titulo": "Federal Reserve Warns: Another Rate Hike Coming this Year - RVBusiness",
             "corpo": "Federal Reserve Warns: Another Rate Hike Coming this Year",
             "fonte": "RVBusiness",
+            "relevancia_pontos": 6,
+            "relevancia": "Alta",
+            "impacto": 0.55,
+            "direcao": "🟢 Favorável ao USD",
+            "explicacao": "Sinal mais restritivo: juros altos por mais tempo tendem a apoiar o dólar."
+          },
+          {
+            "titulo": "Fed minutes: Another rate hike likely coming this year to combat persistent inflation - WREG.com",
+            "corpo": "Fed minutes: Another rate hike likely coming this year to combat persistent inflation",
+            "fonte": "WREG.com",
             "relevancia_pontos": 6,
             "relevancia": "Alta",
             "impacto": 0.55,
@@ -451,7 +451,7 @@
           "juros": 2.5,
           "inflacao": 3.22645,
           "pib": 1.6603,
-          "sentimento": 52.17391304347826,
+          "sentimento": 50.0,
           "fonte": "FRED + transformação anual"
         },
         "GBP": {
@@ -486,7 +486,7 @@
           "juros": 4.51,
           "inflacao": 2.7,
           "pib": 2.13764,
-          "sentimento": 38.46153846153846,
+          "sentimento": 33.333333333333336,
           "fonte": "FRED + transformação anual + fallback parcial"
         },
         "NZD": {
@@ -500,7 +500,7 @@
           "juros": 13.75,
           "inflacao": 4.58,
           "pib": 2.4,
-          "sentimento": 54.54545454545455,
+          "sentimento": 56.52173913043478,
           "fonte": "BCB + validação + fallback parcial"
         }
       },
@@ -510,7 +510,7 @@
           "juros": 13.8,
           "inflacao": 4.6,
           "pib": 2.4,
-          "sentimento": 54.5,
+          "sentimento": 56.5,
           "fonte": "BCB + validação + fallback parcial",
           "Moeda": "Real Brasileiro",
           "juros_reais": 9.2,
@@ -521,8 +521,8 @@
           "n_emprego": 50.0,
           "n_atividade": 50.0,
           "Pontuação_Macro": 77.5,
-          "Influência_Fed": -3.0,
-          "Pontuação_Final": 74.6,
+          "Influência_Fed": -2.8,
+          "Pontuação_Final": 74.8,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 20.0,
@@ -532,11 +532,11 @@
               "Atividade": 10.0,
               "Sentimento": 10.0
             },
-            "fed": -2.965846153846154,
+            "fed": -2.766461538461539,
             "other": {
               "Limite da escala 0–100": 1.4210854715202004e-14
             },
-            "unrounded_final": 74.55854123007988
+            "unrounded_final": 74.7579258454645
           },
           "Posição": 1
         },
@@ -552,12 +552,12 @@
           "n_juros": 65.6,
           "n_inflacao": 62.67743,
           "n_pib": 73.09578815534078,
-          "n_sentimento": 76.3888888888889,
+          "n_sentimento": 73.71794871794873,
           "n_emprego": 44.675,
           "n_atividade": 52.0,
           "Pontuação_Macro": 57.6,
-          "Influência_Fed": 13.7,
-          "Pontuação_Final": 58.3,
+          "Influência_Fed": 12.8,
+          "Pontuação_Final": 58.1,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 15.743999999999998,
@@ -567,12 +567,12 @@
               "Atividade": 6.24,
               "Sentimento": 0.0
             },
-            "fed": 12.746153846153847,
+            "fed": 12.561538461538461,
             "other": {
               "Índice amplo USD": 4.2215679999999995,
-              "Limite da escala 0–100": 7.105427357601002e-15
+              "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 58.27515924615385
+            "unrounded_final": 58.09054386153846
           },
           "Posição": 2
         },
@@ -581,19 +581,19 @@
           "juros": 4.5,
           "inflacao": 2.7,
           "pib": 2.1,
-          "sentimento": 38.5,
+          "sentimento": 33.3,
           "fonte": "FRED + transformação anual + fallback parcial",
           "Moeda": "Dólar Australiano",
           "juros_reais": 1.8,
           "n_juros": 29.981781944622814,
           "n_inflacao": 44.37869822485208,
           "n_pib": 70.40481809880697,
-          "n_sentimento": 70.51282051282051,
+          "n_sentimento": 58.97435897435898,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 50.3,
-          "Influência_Fed": -2.2,
-          "Pontuação_Final": 48.0,
+          "Pontuação_Macro": 49.1,
+          "Influência_Fed": -2.1,
+          "Pontuação_Final": 47.0,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 5.996356388924563,
@@ -601,13 +601,13 @@
               "PIB": 10.560722714821045,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 7.051282051282051
+              "Sentimento": 5.897435897435898
             },
-            "fed": -2.224384615384616,
+            "fed": -2.074846153846154,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 48.040781273370854
+            "unrounded_final": 47.03647358106316
           },
           "Posição": 3
         },
@@ -616,19 +616,19 @@
           "juros": 2.5,
           "inflacao": 3.2,
           "pib": 1.7,
-          "sentimento": 52.2,
+          "sentimento": 50.0,
           "fonte": "FRED + transformação anual",
           "Moeda": "Euro",
           "juros_reais": -0.7,
           "n_juros": 5.851658413840014,
           "n_inflacao": 59.95414201183431,
           "n_pib": 46.58676419956989,
-          "n_sentimento": 95.65217391304347,
+          "n_sentimento": 88.46153846153845,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 46.7,
+          "Pontuação_Macro": 46.0,
           "Influência_Fed": -0.5,
-          "Pontuação_Final": 46.2,
+          "Pontuação_Final": 45.5,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 1.1703316827680028,
@@ -636,13 +636,13 @@
               "PIB": 6.988014629935484,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 9.565217391304348
+              "Sentimento": 8.846153846153845
             },
-            "fed": -0.49430769230769245,
+            "fed": -0.46107692307692316,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 46.222377313475285
+            "unrounded_final": 45.53654453755556
           },
           "Posição": 4
         },
@@ -658,12 +658,12 @@
           "n_juros": 0.9185134447346007,
           "n_inflacao": 0.0,
           "n_pib": 100.0,
-          "n_sentimento": 91.66666666666666,
+          "n_sentimento": 88.46153846153845,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 44.4,
-          "Influência_Fed": 1.0,
-          "Pontuação_Final": 45.3,
+          "Pontuação_Macro": 44.0,
+          "Influência_Fed": 0.9,
+          "Pontuação_Final": 45.0,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 0.18370268894692016,
@@ -671,13 +671,13 @@
               "PIB": 15.0,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 9.166666666666666
+              "Sentimento": 8.846153846153845
             },
-            "fed": 0.9886153846153849,
+            "fed": 0.9221538461538463,
             "other": {
-              "Limite da escala 0–100": 0.0
+              "Limite da escala 0–100": 7.105427357601002e-15
             },
-            "unrounded_final": 45.33898474022897
+            "unrounded_final": 44.95201038125462
           },
           "Posição": 5
         },
@@ -693,12 +693,12 @@
           "n_juros": 17.329033301463625,
           "n_inflacao": 38.46153846153847,
           "n_pib": 43.57794731826098,
-          "n_sentimento": 91.66666666666666,
+          "n_sentimento": 88.46153846153845,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 44.9,
-          "Influência_Fed": -2.2,
-          "Pontuação_Final": 42.7,
+          "Pontuação_Macro": 44.6,
+          "Influência_Fed": -2.1,
+          "Pontuação_Final": 42.5,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 3.465806660292725,
@@ -706,13 +706,13 @@
               "PIB": 6.536692097739147,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 9.166666666666666
+              "Sentimento": 8.846153846153845
             },
-            "fed": -2.224384615384616,
+            "fed": -2.074846153846154,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 42.71401157854469
+            "unrounded_final": 42.54303721957034
           },
           "Posição": 6
         },
@@ -728,12 +728,12 @@
           "n_juros": 12.572360879223329,
           "n_inflacao": 32.544378698224854,
           "n_pib": 20.021356113187398,
-          "n_sentimento": 91.66666666666666,
+          "n_sentimento": 88.46153846153845,
           "n_emprego": 50.0,
           "n_atividade": 50.0,
-          "Pontuação_Macro": 39.6,
-          "Influência_Fed": -1.5,
-          "Pontuação_Final": 38.1,
+          "Pontuação_Macro": 39.2,
+          "Influência_Fed": -1.4,
+          "Pontuação_Final": 37.9,
           "strength_attribution": {
             "factors": {
               "Juros / Treasury": 2.514472175844666,
@@ -741,13 +741,13 @@
               "PIB": 3.0032034169781094,
               "Emprego": 10.0,
               "Atividade": 10.0,
-              "Sentimento": 9.166666666666666
+              "Sentimento": 8.846153846153845
             },
-            "fed": -1.482923076923077,
+            "fed": -1.3832307692307695,
             "other": {
-              "Limite da escala 0–100": 0.0
+              "Limite da escala 0–100": 7.105427357601002e-15
             },
-            "unrounded_final": 38.08307598730009
+            "unrounded_final": 37.86225547447958
           },
           "Posição": 7
         },
@@ -778,11 +778,11 @@
               "Atividade": 10.0,
               "Sentimento": 0.0
             },
-            "fed": -0.24715384615384622,
+            "fed": -0.23053846153846158,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 35.4976290730284
+            "unrounded_final": 35.514244457643784
           },
           "Posição": 8
         },
@@ -813,23 +813,23 @@
               "Atividade": 10.0,
               "Sentimento": 0.0
             },
-            "fed": 1.235769230769231,
+            "fed": 1.1526923076923077,
             "other": {
               "Limite da escala 0–100": 0.0
             },
-            "unrounded_final": 28.336360946745565
+            "unrounded_final": 28.25328402366864
           },
           "Posição": 9
         }
       ],
       "usd_detalhado": {
-        "score": 58.27515924615385,
+        "score": 58.09054386153846,
         "componentes": {
           "Inflação": 62.67743,
           "Emprego": 44.675,
           "Atividade": 52.0,
           "Juros / Treasury 2Y": 65.6,
-          "Federal Reserve": 63.73076923076923,
+          "Federal Reserve": 62.80769230769231,
           "Índice amplo USD": 52.7696
         },
         "pesos": {
@@ -897,7 +897,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -12.1,
+      "matrix_diff": -12.6,
       "h4": "🟡 PARCIAL",
       "h1": "🟢 PULLBACK OK",
       "m15": "🔴 SEM GATILHO",
@@ -1235,7 +1235,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (2160 min)"
+        "Técnica desatualizada (2191 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -1247,7 +1247,7 @@
         "Score Mestre forte (88/100)"
       ],
       "executable": false,
-      "technical_age": 2159.5,
+      "technical_age": 2191.3,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -1255,21 +1255,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 2159.5,
+            "age_minutes": 2191.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 2221.8,
+            "age_minutes": 2253.6,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 2340.1,
+            "age_minutes": 2371.9,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -1394,7 +1394,7 @@
         "reference_at": "2026-10-09T20:51:46.321885+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:46.321885+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -1409,7 +1409,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-09T08:55:14.212733+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00"
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00"
       }
     },
     {
@@ -1424,7 +1424,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -22.8,
+      "matrix_diff": -22.6,
       "h4": "⚪ MACRO AGUARDAR",
       "h1": "⚪ MACRO AGUARDAR",
       "m15": "⚪ MACRO AGUARDAR",
@@ -1691,7 +1691,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (2160 min)"
+        "Técnica desatualizada (2191 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -1701,7 +1701,7 @@
       ],
       "positives": [],
       "executable": false,
-      "technical_age": 2159.5,
+      "technical_age": 2191.3,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -1709,21 +1709,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 2159.5,
+            "age_minutes": 2191.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 2159.5,
+            "age_minutes": 2191.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 2276.3,
+            "age_minutes": 2308.1,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -1750,9 +1750,9 @@
       "scanner_processed_at": 1791579105.0886507,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 2406.272516516667,
+        "age_minutes": 2438.0852118333332,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 2406 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 2438 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "GBP",
@@ -1848,7 +1848,7 @@
         "reference_at": "2026-10-09T20:51:44.779381+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.6,
+        "age_minutes": 2191.4,
         "valid_until": "2026-10-09T21:51:44.779381+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -1862,7 +1862,7 @@
         "generation": 29,
         "observed_at": "2026-10-11T01:22:21.041651+00:00",
         "expired_at": "2026-10-11T01:22:21.041651+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00"
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00"
       }
     },
     {
@@ -1877,7 +1877,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": -10.3,
+      "matrix_diff": -11.1,
       "h4": "⚪ MACRO AGUARDAR",
       "h1": "⚪ MACRO AGUARDAR",
       "m15": "⚪ MACRO AGUARDAR",
@@ -2143,7 +2143,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (2160 min)"
+        "Técnica desatualizada (2191 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -2155,7 +2155,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 2159.5,
+      "technical_age": 2191.3,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -2163,21 +2163,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 2159.5,
+            "age_minutes": 2191.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 2221.8,
+            "age_minutes": 2253.6,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 2340.1,
+            "age_minutes": 2371.9,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -2300,7 +2300,7 @@
         "reference_at": "2026-10-09T20:51:47.652797+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:47.652797+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -2312,7 +2312,7 @@
         "automatic_execution": false,
         "real_orders_enabled": false,
         "generation": 0,
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00"
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00"
       }
     },
     {
@@ -2667,7 +2667,7 @@
         "Risco de evento desconhecido",
         "H4 está contra o viés",
         "H1 está contra o viés",
-        "Técnica desatualizada (2159 min)"
+        "Técnica desatualizada (2191 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -2680,7 +2680,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 2159.4,
+      "technical_age": 2191.2,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -2688,21 +2688,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 2159.4,
+            "age_minutes": 2191.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 2159.4,
+            "age_minutes": 2191.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 2340.0,
+            "age_minutes": 2371.8,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -2825,7 +2825,7 @@
         "reference_at": "2026-10-09T20:51:50.345446+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:50.345446+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -2840,7 +2840,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-08T18:57:37.984473+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00"
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00"
       }
     },
     {
@@ -2855,7 +2855,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": 30.0,
+      "matrix_diff": 29.8,
       "h4": "🟢 CONFIRMA",
       "h1": "🟢 PULLBACK OK",
       "m15": "🔴 SEM GATILHO",
@@ -3220,7 +3220,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (2160 min)"
+        "Técnica desatualizada (2191 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -3233,7 +3233,7 @@
         "Qualidade alta (84%)"
       ],
       "executable": false,
-      "technical_age": 2159.5,
+      "technical_age": 2191.3,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -3241,21 +3241,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 2159.5,
+            "age_minutes": 2191.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 2221.8,
+            "age_minutes": 2253.6,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 2340.0,
+            "age_minutes": 2371.9,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -3381,7 +3381,7 @@
         "reference_at": "2026-10-09T20:51:49.062644+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:49.062644+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -3396,7 +3396,7 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-09T08:55:14.212733+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00"
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00"
       }
     },
     {
@@ -3411,7 +3411,7 @@
       "base_score": 50.0,
       "quote_score": 50.0,
       "macro_diff": 0.0,
-      "matrix_diff": 13.0,
+      "matrix_diff": 13.1,
       "h4": "🔴 CONTRA",
       "h1": "🔴 CONTRA",
       "m15": "🔴 SEM GATILHO",
@@ -3751,7 +3751,7 @@
         "Risco de evento desconhecido",
         "H4 está contra o viés",
         "H1 está contra o viés",
-        "Técnica desatualizada (2158 min)"
+        "Técnica desatualizada (2190 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -3764,7 +3764,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 2158.5,
+      "technical_age": 2190.3,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -3772,21 +3772,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 2158.5,
+            "age_minutes": 2190.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 2158.5,
+            "age_minutes": 2190.3,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 2339.1,
+            "age_minutes": 2370.9,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -3811,9 +3811,9 @@
       "scanner_processed_at": 1791579167.3297536,
       "stale_technical": [],
       "sweep_state": {
-        "age_minutes": 2316.2788989833334,
+        "age_minutes": 2348.091722166667,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 2316 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 2348 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "USD",
@@ -3909,7 +3909,7 @@
         "reference_at": "2026-10-09T20:52:47.050078+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:52 UTC",
-        "age_minutes": 2158.5,
+        "age_minutes": 2190.3,
         "valid_until": "2026-10-09T21:52:47.050078+00:00",
         "valid_until_display": "09/10/2026 21:52 UTC",
         "remaining_minutes": 0.0,
@@ -3925,7 +3925,7 @@
         "confirmed_at": "2026-10-07T09:26:10.058663+00:00",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-08T18:57:37.984473+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00"
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00"
       }
     },
     {
@@ -4276,7 +4276,7 @@
         "Dados técnicos insuficientes (35/100)",
         "ADR14 indisponível",
         "Risco de evento desconhecido",
-        "Técnica desatualizada (2159 min)"
+        "Técnica desatualizada (2191 min)"
       ],
       "soft_blocks": [
         "Gate ainda não liberou execução",
@@ -4289,7 +4289,7 @@
         "Qualidade alta (91%)"
       ],
       "executable": false,
-      "technical_age": 2159.4,
+      "technical_age": 2191.2,
       "data_ready": {
         "score": 35.0,
         "label": "🔴 DADOS INSUFICIENTES",
@@ -4297,21 +4297,21 @@
         "institutional_data_ready": false,
         "timeframes": {
           "m15": {
-            "age_minutes": 2159.4,
+            "age_minutes": 2191.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h1": {
-            "age_minutes": 2159.4,
+            "age_minutes": 2191.2,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
             "usable": false
           },
           "h4": {
-            "age_minutes": 2340.0,
+            "age_minutes": 2371.8,
             "state": "🔴 DESATUALIZADO",
             "score": 0.0,
             "fresh": false,
@@ -4338,9 +4338,9 @@
         "H1: 🟢 PULLBACK OK — histórico; não conta como confirmação atual"
       ],
       "sweep_state": {
-        "age_minutes": 2196.2804881833335,
+        "age_minutes": 2228.0933646666667,
         "current": false,
-        "label": "⏳ SWEEP ANTIGO · 2196 min — NÃO USAR COMO CONFIRMAÇÃO"
+        "label": "⏳ SWEEP ANTIGO · 2228 min — NÃO USAR COMO CONFIRMAÇÃO"
       },
       "strength": {
         "base": "USD",
@@ -4436,7 +4436,7 @@
         "reference_at": "2026-10-09T20:51:51.882673+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.4,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:51.882673+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4451,13 +4451,13 @@
         "observed_at": "2026-09-22T01:37:35.564300+00:00",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-08T14:55:47.619000+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00"
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00"
       }
     }
   ],
   "signal_lifecycle": {
     "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
-    "updated_at": "2026-10-11T08:51:17.126040+00:00",
+    "updated_at": "2026-10-11T09:23:05.795222+00:00",
     "pairs": {
       "EUR/USD": {
         "schema": "ATLASQUANT_SIGNAL_LIFECYCLE_V1",
@@ -4468,7 +4468,7 @@
         "reference_at": "2026-10-09T20:51:46.321885+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:46.321885+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4485,7 +4485,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-09T08:55:14.212733+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00",
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4498,7 +4498,7 @@
         "reference_at": "2026-10-09T20:51:44.779381+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.4,
         "valid_until": "2026-10-09T21:51:44.779381+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4515,7 +4515,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-11T01:22:21.041651+00:00",
         "blocked_at": "",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00",
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4528,7 +4528,7 @@
         "reference_at": "2026-10-09T20:51:47.652797+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:47.652797+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4545,7 +4545,7 @@
         "confirmed_at": "",
         "expired_at": "",
         "blocked_at": "",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00",
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00",
         "previous_status_code": "NO_SIGNAL",
         "previous_side": "WAIT"
       },
@@ -4558,7 +4558,7 @@
         "reference_at": "2026-10-09T20:51:50.345446+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.4,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:50.345446+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4575,7 +4575,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-08T18:57:37.984473+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00",
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "SELL"
       },
@@ -4588,7 +4588,7 @@
         "reference_at": "2026-10-09T20:51:49.062644+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.5,
+        "age_minutes": 2191.3,
         "valid_until": "2026-10-09T21:51:49.062644+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4605,7 +4605,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-09T08:55:14.212733+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00",
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       },
@@ -4618,7 +4618,7 @@
         "reference_at": "2026-10-09T20:52:47.050078+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:52 UTC",
-        "age_minutes": 2158.5,
+        "age_minutes": 2190.3,
         "valid_until": "2026-10-09T21:52:47.050078+00:00",
         "valid_until_display": "09/10/2026 21:52 UTC",
         "remaining_minutes": 0.0,
@@ -4635,7 +4635,7 @@
         "confirmed_at": "2026-10-07T09:26:10.058663+00:00",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-08T18:57:37.984473+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00",
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       },
@@ -4648,7 +4648,7 @@
         "reference_at": "2026-10-09T20:51:51.882673+00:00",
         "reference_source": "m15_fetched_at",
         "reference_display": "09/10/2026 20:51 UTC",
-        "age_minutes": 2159.4,
+        "age_minutes": 2191.2,
         "valid_until": "2026-10-09T21:51:51.882673+00:00",
         "valid_until_display": "09/10/2026 21:51 UTC",
         "remaining_minutes": 0.0,
@@ -4665,7 +4665,7 @@
         "confirmed_at": "",
         "expired_at": "2026-10-09T22:23:43.566334+00:00",
         "blocked_at": "2026-10-08T14:55:47.619000+00:00",
-        "last_seen_at": "2026-10-11T08:51:17.126040+00:00",
+        "last_seen_at": "2026-10-11T09:23:05.795222+00:00",
         "previous_status_code": "EXPIRED",
         "previous_side": "BUY"
       }
