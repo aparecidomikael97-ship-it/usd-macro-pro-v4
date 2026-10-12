@@ -15,7 +15,7 @@ from packaging.requirements import Requirement
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REQUIREMENT = 'tzdata==2026.3; sys_platform == "win32"'
+REQUIREMENT = 'tzdata==2026.3;sys_platform=="win32"'
 
 
 class AionWindowsTimezoneRequirementTests(unittest.TestCase):
