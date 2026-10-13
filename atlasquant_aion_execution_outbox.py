@@ -546,60 +546,14 @@ class ExecutionOutbox:
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Commit a local observation only if the send/reconcile snapshot is current.
+        """No trusted producer receipt verifier is enrolled in staging.
 
-        This CAS does not authenticate any adapter receipt or external effect.
+        A private Python method cannot confer external effect authority. This
+        formerly committed adapter-supplied booleans as confirmed effects.
+        Keep denial unconditional until a separately reviewed receipt admission
+        boundary with independently pinned provenance, freshness and readback.
         """
-        effect = _token(effect_ref, "effect_ref", 128)
-        if _clean(expected.get("idempotency_key"), 64) != key:
-            raise ValueError("confirmation expected key mismatch")
-        seen_state = _clean(expected.get("state"), 32)
-        if seen_state not in {"UNCERTAIN", "SENT"}:
-            raise ValueError("confirmation requires observed SENT/UNCERTAIN")
-        encoded = _canonical(redact(dict(result or {})))
-        self.db.execute("BEGIN IMMEDIATE")
-        try:
-            changed = self.db.execute(
-                """UPDATE action_outbox
-                   SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
-                       lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state=? AND lease_owner=? AND lease_until=?
-                     AND NOT EXISTS (
-                         SELECT 1 FROM action_effects e
-                         WHERE e.idempotency_key=action_outbox.idempotency_key
-                           AND e.owner=action_outbox.owner
-                           AND e.tenant=action_outbox.tenant
-                           AND e.workspace=action_outbox.workspace
-                           AND e.effect_ref<>?
-                     )""",
-                (
-                    _iso(confirmed_at), effect, key, *self._scope_args(),
-                    seen_state, _clean(expected.get("lease_owner"), 128),
-                    _clean(expected.get("lease_until"), 128), effect,
-                ),
-            )
-            if changed.rowcount != 1:
-                raise RuntimeError("stale confirmation or effect collision; state preserved")
-            existing = self.db.execute(
-                """SELECT effect_ref FROM action_effects
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (key, *self._scope_args()),
-            ).fetchone()
-            if existing is not None and existing["effect_ref"] != effect:
-                raise ValueError("effect ledger idempotency collision")
-            if existing is None:
-                self.db.execute(
-                    """INSERT INTO action_effects(
-                        idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
-                    ) VALUES (?,?,?,?,?,?,?)""",
-                    (key, *self._scope_args(), effect, _iso(confirmed_at), encoded),
-                )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-        return self.get(key)
+        raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
 
     def dispatch_claimed(
         self,
@@ -740,16 +694,21 @@ class ExecutionOutbox:
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
-        if result.get("accepted") is not True:
-            # The external send boundary was already crossed. Neither a local
-            # retryable=False/True flag nor an adapter "rejected" response proves
-            # no effect (or excludes a delayed effect). Keep the action UNCERTAIN.
-            # Never release this aggregate for automatic retry/compensation.
+        if result.get("accepted") is not True or result.get("confirmed") is True:
+            # Both negative and positive callback claims are untrusted. A
+            # positive bool and effect_ref cannot create a confirmed effect
+            # without an independently authenticated producer receipt.
+            # Keep the entire aggregate blocked until real evidence exists.
+            unverified_reason = (
+                "ADAPTER_REJECTION_EFFECT_UNVERIFIED"
+                if result.get("accepted") is not True
+                else "ADAPTER_POSITIVE_EFFECT_UNVERIFIED"
+            )
             with self.db:
                 changed = self.db.execute(
                     """UPDATE action_outbox
                        SET state='UNCERTAIN',lease_owner='',lease_until='',
-                           last_error='ADAPTER_REJECTION_EFFECT_UNVERIFIED'
+                           last_error=?
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                          AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
                          AND NOT EXISTS (
@@ -760,26 +719,15 @@ class ExecutionOutbox:
                                AND e.workspace=action_outbox.workspace
                          )""",
                     (
-                        key, *self._scope_args(),
+                        unverified_reason, key, *self._scope_args(),
                         sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
                     ),
                 )
                 if changed.rowcount != 1:
-                    raise RuntimeError("stale adapter rejection; state preserved")
+                    raise RuntimeError("stale unverified adapter claim; state preserved")
             return {**self.get(key), "dispatch_state": "UNCERTAIN_PROOF_REQUIRED"}
 
         effect_ref = _clean(result.get("effect_ref"), 128)
-        if result.get("confirmed") is True:
-            if not effect_ref:
-                raise ValueError("confirmed adapter result requires effect_ref")
-            out = self._confirm(
-                key,
-                expected=sent_snapshot,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "dispatch_state": "CONFIRMED"}
 
         with self.db:
             changed = self.db.execute(
@@ -823,17 +771,17 @@ class ExecutionOutbox:
 
         result = _mapping(reconcile(key, dict(intent["decision"])))
         if result.get("found") is True and result.get("confirmed") is True:
-            effect_ref = _clean(result.get("effect_ref"), 128)
-            if not effect_ref:
-                raise ValueError("confirmed reconciliation requires effect_ref")
-            out = self._confirm(
-                key,
-                expected=intent,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "reconcile_state": "CONFIRMED"}
+            # The adapter is not the external producer or a trust witness.
+            # Do not promote SENT/UNCERTAIN or insert a local effects receipt.
+            current = self.get(key)
+            if (
+                current["state"] != intent["state"]
+                or current["lease_owner"] != intent["lease_owner"]
+                or current["lease_until"] != intent["lease_until"]
+                or current["effect_ref"] != intent["effect_ref"]
+            ):
+                return {**current, "reconcile_state": "STALE_OBSERVATION_IGNORED"}
+            return {**current, "reconcile_state": "INDEPENDENT_POSITIVE_PROOF_REQUIRED"}
 
         if result.get("found") is False and result.get("authoritative_absence") is True:
             # Never accept "authoritative_absence" merely because an injected
