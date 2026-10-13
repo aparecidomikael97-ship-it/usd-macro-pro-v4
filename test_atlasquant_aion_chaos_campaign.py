@@ -225,9 +225,15 @@ class AionChaosCampaignTests(unittest.TestCase):
                 authorize=authorization(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(reconciled["state"], "CONFIRMED")
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
+            )
             self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(
+                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=3))
+            )
             store.close()
 
     def test_tool_failure_after_prior_effect_requires_manual_compensation_approval(self):
@@ -289,35 +295,28 @@ class AionChaosCampaignTests(unittest.TestCase):
                 cumulative_authority_guard=lambda d: budget.guard(d, now=NOW),
                 now=NOW + timedelta(seconds=1),
             )
-            self.assertEqual(confirmed["state"], "CONFIRMED")
-            saga.sync_forward_outcome("chaos-saga", "one", now=NOW + timedelta(seconds=1))
-
-            saga.enqueue_next(
-                "chaos-saga",
-                authorization_ref="approval-1",
-                valid_until=NOW + timedelta(minutes=5),
-                created_at=NOW + timedelta(seconds=2),
-            )
-            claimed = outbox.claim_next("worker-1", now=NOW + timedelta(seconds=2), lease_seconds=60)
-            failed = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=ChaosAdapter("reject"),
-                cumulative_authority_guard=lambda d: budget.guard(d, now=NOW + timedelta(seconds=2)),
-                now=NOW + timedelta(seconds=3),
-            )
-            self.assertEqual(failed["state"], "UNCERTAIN")
+            # A fake positive has NOT supplied a producer-authenticated receipt.
+            self.assertEqual(confirmed["state"], "UNCERTAIN")
+            self.assertEqual(confirmed["dispatch_state"], "UNCERTAIN_PROOF_REQUIRED")
             synced = saga.sync_forward_outcome(
-                "chaos-saga",
-                "two",
-                now=NOW + timedelta(seconds=3),
+                "chaos-saga", "one", now=NOW + timedelta(seconds=1),
             )
             self.assertEqual(synced["state"], "RECONCILIATION_REQUIRED")
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(outbox.claim_next(
+                "worker-2", now=NOW + timedelta(seconds=2),
+            ))
+            with self.assertRaisesRegex(ValueError, "state does not allow"):
+                saga.enqueue_next(
+                    "chaos-saga",
+                    authorization_ref="approval-1",
+                    valid_until=NOW + timedelta(minutes=5),
+                    created_at=NOW + timedelta(seconds=2),
+                )
             with self.assertRaisesRegex(ValueError, "not eligible"):
                 saga.prepare_compensation(
                     "chaos-saga",
-                    explicit_human_approval=False,
+                    explicit_human_approval=True,
                     approval_ref="approval-comp",
                     reauth_ref="reauth-comp",
                     now=NOW + timedelta(seconds=4),
@@ -353,7 +352,7 @@ class AionChaosCampaignTests(unittest.TestCase):
             observation("PROVIDER", failure_mode="provider outage", containment="circuit OPEN", recovery="safe mode read-only"),
             observation("NETWORK", failure_mode="timeout before effect", containment="UNCERTAIN", recovery="independent absence receipt unavailable -> BLOCKED"),
             observation("STORE", failure_mode="crash before CAS commit", containment="transaction rollback", recovery="reopen revision unchanged"),
-            observation("QUEUE", failure_mode="response lost after effect", containment="UNCERTAIN", recovery="reconcile -> CONFIRMED exactly once"),
+            observation("QUEUE", failure_mode="response lost after effect", containment="UNCERTAIN", recovery="no producer attestation available; remain UNCERTAIN"),
             observation("TOOL", failure_mode="second tool rejected", containment="RECONCILIATION_REQUIRED", recovery="independent result first; no compensation"),
             observation("AGENT", failure_mode="loop/error storm", containment="ISOLATE_RECOMMENDED", recovery="read-only diagnosis"),
             observation("STATE_CORRUPTION", failure_mode="ledger digest tamper", containment="integrity MISMATCH", recovery="blocked for review"),
