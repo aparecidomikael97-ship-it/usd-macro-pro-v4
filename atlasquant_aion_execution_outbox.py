@@ -34,6 +34,7 @@ STATES = frozenset({
     "PENDING",
     "RETRY",
     "CLAIMED",
+    "BLOCKED_PRODUCER",
     "UNCERTAIN",
     "SENT",
     "CONFIRMED",
@@ -494,7 +495,10 @@ class ExecutionOutbox:
             ("workspace_id", self.scope.workspace_id),
         ):
             supplied = _clean(current.get(field), 128)
-            if supplied and supplied != wanted:
+            # An absent/blank scope is not a valid authorization assertion.
+            if not supplied:
+                return False, "REVOKED", {"reason": field.upper() + "_MISSING"}
+            if supplied != wanted:
                 return False, "REVOKED", {"reason": field.upper() + "_MISMATCH"}
         if _clean(current.get("policy_version"), 128) != _clean(decision.get("policy_version"), 128):
             return False, "BLOCKED_REAPPROVAL", {"reason": "POLICY_VERSION_CHANGED"}
@@ -507,62 +511,50 @@ class ExecutionOutbox:
                 return False, "BLOCKED_REAPPROVAL", {"reason": "REAUTH_TRANSACTION_MISMATCH"}
         return True, "ALLOW", current
 
-    def _set_blocked(self, key: str, state: str, reason: str) -> dict[str, Any]:
+    def _set_blocked(
+        self, key: str, state: str, reason: str, *, expected: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Block only the same observed state and lease, never a later effect."""
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
+        if _clean(expected.get("idempotency_key"), 64) != key:
+            raise ValueError("expected intent key mismatch")
+        seen_state = _clean(expected.get("state"), 32)
+        if seen_state not in {"CLAIMED", "UNCERTAIN", "SENT"}:
+            raise ValueError("expected state cannot be blocked")
         with self.db:
-            self.db.execute(
+            changed = self.db.execute(
                 """UPDATE action_outbox
                    SET state=?,lease_owner='',lease_until='',last_error=?
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (state, _clean(reason, 240), key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state=? AND lease_owner=? AND lease_until=?""",
+                (
+                    state, _clean(reason, 240), key, *self._scope_args(),
+                    seen_state, _clean(expected.get("lease_owner"), 128),
+                    _clean(expected.get("lease_until"), 128),
+                ),
             )
+            if changed.rowcount != 1:
+                raise RuntimeError("stale outbox state/lease; blocked mutation rejected")
         return self.get(key)
 
     def _confirm(
         self,
         key: str,
         *,
+        expected: Mapping[str, Any],
         effect_ref: Any,
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        effect = _token(effect_ref, "effect_ref", 128)
-        encoded = _canonical(redact(dict(result or {})))
-        self.db.execute("BEGIN IMMEDIATE")
-        try:
-            existing = self.db.execute(
-                """SELECT effect_ref FROM action_effects
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (key, *self._scope_args()),
-            ).fetchone()
-            if existing is not None and existing["effect_ref"] != effect:
-                raise ValueError("effect ledger idempotency collision")
-            if existing is None:
-                self.db.execute(
-                    """INSERT INTO action_effects(
-                        idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
-                    ) VALUES (?,?,?,?,?,?,?)""",
-                    (
-                        key,
-                        *self._scope_args(),
-                        effect,
-                        _iso(confirmed_at),
-                        encoded,
-                    ),
-                )
-            self.db.execute(
-                """UPDATE action_outbox
-                   SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
-                       lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(confirmed_at), effect, key, *self._scope_args()),
-            )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-        return self.get(key)
+        """No trusted producer receipt verifier is enrolled in staging.
+
+        A private Python method cannot confer external effect authority. This
+        formerly committed adapter-supplied booleans as confirmed effects.
+        Keep denial unconditional until a separately reviewed receipt admission
+        boundary with independently pinned provenance, freshness and readback.
+        """
+        raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
 
     def dispatch_claimed(
         self,
@@ -577,7 +569,12 @@ class ExecutionOutbox:
         """Dispatch one claimed intent; uncertain outcomes require reconciliation."""
         key = _clean(idempotency_key, 64)
         worker = _token(worker_id, "worker_id")
-        now_dt = _utc(now)
+        # A callable clock supports deterministic staging tests. A real host must
+        # supply trusted time/lease fencing; caller-supplied values are NOT proof.
+        def read_clock() -> datetime:
+            return _utc(now() if callable(now) else now)
+
+        now_dt = read_clock()
         intent = self.get(key)
         if intent["state"] != "CLAIMED":
             raise ValueError("intent must be CLAIMED before dispatch")
@@ -586,15 +583,20 @@ class ExecutionOutbox:
         if not intent["lease_until"] or now_dt >= _utc(intent["lease_until"]):
             raise TimeoutError("claim lease expired before dispatch")
 
+        def block_current(block_key: str, state: str, reason: str) -> dict[str, Any]:
+            if block_key != key:
+                raise ValueError("stale block key mismatch")
+            return self._set_blocked(key, state, reason, expected=intent)
+
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
         if not allowed:
-            return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+            return block_current(key, blocked_state, auth.get("reason", blocked_state))
 
         decision = _mapping(intent.get("decision"))
         budget_ref = _clean(decision.get("authority_budget_ref"), 128)
         if budget_ref:
             if not callable(cumulative_authority_guard):
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_REQUIRED",
@@ -602,98 +604,226 @@ class ExecutionOutbox:
             try:
                 budget = _mapping(cumulative_authority_guard(dict(decision)))
             except Exception:
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_FAILED",
                 )
             if budget.get("allowed") is not True:
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     _clean(budget.get("reason") or "CUMULATIVE_AUTHORITY_BUDGET_EXCEEDED", 240),
                 )
             if _clean(budget.get("authority_budget_ref"), 128) != budget_ref:
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_BUDGET_REF_MISMATCH",
                 )
             if _clean(budget.get("transaction_id"), 128) != _clean(decision.get("transaction_id"), 128):
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
                 )
 
+        # V16-A.30 local-only preflight: preserve both authorization and
+        # time-of-use checks even when productive enrollment is unavailable.
+        # These checks are necessary but NEVER sufficient to enable a sender.
+        # No adapter attribute is read and there are no external effects.
+        # Callbacks can block or revoke authorization after the first check.
+        # Recheck after those callbacks, then read time AGAIN after revalidation.
+        pre_send_dt = read_clock()
+        if pre_send_dt >= _utc(intent["lease_until"]):
+            raise TimeoutError("claim lease expired during authorization callbacks")
+        allowed, blocked_state, auth = self._authorization_gate(
+            intent, authorize, pre_send_dt,
+        )
+        if not allowed:
+            return block_current(key, blocked_state, auth.get("reason", blocked_state))
+        fenced_at = read_clock()
+        if fenced_at >= _utc(intent["lease_until"]):
+            raise TimeoutError("claim lease expired before send")
+        if fenced_at >= _utc(decision.get("valid_until")):
+            return block_current(key, "BLOCKED_REAPPROVAL", "AUTHORITY_EXPIRED")
+
+        # In this NO-PRODUCER state use a READ-ONLY guard equivalent to
+        # the CAS admission predicates. It catches revoked claims, moved
+        # leases and changed persisted deadlines, without writing UNCERTAIN.
+        # It does not authorize or replace the later transactional CAS.
+        available = self.db.execute(
+            """SELECT 1 FROM action_outbox
+               WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                 AND state='CLAIMED' AND lease_owner=?
+                 AND lease_until=? AND lease_until>?
+                 AND EXISTS (
+                     SELECT 1 FROM action_decisions d
+                     WHERE d.decision_id=action_outbox.decision_id
+                       AND d.valid_until>?
+                 )""",
+            (
+                key, *self._scope_args(), worker,
+                intent["lease_until"], _iso(fenced_at), _iso(fenced_at),
+            ),
+        ).fetchone()
+        if available is None:
+            raise TimeoutError("claim/deadline changed before send; dispatch blocked")
+
+        # V16-A.27: no independently enrolled producer, issuer, bound account
+        # or monotonic witness is present in this staging implementation.
+        # This is a mandatory pre-adapter hard stop, NOT a self-attested
+        # adapter capability, user-controlled flag or fixture signature.
+        # Even inspecting adapter.send may execute untrusted descriptor code.
+        # Without a separately reviewed, externally rooted enrollment verifier
+        # it is unsafe to CROSS the effect boundary merely because local
+        # policy, clock, owner or lease checks passed.
+        # The no-producer denial must survive process restarts and lease
+        # expiry; otherwise each expired CLAIMED lease returns to RETRY and
+        # attempts increase forever without any possible legitimate send.
+        # BLOCKED_PRODUCER is NON-TERMINAL: it keeps following actions of the
+        # same aggregate in PENDING, never releases FIFO or claims.
+        # Only the exact observed worker/lease/decision can persist this deny.
+        with self.db:
+            blocked = self.db.execute(
+                """UPDATE action_outbox
+                   SET state='BLOCKED_PRODUCER',lease_owner='',lease_until='',
+                       last_error='INDEPENDENT_PRODUCER_NOT_ENROLLED'
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?
+                     AND lease_until>?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                           AND e.owner=action_outbox.owner
+                           AND e.tenant=action_outbox.tenant
+                           AND e.workspace=action_outbox.workspace
+                     )
+                     AND EXISTS (
+                         SELECT 1 FROM action_decisions d
+                         WHERE d.decision_id=action_outbox.decision_id
+                           AND d.valid_until>?
+                     )""",
+                (
+                    key, *self._scope_args(), worker,
+                    intent["lease_until"], _iso(fenced_at), _iso(fenced_at),
+                ),
+            )
+            if blocked.rowcount != 1:
+                raise RuntimeError(
+                    "stale producer enrollment denial; no state overwritten"
+                )
+        raise PermissionError("INDEPENDENT_PRODUCER_NOT_ENROLLED")
+
+        # Do not remove the legacy adapter path below until its replacement
+        # is reviewed. It is intentionally unreachable while enrollment is
+        # absent; NO code after this gate constitutes a working producer verifier.
         send = getattr(adapter, "send", None)
         if not callable(send):
             raise TypeError("adapter.send required")
 
-        # Persist ambiguity BEFORE crossing the external boundary. If the process
-        # dies after this commit, restart must reconcile and must not blind-retry.
+        # Keep the persisted UNCERTAIN transition atomic with a compare-and-swap
+        # on claim owner, its exact lease and both persisted deadlines. No send
+        # occurs if another writer or expiry invalidates the pre-send claim.
+        # This local fence does NOT prevent late effects on an external provider.
         with self.db:
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='UNCERTAIN',dispatch_started_at=?,last_error='DISPATCH_IN_PROGRESS'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_owner=?""",
-                (_iso(now_dt), key, *self._scope_args(), worker),
+                     AND state='CLAIMED' AND lease_owner=?
+                     AND lease_until=? AND lease_until>?
+                     AND EXISTS (
+                         SELECT 1 FROM action_decisions d
+                         WHERE d.decision_id=action_outbox.decision_id
+                           AND d.valid_until>?
+                     )""",
+                (
+                    _iso(fenced_at), key, *self._scope_args(), worker,
+                    intent["lease_until"], _iso(fenced_at), _iso(fenced_at),
+                ),
             )
+            if cursor.rowcount != 1:
+                raise TimeoutError("claim/deadline changed before send; dispatch blocked")
 
+        # Snapshot exactly the state admitted to the external boundary. A later
+        # adapter response cannot rewrite a newer reconciliation or revocation.
+        sent_snapshot = self.get(key)
         try:
             result = _mapping(send(dict(intent["decision"]), key))
         except Exception as exc:
             with self.db:
-                self.db.execute(
+                changed = self.db.execute(
                     """UPDATE action_outbox
-                       SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?""",
                     (
-                        "",
                         "SEND_RESULT_UNKNOWN:" + type(exc).__name__,
-                        key,
-                        *self._scope_args(),
+                        key, *self._scope_args(),
+                        sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
                     ),
                 )
+                if changed.rowcount != 1:
+                    raise RuntimeError("stale send error; state preserved") from exc
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
-        if result.get("accepted") is not True:
-            state = "RETRY" if result.get("retryable") is True else "FAILED"
+        if result.get("accepted") is not True or result.get("confirmed") is True:
+            # Both negative and positive callback claims are untrusted. A
+            # positive bool and effect_ref cannot create a confirmed effect
+            # without an independently authenticated producer receipt.
+            # Keep the entire aggregate blocked until real evidence exists.
+            unverified_reason = (
+                "ADAPTER_REJECTION_EFFECT_UNVERIFIED"
+                if result.get("accepted") is not True
+                else "ADAPTER_POSITIVE_EFFECT_UNVERIFIED"
+            )
             with self.db:
-                self.db.execute(
+                changed = self.db.execute(
                     """UPDATE action_outbox
-                       SET state=?,lease_owner='',lease_until='',last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                         AND NOT EXISTS (
+                             SELECT 1 FROM action_effects e
+                             WHERE e.idempotency_key=action_outbox.idempotency_key
+                               AND e.owner=action_outbox.owner
+                               AND e.tenant=action_outbox.tenant
+                               AND e.workspace=action_outbox.workspace
+                         )""",
                     (
-                        state,
-                        _clean(result.get("reason") or "ADAPTER_REJECTED", 240),
-                        key,
-                        *self._scope_args(),
+                        unverified_reason, key, *self._scope_args(),
+                        sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
                     ),
                 )
-            return {**self.get(key), "dispatch_state": state}
+                if changed.rowcount != 1:
+                    raise RuntimeError("stale unverified adapter claim; state preserved")
+            return {**self.get(key), "dispatch_state": "UNCERTAIN_PROOF_REQUIRED"}
 
         effect_ref = _clean(result.get("effect_ref"), 128)
-        if result.get("confirmed") is True:
-            if not effect_ref:
-                raise ValueError("confirmed adapter result requires effect_ref")
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "dispatch_state": "CONFIRMED"}
 
         with self.db:
-            self.db.execute(
+            changed = self.db.execute(
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(now_dt), effect_ref, key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                           AND e.owner=action_outbox.owner
+                           AND e.tenant=action_outbox.tenant
+                           AND e.workspace=action_outbox.workspace
+                     )""",
+                (
+                    _iso(now_dt), effect_ref, key, *self._scope_args(),
+                    sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
+                ),
             )
+            if changed.rowcount != 1:
+                raise RuntimeError("stale send result; SENT denied")
         return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
 
     def reconcile(
@@ -710,41 +840,50 @@ class ExecutionOutbox:
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
             raise ValueError("only SENT or UNCERTAIN intents require reconciliation")
+        # V16-A.33: unlike a trusted read-only local database lookup, an
+        # injected adapter.reconcile property/callback is arbitrary executable
+        # code. In this staging version no independent producer enrollment,
+        # issuer root, account binding or monotonic witness is available.
+        # Thus deny BEFORE even evaluating the potentially effectful property.
+        # No current state or effect ledger mutation occurs. Historical
+        # SENT/UNCERTAIN remains in doubt pending independently authenticated
+        # receipts; no blind resend, release, or compensation is permitted.
+        raise PermissionError("INDEPENDENT_PRODUCER_NOT_ENROLLED")
+
+        # Unreachable legacy path, NOT a productive readback authorization.
+        # Its enabling requires separately reviewed external enrollment gates.
         reconcile = getattr(adapter, "reconcile", None)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
 
         result = _mapping(reconcile(key, dict(intent["decision"])))
         if result.get("found") is True and result.get("confirmed") is True:
-            effect_ref = _clean(result.get("effect_ref"), 128)
-            if not effect_ref:
-                raise ValueError("confirmed reconciliation requires effect_ref")
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "reconcile_state": "CONFIRMED"}
+            # The adapter is not the external producer or a trust witness.
+            # Do not promote SENT/UNCERTAIN or insert a local effects receipt.
+            current = self.get(key)
+            if (
+                current["state"] != intent["state"]
+                or current["lease_owner"] != intent["lease_owner"]
+                or current["lease_until"] != intent["lease_until"]
+                or current["effect_ref"] != intent["effect_ref"]
+            ):
+                return {**current, "reconcile_state": "STALE_OBSERVATION_IGNORED"}
+            return {**current, "reconcile_state": "INDEPENDENT_POSITIVE_PROOF_REQUIRED"}
 
         if result.get("found") is False and result.get("authoritative_absence") is True:
-            allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
-            if not allowed:
-                out = self._set_blocked(
-                    key,
-                    blocked_state,
-                    auth.get("reason", blocked_state),
-                )
-                return {**out, "reconcile_state": blocked_state}
-            with self.db:
-                self.db.execute(
-                    """UPDATE action_outbox
-                       SET state='RETRY',lease_owner='',lease_until='',
-                           last_error='AUTHORITATIVE_ABSENCE_CONFIRMED'
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (key, *self._scope_args()),
-                )
-            return {**self.get(key), "reconcile_state": "RETRY"}
+            # Never accept "authoritative_absence" merely because an injected
+            # adapter says so. A positive *independent* causal no-effect receipt,
+            # with a producer-enforced late-effect fence, has no admission path
+            # in this staging module yet; keeping UNCERTAIN/SENT is intentional.
+            current = self.get(key)
+            if (
+                current["state"] != intent["state"]
+                or current["lease_owner"] != intent["lease_owner"]
+                or current["lease_until"] != intent["lease_until"]
+                or current["effect_ref"] != intent["effect_ref"]
+            ):
+                return {**current, "reconcile_state": "STALE_OBSERVATION_IGNORED"}
+            return {**current, "reconcile_state": "INDEPENDENT_ABSENCE_PROOF_REQUIRED"}
 
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
