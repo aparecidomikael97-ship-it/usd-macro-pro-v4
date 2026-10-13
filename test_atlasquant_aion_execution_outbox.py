@@ -123,6 +123,75 @@ class ExecutionOutboxTests(unittest.TestCase):
             reauth_ref=reauth_ref,
         )
 
+    def test_authority_callback_must_include_tenant_and_workspace(self):
+        for missing in ("tenant_id", "workspace_id"):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as raw:
+                store, outbox = self._outbox(raw)
+                item = self._enqueue(outbox)
+                outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+                adapter = FakeIdempotentAdapter()
+
+                def authorize(decision):
+                    current = policy(self.scope)(decision)
+                    current.pop(missing)
+                    return current
+
+                result = outbox.dispatch_claimed(
+                    item["idempotency_key"],
+                    worker_id="worker-1",
+                    authorize=authorize,
+                    adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+                self.assertEqual(result["state"], "REVOKED")
+                self.assertEqual(result["last_error"], missing.upper() + "_MISSING")
+                self.assertEqual(adapter.send_calls, 0)
+                store.close()
+
+    def test_authority_callback_rejects_blank_and_foreign_scope(self):
+        for field in ("tenant_id", "workspace_id"):
+            for supplied in ("", " ", "tenant-b"):
+                with self.subTest(field=field, supplied=supplied), tempfile.TemporaryDirectory() as raw:
+                    store, outbox = self._outbox(raw)
+                    item = self._enqueue(outbox)
+                    outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+                    adapter = FakeIdempotentAdapter()
+
+                    def authorize(decision):
+                        current = policy(self.scope)(decision)
+                        current[field] = supplied
+                        return current
+
+                    result = outbox.dispatch_claimed(
+                        item["idempotency_key"],
+                        worker_id="worker-1",
+                        authorize=authorize,
+                        adapter=adapter,
+                        now=NOW + timedelta(seconds=1),
+                    )
+                    expected = field.upper() + ("_MISSING" if not supplied.strip() else "_MISMATCH")
+                    self.assertEqual(result["state"], "REVOKED")
+                    self.assertEqual(result["last_error"], expected)
+                    self.assertEqual(adapter.send_calls, 0)
+                    store.close()
+
+    def test_full_scope_authorization_continues_to_allow_valid_send(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox = self._outbox(raw)
+            item = self._enqueue(outbox)
+            outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+            adapter = FakeIdempotentAdapter()
+            result = outbox.dispatch_claimed(
+                item["idempotency_key"],
+                worker_id="worker-1",
+                authorize=policy(self.scope),
+                adapter=adapter,
+                now=NOW + timedelta(seconds=1),
+            )
+            self.assertEqual(result["state"], "CONFIRMED")
+            self.assertEqual(adapter.send_calls, 1)
+            store.close()
+
     def test_enqueue_is_transactional_idempotent_and_collision_safe(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
