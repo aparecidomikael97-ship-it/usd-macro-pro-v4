@@ -198,6 +198,65 @@ class ExecutionSagaTests(unittest.TestCase):
         )
         return result
 
+    def _fixture_mark_confirmed_only_after_simulated_external_positive_review(
+        self, outbox, key, *, allow_uncertain_send=False,
+    ):
+        """LOCAL SQL test fixture only. NOT a receipt, verifier or host permission.
+
+        It models a hypothetical pre-reviewed terminal effect solely to exercise
+        Saga's state-machine transitions; no producer or external trust exists.
+        """
+        observed = outbox.get(key)
+        self.assertEqual(observed["state"], "UNCERTAIN")
+        if allow_uncertain_send:
+            self.assertTrue(
+                observed["last_error"].startswith("SEND_RESULT_UNKNOWN:"),
+                "only simulated lost-response fixtures may bypass positive claim status",
+            )
+        else:
+            self.assertEqual(
+                observed["last_error"], "ADAPTER_POSITIVE_EFFECT_UNVERIFIED",
+            )
+        effect_ref = "SIMULATED-NOT-TRUSTED-" + key[:24]
+        with outbox.db:
+            changed = outbox.db.execute(
+                """UPDATE action_outbox
+                   SET state='CONFIRMED',effect_ref=?,confirmed_at=?,
+                       lease_owner='',lease_until='',last_error=''
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='UNCERTAIN'
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                     )""",
+                (
+                    effect_ref, NOW.isoformat(), key,
+                    self.scope.owner_id, self.scope.tenant_id, self.scope.workspace_id,
+                ),
+            )
+            self.assertEqual(changed.rowcount, 1)
+            outbox.db.execute(
+                """INSERT INTO action_effects(
+                    idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
+                ) VALUES (?,?,?,?,?,?,?)""",
+                (
+                    key, self.scope.owner_id, self.scope.tenant_id,
+                    self.scope.workspace_id, effect_ref, NOW.isoformat(), "{}",
+                ),
+            )
+        self.assertEqual(outbox.get(key)["state"], "CONFIRMED")
+        return outbox.get(key)
+
+    def _fixture_dispatch_after_simulated_external_positive_review(
+        self, outbox, budget, adapter, **kwargs,
+    ):
+        """Test-only Saga state-machine fixture, no productive approval or receipt."""
+        result = self._dispatch_claimed(outbox, budget, adapter, **kwargs)
+        self.assertEqual(result["dispatch_state"], "UNCERTAIN_PROOF_REQUIRED")
+        return self._fixture_mark_confirmed_only_after_simulated_external_positive_review(
+            outbox, result["idempotency_key"],
+        )
+
     def _fixture_mark_failed_only_after_simulated_external_no_effect_review(self, outbox, key):
         """Synthetic test arrangement, NOT a production receipt or recovery API."""
         self.assertEqual(outbox.get(key)["state"], "UNCERTAIN")
@@ -218,13 +277,13 @@ class ExecutionSagaTests(unittest.TestCase):
 
             first = self._enqueue_forward(saga, offset=0)
             self.assertEqual(first["saga"]["steps"][0]["state"], "ENQUEUED")
-            result = self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=1)
+            result = self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=1)
             self.assertEqual(result["state"], "CONFIRMED")
             synced = saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
             self.assertEqual(synced["state"], "RUNNING")
 
             self._enqueue_forward(saga, offset=2)
-            result = self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=3)
+            result = self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=3)
             self.assertEqual(result["state"], "CONFIRMED")
             synced = saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
             self.assertEqual(synced["state"], "COMPLETED")
@@ -242,7 +301,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self._create(saga)
 
             self._enqueue_forward(saga)
-            self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=1)
+            self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=1)
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
 
             self._enqueue_forward(saga, offset=2)
@@ -289,7 +348,7 @@ class ExecutionSagaTests(unittest.TestCase):
                 created_at=NOW + timedelta(seconds=5),
             )
             self.assertEqual(queued["saga"]["steps"][0]["state"], "COMPENSATION_ENQUEUED")
-            result = self._dispatch_claimed(
+            result = self._fixture_dispatch_after_simulated_external_positive_review(
                 outbox,
                 budget,
                 FakeAdapter(),
@@ -318,7 +377,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self._create(saga, steps=self._steps(three=True))
             for index, key in enumerate(("one", "two"), start=1):
                 self._enqueue_forward(saga, offset=index * 2)
-                self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=index * 2 + 1)
+                self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=index * 2 + 1)
                 saga.sync_forward_outcome(
                     "saga-1",
                     key,
@@ -354,7 +413,7 @@ class ExecutionSagaTests(unittest.TestCase):
             )
             self.assertEqual(active["step_key"], "two")
 
-            self._dispatch_claimed(
+            self._fixture_dispatch_after_simulated_external_positive_review(
                 outbox,
                 budget,
                 FakeAdapter(),
@@ -382,7 +441,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self._create(saga, steps=self._steps(irreversible_first=True))
 
             self._enqueue_forward(saga)
-            self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=1)
+            self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=1)
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
 
             self._enqueue_forward(saga, offset=2)
@@ -434,7 +493,21 @@ class ExecutionSagaTests(unittest.TestCase):
                 authorize=policy(self.scope),
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(reconciled["state"], "CONFIRMED")
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
+            )
+            self.assertEqual(
+                saga.sync_forward_outcome(
+                    "saga-1", "one", now=NOW + timedelta(seconds=3),
+                )["state"],
+                "RECONCILIATION_REQUIRED",
+            )
+            # Saga state-machine only: explicit simulated review, never a
+            # productive receipt or an automatic admission from an adapter.
+            self._fixture_mark_confirmed_only_after_simulated_external_positive_review(
+                outbox, result["idempotency_key"], allow_uncertain_send=True,
+            )
             synced = saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=3))
             self.assertEqual(synced["state"], "RUNNING")
             store.close()
@@ -449,7 +522,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self._create(saga, steps=self._steps(three=True))
             for index, key in enumerate(("one", "two"), start=1):
                 self._enqueue_forward(saga, offset=index * 2)
-                self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=index * 2 + 1)
+                self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=index * 2 + 1)
                 saga.sync_forward_outcome("saga-1", key, now=NOW + timedelta(seconds=index * 2 + 1))
             self._enqueue_forward(saga, offset=6)
             unresolved = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=7)
@@ -506,7 +579,19 @@ class ExecutionSagaTests(unittest.TestCase):
                 ),
                 now=NOW + timedelta(seconds=12),
             )
-            self.assertEqual(reconciled["state"], "CONFIRMED")
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
+            )
+            self.assertEqual(
+                saga.sync_compensation_outcome(
+                    "saga-1", "two", now=NOW + timedelta(seconds=12),
+                )["state"],
+                "RECONCILIATION_REQUIRED",
+            )
+            self._fixture_mark_confirmed_only_after_simulated_external_positive_review(
+                outbox, result["idempotency_key"], allow_uncertain_send=True,
+            )
             synced = saga.sync_compensation_outcome("saga-1", "two", now=NOW + timedelta(seconds=12))
             self.assertEqual(synced["state"], "COMPENSATING")
             next_comp = saga.enqueue_next_compensation(
@@ -526,7 +611,7 @@ class ExecutionSagaTests(unittest.TestCase):
             store, outbox, budget, saga = self._components(raw)
             self._create(saga)
             self._enqueue_forward(saga)
-            self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=1)
+            self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=1)
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
             self._enqueue_forward(saga, offset=2)
             unknown = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
@@ -627,7 +712,7 @@ class ExecutionSagaTests(unittest.TestCase):
                 valid_until=NOW + timedelta(minutes=5),
                 created_at=NOW,
             )
-            self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=1)
+            self._fixture_dispatch_after_simulated_external_positive_review(outbox, budget, FakeAdapter(), offset=1)
             saga.sync_forward_outcome("saga-a", "one", now=NOW + timedelta(seconds=1))
 
             self._create(saga, saga_id="saga-b", steps=one_step)
