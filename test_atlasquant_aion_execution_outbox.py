@@ -1465,6 +1465,47 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         self.assertEqual(self.outbox.effect_count(), 0)
         self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
 
+    def test_self_attested_adapter_enrollment_cannot_enable_send(self):
+        """A.27: adapter-provided enrollment metadata confers no authority."""
+        class FakeEnrolledAdapter:
+            producer_enrolled = True
+            issuer_id = "CALLER_SELF_ATTESTED_NOT_PINNED"
+            trusted = True
+            signed_receipt = "CALLER_FORGED_NOT_VERIFIED"
+            def __init__(self):
+                self.calls = 0
+            def send(self, _decision, _key):
+                self.calls += 1
+                raise AssertionError("untrusted adapter must not reach send")
+        adapter = FakeEnrolledAdapter()
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+        ):
+            self._dispatch(adapter)
+        self.assertEqual(adapter.calls, 0)
+        self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_pre_send_gate_rejects_before_accessing_adapter_descriptor(self):
+        """A.27: even a dynamic send property may have dangerous side effects."""
+        class DangerousDescriptor:
+            def __init__(self):
+                self.property_reads = 0
+                self.calls = 0
+            @property
+            def send(self):
+                self.property_reads += 1
+                raise AssertionError("send property must not be evaluated")
+        adapter = DangerousDescriptor()
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+        ):
+            self._dispatch(adapter)
+        self.assertEqual(adapter.property_reads, 0)
+        self.assertEqual(adapter.calls, 0)
+        self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
     def test_fake_positive_cannot_release_followup_same_aggregate(self):
         """No next aggregate action may run on a merely asserted effect."""
         later = self.outbox.enqueue(
