@@ -445,14 +445,15 @@ class ExecutionOutbox:
                            AND earlier.workspace=d.workspace
                            AND earlier.aggregate_key=d.aggregate_key
                            AND earlier.aggregate_seq<d.aggregate_seq
-                           -- A.44: a locally writable CONFIRMED/FAILED row
-                           -- is not a causal producer receipt or an enforced
-                           -- terminal no-effect fence. Never release the next
-                           -- intent from either claim until external admission
-                           -- is independently verified (not enrolled yet).
-                           -- Local pre-send policy revocation / reapproval
-                           -- blocks remain distinct no-adapter outcomes.
-                           AND eo.state NOT IN ('REVOKED','BLOCKED_REAPPROVAL')
+                           -- A.44: even a local terminal-looking marker
+                           -- (CONFIRMED, FAILED, REVOKED or BLOCKED_REAPPROVAL)
+                           -- can be forged by a writer of this same SQLite DB.
+                           -- The current system has NO independently authenticated
+                           -- producer receipt, no-effect fence, or trust witness.
+                           -- Thus ANY prior same-aggregate intent keeps later
+                           -- ones unclaimable until an independently reviewed
+                           -- producer/owner proof admission path is enrolled.
+                           -- Other aggregates remain independently claimable.
                      )
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
