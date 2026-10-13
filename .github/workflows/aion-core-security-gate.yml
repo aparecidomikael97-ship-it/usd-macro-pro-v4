@@ -217,6 +217,12 @@ jobs:
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_tail_event_cannot_mask_running_saga \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_direct_saga_state_rewrite_mismatches_event_tip \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority
+      - name: A46 reject tampered loaded checkpoint before Global Worker CAS or executor
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a46_corrupted_checkpoint_get_success_does_not_execute_or_write \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a46_corrupted_global_worker_digest_does_not_reach_claim \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a46_confirmed_read_without_checkpoint_is_untrusted
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
