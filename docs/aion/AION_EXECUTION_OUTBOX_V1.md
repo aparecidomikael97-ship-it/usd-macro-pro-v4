@@ -258,3 +258,42 @@ successful effect or treated as covered by the preflight checks.
 Code and test coverage exist only in Draft branches. No deployment, Worker,
 Render, installer, physical AM12 activation or production connection is
 authorized. 0/6 P0 homologated; all 20 first-install gates remain NO-GO.
+
+
+## V16-A.31 — durable, nonterminal producer-blocked state (LAB)
+
+An unconditional exception on an otherwise valid CLAIMED intent prevented
+the send boundary from being crossed, but left the claim leased. When the
+lease expired, `release_expired_claims` could return it to `RETRY` and
+a later worker could claim the same unenrolled action again indefinitely.
+A.31 closes this **local retry/churn gap**, not external provider trust.
+
+- `BLOCKED_PRODUCER` is a distinct, durable, **NON-TERMINAL** state.
+  It is intentionally absent from `TERMINAL_STATES` and cannot release
+  a later action of the same aggregate through the FIFO claim query.
+- On otherwise valid local preflight, the still mandatory
+  `INDEPENDENT_PRODUCER_NOT_ENROLLED` denial first persists
+  `CLAIMED → BLOCKED_PRODUCER` in one scoped SQLite transaction.
+  A conditional UPDATE checks original worker/lease/state, current lease
+  validity, persisted decision deadline, and absence of a recorded effect;
+  stale observations raise and do not overwrite newer state.
+- The transition clears the lease, stores the denial reason and retains
+  the attempt count. Lease reaper and ordinary `PENDING/RETRY` claim
+  logic cannot pick up `BLOCKED_PRODUCER` again, even after restart.
+- After the successful durable block, it still raises PermissionError
+  **before reading or calling `adapter.send`**. No producer enrollment,
+  mock-signature override, witness, external send or effects ledger write
+  has been introduced.
+- No unblocking workflow is implemented. A future real enrollment
+  process cannot simply flip this state without a separately approved
+  origin/epoch/intent/owner/tenant/device attestation and an independently
+  auditable transition. As long as that mechanism is absent, this block
+  deliberately sacrifices liveness to avoid false authority.
+- Outbox tests check the durable denial after lease expiry and a second
+  SQLite connection, with the next action of the same aggregate held
+  while unrelated aggregates can still be independently claimed.
+
+The remaining legacy post-send tests are separate coverage gaps because
+there is no authorized producer that can cross the send boundary. The
+A.12+A.16 original 37+8 cases have not been reproduced from their missing
+archives. No P0 or first-install gate becomes homologated by this state.
