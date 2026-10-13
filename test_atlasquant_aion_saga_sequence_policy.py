@@ -52,6 +52,13 @@ class PureSequencePolicyTests(unittest.TestCase):
         # This candidate is a state calculation, NOT external proof.
         self.assertEqual(select_forward_step("RUNNING", _steps("CONFIRMED", "PENDING")), 1)
 
+    def test_simulated_outcome_labels_never_unlock_real_sequence(self):
+        for state in ("SIMULATED_ONLY_COMMITTED", "SIMULATED_ONLY_NO_EFFECT",
+                      "SIMULATED_ONLY_UNCERTAIN"):
+            with self.subTest(state=state):
+                with self.assertRaisesRegex(ValueError, "earlier confirmation"):
+                    select_forward_step("RUNNING", _steps(state, "PENDING"))
+
     def test_terminal_and_reconciliation_sagas_cannot_enqueue(self):
         for state in ("COMPLETED", "FAILED", "COMPENSATING",
                       "RECONCILIATION_REQUIRED", "PRODUCER_ENROLLMENT_REQUIRED"):
