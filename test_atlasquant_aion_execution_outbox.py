@@ -1528,6 +1528,82 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         )
         self.assertEqual(self.outbox.effect_count(), 0)
 
+    def _stage_uncertain_readback_without_producer(self):
+        """TEST-ONLY historical ambiguity; never crosses any adapter boundary."""
+        before = self.outbox.get(self.key)
+        self.assertEqual(before["state"], "CLAIMED")
+        with self.outbox.db:
+            row = self.outbox.db.execute(
+                """UPDATE action_outbox
+                   SET state='UNCERTAIN',lease_owner='',lease_until='',
+                       last_error='A32_TEST_ONLY_UNKNOWN_SOURCE'
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                           AND e.owner=action_outbox.owner
+                           AND e.tenant=action_outbox.tenant
+                           AND e.workspace=action_outbox.workspace
+                     )""",
+                (self.key, self.scope.owner_id, self.scope.tenant_id,
+                 self.scope.workspace_id, before["lease_owner"], before["lease_until"]),
+            )
+            self.assertEqual(row.rowcount, 1)
+        self.assertEqual(self.outbox.get(self.key)["state"], "UNCERTAIN")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_unenrolled_reconcile_must_not_access_dynamic_adapter_descriptor(self):
+        """A.32 RED: a malicious reconcile property can itself create effects."""
+        self._stage_uncertain_readback_without_producer()
+
+        class DangerousReconcileAttribute:
+            def __init__(self):
+                self.property_reads = 0
+
+            @property
+            def reconcile(self):
+                self.property_reads += 1
+                raise AssertionError("untrusted descriptor evaluated before enrollment")
+
+        adapter = DangerousReconcileAttribute()
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+        ):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=fixture_authority(self.scope),
+                now=NOW + timedelta(seconds=2),
+            )
+        self.assertEqual(adapter.property_reads, 0)
+        self.assertEqual(self.outbox.get(self.key)["state"], "UNCERTAIN")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_unenrolled_reconcile_must_not_invoke_side_effecting_callback(self):
+        """A.32 RED: reconcile callback is not a trusted read-only operation."""
+        self._stage_uncertain_readback_without_producer()
+
+        class DangerousReconcileCallable:
+            def __init__(self):
+                self.reconcile_calls = 0
+
+            def reconcile(self, _key, _decision):
+                self.reconcile_calls += 1
+                return {"found": True, "confirmed": True, "effect_ref": "FORGED"}
+
+        adapter = DangerousReconcileCallable()
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+        ):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=fixture_authority(self.scope),
+                now=NOW + timedelta(seconds=2),
+            )
+        self.assertEqual(adapter.reconcile_calls, 0)
+        self.assertEqual(self.outbox.get(self.key)["state"], "UNCERTAIN")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
     def test_unenrolled_block_survives_lease_expiry_and_store_reopen(self):
         """A.31: denied intents must never churn CLAIMED/RETRY across restarts."""
         adapter = ClaimsConfirmedWithoutProducer()
