@@ -349,8 +349,9 @@ class AionChaosCampaignTests(unittest.TestCase):
             synced = saga.sync_forward_outcome(
                 "chaos-saga", "one", now=NOW + timedelta(seconds=1),
             )
-            self.assertEqual(synced["state"], "RUNNING")
-            self.assertEqual(synced["saga"]["steps"][0]["state"], "ENQUEUED")
+            self.assertEqual(synced["state"], "PRODUCER_ENROLLMENT_REQUIRED")
+            self.assertEqual(synced["saga"]["steps"][0]["state"], "BLOCKED_PRODUCER")
+            self.assertEqual(synced["step_state"], "BLOCKED_PRODUCER")
             self.assertEqual(outbox.effect_count(), 0)
             self.assertIsNone(outbox.claim_next(
                 "worker-2", now=NOW + timedelta(seconds=2),
