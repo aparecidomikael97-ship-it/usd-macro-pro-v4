@@ -445,7 +445,15 @@ class ExecutionOutbox:
                            AND earlier.workspace=d.workspace
                            AND earlier.aggregate_key=d.aggregate_key
                            AND earlier.aggregate_seq<d.aggregate_seq
-                           AND eo.state NOT IN ('CONFIRMED','REVOKED','BLOCKED_REAPPROVAL','FAILED')
+                           -- A.44: even a local terminal-looking marker
+                           -- (CONFIRMED, FAILED, REVOKED or BLOCKED_REAPPROVAL)
+                           -- can be forged by a writer of this same SQLite DB.
+                           -- The current system has NO independently authenticated
+                           -- producer receipt, no-effect fence, or trust witness.
+                           -- Thus ANY prior same-aggregate intent keeps later
+                           -- ones unclaimable until an independently reviewed
+                           -- producer/owner proof admission path is enrolled.
+                           -- Other aggregates remain independently claimable.
                      )
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
