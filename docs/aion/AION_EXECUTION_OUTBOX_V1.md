@@ -89,10 +89,26 @@ Dispatch persists `UNCERTAIN` **before** crossing the adapter boundary.
 Therefore a crash or timeout after that point cannot cause a blind resend after
 restart. A future adapter must expose an idempotency-aware reconciliation path.
 
-- found + confirmed -> `CONFIRMED`, effect ledger written once;
-- authoritative absence -> policy is revalidated again, then the intent may
-  return to `RETRY`;
-- ambiguous result -> remains uncertain.
+- found + confirmed -> `CONFIRMED` in local fixture semantics, effect ledger written once;
+  **a real producer receipt and independently authenticated source remain
+  mandatory before operational trust**;
+- adapter-declared `authoritative_absence=true` **is not evidence of no effect**,
+  even when the fake adapter knows the fixture did not send anything: keep
+  `UNCERTAIN`/`SENT`, return `INDEPENDENT_ABSENCE_PROOF_REQUIRED`;
+- an adapter response `accepted=false`, regardless of `retryable`, is not
+  proof of no effect or no delayed effect after the pre-send UNCERTAIN commit:
+  keep `UNCERTAIN` and the aggregate blocked;
+- any ambiguity -> no automatic `RETRY`, terminal `FAILED`, escalation to
+  compensation, or release of the next aggregate action solely from a callback;
+- only an independently authenticated, causal no-effect receipt **and** a
+  producer-enforced late-effect fence could justify a future recovery path.
+  No such productive admission mechanism exists in this staging version.
+
+The original synthetic tests modeled an adapter's self-declared absence as
+authoritative. The A.20 lab candidate intentionally revokes that assumption;
+separate compensation-engine tests still exercise their state machine via an
+**explicit SQL fixture simulating external review**, never proof or an
+available production API.
 
 ## Effect ledger
 
@@ -112,7 +128,8 @@ The staged red-team suite proves:
 - transaction reauthentication mismatch forces reapproval;
 - expired authority causes zero adapter calls;
 - lost response after a successful effect is reconciled without a second send;
-- authoritative proof of no effect is required before retry;
+- unverified adapter absence/rejection cannot authorize retry or release FIFO;
+- external proof of no effect is still required, with no live verifier installed;
 - per-resource ordering is enforced;
 - expired pre-dispatch claims are recoverable;
 - cross-tenant access fails closed;
@@ -131,3 +148,245 @@ This block does not activate:
 - biometric/FIDO transaction confirmation implementation.
 
 Those remain separate gates.
+
+
+## V16-A.24 — temporary positive-admission hard stop (LAB candidate only)
+
+The executable A.21 adversarial contracts in Draft #1236 proved that injected,
+untrusted `adapter.send` and `adapter.reconcile` responses could set
+`CONFIRMED` and populate `action_effects` even when no producer existed.
+
+This staged A.24 child deliberately **does not provide any path for a callback
+boolean, `effect_ref`, or a direct private `_confirm` call to certify an effect**.
+
+- A post-send `accepted=true, confirmed=true` is kept `UNCERTAIN` and the
+  scoped aggregate remains blocked, reporting `UNCERTAIN_PROOF_REQUIRED` and
+  `ADAPTER_POSITIVE_EFFECT_UNVERIFIED`.
+- An `adapter.reconcile(found=true, confirmed=true)` leaves a current
+  `SENT` or `UNCERTAIN` untouched, reporting
+  `INDEPENDENT_POSITIVE_PROOF_REQUIRED`. A stale observation is ignored.
+- A direct call to `_confirm` raises
+  `INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED`; no ledger row is added.
+- The A.20 negative quarantine remains active. An unverified negative result
+  never permits retry, FAILED, compensation or release of the next aggregate.
+
+**Important compatibility cost:** tests and Saga fixture workflows that used a
+fake adapter's `confirmed=true` as an effect may now correctly fail. They
+must remain visible in CI as **legacy contract incompatibilities** until a
+reviewed proof-admission mechanism and updated safety tests exist. Do not add
+an allow-fixture-in-production flag, xfail/skip, trust a self-enrolled key or
+weaken the new A.21 adversarial tests merely to force green.
+
+A future real path needs producer-issued causal positive receipts,
+independently enrolled issuer/pins/tenant+resource scope, challenge/nonce,
+replay/revocation/freshness checks, causal readback and a separately retained
+antirollback current-head. The producer must also furnish a terminal
+fenced-no-effect proof before safe retry of ambiguous attempts. Neither path
+exists in the A.24 staging candidate.
+
+No external sender is enabled, and a red CI from legacy positive fixtures is
+not evidence of a released system. Main, Core V1, Worker, AM12 and deployment
+remain untouched; first install remains HARD NO-GO (20/20 blocked).
+
+
+## V16-A.27 — mandatory pre-adapter producer enrollment stop (LAB only)
+
+The prior A.26 red-team acceptance test (Draft #1239, Quality run
+38426167793) executed against the actual Outbox module: the expected
+`INDEPENDENT_PRODUCER_NOT_ENROLLED` PermissionError was not raised.
+This exposed an **effect-boundary risk** distinct from merely denying
+untrusted positive/negative callback confirmations. In a future connected
+deployment, `adapter.send` may itself cause an irrevocable effect.
+
+This LAB candidate places an **unconditional fail-closed hard stop** in
+`dispatch_claimed` *before* retrieving an adapter's `send` attribute,
+before the SQLite transition to `UNCERTAIN`, and before invoking the
+sender. It raises `PermissionError("INDEPENDENT_PRODUCER_NOT_ENROLLED")`;
+the accepted local claim remains `CLAIMED` and no ledger row is added.
+
+The stop does **not** validate real enrollment and provides **no opt-in,
+fixture permit, self-attested producer flag, environment switch or trusted
+test key**. It can only be removed/replaced following a separate design
+review of independently rooted enrollment + producer account and owner/host
+binding, causal receipts and monotonic antirollback witness, as well as
+producer-enforced epoch/idempotency fencing and physical verification.
+Old code below the hard stop is deliberately unreachable in this isolated
+candidate; it is NOT an alternative approved operation path.
+
+This containment intentionally changes liveness: any real action cannot
+reach a producer at all in this staging build, even when local authorization
+and a lease exist. Legacy tests that expected calls to an in-memory fake
+sender may now fail. They are not proof of production readiness; failures
+must stay visible and must not be bypassed to achieve a green workflow.
+The direct adversarial A.26 test and new A.27 self-attestation and
+descriptor-side-effect tests must be checked independently from broad CI.
+
+No actual producer, root, Windows Hello/FIDO, AM12 host, Worker, Render or
+deployment is enrolled or activated. Main and frozen Core V1 remain
+untouched. First-install gates remain HARD NO-GO.
+
+
+## V16-A.30 — local policy, time-of-use and persisted fence validation before hard denial
+
+A.27 had introduced an unconditional NO-PRODUCER stop before even checking
+the existing second authorization callback and persisted deadline/lease
+fences. That did not enable any side effect, but obscured useful security
+regression coverage: lease expiry during callbacks, revocation at second
+authorization, a moved lease, or shortened persisted decision deadline.
+
+This LAB-only A.30 reorders **local pre-send checks**:
+1. Retain the first authorization and budget checks unchanged.
+2. Re-check time and lease, invoke second authorization, re-read time,
+   check decision validity and live lease.
+3. Perform a READ-ONLY scoped query using original state, owner, tenant,
+   workspace, worker, original lease and persisted decision deadline.
+   A mismatch still fails without touching the adapter.
+4. After all of those necessary-but-NOT-sufficient checks, unconditionally
+   raise `INDEPENDENT_PRODUCER_NOT_ENROLLED`. No `adapter.send` lookup,
+   `UNCERTAIN` mutation, or sender invocation occurs. The previous
+   transactional CAS remains behind the hard stop, unreachable, and is
+   NOT being represented as a proved operational send fence.
+
+**No trust is enrolled:** this validation does not implement positive or
+negative causal receipt verification, producer issuer custody, monotonic
+witness, HUMAN_OWNER device proof, or a producer-side epoch/idempotency
+fence. A read-only query before denial is not a substitute for atomic
+producer admission or source authenticity. Existing tests that require
+a real callback to `send` should remain RED, not rewritten to fake a
+successful effect or treated as covered by the preflight checks.
+
+Code and test coverage exist only in Draft branches. No deployment, Worker,
+Render, installer, physical AM12 activation or production connection is
+authorized. 0/6 P0 homologated; all 20 first-install gates remain NO-GO.
+
+
+## V16-A.31 — durable, nonterminal producer-blocked state (LAB)
+
+An unconditional exception on an otherwise valid CLAIMED intent prevented
+the send boundary from being crossed, but left the claim leased. When the
+lease expired, `release_expired_claims` could return it to `RETRY` and
+a later worker could claim the same unenrolled action again indefinitely.
+A.31 closes this **local retry/churn gap**, not external provider trust.
+
+- `BLOCKED_PRODUCER` is a distinct, durable, **NON-TERMINAL** state.
+  It is intentionally absent from `TERMINAL_STATES` and cannot release
+  a later action of the same aggregate through the FIFO claim query.
+- On otherwise valid local preflight, the still mandatory
+  `INDEPENDENT_PRODUCER_NOT_ENROLLED` denial first persists
+  `CLAIMED → BLOCKED_PRODUCER` in one scoped SQLite transaction.
+  A conditional UPDATE checks original worker/lease/state, current lease
+  validity, persisted decision deadline, and absence of a recorded effect;
+  stale observations raise and do not overwrite newer state.
+- The transition clears the lease, stores the denial reason and retains
+  the attempt count. Lease reaper and ordinary `PENDING/RETRY` claim
+  logic cannot pick up `BLOCKED_PRODUCER` again, even after restart.
+- After the successful durable block, it still raises PermissionError
+  **before reading or calling `adapter.send`**. No producer enrollment,
+  mock-signature override, witness, external send or effects ledger write
+  has been introduced.
+- No unblocking workflow is implemented. A future real enrollment
+  process cannot simply flip this state without a separately approved
+  origin/epoch/intent/owner/tenant/device attestation and an independently
+  auditable transition. As long as that mechanism is absent, this block
+  deliberately sacrifices liveness to avoid false authority.
+- Outbox tests check the durable denial after lease expiry and a second
+  SQLite connection, with the next action of the same aggregate held
+  while unrelated aggregates can still be independently claimed.
+
+The remaining legacy post-send tests are separate coverage gaps because
+there is no authorized producer that can cross the send boundary. The
+A.12+A.16 original 37+8 cases have not been reproduced from their missing
+archives. No P0 or first-install gate becomes homologated by this state.
+
+### Saga propagation of producer block
+
+The Saga coordinator now recognizes `BLOCKED_PRODUCER` in **both** forward
+and compensation outcomes. The step becomes `BLOCKED_PRODUCER` and the
+Saga becomes `PRODUCER_ENROLLMENT_REQUIRED`, a non-successful, nonterminal
+hold that forbids forward enqueue, effect recognition and compensation.
+This prevents an unmapped-state exception as well as accidental treatment
+of the absence of producer enrollment as either CONFIRMED or FAILED.
+
+This status is only a diagnostic hold. No Saga command or test fixture may
+enroll a producer or resolve a blocked effect on its own.
+
+
+## V16-A.33 — historical reconciliation is also an executable trust boundary
+
+A.32 deliberately tested two failures on the actual staging module. For a
+test-local `UNCERTAIN` historical observation without any external send,
+`reconcile()` reached the injected adapter's `@property reconcile` and
+callable `reconcile` before any independently enrolled producer existed.
+Both adversarial tests failed on A.32 (6,162 tests / 2 new failures +
+23 pre-existing Outbox errors): a callback that *claims* to be read-only
+cannot be assumed to have no side effects, and authenticating its *return*
+after the call is not enough.
+
+This A.33 isolated LAB child introduces a **second unconditional hard
+stop**, after verifying `SENT/UNCERTAIN` and **before looking up any
+`adapter.reconcile` attribute or invoking callback**. Until an externally
+controlled producer enrollment/root, scoped/account-bound capability and
+readback/provenance verifier exist, `reconcile` raises
+`INDEPENDENT_PRODUCER_NOT_ENROLLED`; it leaves the intent and effect ledger
+unchanged. There is no fallback to automatic retry, FAILED or compensation.
+The original post-send reconciliation code remains unreachable in this
+candidate, just as `adapter.send` is unreachable behind the A.31 deny.
+
+**Liveness and historical coverage limitation:** this is a security-first
+containment, NOT a working producer readback implementation. A legitimate
+external event may remain ambiguous indefinitely until a verified issuer and
+witness are enrolled in a separate, reviewed architecture. Historical
+test-only adapters that used to exercise readback callbacks now encounter
+this denial; Quality/Saga/Chaos suite incompatibilities are to be inventoried
+and made explicit without a mock authorization bypass. The unexecuted A.12
+37 + A.16 8 external cases and all physical owner, provider and witness
+acceptance gates remain separate.
+
+NO GO for deployment or merge. 0/6 P0 homologated, 20/20 first-install gates
+blocked. No real producer, network dispatch or trust root was enabled.
+
+
+## V16-A.39 — no local CONFIRMED/FAILED elevation in Saga
+
+The red-team A.38 child (#1251) proved that the *real*
+`ExecutionSagaCoordinator.sync_forward_outcome` could treat only a local
+SQLite `CONFIRMED` row (with an equally local effects-ledger row) as an
+externally verified effect, recording authority usage and advancing a Saga.
+It also treated a local `FAILED` row as terminal absence of an effect,
+although no producer had durably fenced late queued work. Both tests
+reproduced the bypass in CI: 6,173 tests / 2 new FAIL plus 23 historical
+Outbox ERROR. No actual provider was called; the unsafe promotion occurs
+under malicious, restored or incorrectly wired local state.
+
+A.39 adds mandatory **pre-admission denials** in BOTH Saga forward and
+compensation outcome synchronization:
+
+- `outbox.state == CONFIRMED` → raise
+  `INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED`, BEFORE any budget,
+  effect-ref or Saga mutation.
+- `outbox.state == FAILED` → raise
+  `INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED`, BEFORE any terminal
+  FAILED status, compensation eligibility or Saga mutation.
+- `BLOCKED_PRODUCER` continues as nonterminal
+  `PRODUCER_ENROLLMENT_REQUIRED`; `UNCERTAIN/SENT` remain reconciliation
+  required. Local policy-origin `REVOKED/BLOCKED_REAPPROVAL` retains its
+  separate denial semantics; that is NOT a producer negative receipt.
+- There is no code path that imports A.37 local matching as issuer trust,
+  no product callback and no compensation execution unlocked.
+
+These are staging, unconditional, fail-closed decisions, **not** real
+positive/negative verification. They intentionally invalidate previous
+Saga tests that used test-only SQL `CONFIRMED/FAILED` to simulate complete
+transaction/rollback liveness. Such simulated success paths cannot be
+relabelled as authentic external effects to restore CI green. Real Saga
+completion and compensation require independently enrolled producer
+receipts, current nonrollback witness and terminal producer-side fencing.
+
+A.39 additionally tests malicious compensation bindings with locally
+forged positive/negative states; it cannot claim a working compensation
+or an attested external effect.
+
+Until independent trust evidence and the original A12+A16 regression
+archives are available, 0/6 P0 remain unhomologated and 20/20 first
+installation gates HARD NO-GO. No live send/reconcile, account, signing,
+external provider, AM12 installation, merge or deploy was performed.

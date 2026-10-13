@@ -33,6 +33,12 @@ jobs:
             atlasquant_aion_fortress.py \
             atlasquant_aion_resilience.py \
             atlasquant_aion_chaos_campaign.py \
+            atlasquant_aion_execution_outbox.py \
+            test_atlasquant_aion_execution_outbox.py \
+            atlasquant_aion_producer_receipt_untrusted_precheck.py \
+            test_atlasquant_aion_producer_receipt_untrusted_precheck.py \
+            atlasquant_aion_execution_saga.py \
+            test_atlasquant_aion_execution_saga.py \
             atlasquant_aion_mission_control.py \
             atlasquant_aion_drift_monitor.py \
             atlasquant_aion_blast_radius_gate.py \
@@ -163,6 +169,26 @@ jobs:
             test_atlasquant_aion_v26_memory_recovery_redteam.py \
             test_atlasquant_aion_observability.py \
             test_atlasquant_aion_core_hardening_v24.py
+      - name: Prove AION Outbox no-producer hard denials independently of legacy Quality
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_no_enrolled_producer_must_block_before_adapter_send \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_self_attested_adapter_enrollment_cannot_enable_send \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_pre_send_gate_rejects_before_accessing_adapter_descriptor \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_access_dynamic_adapter_descriptor \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_invoke_side_effecting_callback \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_block_survives_lease_expiry_and_store_reopen \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_block_keeps_same_aggregate_fifo_but_not_unrelated_work
+      - name: Prove external producer receipt claims never admit without independent trust
+        run: |
+          python -m unittest -q test_atlasquant_aion_producer_receipt_untrusted_precheck.py
+
+      - name: Prove Saga refuses local forged external effects independently of Quality
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_confirmed_cannot_supply_external_producer_receipt \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_failed_cannot_supply_terminal_no_effect_fence \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a39_compensation_cannot_promote_local_confirmed_or_failed
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
