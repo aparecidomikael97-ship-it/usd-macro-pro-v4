@@ -1523,6 +1523,29 @@ def run_global_worker_once(
             "real_trading_enabled": False,
         }
 
+    # V16-A.47: a rollout flag is not an independently enrolled source,
+    # owner or latest-head antirollback witness. No verifiable trust root is
+    # installed in this runtime. Deny before accessing even the supplied
+    # config descriptor or making a network read, CAS claim, or executor call.
+    # Do not add a bypass flag, fixture signer, or self-attested "verified".
+    # Replacing this hold requires an independently reviewed real witness
+    # and source/tenant/owner binding with physical HUMAN_OWNER approval.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
+        "processed": 0,
+        "network_called": False,
+        "executor_called": False,
+        "automatic_runtime_checkpoint_persistence": False,
+        "automatic_retry_allowed": False,
+        "source_authenticity_verified": False,
+        "independent_witness_verified": False,
+        "owner_identity_verified": False,
+        "external_action_executed": False,
+        "real_trading_enabled": False,
+    }
+
     cfg = config or config_from_mapping()
     runtime = _runtime_id(runtime_id)
     if not runtime:
