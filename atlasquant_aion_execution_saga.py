@@ -883,6 +883,14 @@ class ExecutionSagaCoordinator:
         ).fetchall()
         previous = GENESIS_HASH
         blockers = []
+        # A.43: an empty chain is not a valid intact saga merely because
+        # there are no rows whose hashes can mismatch. Every created Saga
+        # must have a SAGA_CREATED genesis event. This is local consistency,
+        # NOT an independently authenticated antirollback witness.
+        if not rows:
+            blockers.append("EVENT_CHAIN_EMPTY")
+        elif rows[0]["event_type"] != "SAGA_CREATED":
+            blockers.append("GENESIS_EVENT_MISSING")
         for expected_sequence, row in enumerate(rows, start=1):
             if int(row["sequence"]) != expected_sequence:
                 blockers.append("EVENT_SEQUENCE_MISMATCH")
@@ -905,6 +913,12 @@ class ExecutionSagaCoordinator:
                 blockers.append("EVENT_HASH_MISMATCH")
                 break
             previous = row["event_hash"]
+        # Detect simple tail deletion or direct Saga-state rewrite where the
+        # surviving local event chain no longer describes the current state.
+        # Rehashing/replaying both tables remains possible without an
+        # independent latest-head witness: never call this external proof.
+        if rows and not blockers and rows[-1]["state"] != saga["state"]:
+            blockers.append("LATEST_EVENT_STATE_MISMATCH")
         return {
             "schema": SCHEMA,
             "saga_id": saga["saga_id"],
@@ -912,6 +926,10 @@ class ExecutionSagaCoordinator:
             "blockers": blockers,
             "events": len(rows),
             "tip_hash": previous,
+            "proof_scope": "LOCAL_SQLITE_CHAIN_ONLY",
+            "independent_witness_verified": False,
+            "producer_effect_verified": False,
+            "authorizes_execution": False,
             "automatic_compensation": False,
             "executes_action": False,
         }
