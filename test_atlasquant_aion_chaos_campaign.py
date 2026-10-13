@@ -128,6 +128,36 @@ class AionChaosCampaignTests(unittest.TestCase):
             valid_until=NOW + timedelta(minutes=5),
         )
 
+    def _fixture_force_uncertain_without_send(self, outbox, key):
+        """TEST-ONLY raw SQLite ambiguous state; never enrolls a producer.
+
+        Used for read-only reconciliation exercises after a real dispatch was
+        explicitly denied. This is NOT an issuer, external receipt, effect or
+        callable alternative to the pre-send production hard stop.
+        """
+        before = outbox.get(key)
+        self.assertEqual(before["state"], "BLOCKED_PRODUCER")
+        self.assertEqual(before["last_error"], "INDEPENDENT_PRODUCER_NOT_ENROLLED")
+        self.assertEqual(before["lease_owner"], "")
+        self.assertEqual(before["lease_until"], "")
+        with outbox.db:
+            changed = outbox.db.execute(
+                """UPDATE action_outbox
+                   SET state='UNCERTAIN',lease_owner='',lease_until='',
+                       last_error='TEST_FIXTURE_UNKNOWN_NO_SEND'
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='BLOCKED_PRODUCER'
+                     AND last_error='INDEPENDENT_PRODUCER_NOT_ENROLLED'
+                     AND lease_owner=? AND lease_until=?""",
+                (
+                    key, self.scope.owner_id, self.scope.tenant_id,
+                    self.scope.workspace_id, before["lease_owner"],
+                    before["lease_until"],
+                ),
+            )
+            self.assertEqual(changed.rowcount, 1)
+        self.assertEqual(outbox.effect_count(), 0)
+
     def test_provider_fault_opens_circuit_and_degrades_to_read_only(self):
         breaker = circuit_breaker(
             "provider",
@@ -141,29 +171,41 @@ class AionChaosCampaignTests(unittest.TestCase):
         self.assertEqual(safe["mode"], "DEGRADED_READ_ONLY")
         self.assertFalse(safe["external_side_effects_allowed"])
 
-    def test_network_timeout_never_blind_resends_without_authoritative_absence(self):
+    def test_unenrolled_network_sender_denied_and_unverified_absence_cannot_retry(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox, "network-1")
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
             adapter = ChaosAdapter("lose-before-effect")
-            result = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(result["state"], "UNCERTAIN")
-            self.assertEqual(adapter.send_calls, 1)
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.dispatch_claimed(
+                    claimed["idempotency_key"],
+                    worker_id="worker-1",
+                    authorize=authorization(self.scope),
+                    adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "BLOCKED_PRODUCER")
+            self.assertEqual(adapter.send_calls, 0)
+            # The following read-only reconciliation uses only synthetic DB
+            # state. No producer was called, nor was a no-effect proof issued.
+            self._fixture_force_uncertain_without_send(outbox, item["idempotency_key"])
             reconciled = outbox.reconcile(
                 item["idempotency_key"],
                 adapter=adapter,
                 authorize=authorization(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(reconciled["state"], "RETRY")
-            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"], "INDEPENDENT_ABSENCE_PROOF_REQUIRED",
+            )
+            self.assertIsNone(outbox.claim_next(
+                "worker-2", now=NOW + timedelta(seconds=3),
+            ))
+            self.assertEqual(adapter.send_calls, 0)
             self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
@@ -199,32 +241,47 @@ class AionChaosCampaignTests(unittest.TestCase):
             self.assertEqual(recovered.integrity_report()["state"], "MATCH")
             reopened.close()
 
-    def test_queue_lost_response_reconciles_exactly_once_without_resend(self):
+    def test_unenrolled_queue_sender_denied_and_fake_effect_cannot_confirm(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox, "queue-1")
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
             adapter = ChaosAdapter("lose-after-effect")
-            result = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(result["state"], "UNCERTAIN")
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.dispatch_claimed(
+                    claimed["idempotency_key"],
+                    worker_id="worker-1",
+                    authorize=authorization(self.scope),
+                    adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "BLOCKED_PRODUCER")
+            # Simulate ONLY a callback claiming an effect on an inert fixture.
+            # This did not arise from adapter.send and is not a causal receipt.
+            self._fixture_force_uncertain_without_send(outbox, item["idempotency_key"])
+            adapter.effects[item["idempotency_key"]] = "UNTRUSTED_FIXTURE_EFFECT"
             reconciled = outbox.reconcile(
                 item["idempotency_key"],
                 adapter=adapter,
                 authorize=authorization(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(reconciled["state"], "CONFIRMED")
-            self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
+            )
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(adapter.reconcile_calls, 1)
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(
+                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=3))
+            )
             store.close()
 
-    def test_tool_failure_after_prior_effect_requires_manual_compensation_approval(self):
+    def test_unenrolled_tool_cannot_advance_saga_or_authorize_compensation(self):
         with tempfile.TemporaryDirectory() as raw:
             store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
             outbox = ExecutionOutbox(store, self.scope)
@@ -275,43 +332,41 @@ class AionChaosCampaignTests(unittest.TestCase):
                 created_at=NOW,
             )
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-            confirmed = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=ChaosAdapter("confirmed"),
-                cumulative_authority_guard=lambda d: budget.guard(d, now=NOW),
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(confirmed["state"], "CONFIRMED")
-            saga.sync_forward_outcome("chaos-saga", "one", now=NOW + timedelta(seconds=1))
-
-            saga.enqueue_next(
-                "chaos-saga",
-                authorization_ref="approval-1",
-                valid_until=NOW + timedelta(minutes=5),
-                created_at=NOW + timedelta(seconds=2),
-            )
-            claimed = outbox.claim_next("worker-1", now=NOW + timedelta(seconds=2), lease_seconds=60)
-            failed = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=ChaosAdapter("reject"),
-                cumulative_authority_guard=lambda d: budget.guard(d, now=NOW + timedelta(seconds=2)),
-                now=NOW + timedelta(seconds=3),
-            )
-            self.assertEqual(failed["state"], "FAILED")
+            adapter = ChaosAdapter("confirmed")
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.dispatch_claimed(
+                    claimed["idempotency_key"],
+                    worker_id="worker-1",
+                    authorize=authorization(self.scope),
+                    adapter=adapter,
+                    cumulative_authority_guard=lambda d: budget.guard(d, now=NOW),
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(outbox.get(claimed["idempotency_key"])["state"], "BLOCKED_PRODUCER")
             synced = saga.sync_forward_outcome(
-                "chaos-saga",
-                "two",
-                now=NOW + timedelta(seconds=3),
+                "chaos-saga", "one", now=NOW + timedelta(seconds=1),
             )
-            self.assertEqual(synced["state"], "COMPENSATION_REQUIRED")
-            with self.assertRaisesRegex(ValueError, "explicit human approval"):
+            self.assertEqual(synced["state"], "PRODUCER_ENROLLMENT_REQUIRED")
+            self.assertEqual(synced["saga"]["steps"][0]["state"], "BLOCKED_PRODUCER")
+            self.assertEqual(synced["step_state"], "BLOCKED_PRODUCER")
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(outbox.claim_next(
+                "worker-2", now=NOW + timedelta(seconds=2),
+            ))
+            with self.assertRaisesRegex(ValueError, "saga state does not allow forward enqueue"):
+                saga.enqueue_next(
+                    "chaos-saga",
+                    authorization_ref="approval-1",
+                    valid_until=NOW + timedelta(minutes=5),
+                    created_at=NOW + timedelta(seconds=2),
+                )
+            with self.assertRaisesRegex(ValueError, "not eligible"):
                 saga.prepare_compensation(
                     "chaos-saga",
-                    explicit_human_approval=False,
+                    explicit_human_approval=True,
                     approval_ref="approval-comp",
                     reauth_ref="reauth-comp",
                     now=NOW + timedelta(seconds=4),
@@ -345,10 +400,10 @@ class AionChaosCampaignTests(unittest.TestCase):
     def test_complete_campaign_requires_all_domains_and_remains_non_authoritative(self):
         observations = [
             observation("PROVIDER", failure_mode="provider outage", containment="circuit OPEN", recovery="safe mode read-only"),
-            observation("NETWORK", failure_mode="timeout before effect", containment="UNCERTAIN", recovery="authoritative absence -> RETRY"),
+            observation("NETWORK", failure_mode="timeout before effect", containment="UNCERTAIN", recovery="independent absence receipt unavailable -> BLOCKED"),
             observation("STORE", failure_mode="crash before CAS commit", containment="transaction rollback", recovery="reopen revision unchanged"),
-            observation("QUEUE", failure_mode="response lost after effect", containment="UNCERTAIN", recovery="reconcile -> CONFIRMED exactly once"),
-            observation("TOOL", failure_mode="second tool rejected", containment="COMPENSATION_REQUIRED", recovery="manual approval required"),
+            observation("QUEUE", failure_mode="response lost after effect", containment="UNCERTAIN", recovery="no producer attestation available; remain UNCERTAIN"),
+            observation("TOOL", failure_mode="second tool rejected", containment="RECONCILIATION_REQUIRED", recovery="independent result first; no compensation"),
             observation("AGENT", failure_mode="loop/error storm", containment="ISOLATE_RECOMMENDED", recovery="read-only diagnosis"),
             observation("STATE_CORRUPTION", failure_mode="ledger digest tamper", containment="integrity MISMATCH", recovery="blocked for review"),
         ]
