@@ -202,6 +202,13 @@ jobs:
       - name: A42 real Saga compensation refuses forged SQLite claims and owner refs
         run: |
           python -m unittest -q test_atlasquant_aion_saga_compensation_admission.py
+      - name: A43 verify Saga local event chain gaps never masquerade as external proof
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_entire_event_chain_is_mismatch_not_false_match \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_tail_event_cannot_mask_running_saga \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_direct_saga_state_rewrite_mismatches_event_tip \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
