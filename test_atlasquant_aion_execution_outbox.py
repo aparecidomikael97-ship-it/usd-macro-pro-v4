@@ -906,5 +906,109 @@ class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
         self.assertEqual(result["last_error"], "AUTHORITY_REVOKED")
 
 
+
+class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
+    """Reentrant fixture interleavings. No real provider/authoritative receipt."""
+
+    def setUp(self):
+        self.scope = Scope("owner-test", "tenant-a", "workspace-a")
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.store = SQLiteChatStore(Path(self.tempdir.name) / "chat.sqlite3")
+        self.outbox = ExecutionOutbox(self.store, self.scope)
+        self.item = self.outbox.enqueue(
+            intent_ref="intent-stale-retry",
+            action="send_email",
+            payload={"fixture": "local-only"},
+            aggregate_key="client-stale-retry",
+            policy_version="policy-v1",
+            authorization_ref="approval-1",
+            created_at=NOW,
+            valid_until=NOW + timedelta(minutes=5),
+        )
+        self.key = self.item["idempotency_key"]
+        self.outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+        self.adapter = FakeIdempotentAdapter("sent")
+        self.assertEqual(self.outbox.dispatch_claimed(
+            self.key, worker_id="worker-1",
+            authorize=policy(self.scope), adapter=self.adapter,
+            now=NOW + timedelta(seconds=1),
+        )["state"], "SENT")
+
+    def tearDown(self):
+        self.store.close()
+        self.tempdir.cleanup()
+
+    def test_stale_absence_must_not_reopen_confirmed_effect(self):
+        outbox, key = self.outbox, self.key
+
+        class LateAbsence:
+            def reconcile(self, _key, _decision):
+                outbox._confirm(
+                    key, effect_ref="EFFECT-VERIFIED",
+                    confirmed_at=NOW + timedelta(seconds=2),
+                )
+                return {"found": False, "authoritative_absence": True}
+
+        with self.assertRaisesRegex(RuntimeError, "stale reconciliation"):
+            outbox.reconcile(
+                key, adapter=LateAbsence(),
+                authorize=policy(self.scope),
+                now=NOW + timedelta(seconds=3),
+            )
+        self.assertEqual(outbox.get(key)["state"], "CONFIRMED")
+        self.assertEqual(outbox.get(key)["effect_ref"], "EFFECT-VERIFIED")
+        self.assertEqual(outbox.effect_count(), 1)
+        self.assertEqual(self.adapter.send_calls, 1)
+
+    def test_stale_absence_cannot_reopen_revoked_state(self):
+        outbox, key = self.outbox, self.key
+
+        class LateAbsence:
+            def reconcile(self, _key, _decision):
+                with outbox.db:
+                    outbox.db.execute(
+                        "UPDATE action_outbox SET state='REVOKED' "
+                        "WHERE idempotency_key=?",
+                        (key,),
+                    )
+                return {"found": False, "authoritative_absence": True}
+
+        with self.assertRaisesRegex(RuntimeError, "stale reconciliation"):
+            outbox.reconcile(
+                key, adapter=LateAbsence(),
+                authorize=policy(self.scope),
+                now=NOW + timedelta(seconds=3),
+            )
+        self.assertEqual(outbox.get(key)["state"], "REVOKED")
+        self.assertEqual(self.adapter.send_calls, 1)
+
+    def test_stale_authorize_callback_cannot_reset_lease_and_retry(self):
+        outbox, key = self.outbox, self.key
+
+        class Absence:
+            def reconcile(self, _key, _decision):
+                return {"found": False, "authoritative_absence": True}
+
+        def changed_authorize(decision):
+            with outbox.db:
+                outbox.db.execute(
+                    "UPDATE action_outbox SET lease_owner='other-worker' "
+                    "WHERE idempotency_key=?",
+                    (key,),
+                )
+            return policy(self.scope)(decision)
+
+        with self.assertRaisesRegex(RuntimeError, "stale reconciliation"):
+            outbox.reconcile(
+                key, adapter=Absence(),
+                authorize=changed_authorize,
+                now=NOW + timedelta(seconds=3),
+            )
+        self.assertEqual(outbox.get(key)["state"], "SENT")
+        self.assertEqual(outbox.get(key)["lease_owner"], "other-worker")
+        self.assertEqual(self.adapter.send_calls, 1)
+
+
+
 if __name__ == "__main__":
     unittest.main()
