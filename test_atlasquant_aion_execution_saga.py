@@ -192,6 +192,9 @@ class ExecutionSagaTests(unittest.TestCase):
         claimed = outbox.claim_next(worker, now=when, lease_seconds=60)
         self.assertIsNotNone(claimed)
         key = claimed["idempotency_key"]
+        # Earlier TEST-only saga steps may have created hypothetical effects.
+        # What this gate must prove is that this denied attempt adds NONE.
+        effects_before_denial = outbox.effect_count()
         try:
             # A denial by an earlier budget/policy gate remains an ordinary
             # result; it must not be converted into a synthetic attempt.
@@ -215,7 +218,7 @@ class ExecutionSagaTests(unittest.TestCase):
             observed = outbox.get(key)
             self.assertEqual(observed["state"], "CLAIMED")
             self.assertEqual(observed["lease_owner"], worker)
-            self.assertEqual(outbox.effect_count(), 0)
+            self.assertEqual(outbox.effect_count(), effects_before_denial)
 
             # TEST FIXTURE ONLY, after verifying actual pre-send denial.
             # This stages an observation used by Saga and read-only reconcile,
@@ -255,7 +258,7 @@ class ExecutionSagaTests(unittest.TestCase):
             if mode == "lose-after-effect":
                 adapter.effects[key] = "UNTRUSTED_FIXTURE_EFFECT"
             self.assertEqual(adapter.send_calls, 0)
-            self.assertEqual(outbox.effect_count(), 0)
+            self.assertEqual(outbox.effect_count(), effects_before_denial)
             staged = outbox.get(key)
             self.assertEqual(staged["state"], "UNCERTAIN")
             return {
