@@ -224,3 +224,37 @@ descriptor-side-effect tests must be checked independently from broad CI.
 No actual producer, root, Windows Hello/FIDO, AM12 host, Worker, Render or
 deployment is enrolled or activated. Main and frozen Core V1 remain
 untouched. First-install gates remain HARD NO-GO.
+
+
+## V16-A.30 — local policy, time-of-use and persisted fence validation before hard denial
+
+A.27 had introduced an unconditional NO-PRODUCER stop before even checking
+the existing second authorization callback and persisted deadline/lease
+fences. That did not enable any side effect, but obscured useful security
+regression coverage: lease expiry during callbacks, revocation at second
+authorization, a moved lease, or shortened persisted decision deadline.
+
+This LAB-only A.30 reorders **local pre-send checks**:
+1. Retain the first authorization and budget checks unchanged.
+2. Re-check time and lease, invoke second authorization, re-read time,
+   check decision validity and live lease.
+3. Perform a READ-ONLY scoped query using original state, owner, tenant,
+   workspace, worker, original lease and persisted decision deadline.
+   A mismatch still fails without touching the adapter.
+4. After all of those necessary-but-NOT-sufficient checks, unconditionally
+   raise `INDEPENDENT_PRODUCER_NOT_ENROLLED`. No `adapter.send` lookup,
+   `UNCERTAIN` mutation, or sender invocation occurs. The previous
+   transactional CAS remains behind the hard stop, unreachable, and is
+   NOT being represented as a proved operational send fence.
+
+**No trust is enrolled:** this validation does not implement positive or
+negative causal receipt verification, producer issuer custody, monotonic
+witness, HUMAN_OWNER device proof, or a producer-side epoch/idempotency
+fence. A read-only query before denial is not a substitute for atomic
+producer admission or source authenticity. Existing tests that require
+a real callback to `send` should remain RED, not rewritten to fake a
+successful effect or treated as covered by the preflight checks.
+
+Code and test coverage exist only in Draft branches. No deployment, Worker,
+Render, installer, physical AM12 activation or production connection is
+authorized. 0/6 P0 homologated; all 20 first-install gates remain NO-GO.
