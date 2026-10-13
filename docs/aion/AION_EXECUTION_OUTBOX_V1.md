@@ -344,3 +344,49 @@ acceptance gates remain separate.
 
 NO GO for deployment or merge. 0/6 P0 homologated, 20/20 first-install gates
 blocked. No real producer, network dispatch or trust root was enabled.
+
+
+## V16-A.39 — no local CONFIRMED/FAILED elevation in Saga
+
+The red-team A.38 child (#1251) proved that the *real*
+`ExecutionSagaCoordinator.sync_forward_outcome` could treat only a local
+SQLite `CONFIRMED` row (with an equally local effects-ledger row) as an
+externally verified effect, recording authority usage and advancing a Saga.
+It also treated a local `FAILED` row as terminal absence of an effect,
+although no producer had durably fenced late queued work. Both tests
+reproduced the bypass in CI: 6,173 tests / 2 new FAIL plus 23 historical
+Outbox ERROR. No actual provider was called; the unsafe promotion occurs
+under malicious, restored or incorrectly wired local state.
+
+A.39 adds mandatory **pre-admission denials** in BOTH Saga forward and
+compensation outcome synchronization:
+
+- `outbox.state == CONFIRMED` → raise
+  `INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED`, BEFORE any budget,
+  effect-ref or Saga mutation.
+- `outbox.state == FAILED` → raise
+  `INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED`, BEFORE any terminal
+  FAILED status, compensation eligibility or Saga mutation.
+- `BLOCKED_PRODUCER` continues as nonterminal
+  `PRODUCER_ENROLLMENT_REQUIRED`; `UNCERTAIN/SENT` remain reconciliation
+  required. Local policy-origin `REVOKED/BLOCKED_REAPPROVAL` retains its
+  separate denial semantics; that is NOT a producer negative receipt.
+- There is no code path that imports A.37 local matching as issuer trust,
+  no product callback and no compensation execution unlocked.
+
+These are staging, unconditional, fail-closed decisions, **not** real
+positive/negative verification. They intentionally invalidate previous
+Saga tests that used test-only SQL `CONFIRMED/FAILED` to simulate complete
+transaction/rollback liveness. Such simulated success paths cannot be
+relabelled as authentic external effects to restore CI green. Real Saga
+completion and compensation require independently enrolled producer
+receipts, current nonrollback witness and terminal producer-side fencing.
+
+A.39 additionally tests malicious compensation bindings with locally
+forged positive/negative states; it cannot claim a working compensation
+or an attested external effect.
+
+Until independent trust evidence and the original A12+A16 regression
+archives are available, 0/6 P0 remain unhomologated and 20/20 first
+installation gates HARD NO-GO. No live send/reconcile, account, signing,
+external provider, AM12 installation, merge or deploy was performed.
