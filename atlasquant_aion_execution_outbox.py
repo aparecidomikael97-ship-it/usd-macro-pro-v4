@@ -494,7 +494,9 @@ class ExecutionOutbox:
             ("workspace_id", self.scope.workspace_id),
         ):
             supplied = _clean(current.get(field), 128)
-            if supplied and supplied != wanted:
+            if not supplied:
+                return False, "REVOKED", {"reason": field.upper() + "_MISSING"}
+            if supplied != wanted:
                 return False, "REVOKED", {"reason": field.upper() + "_MISMATCH"}
         if _clean(current.get("policy_version"), 128) != _clean(decision.get("policy_version"), 128):
             return False, "BLOCKED_REAPPROVAL", {"reason": "POLICY_VERSION_CHANGED"}
