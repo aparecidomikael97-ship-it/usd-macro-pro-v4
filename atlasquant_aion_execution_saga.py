@@ -662,6 +662,12 @@ class ExecutionSagaCoordinator:
             raise ValueError("no confirmed effects to compensate")
         if any(not row["reversible"] for row in confirmed):
             raise ValueError("irreversible confirmed effect requires manual intervention")
+        # V16-A.42: a local Saga CONFIRMED row and caller-provided approval
+        # booleans/refs cannot authenticate an external effect or HUMAN_OWNER.
+        # Until independent producer proof + human approval verification exist,
+        # NEVER promote these SQLite projections into a compensation plan.
+        # Deny before any Saga mutation, event append or budget operation.
+        raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
         now_iso = _iso(_utc(now))
         self.db.execute("BEGIN IMMEDIATE")
         try:
@@ -712,6 +718,11 @@ class ExecutionSagaCoordinator:
         saga = self.get(saga_id)
         candidate = select_compensation_step(saga["state"], saga["steps"])
         step = saga["steps"][candidate]
+        # V16-A.42: local COMPENSATING/COMPENSATION_PENDING, effect_ref and
+        # approval/reauth refs may all be forged in SQLite. There is no
+        # independently enrolled producer effect or owner authorization yet.
+        # A pure sequence candidate is NEVER sufficient to stage a rollback.
+        raise PermissionError("INDEPENDENT_PRODUCER_COMPENSATION_NOT_ENROLLED")
         item = self.outbox.enqueue(
             intent_ref=f"{saga['saga_id']}:{step['step_key']}:compensation",
             action=step["compensation_action"],
