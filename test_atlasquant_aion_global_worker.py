@@ -222,43 +222,49 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertFalse(result["network_called"])
         self.assertEqual(result["processed"], 0)
 
-    def test_a47_feature_true_without_independent_source_must_not_fetch_or_execute(self):
-        """The rollout feature flag alone cannot authorize reading/staging work."""
+    def test_a47_feature_true_cannot_claim_cas_or_execute_without_source_witness(self):
+        """A valid-looking local checkpoint never grants external source trust."""
+        checkpoint = self.armed_checkpoint()
+        self.assertIn(
+            checkpoint_integrity_report(checkpoint)["state"],
+            {"CONFIRMED", "MIGRATION_REQUIRED"},
+        )
         with patch(
-            "atlasquant_aion_global_worker.load_runtime_checkpoint"
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "fake-local-sha"},
         ) as load, patch(
             "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
         ) as persist, patch(
             "atlasquant_aion_global_worker._execute_due_local_work_authorized"
         ) as execute:
             result = run_global_worker_once(
-                config=_config(),
-                runtime_id="a47-unenrolled",
-                feature_enabled=True,
-                now=TICK,
+                config=_config(), runtime_id="a47-unenrolled",
+                feature_enabled=True, now=TICK,
             )
-        load.assert_not_called()
+        load.assert_called_once()
         persist.assert_not_called()
         execute.assert_not_called()
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["reason"], "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED")
         self.assertEqual(result["processed"], 0)
-        self.assertFalse(result["network_called"])
+        self.assertTrue(result["network_called"])  # safe read only
         self.assertFalse(result["external_action_executed"])
 
-    def test_a47_enabled_environment_without_source_must_not_fetch_or_write(self):
+    def test_a47_enabled_environment_cannot_claim_cas_without_source_witness(self):
+        checkpoint = self.armed_checkpoint()
         with patch(
             "atlasquant_aion_global_worker.global_worker_feature_enabled",
             return_value=True,
         ), patch(
-            "atlasquant_aion_global_worker.load_runtime_checkpoint"
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "fake-local-sha"},
         ) as load, patch(
             "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
         ) as persist, patch(
             "atlasquant_aion_global_worker._execute_due_local_work_authorized"
         ) as execute:
             result = run_global_worker_once(config=_config(), runtime_id="a47-env", now=TICK)
-        load.assert_not_called()
+        load.assert_called_once()
         persist.assert_not_called()
         execute.assert_not_called()
         self.assertEqual(result["status"], "BLOCKED")
@@ -290,7 +296,8 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         persist.assert_not_called()
         execute.assert_not_called()
         self.assertEqual(result["status"], "BLOCKED")
-        self.assertEqual(result["reason"], "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED")
+        self.assertEqual(result["reason"], "GLOBAL_RUNTIME_CONFIG_TYPE_INVALID")
+        self.assertFalse(result["network_called"])
 
     def test_a46_corrupted_checkpoint_get_success_does_not_execute_or_write(self):
         checkpoint = self.armed_checkpoint()
