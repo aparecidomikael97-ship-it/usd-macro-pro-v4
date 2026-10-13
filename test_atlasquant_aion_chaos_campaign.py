@@ -128,6 +128,31 @@ class AionChaosCampaignTests(unittest.TestCase):
             valid_until=NOW + timedelta(minutes=5),
         )
 
+    def _fixture_force_uncertain_without_send(self, outbox, key):
+        """TEST-ONLY raw SQLite ambiguous state; never enrolls a producer.
+
+        Used for read-only reconciliation exercises after a real dispatch was
+        explicitly denied. This is NOT an issuer, external receipt, effect or
+        callable alternative to the pre-send production hard stop.
+        """
+        before = outbox.get(key)
+        self.assertEqual(before["state"], "CLAIMED")
+        with outbox.db:
+            changed = outbox.db.execute(
+                """UPDATE action_outbox
+                   SET state='UNCERTAIN',lease_owner='',lease_until='',
+                       last_error='TEST_FIXTURE_UNKNOWN_NO_SEND'
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?""",
+                (
+                    key, self.scope.owner_id, self.scope.tenant_id,
+                    self.scope.workspace_id, before["lease_owner"],
+                    before["lease_until"],
+                ),
+            )
+            self.assertEqual(changed.rowcount, 1)
+        self.assertEqual(outbox.effect_count(), 0)
+
     def test_provider_fault_opens_circuit_and_degrades_to_read_only(self):
         breaker = circuit_breaker(
             "provider",
@@ -141,21 +166,27 @@ class AionChaosCampaignTests(unittest.TestCase):
         self.assertEqual(safe["mode"], "DEGRADED_READ_ONLY")
         self.assertFalse(safe["external_side_effects_allowed"])
 
-    def test_network_timeout_never_resends_on_unverified_adapter_absence(self):
+    def test_unenrolled_network_sender_denied_and_unverified_absence_cannot_retry(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox, "network-1")
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
             adapter = ChaosAdapter("lose-before-effect")
-            result = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(result["state"], "UNCERTAIN")
-            self.assertEqual(adapter.send_calls, 1)
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.dispatch_claimed(
+                    claimed["idempotency_key"],
+                    worker_id="worker-1",
+                    authorize=authorization(self.scope),
+                    adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "CLAIMED")
+            self.assertEqual(adapter.send_calls, 0)
+            # The following read-only reconciliation uses only synthetic DB
+            # state. No producer was called, nor was a no-effect proof issued.
+            self._fixture_force_uncertain_without_send(outbox, item["idempotency_key"])
             reconciled = outbox.reconcile(
                 item["idempotency_key"],
                 adapter=adapter,
@@ -169,7 +200,7 @@ class AionChaosCampaignTests(unittest.TestCase):
             self.assertIsNone(outbox.claim_next(
                 "worker-2", now=NOW + timedelta(seconds=3),
             ))
-            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(adapter.send_calls, 0)
             self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
@@ -205,20 +236,28 @@ class AionChaosCampaignTests(unittest.TestCase):
             self.assertEqual(recovered.integrity_report()["state"], "MATCH")
             reopened.close()
 
-    def test_queue_lost_response_reconciles_exactly_once_without_resend(self):
+    def test_unenrolled_queue_sender_denied_and_fake_effect_cannot_confirm(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox, "queue-1")
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
             adapter = ChaosAdapter("lose-after-effect")
-            result = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(result["state"], "UNCERTAIN")
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.dispatch_claimed(
+                    claimed["idempotency_key"],
+                    worker_id="worker-1",
+                    authorize=authorization(self.scope),
+                    adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "CLAIMED")
+            # Simulate ONLY a callback claiming an effect on an inert fixture.
+            # This did not arise from adapter.send and is not a causal receipt.
+            self._fixture_force_uncertain_without_send(outbox, item["idempotency_key"])
+            adapter.effects[item["idempotency_key"]] = "UNTRUSTED_FIXTURE_EFFECT"
             reconciled = outbox.reconcile(
                 item["idempotency_key"],
                 adapter=adapter,
@@ -229,14 +268,15 @@ class AionChaosCampaignTests(unittest.TestCase):
             self.assertEqual(
                 reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
             )
-            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(adapter.reconcile_calls, 1)
             self.assertEqual(outbox.effect_count(), 0)
             self.assertIsNone(
                 outbox.claim_next("worker-2", now=NOW + timedelta(seconds=3))
             )
             store.close()
 
-    def test_tool_failure_after_prior_effect_requires_manual_compensation_approval(self):
+    def test_unenrolled_tool_cannot_advance_saga_or_authorize_compensation(self):
         with tempfile.TemporaryDirectory() as raw:
             store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
             outbox = ExecutionOutbox(store, self.scope)
@@ -287,26 +327,30 @@ class AionChaosCampaignTests(unittest.TestCase):
                 created_at=NOW,
             )
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-            confirmed = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=ChaosAdapter("confirmed"),
-                cumulative_authority_guard=lambda d: budget.guard(d, now=NOW),
-                now=NOW + timedelta(seconds=1),
-            )
-            # A fake positive has NOT supplied a producer-authenticated receipt.
-            self.assertEqual(confirmed["state"], "UNCERTAIN")
-            self.assertEqual(confirmed["dispatch_state"], "UNCERTAIN_PROOF_REQUIRED")
+            adapter = ChaosAdapter("confirmed")
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.dispatch_claimed(
+                    claimed["idempotency_key"],
+                    worker_id="worker-1",
+                    authorize=authorization(self.scope),
+                    adapter=adapter,
+                    cumulative_authority_guard=lambda d: budget.guard(d, now=NOW),
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(outbox.get(claimed["idempotency_key"])["state"], "CLAIMED")
             synced = saga.sync_forward_outcome(
                 "chaos-saga", "one", now=NOW + timedelta(seconds=1),
             )
-            self.assertEqual(synced["state"], "RECONCILIATION_REQUIRED")
+            self.assertEqual(synced["state"], "RUNNING")
+            self.assertEqual(synced["saga"]["steps"][0]["state"], "ENQUEUED")
             self.assertEqual(outbox.effect_count(), 0)
             self.assertIsNone(outbox.claim_next(
                 "worker-2", now=NOW + timedelta(seconds=2),
             ))
-            with self.assertRaisesRegex(ValueError, "state does not allow"):
+            with self.assertRaisesRegex(ValueError, "previous saga step is not settled"):
                 saga.enqueue_next(
                     "chaos-saga",
                     authorization_ref="approval-1",
