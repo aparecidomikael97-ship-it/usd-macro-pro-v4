@@ -541,14 +541,46 @@ class ExecutionOutbox:
         self,
         key: str,
         *,
+        expected: Mapping[str, Any],
         effect_ref: Any,
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Commit a local observation only if the send/reconcile snapshot is current.
+
+        This CAS does not authenticate any adapter receipt or external effect.
+        """
         effect = _token(effect_ref, "effect_ref", 128)
+        if _clean(expected.get("idempotency_key"), 64) != key:
+            raise ValueError("confirmation expected key mismatch")
+        seen_state = _clean(expected.get("state"), 32)
+        if seen_state not in {"UNCERTAIN", "SENT"}:
+            raise ValueError("confirmation requires observed SENT/UNCERTAIN")
         encoded = _canonical(redact(dict(result or {})))
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            changed = self.db.execute(
+                """UPDATE action_outbox
+                   SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
+                       lease_owner='',lease_until='',last_error=''
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state=? AND lease_owner=? AND lease_until=?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                           AND e.owner=action_outbox.owner
+                           AND e.tenant=action_outbox.tenant
+                           AND e.workspace=action_outbox.workspace
+                           AND e.effect_ref<>?
+                     )""",
+                (
+                    _iso(confirmed_at), effect, key, *self._scope_args(),
+                    seen_state, _clean(expected.get("lease_owner"), 128),
+                    _clean(expected.get("lease_until"), 128), effect,
+                ),
+            )
+            if changed.rowcount != 1:
+                raise RuntimeError("stale confirmation or effect collision; state preserved")
             existing = self.db.execute(
                 """SELECT effect_ref FROM action_effects
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
@@ -561,21 +593,8 @@ class ExecutionOutbox:
                     """INSERT INTO action_effects(
                         idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
                     ) VALUES (?,?,?,?,?,?,?)""",
-                    (
-                        key,
-                        *self._scope_args(),
-                        effect,
-                        _iso(confirmed_at),
-                        encoded,
-                    ),
+                    (key, *self._scope_args(), effect, _iso(confirmed_at), encoded),
                 )
-            self.db.execute(
-                """UPDATE action_outbox
-                   SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
-                       lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(confirmed_at), effect, key, *self._scope_args()),
-            )
             self.db.commit()
         except Exception:
             self.db.rollback()
@@ -698,38 +717,54 @@ class ExecutionOutbox:
             if cursor.rowcount != 1:
                 raise TimeoutError("claim/deadline changed before send; dispatch blocked")
 
+        # Snapshot exactly the state admitted to the external boundary. A later
+        # adapter response cannot rewrite a newer reconciliation or revocation.
+        sent_snapshot = self.get(key)
         try:
             result = _mapping(send(dict(intent["decision"]), key))
         except Exception as exc:
             with self.db:
-                self.db.execute(
+                changed = self.db.execute(
                     """UPDATE action_outbox
-                       SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?""",
                     (
-                        "",
                         "SEND_RESULT_UNKNOWN:" + type(exc).__name__,
-                        key,
-                        *self._scope_args(),
+                        key, *self._scope_args(),
+                        sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
                     ),
                 )
+                if changed.rowcount != 1:
+                    raise RuntimeError("stale send error; state preserved") from exc
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
         if result.get("accepted") is not True:
+            # Local compatibility behavior only: adapter.retryable is NOT
+            # independent proof of non-effect; external retry is still NO-GO.
             state = "RETRY" if result.get("retryable") is True else "FAILED"
             with self.db:
-                self.db.execute(
+                changed = self.db.execute(
                     """UPDATE action_outbox
                        SET state=?,lease_owner='',lease_until='',last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                         AND NOT EXISTS (
+                             SELECT 1 FROM action_effects e
+                             WHERE e.idempotency_key=action_outbox.idempotency_key
+                               AND e.owner=action_outbox.owner
+                               AND e.tenant=action_outbox.tenant
+                               AND e.workspace=action_outbox.workspace
+                         )""",
                     (
-                        state,
-                        _clean(result.get("reason") or "ADAPTER_REJECTED", 240),
-                        key,
-                        *self._scope_args(),
+                        state, _clean(result.get("reason") or "ADAPTER_REJECTED", 240),
+                        key, *self._scope_args(),
+                        sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
                     ),
                 )
+                if changed.rowcount != 1:
+                    raise RuntimeError("stale adapter rejection; RETRY/FAILED denied")
             return {**self.get(key), "dispatch_state": state}
 
         effect_ref = _clean(result.get("effect_ref"), 128)
@@ -738,6 +773,7 @@ class ExecutionOutbox:
                 raise ValueError("confirmed adapter result requires effect_ref")
             out = self._confirm(
                 key,
+                expected=sent_snapshot,
                 effect_ref=effect_ref,
                 confirmed_at=now_dt,
                 result=result,
@@ -745,12 +781,25 @@ class ExecutionOutbox:
             return {**out, "dispatch_state": "CONFIRMED"}
 
         with self.db:
-            self.db.execute(
+            changed = self.db.execute(
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(now_dt), effect_ref, key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                           AND e.owner=action_outbox.owner
+                           AND e.tenant=action_outbox.tenant
+                           AND e.workspace=action_outbox.workspace
+                     )""",
+                (
+                    _iso(now_dt), effect_ref, key, *self._scope_args(),
+                    sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
+                ),
             )
+            if changed.rowcount != 1:
+                raise RuntimeError("stale send result; SENT denied")
         return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
 
     def reconcile(
@@ -778,6 +827,7 @@ class ExecutionOutbox:
                 raise ValueError("confirmed reconciliation requires effect_ref")
             out = self._confirm(
                 key,
+                expected=intent,
                 effect_ref=effect_ref,
                 confirmed_at=now_dt,
                 result=result,
