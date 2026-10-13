@@ -1550,7 +1550,8 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         self.assertIsNone(
             self.outbox.claim_next("other-worker", now=NOW + timedelta(days=1)),
         )
-        with SQLiteChatStore(Path(self.root.name) / "chat.sqlite3") as reopened:
+        reopened = SQLiteChatStore(Path(self.root.name) / "chat.sqlite3")
+        try:
             another = ExecutionOutbox(reopened, self.scope)
             persisted = another.get(self.key)
             self.assertEqual(persisted["state"], "BLOCKED_PRODUCER")
@@ -1558,6 +1559,8 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
             self.assertIsNone(
                 another.claim_next("worker-after-restart", now=NOW + timedelta(days=2)),
             )
+        finally:
+            reopened.close()
         self.assertEqual(self.outbox.effect_count(), 0)
 
     def test_block_keeps_same_aggregate_fifo_but_not_unrelated_work(self):
