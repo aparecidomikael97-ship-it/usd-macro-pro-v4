@@ -217,6 +217,12 @@ jobs:
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_tail_event_cannot_mask_running_saga \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_direct_saga_state_rewrite_mismatches_event_tip \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority
+      - name: A47 hard stop if independent source witness is not enrolled
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_feature_true_cannot_claim_cas_or_execute_without_source_witness \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_enabled_environment_cannot_claim_cas_without_source_witness \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_no_untrusted_runtime_config_property_read_without_source
       - name: A46 reject tampered loaded checkpoint before Global Worker CAS or executor
         run: |
           python -m unittest -q \

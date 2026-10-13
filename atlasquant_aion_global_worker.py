@@ -1523,6 +1523,20 @@ def run_global_worker_once(
             "real_trading_enabled": False,
         }
 
+    # An untrusted runtime-config object must not execute Python properties
+    # or __bool__ methods before the source/witness boundary is checked.
+    if config is not None and type(config) is not RuntimeConfig:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "GLOBAL_RUNTIME_CONFIG_TYPE_INVALID",
+            "processed": 0,
+            "network_called": False,
+            "executor_called": False,
+            "automatic_runtime_checkpoint_persistence": False,
+            "external_action_executed": False,
+        }
+
     cfg = config or config_from_mapping()
     runtime = _runtime_id(runtime_id)
     if not runtime:
@@ -1701,6 +1715,33 @@ def run_global_worker_once(
             "external_action_executed": False,
             **_loop_evidence(loop_governor),
         }
+    # V16-A.47: local digests and GitHub CAS do not authenticate the source,
+    # bind owner/tenant/repo/path, or prove the latest antirollback head.
+    # Read-only checks above (raw integrity, kill switch, lease, scope,
+    # governor and collision handling) remain enforceable and testable.
+    # No independently enrolled source/witness exists; block before ANY
+    # runtime lease write, persistence, or local executor. This deliberately
+    # keeps old mock-positive execution tests RED until real proof is enrolled.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
+        "checkpoint_integrity": integrity_state,
+        "processed": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "blocked": 0,
+        "network_called": True,
+        "executor_called": False,
+        "automatic_runtime_checkpoint_persistence": False,
+        "automatic_retry_allowed": False,
+        "source_authenticity_verified": False,
+        "independent_witness_verified": False,
+        "owner_identity_verified": False,
+        "external_action_executed": False,
+        "real_trading_enabled": False,
+    }
+
     claim_checkpoint = attach_global_worker_state(checkpoint, claimed)
     claim_write = _persist_runtime_checkpoint_cas(
         claim_checkpoint,
