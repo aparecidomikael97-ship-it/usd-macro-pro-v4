@@ -1594,29 +1594,6 @@ def run_global_worker_once(
             "external_action_executed": False,
             "real_trading_enabled": False,
         }
-    # V16-A.47: local digest consistency (A46), feature flag and GitHub
-    # read/sha are NOT independent source ownership or latest-head witness.
-    # At this stage the fetch has been read-only and raw integrity checked.
-    # Hold BEFORE normalization, local lease CAS, any runtime write or
-    # executor. This leaves A46 corruption denials independently testable.
-    # There is no enrolled external witness, issuer or HUMAN_OWNER trust root.
-    return {
-        "schema": SCHEMA,
-        "status": "BLOCKED",
-        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
-        "checkpoint_integrity": integrity_state,
-        "processed": 0,
-        "network_called": True,
-        "executor_called": False,
-        "automatic_runtime_checkpoint_persistence": False,
-        "automatic_retry_allowed": False,
-        "source_authenticity_verified": False,
-        "independent_witness_verified": False,
-        "owner_identity_verified": False,
-        "external_action_executed": False,
-        "real_trading_enabled": False,
-    }
-
     checkpoint = ensure_operating_checkpoint(loaded.get("checkpoint"))
     state, state_status = load_global_worker_state(checkpoint)
     if state_status["state"] == "EMPTY":
@@ -1738,6 +1715,30 @@ def run_global_worker_once(
             "external_action_executed": False,
             **_loop_evidence(loop_governor),
         }
+    # V16-A.47: local digests and GitHub CAS do not authenticate the source,
+    # bind owner/tenant/repo/path, or prove the latest antirollback head.
+    # Read-only checks above (raw integrity, kill switch, lease, scope,
+    # governor and collision handling) remain enforceable and testable.
+    # No independently enrolled source/witness exists; block before ANY
+    # runtime lease write, persistence, or local executor. This deliberately
+    # keeps old mock-positive execution tests RED until real proof is enrolled.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
+        "checkpoint_integrity": integrity_state,
+        "processed": 0,
+        "network_called": True,
+        "executor_called": False,
+        "automatic_runtime_checkpoint_persistence": False,
+        "automatic_retry_allowed": False,
+        "source_authenticity_verified": False,
+        "independent_witness_verified": False,
+        "owner_identity_verified": False,
+        "external_action_executed": False,
+        "real_trading_enabled": False,
+    }
+
     claim_checkpoint = attach_global_worker_state(checkpoint, claimed)
     claim_write = _persist_runtime_checkpoint_cas(
         claim_checkpoint,
