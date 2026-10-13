@@ -35,6 +35,8 @@ jobs:
             atlasquant_aion_chaos_campaign.py \
             atlasquant_aion_execution_outbox.py \
             test_atlasquant_aion_execution_outbox.py \
+            atlasquant_aion_producer_receipt_untrusted_precheck.py \
+            test_atlasquant_aion_producer_receipt_untrusted_precheck.py \
             atlasquant_aion_mission_control.py \
             atlasquant_aion_drift_monitor.py \
             atlasquant_aion_blast_radius_gate.py \
@@ -175,6 +177,10 @@ jobs:
             test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_invoke_side_effecting_callback \
             test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_block_survives_lease_expiry_and_store_reopen \
             test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_block_keeps_same_aggregate_fifo_but_not_unrelated_work
+      - name: Prove external producer receipt claims never admit without independent trust
+        run: |
+          python -m unittest -q test_atlasquant_aion_producer_receipt_untrusted_precheck.py
+
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
