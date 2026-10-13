@@ -216,8 +216,10 @@ class ExecutionSagaTests(unittest.TestCase):
                 raise
             self.assertEqual(adapter.send_calls, 0)
             observed = outbox.get(key)
-            self.assertEqual(observed["state"], "CLAIMED")
-            self.assertEqual(observed["lease_owner"], worker)
+            self.assertEqual(observed["state"], "BLOCKED_PRODUCER")
+            self.assertEqual(observed["lease_owner"], "")
+            self.assertEqual(observed["lease_until"], "")
+            self.assertEqual(observed["last_error"], "INDEPENDENT_PRODUCER_NOT_ENROLLED")
             self.assertEqual(outbox.effect_count(), effects_before_denial)
 
             # TEST FIXTURE ONLY, after verifying actual pre-send denial.
@@ -236,7 +238,9 @@ class ExecutionSagaTests(unittest.TestCase):
                        SET state='UNCERTAIN',lease_owner='',lease_until='',
                            last_error=?
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                         AND state='CLAIMED' AND lease_owner=? AND lease_until=?
+                         AND state='BLOCKED_PRODUCER'
+                         AND last_error='INDEPENDENT_PRODUCER_NOT_ENROLLED'
+                         AND lease_owner=? AND lease_until=?
                          AND NOT EXISTS (
                              SELECT 1 FROM action_effects e
                              WHERE e.idempotency_key=action_outbox.idempotency_key
@@ -247,7 +251,7 @@ class ExecutionSagaTests(unittest.TestCase):
                     (
                         unverified_error, key,
                         self.scope.owner_id, self.scope.tenant_id,
-                        self.scope.workspace_id, worker, observed["lease_until"],
+                        self.scope.workspace_id, observed["lease_owner"], observed["lease_until"],
                     ),
                 )
                 self.assertEqual(changed.rowcount, 1)
