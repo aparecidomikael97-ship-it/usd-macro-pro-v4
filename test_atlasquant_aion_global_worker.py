@@ -222,6 +222,78 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertFalse(result["network_called"])
         self.assertEqual(result["processed"], 0)
 
+    def test_a46_corrupted_checkpoint_get_success_does_not_execute_or_write(self):
+        checkpoint = self.armed_checkpoint()
+        checkpoint["operating"]["task_digest"] = "f" * 64
+        self.assertEqual(checkpoint_integrity_report(checkpoint)["state"], "MISMATCH")
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={
+                "status": "CONFIRMED",
+                "checkpoint": checkpoint,
+                "sha": "fake-github-sha",
+                "integrity": {"state": "CONFIRMED", "write_safe": True},
+            },
+        ) as load, patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
+        ) as persist, patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as execute:
+            result = run_global_worker_once(
+                config=_config(),
+                runtime_id="a46-worker-check",
+                feature_enabled=True,
+                now=TICK,
+            )
+        load.assert_called_once()
+        persist.assert_not_called()
+        execute.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "GLOBAL_CHECKPOINT_INTEGRITY_MISMATCH")
+        self.assertEqual(result["processed"], 0)
+        self.assertFalse(result["executor_called"])
+        self.assertFalse(result["external_action_executed"])
+
+    def test_a46_corrupted_global_worker_digest_does_not_reach_claim(self):
+        checkpoint = self.armed_checkpoint()
+        checkpoint[GLOBAL_WORKER_NAMESPACE]["digest"] = "a46-forged-global-worker"
+        self.assertEqual(checkpoint_integrity_report(checkpoint)["state"], "MISMATCH")
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": checkpoint, "sha": "fake-github-sha"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
+        ) as persist, patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as execute:
+            result = run_global_worker_once(
+                config=_config(), runtime_id="a46-worker-corrupt",
+                feature_enabled=True, now=TICK,
+            )
+        persist.assert_not_called()
+        execute.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["checkpoint_integrity"], "MISMATCH")
+
+    def test_a46_confirmed_read_without_checkpoint_is_untrusted(self):
+        with patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint",
+            return_value={"status": "CONFIRMED", "checkpoint": None, "sha": "fake-github-sha"},
+        ), patch(
+            "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas"
+        ) as persist, patch(
+            "atlasquant_aion_global_worker._execute_due_local_work_authorized"
+        ) as execute:
+            result = run_global_worker_once(
+                config=_config(), runtime_id="a46-worker-missing",
+                feature_enabled=True, now=TICK,
+            )
+        persist.assert_not_called()
+        execute.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["checkpoint_integrity"], "UNKNOWN")
+        self.assertFalse(result["external_action_executed"])
+
     def test_global_tick_claims_fence_executes_and_persists_receipt(self):
         checkpoint = self.armed_checkpoint()
         captures = []
