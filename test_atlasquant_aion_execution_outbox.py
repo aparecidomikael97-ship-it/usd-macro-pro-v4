@@ -307,7 +307,7 @@ class ExecutionOutboxTests(unittest.TestCase):
             self.assertEqual(outbox.effect_count(), 1)
             store.close()
 
-    def test_authoritative_absence_allows_retry_after_lost_pre_effect_attempt(self):
+    def test_unverified_absence_never_allows_retry_even_if_fixture_knows_no_effect(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox)
@@ -323,31 +323,21 @@ class ExecutionOutboxTests(unittest.TestCase):
             self.assertEqual(first["state"], "UNCERTAIN")
             self.assertEqual(len(adapter.effects), 0)
 
+            # Fixture knowledge is not an authenticated receipt from a real
+            # external producer. The adapter's bool cannot reopen the action.
             retry = outbox.reconcile(
                 item["idempotency_key"],
                 adapter=adapter,
                 authorize=policy(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(retry["state"], "RETRY")
-
-            claimed = outbox.claim_next(
-                "worker-2",
-                now=NOW + timedelta(seconds=3),
-                lease_seconds=60,
-            )
-            adapter.mode = "confirmed"
-            final = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-2",
-                authorize=policy(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=4),
-            )
-            self.assertEqual(final["state"], "CONFIRMED")
-            self.assertEqual(adapter.send_calls, 2)
-            self.assertEqual(len(adapter.effects), 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(retry["state"], "UNCERTAIN")
+            self.assertEqual(retry["reconcile_state"], "INDEPENDENT_ABSENCE_PROOF_REQUIRED")
+            self.assertIsNone(outbox.claim_next(
+                "worker-2", now=NOW + timedelta(seconds=3), lease_seconds=60,
+            ))
+            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
     def test_same_aggregate_is_ordered_until_previous_intent_is_terminal(self):
@@ -902,12 +892,12 @@ class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
                 )
                 return {"found": False, "authoritative_absence": True}
 
-        with self.assertRaisesRegex(RuntimeError, "stale outbox state/lease"):
-            self.outbox.reconcile(
-                self.key, adapter=StaleAbsenceAdapter(),
-                authorize=policy(self.scope, allowed=False),
-                now=NOW + timedelta(seconds=3),
-            )
+        observed = self.outbox.reconcile(
+            self.key, adapter=StaleAbsenceAdapter(),
+            authorize=policy(self.scope, allowed=False),
+            now=NOW + timedelta(seconds=3),
+        )
+        self.assertEqual(observed["reconcile_state"], "STALE_OBSERVATION_IGNORED")
         self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
         self.assertEqual(self.outbox.effect_count(), 1)
 
@@ -964,12 +954,12 @@ class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
                 )
                 return {"found": False, "authoritative_absence": True}
 
-        with self.assertRaisesRegex(RuntimeError, "stale reconciliation"):
-            outbox.reconcile(
-                key, adapter=LateAbsence(),
-                authorize=policy(self.scope),
-                now=NOW + timedelta(seconds=3),
-            )
+        observed = outbox.reconcile(
+            key, adapter=LateAbsence(),
+            authorize=policy(self.scope),
+            now=NOW + timedelta(seconds=3),
+        )
+        self.assertEqual(observed["reconcile_state"], "STALE_OBSERVATION_IGNORED")
         self.assertEqual(outbox.get(key)["state"], "CONFIRMED")
         self.assertEqual(outbox.get(key)["effect_ref"], "EFFECT-VERIFIED")
         self.assertEqual(outbox.effect_count(), 1)
@@ -988,39 +978,35 @@ class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
                     )
                 return {"found": False, "authoritative_absence": True}
 
-        with self.assertRaisesRegex(RuntimeError, "stale reconciliation"):
-            outbox.reconcile(
-                key, adapter=LateAbsence(),
-                authorize=policy(self.scope),
-                now=NOW + timedelta(seconds=3),
-            )
+        observed = outbox.reconcile(
+            key, adapter=LateAbsence(),
+            authorize=policy(self.scope),
+            now=NOW + timedelta(seconds=3),
+        )
+        self.assertEqual(observed["reconcile_state"], "STALE_OBSERVATION_IGNORED")
         self.assertEqual(outbox.get(key)["state"], "REVOKED")
         self.assertEqual(self.adapter.send_calls, 1)
 
-    def test_stale_authorize_callback_cannot_reset_lease_and_retry(self):
+    def test_unverified_absence_cannot_invoke_authorize_or_reopen_retry(self):
         outbox, key = self.outbox, self.key
 
         class Absence:
             def reconcile(self, _key, _decision):
                 return {"found": False, "authoritative_absence": True}
 
-        def changed_authorize(decision):
-            with outbox.db:
-                outbox.db.execute(
-                    "UPDATE action_outbox SET lease_owner='other-worker' "
-                    "WHERE idempotency_key=?",
-                    (key,),
-                )
-            return policy(self.scope)(decision)
+        authorize_calls = []
+        def observed_authorize(_decision):
+            authorize_calls.append("unexpected")
+            return policy(self.scope)({})
 
-        with self.assertRaisesRegex(RuntimeError, "stale reconciliation"):
-            outbox.reconcile(
-                key, adapter=Absence(),
-                authorize=changed_authorize,
-                now=NOW + timedelta(seconds=3),
-            )
+        outcome = outbox.reconcile(
+            key, adapter=Absence(), authorize=observed_authorize,
+            now=NOW + timedelta(seconds=3),
+        )
+        self.assertEqual(outcome["state"], "SENT")
+        self.assertEqual(outcome["reconcile_state"], "INDEPENDENT_ABSENCE_PROOF_REQUIRED")
+        self.assertEqual(authorize_calls, [])
         self.assertEqual(outbox.get(key)["state"], "SENT")
-        self.assertEqual(outbox.get(key)["lease_owner"], "other-worker")
         self.assertEqual(self.adapter.send_calls, 1)
 
 
@@ -1167,6 +1153,102 @@ class OutboxPostSendStateCASP0Tests(unittest.TestCase):
             )
         self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
         self.assertEqual(self.outbox.effect_count(), 0)
+
+
+
+class OutboxUnverifiedAdapterResultP0Tests(unittest.TestCase):
+    """Untrusted negative answers must NOT certify no effect or allow a resend."""
+
+    def test_adapter_rejection_boolean_does_not_release_aggregate(self):
+        for retryable in (True, False):
+            with self.subTest(retryable=retryable):
+                with tempfile.TemporaryDirectory() as raw:
+                    scope = Scope("owner-test", "tenant-a", "workspace-a")
+                    store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
+                    try:
+                        outbox = ExecutionOutbox(store, scope)
+                        first = outbox.enqueue(
+                            intent_ref="intent-first", action="send_email",
+                            payload={"fixture": 1}, aggregate_key="client-1",
+                            policy_version="policy-v1", authorization_ref="approval-1",
+                            created_at=NOW, valid_until=NOW + timedelta(minutes=5),
+                        )
+                        second = outbox.enqueue(
+                            intent_ref="intent-second", action="send_email",
+                            payload={"fixture": 2}, aggregate_key="client-1",
+                            policy_version="policy-v1", authorization_ref="approval-1",
+                            created_at=NOW, valid_until=NOW + timedelta(minutes=5),
+                        )
+                        outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+
+                        class RejectingAdapter:
+                            send_calls = 0
+                            def send(self, _decision, _key):
+                                self.send_calls += 1
+                                return {
+                                    "accepted": False, "retryable": retryable,
+                                    "reason": "unverified adapter rejection",
+                                }
+
+                        adapter = RejectingAdapter()
+                        result = outbox.dispatch_claimed(
+                            first["idempotency_key"], worker_id="worker-1",
+                            authorize=policy(scope), adapter=adapter,
+                            now=NOW + timedelta(seconds=1),
+                        )
+                        self.assertEqual(result["state"], "UNCERTAIN")
+                        self.assertEqual(result["dispatch_state"], "UNCERTAIN_PROOF_REQUIRED")
+                        self.assertEqual(result["last_error"], "ADAPTER_REJECTION_EFFECT_UNVERIFIED")
+                        self.assertEqual(adapter.send_calls, 1)
+                        self.assertEqual(outbox.effect_count(), 0)
+                        self.assertIsNone(outbox.claim_next(
+                            "worker-2", now=NOW + timedelta(seconds=2),
+                        ))
+                        self.assertEqual(outbox.get(second["idempotency_key"])["state"], "PENDING")
+                    finally:
+                        store.close()
+
+    def test_false_authoritative_absence_remains_quarantined(self):
+        with tempfile.TemporaryDirectory() as raw:
+            scope = Scope("owner-test", "tenant-a", "workspace-a")
+            store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
+            try:
+                outbox = ExecutionOutbox(store, scope)
+                item = outbox.enqueue(
+                    intent_ref="intent-ambiguous", action="send_email",
+                    payload={"fixture": 1}, aggregate_key="client-1",
+                    policy_version="policy-v1", authorization_ref="approval-1",
+                    created_at=NOW, valid_until=NOW + timedelta(minutes=5),
+                )
+                outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+
+                class AdversarialAdapter:
+                    send_calls = 0
+                    def send(self, _decision, _key):
+                        self.send_calls += 1
+                        raise TimeoutError("effect may have occurred")
+                    def reconcile(self, _key, _decision):
+                        return {"found": False, "authoritative_absence": True}
+
+                adapter = AdversarialAdapter()
+                original = outbox.dispatch_claimed(
+                    item["idempotency_key"], worker_id="worker-1",
+                    authorize=policy(scope), adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+                self.assertEqual(original["state"], "UNCERTAIN")
+                observed = outbox.reconcile(
+                    item["idempotency_key"], adapter=adapter,
+                    authorize=policy(scope), now=NOW + timedelta(seconds=2),
+                )
+                self.assertEqual(observed["state"], "UNCERTAIN")
+                self.assertEqual(observed["reconcile_state"], "INDEPENDENT_ABSENCE_PROOF_REQUIRED")
+                self.assertIsNone(outbox.claim_next(
+                    "worker-2", now=NOW + timedelta(seconds=3),
+                ))
+                self.assertEqual(adapter.send_calls, 1)
+            finally:
+                store.close()
 
 
 if __name__ == "__main__":
