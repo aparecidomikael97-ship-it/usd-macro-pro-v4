@@ -840,6 +840,18 @@ class ExecutionOutbox:
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
             raise ValueError("only SENT or UNCERTAIN intents require reconciliation")
+        # V16-A.33: unlike a trusted read-only local database lookup, an
+        # injected adapter.reconcile property/callback is arbitrary executable
+        # code. In this staging version no independent producer enrollment,
+        # issuer root, account binding or monotonic witness is available.
+        # Thus deny BEFORE even evaluating the potentially effectful property.
+        # No current state or effect ledger mutation occurs. Historical
+        # SENT/UNCERTAIN remains in doubt pending independently authenticated
+        # receipts; no blind resend, release, or compensation is permitted.
+        raise PermissionError("INDEPENDENT_PRODUCER_NOT_ENROLLED")
+
+        # Unreachable legacy path, NOT a productive readback authorization.
+        # Its enabling requires separately reviewed external enrollment gates.
         reconcile = getattr(adapter, "reconcile", None)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
