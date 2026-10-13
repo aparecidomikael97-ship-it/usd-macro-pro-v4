@@ -220,8 +220,8 @@ jobs:
       - name: A47 hard stop if independent source witness is not enrolled
         run: |
           python -m unittest -q \
-            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_feature_true_without_independent_source_must_not_fetch_or_execute \
-            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_enabled_environment_without_source_must_not_fetch_or_write \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_feature_true_cannot_claim_cas_or_execute_without_source_witness \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_enabled_environment_cannot_claim_cas_without_source_witness \
             test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_no_untrusted_runtime_config_property_read_without_source
       - name: A46 reject tampered loaded checkpoint before Global Worker CAS or executor
         run: |
