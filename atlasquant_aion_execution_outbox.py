@@ -436,25 +436,15 @@ class ExecutionOutbox:
                    JOIN action_decisions d ON d.decision_id=o.decision_id
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
                      AND o.state IN ('PENDING','RETRY')
-                     AND NOT EXISTS (
-                         SELECT 1
-                         FROM action_decisions earlier
-                         JOIN action_outbox eo ON eo.decision_id=earlier.decision_id
-                         WHERE earlier.owner=d.owner
-                           AND earlier.tenant=d.tenant
-                           AND earlier.workspace=d.workspace
-                           AND earlier.aggregate_key=d.aggregate_key
-                           AND earlier.aggregate_seq<d.aggregate_seq
-                           -- A.44: even a local terminal-looking marker
-                           -- (CONFIRMED, FAILED, REVOKED or BLOCKED_REAPPROVAL)
-                           -- can be forged by a writer of this same SQLite DB.
-                           -- The current system has NO independently authenticated
-                           -- producer receipt, no-effect fence, or trust witness.
-                           -- Thus ANY prior same-aggregate intent keeps later
-                           -- ones unclaimable until an independently reviewed
-                           -- producer/owner proof admission path is enrolled.
-                           -- Other aggregates remain independently claimable.
-                     )
+                     -- A.45: while no independently verifiable producer
+                     -- admission exists, ONLY the first ordinal of each
+                     -- scoped aggregate may be claimed. A previous Outbox row
+                     -- (or even its local decision) can be deleted/rolled back;
+                     -- a JOIN over surviving predecessor rows must never
+                     -- make an ordinal 2+ look like the first action.
+                     -- This is local fail-closed FIFO, not a witness against
+                     -- rewriting the ordinal or rolling back the whole DB.
+                     AND d.aggregate_seq=1
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
                 (owner, tenant, workspace),
