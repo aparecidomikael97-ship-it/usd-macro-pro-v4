@@ -297,3 +297,15 @@ The remaining legacy post-send tests are separate coverage gaps because
 there is no authorized producer that can cross the send boundary. The
 A.12+A.16 original 37+8 cases have not been reproduced from their missing
 archives. No P0 or first-install gate becomes homologated by this state.
+
+### Saga propagation of producer block
+
+The Saga coordinator now recognizes `BLOCKED_PRODUCER` in **both** forward
+and compensation outcomes. The step becomes `BLOCKED_PRODUCER` and the
+Saga becomes `PRODUCER_ENROLLMENT_REQUIRED`, a non-successful, nonterminal
+hold that forbids forward enqueue, effect recognition and compensation.
+This prevents an unmapped-state exception as well as accidental treatment
+of the absence of producer enrollment as either CONFIRMED or FAILED.
+
+This status is only a diagnostic hold. No Saga command or test fixture may
+enroll a producer or resolve a blocked effect on its own.
