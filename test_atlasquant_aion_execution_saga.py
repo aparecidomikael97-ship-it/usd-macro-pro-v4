@@ -413,6 +413,58 @@ class ExecutionSagaTests(unittest.TestCase):
             self.assertEqual(adapter.send_calls, 0)
             store.close()
 
+    def test_a39_compensation_cannot_promote_local_confirmed_or_failed(self):
+        """A39: even the compensation readback path cannot trust SQLite-only state."""
+        for kind in ("CONFIRMED", "FAILED"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as raw:
+                store, outbox, budget, saga = self._components(raw)
+                self._create(saga)
+                enqueued = self._enqueue_forward(saga)
+                key = enqueued["outbox"]["idempotency_key"]
+                adapter = FakeAdapter("confirmed" if kind == "CONFIRMED" else "reject")
+                observed = self._dispatch_claimed(outbox, budget, adapter, offset=1)
+                self.assertEqual(observed["idempotency_key"], key)
+                self.assertEqual(adapter.send_calls, 0)
+                if kind == "CONFIRMED":
+                    self._fixture_mark_confirmed_only_after_simulated_external_positive_review(
+                        outbox, key,
+                    )
+                    reason = "INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED"
+                else:
+                    self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                        outbox, key,
+                    )
+                    reason = "INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED"
+                # Deliberately forge ONLY the test-local Saga compensation
+                # binding, to exercise the real guarded compensation method.
+                # This does not prepare any genuine compensation request.
+                with saga.db:
+                    row = saga.db.execute(
+                        """UPDATE aion_execution_saga_steps
+                           SET compensation_outbox_key=?
+                           WHERE saga_id=? AND step_key=? AND state='ENQUEUED'""",
+                        (key, "saga-1", "one"),
+                    )
+                    self.assertEqual(row.rowcount, 1)
+                before = saga.get("saga-1")
+                budget_before = budget.snapshot(
+                    "saga-1", now=NOW + timedelta(seconds=3),
+                )["transaction_effects"]
+                with self.assertRaisesRegex(PermissionError, reason):
+                    saga.sync_compensation_outcome(
+                        "saga-1", "one", now=NOW + timedelta(seconds=3),
+                    )
+                after = saga.get("saga-1")
+                self.assertEqual(after["state"], before["state"])
+                self.assertEqual(after["steps"][0]["state"], before["steps"][0]["state"])
+                self.assertEqual(
+                    budget.snapshot("saga-1", now=NOW + timedelta(seconds=3))[
+                        "transaction_effects"
+                    ], budget_before,
+                )
+                self.assertEqual(adapter.send_calls, 0)
+                store.close()
+
     def test_all_forward_steps_confirm_in_order_and_complete(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(raw)
