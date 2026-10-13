@@ -187,3 +187,40 @@ exists in the A.24 staging candidate.
 No external sender is enabled, and a red CI from legacy positive fixtures is
 not evidence of a released system. Main, Core V1, Worker, AM12 and deployment
 remain untouched; first install remains HARD NO-GO (20/20 blocked).
+
+
+## V16-A.27 — mandatory pre-adapter producer enrollment stop (LAB only)
+
+The prior A.26 red-team acceptance test (Draft #1239, Quality run
+38426167793) executed against the actual Outbox module: the expected
+`INDEPENDENT_PRODUCER_NOT_ENROLLED` PermissionError was not raised.
+This exposed an **effect-boundary risk** distinct from merely denying
+untrusted positive/negative callback confirmations. In a future connected
+deployment, `adapter.send` may itself cause an irrevocable effect.
+
+This LAB candidate places an **unconditional fail-closed hard stop** in
+`dispatch_claimed` *before* retrieving an adapter's `send` attribute,
+before the SQLite transition to `UNCERTAIN`, and before invoking the
+sender. It raises `PermissionError("INDEPENDENT_PRODUCER_NOT_ENROLLED")`;
+the accepted local claim remains `CLAIMED` and no ledger row is added.
+
+The stop does **not** validate real enrollment and provides **no opt-in,
+fixture permit, self-attested producer flag, environment switch or trusted
+test key**. It can only be removed/replaced following a separate design
+review of independently rooted enrollment + producer account and owner/host
+binding, causal receipts and monotonic antirollback witness, as well as
+producer-enforced epoch/idempotency fencing and physical verification.
+Old code below the hard stop is deliberately unreachable in this isolated
+candidate; it is NOT an alternative approved operation path.
+
+This containment intentionally changes liveness: any real action cannot
+reach a producer at all in this staging build, even when local authorization
+and a lease exist. Legacy tests that expected calls to an in-memory fake
+sender may now fail. They are not proof of production readiness; failures
+must stay visible and must not be bypassed to achieve a green workflow.
+The direct adversarial A.26 test and new A.27 self-attestation and
+descriptor-side-effect tests must be checked independently from broad CI.
+
+No actual producer, root, Windows Hello/FIDO, AM12 host, Worker, Render or
+deployment is enrolled or activated. Main and frozen Core V1 remain
+untouched. First-install gates remain HARD NO-GO.
