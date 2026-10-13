@@ -347,6 +347,72 @@ class ExecutionSagaTests(unittest.TestCase):
             )
             self.assertEqual(changed.rowcount, 1)
 
+    def test_a38_local_sql_confirmed_cannot_supply_external_producer_receipt(self):
+        """A.38 RED: local CONFIRMED+effects ledger are not producer testimony."""
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox, budget, saga = self._components(raw)
+            self._create(saga)
+            self._enqueue_forward(saga)
+            adapter = FakeAdapter("confirmed")
+            # Existing test-only SQL helper intentionally bypasses no-producer
+            # dispatch and FORGES local CONFIRMED + ledger in the fixture.
+            # No adapter.send or external producer/witness ever runs.
+            fabricated = self._fixture_dispatch_after_simulated_external_positive_review(
+                outbox, budget, adapter, offset=1,
+            )
+            self.assertEqual(fabricated["state"], "CONFIRMED")
+            self.assertEqual(adapter.send_calls, 0)
+            before_saga = saga.get("saga-1")
+            before_budget = budget.snapshot(
+                "saga-1", now=NOW + timedelta(seconds=2),
+            )["transaction_effects"]
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+            ):
+                saga.sync_forward_outcome(
+                    "saga-1", "one", now=NOW + timedelta(seconds=2),
+                )
+            after = saga.get("saga-1")
+            self.assertEqual(after["state"], before_saga["state"])
+            self.assertEqual(after["steps"][0]["state"], before_saga["steps"][0]["state"])
+            self.assertEqual(
+                budget.snapshot("saga-1", now=NOW + timedelta(seconds=2))[
+                    "transaction_effects"
+                ], before_budget,
+            )
+            store.close()
+
+    def test_a38_local_sql_failed_cannot_supply_terminal_no_effect_fence(self):
+        """A.38 RED: FAILED from local DB is not NO_EFFECT_FENCED receipt."""
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox, budget, saga = self._components(raw)
+            self._create(saga)
+            self._enqueue_forward(saga)
+            adapter = FakeAdapter("reject")
+            uncertain = self._dispatch_claimed(
+                outbox, budget, adapter, offset=1,
+            )
+            self.assertEqual(uncertain["state"], "UNCERTAIN")
+            self.assertEqual(adapter.send_calls, 0)
+            # A SQL-only fixture assumes a terminal negative with NO actual
+            # provider and NO producer-side late-effect fence.
+            self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                outbox, uncertain["idempotency_key"],
+            )
+            self.assertEqual(outbox.get(uncertain["idempotency_key"])["state"], "FAILED")
+            before_saga = saga.get("saga-1")
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED",
+            ):
+                saga.sync_forward_outcome(
+                    "saga-1", "one", now=NOW + timedelta(seconds=2),
+                )
+            after = saga.get("saga-1")
+            self.assertEqual(after["state"], before_saga["state"])
+            self.assertEqual(after["steps"][0]["state"], before_saga["steps"][0]["state"])
+            self.assertEqual(adapter.send_calls, 0)
+            store.close()
+
     def test_all_forward_steps_confirm_in_order_and_complete(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(raw)
