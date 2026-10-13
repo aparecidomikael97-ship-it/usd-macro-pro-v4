@@ -189,19 +189,21 @@ class AionChaosCampaignTests(unittest.TestCase):
                 )
             self.assertEqual(outbox.get(item["idempotency_key"])["state"], "BLOCKED_PRODUCER")
             self.assertEqual(adapter.send_calls, 0)
-            # The following read-only reconciliation uses only synthetic DB
-            # state. No producer was called, nor was a no-effect proof issued.
+            # A TEST-ONLY UNCERTAIN state models historical ambiguity.
+            # A33 denies even looking up the untrusted readback descriptor,
+            # regardless of an adapter's unsupported absence assertion.
             self._fixture_force_uncertain_without_send(outbox, item["idempotency_key"])
-            reconciled = outbox.reconcile(
-                item["idempotency_key"],
-                adapter=adapter,
-                authorize=authorization(self.scope),
-                now=NOW + timedelta(seconds=2),
-            )
-            self.assertEqual(reconciled["state"], "UNCERTAIN")
-            self.assertEqual(
-                reconciled["reconcile_state"], "INDEPENDENT_ABSENCE_PROOF_REQUIRED",
-            )
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.reconcile(
+                    item["idempotency_key"],
+                    adapter=adapter,
+                    authorize=authorization(self.scope),
+                    now=NOW + timedelta(seconds=2),
+                )
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "UNCERTAIN")
+            self.assertEqual(adapter.reconcile_calls, 0)
             self.assertIsNone(outbox.claim_next(
                 "worker-2", now=NOW + timedelta(seconds=3),
             ))
@@ -263,18 +265,18 @@ class AionChaosCampaignTests(unittest.TestCase):
             # This did not arise from adapter.send and is not a causal receipt.
             self._fixture_force_uncertain_without_send(outbox, item["idempotency_key"])
             adapter.effects[item["idempotency_key"]] = "UNTRUSTED_FIXTURE_EFFECT"
-            reconciled = outbox.reconcile(
-                item["idempotency_key"],
-                adapter=adapter,
-                authorize=authorization(self.scope),
-                now=NOW + timedelta(seconds=2),
-            )
-            self.assertEqual(reconciled["state"], "UNCERTAIN")
-            self.assertEqual(
-                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
-            )
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.reconcile(
+                    item["idempotency_key"],
+                    adapter=adapter,
+                    authorize=authorization(self.scope),
+                    now=NOW + timedelta(seconds=2),
+                )
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "UNCERTAIN")
             self.assertEqual(adapter.send_calls, 0)
-            self.assertEqual(adapter.reconcile_calls, 1)
+            self.assertEqual(adapter.reconcile_calls, 0)
             self.assertEqual(outbox.effect_count(), 0)
             self.assertIsNone(
                 outbox.claim_next("worker-2", now=NOW + timedelta(seconds=3))
