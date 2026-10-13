@@ -1446,6 +1446,25 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         self.assertEqual(self.outbox.get(self.key)["state"], "SENT")
         self.assertEqual(self.outbox.effect_count(), 0)
 
+    def test_no_enrolled_producer_must_block_before_adapter_send(self):
+        """A.26 RED: no independent issuer/producer enrollment exists.
+
+        Reaching send is a potential real external effect, even if CONFIRMED
+        admission has been disabled. This assertion is a security contract,
+        NOT a fixture permission or an A.12/A.16 original test.
+        """
+        adapter = ClaimsConfirmedWithoutProducer()
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+        ):
+            self._dispatch(adapter)
+        self.assertEqual(
+            adapter.calls, 0,
+            "the external send callback must never run without producer enrollment",
+        )
+        self.assertEqual(self.outbox.effect_count(), 0)
+        self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
+
     def test_fake_positive_cannot_release_followup_same_aggregate(self):
         """No next aggregate action may run on a merely asserted effect."""
         later = self.outbox.enqueue(
