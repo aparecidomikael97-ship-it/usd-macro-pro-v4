@@ -309,3 +309,38 @@ of the absence of producer enrollment as either CONFIRMED or FAILED.
 
 This status is only a diagnostic hold. No Saga command or test fixture may
 enroll a producer or resolve a blocked effect on its own.
+
+
+## V16-A.33 — historical reconciliation is also an executable trust boundary
+
+A.32 deliberately tested two failures on the actual staging module. For a
+test-local `UNCERTAIN` historical observation without any external send,
+`reconcile()` reached the injected adapter's `@property reconcile` and
+callable `reconcile` before any independently enrolled producer existed.
+Both adversarial tests failed on A.32 (6,162 tests / 2 new failures +
+23 pre-existing Outbox errors): a callback that *claims* to be read-only
+cannot be assumed to have no side effects, and authenticating its *return*
+after the call is not enough.
+
+This A.33 isolated LAB child introduces a **second unconditional hard
+stop**, after verifying `SENT/UNCERTAIN` and **before looking up any
+`adapter.reconcile` attribute or invoking callback**. Until an externally
+controlled producer enrollment/root, scoped/account-bound capability and
+readback/provenance verifier exist, `reconcile` raises
+`INDEPENDENT_PRODUCER_NOT_ENROLLED`; it leaves the intent and effect ledger
+unchanged. There is no fallback to automatic retry, FAILED or compensation.
+The original post-send reconciliation code remains unreachable in this
+candidate, just as `adapter.send` is unreachable behind the A.31 deny.
+
+**Liveness and historical coverage limitation:** this is a security-first
+containment, NOT a working producer readback implementation. A legitimate
+external event may remain ambiguous indefinitely until a verified issuer and
+witness are enrolled in a separate, reviewed architecture. Historical
+test-only adapters that used to exercise readback callbacks now encounter
+this denial; Quality/Saga/Chaos suite incompatibilities are to be inventoried
+and made explicit without a mock authorization bypass. The unexecuted A.12
+37 + A.16 8 external cases and all physical owner, provider and witness
+acceptance gates remain separate.
+
+NO GO for deployment or merge. 0/6 P0 homologated, 20/20 first-install gates
+blocked. No real producer, network dispatch or trust root was enabled.
