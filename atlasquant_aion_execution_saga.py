@@ -543,6 +543,15 @@ class ExecutionSagaCoordinator:
             raise LookupError("saga step/outbox binding unavailable")
         out = self.outbox.get(step["outbox_key"])
         state = out["state"]
+        # V16-A.39: a local SQLite state/effects row is not authenticated
+        # producer testimony. In particular, this staging system cannot
+        # presently enroll or verify a real causal COMMITTED_EFFECT receipt
+        # or a producer-enforced terminal NO_EFFECT_FENCED receipt. Fail
+        # BEFORE writing Saga state or recording authority-budget effects.
+        if state == "CONFIRMED":
+            raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
+        if state == "FAILED":
+            raise PermissionError("INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED")
         mapped = {
             "PENDING": "ENQUEUED",
             "CLAIMED": "ENQUEUED",
@@ -791,6 +800,13 @@ class ExecutionSagaCoordinator:
         out = self.outbox.get(step["compensation_outbox_key"])
         now_iso = _iso(_utc(now))
         out_state = out["state"]
+        # The compensation path is another possible effect-ledger/authority
+        # elevation. A local CONFIRMED or FAILED row cannot prove the
+        # external compensation or its terminal no-effect fence either.
+        if out_state == "CONFIRMED":
+            raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
+        if out_state == "FAILED":
+            raise PermissionError("INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED")
         if out_state == "BLOCKED_PRODUCER":
             mapped = "BLOCKED_PRODUCER"
             saga_state = "PRODUCER_ENROLLMENT_REQUIRED"
