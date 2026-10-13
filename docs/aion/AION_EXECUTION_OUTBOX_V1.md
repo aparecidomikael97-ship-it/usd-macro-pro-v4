@@ -89,10 +89,26 @@ Dispatch persists `UNCERTAIN` **before** crossing the adapter boundary.
 Therefore a crash or timeout after that point cannot cause a blind resend after
 restart. A future adapter must expose an idempotency-aware reconciliation path.
 
-- found + confirmed -> `CONFIRMED`, effect ledger written once;
-- authoritative absence -> policy is revalidated again, then the intent may
-  return to `RETRY`;
-- ambiguous result -> remains uncertain.
+- found + confirmed -> `CONFIRMED` in local fixture semantics, effect ledger written once;
+  **a real producer receipt and independently authenticated source remain
+  mandatory before operational trust**;
+- adapter-declared `authoritative_absence=true` **is not evidence of no effect**,
+  even when the fake adapter knows the fixture did not send anything: keep
+  `UNCERTAIN`/`SENT`, return `INDEPENDENT_ABSENCE_PROOF_REQUIRED`;
+- an adapter response `accepted=false`, regardless of `retryable`, is not
+  proof of no effect or no delayed effect after the pre-send UNCERTAIN commit:
+  keep `UNCERTAIN` and the aggregate blocked;
+- any ambiguity -> no automatic `RETRY`, terminal `FAILED`, escalation to
+  compensation, or release of the next aggregate action solely from a callback;
+- only an independently authenticated, causal no-effect receipt **and** a
+  producer-enforced late-effect fence could justify a future recovery path.
+  No such productive admission mechanism exists in this staging version.
+
+The original synthetic tests modeled an adapter's self-declared absence as
+authoritative. The A.20 lab candidate intentionally revokes that assumption;
+separate compensation-engine tests still exercise their state machine via an
+**explicit SQL fixture simulating external review**, never proof or an
+available production API.
 
 ## Effect ledger
 
@@ -112,7 +128,8 @@ The staged red-team suite proves:
 - transaction reauthentication mismatch forces reapproval;
 - expired authority causes zero adapter calls;
 - lost response after a successful effect is reconciled without a second send;
-- authoritative proof of no effect is required before retry;
+- unverified adapter absence/rejection cannot authorize retry or release FIFO;
+- external proof of no effect is still required, with no live verifier installed;
 - per-resource ordering is enforced;
 - expired pre-dispatch claims are recoverable;
 - cross-tenant access fails closed;
