@@ -180,22 +180,92 @@ class ExecutionSagaTests(unittest.TestCase):
         approval_ref="approval-forward",
         reauth_ref="",
     ):
+        """Test-only Saga state fixture: the real effect boundary remains DENIED.
+
+        Always run real dispatch_claimed first. When (and only when) its genuine
+        no-enrollment hard stop is observed BEFORE any adapter call, inject an
+        inert, scoped UNCERTAIN row to exercise Saga state-machine behavior.
+        This helper is NOT a producer enrollment, a receipt or an alternative
+        runtime dispatcher. It never invokes adapter.send or creates effects.
+        """
         when = NOW + timedelta(seconds=offset)
         claimed = outbox.claim_next(worker, now=when, lease_seconds=60)
         self.assertIsNotNone(claimed)
-        result = outbox.dispatch_claimed(
-            claimed["idempotency_key"],
-            worker_id=worker,
-            authorize=policy(
-                self.scope,
-                authorization_ref=approval_ref,
-                reauthenticated=True,
-                reauth_ref=reauth_ref,
-            ),
-            adapter=adapter,
-            cumulative_authority_guard=lambda d: budget.guard(d, now=when),
-            now=when,
-        )
+        key = claimed["idempotency_key"]
+        try:
+            # A denial by an earlier budget/policy gate remains an ordinary
+            # result; it must not be converted into a synthetic attempt.
+            result = outbox.dispatch_claimed(
+                key,
+                worker_id=worker,
+                authorize=policy(
+                    self.scope,
+                    authorization_ref=approval_ref,
+                    reauthenticated=True,
+                    reauth_ref=reauth_ref,
+                ),
+                adapter=adapter,
+                cumulative_authority_guard=lambda d: budget.guard(d, now=when),
+                now=when,
+            )
+        except PermissionError as exc:
+            if str(exc) != "INDEPENDENT_PRODUCER_NOT_ENROLLED":
+                raise
+            self.assertEqual(adapter.send_calls, 0)
+            observed = outbox.get(key)
+            self.assertEqual(observed["state"], "CLAIMED")
+            self.assertEqual(observed["lease_owner"], worker)
+            self.assertEqual(outbox.effect_count(), 0)
+
+            # TEST FIXTURE ONLY, after verifying actual pre-send denial.
+            # This stages an observation used by Saga and read-only reconcile,
+            # never a real send attempt, issuer certificate or effect proof.
+            mode = adapter.mode
+            self.assertIn(mode, {"confirmed", "reject", "lose-after-effect"})
+            unverified_error = {
+                "confirmed": "ADAPTER_POSITIVE_EFFECT_UNVERIFIED",
+                "reject": "ADAPTER_REJECTION_EFFECT_UNVERIFIED",
+                "lose-after-effect": "SEND_RESULT_UNKNOWN:TimeoutError",
+            }[mode]
+            with outbox.db:
+                changed = outbox.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='CLAIMED' AND lease_owner=? AND lease_until=?
+                         AND NOT EXISTS (
+                             SELECT 1 FROM action_effects e
+                             WHERE e.idempotency_key=action_outbox.idempotency_key
+                               AND e.owner=action_outbox.owner
+                               AND e.tenant=action_outbox.tenant
+                               AND e.workspace=action_outbox.workspace
+                         )""",
+                    (
+                        unverified_error, key,
+                        self.scope.owner_id, self.scope.tenant_id,
+                        self.scope.workspace_id, worker, observed["lease_until"],
+                    ),
+                )
+                self.assertEqual(changed.rowcount, 1)
+
+            # A stored fake positive is ONLY a read-only reconciliation
+            # adversary: adapter.reconcile may claim found, but Outbox must
+            # refuse to promote it. No simulated external send has happened.
+            if mode == "lose-after-effect":
+                adapter.effects[key] = "UNTRUSTED_FIXTURE_EFFECT"
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(outbox.effect_count(), 0)
+            staged = outbox.get(key)
+            self.assertEqual(staged["state"], "UNCERTAIN")
+            return {
+                **staged,
+                "dispatch_state": (
+                    "UNCERTAIN_RECONCILE_REQUIRED"
+                    if mode == "lose-after-effect"
+                    else "UNCERTAIN_PROOF_REQUIRED"
+                ),
+            }
         return result
 
     def _fixture_mark_confirmed_only_after_simulated_external_positive_review(
