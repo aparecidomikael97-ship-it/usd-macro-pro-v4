@@ -622,5 +622,184 @@ class OutboxScopeBindingP0Tests(unittest.TestCase):
 
 
 
+
+class OutboxTimeOfUseFenceP0Tests(unittest.TestCase):
+    """Inert staged checks: no real producer, witness, or trusted clock."""
+
+    def setUp(self):
+        self.scope = Scope("owner-test", "tenant-a", "workspace-a")
+
+    def fixture(self, *, ttl=100, lease_seconds=60):
+        root = tempfile.TemporaryDirectory()
+        store = SQLiteChatStore(Path(root.name) / "chat.sqlite3")
+        outbox = ExecutionOutbox(store, self.scope)
+        item = outbox.enqueue(
+            intent_ref="intent-time-of-use",
+            action="send_email",
+            payload={"fixture": "no-network"},
+            aggregate_key="client-time-of-use",
+            policy_version="policy-v1",
+            authorization_ref="approval-1",
+            created_at=NOW,
+            valid_until=NOW + timedelta(seconds=ttl),
+        )
+        outbox.claim_next("worker-1", now=NOW, lease_seconds=lease_seconds)
+        return root, store, outbox, item
+
+    def policy_grant(self, **changes):
+        grant = policy(self.scope)({})
+        grant.update(changes)
+        return grant
+
+    def test_authority_expired_during_first_callback_blocks_send(self):
+        root, store, outbox, item = self.fixture(ttl=3)
+        try:
+            tick = [NOW + timedelta(seconds=1)]
+            def authorize(_decision):
+                tick[0] = NOW + timedelta(seconds=4)
+                return self.policy_grant()
+            adapter = CountingAdapter()
+            result = outbox.dispatch_claimed(
+                item["idempotency_key"], worker_id="worker-1",
+                authorize=authorize, adapter=adapter, now=lambda: tick[0],
+            )
+            self.assertEqual(result["state"], "BLOCKED_REAPPROVAL")
+            self.assertEqual(result["last_error"], "AUTHORITY_EXPIRED")
+            self.assertEqual(adapter.calls, 0)
+        finally:
+            store.close()
+            root.cleanup()
+
+    def test_lease_expired_during_first_callback_blocks_send(self):
+        root, store, outbox, item = self.fixture(lease_seconds=3)
+        try:
+            tick = [NOW + timedelta(seconds=1)]
+            def authorize(_decision):
+                tick[0] = NOW + timedelta(seconds=4)
+                return self.policy_grant()
+            adapter = CountingAdapter()
+            with self.assertRaisesRegex(TimeoutError, "lease expired"):
+                outbox.dispatch_claimed(
+                    item["idempotency_key"], worker_id="worker-1",
+                    authorize=authorize, adapter=adapter, now=lambda: tick[0],
+                )
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "CLAIMED")
+            self.assertEqual(adapter.calls, 0)
+        finally:
+            store.close()
+            root.cleanup()
+
+    def test_revoked_by_second_authorization_callback_blocks_send(self):
+        root, store, outbox, item = self.fixture()
+        try:
+            calls = [0]
+            def authorize(_decision):
+                calls[0] += 1
+                return self.policy_grant(allowed=(calls[0] == 1))
+            adapter = CountingAdapter()
+            result = outbox.dispatch_claimed(
+                item["idempotency_key"], worker_id="worker-1",
+                authorize=authorize, adapter=adapter,
+                now=NOW + timedelta(seconds=1),
+            )
+            self.assertEqual(calls[0], 2)
+            self.assertEqual(result["state"], "REVOKED")
+            self.assertEqual(result["last_error"], "AUTHORITY_REVOKED")
+            self.assertEqual(adapter.calls, 0)
+        finally:
+            store.close()
+            root.cleanup()
+
+    def test_lease_expires_during_second_callback_blocks_send(self):
+        root, store, outbox, item = self.fixture(lease_seconds=3)
+        try:
+            tick, calls = [NOW + timedelta(seconds=1)], [0]
+            def authorize(_decision):
+                calls[0] += 1
+                if calls[0] == 2:
+                    tick[0] = NOW + timedelta(seconds=4)
+                return self.policy_grant()
+            adapter = CountingAdapter()
+            with self.assertRaisesRegex(TimeoutError, "lease expired"):
+                outbox.dispatch_claimed(
+                    item["idempotency_key"], worker_id="worker-1",
+                    authorize=authorize, adapter=adapter, now=lambda: tick[0],
+                )
+            self.assertEqual(calls[0], 2)
+            self.assertEqual(adapter.calls, 0)
+        finally:
+            store.close()
+            root.cleanup()
+
+    def test_cas_rejects_lease_changed_during_callback(self):
+        root, store, outbox, item = self.fixture()
+        try:
+            calls = [0]
+            def authorize(_decision):
+                calls[0] += 1
+                if calls[0] == 1:
+                    with store.db:
+                        store.db.execute(
+                            "UPDATE action_outbox SET lease_until=? WHERE idempotency_key=?",
+                            ((NOW + timedelta(seconds=45)).isoformat(),
+                             item["idempotency_key"]),
+                        )
+                return self.policy_grant()
+            adapter = CountingAdapter()
+            with self.assertRaisesRegex(TimeoutError, "changed before send"):
+                outbox.dispatch_claimed(
+                    item["idempotency_key"], worker_id="worker-1",
+                    authorize=authorize, adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(adapter.calls, 0)
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "CLAIMED")
+        finally:
+            store.close()
+            root.cleanup()
+
+    def test_cas_rejects_persisted_authority_deadline_changed(self):
+        root, store, outbox, item = self.fixture()
+        try:
+            calls = [0]
+            def authorize(_decision):
+                calls[0] += 1
+                if calls[0] == 1:
+                    with store.db:
+                        store.db.execute(
+                            "UPDATE action_decisions SET valid_until=? WHERE decision_id=?",
+                            (NOW.isoformat(), item["decision"]["decision_id"]),
+                        )
+                return self.policy_grant()
+            adapter = CountingAdapter()
+            with self.assertRaisesRegex(TimeoutError, "changed before send"):
+                outbox.dispatch_claimed(
+                    item["idempotency_key"], worker_id="worker-1",
+                    authorize=authorize, adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+            self.assertEqual(adapter.calls, 0)
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "CLAIMED")
+        finally:
+            store.close()
+            root.cleanup()
+
+    def test_unexpired_claim_still_dispatches_once(self):
+        root, store, outbox, item = self.fixture()
+        try:
+            adapter = FakeIdempotentAdapter()
+            result = outbox.dispatch_claimed(
+                item["idempotency_key"], worker_id="worker-1",
+                authorize=policy(self.scope), adapter=adapter,
+                now=NOW + timedelta(seconds=1),
+            )
+            self.assertEqual(result["state"], "CONFIRMED")
+            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(outbox.effect_count(), 1)
+        finally:
+            store.close()
+            root.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()
