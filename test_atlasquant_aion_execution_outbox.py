@@ -1463,7 +1463,7 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
             "the external send callback must never run without producer enrollment",
         )
         self.assertEqual(self.outbox.effect_count(), 0)
-        self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
+        self.assertEqual(self.outbox.get(self.key)["state"], "BLOCKED_PRODUCER")
 
     def test_self_attested_adapter_enrollment_cannot_enable_send(self):
         """A.27: adapter-provided enrollment metadata confers no authority."""
@@ -1483,7 +1483,7 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         ):
             self._dispatch(adapter)
         self.assertEqual(adapter.calls, 0)
-        self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
+        self.assertEqual(self.outbox.get(self.key)["state"], "BLOCKED_PRODUCER")
         self.assertEqual(self.outbox.effect_count(), 0)
 
     def test_pre_send_gate_rejects_before_accessing_adapter_descriptor(self):
@@ -1503,7 +1503,7 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
             self._dispatch(adapter)
         self.assertEqual(adapter.property_reads, 0)
         self.assertEqual(adapter.calls, 0)
-        self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
+        self.assertEqual(self.outbox.get(self.key)["state"], "BLOCKED_PRODUCER")
         self.assertEqual(self.outbox.effect_count(), 0)
 
     def test_fake_positive_cannot_release_followup_same_aggregate(self):
@@ -1526,6 +1526,75 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         self.assertEqual(
             self.outbox.get(later["idempotency_key"])["state"], "PENDING",
         )
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_unenrolled_block_survives_lease_expiry_and_store_reopen(self):
+        """A.31: denied intents must never churn CLAIMED/RETRY across restarts."""
+        adapter = ClaimsConfirmedWithoutProducer()
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+        ):
+            self._dispatch(adapter)
+        before = self.outbox.get(self.key)
+        self.assertEqual(before["state"], "BLOCKED_PRODUCER")
+        self.assertEqual(before["attempts"], 1)
+        self.assertEqual(before["lease_owner"], "")
+        self.assertEqual(before["lease_until"], "")
+        self.assertEqual(before["last_error"], "INDEPENDENT_PRODUCER_NOT_ENROLLED")
+        self.assertEqual(self.outbox.effect_count(), 0)
+        self.assertEqual(adapter.calls, 0)
+
+        self.assertEqual(
+            self.outbox.release_expired_claims(now=NOW + timedelta(days=1)), 0,
+        )
+        self.assertIsNone(
+            self.outbox.claim_next("other-worker", now=NOW + timedelta(days=1)),
+        )
+        with SQLiteChatStore(Path(self.root.name) / "chat.sqlite3") as reopened:
+            another = ExecutionOutbox(reopened, self.scope)
+            persisted = another.get(self.key)
+            self.assertEqual(persisted["state"], "BLOCKED_PRODUCER")
+            self.assertEqual(persisted["attempts"], 1)
+            self.assertIsNone(
+                another.claim_next("worker-after-restart", now=NOW + timedelta(days=2)),
+            )
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_block_keeps_same_aggregate_fifo_but_not_unrelated_work(self):
+        """A.31: no hidden terminal release; independently ordered work survives."""
+        same = self.outbox.enqueue(
+            intent_ref="intent-followup-must-not-overtake",
+            action="send_email",
+            payload={"fixture": "same aggregate still blocked"},
+            aggregate_key="client-false-positive-A21",
+            policy_version="policy-v1",
+            authorization_ref="approval-fixture-only",
+            created_at=NOW + timedelta(seconds=1),
+            valid_until=NOW + timedelta(minutes=5),
+        )
+        other = self.outbox.enqueue(
+            intent_ref="intent-independent-aggregate",
+            action="send_email",
+            payload={"fixture": "unrelated aggregate"},
+            aggregate_key="other-client",
+            policy_version="policy-v1",
+            authorization_ref="approval-fixture-only",
+            created_at=NOW + timedelta(seconds=2),
+            valid_until=NOW + timedelta(minutes=5),
+        )
+        adapter = ClaimsConfirmedWithoutProducer()
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+        ):
+            self._dispatch(adapter)
+        self.assertEqual(adapter.calls, 0)
+        self.assertEqual(self.outbox.get(self.key)["state"], "BLOCKED_PRODUCER")
+        claimed = self.outbox.claim_next(
+            "other-worker", now=NOW + timedelta(seconds=4),
+        )
+        self.assertIsNotNone(claimed)
+        self.assertEqual(claimed["idempotency_key"], other["idempotency_key"])
+        self.assertEqual(self.outbox.get(same["idempotency_key"])["state"], "PENDING")
         self.assertEqual(self.outbox.effect_count(), 0)
 
 
