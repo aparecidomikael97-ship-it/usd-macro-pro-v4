@@ -1013,6 +1013,68 @@ class ExecutionSagaTests(unittest.TestCase):
             self.assertEqual(saga2.integrity_report("saga-1")["state"], "MATCH")
             reopened.close()
 
+    def test_a43_deleted_entire_event_chain_is_mismatch_not_false_match(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox, budget, saga = self._components(raw)
+            self._create(saga)
+            self.assertEqual(saga.integrity_report("saga-1")["state"], "MATCH")
+            with store.db:
+                store.db.execute(
+                    "DELETE FROM aion_execution_saga_events WHERE saga_id=?",
+                    ("saga-1",),
+                )
+            report = saga.integrity_report("saga-1")
+            self.assertEqual(report["state"], "MISMATCH")
+            self.assertIn("EVENT_CHAIN_EMPTY", report["blockers"])
+            self.assertEqual(report["events"], 0)
+            self.assertIs(report["independent_witness_verified"], False)
+            store.close()
+
+    def test_a43_deleted_tail_event_cannot_mask_running_saga(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox, budget, saga = self._components(raw)
+            self._create(saga)
+            self._enqueue_forward(saga)
+            self.assertEqual(saga.integrity_report("saga-1")["state"], "MATCH")
+            with store.db:
+                store.db.execute(
+                    "DELETE FROM aion_execution_saga_events WHERE saga_id=? AND sequence=2",
+                    ("saga-1",),
+                )
+            report = saga.integrity_report("saga-1")
+            self.assertEqual(report["state"], "MISMATCH")
+            self.assertIn("LATEST_EVENT_STATE_MISMATCH", report["blockers"])
+            self.assertIs(report["authorizes_execution"], False)
+            store.close()
+
+    def test_a43_direct_saga_state_rewrite_mismatches_event_tip(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox, budget, saga = self._components(raw)
+            self._create(saga)
+            with store.db:
+                store.db.execute(
+                    "UPDATE aion_execution_sagas SET state=? WHERE saga_id=?",
+                    ("COMPLETED", "saga-1"),
+                )
+            report = saga.integrity_report("saga-1")
+            self.assertEqual(report["state"], "MISMATCH")
+            self.assertIn("LATEST_EVENT_STATE_MISMATCH", report["blockers"])
+            self.assertIs(report["producer_effect_verified"], False)
+            store.close()
+
+    def test_a43_valid_local_chain_never_claims_external_authority(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox, budget, saga = self._components(raw)
+            self._create(saga)
+            report = saga.integrity_report("saga-1")
+            self.assertEqual(report["state"], "MATCH")
+            self.assertEqual(report["proof_scope"], "LOCAL_SQLITE_CHAIN_ONLY")
+            self.assertIs(report["independent_witness_verified"], False)
+            self.assertIs(report["producer_effect_verified"], False)
+            self.assertIs(report["authorizes_execution"], False)
+            self.assertIs(report["executes_action"], False)
+            store.close()
+
     def test_saga_plan_rejects_critical_capability_and_over_budget_shape(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(
