@@ -198,6 +198,19 @@ class ExecutionSagaTests(unittest.TestCase):
         )
         return result
 
+    def _fixture_mark_failed_only_after_simulated_external_no_effect_review(self, outbox, key):
+        """Synthetic test arrangement, NOT a production receipt or recovery API."""
+        self.assertEqual(outbox.get(key)["state"], "UNCERTAIN")
+        with outbox.db:
+            changed = outbox.db.execute(
+                """UPDATE action_outbox
+                   SET state='FAILED',last_error='TEST_FIXTURE_EXTERNAL_NO_EFFECT_ASSUMED'
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='UNCERTAIN'""",
+                (key, self.scope.owner_id, self.scope.tenant_id, self.scope.workspace_id),
+            )
+            self.assertEqual(changed.rowcount, 1)
+
     def test_all_forward_steps_confirm_in_order_and_complete(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(raw)
@@ -234,7 +247,20 @@ class ExecutionSagaTests(unittest.TestCase):
 
             self._enqueue_forward(saga, offset=2)
             failed = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
-            self.assertEqual(failed["state"], "FAILED")
+            self.assertEqual(failed["state"], "UNCERTAIN")
+            unverified = saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
+            self.assertEqual(unverified["state"], "RECONCILIATION_REQUIRED")
+            with self.assertRaisesRegex(ValueError, "not eligible"):
+                saga.prepare_compensation(
+                    "saga-1", explicit_human_approval=True,
+                    approval_ref="approval-comp", reauth_ref="reauth-comp",
+                    now=NOW + timedelta(seconds=4),
+                )
+            # Simulate an EXTERNAL no-effect determination solely to preserve
+            # coverage of the compensation engine. Not an admissible runtime proof.
+            self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                outbox, failed["idempotency_key"],
+            )
             synced = saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
             self.assertEqual(synced["state"], "COMPENSATION_REQUIRED")
 
@@ -300,7 +326,13 @@ class ExecutionSagaTests(unittest.TestCase):
                 )
 
             self._enqueue_forward(saga, offset=6)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=7)
+            unknown = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=7)
+            self.assertEqual(unknown["state"], "UNCERTAIN")
+            blocked = saga.sync_forward_outcome("saga-1", "three", now=NOW + timedelta(seconds=7))
+            self.assertEqual(blocked["state"], "RECONCILIATION_REQUIRED")
+            self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                outbox, unknown["idempotency_key"],
+            )
             out = saga.sync_forward_outcome("saga-1", "three", now=NOW + timedelta(seconds=7))
             self.assertEqual(out["state"], "COMPENSATION_REQUIRED")
 
@@ -354,7 +386,13 @@ class ExecutionSagaTests(unittest.TestCase):
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
 
             self._enqueue_forward(saga, offset=2)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
+            unknown = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
+            self.assertEqual(unknown["state"], "UNCERTAIN")
+            blocked = saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
+            self.assertEqual(blocked["state"], "RECONCILIATION_REQUIRED")
+            self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                outbox, unknown["idempotency_key"],
+            )
             out = saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
             self.assertEqual(out["state"], "MANUAL_INTERVENTION_REQUIRED")
             self.assertEqual(out["saga"]["steps"][0]["state"], "MANUAL_REQUIRED")
@@ -414,8 +452,19 @@ class ExecutionSagaTests(unittest.TestCase):
                 self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=index * 2 + 1)
                 saga.sync_forward_outcome("saga-1", key, now=NOW + timedelta(seconds=index * 2 + 1))
             self._enqueue_forward(saga, offset=6)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=7)
-            saga.sync_forward_outcome("saga-1", "three", now=NOW + timedelta(seconds=7))
+            unresolved = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=7)
+            self.assertEqual(unresolved["state"], "UNCERTAIN")
+            self.assertEqual(
+                saga.sync_forward_outcome("saga-1", "three", now=NOW + timedelta(seconds=7))["state"],
+                "RECONCILIATION_REQUIRED",
+            )
+            self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                outbox, unresolved["idempotency_key"],
+            )
+            self.assertEqual(
+                saga.sync_forward_outcome("saga-1", "three", now=NOW + timedelta(seconds=7))["state"],
+                "COMPENSATION_REQUIRED",
+            )
             saga.prepare_compensation(
                 "saga-1",
                 explicit_human_approval=True,
@@ -472,7 +521,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self.assertEqual(active["step_key"], "one")
             store.close()
 
-    def test_compensation_failure_escalates_manual(self):
+    def test_compensation_unverified_failure_requires_external_review_before_manual_terminal(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(raw)
             self._create(saga)
@@ -480,8 +529,19 @@ class ExecutionSagaTests(unittest.TestCase):
             self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=1)
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
             self._enqueue_forward(saga, offset=2)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
-            saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
+            unknown = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
+            self.assertEqual(unknown["state"], "UNCERTAIN")
+            self.assertEqual(
+                saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))["state"],
+                "RECONCILIATION_REQUIRED",
+            )
+            self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                outbox, unknown["idempotency_key"],
+            )
+            self.assertEqual(
+                saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))["state"],
+                "COMPENSATION_REQUIRED",
+            )
             saga.prepare_compensation(
                 "saga-1",
                 explicit_human_approval=True,
@@ -494,13 +554,21 @@ class ExecutionSagaTests(unittest.TestCase):
                 valid_until=NOW + timedelta(minutes=5),
                 created_at=NOW + timedelta(seconds=5),
             )
-            self._dispatch_claimed(
+            unresolved_comp = self._dispatch_claimed(
                 outbox,
                 budget,
                 FakeAdapter("reject"),
                 offset=6,
                 approval_ref="approval-comp",
                 reauth_ref="reauth-comp",
+            )
+            self.assertEqual(unresolved_comp["state"], "UNCERTAIN")
+            in_review = saga.sync_compensation_outcome(
+                "saga-1", "one", now=NOW + timedelta(seconds=6),
+            )
+            self.assertEqual(in_review["state"], "RECONCILIATION_REQUIRED")
+            self._fixture_mark_failed_only_after_simulated_external_no_effect_review(
+                outbox, unresolved_comp["idempotency_key"],
             )
             final = saga.sync_compensation_outcome("saga-1", "one", now=NOW + timedelta(seconds=6))
             self.assertEqual(final["state"], "MANUAL_INTERVENTION_REQUIRED")
