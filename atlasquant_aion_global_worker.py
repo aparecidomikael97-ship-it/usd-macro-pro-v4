@@ -1156,7 +1156,34 @@ def _persist_runtime_checkpoint_cas(
     operation: str,
     timeout: float = 15.0,
 ) -> dict[str, Any]:
-    """Narrow automatic writer used only by an already-authorized global tick."""
+    """Narrow global Worker writer. No independent source witness enrolled.
+
+    Global tick admission (A47) is not sufficient: this function is callable
+    directly. Enforce the SAME no-witness denial at the actual write boundary
+    before reading a caller-controlled config or contacting GitHub. Any future
+    productive replacement requires a separately reviewed external trust root,
+    owner/resource/tenant binding and independently witnessed latest head.
+    """
+    # V16-A.48: no caller token, GitHub SHA, local checkpoint digest or forged
+    # witness marker can substitute for an independently enrolled trust root.
+    # Fail closed for both valid and hostile configs with zero I/O. No bypass.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
+        "saved": False,
+        "verified": False,
+        "write_accepted": False,
+        "write_outcome": "NOT_ATTEMPTED",
+        "reconciliation_required": False,
+        "automatic_retry_allowed": False,
+        "independent_witness_verified": False,
+        "source_authenticity_verified": False,
+        "owner_identity_verified": False,
+        "network_called": False,
+        "external_action_executed": False,
+    }
+
     require_runtime_branch(config.branch)
     if not config.write_ready or not str(expected_sha or "").strip():
         return {
