@@ -38,6 +38,8 @@ jobs:
             atlasquant_aion_producer_receipt_untrusted_precheck.py \
             test_atlasquant_aion_producer_receipt_untrusted_precheck.py \
             atlasquant_aion_execution_saga.py \
+            atlasquant_aion_saga_sequence_policy.py \
+            test_atlasquant_aion_saga_sequence_policy.py \
             test_atlasquant_aion_execution_saga.py \
             test_atlasquant_aion_saga_pure_simulation_reference.py \
             atlasquant_aion_mission_control.py \
@@ -193,6 +195,9 @@ jobs:
       - name: Simulate historical Saga liveness in nonproductive pure model
         run: |
           python -m unittest -q test_atlasquant_aion_saga_pure_simulation_reference.py
+      - name: A41 verify pure shared sequence policy and forged SQLite denial
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_sequence_policy.py
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
