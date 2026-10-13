@@ -769,6 +769,71 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         self.assertEqual(second["stats"]["crash_recoveries"], 1)
 
 
+    def test_a48_direct_writer_denies_valid_local_checkpoint_before_put(self):
+        # A healthy-looking in-memory state is not owner/tenant/source proof.
+        checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
+        self.assertIn(
+            checkpoint_integrity_report(checkpoint)["state"],
+            {"CONFIRMED", "MIGRATION_REQUIRED"},
+        )
+        with patch(
+            "atlasquant_aion_global_worker.requests.put"
+        ) as put, patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint"
+        ) as readback:
+            result = _persist_runtime_checkpoint_cas(
+                checkpoint, _config(), expected_sha="sha-local",
+                operation="claim global lease",
+            )
+        put.assert_not_called()
+        readback.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED")
+        self.assertFalse(result["saved"])
+        self.assertFalse(result["verified"])
+        self.assertFalse(result["reconciliation_required"])
+        self.assertFalse(result["independent_witness_verified"])
+
+    def test_a48_forged_local_witness_marker_cannot_activate_direct_writer(self):
+        # Test-only fake witness in same admin-controlled checkpoint domain.
+        checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
+        checkpoint["independent_witness"] = {
+            "status": "VERIFIED", "owner": "HUMAN_OWNER",
+            "source": "locally_forged_A48_test_only",
+        }
+        with patch("atlasquant_aion_global_worker.requests.put") as put, patch(
+            "atlasquant_aion_global_worker.load_runtime_checkpoint"
+        ) as readback:
+            result = _persist_runtime_checkpoint_cas(
+                checkpoint, _config(), expected_sha="sha-local",
+                operation="persist global worker tick",
+            )
+        put.assert_not_called()
+        readback.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED")
+        self.assertFalse(result["independent_witness_verified"])
+
+    def test_a48_direct_writer_does_not_read_hostile_config_properties(self):
+        class HostileConfig:
+            reads = 0
+
+            @property
+            def branch(self):
+                self.reads += 1
+                raise AssertionError("hostile branch property should not run")
+
+        config = HostileConfig()
+        with patch("atlasquant_aion_global_worker.requests.put") as put:
+            result = _persist_runtime_checkpoint_cas(
+                {}, config, expected_sha="sha-local",
+                operation="claim global lease",
+            )
+        self.assertEqual(config.reads, 0)
+        put.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED")
+
     def test_global_cas_unverified_write_returns_reconciliation_receipt(self):
         checkpoint = ensure_operating_checkpoint(self.armed_checkpoint())
         put = MagicMock()
