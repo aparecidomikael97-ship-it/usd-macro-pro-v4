@@ -1556,6 +1556,30 @@ def run_global_worker_once(
             "network_called": True,
             "external_action_executed": False,
         }
+    # V16-A.46: a successful GitHub GET/decode is not a trustworthy
+    # checkpoint. load_runtime_checkpoint can report status=CONFIRMED while
+    # its embedded digests are MISMATCH or UNKNOWN. Re-evaluate the RAW
+    # checkpoint before ensure_operating_checkpoint normalizes and may
+    # regenerate digest fields; do not trust a caller-supplied 'integrity'
+    # dictionary or claim external source ownership from a local hash.
+    try:
+        integrity = checkpoint_integrity_report(loaded.get("checkpoint"))
+        integrity_state = str(integrity.get("state") or "UNKNOWN").upper()
+    except Exception:
+        integrity_state = "UNKNOWN"
+    if integrity_state not in {"CONFIRMED", "MIGRATION_REQUIRED"}:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "GLOBAL_CHECKPOINT_INTEGRITY_" + integrity_state,
+            "checkpoint_integrity": integrity_state,
+            "processed": 0,
+            "network_called": True,
+            "executor_called": False,
+            "automatic_runtime_checkpoint_persistence": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+        }
     checkpoint = ensure_operating_checkpoint(loaded.get("checkpoint"))
     state, state_status = load_global_worker_state(checkpoint)
     if state_status["state"] == "EMPTY":
