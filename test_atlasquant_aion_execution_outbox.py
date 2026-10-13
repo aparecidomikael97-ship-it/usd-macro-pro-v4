@@ -801,5 +801,110 @@ class OutboxTimeOfUseFenceP0Tests(unittest.TestCase):
             root.cleanup()
 
 
+
+class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
+    """Synthetic interleavings expose stale status/lease overwrite risks."""
+
+    def setUp(self):
+        self.scope = Scope("owner-test", "tenant-a", "workspace-a")
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.store = SQLiteChatStore(Path(self.tempdir.name) / "chat.sqlite3")
+        self.outbox = ExecutionOutbox(self.store, self.scope)
+        self.item = self.outbox.enqueue(
+            intent_ref="intent-stale-block",
+            action="send_email",
+            payload={"fixture": "no-network"},
+            aggregate_key="client-stale-block",
+            policy_version="policy-v1",
+            authorization_ref="approval-1",
+            created_at=NOW,
+            valid_until=NOW + timedelta(minutes=5),
+        )
+        self.key = self.item["idempotency_key"]
+        self.outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+
+    def tearDown(self):
+        self.store.close()
+        self.tempdir.cleanup()
+
+    def test_late_revocation_does_not_clobber_confirmed_effect(self):
+        def changed_while_callback(_decision):
+            # Simulate another actor confirming before this old callback replies.
+            self.outbox._confirm(
+                self.key, effect_ref="EFFECT-PROVEN",
+                confirmed_at=NOW + timedelta(seconds=1),
+            )
+            return policy(self.scope, allowed=False)({})
+        adapter = CountingAdapter()
+        with self.assertRaisesRegex(RuntimeError, "stale outbox state/lease"):
+            self.outbox.dispatch_claimed(
+                self.key, worker_id="worker-1",
+                authorize=changed_while_callback,
+                adapter=adapter, now=NOW + timedelta(seconds=1),
+            )
+        self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
+        self.assertEqual(self.outbox.effect_count(), 1)
+        self.assertEqual(adapter.calls, 0)
+
+    def test_late_revocation_cannot_revoke_reclaimed_claim(self):
+        def changed_while_callback(_decision):
+            with self.store.db:
+                self.store.db.execute(
+                    "UPDATE action_outbox SET lease_owner=?,lease_until=? "
+                    "WHERE idempotency_key=?",
+                    ("worker-2", (NOW + timedelta(seconds=55)).isoformat(), self.key),
+                )
+            return policy(self.scope, allowed=False)({})
+        adapter = CountingAdapter()
+        with self.assertRaisesRegex(RuntimeError, "stale outbox state/lease"):
+            self.outbox.dispatch_claimed(
+                self.key, worker_id="worker-1",
+                authorize=changed_while_callback,
+                adapter=adapter, now=NOW + timedelta(seconds=1),
+            )
+        unchanged = self.outbox.get(self.key)
+        self.assertEqual(unchanged["state"], "CLAIMED")
+        self.assertEqual(unchanged["lease_owner"], "worker-2")
+        self.assertEqual(adapter.calls, 0)
+
+    def test_reconcile_late_block_cannot_clobber_confirmation(self):
+        sent_adapter = FakeIdempotentAdapter(mode="sent")
+        sent = self.outbox.dispatch_claimed(
+            self.key, worker_id="worker-1",
+            authorize=policy(self.scope), adapter=sent_adapter,
+            now=NOW + timedelta(seconds=1),
+        )
+        self.assertEqual(sent["state"], "SENT")
+        outbox = self.outbox
+        key = self.key
+
+        class StaleAbsenceAdapter:
+            def reconcile(self, _key, _decision):
+                # Another observation wins while the old result is pending.
+                outbox._confirm(
+                    key, effect_ref="EFFECT-RECONCILED",
+                    confirmed_at=NOW + timedelta(seconds=2),
+                )
+                return {"found": False, "authoritative_absence": True}
+
+        with self.assertRaisesRegex(RuntimeError, "stale outbox state/lease"):
+            self.outbox.reconcile(
+                self.key, adapter=StaleAbsenceAdapter(),
+                authorize=policy(self.scope, allowed=False),
+                now=NOW + timedelta(seconds=3),
+            )
+        self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
+        self.assertEqual(self.outbox.effect_count(), 1)
+
+    def test_current_revocation_remains_functional(self):
+        result = self.outbox.dispatch_claimed(
+            self.key, worker_id="worker-1",
+            authorize=policy(self.scope, allowed=False),
+            adapter=CountingAdapter(), now=NOW + timedelta(seconds=1),
+        )
+        self.assertEqual(result["state"], "REVOKED")
+        self.assertEqual(result["last_error"], "AUTHORITY_REVOKED")
+
+
 if __name__ == "__main__":
     unittest.main()
