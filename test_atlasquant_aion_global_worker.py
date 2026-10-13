@@ -224,7 +224,7 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
 
     def test_a46_corrupted_checkpoint_get_success_does_not_execute_or_write(self):
         checkpoint = self.armed_checkpoint()
-        checkpoint["operating"]["task_digest"] = "f" * 64
+        checkpoint.setdefault("operating", {})["task_digest"] = "f" * 64
         self.assertEqual(checkpoint_integrity_report(checkpoint)["state"], "MISMATCH")
         with patch(
             "atlasquant_aion_global_worker.load_runtime_checkpoint",
