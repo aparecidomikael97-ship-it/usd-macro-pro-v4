@@ -36,6 +36,7 @@ jobs:
             atlasquant_aion_execution_outbox.py \
             test_atlasquant_aion_execution_outbox.py \
             test_atlasquant_aion_outbox_fifo_local_terminal_denial.py \
+            test_atlasquant_aion_outbox_missing_predecessor_denial.py \
             atlasquant_aion_producer_receipt_untrusted_precheck.py \
             test_atlasquant_aion_producer_receipt_untrusted_precheck.py \
             atlasquant_aion_execution_saga.py \
@@ -187,6 +188,9 @@ jobs:
       - name: A44 refuse same-aggregate FIFO release on locally forged terminal rows
         run: |
           python -m unittest -q test_atlasquant_aion_outbox_fifo_local_terminal_denial.py
+      - name: A45 missing predecessor local Outbox row never releases same-aggregate FIFO
+        run: |
+          python -m unittest -q test_atlasquant_aion_outbox_missing_predecessor_denial.py
       - name: Prove external producer receipt claims never admit without independent trust
         run: |
           python -m unittest -q test_atlasquant_aion_producer_receipt_untrusted_precheck.py
