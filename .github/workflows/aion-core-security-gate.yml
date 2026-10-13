@@ -39,6 +39,7 @@ jobs:
             test_atlasquant_aion_producer_receipt_untrusted_precheck.py \
             atlasquant_aion_execution_saga.py \
             test_atlasquant_aion_execution_saga.py \
+            test_atlasquant_aion_saga_pure_simulation_reference.py \
             atlasquant_aion_mission_control.py \
             atlasquant_aion_drift_monitor.py \
             atlasquant_aion_blast_radius_gate.py \
@@ -189,6 +190,9 @@ jobs:
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_confirmed_cannot_supply_external_producer_receipt \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_failed_cannot_supply_terminal_no_effect_fence \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a39_compensation_cannot_promote_local_confirmed_or_failed
+      - name: Simulate historical Saga liveness in nonproductive pure model
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_pure_simulation_reference.py
       - name: Run AION v2.1 scope and quarantine tests
         run: |
           python -m pytest -q \
