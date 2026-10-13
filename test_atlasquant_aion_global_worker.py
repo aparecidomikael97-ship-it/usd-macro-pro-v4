@@ -246,7 +246,10 @@ class AionGlobalDurableWorkerTests(unittest.TestCase):
         execute.assert_not_called()
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["reason"], "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED")
-        self.assertEqual(result["processed"], 0)
+        self.assertEqual(
+            {key: result[key] for key in ("processed", "succeeded", "failed", "blocked")},
+            {"processed": 0, "succeeded": 0, "failed": 0, "blocked": 0},
+        )
         self.assertTrue(result["network_called"])  # safe read only
         self.assertFalse(result["external_action_executed"])
 
