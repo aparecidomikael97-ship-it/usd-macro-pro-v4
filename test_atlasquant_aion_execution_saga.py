@@ -564,16 +564,18 @@ class ExecutionSagaTests(unittest.TestCase):
                     now=NOW + timedelta(seconds=2),
                 )
 
-            reconciled = outbox.reconcile(
-                result["idempotency_key"],
-                adapter=adapter,
-                authorize=policy(self.scope),
-                now=NOW + timedelta(seconds=3),
-            )
-            self.assertEqual(reconciled["state"], "UNCERTAIN")
-            self.assertEqual(
-                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
-            )
+            # Even a callback called "readback" remains untrusted code.
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.reconcile(
+                    result["idempotency_key"],
+                    adapter=adapter,
+                    authorize=policy(self.scope),
+                    now=NOW + timedelta(seconds=3),
+                )
+            self.assertEqual(outbox.get(result["idempotency_key"])["state"], "UNCERTAIN")
+            self.assertEqual(adapter.send_calls, 0)
             self.assertEqual(
                 saga.sync_forward_outcome(
                     "saga-1", "one", now=NOW + timedelta(seconds=3),
@@ -646,20 +648,22 @@ class ExecutionSagaTests(unittest.TestCase):
                     created_at=NOW + timedelta(seconds=11),
                 )
 
-            reconciled = outbox.reconcile(
-                result["idempotency_key"],
-                adapter=adapter,
-                authorize=policy(
-                    self.scope,
-                    authorization_ref="approval-comp",
-                    reauth_ref="reauth-comp",
-                ),
-                now=NOW + timedelta(seconds=12),
-            )
-            self.assertEqual(reconciled["state"], "UNCERTAIN")
-            self.assertEqual(
-                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
-            )
+            # A33 blocks untrusted reconcile before callback invocation.
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.reconcile(
+                    result["idempotency_key"],
+                    adapter=adapter,
+                    authorize=policy(
+                        self.scope,
+                        authorization_ref="approval-comp",
+                        reauth_ref="reauth-comp",
+                    ),
+                    now=NOW + timedelta(seconds=12),
+                )
+            self.assertEqual(outbox.get(result["idempotency_key"])["state"], "UNCERTAIN")
+            self.assertEqual(adapter.send_calls, 0)
             self.assertEqual(
                 saga.sync_compensation_outcome(
                     "saga-1", "two", now=NOW + timedelta(seconds=12),
