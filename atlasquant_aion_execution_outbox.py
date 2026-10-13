@@ -627,6 +627,48 @@ class ExecutionOutbox:
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
                 )
 
+        # V16-A.30 local-only preflight: preserve both authorization and
+        # time-of-use checks even when productive enrollment is unavailable.
+        # These checks are necessary but NEVER sufficient to enable a sender.
+        # No adapter attribute is read and there are no external effects.
+        # Callbacks can block or revoke authorization after the first check.
+        # Recheck after those callbacks, then read time AGAIN after revalidation.
+        pre_send_dt = read_clock()
+        if pre_send_dt >= _utc(intent["lease_until"]):
+            raise TimeoutError("claim lease expired during authorization callbacks")
+        allowed, blocked_state, auth = self._authorization_gate(
+            intent, authorize, pre_send_dt,
+        )
+        if not allowed:
+            return block_current(key, blocked_state, auth.get("reason", blocked_state))
+        fenced_at = read_clock()
+        if fenced_at >= _utc(intent["lease_until"]):
+            raise TimeoutError("claim lease expired before send")
+        if fenced_at >= _utc(decision.get("valid_until")):
+            return block_current(key, "BLOCKED_REAPPROVAL", "AUTHORITY_EXPIRED")
+
+        # In this NO-PRODUCER state use a READ-ONLY guard equivalent to
+        # the CAS admission predicates. It catches revoked claims, moved
+        # leases and changed persisted deadlines, without writing UNCERTAIN.
+        # It does not authorize or replace the later transactional CAS.
+        available = self.db.execute(
+            """SELECT 1 FROM action_outbox
+               WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                 AND state='CLAIMED' AND lease_owner=?
+                 AND lease_until=? AND lease_until>?
+                 AND EXISTS (
+                     SELECT 1 FROM action_decisions d
+                     WHERE d.decision_id=action_outbox.decision_id
+                       AND d.valid_until>?
+                 )""",
+            (
+                key, *self._scope_args(), worker,
+                intent["lease_until"], _iso(fenced_at), _iso(fenced_at),
+            ),
+        ).fetchone()
+        if available is None:
+            raise TimeoutError("claim/deadline changed before send; dispatch blocked")
+
         # V16-A.27: no independently enrolled producer, issuer, bound account
         # or monotonic witness is present in this staging implementation.
         # This is a mandatory pre-adapter hard stop, NOT a self-attested
@@ -643,22 +685,6 @@ class ExecutionOutbox:
         send = getattr(adapter, "send", None)
         if not callable(send):
             raise TypeError("adapter.send required")
-
-        # Callbacks can block or revoke authorization after the first check.
-        # Recheck after those callbacks, then read time AGAIN after revalidation.
-        pre_send_dt = read_clock()
-        if pre_send_dt >= _utc(intent["lease_until"]):
-            raise TimeoutError("claim lease expired during authorization callbacks")
-        allowed, blocked_state, auth = self._authorization_gate(
-            intent, authorize, pre_send_dt,
-        )
-        if not allowed:
-            return block_current(key, blocked_state, auth.get("reason", blocked_state))
-        fenced_at = read_clock()
-        if fenced_at >= _utc(intent["lease_until"]):
-            raise TimeoutError("claim lease expired before send")
-        if fenced_at >= _utc(decision.get("valid_until")):
-            return block_current(key, "BLOCKED_REAPPROVAL", "AUTHORITY_EXPIRED")
 
         # Keep the persisted UNCERTAIN transition atomic with a compare-and-swap
         # on claim owner, its exact lease and both persisted deadlines. No send
