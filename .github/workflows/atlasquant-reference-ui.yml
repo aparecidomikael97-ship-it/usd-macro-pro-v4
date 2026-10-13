@@ -44,7 +44,7 @@ jobs:
         run: python -m pytest -q -s test_atlasquant_reference_browser.py test_atlasquant_aion_chat_product_ui_browser_staged.py
       - name: Save visual evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: atlasquant-reference-ui-evidence
           path: visual_review/
