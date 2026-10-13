@@ -1523,28 +1523,19 @@ def run_global_worker_once(
             "real_trading_enabled": False,
         }
 
-    # V16-A.47: a rollout flag is not an independently enrolled source,
-    # owner or latest-head antirollback witness. No verifiable trust root is
-    # installed in this runtime. Deny before accessing even the supplied
-    # config descriptor or making a network read, CAS claim, or executor call.
-    # Do not add a bypass flag, fixture signer, or self-attested "verified".
-    # Replacing this hold requires an independently reviewed real witness
-    # and source/tenant/owner binding with physical HUMAN_OWNER approval.
-    return {
-        "schema": SCHEMA,
-        "status": "BLOCKED",
-        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
-        "processed": 0,
-        "network_called": False,
-        "executor_called": False,
-        "automatic_runtime_checkpoint_persistence": False,
-        "automatic_retry_allowed": False,
-        "source_authenticity_verified": False,
-        "independent_witness_verified": False,
-        "owner_identity_verified": False,
-        "external_action_executed": False,
-        "real_trading_enabled": False,
-    }
+    # An untrusted runtime-config object must not execute Python properties
+    # or __bool__ methods before the source/witness boundary is checked.
+    if config is not None and type(config) is not RuntimeConfig:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "GLOBAL_RUNTIME_CONFIG_TYPE_INVALID",
+            "processed": 0,
+            "network_called": False,
+            "executor_called": False,
+            "automatic_runtime_checkpoint_persistence": False,
+            "external_action_executed": False,
+        }
 
     cfg = config or config_from_mapping()
     runtime = _runtime_id(runtime_id)
@@ -1603,6 +1594,29 @@ def run_global_worker_once(
             "external_action_executed": False,
             "real_trading_enabled": False,
         }
+    # V16-A.47: local digest consistency (A46), feature flag and GitHub
+    # read/sha are NOT independent source ownership or latest-head witness.
+    # At this stage the fetch has been read-only and raw integrity checked.
+    # Hold BEFORE normalization, local lease CAS, any runtime write or
+    # executor. This leaves A46 corruption denials independently testable.
+    # There is no enrolled external witness, issuer or HUMAN_OWNER trust root.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
+        "checkpoint_integrity": integrity_state,
+        "processed": 0,
+        "network_called": True,
+        "executor_called": False,
+        "automatic_runtime_checkpoint_persistence": False,
+        "automatic_retry_allowed": False,
+        "source_authenticity_verified": False,
+        "independent_witness_verified": False,
+        "owner_identity_verified": False,
+        "external_action_executed": False,
+        "real_trading_enabled": False,
+    }
+
     checkpoint = ensure_operating_checkpoint(loaded.get("checkpoint"))
     state, state_status = load_global_worker_state(checkpoint)
     if state_status["state"] == "EMPTY":
