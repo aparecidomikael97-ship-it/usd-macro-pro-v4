@@ -356,7 +356,7 @@ class AionChaosCampaignTests(unittest.TestCase):
             self.assertIsNone(outbox.claim_next(
                 "worker-2", now=NOW + timedelta(seconds=2),
             ))
-            with self.assertRaisesRegex(ValueError, "previous saga step is not settled"):
+            with self.assertRaisesRegex(ValueError, "saga state does not allow forward enqueue"):
                 saga.enqueue_next(
                     "chaos-saga",
                     authorization_ref="approval-1",
