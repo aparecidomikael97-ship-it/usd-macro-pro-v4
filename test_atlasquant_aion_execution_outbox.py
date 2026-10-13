@@ -18,6 +18,36 @@ from atlasquant_aion_execution_outbox import (
 NOW = datetime(2026, 10, 5, 5, 0, tzinfo=timezone.utc)
 
 
+def _fixture_simulate_independent_positive_review(outbox, key, effect_ref):
+    """Only a raw SQLite fixture for stale-CAS race tests.
+
+    NOT a producer receipt, approval function, or production recovery API.
+    This must never be imported by an operating AION host.
+    """
+    current = outbox.get(key)
+    if current["state"] not in {"SENT", "UNCERTAIN"}:
+        raise AssertionError("fixture positive review expects an uncertain effect")
+    with outbox.db:
+        args = (key, outbox.scope.owner_id, outbox.scope.tenant_id, outbox.scope.workspace_id)
+        outbox.db.execute(
+            """INSERT INTO action_effects(
+                idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
+            ) VALUES (?,?,?,?,?,?,?)""",
+            (*args, effect_ref, NOW.isoformat(), "{}"),
+        )
+        changed = outbox.db.execute(
+            """UPDATE action_outbox
+               SET state='CONFIRMED',effect_ref=?,confirmed_at=?,
+                   lease_owner='',lease_until='',last_error=''
+               WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                 AND state=? AND lease_owner=? AND lease_until=?""",
+            (effect_ref, NOW.isoformat(), *args, current["state"],
+             current["lease_owner"], current["lease_until"]),
+        )
+        if changed.rowcount != 1:
+            raise AssertionError("stale fixture review; refusing to overwrite")
+
+
 def policy(
     scope,
     *,
@@ -301,10 +331,15 @@ class ExecutionOutboxTests(unittest.TestCase):
                 authorize=policy(self.scope),
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(reconciled["state"], "CONFIRMED")
-            self.assertEqual(reconciled["reconcile_state"], "CONFIRMED")
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
+            )
             self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(
+                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=4))
+            )
             store.close()
 
     def test_unverified_absence_never_allows_retry_even_if_fixture_knows_no_effect(self):
@@ -367,12 +402,14 @@ class ExecutionOutboxTests(unittest.TestCase):
                 adapter=adapter,
                 now=NOW + timedelta(seconds=2),
             )
-            claimed_second = outbox.claim_next(
+            self.assertEqual(outbox.get(first["idempotency_key"])["state"], "UNCERTAIN")
+            self.assertIsNone(outbox.claim_next(
                 "worker-2",
                 now=NOW + timedelta(seconds=3),
                 lease_seconds=60,
-            )
-            self.assertEqual(claimed_second["idempotency_key"], second["idempotency_key"])
+            ))
+            self.assertEqual(outbox.get(second["idempotency_key"])["state"], "PENDING")
+            self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
     def test_expired_claim_before_dispatch_is_retryable_because_boundary_not_crossed(self):
@@ -451,9 +488,15 @@ class ExecutionOutboxTests(unittest.TestCase):
                 authorize=policy(self.scope),
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(confirmed["state"], "CONFIRMED")
+            self.assertEqual(confirmed["state"], "SENT")
+            self.assertEqual(
+                confirmed["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
+            )
             self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(
+                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=4))
+            )
             store.close()
 
     def test_module_has_no_built_in_external_execution_capability(self):
@@ -783,9 +826,11 @@ class OutboxTimeOfUseFenceP0Tests(unittest.TestCase):
                 authorize=policy(self.scope), adapter=adapter,
                 now=NOW + timedelta(seconds=1),
             )
-            self.assertEqual(result["state"], "CONFIRMED")
+            self.assertEqual(result["state"], "UNCERTAIN")
+            self.assertEqual(result["dispatch_state"], "UNCERTAIN_PROOF_REQUIRED")
+            self.assertEqual(result["last_error"], "ADAPTER_POSITIVE_EFFECT_UNVERIFIED")
             self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(outbox.effect_count(), 0)
         finally:
             store.close()
             root.cleanup()
@@ -886,9 +931,8 @@ class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
         class StaleAbsenceAdapter:
             def reconcile(self, _key, _decision):
                 # Another observation wins while the old result is pending.
-                outbox._confirm(
-                    key, expected=outbox.get(key), effect_ref="EFFECT-RECONCILED",
-                    confirmed_at=NOW + timedelta(seconds=2),
+                _fixture_simulate_independent_positive_review(
+                    outbox, key, "EFFECT-RECONCILED",
                 )
                 return {"found": False, "authoritative_absence": True}
 
@@ -948,9 +992,8 @@ class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
 
         class LateAbsence:
             def reconcile(self, _key, _decision):
-                outbox._confirm(
-                    key, expected=outbox.get(key), effect_ref="EFFECT-VERIFIED",
-                    confirmed_at=NOW + timedelta(seconds=2),
+                _fixture_simulate_independent_positive_review(
+                    outbox, key, "EFFECT-VERIFIED",
                 )
                 return {"found": False, "authoritative_absence": True}
 
@@ -1070,7 +1113,7 @@ class OutboxPostSendStateCASP0Tests(unittest.TestCase):
             def send(self, _decision, _key):
                 fixture.peer_state("REVOKED")
                 return {"accepted": True, "confirmed": True, "effect_ref": "EFFECT-OLD"}
-        with self.assertRaisesRegex(RuntimeError, "stale confirmation"):
+        with self.assertRaisesRegex(RuntimeError, "stale unverified adapter claim"):
             self.dispatch(Adapter())
         self.assertEqual(self.outbox.get(self.key)["state"], "REVOKED")
         self.assertEqual(self.outbox.effect_count(), 0)
@@ -1099,7 +1142,7 @@ class OutboxPostSendStateCASP0Tests(unittest.TestCase):
                             "accepted": False, "retryable": retryable,
                             "reason": "stale adapter claim",
                         }
-                with self.assertRaisesRegex(RuntimeError, "stale adapter rejection"):
+                with self.assertRaisesRegex(RuntimeError, "stale unverified adapter claim"):
                     self.dispatch(Adapter())
                 self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
                 self.assertEqual(self.outbox.get(self.key)["effect_ref"], "EFFECT-PEER")
@@ -1137,16 +1180,16 @@ class OutboxPostSendStateCASP0Tests(unittest.TestCase):
                 return {"found": True, "confirmed": True, "effect_ref": "EFFECT-STALE"}
         adapter = Adapter()
         self.assertEqual(self.dispatch(adapter)["state"], "SENT")
-        with self.assertRaisesRegex(RuntimeError, "stale confirmation"):
-            self.outbox.reconcile(
-                self.key, adapter=adapter, authorize=policy(self.scope),
-                now=NOW + timedelta(seconds=2),
-            )
+        observed = self.outbox.reconcile(
+            self.key, adapter=adapter, authorize=policy(self.scope),
+            now=NOW + timedelta(seconds=2),
+        )
+        self.assertEqual(observed["reconcile_state"], "STALE_OBSERVATION_IGNORED")
         self.assertEqual(self.outbox.get(self.key)["state"], "REVOKED")
         self.assertEqual(self.outbox.effect_count(), 0)
 
     def test_confirm_rejects_claimed_without_send(self):
-        with self.assertRaisesRegex(ValueError, "requires observed SENT/UNCERTAIN"):
+        with self.assertRaisesRegex(PermissionError, "INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED"):
             self.outbox._confirm(
                 self.key, expected=self.outbox.get(self.key),
                 effect_ref="EFFECT-FAKE", confirmed_at=NOW,
