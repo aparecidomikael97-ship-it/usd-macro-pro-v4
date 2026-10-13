@@ -494,7 +494,10 @@ class ExecutionOutbox:
             ("workspace_id", self.scope.workspace_id),
         ):
             supplied = _clean(current.get(field), 128)
-            if supplied and supplied != wanted:
+            # An absent/blank scope is not a valid authorization assertion.
+            if not supplied:
+                return False, "REVOKED", {"reason": field.upper() + "_MISSING"}
+            if supplied != wanted:
                 return False, "REVOKED", {"reason": field.upper() + "_MISMATCH"}
         if _clean(current.get("policy_version"), 128) != _clean(decision.get("policy_version"), 128):
             return False, "BLOCKED_REAPPROVAL", {"reason": "POLICY_VERSION_CHANGED"}
@@ -577,7 +580,12 @@ class ExecutionOutbox:
         """Dispatch one claimed intent; uncertain outcomes require reconciliation."""
         key = _clean(idempotency_key, 64)
         worker = _token(worker_id, "worker_id")
-        now_dt = _utc(now)
+        # A callable clock supports deterministic staging tests. A real host must
+        # supply trusted time/lease fencing; caller-supplied values are NOT proof.
+        def read_clock() -> datetime:
+            return _utc(now() if callable(now) else now)
+
+        now_dt = read_clock()
         intent = self.get(key)
         if intent["state"] != "CLAIMED":
             raise ValueError("intent must be CLAIMED before dispatch")
@@ -630,16 +638,45 @@ class ExecutionOutbox:
         if not callable(send):
             raise TypeError("adapter.send required")
 
-        # Persist ambiguity BEFORE crossing the external boundary. If the process
-        # dies after this commit, restart must reconcile and must not blind-retry.
+        # Callbacks can block or revoke authorization after the first check.
+        # Recheck after those callbacks, then read time AGAIN after revalidation.
+        pre_send_dt = read_clock()
+        if pre_send_dt >= _utc(intent["lease_until"]):
+            raise TimeoutError("claim lease expired during authorization callbacks")
+        allowed, blocked_state, auth = self._authorization_gate(
+            intent, authorize, pre_send_dt,
+        )
+        if not allowed:
+            return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+        fenced_at = read_clock()
+        if fenced_at >= _utc(intent["lease_until"]):
+            raise TimeoutError("claim lease expired before send")
+        if fenced_at >= _utc(decision.get("valid_until")):
+            return self._set_blocked(key, "BLOCKED_REAPPROVAL", "AUTHORITY_EXPIRED")
+
+        # Keep the persisted UNCERTAIN transition atomic with a compare-and-swap
+        # on claim owner, its exact lease and both persisted deadlines. No send
+        # occurs if another writer or expiry invalidates the pre-send claim.
+        # This local fence does NOT prevent late effects on an external provider.
         with self.db:
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='UNCERTAIN',dispatch_started_at=?,last_error='DISPATCH_IN_PROGRESS'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_owner=?""",
-                (_iso(now_dt), key, *self._scope_args(), worker),
+                     AND state='CLAIMED' AND lease_owner=?
+                     AND lease_until=? AND lease_until>?
+                     AND EXISTS (
+                         SELECT 1 FROM action_decisions d
+                         WHERE d.decision_id=action_outbox.decision_id
+                           AND d.valid_until>?
+                     )""",
+                (
+                    _iso(fenced_at), key, *self._scope_args(), worker,
+                    intent["lease_until"], _iso(fenced_at), _iso(fenced_at),
+                ),
             )
+            if cursor.rowcount != 1:
+                raise TimeoutError("claim/deadline changed before send; dispatch blocked")
 
         try:
             result = _mapping(send(dict(intent["decision"]), key))
