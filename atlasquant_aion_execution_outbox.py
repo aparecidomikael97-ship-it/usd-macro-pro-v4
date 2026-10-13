@@ -794,14 +794,33 @@ class ExecutionOutbox:
                     expected=intent,
                 )
                 return {**out, "reconcile_state": blocked_state}
+            # An absence answer is a stale observation if another worker or a
+            # confirmed effect changed this intent while callbacks were running.
+            # This is only a LOCAL CAS. No provider is trusted merely for setting
+            # authoritative_absence=True; real retry requires independent proof.
             with self.db:
-                self.db.execute(
+                changed = self.db.execute(
                     """UPDATE action_outbox
                        SET state='RETRY',lease_owner='',lease_until='',
                            last_error='AUTHORITATIVE_ABSENCE_CONFIRMED'
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (key, *self._scope_args()),
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state=? AND lease_owner=? AND lease_until=?
+                         AND NOT EXISTS (
+                             SELECT 1 FROM action_effects e
+                             WHERE e.idempotency_key=action_outbox.idempotency_key
+                               AND e.owner=action_outbox.owner
+                               AND e.tenant=action_outbox.tenant
+                               AND e.workspace=action_outbox.workspace
+                         )""",
+                    (
+                        key, *self._scope_args(),
+                        intent["state"], intent["lease_owner"], intent["lease_until"],
+                    ),
                 )
+                if changed.rowcount != 1:
+                    raise RuntimeError(
+                        "stale reconciliation or existing effect; RETRY denied"
+                    )
             return {**self.get(key), "reconcile_state": "RETRY"}
 
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
