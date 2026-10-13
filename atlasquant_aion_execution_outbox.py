@@ -609,7 +609,9 @@ class ExecutionOutbox:
         if not intent["lease_until"] or now_dt >= _utc(intent["lease_until"]):
             raise TimeoutError("claim lease expired before dispatch")
 
-        def block_current(state: str, reason: str) -> dict[str, Any]:
+        def block_current(block_key: str, state: str, reason: str) -> dict[str, Any]:
+            if block_key != key:
+                raise ValueError("stale block key mismatch")
             return self._set_blocked(key, state, reason, expected=intent)
 
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
