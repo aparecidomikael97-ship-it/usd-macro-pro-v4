@@ -217,6 +217,12 @@ jobs:
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_tail_event_cannot_mask_running_saga \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_direct_saga_state_rewrite_mismatches_event_tip \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority
+      - name: A48 direct Global Worker CAS writer fails closed without independent witness
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a48_direct_writer_denies_valid_local_checkpoint_before_put \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a48_forged_local_witness_marker_cannot_activate_direct_writer \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a48_direct_writer_does_not_read_hostile_config_properties
       - name: A47 hard stop if independent source witness is not enrolled
         run: |
           python -m unittest -q \
