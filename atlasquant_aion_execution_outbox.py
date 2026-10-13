@@ -510,16 +510,31 @@ class ExecutionOutbox:
                 return False, "BLOCKED_REAPPROVAL", {"reason": "REAUTH_TRANSACTION_MISMATCH"}
         return True, "ALLOW", current
 
-    def _set_blocked(self, key: str, state: str, reason: str) -> dict[str, Any]:
+    def _set_blocked(
+        self, key: str, state: str, reason: str, *, expected: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Block only the same observed state and lease, never a later effect."""
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
+        if _clean(expected.get("idempotency_key"), 64) != key:
+            raise ValueError("expected intent key mismatch")
+        seen_state = _clean(expected.get("state"), 32)
+        if seen_state not in {"CLAIMED", "UNCERTAIN", "SENT"}:
+            raise ValueError("expected state cannot be blocked")
         with self.db:
-            self.db.execute(
+            changed = self.db.execute(
                 """UPDATE action_outbox
                    SET state=?,lease_owner='',lease_until='',last_error=?
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (state, _clean(reason, 240), key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state=? AND lease_owner=? AND lease_until=?""",
+                (
+                    state, _clean(reason, 240), key, *self._scope_args(),
+                    seen_state, _clean(expected.get("lease_owner"), 128),
+                    _clean(expected.get("lease_until"), 128),
+                ),
             )
+            if changed.rowcount != 1:
+                raise RuntimeError("stale outbox state/lease; blocked mutation rejected")
         return self.get(key)
 
     def _confirm(
@@ -594,15 +609,18 @@ class ExecutionOutbox:
         if not intent["lease_until"] or now_dt >= _utc(intent["lease_until"]):
             raise TimeoutError("claim lease expired before dispatch")
 
+        def block_current(state: str, reason: str) -> dict[str, Any]:
+            return self._set_blocked(key, state, reason, expected=intent)
+
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
         if not allowed:
-            return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+            return block_current(key, blocked_state, auth.get("reason", blocked_state))
 
         decision = _mapping(intent.get("decision"))
         budget_ref = _clean(decision.get("authority_budget_ref"), 128)
         if budget_ref:
             if not callable(cumulative_authority_guard):
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_REQUIRED",
@@ -610,25 +628,25 @@ class ExecutionOutbox:
             try:
                 budget = _mapping(cumulative_authority_guard(dict(decision)))
             except Exception:
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_FAILED",
                 )
             if budget.get("allowed") is not True:
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     _clean(budget.get("reason") or "CUMULATIVE_AUTHORITY_BUDGET_EXCEEDED", 240),
                 )
             if _clean(budget.get("authority_budget_ref"), 128) != budget_ref:
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_BUDGET_REF_MISMATCH",
                 )
             if _clean(budget.get("transaction_id"), 128) != _clean(decision.get("transaction_id"), 128):
-                return self._set_blocked(
+                return block_current(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
@@ -647,12 +665,12 @@ class ExecutionOutbox:
             intent, authorize, pre_send_dt,
         )
         if not allowed:
-            return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+            return block_current(key, blocked_state, auth.get("reason", blocked_state))
         fenced_at = read_clock()
         if fenced_at >= _utc(intent["lease_until"]):
             raise TimeoutError("claim lease expired before send")
         if fenced_at >= _utc(decision.get("valid_until")):
-            return self._set_blocked(key, "BLOCKED_REAPPROVAL", "AUTHORITY_EXPIRED")
+            return block_current(key, "BLOCKED_REAPPROVAL", "AUTHORITY_EXPIRED")
 
         # Keep the persisted UNCERTAIN transition atomic with a compare-and-swap
         # on claim owner, its exact lease and both persisted deadlines. No send
@@ -771,6 +789,7 @@ class ExecutionOutbox:
                     key,
                     blocked_state,
                     auth.get("reason", blocked_state),
+                    expected=intent,
                 )
                 return {**out, "reconcile_state": blocked_state}
             with self.db:
