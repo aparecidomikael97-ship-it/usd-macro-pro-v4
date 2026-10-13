@@ -741,13 +741,15 @@ class ExecutionOutbox:
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
         if result.get("accepted") is not True:
-            # Local compatibility behavior only: adapter.retryable is NOT
-            # independent proof of non-effect; external retry is still NO-GO.
-            state = "RETRY" if result.get("retryable") is True else "FAILED"
+            # The external send boundary was already crossed. Neither a local
+            # retryable=False/True flag nor an adapter "rejected" response proves
+            # no effect (or excludes a delayed effect). Keep the action UNCERTAIN.
+            # Never release this aggregate for automatic retry/compensation.
             with self.db:
                 changed = self.db.execute(
                     """UPDATE action_outbox
-                       SET state=?,lease_owner='',lease_until='',last_error=?
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error='ADAPTER_REJECTION_EFFECT_UNVERIFIED'
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                          AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
                          AND NOT EXISTS (
@@ -758,14 +760,13 @@ class ExecutionOutbox:
                                AND e.workspace=action_outbox.workspace
                          )""",
                     (
-                        state, _clean(result.get("reason") or "ADAPTER_REJECTED", 240),
                         key, *self._scope_args(),
                         sent_snapshot["lease_owner"], sent_snapshot["lease_until"],
                     ),
                 )
                 if changed.rowcount != 1:
-                    raise RuntimeError("stale adapter rejection; RETRY/FAILED denied")
-            return {**self.get(key), "dispatch_state": state}
+                    raise RuntimeError("stale adapter rejection; state preserved")
+            return {**self.get(key), "dispatch_state": "UNCERTAIN_PROOF_REQUIRED"}
 
         effect_ref = _clean(result.get("effect_ref"), 128)
         if result.get("confirmed") is True:
@@ -835,43 +836,19 @@ class ExecutionOutbox:
             return {**out, "reconcile_state": "CONFIRMED"}
 
         if result.get("found") is False and result.get("authoritative_absence") is True:
-            allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
-            if not allowed:
-                out = self._set_blocked(
-                    key,
-                    blocked_state,
-                    auth.get("reason", blocked_state),
-                    expected=intent,
-                )
-                return {**out, "reconcile_state": blocked_state}
-            # An absence answer is a stale observation if another worker or a
-            # confirmed effect changed this intent while callbacks were running.
-            # This is only a LOCAL CAS. No provider is trusted merely for setting
-            # authoritative_absence=True; real retry requires independent proof.
-            with self.db:
-                changed = self.db.execute(
-                    """UPDATE action_outbox
-                       SET state='RETRY',lease_owner='',lease_until='',
-                           last_error='AUTHORITATIVE_ABSENCE_CONFIRMED'
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                         AND state=? AND lease_owner=? AND lease_until=?
-                         AND NOT EXISTS (
-                             SELECT 1 FROM action_effects e
-                             WHERE e.idempotency_key=action_outbox.idempotency_key
-                               AND e.owner=action_outbox.owner
-                               AND e.tenant=action_outbox.tenant
-                               AND e.workspace=action_outbox.workspace
-                         )""",
-                    (
-                        key, *self._scope_args(),
-                        intent["state"], intent["lease_owner"], intent["lease_until"],
-                    ),
-                )
-                if changed.rowcount != 1:
-                    raise RuntimeError(
-                        "stale reconciliation or existing effect; RETRY denied"
-                    )
-            return {**self.get(key), "reconcile_state": "RETRY"}
+            # Never accept "authoritative_absence" merely because an injected
+            # adapter says so. A positive *independent* causal no-effect receipt,
+            # with a producer-enforced late-effect fence, has no admission path
+            # in this staging module yet; keeping UNCERTAIN/SENT is intentional.
+            current = self.get(key)
+            if (
+                current["state"] != intent["state"]
+                or current["lease_owner"] != intent["lease_owner"]
+                or current["lease_until"] != intent["lease_until"]
+                or current["effect_ref"] != intent["effect_ref"]
+            ):
+                return {**current, "reconcile_state": "STALE_OBSERVATION_IGNORED"}
+            return {**current, "reconcile_state": "INDEPENDENT_ABSENCE_PROOF_REQUIRED"}}
 
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
