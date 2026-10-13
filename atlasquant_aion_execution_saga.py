@@ -27,6 +27,7 @@ from atlasquant_aion_cumulative_authority_budget import (
     CumulativeAuthorityBudget,
 )
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from atlasquant_aion_saga_sequence_policy import select_forward_step, select_compensation_step
 
 SCHEMA = "ATLASQUANT_AION_EXECUTION_SAGA_V1"
 MAX_STEPS = 12
@@ -462,20 +463,14 @@ class ExecutionSagaCoordinator:
         reauth_ref: Any = "",
     ) -> dict[str, Any]:
         saga = self.get(saga_id)
-        if saga["state"] not in {"PLANNED", "RUNNING"}:
-            raise ValueError("saga state does not allow forward enqueue")
-        active = [row for row in saga["steps"] if row["state"] in {"ENQUEUED", "RETRY", "UNCERTAIN"}]
-        if active:
-            raise ValueError("previous saga step is not settled")
-        prior_failed = [row for row in saga["steps"] if row["state"] in {"FAILED", "REVOKED", "BLOCKED_REAPPROVAL"}]
-        if prior_failed:
-            raise ValueError("failed saga cannot enqueue forward work")
-        pending = next((row for row in saga["steps"] if row["state"] == "PENDING"), None)
-        if pending is None:
-            raise ValueError("no pending saga step")
-        earlier = [row for row in saga["steps"] if row["ordinal"] < pending["ordinal"]]
-        if any(row["state"] != "CONFIRMED" for row in earlier):
-            raise ValueError("saga order requires earlier confirmation")
+        candidate = select_forward_step(saga["state"], saga["steps"])
+        pending = saga["steps"][candidate]
+        # A.41: the pure selector only sees SQLite projection. The real
+        # coordinator has NO enrolled external producer verification yet.
+        # Never allow a locally forged prior CONFIRMED to enqueue a later
+        # forward step. Fail BEFORE Outbox enqueue or any Saga mutation.
+        if candidate > 0:
+            raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
 
         item = self.outbox.enqueue(
             intent_ref=f"{saga['saga_id']}:{pending['step_key']}:forward",
@@ -715,22 +710,8 @@ class ExecutionSagaCoordinator:
         created_at: Any | None = None,
     ) -> dict[str, Any]:
         saga = self.get(saga_id)
-        if saga["state"] != "COMPENSATING":
-            raise ValueError("saga is not in compensation mode")
-        active = [
-            row for row in saga["steps"]
-            if row["state"] in {"COMPENSATION_ENQUEUED", "UNCERTAIN", "COMPENSATION_FAILED"}
-        ]
-        if active:
-            raise ValueError("previous compensation is not settled")
-        pending = sorted(
-            [row for row in saga["steps"] if row["state"] == "COMPENSATION_PENDING"],
-            key=lambda row: row["ordinal"],
-            reverse=True,
-        )
-        if not pending:
-            raise ValueError("no pending compensation")
-        step = pending[0]
+        candidate = select_compensation_step(saga["state"], saga["steps"])
+        step = saga["steps"][candidate]
         item = self.outbox.enqueue(
             intent_ref=f"{saga['saga_id']}:{step['step_key']}:compensation",
             action=step["compensation_action"],
