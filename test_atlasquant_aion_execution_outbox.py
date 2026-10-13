@@ -830,10 +830,25 @@ class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
     def test_late_revocation_does_not_clobber_confirmed_effect(self):
         def changed_while_callback(_decision):
             # Simulate another actor confirming before this old callback replies.
-            self.outbox._confirm(
-                self.key, effect_ref="EFFECT-PROVEN",
-                confirmed_at=NOW + timedelta(seconds=1),
-            )
+            # Synthetic peer updates an independently observed terminal row.
+            # A fresh _confirm from CLAIMED is intentionally forbidden.
+            with self.store.db:
+                self.store.db.execute(
+                    """INSERT INTO action_effects(
+                        idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
+                    ) VALUES (?,?,?,?,?,?,?)""",
+                    (
+                        self.key, self.scope.owner_id, self.scope.tenant_id,
+                        self.scope.workspace_id, "EFFECT-PROVEN",
+                        (NOW + timedelta(seconds=1)).isoformat(), "{}",
+                    ),
+                )
+                self.store.db.execute(
+                    """UPDATE action_outbox SET state='CONFIRMED',
+                        confirmed_at=?,effect_ref=?,lease_owner='',lease_until=''
+                        WHERE idempotency_key=?""",
+                    ((NOW + timedelta(seconds=1)).isoformat(), "EFFECT-PROVEN", self.key),
+                )
             return policy(self.scope, allowed=False)({})
         adapter = CountingAdapter()
         with self.assertRaisesRegex(RuntimeError, "stale outbox state/lease"):
@@ -882,7 +897,7 @@ class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
             def reconcile(self, _key, _decision):
                 # Another observation wins while the old result is pending.
                 outbox._confirm(
-                    key, effect_ref="EFFECT-RECONCILED",
+                    key, expected=outbox.get(key), effect_ref="EFFECT-RECONCILED",
                     confirmed_at=NOW + timedelta(seconds=2),
                 )
                 return {"found": False, "authoritative_absence": True}
@@ -944,7 +959,7 @@ class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
         class LateAbsence:
             def reconcile(self, _key, _decision):
                 outbox._confirm(
-                    key, effect_ref="EFFECT-VERIFIED",
+                    key, expected=outbox.get(key), effect_ref="EFFECT-VERIFIED",
                     confirmed_at=NOW + timedelta(seconds=2),
                 )
                 return {"found": False, "authoritative_absence": True}
@@ -1008,6 +1023,150 @@ class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
         self.assertEqual(outbox.get(key)["lease_owner"], "other-worker")
         self.assertEqual(self.adapter.send_calls, 1)
 
+
+
+
+class OutboxPostSendStateCASP0Tests(unittest.TestCase):
+    """Post-send race fixtures; adapter callbacks are not external evidence."""
+
+    def setUp(self):
+        self.scope = Scope("owner-test", "tenant-a", "workspace-a")
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.store = SQLiteChatStore(Path(self.tempdir.name) / "chat.sqlite3")
+        self.outbox = ExecutionOutbox(self.store, self.scope)
+        self.item = self.outbox.enqueue(
+            intent_ref="intent-post-send-cas",
+            action="send_email",
+            payload={"fixture": "inert-only"},
+            aggregate_key="client-post-send",
+            policy_version="policy-v1",
+            authorization_ref="approval-1",
+            created_at=NOW,
+            valid_until=NOW + timedelta(minutes=5),
+        )
+        self.key = self.item["idempotency_key"]
+        self.outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+
+    def tearDown(self):
+        self.store.close()
+        self.tempdir.cleanup()
+
+    def dispatch(self, adapter):
+        return self.outbox.dispatch_claimed(
+            self.key, worker_id="worker-1",
+            authorize=policy(self.scope), adapter=adapter,
+            now=NOW + timedelta(seconds=1),
+        )
+
+    def peer_state(self, state, *, record_effect=False):
+        # Pure SQL fixture simulates a concurrent state owner, not a real producer.
+        with self.store.db:
+            if record_effect:
+                self.store.db.execute(
+                    """INSERT INTO action_effects(
+                        idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
+                    ) VALUES (?,?,?,?,?,?,?)""",
+                    (
+                        self.key, self.scope.owner_id, self.scope.tenant_id,
+                        self.scope.workspace_id, "EFFECT-PEER",
+                        (NOW + timedelta(seconds=2)).isoformat(), "{}",
+                    ),
+                )
+            self.store.db.execute(
+                "UPDATE action_outbox SET state=?,effect_ref=?,lease_owner='',lease_until='' "
+                "WHERE idempotency_key=?",
+                (state, "EFFECT-PEER" if record_effect else "", self.key),
+            )
+
+    def test_confirmed_adapter_response_cannot_overwrite_revoked(self):
+        fixture = self
+        class Adapter:
+            def send(self, _decision, _key):
+                fixture.peer_state("REVOKED")
+                return {"accepted": True, "confirmed": True, "effect_ref": "EFFECT-OLD"}
+        with self.assertRaisesRegex(RuntimeError, "stale confirmation"):
+            self.dispatch(Adapter())
+        self.assertEqual(self.outbox.get(self.key)["state"], "REVOKED")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_stale_adapter_reject_cannot_reopen_confirmed_as_retry_or_failed(self):
+        for retryable in (True, False):
+            with self.subTest(retryable=retryable):
+                # Reset fixture state between the two independent simulations.
+                if self.outbox.get(self.key)["state"] != "CLAIMED":
+                    with self.store.db:
+                        self.store.db.execute(
+                            "DELETE FROM action_effects WHERE idempotency_key=?", (self.key,),
+                        )
+                        self.store.db.execute(
+                            """UPDATE action_outbox
+                               SET state='CLAIMED',lease_owner='worker-1',lease_until=?,
+                                   effect_ref='',last_error=''
+                               WHERE idempotency_key=?""",
+                            ((NOW + timedelta(seconds=60)).isoformat(), self.key),
+                        )
+                fixture = self
+                class Adapter:
+                    def send(self, _decision, _key):
+                        fixture.peer_state("CONFIRMED", record_effect=True)
+                        return {
+                            "accepted": False, "retryable": retryable,
+                            "reason": "stale adapter claim",
+                        }
+                with self.assertRaisesRegex(RuntimeError, "stale adapter rejection"):
+                    self.dispatch(Adapter())
+                self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
+                self.assertEqual(self.outbox.get(self.key)["effect_ref"], "EFFECT-PEER")
+                self.assertEqual(self.outbox.effect_count(), 1)
+
+    def test_stale_sent_response_cannot_overwrite_confirmed(self):
+        fixture = self
+        class Adapter:
+            def send(self, _decision, _key):
+                fixture.peer_state("CONFIRMED", record_effect=True)
+                return {"accepted": True, "confirmed": False, "effect_ref": "EFFECT-OLD"}
+        with self.assertRaisesRegex(RuntimeError, "stale send result"):
+            self.dispatch(Adapter())
+        self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
+        self.assertEqual(self.outbox.effect_count(), 1)
+
+    def test_exception_after_peer_confirmation_never_clobbers_it(self):
+        fixture = self
+        class Adapter:
+            def send(self, _decision, _key):
+                fixture.peer_state("CONFIRMED", record_effect=True)
+                raise TimeoutError("fixture lost response after peer confirmation")
+        with self.assertRaisesRegex(RuntimeError, "stale send error"):
+            self.dispatch(Adapter())
+        self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
+        self.assertEqual(self.outbox.effect_count(), 1)
+
+    def test_reconcile_confirmed_cannot_revive_revoked(self):
+        fixture = self
+        class Adapter:
+            def send(self, _decision, _key):
+                return {"accepted": True, "confirmed": False, "effect_ref": "EFFECT-PENDING"}
+            def reconcile(self, _key, _decision):
+                fixture.peer_state("REVOKED")
+                return {"found": True, "confirmed": True, "effect_ref": "EFFECT-STALE"}
+        adapter = Adapter()
+        self.assertEqual(self.dispatch(adapter)["state"], "SENT")
+        with self.assertRaisesRegex(RuntimeError, "stale confirmation"):
+            self.outbox.reconcile(
+                self.key, adapter=adapter, authorize=policy(self.scope),
+                now=NOW + timedelta(seconds=2),
+            )
+        self.assertEqual(self.outbox.get(self.key)["state"], "REVOKED")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_confirm_rejects_claimed_without_send(self):
+        with self.assertRaisesRegex(ValueError, "requires observed SENT/UNCERTAIN"):
+            self.outbox._confirm(
+                self.key, expected=self.outbox.get(self.key),
+                effect_ref="EFFECT-FAKE", confirmed_at=NOW,
+            )
+        self.assertEqual(self.outbox.get(self.key)["state"], "CLAIMED")
+        self.assertEqual(self.outbox.effect_count(), 0)
 
 
 if __name__ == "__main__":
