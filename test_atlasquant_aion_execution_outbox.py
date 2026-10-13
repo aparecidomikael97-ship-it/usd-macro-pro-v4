@@ -1387,6 +1387,44 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         self.assertEqual(adapter.calls, 1)
         self.assertEqual(self.outbox.effect_count(), 0)
 
+    def test_private_confirm_is_closed_without_independent_producer_receipt(self):
+        """Direct calls cannot bypass the missing external trust boundary."""
+        adapter = ClaimsReconciledWithoutProducer()
+        sent = self._dispatch(adapter)
+        self.assertEqual(sent["state"], "SENT")
+        with self.assertRaisesRegex(
+            PermissionError, "INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+        ):
+            self.outbox._confirm(
+                self.key, expected=self.outbox.get(self.key),
+                effect_ref="CALLER-INVENTED",
+                confirmed_at=NOW + timedelta(seconds=2),
+            )
+        self.assertEqual(self.outbox.get(self.key)["state"], "SENT")
+        self.assertEqual(self.outbox.effect_count(), 0)
+
+    def test_fake_positive_cannot_release_followup_same_aggregate(self):
+        """No next aggregate action may run on a merely asserted effect."""
+        later = self.outbox.enqueue(
+            intent_ref="intent-second-after-forged-positive",
+            action="send_email",
+            payload={"fixture": "second never dispatched"},
+            aggregate_key="client-false-positive-A21",
+            policy_version="policy-v1",
+            authorization_ref="approval-fixture-only",
+            created_at=NOW + timedelta(seconds=1),
+            valid_until=NOW + timedelta(minutes=5),
+        )
+        result = self._dispatch(ClaimsConfirmedWithoutProducer())
+        self.assertEqual(result["state"], "UNCERTAIN")
+        self.assertIsNone(self.outbox.claim_next(
+            "worker-followup", now=NOW + timedelta(seconds=2),
+        ))
+        self.assertEqual(
+            self.outbox.get(later["idempotency_key"])["state"], "PENDING",
+        )
+        self.assertEqual(self.outbox.effect_count(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
