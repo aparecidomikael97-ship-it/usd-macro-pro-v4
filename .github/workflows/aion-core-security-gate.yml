@@ -217,6 +217,9 @@ jobs:
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_tail_event_cannot_mask_running_saga \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_direct_saga_state_rewrite_mismatches_event_tip \
             test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority
+      - name: A49 non-authorizing offline Global Worker state-transition simulation
+        run: |
+          python -m unittest -q test_atlasquant_aion_global_worker_pure_simulation_lab.py
       - name: A48 direct Global Worker CAS writer fails closed without independent witness
         run: |
           python -m unittest -q \
