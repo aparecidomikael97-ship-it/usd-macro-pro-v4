@@ -148,3 +148,42 @@ This block does not activate:
 - biometric/FIDO transaction confirmation implementation.
 
 Those remain separate gates.
+
+
+## V16-A.24 — temporary positive-admission hard stop (LAB candidate only)
+
+The executable A.21 adversarial contracts in Draft #1236 proved that injected,
+untrusted `adapter.send` and `adapter.reconcile` responses could set
+`CONFIRMED` and populate `action_effects` even when no producer existed.
+
+This staged A.24 child deliberately **does not provide any path for a callback
+boolean, `effect_ref`, or a direct private `_confirm` call to certify an effect**.
+
+- A post-send `accepted=true, confirmed=true` is kept `UNCERTAIN` and the
+  scoped aggregate remains blocked, reporting `UNCERTAIN_PROOF_REQUIRED` and
+  `ADAPTER_POSITIVE_EFFECT_UNVERIFIED`.
+- An `adapter.reconcile(found=true, confirmed=true)` leaves a current
+  `SENT` or `UNCERTAIN` untouched, reporting
+  `INDEPENDENT_POSITIVE_PROOF_REQUIRED`. A stale observation is ignored.
+- A direct call to `_confirm` raises
+  `INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED`; no ledger row is added.
+- The A.20 negative quarantine remains active. An unverified negative result
+  never permits retry, FAILED, compensation or release of the next aggregate.
+
+**Important compatibility cost:** tests and Saga fixture workflows that used a
+fake adapter's `confirmed=true` as an effect may now correctly fail. They
+must remain visible in CI as **legacy contract incompatibilities** until a
+reviewed proof-admission mechanism and updated safety tests exist. Do not add
+an allow-fixture-in-production flag, xfail/skip, trust a self-enrolled key or
+weaken the new A.21 adversarial tests merely to force green.
+
+A future real path needs producer-issued causal positive receipts,
+independently enrolled issuer/pins/tenant+resource scope, challenge/nonce,
+replay/revocation/freshness checks, causal readback and a separately retained
+antirollback current-head. The producer must also furnish a terminal
+fenced-no-effect proof before safe retry of ambiguous attempts. Neither path
+exists in the A.24 staging candidate.
+
+No external sender is enabled, and a red CI from legacy positive fixtures is
+not evidence of a released system. Main, Core V1, Worker, AM12 and deployment
+remain untouched; first install remains HARD NO-GO (20/20 blocked).
