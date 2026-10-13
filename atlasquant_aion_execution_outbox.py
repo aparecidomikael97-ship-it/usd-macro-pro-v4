@@ -627,6 +627,19 @@ class ExecutionOutbox:
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
                 )
 
+        # V16-A.27: no independently enrolled producer, issuer, bound account
+        # or monotonic witness is present in this staging implementation.
+        # This is a mandatory pre-adapter hard stop, NOT a self-attested
+        # adapter capability, user-controlled flag or fixture signature.
+        # Even inspecting adapter.send may execute untrusted descriptor code.
+        # Without a separately reviewed, externally rooted enrollment verifier
+        # it is unsafe to CROSS the effect boundary merely because local
+        # policy, clock, owner or lease checks passed.
+        raise PermissionError("INDEPENDENT_PRODUCER_NOT_ENROLLED")
+
+        # Do not remove the legacy adapter path below until its replacement
+        # is reviewed. It is intentionally unreachable while enrollment is
+        # absent; NO code after this gate constitutes a working producer verifier.
         send = getattr(adapter, "send", None)
         if not callable(send):
             raise TypeError("adapter.send required")
