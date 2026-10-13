@@ -136,14 +136,19 @@ class AionChaosCampaignTests(unittest.TestCase):
         callable alternative to the pre-send production hard stop.
         """
         before = outbox.get(key)
-        self.assertEqual(before["state"], "CLAIMED")
+        self.assertEqual(before["state"], "BLOCKED_PRODUCER")
+        self.assertEqual(before["last_error"], "INDEPENDENT_PRODUCER_NOT_ENROLLED")
+        self.assertEqual(before["lease_owner"], "")
+        self.assertEqual(before["lease_until"], "")
         with outbox.db:
             changed = outbox.db.execute(
                 """UPDATE action_outbox
                    SET state='UNCERTAIN',lease_owner='',lease_until='',
                        last_error='TEST_FIXTURE_UNKNOWN_NO_SEND'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?""",
+                     AND state='BLOCKED_PRODUCER'
+                     AND last_error='INDEPENDENT_PRODUCER_NOT_ENROLLED'
+                     AND lease_owner=? AND lease_until=?""",
                 (
                     key, self.scope.owner_id, self.scope.tenant_id,
                     self.scope.workspace_id, before["lease_owner"],
@@ -182,7 +187,7 @@ class AionChaosCampaignTests(unittest.TestCase):
                     adapter=adapter,
                     now=NOW + timedelta(seconds=1),
                 )
-            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "CLAIMED")
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "BLOCKED_PRODUCER")
             self.assertEqual(adapter.send_calls, 0)
             # The following read-only reconciliation uses only synthetic DB
             # state. No producer was called, nor was a no-effect proof issued.
@@ -253,7 +258,7 @@ class AionChaosCampaignTests(unittest.TestCase):
                     now=NOW + timedelta(seconds=1),
                 )
             self.assertEqual(adapter.send_calls, 0)
-            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "CLAIMED")
+            self.assertEqual(outbox.get(item["idempotency_key"])["state"], "BLOCKED_PRODUCER")
             # Simulate ONLY a callback claiming an effect on an inert fixture.
             # This did not arise from adapter.send and is not a causal receipt.
             self._fixture_force_uncertain_without_send(outbox, item["idempotency_key"])
@@ -340,7 +345,7 @@ class AionChaosCampaignTests(unittest.TestCase):
                     now=NOW + timedelta(seconds=1),
                 )
             self.assertEqual(adapter.send_calls, 0)
-            self.assertEqual(outbox.get(claimed["idempotency_key"])["state"], "CLAIMED")
+            self.assertEqual(outbox.get(claimed["idempotency_key"])["state"], "BLOCKED_PRODUCER")
             synced = saga.sync_forward_outcome(
                 "chaos-saga", "one", now=NOW + timedelta(seconds=1),
             )
