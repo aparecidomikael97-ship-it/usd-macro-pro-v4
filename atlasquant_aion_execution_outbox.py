@@ -848,7 +848,7 @@ class ExecutionOutbox:
                 or current["effect_ref"] != intent["effect_ref"]
             ):
                 return {**current, "reconcile_state": "STALE_OBSERVATION_IGNORED"}
-            return {**current, "reconcile_state": "INDEPENDENT_ABSENCE_PROOF_REQUIRED"}}
+            return {**current, "reconcile_state": "INDEPENDENT_ABSENCE_PROOF_REQUIRED"}
 
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
