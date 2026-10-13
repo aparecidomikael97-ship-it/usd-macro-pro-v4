@@ -34,6 +34,7 @@ STATES = frozenset({
     "PENDING",
     "RETRY",
     "CLAIMED",
+    "BLOCKED_PRODUCER",
     "UNCERTAIN",
     "SENT",
     "CONFIRMED",
@@ -677,6 +678,41 @@ class ExecutionOutbox:
         # Without a separately reviewed, externally rooted enrollment verifier
         # it is unsafe to CROSS the effect boundary merely because local
         # policy, clock, owner or lease checks passed.
+        # The no-producer denial must survive process restarts and lease
+        # expiry; otherwise each expired CLAIMED lease returns to RETRY and
+        # attempts increase forever without any possible legitimate send.
+        # BLOCKED_PRODUCER is NON-TERMINAL: it keeps following actions of the
+        # same aggregate in PENDING, never releases FIFO or claims.
+        # Only the exact observed worker/lease/decision can persist this deny.
+        with self.db:
+            blocked = self.db.execute(
+                """UPDATE action_outbox
+                   SET state='BLOCKED_PRODUCER',lease_owner='',lease_until='',
+                       last_error='INDEPENDENT_PRODUCER_NOT_ENROLLED'
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?
+                     AND lease_until>?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                           AND e.owner=action_outbox.owner
+                           AND e.tenant=action_outbox.tenant
+                           AND e.workspace=action_outbox.workspace
+                     )
+                     AND EXISTS (
+                         SELECT 1 FROM action_decisions d
+                         WHERE d.decision_id=action_outbox.decision_id
+                           AND d.valid_until>?
+                     )""",
+                (
+                    key, *self._scope_args(), worker,
+                    intent["lease_until"], _iso(fenced_at), _iso(fenced_at),
+                ),
+            )
+            if blocked.rowcount != 1:
+                raise RuntimeError(
+                    "stale producer enrollment denial; no state overwritten"
+                )
         raise PermissionError("INDEPENDENT_PRODUCER_NOT_ENROLLED")
 
         # Do not remove the legacy adapter path below until its replacement
