@@ -75,11 +75,13 @@ def inspect_untrusted_receipt_shape(
         return _deny("EXPECTED_KEY_NOT_STRING")
     if set(expected_local_binding) != set(_BINDING):
         return _deny("EXPECTED_BINDING_FIELDS_MISMATCH")
+    # Inspect keys BEFORE dict.get: a foreign key whose hash collides
+    # with "kind" might execute an attacker-controlled __eq__ otherwise.
+    if any(type(key) is not str for key in untrusted_claim):
+        return _deny("CLAIM_KEY_NOT_STRING")
     kind = untrusted_claim.get("kind")
     if type(kind) is not str or kind not in _DOMAINS:
         return _deny("INVALID_CLAIM_KIND")
-    if any(type(key) is not str for key in untrusted_claim):
-        return _deny("CLAIM_KEY_NOT_STRING")
     allowed = _FIELDS | {_EXTRA[kind]}
     if set(untrusted_claim) != allowed:
         return _deny("CLAIM_FIELDS_MISMATCH")
