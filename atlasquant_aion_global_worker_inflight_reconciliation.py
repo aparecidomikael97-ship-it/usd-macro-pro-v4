@@ -264,8 +264,12 @@ def assess_global_inflight_reconciliation(
         status = "INCONSISTENT_EVIDENCE_REVIEW_REQUIRED"
         suggested_resolution = "PRESERVE_AND_REVIEW"
     elif expected_count == 0:
-        status = "EMPTY_BATCH_READY_FOR_HUMAN_CLEAR"
-        suggested_resolution = "CLEAR_INFLIGHT_NO_WORK"
+        # A66: a local-only zero-count manifest (even with a valid digest)
+        # is not independent proof that no work was ever in flight. An
+        # attacker able to rewrite the checkpoint can also rehash its work
+        # intent/lease metadata; do not advertise any clear-ready result.
+        status = "UNVERIFIED_EMPTY_BATCH_REVIEW_REQUIRED"
+        suggested_resolution = "PRESERVE_AND_ESCALATE"
     elif local_terminal_unverified:
         status = "UNVERIFIED_TERMINAL_EVIDENCE_REVIEW_REQUIRED"
         suggested_resolution = "PRESERVE_AND_ESCALATE"
