@@ -1,0 +1,46 @@
+name: AION A56 LAB direct human-route boundary
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a55-a53-a54-integrated-fail-closed-20261013]
+    paths:
+      - atlasquant_aion_background_executor.py
+      - test_atlasquant_aion_human_click_route_a56.py
+      - .github/workflows/aion-a56-human-click-route-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  direct-human-click-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned project dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: Confirm source HEAD and run inert A56 tests with sockets disabled
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import socket, unittest
+          socket.socket.connect = lambda *a, **k: (_ for _ in ()).throw(
+              AssertionError("A56_LAB_EXTERNAL_NETWORK_DENIED")
+          )
+          names = [
+              "test_atlasquant_aion_human_click_route_a56",
+              "test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness",
+              "test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt",
+              "test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_explicit_human_click_remains_usable",
+          ]
+          result = unittest.TextTestRunner(verbosity=2).run(
+              unittest.defaultTestLoader.loadTestsFromNames(names)
+          )
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
