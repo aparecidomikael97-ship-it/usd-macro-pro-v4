@@ -75,6 +75,9 @@ A54_PINNED_LAB_BASES = {
     # A59 PR base is an immutable A58 LAB head. Unknown bases still DENY.
     "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014":
         "2eda461d4a9076807d3c0a1fea2b904f5c7d9e62",
+    # A60 parent A59 is explicitly SHA-pinned, not an arbitrary PR base.
+    "lab/aion-v16-a59-live-self-reported-status-red-20261014":
+        "3c1e05ac3e497f37aa1473d7b7f3ab5d9633c22f",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -113,7 +116,10 @@ def _production_base():
         # A54 -> A52 -> A49 needs depth three for the pinned ancestor.
         # Earlier pinned bases need at most depth two. Never omit ancestry.
         pinned_depth = (
-            "64" if target == "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014"
+            "64" if target in {
+                "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014",
+                "lab/aion-v16-a59-live-self-reported-status-red-20261014",
+            }
             else "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013"
             else "2"
         )
