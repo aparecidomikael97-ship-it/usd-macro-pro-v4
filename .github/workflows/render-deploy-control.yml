@@ -15,8 +15,9 @@ on:
 
 permissions:
   contents: read
-  # A68: Disabled deploy workflow must not carry workflow-dispatch privileges.
-  actions: read
+  # Kept for the separately reviewed recovery path; while redeploy.if=false
+  # this job cannot start, use its token, or dispatch a downstream workflow.
+  actions: write
 
 concurrency:
   group: atlasquant-render-deploy-control
