@@ -118,6 +118,90 @@ class A59LiveEvidenceSourceTrustTests(unittest.TestCase):
             self.assertFalse(report[key])
         self.assertEqual(report["reason"], "INDEPENDENT_LIVE_ATTESTATION_NOT_ENROLLED")
 
+    def test_06_stale_lease_must_not_claim_confirmed_local_tick(self):
+        lease = {
+            "owner": "gha-local-lease",
+            "token": "untrusted-local-token",
+            "fencing_token": 1,
+            "acquired_at": live_fixture.ACTIVATED.isoformat(),
+            "heartbeat_at": live_fixture.TICK.isoformat(),
+            "expires_at": (live_fixture.TICK - timedelta(minutes=1)).isoformat(),
+        }
+        checkpoint = self.v.with_stats(
+            self.v.armed_checkpoint(),
+            heartbeat_at=live_fixture.TICK.isoformat(),
+            tick_at=live_fixture.TICK.isoformat(),
+            runtime_id="gha-local-lease",
+            ticks=1,
+            lease=lease,
+        )
+        report = verify_global_worker_live_activation(
+            self.v.access, self.v.runtime(checkpoint),
+            live_fixture._flag(),
+            activation_result=live_fixture._activation_result(),
+            now=live_fixture.TICK + timedelta(seconds=10),
+        )
+        self.assertEqual(report["status"], "BLOCKED_STALE_LEASE")
+        self.assertFalse(report["live_confirmed"])
+        self.assertFalse(report["heartbeat_confirmed"])
+        self.assertFalse(report["tick_confirmed"])
+
+    def test_07_inflight_block_must_not_claim_confirmed_local_tick(self):
+        f = receipt_fixture.A58LocalTerminalAuthorityDenialTests()
+        f.setUp()
+        checkpoint = self.v.with_stats(
+            f.claimed,
+            heartbeat_at=receipt_fixture.rf.TICK.isoformat(),
+            tick_at=receipt_fixture.rf.TICK.isoformat(),
+            runtime_id="gha-local-inflight",
+            ticks=1,
+        )
+        report = verify_global_worker_live_activation(
+            f.f.access, f.runtime(checkpoint),
+            live_fixture._flag(updated_at=receipt_fixture.rf.BASE),
+            activation_result=live_fixture._activation_result(
+                activated_at=receipt_fixture.rf.BASE
+            ),
+            now=receipt_fixture.rf.TICK + timedelta(minutes=20),
+        )
+        self.assertEqual(report["status"], "BLOCKED_INFLIGHT_RECONCILIATION")
+        self.assertFalse(report["live_confirmed"])
+        self.assertFalse(report["heartbeat_confirmed"])
+        self.assertFalse(report["tick_confirmed"])
+
+    def test_08_unsafe_local_receipt_must_not_claim_confirmed_work(self):
+        f = receipt_fixture.A58LocalTerminalAuthorityDenialTests()
+        f.setUp()
+        checkpoint = f.locally_relabel_terminal(
+            f.local_receipt_checkpoint(), unsafe=True,
+        )
+        state, _ = load_global_worker_state(checkpoint)
+        stats = deepcopy(state["stats"])
+        stats.update({
+            "last_heartbeat_at": receipt_fixture.rf.TICK.isoformat(),
+            "last_tick_at": receipt_fixture.rf.TICK.isoformat(),
+            "last_runtime_id": "gha-untrusted-unsafe",
+            "ticks": 1,
+        })
+        checkpoint = attach_global_worker_state(
+            checkpoint,
+            _mutated(state, stats=stats, lease=_empty_lease(), inflight_tick={}),
+        )
+        report = verify_global_worker_live_activation(
+            f.f.access, f.runtime(checkpoint),
+            live_fixture._flag(updated_at=receipt_fixture.rf.BASE),
+            activation_result=live_fixture._activation_result(
+                activated_at=receipt_fixture.rf.BASE
+            ),
+            now=receipt_fixture.rf.TICK + timedelta(minutes=20),
+        )
+        self.assertEqual(report["status"], "BLOCKED_UNSAFE_RECEIPT")
+        self.assertEqual(report["unsafe_receipts_after_activation"], 1)
+        self.assertFalse(report["live_confirmed"])
+        self.assertFalse(report["work_receipt_confirmed"])
+        self.assertFalse(report["heartbeat_confirmed"])
+        self.assertFalse(report["tick_confirmed"])
+
     def test_05_feature_off_is_not_live_even_with_self_asserted_stats(self):
         checkpoint = self.v.with_stats(
             self.v.armed_checkpoint(),
