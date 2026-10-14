@@ -290,6 +290,23 @@ def verify_global_worker_live_activation(
         status = "AWAITING_LIVE_EVIDENCE"
         reason = ""
 
+    # A59: Last heartbeat/tick and executor receipts come from the same
+    # caller-supplied local checkpoint. Even an internally consistent digest
+    # and a claimed ENABLED flag are not independent evidence of a live Worker.
+    # Keep read-only diagnostic/negative states, but NEVER certify LIVE until
+    # a separately enrolled, current-head/owner authority can be verified.
+    # Do not add a caller-provided "verified" boolean as a bypass.
+    if status in {
+        "LIVE_CONFIRMED_WITH_WORK",
+        "LIVE_CONFIRMED_IDLE",
+        "LIVE_HEARTBEAT_CONFIRMED_AWAITING_TICK",
+    }:
+        status = "BLOCKED_UNVERIFIED_LIVE_EVIDENCE"
+        reason = "INDEPENDENT_LIVE_ATTESTATION_NOT_ENROLLED"
+        heartbeat_after_activation = False
+        tick_after_activation = False
+        live_receipts = []
+
     live_confirmed = status in {
         "LIVE_CONFIRMED_WITH_WORK",
         "LIVE_CONFIRMED_IDLE",
