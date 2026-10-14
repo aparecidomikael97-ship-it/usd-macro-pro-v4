@@ -8,6 +8,7 @@ import unittest
 from copy import deepcopy
 
 import test_atlasquant_aion_global_worker_inflight_resolution as fixture
+from atlasquant_aion_core_intelligence.evidence import digest
 from atlasquant_aion_global_worker import (
     _mutated,
     attach_global_worker_state,
@@ -74,6 +75,20 @@ class EmptyInflightRequiresIndependentWitnessA66Tests(unittest.TestCase):
         # self-contained Worker digest, without a current-head attestation.
         inflight["work_intent_count"] = 0
         inflight["work_occurrences"] = []
+        # Also rewrite all self-contained digests/intent identifiers coherently.
+        # This demonstrates why checksum validation alone is not custody.
+        inflight["work_intent_digest"] = digest({
+            "as_of": inflight["work_intent_as_of"],
+            "count": 0,
+            "occurrences": [],
+        })
+        inflight["intent_id"] = digest({
+            "owner": inflight["owner"],
+            "lease_token": inflight["lease_token"],
+            "fencing_token": inflight["fencing_token"],
+            "claimed_at": inflight["claimed_at"],
+            "work_intent_digest": inflight["work_intent_digest"],
+        })
         forged = attach_global_worker_state(
             claimed, _mutated(state, inflight_tick=inflight)
         )
