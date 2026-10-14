@@ -42,7 +42,7 @@ from currency_news_v107 import (
 from ict_execution_v108 import detect_crt, detect_ote, detect_amd, detect_fvg
 from institutional_engine_v110 import build_institutional_snapshot, SMT_COMPANIONS
 
-from atlasquant_runtime_store import resolve_runtime_branch, require_runtime_branch
+from atlasquant_runtime_store import DEFAULT_RUNTIME_BRANCH, resolve_runtime_branch, require_runtime_branch
 from atlasquant_quota_shadow import (
     build_quota_shadow_sample,
     append_quota_shadow_sample,
@@ -87,6 +87,12 @@ BRANCH = require_runtime_branch(resolve_runtime_branch(
     os.getenv("GITHUB_DATA_BRANCH", ""),
     os.getenv("GITHUB_BRANCH_HISTORICO", ""),
 ))
+# A67: the scheduled job holds repository-wide contents:write. The shared
+# resolver supports legacy/custom runtime branches, but this privileged
+# writer is authorized to emit telemetry only to the dedicated data branch.
+# Reject configuration drift before loading any token or making any request.
+if BRANCH != DEFAULT_RUNTIME_BRANCH:
+    raise ValueError("AUTOPILOT_RUNTIME_BRANCH_NOT_APPROVED")
 TOKEN = os.getenv("GITHUB_TOKEN_HISTORICO", os.getenv("GITHUB_TOKEN", "")).strip()
 TD_KEY = os.getenv("CHAVE_TWELVE_DATA", "").strip()
 NEWS_KEY = os.getenv("CHAVE_NEWSAPI", "").strip()
