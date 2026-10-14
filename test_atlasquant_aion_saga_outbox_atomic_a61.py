@@ -94,5 +94,57 @@ class A61SagaOutboxAtomicStagingTests(unittest.TestCase):
         self.assertEqual(self.outbox.effect_count(), 0)
 
 
+    def test_05_outer_transaction_rollback_cancels_nested_outbox_enqueue(self):
+        kwargs = {
+            "intent_ref": "a61-parent-rollback",
+            "action": "record_internal_note",
+            "payload": {"synthetic": True},
+            "aggregate_key": "a61-parent-tx",
+            "policy_version": "policy-v1",
+            "authorization_ref": "approval-forward",
+            "created_at": historic.NOW,
+            "valid_until": historic.NOW + timedelta(minutes=5),
+        }
+        before = self._snapshot()
+        self.saga.db.execute("BEGIN IMMEDIATE")
+        try:
+            staged = self.outbox.enqueue(**kwargs)
+            self.assertEqual(staged["enqueue_state"], "ENQUEUED")
+            self.assertTrue(self.saga.db.in_transaction)
+            same = self.outbox.enqueue(**kwargs)
+            self.assertEqual(same["enqueue_state"], "IDEMPOTENT")
+        finally:
+            self.saga.db.rollback()
+        self._assert_unchanged_after_failure(before)
+
+    def test_06_nested_enqueue_sql_failure_preserves_parent_transaction(self):
+        self.saga.db.execute(
+            """CREATE TRIGGER a61_inject_outbox_row BEFORE INSERT
+               ON action_outbox BEGIN
+               SELECT RAISE(ABORT, 'A61_INJECT_OUTBOX_WRITE');
+               END"""
+        )
+        before = self._snapshot()
+        self.saga.db.execute("BEGIN IMMEDIATE")
+        try:
+            with self.assertRaisesRegex(Exception, "A61_INJECT_OUTBOX_WRITE"):
+                self.outbox.enqueue(
+                    intent_ref="a61-nested-fail",
+                    action="record_internal_note",
+                    payload={"synthetic": True},
+                    aggregate_key="a61-failed-tx",
+                    policy_version="policy-v1",
+                    authorization_ref="approval-forward",
+                    created_at=historic.NOW,
+                    valid_until=historic.NOW + timedelta(minutes=5),
+                )
+            # Failed SAVEPOINT must not abort the caller's outer transaction.
+            self.assertTrue(self.saga.db.in_transaction)
+            self.assertEqual(self._snapshot(), before)
+        finally:
+            self.saga.db.rollback()
+        self._assert_unchanged_after_failure(before)
+
+
 if __name__ == "__main__":
     unittest.main()
