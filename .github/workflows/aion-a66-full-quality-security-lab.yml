@@ -5,6 +5,11 @@ on:
     branches: [lab/aion-v16-a65-saga-unverified-terminal-state-20261014]
     paths:
       - ".github/workflows/aion-a66-full-quality-security-lab.yml"
+      - ".github/workflows/quality-tests.yml"
+      - "atlasquant_aion_global_worker_inflight_reconciliation.py"
+      - "atlasquant_aion_global_worker_inflight_resolution.py"
+      - "test_atlasquant_aion_inflight_empty_witness_a66.py"
+      - "test_atlasquant_aion_convergence.py"
   workflow_dispatch:
 
 permissions:
