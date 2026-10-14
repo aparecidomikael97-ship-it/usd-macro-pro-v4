@@ -1,0 +1,55 @@
+name: AION A66 LAB empty inflight independent-witness hard deny
+
+on:
+  pull_request:
+    branches:
+      - lab/aion-v16-a65-saga-unverified-terminal-state-20261014
+    paths:
+      - "test_atlasquant_aion_inflight_empty_witness_a66.py"
+      - "atlasquant_aion_global_worker_inflight_reconciliation.py"
+      - "atlasquant_aion_global_worker_inflight_resolution.py"
+      - ".github/workflows/aion-a66-empty-inflight-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  a66-negative-contract:
+    name: A66 strict no-witness negative contract (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing requirements
+        run: |
+          python -m pip install -r requirements.txt
+      - name: Verify syntax
+        run: |
+          python -m py_compile atlasquant_aion_global_worker_inflight_reconciliation.py atlasquant_aion_global_worker_inflight_resolution.py test_atlasquant_aion_inflight_empty_witness_a66.py
+      - name: Run exact-head A66 negative contracts with socket connects denied
+        shell: bash
+        run: |
+          python - <<'PY'
+          import socket
+          import sys
+          import unittest
+          def deny_network(self, *a, **k):
+              raise RuntimeError("NETWORK_FORBIDDEN_A66_LAB")
+          socket.socket.connect = deny_network
+          socket.socket.connect_ex = deny_network
+          suite = unittest.defaultTestLoader.loadTestsFromName(
+              "test_atlasquant_aion_inflight_empty_witness_a66"
+          )
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          sys.exit(0 if result.wasSuccessful() else 1)
+          PY

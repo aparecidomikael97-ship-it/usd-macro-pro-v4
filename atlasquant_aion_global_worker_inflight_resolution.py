@@ -26,8 +26,12 @@ from atlasquant_aion_global_worker_inflight_reconciliation import (
 
 SCHEMA = "ATLASQUANT_AION_GLOBAL_INFLIGHT_RESOLUTION_CEREMONY_V1"
 CONFIRMATION_PHRASE = "CONFIRMAR LIMPEZA INFLIGHT RECONCILIADO"
+# A66: a local EMPTY_BATCH is never proof of no effect, even when the
+# checkpoint's self-contained checksums are internally consistent. Do not
+# stage a conditional clear while independent F1/T1 custody is unenrolled.
+# The remaining historical terminal label is also unreachable without
+# independent receipt proof under the current conservative assessor.
 CLEARABLE_STATUSES = frozenset({
-    "EMPTY_BATCH_READY_FOR_HUMAN_CLEAR",
     "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR",
 })
 
@@ -104,7 +108,12 @@ def stage_resolved_inflight_clear(
 
     assessment = assess_global_inflight_reconciliation(runtime, now=current)
     assessment_status = str(assessment.get("status") or "")
-    if assessment_status not in CLEARABLE_STATUSES:
+    # A66: keep the current "empty work" diagnosis non-clearable, but
+    # continue evaluating caller scope and active lease first. This preserves
+    # the more precise security denial for wrong-context or live-lease calls.
+    # No branch here authorizes an unproven empty batch for staging.
+    if (assessment_status not in CLEARABLE_STATUSES
+            and assessment_status != "UNVERIFIED_EMPTY_BATCH_REVIEW_REQUIRED"):
         return {
             "schema": SCHEMA,
             "status": "BLOCKED",
@@ -166,6 +175,20 @@ def stage_resolved_inflight_clear(
             "schema": SCHEMA,
             "status": "BLOCKED",
             "reason": "EXPIRED_OWNED_LEASE_REQUIRED",
+            "checkpoint": dict(checkpoint),
+            "requires_checkpoint_save": False,
+            "external_persisted": False,
+            "automatic_retry_allowed": False,
+            "executes_action": False,
+        }
+
+    if assessment_status == "UNVERIFIED_EMPTY_BATCH_REVIEW_REQUIRED":
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "INFLIGHT_RECONCILIATION_NOT_CLEARABLE",
+            "assessment_status": assessment_status,
+            "assessment": assessment,
             "checkpoint": dict(checkpoint),
             "requires_checkpoint_save": False,
             "external_persisted": False,

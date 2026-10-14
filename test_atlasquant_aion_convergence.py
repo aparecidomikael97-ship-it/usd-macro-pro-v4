@@ -93,6 +93,9 @@ A54_PINNED_LAB_BASES = {
     # A65 parent A64 approved for LAB testing only at exact immutable SHA.
     "lab/aion-v16-a64-saga-forward-outbox-binding-20261014":
         "e577d59c65f2541e41155b525337800fe71cbb46",
+    # A66 parent A65 must be immutable; never infer from a moving LAB ref.
+    "lab/aion-v16-a65-saga-unverified-terminal-state-20261014":
+        "a59be4fe0c689fb9a7c1f0cd18811d5031f57919",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -131,7 +134,11 @@ def _production_base():
         # A54 -> A52 -> A49 needs depth three for the pinned ancestor.
         # Earlier pinned bases need at most depth two. Never omit ancestry.
         pinned_depth = (
-            "64" if target in {
+            # A66's fixed A65 base is 65 commits ahead of A49. Fetch a
+            # deeper, bounded history so the required ancestry check runs,
+            # never relax A54_A49_PARENT_NOT_VERIFIED on shallow clones.
+            "96" if target == "lab/aion-v16-a65-saga-unverified-terminal-state-20261014"
+            else "64" if target in {
                 "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014",
                 "lab/aion-v16-a59-live-self-reported-status-red-20261014",
                 "lab/aion-v16-a60-saga-pre-enqueue-local-integrity-20261014",
@@ -139,6 +146,7 @@ def _production_base():
                 "lab/aion-v16-a62-saga-outcome-untrusted-local-20261014",
                 "lab/aion-v16-a63-saga-outcome-locked-snapshot-20261014",
                 "lab/aion-v16-a64-saga-forward-outbox-binding-20261014",
+                "lab/aion-v16-a65-saga-unverified-terminal-state-20261014",
             }
             else "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013"
             else "2"
