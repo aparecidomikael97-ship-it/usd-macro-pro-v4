@@ -3,7 +3,7 @@ name: Quality tests
 on:
   workflow_dispatch:
   pull_request:
-    branches: [lab/aion-v16-a52-a50-a51-integrated-containment-20261013, lab/aion-v16-a49-worker-pure-transition-simulation-20261013, main]
+    branches: [lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013, lab/aion-v16-a52-a50-a51-integrated-containment-20261013, lab/aion-v16-a49-worker-pure-transition-simulation-20261013, main]
   push:
     branches: [main, atlasquant-dev, atlasquant-runtime, atlasquant-runtime-integration, atlasquant-integration, atlasquant-release-final, atlasquant-support-final, atlasquant-support-ui, atlasquant-brokers-guide, atlasquant-voice-readiness, atlasquant-academy-media, atlasquant-commercial-prep, atlasquant-final-release-prep, atlasquant-backup-workflow, atlasquant-home-radar, atlasquant-private-validation, atlasquant-fast-startup, atlasquant-startup-observability, atlasquant-voice-assistant-final, atlasquant-render-fast-home, atlasquant-mobile-dom-stability, atlasquant-natural-deep-voice]
     paths:

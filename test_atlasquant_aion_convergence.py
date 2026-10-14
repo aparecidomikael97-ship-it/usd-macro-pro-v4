@@ -70,6 +70,8 @@ A54_PINNED_LAB_BASES = {
         "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2",
     "lab/aion-v16-a52-a50-a51-integrated-containment-20261013":
         "60c61d959c81d50f6a9d6b5d1f1f932abf14844d",
+    "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013":
+        "b36830e1733ce5c7e91fe67f730b4e061574b3eb",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -105,9 +107,11 @@ def _production_base():
             or any(c not in "0123456789abcdef" for c in main_sha)):
         raise AssertionError("A54_MAIN_COMMIT_INVALID")
     if target != "main":
-        # Depth two includes A52's immediate pinned A49 parent. No wildcards.
+        # A54 -> A52 -> A49 needs depth three for the pinned ancestor.
+        # Earlier pinned bases need at most depth two. Never omit ancestry.
+        pinned_depth = "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013" else "2"
         fetched = _git([
-            "fetch", "--no-tags", "--depth", "2", "origin",
+            "fetch", "--no-tags", "--depth", pinned_depth, "origin",
             f"+refs/heads/{target}:refs/remotes/origin/{target}",
         ])
         if fetched.returncode != 0:
@@ -404,6 +408,74 @@ class AionConvergenceTests(unittest.TestCase):
         self.assertEqual(ctx.exception.result["error_code"], "REVISION_CHECKPOINT_CONFLICT")
         self.assertNotEqual(checkpoint_source_digest(current), "stale")
 
+
+
+class A55PinnedA54BaseTests(unittest.TestCase):
+    """Adversarial stacked-base gate: no claim of external witness authority."""
+
+    A54_TARGET = "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013"
+    MAIN_SHA = "a" * 40
+
+    def _resolve(self, target, *, moved=False, main_down=False, ancestry_down=False, bad_origin=False):
+        calls = []
+
+        def fake_git(args):
+            calls.append(list(args))
+            if args[:2] == ["remote", "get-url"]:
+                value = ("https://github.com/untrusted/not-our-repo"
+                         if bad_origin else next(iter(A54_ORIGIN_URLS)))
+                return subprocess.CompletedProcess(args, 0, value, "")
+            if args[:1] == ["fetch"]:
+                is_main = args[-1] == "+refs/heads/main:refs/remotes/origin/main"
+                failed = main_down if is_main else False
+                return subprocess.CompletedProcess(args, int(failed), "", "offline" if failed else "")
+            if args[:2] == ["rev-parse", "--verify"]:
+                if args[-1] == "origin/main^{commit}":
+                    return subprocess.CompletedProcess(args, 0, self.MAIN_SHA, "")
+                if args[-1] == f"origin/{self.A54_TARGET}^{{commit}}":
+                    sha = "b" * 40 if moved else A54_PINNED_LAB_BASES[self.A54_TARGET]
+                    return subprocess.CompletedProcess(args, 0, sha, "")
+            if args[:2] == ["merge-base", "--is-ancestor"]:
+                return subprocess.CompletedProcess(args, int(ancestry_down), "", "")
+            raise AssertionError("A55_UNEXPECTED_GIT_CALL " + repr(args))
+
+        self.calls = calls
+        with mock.patch.dict(os.environ, {"GITHUB_EVENT_NAME": "pull_request",
+                                         "GITHUB_BASE_REF": target}), mock.patch(
+            __name__ + "._git", side_effect=fake_git
+        ):
+            return _production_base()
+
+    def test_a55_exact_a54_pin_fetches_depth_three_and_returns_real_main(self):
+        self.assertEqual(self._resolve(self.A54_TARGET), self.MAIN_SHA)
+        self.assertIn(["fetch", "--no-tags", "--depth", "3", "origin",
+                       "+refs/heads/" + self.A54_TARGET + ":refs/remotes/origin/" + self.A54_TARGET],
+                      self.calls)
+        self.assertIn(["merge-base", "--is-ancestor", A54_A49_PARENT,
+                       A54_PINNED_LAB_BASES[self.A54_TARGET]], self.calls)
+        self.assertEqual(self.calls[1][-1], "+refs/heads/main:refs/remotes/origin/main")
+
+    def test_a55_moved_a54_pin_denied(self):
+        with self.assertRaisesRegex(AssertionError, "A54_LAB_BASE_SHA_MISMATCH"):
+            self._resolve(self.A54_TARGET, moved=True)
+
+    def test_a55_unknown_base_denied_before_any_git(self):
+        with self.assertRaisesRegex(AssertionError, "A54_UNKNOWN_PR_BASE"):
+            self._resolve("lab/unknown-not-allowlisted")
+        self.assertEqual(self.calls, [])
+
+    def test_a55_no_true_main_never_falls_back_to_lab(self):
+        with self.assertRaisesRegex(AssertionError, "A54_TRUE_MAIN_UNAVAILABLE"):
+            self._resolve(self.A54_TARGET, main_down=True)
+        self.assertFalse(any("refs/heads/" + self.A54_TARGET in " ".join(c) for c in self.calls))
+
+    def test_a55_missing_a49_ancestry_denied(self):
+        with self.assertRaisesRegex(AssertionError, "A54_A49_PARENT_NOT_VERIFIED"):
+            self._resolve(self.A54_TARGET, ancestry_down=True)
+
+    def test_a55_wrong_origin_denied(self):
+        with self.assertRaisesRegex(AssertionError, "A54_ORIGIN_NOT_APPROVED"):
+            self._resolve(self.A54_TARGET, bad_origin=True)
 
 if __name__ == "__main__":
     unittest.main()
