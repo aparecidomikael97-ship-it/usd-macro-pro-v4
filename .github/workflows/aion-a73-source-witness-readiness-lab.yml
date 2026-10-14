@@ -1,0 +1,35 @@
+name: AION A73 LAB independent source witness readiness hard-stop
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a72-inflight-attempt-malformed-hard-stop-20261014]
+    paths:
+      - "atlasquant_aion_global_worker_readiness.py"
+      - "test_atlasquant_aion_readiness_source_witness_a73.py"
+      - ".github/workflows/aion-a73-source-witness-readiness-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  a73-readiness:
+    name: A73 source witness absent denies readiness (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Existing pinned dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: A73 targeted and A72/A71/A58 historical security checks
+        run: python -m unittest -v test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_inflight_attempt_a72 test_atlasquant_aion_inflight_receipt_safety_a71 test_atlasquant_aion_inflight_untrusted_receipts_a58
