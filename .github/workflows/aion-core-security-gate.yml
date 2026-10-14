@@ -3,7 +3,7 @@ name: AION Core Security Gate
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main, integration/aion-unified-core-v2-20261003, integration/aion-core-v21-hardening-adapters-20261003]
+    branches: [lab/aion-v16-a49-worker-pure-transition-simulation-20261013, main, integration/aion-unified-core-v2-20261003, integration/aion-core-v21-hardening-adapters-20261003]
 
 permissions:
   contents: read
@@ -145,6 +145,15 @@ jobs:
             test_atlasquant_aion_v224_owner_signature_ceremony.py \
             test_atlasquant_aion_v225_explicit_owner_decision_record.py \
             test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+      - name: A51 direct autonomous executor admission denies absent independent witness
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_explicit_human_click_remains_usable
+      - name: A50 persisted Saga plan and genesis binding integrity must detect SQLite tamper
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_plan_integrity_a50.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \

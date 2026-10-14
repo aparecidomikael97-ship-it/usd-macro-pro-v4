@@ -371,6 +371,40 @@ def _execute_due_local_work_authorized(
     """Internal kernel after an authenticated authorization boundary."""
     if authorization_mode not in {"HUMAN_CLICK", "ARMED_WORKER", "GLOBAL_WORKER"}:
         raise ValueError("invalid executor authorization mode")
+    # V16-A.51: this internal function is callable directly. Mode strings,
+    # caller-provided digests, local checkpoint "witness" fields and an ADMIN
+    # session cannot enroll independent source/current-head authority.
+    # Block BOTH unattended entry modes before reading schedules, issuing a
+    # local success receipt, or invoking the Core handler. Preserve only the
+    # distinct explicit HUMAN_CLICK entrypoint below. Do not add test bypasses.
+    if authorization_mode in {"ARMED_WORKER", "GLOBAL_WORKER"}:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "INDEPENDENT_AUTONOMOUS_AUTHORITY_NOT_ENROLLED",
+            "checkpoint": deepcopy(dict(checkpoint or {})),
+            "due_count": 0,
+            "processed": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "blocked": 0,
+            "outcomes": [],
+            "action_receipts": [],
+            "action_receipts_are_authority": False,
+            "requires_checkpoint_save": False,
+            "external_persisted": False,
+            "manual_invocation_only": False,
+            "authorization_mode": authorization_mode,
+            "autonomous_worker_started": False,
+            "background_worker_connected": False,
+            "provider_called": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+            "payment_executed": False,
+            "publication_executed": False,
+            "deploy_executed": False,
+            "independent_witness_verified": False,
+        }
     if not isinstance(authorization_digest, str) or not authorization_digest.strip():
         raise ValueError("executor authorization digest required")
     if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
