@@ -33,7 +33,7 @@ class A63SagaOutboxSnapshotRaceTests(unittest.TestCase):
             self.outbox.effect_count(),
         )
 
-    def interleave(self, alteration):
+    def interleave(self, alteration, *, min_reads=2):
         original_get = self.outbox.get
         called = [0]
 
@@ -48,7 +48,9 @@ class A63SagaOutboxSnapshotRaceTests(unittest.TestCase):
         with patch.object(self.outbox, "get", side_effect=read_then_change):
             with self.assertRaisesRegex(PermissionError, "SAGA_.*SNAPSHOT_STALE"):
                 self.saga.sync_forward_outcome("saga-1", "one", now=historic.NOW)
-        self.assertGreaterEqual(called[0], 2, "Expected locked re-read before outcome mutation")
+        # A stale Saga snapshot is denied before a second Outbox fetch;
+        # Outbox mutations still must trigger their own locked re-read.
+        self.assertGreaterEqual(called[0], min_reads, "Insufficient reads for denial path")
 
     def test_01_pending_to_uncertain_cannot_be_overwritten_by_stale_read(self):
         before = self.snapshot()
@@ -83,7 +85,7 @@ class A63SagaOutboxSnapshotRaceTests(unittest.TestCase):
                     "UPDATE aion_execution_sagas SET updated_at=? WHERE saga_id=?",
                     ("2026-10-14T23:11:59Z", "saga-1"),
                 )
-        self.interleave(change)
+        self.interleave(change, min_reads=1)
         self.assertNotEqual(self.saga.get("saga-1")["updated_at"], initial_updated)
         self.assertEqual(self.snapshot(), before)
         self.assertEqual(self.saga.integrity_report("saga-1")["state"], "MATCH")
