@@ -111,6 +111,9 @@ A54_PINNED_LAB_BASES = {
     # A71 requires reviewed A70 at exact immutable SHA, not a mutable LAB ref.
     "lab/aion-v16-a70-main-ruleset-contract-20261014":
         "4152d9f1d5b8afad6703f4678ca89ba1b254fcfe",
+    # A72 reviewed A71 parent pinned exactly, never a floating LAB base.
+    "lab/aion-v16-a71-inflight-receipt-missing-unsafe-20261014":
+        "6501bff88f818202e6b5a5538093a6698d259dd9",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -158,7 +161,9 @@ def _production_base():
             # A69 A68 parent is 92 commits ahead of the A49 ancestor.
             # A70 reviewed A69 base is 99 commits beyond required A49.
             # A71 preserves A49 ancestry across the reviewed A70 stack.
-            "160" if target == "lab/aion-v16-a70-main-ruleset-contract-20261014"
+            # A72 needs A71 and the unchanged A49 ancestor.
+            "176" if target == "lab/aion-v16-a71-inflight-receipt-missing-unsafe-20261014"
+            else "160" if target == "lab/aion-v16-a70-main-ruleset-contract-20261014"
             else "136" if target == "lab/aion-v16-a69-checkpoint-bootstrap-migration-hard-stop-20261014"
             else "128" if target == "lab/aion-v16-a68-render-deploy-hard-stop-20261014"
             else "120" if target == "lab/aion-v16-a67-autopilot-data-branch-pin-20261014"
