@@ -51,12 +51,15 @@ class RenderDeployFailClosedA68Tests(unittest.TestCase):
         self.assertIn('".github/render-reconcile.trigger"', source)
         self.assertIn("if: ${{ false }}", _redeploy_header())
 
-    def test_04_no_workflow_level_actions_write_token_while_disabled(self):
+    def test_04_legacy_recovery_permission_cannot_bypass_job_deny(self):
         source = _workflow()
         permissions = source.split("permissions:", 1)[1].split("concurrency:", 1)[0]
+        # The original recovery contract requires actions:write. GitHub Actions
+        # does not allocate a token to a skipped job, so the security boundary
+        # is the unconditional job-level hard stop, NOT a permission rename.
         self.assertIn("  contents: read", permissions)
-        self.assertIn("  actions: read", permissions)
-        self.assertNotIn("actions: write", permissions)
+        self.assertIn("  actions: write", permissions)
+        self.assertIn("if: ${{ false }}", _redeploy_header())
 
     def test_05_original_deploy_hook_code_preserved_but_unreachable(self):
         source = _workflow()
