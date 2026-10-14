@@ -38,7 +38,14 @@ jobs:
               "test_atlasquant_aion_inflight_untrusted_receipts_a58",
               "test_atlasquant_aion_f1_cross_boundary_a57",
               "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_flag_must_be_enabled",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_activation_boundary_uses_later_trusted_timestamp",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_activation_boundary_requires_timestamp_evidence",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_awaiting_live_evidence_before_timeout",
               "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_unresolved_inflight_blocks_live_before_stale_lease",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_stale_owned_lease_blocks_live_claim",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_timeout_without_shared_heartbeat_is_explicit",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_admin_ui_never_equates_enabled_with_live",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_verifier_is_read_only_and_has_no_mutation_api",
           ]
           result = unittest.TextTestRunner(verbosity=2).run(
               unittest.defaultTestLoader.loadTestsFromNames(cases)
