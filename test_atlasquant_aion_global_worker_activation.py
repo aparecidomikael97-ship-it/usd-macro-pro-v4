@@ -771,5 +771,95 @@ jobs:
         self.assertIn("requests.patch(", source)
 
 
+class A53IndependentActivationBoundaryTests(unittest.TestCase):
+    """Exercise real activation entrypoints with every transport intercepted."""
+
+    def assert_denied(self, result):
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED")
+        self.assertFalse(result["modified"])
+        self.assertFalse(result["feature_flag_modified"])
+        self.assertFalse(result["independent_witness_verified"])
+        self.assertFalse(result["global_worker_executed"])
+
+    def test_a53_direct_unset_writer_cannot_post_enable_without_authority(self):
+        response = Mock(status_code=201)
+        with patch("requests.sessions.Session.request", side_effect=AssertionError("NO_LIVE_IO")), patch(
+            "atlasquant_aion_global_worker_activation.requests.post", return_value=response,
+        ) as post, patch("atlasquant_aion_global_worker_activation.requests.patch") as update:
+            result = write_repository_feature_flag_enabled(_config(), "UNSET")
+        post.assert_not_called()
+        update.assert_not_called()
+        self.assert_denied(result)
+
+    def test_a53_direct_disabled_writer_cannot_patch_enable_without_authority(self):
+        response = Mock(status_code=204)
+        with patch("requests.sessions.Session.request", side_effect=AssertionError("NO_LIVE_IO")), patch(
+            "atlasquant_aion_global_worker_activation.requests.patch", return_value=response,
+        ) as update, patch("atlasquant_aion_global_worker_activation.requests.post") as post:
+            result = write_repository_feature_flag_enabled(_config(), "DISABLED")
+        update.assert_not_called()
+        post.assert_not_called()
+        self.assert_denied(result)
+
+    def test_a53_direct_writer_denies_before_reading_caller_config_descriptors(self):
+        reads = []
+
+        class CallerConfig:
+            @property
+            def repo(self):
+                reads.append("repo")
+                return "owner/repo"
+
+            @property
+            def token(self):
+                reads.append("token")
+                return "TEST_ONLY_NOT_A_CREDENTIAL"
+
+        with patch("requests.sessions.Session.request", side_effect=AssertionError("NO_LIVE_IO")), patch(
+            "atlasquant_aion_global_worker_activation.requests.post", return_value=Mock(status_code=201),
+        ) as post:
+            result = write_repository_feature_flag_enabled(CallerConfig(), "UNSET")
+        self.assertEqual(reads, [])
+        post.assert_not_called()
+        self.assert_denied(result)
+
+    def test_a53_local_ticket_cannot_authorize_injected_activation_writer(self):
+        # Reuse the existing local staging setup; no validation is mocked.
+        fixture = GlobalWorkerActivationCeremonyTests()
+        fixture.setUp()
+        ticket = fixture.approval()
+        before = deepcopy(fixture.runtime)
+        flag_reader = Mock(side_effect=[
+            _safe_flag("UNSET"),
+            {"status": "CONFIRMED", "state": "ENABLED"},
+        ])
+        runtime_reader = Mock(return_value=deepcopy(fixture.runtime))
+        writer = Mock(return_value={"status": "WRITE_ACCEPTED", "modified": True})
+        disabler = Mock()
+        with patch("requests.sessions.Session.request", side_effect=AssertionError("NO_LIVE_IO")):
+            result = activate_global_worker_feature_flag(
+                fixture.access, fixture.runtime, ticket, _config(),
+                confirmation=True, runtime_reader=runtime_reader,
+                flag_reader=flag_reader, flag_writer=writer, flag_disabler=disabler,
+                now=NOW,
+            )
+        writer.assert_not_called()
+        disabler.assert_not_called()
+        self.assertEqual(fixture.runtime, before)
+        self.assert_denied(result)
+
+    def test_a53_safety_disable_still_emits_only_disabled_value(self):
+        response = Mock(status_code=204)
+        with patch("requests.sessions.Session.request", side_effect=AssertionError("NO_LIVE_IO")), patch(
+            "atlasquant_aion_global_worker_activation.requests.patch", return_value=response,
+        ) as update, patch("atlasquant_aion_global_worker_activation.requests.post") as post:
+            result = force_disable_repository_feature_flag(_config())
+        update.assert_called_once()
+        post.assert_not_called()
+        self.assertEqual(update.call_args.kwargs["json"]["value"], "0")
+        self.assertEqual(result["status"], "DISABLED")
+
+
 if __name__ == "__main__":
     unittest.main()
