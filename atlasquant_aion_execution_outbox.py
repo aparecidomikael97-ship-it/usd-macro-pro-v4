@@ -296,7 +296,15 @@ class ExecutionOutbox:
         idempotency_key = _digest(key_material)
         decision_id = "DEC-" + idempotency_key[:24].upper()
 
-        self.db.execute("BEGIN IMMEDIATE")
+        # A61: standalone enqueue still owns an IMMEDIATE transaction.
+        # If Saga already owns that same SQLite connection's transaction,
+        # use a SAVEPOINT: releasing it does NOT commit the outer Saga.
+        # This cannot authorize an external effect or bypass producer gates.
+        owns_transaction = not self.db.in_transaction
+        if owns_transaction:
+            self.db.execute("BEGIN IMMEDIATE")
+        else:
+            self.db.execute("SAVEPOINT aion_outbox_enqueue")
         try:
             existing = self.db.execute(
                 """SELECT o.idempotency_key, d.data AS decision_data
@@ -308,7 +316,10 @@ class ExecutionOutbox:
             if existing is not None:
                 if existing["idempotency_key"] != idempotency_key:
                     raise ValueError("intent_ref idempotency collision")
-                self.db.commit()
+                if owns_transaction:
+                    self.db.commit()
+                else:
+                    self.db.execute("RELEASE SAVEPOINT aion_outbox_enqueue")
                 out = self.get(idempotency_key)
                 return {**out, "enqueue_state": "IDEMPOTENT"}
 
@@ -386,9 +397,16 @@ class ExecutionOutbox:
                     }),
                 ),
             )
-            self.db.commit()
+            if owns_transaction:
+                self.db.commit()
+            else:
+                self.db.execute("RELEASE SAVEPOINT aion_outbox_enqueue")
         except Exception:
-            self.db.rollback()
+            if owns_transaction:
+                self.db.rollback()
+            else:
+                self.db.execute("ROLLBACK TO SAVEPOINT aion_outbox_enqueue")
+                self.db.execute("RELEASE SAVEPOINT aion_outbox_enqueue")
             raise
         out = self.get(idempotency_key)
         return {**out, "enqueue_state": "ENQUEUED"}
