@@ -619,6 +619,33 @@ class ExecutionSagaCoordinator:
                 raise PermissionError("SAGA_SNAPSHOT_STALE")
             if self.outbox.get(step["outbox_key"]) != out:
                 raise PermissionError("SAGA_OUTBOX_SNAPSHOT_STALE")
+            # A64: a locally mutable step.outbox_key is not authorization to
+            # consume any row in the same tenant. Check the decision's exact
+            # Saga/step/action/budget binding while holding SQLite writer lock.
+            # This is LOCAL linkage, not producer testimony or antirollback.
+            d = out.get("decision")
+            expected = {
+                "idempotency_key": step["outbox_key"],
+                "owner_id": saga["owner_id"],
+                "tenant_id": saga["tenant_id"],
+                "workspace_id": saga["workspace_id"],
+                "intent_ref": f"{saga['saga_id']}:{key}:forward",
+                "transaction_id": saga["saga_id"],
+                "aggregate_key": f"saga:{saga['saga_id']}:forward",
+                "action": step["action"],
+                "payload": step["payload"],
+                "policy_version": saga["policy_version"],
+                "authority_budget_ref": saga["authority_budget_ref"],
+                "risk_points": step["risk_points"],
+                "capability_class": step["capability_class"],
+            }
+            if (
+                not isinstance(d, dict)
+                or out["idempotency_key"] != step["outbox_key"]
+                or out["aggregate_key"] != expected["aggregate_key"]
+                or any(d.get(field) != value for field, value in expected.items())
+            ):
+                raise PermissionError("SAGA_OUTBOX_BINDING_MISMATCH")
             self.db.execute(
                 """UPDATE aion_execution_saga_steps
                    SET state=?,effect_ref=?,last_error=?
