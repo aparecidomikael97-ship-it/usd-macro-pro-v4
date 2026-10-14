@@ -6,12 +6,13 @@ HUMAN_OWNER proof; this suite never enables outbox dispatch or real actions.
 import tempfile
 import unittest
 
-from test_atlasquant_aion_execution_saga import ExecutionSagaTests, NOW
+import test_atlasquant_aion_execution_saga as _saga_fixture
+NOW = _saga_fixture.NOW
 
 
 class A60SagaPreEnqueueIntegrityTests(unittest.TestCase):
     def setUp(self):
-        self.fixture = ExecutionSagaTests()
+        self.fixture = _saga_fixture.ExecutionSagaTests()
         self.fixture.setUp()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
