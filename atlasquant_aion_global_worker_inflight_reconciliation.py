@@ -174,6 +174,10 @@ def assess_global_inflight_reconciliation(
     evidence_rows = []
     unsafe_evidence = False
     terminal_proven = 0
+    # Local checkpoint digests do not authenticate an external producer.
+    # Until independent receipt custody is enrolled, terminal-looking rows
+    # are observations only and may not authorize an inflight clear.
+    local_terminal_unverified = 0
     failed_proven = 0
     no_terminal_evidence = 0
     inconsistent = 0
@@ -213,8 +217,12 @@ def assess_global_inflight_reconciliation(
             classification = "INCONSISTENT_EVIDENCE"
             inconsistent += 1
         elif terminal:
-            classification = "TERMINAL_PROVEN"
-            terminal_proven += 1
+            # A58: a caller can relabel a manual row as GLOBAL_WORKER and
+            # recompute the checkpoint digest. Such a row has no independent
+            # producer provenance and must NEVER become TERMINAL_PROVEN.
+            classification = "LOCAL_TERMINAL_UNVERIFIED"
+            local_terminal_unverified += 1
+            no_terminal_evidence += 1
         elif failed:
             classification = "FAILED_PROVEN"
             failed_proven += 1
@@ -258,6 +266,9 @@ def assess_global_inflight_reconciliation(
     elif expected_count == 0:
         status = "EMPTY_BATCH_READY_FOR_HUMAN_CLEAR"
         suggested_resolution = "CLEAR_INFLIGHT_NO_WORK"
+    elif local_terminal_unverified:
+        status = "UNVERIFIED_TERMINAL_EVIDENCE_REVIEW_REQUIRED"
+        suggested_resolution = "PRESERVE_AND_ESCALATE"
     elif terminal_proven == expected_count:
         status = "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR"
         suggested_resolution = "CLEAR_INFLIGHT_KEEP_TERMINAL_EVIDENCE"
@@ -289,6 +300,7 @@ def assess_global_inflight_reconciliation(
         "work_intent_digest": str(inflight.get("work_intent_digest") or ""),
         "work_intent_count": expected_count,
         "terminal_proven": terminal_proven,
+        "local_terminal_unverified": local_terminal_unverified,
         "failed_proven": failed_proven,
         "no_terminal_evidence": no_terminal_evidence,
         "inconsistent_evidence": inconsistent,
