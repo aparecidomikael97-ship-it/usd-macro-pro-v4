@@ -50,8 +50,10 @@ def _receipt_is_safe(row: Mapping[str, Any]) -> bool:
         "real_trading_enabled",
         "execution_authorized",
     ):
-        value = row.get(key, False)
-        if not isinstance(value, bool) or value is True:
+        # A71: an absent safety bit is UNKNOWN, never an implicit False.
+        # This checkpoint receipt is locally mutable/re-digestable; its
+        # completeness must be checked before even labelling it "safe".
+        if key not in row or type(row[key]) is not bool or row[key] is not False:
             return False
     return True
 

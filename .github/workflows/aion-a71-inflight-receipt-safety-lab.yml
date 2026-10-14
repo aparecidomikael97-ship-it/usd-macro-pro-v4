@@ -1,0 +1,36 @@
+name: AION A71 LAB missing receipt safety bits
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a70-main-ruleset-contract-20261014]
+    paths:
+      - "atlasquant_aion_global_worker_inflight_reconciliation.py"
+      - "test_atlasquant_aion_inflight_receipt_safety_a71.py"
+      - "test_atlasquant_aion_inflight_untrusted_receipts_a58.py"
+      - ".github/workflows/aion-a71-inflight-receipt-safety-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  a71-inflight-safety:
+    name: A71 receipt presence deny (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing dependencies at pinned versions
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: A71 adversarial plus A58 original no-producer regression
+        run: python -m unittest -v test_atlasquant_aion_inflight_receipt_safety_a71 test_atlasquant_aion_inflight_untrusted_receipts_a58
