@@ -194,6 +194,14 @@ def assess_global_inflight_reconciliation(
         valid = []
         row_inconsistent = False
         for receipt in matching:
+            # A72: local digest-sealed receipts are attacker-rewriteable.
+            # An absent/untyped/negative/unbounded attempt is UNKNOWN and
+            # must not reach int(), sorting, or become safe terminal proof.
+            attempt = receipt.get("attempt")
+            if type(attempt) is not int or not (1 <= attempt <= 1_000_000):
+                unsafe_evidence = True
+                row_inconsistent = True
+                continue
             completed_at = _parse_iso(receipt.get("completed_at"))
             if (
                 str(receipt.get("schedule_id") or "")
@@ -211,7 +219,8 @@ def assess_global_inflight_reconciliation(
             if not _receipt_is_safe(receipt):
                 unsafe_evidence = True
 
-        valid.sort(key=lambda row: int(row.get("attempt") or 0))
+        # Every accepted attempt has passed exact integer range validation.
+        valid.sort(key=lambda row: row["attempt"])
         terminal = [row for row in valid if str(row.get("state") or "") in TERMINAL_STATES]
         failed = [row for row in valid if str(row.get("state") or "") == "FAILED"]
 
@@ -242,7 +251,7 @@ def assess_global_inflight_reconciliation(
             "receipt_count": len(valid),
             "latest_receipt_id": str(latest.get("receipt_id") or ""),
             "latest_state": str(latest.get("state") or ""),
-            "latest_attempt": int(latest.get("attempt") or 0),
+            "latest_attempt": latest["attempt"] if latest else 0,
             "latest_completed_at": str(latest.get("completed_at") or ""),
         })
 
