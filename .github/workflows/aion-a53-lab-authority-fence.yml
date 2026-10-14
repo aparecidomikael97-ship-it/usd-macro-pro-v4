@@ -1,0 +1,38 @@
+name: AION A53 LAB authority fence
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a52-a50-a51-integrated-containment-20261013]
+    paths:
+      - atlasquant_aion_global_worker_activation.py
+      - test_atlasquant_aion_global_worker_activation.py
+      - tools/aion_a53_lab_audit.py
+      - .github/workflows/aion-a53-lab-authority-fence.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inert-tests:
+    name: A53 ${{ matrix.suite }} (live network denied)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [focused, security, quality]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing pinned project test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Verify source HEAD and run inert tests
+        run: |
+          git rev-parse HEAD
+          python tools/aion_a53_lab_audit.py "${{ matrix.suite }}"
