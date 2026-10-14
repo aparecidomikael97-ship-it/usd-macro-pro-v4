@@ -145,6 +145,9 @@ jobs:
             test_atlasquant_aion_v224_owner_signature_ceremony.py \
             test_atlasquant_aion_v225_explicit_owner_decision_record.py \
             test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+      - name: A50 persisted Saga plan and genesis binding integrity must detect SQLite tamper
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_plan_integrity_a50.py
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
