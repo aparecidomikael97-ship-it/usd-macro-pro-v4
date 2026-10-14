@@ -6,6 +6,7 @@ It does not stand in for independent F1/T1, F2, or producer attestation.
 """
 import unittest
 from copy import deepcopy
+from datetime import timedelta
 
 import test_atlasquant_aion_global_worker_inflight_resolution as fixture
 from atlasquant_aion_core_intelligence.evidence import digest
@@ -105,6 +106,37 @@ class EmptyInflightRequiresIndependentWitnessA66Tests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["reason"], "EXACT_CONFIRMATION_PHRASE_REQUIRED")
+        self.assertFalse(result["requires_checkpoint_save"])
+
+
+    def test_04_active_lease_precedence_keeps_precise_diagnostic(self):
+        claimed, _ = self.fixture.claim(self.fixture.arm({}))
+        result = stage_resolved_inflight_clear(
+            self.fixture.access,
+            self.fixture.runtime(claimed),
+            confirmation=True,
+            confirmation_phrase=CONFIRMATION_PHRASE,
+            now=fixture.TICK + timedelta(seconds=30),
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "EXPIRED_OWNED_LEASE_REQUIRED")
+        self.assertFalse(result["requires_checkpoint_save"])
+
+    def test_05_wrong_admin_scope_precedence_keeps_precise_diagnostic(self):
+        claimed, _ = self.fixture.claim(self.fixture.arm({}))
+        other = fixture._access(
+            username="other",
+            fingerprint="other-resolution-admin-999999999",
+        )
+        result = stage_resolved_inflight_clear(
+            other,
+            self.fixture.runtime(claimed),
+            confirmation=True,
+            confirmation_phrase=CONFIRMATION_PHRASE,
+            now=fixture.AFTER_EXPIRY,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "GLOBAL_WORKER_CONTEXT_MISMATCH")
         self.assertFalse(result["requires_checkpoint_save"])
 
 
