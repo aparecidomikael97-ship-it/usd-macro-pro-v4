@@ -35,9 +35,11 @@ jobs:
           )
           names = [
               "test_atlasquant_aion_human_click_route_a56",
-              "test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness",
-              "test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt",
-              "test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_explicit_human_click_remains_usable",
+              "test_atlasquant_aion_background_executor",
+              "test_atlasquant_aion_saga_plan_integrity_a50",
+              "test_atlasquant_aion_global_worker_activation.A53IndependentActivationBoundaryTests",
+              "test_atlasquant_aion_ci_main_boundary_a54",
+              "test_atlasquant_aion_convergence.A55PinnedA54BaseTests",
           ]
           result = unittest.TextTestRunner(verbosity=2).run(
               unittest.defaultTestLoader.loadTestsFromNames(names)
