@@ -47,6 +47,9 @@ RECEIPT_STATES = frozenset({"SUCCEEDED", "FAILED", "BLOCKED"})
 MAX_RECEIPTS = 1000
 MAX_JOBS_PER_RUN = 20
 MAX_ATTEMPTS = 3
+# A56: intra-process route discriminator only. This is NOT a secret,
+# independent owner proof, FIDO/TPM authority, or proof of a physical click.
+_MANUAL_ENTRY_ROUTE_SENTINEL = object()
 RETRY_BACKOFF_SECONDS = (60, 300, 900)
 
 
@@ -367,10 +370,44 @@ def _execute_due_local_work_authorized(
     capability_allowlist: frozenset[str] | set[str] | tuple[str, ...] | list[str] | None = None,
     max_jobs: int = 5,
     now: datetime | None = None,
+    _manual_entry_route_sentinel: object | None = None,
 ) -> dict[str, Any]:
-    """Internal kernel after an authenticated authorization boundary."""
+    """Internal kernel after a frontdoor route check; no external owner attest."""
     if authorization_mode not in {"HUMAN_CLICK", "ARMED_WORKER", "GLOBAL_WORKER"}:
         raise ValueError("invalid executor authorization mode")
+    # A56 denies trivial mode/digest self-assertion on the importable kernel.
+    # The public manual frontdoor must be the local route source. In-process
+    # code can still call that frontdoor with confirmation=True; this software
+    # discriminator is NOT an independent HUMAN_OWNER presence attestation.
+    if (authorization_mode == "HUMAN_CLICK"
+            and _manual_entry_route_sentinel is not _MANUAL_ENTRY_ROUTE_SENTINEL):
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "MANUAL_ENTRY_BOUNDARY_NOT_ESTABLISHED",
+            "checkpoint": deepcopy(dict(checkpoint or {})),
+            "due_count": 0,
+            "processed": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "blocked": 0,
+            "outcomes": [],
+            "action_receipts": [],
+            "action_receipts_are_authority": False,
+            "requires_checkpoint_save": False,
+            "external_persisted": False,
+            "manual_invocation_only": False,
+            "authorization_mode": "HUMAN_CLICK",
+            "autonomous_worker_started": False,
+            "background_worker_connected": False,
+            "provider_called": False,
+            "external_action_executed": False,
+            "real_trading_enabled": False,
+            "payment_executed": False,
+            "publication_executed": False,
+            "deploy_executed": False,
+            "independent_witness_verified": False,
+        }
     # V16-A.51: this internal function is callable directly. Mode strings,
     # caller-provided digests, local checkpoint "witness" fields and an ADMIN
     # session cannot enroll independent source/current-head authority.
@@ -646,6 +683,7 @@ def execute_due_local_work(
         authorization_digest=approval_digest,
         max_jobs=max_jobs,
         now=current,
+        _manual_entry_route_sentinel=_MANUAL_ENTRY_ROUTE_SENTINEL,
     )
 
 
