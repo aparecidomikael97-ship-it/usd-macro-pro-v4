@@ -595,60 +595,30 @@ def validate_global_worker_activation_approval(
     }
 
 
+def _independent_activation_authority_denial() -> dict[str, Any]:
+    """Local tickets and readiness digests cannot enroll external authority."""
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
+        "modified": False,
+        "feature_flag_modified": False,
+        "global_worker_executed": False,
+        "runtime_checkpoint_modified": False,
+        "independent_witness_verified": False,
+    }
+
+
 def write_repository_feature_flag_enabled(
     config: RuntimeConfig,
     prior_state: str,
     *,
     timeout: float = 10.0,
 ) -> dict[str, Any]:
-    """Enable only the named Global Worker repository variable."""
-    if not config.repo or not config.token:
-        return {
-            "status": "UNAVAILABLE",
-            "modified": False,
-            "reason": "Repository/token required for flag mutation.",
-        }
-    state = str(prior_state or "").upper()
-    if state not in SAFE_FLAG_STATES:
-        return {
-            "status": "BLOCKED",
-            "modified": False,
-            "reason": "Feature flag is not in an enable-safe prior state.",
-        }
-
-    headers = _headers(config.token)
-    try:
-        if state == "UNSET":
-            response = requests.post(
-                _variable_collection_url(config),
-                headers=headers,
-                json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
-                timeout=timeout,
-            )
-        else:
-            response = requests.patch(
-                _variable_url(config),
-                headers=headers,
-                json={"name": FEATURE_FLAG_NAME, "value": ENABLED_VALUE},
-                timeout=timeout,
-            )
-        response.raise_for_status()
-        return {
-            "status": "WRITE_ACCEPTED",
-            "modified": True,
-            "previous_state": state,
-            "target_state": "ENABLED",
-            "raw_value_exposed": False,
-        }
-    except Exception as exc:
-        return {
-            "status": "ERROR",
-            "modified": False,
-            "reason": type(exc).__name__,
-            "previous_state": state,
-            "target_state": "ENABLED",
-            "raw_value_exposed": False,
-        }
+    """Refuse direct activation until independent authority is enrolled."""
+    # This public helper bypasses the ceremony when imported directly. Deny
+    # before touching caller config descriptors, credentials or HTTP transport.
+    return _independent_activation_authority_denial()
 
 
 def force_disable_repository_feature_flag(
@@ -784,115 +754,10 @@ def activate_global_worker_feature_flag(
             "reactivation_gate_checked": True,
         }
 
-    write = dict(flag_writer(config, pre_state, timeout=timeout) or {})
-    if write.get("status") != "WRITE_ACCEPTED" or write.get("modified") is not True:
-        observed_after_failed_write = dict(
-            flag_reader(config, timeout=timeout) or {}
-        )
-        observed_state = str(
-            observed_after_failed_write.get("state") or ""
-        ).upper()
-        if observed_state == "ENABLED":
-            rollback = dict(flag_disabler(config, timeout=timeout) or {})
-            rollback_confirm = dict(flag_reader(config, timeout=timeout) or {})
-            rollback_safe = bool(
-                str(rollback_confirm.get("status") or "").upper() == "CONFIRMED"
-                and str(rollback_confirm.get("state") or "").upper()
-                in SAFE_FLAG_STATES
-            )
-            return {
-                "schema": SCHEMA,
-                "status": (
-                    "ACTIVATION_ROLLED_BACK"
-                    if rollback_safe
-                    else "CRITICAL_ACTIVATION_ROLLBACK_FAILED"
-                ),
-                "reason": "FEATURE_FLAG_WRITE_OUTCOME_UNCERTAIN_AND_ENABLED",
-                "feature_flag_modified": not rollback_safe,
-                "global_worker_executed": False,
-                "live_heartbeat_confirmed": False,
-                "runtime_checkpoint_modified": False,
-                "real_trading_enabled": False,
-                "flag_write": write,
-                "rollback": rollback,
-                "rollback_verified_safe": rollback_safe,
-            }
-        return {
-            "schema": SCHEMA,
-            "status": "ERROR",
-            "reason": str(write.get("reason") or "FEATURE_FLAG_ENABLE_WRITE_FAILED"),
-            "feature_flag_modified": False,
-            "global_worker_executed": False,
-            "flag_write": write,
-            "observed_feature_flag_state": observed_state or "UNKNOWN",
-        }
+    # A caller-supplied writer can bypass the public transport helper. No local
+    # ticket, digest or readiness observation establishes an independent root.
+    return _independent_activation_authority_denial()
 
-    post_flag = dict(flag_reader(config, timeout=timeout) or {})
-    post_runtime = dict(
-        runtime_reader(config, timeout=min(timeout, 10.0)) or {}
-    )
-    post_runtime_validation = validate_global_worker_activation_approval(
-        access,
-        post_runtime,
-        approval,
-        now=now,
-    )
-    if (
-        str(post_flag.get("status") or "").upper() == "CONFIRMED"
-        and str(post_flag.get("state") or "").upper() == "ENABLED"
-        and post_runtime_validation.get("state") == "APPROVED"
-    ):
-        return {
-            "schema": SCHEMA,
-            "status": "ACTIVATED_PENDING_LIVE_EVIDENCE",
-            "feature_flag_state": "ENABLED",
-            "feature_flag_modified": True,
-            "global_worker_executed": False,
-            "live_heartbeat_confirmed": False,
-            "live_receipt_confirmed": False,
-            "runtime_checkpoint_modified": False,
-            "real_trading_enabled": False,
-            "activation_approval_digest": str((approval or {}).get("approval_digest") or ""),
-            "post_incident_gate_required": bool(
-                (approval or {}).get("post_incident_gate_required")
-            ),
-            "post_incident_gate_verified_before_write": True,
-            "reactivation_authorized_by_gate": False,
-            "activated_at": current.isoformat(),
-            "runtime_sha_verified_after_write": str(post_runtime.get("sha") or ""),
-            "next_required_evidence": "GLOBAL_WORKER_LIVE_HEARTBEAT_AND_RECEIPT",
-        }
-
-    rollback = dict(flag_disabler(config, timeout=timeout) or {})
-    rollback_confirm = dict(flag_reader(config, timeout=timeout) or {})
-    rollback_safe = bool(
-        str(rollback_confirm.get("status") or "").upper() == "CONFIRMED"
-        and str(rollback_confirm.get("state") or "").upper() in SAFE_FLAG_STATES
-    )
-    return {
-        "schema": SCHEMA,
-        "status": (
-            "ACTIVATION_ROLLED_BACK"
-            if rollback_safe
-            else "CRITICAL_ACTIVATION_ROLLBACK_FAILED"
-        ),
-        "reason": (
-            "RUNTIME_CHANGED_DURING_ACTIVATION"
-            if post_runtime_validation.get("state") != "APPROVED"
-            else "FEATURE_FLAG_ENABLE_NOT_CONFIRMED_AFTER_WRITE"
-        ),
-        "feature_flag_modified": not rollback_safe,
-        "global_worker_executed": False,
-        "live_heartbeat_confirmed": False,
-        "runtime_checkpoint_modified": False,
-        "real_trading_enabled": False,
-        "flag_write": write,
-        "rollback": rollback,
-        "rollback_verified_safe": rollback_safe,
-        "rollback_feature_flag_state": str(
-            rollback_confirm.get("state") or "UNKNOWN"
-        ),
-    }
 
 
 def deactivate_global_worker_feature_flag(
