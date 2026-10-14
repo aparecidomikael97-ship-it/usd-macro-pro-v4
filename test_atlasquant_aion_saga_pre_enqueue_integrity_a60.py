@@ -29,12 +29,14 @@ class A60SagaPreEnqueueIntegrityTests(unittest.TestCase):
 
     def _assert_not_enqueued(self):
         count_before = self._outbox_rows()
+        state_before = self.saga.get("saga-1")["state"]
         with self.assertRaisesRegex(
             PermissionError, "SAGA_LOCAL_INTEGRITY_MISMATCH"
         ):
             self.fixture._enqueue_forward(self.saga)
         self.assertEqual(self._outbox_rows(), count_before)
-        self.assertEqual(self.saga.get("saga-1")["state"], "PLANNED")
+        # A refusal must not rewrite even an already-corrupted SQLite state.
+        self.assertEqual(self.saga.get("saga-1")["state"], state_before)
 
     def test_01_local_forged_step_action_must_not_enqueue(self):
         with self.saga.db:
