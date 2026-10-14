@@ -36,7 +36,12 @@ jobs:
           names = [
               "test_atlasquant_aion_inflight_untrusted_receipts_a58",
               "test_atlasquant_aion_global_worker_inflight_reconciliation.GlobalInflightReconciliationTests.test_missing_receipt_is_reported_as_ambiguous_not_retried",
+              "test_atlasquant_aion_global_worker_inflight_reconciliation.GlobalInflightReconciliationTests.test_no_inflight_needs_no_reconciliation",
+              "test_atlasquant_aion_global_worker_inflight_reconciliation.GlobalInflightReconciliationTests.test_empty_batch_is_prepared_for_human_clear_without_auto_mutation",
               "test_atlasquant_aion_global_worker_inflight_resolution.GlobalInflightResolutionTests.test_ambiguous_execution_cannot_be_cleared_by_safe_ceremony",
+              "test_atlasquant_aion_global_worker_inflight_resolution.GlobalInflightResolutionTests.test_empty_batch_can_stage_clear_after_lease_expiry",
+              "test_atlasquant_aion_global_worker_inflight_resolution.GlobalInflightResolutionTests.test_active_lease_cannot_be_cleared",
+              "test_atlasquant_aion_global_worker_inflight_resolution.GlobalInflightResolutionTests.test_other_admin_scope_cannot_stage_clear",
               "test_atlasquant_aion_f1_cross_boundary_a57",
           ]
           r = unittest.TextTestRunner(verbosity=2).run(
