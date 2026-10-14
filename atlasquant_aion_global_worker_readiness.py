@@ -406,7 +406,13 @@ def activation_readiness_snapshot(
     shadow = protocol_shadow_probe(now=current)
     flag = feature_flag_state(feature_flag_raw)
 
-    blockers: list[str] = []
+    # A73: local runtime/pulse/simulation PASS is NOT an independently
+    # authenticated resource-owner/source/head/epoch witness (F1/T1).
+    # No trust root or out-of-band monotonic custody is enrolled today.
+    # This is a mandatory operational readiness denial, not an optional
+    # caller-supplied flag. Do not turn any locally supplied "verified"
+    # claim into permission to arm, enable a flag, or execute the Worker.
+    blockers: list[str] = ["INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED"]
     if runtime["state"] != "PASS":
         blockers.append("RUNTIME_POSTURE_NOT_CONFIRMED")
     if workflow["state"] != "PASS":
@@ -453,6 +459,10 @@ def activation_readiness_snapshot(
             "value_exposed": False,
         },
         "read_only": True,
+        "source_authenticity_verified": False,
+        "independent_witness_verified": False,
+        "source_resource_owner_bound": False,
+        "external_activation_allowed": False,
         "runtime_modified": False,
         "feature_flag_modified": False,
         "worker_armed_by_this_check": False,
