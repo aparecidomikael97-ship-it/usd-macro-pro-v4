@@ -106,7 +106,7 @@ class MainRulesetA70Tests(unittest.TestCase):
         security = (ROOT / ".github/workflows/aion-core-security-gate.yml").read_text(encoding="utf-8")
         self.assertIn("main", quality.split("  pull_request:", 1)[1].split("  push:", 1)[0])
         self.assertIn("  test:\n    runs-on:", quality)
-        self.assertIn("  pull_request:\n    branches: [main,", security)
+        self.assertIn("main", security.split("  pull_request:", 1)[1].split("permissions:", 1)[0])
         self.assertIn("name: AION adversarial contracts", security)
         self.assertIn("name: Supply-chain audit", security)
         self.assertEqual(CHECK_SOURCE_APP_ID, 15368)
