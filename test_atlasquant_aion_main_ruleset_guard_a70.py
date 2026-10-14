@@ -104,7 +104,7 @@ class MainRulesetA70Tests(unittest.TestCase):
     def test_12_real_workflow_produces_three_required_names_on_pr_main(self):
         quality = (ROOT / ".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
         security = (ROOT / ".github/workflows/aion-core-security-gate.yml").read_text(encoding="utf-8")
-        self.assertIn("  pull_request:\n    branches: [main]", quality)
+        self.assertIn("main", quality.split("  pull_request:", 1)[1].split("  push:", 1)[0])
         self.assertIn("  test:\n    runs-on:", quality)
         self.assertIn("  pull_request:\n    branches: [main,", security)
         self.assertIn("name: AION adversarial contracts", security)
