@@ -1,13 +1,13 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1791983080.0709703,
+  "last_batch_ts": 1792000773.7776995,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
-      "updated_at": "2026-10-14T07:32:41.188970+00:00",
-      "candle_m15": "2026-10-14T07:15:00+00:00",
-      "price": 0.83227,
+      "updated_at": "2026-10-14T17:59:20.644699+00:00",
+      "candle_m15": "2026-10-14T17:30:00+00:00",
+      "price": 0.83617,
       "macro_direction": "🟢 COMPRA USD/CHF",
       "macro_score": 87.0,
       "quality": 91.0,
@@ -472,32 +472,42 @@
         "Asia Low": 0.83175
       },
       "premium_discount": {
-        "zone": "PRÊMIO",
-        "position": 65.09572901325377,
+        "zone": "ACIMA DO RANGE",
+        "position": 122.53313696612524,
         "equilibrium": 0.831245,
-        "inside_range": true,
-        "expansion_pct": 0.0
+        "inside_range": false,
+        "expansion_pct": 22.53313696612524
       },
       "bsl": [
-        "Asia High",
-        0.83293
+        "PMH",
+        0.8362
       ],
       "ssl": [
         "Asia Low",
         0.83175
       ],
-      "latest_sweep": null,
+      "latest_sweep": {
+        "level": "PMH",
+        "type": "SWEEP BSL",
+        "datetime": "2026-10-14 17:30:00+00:00",
+        "price": 0.8362,
+        "high": 0.83684,
+        "low": 0.83601,
+        "close": 0.83617,
+        "excess_abs": 0.0006399999999999739,
+        "rejection": "fechou de volta abaixo do nível"
+      },
       "killzone": {
-        "now_ny": "2026-10-14 03:33:57.456586-04:00",
+        "now_ny": "2026-10-14 13:59:33.510799-04:00",
         "active": {
-          "name": "London Killzone",
-          "start": "2026-10-14 02:00:00-04:00",
-          "end": "2026-10-14 05:00:00-04:00"
+          "name": "New York PM",
+          "start": "2026-10-14 13:30:00-04:00",
+          "end": "2026-10-14 16:00:00-04:00"
         },
         "next": {
-          "name": "New York AM",
-          "start": "2026-10-14 07:00:00-04:00",
-          "end": "2026-10-14 10:00:00-04:00"
+          "name": "Asian Range",
+          "start": "2026-10-14 20:00:00-04:00",
+          "end": "2026-10-15 00:00:00-04:00"
         },
         "windows": [
           {
@@ -591,7 +601,7 @@
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 60/100",
+            "detail": "USD 61/100",
             "weight": 25.0
           },
           {
@@ -655,13 +665,13 @@
             "name": "Localização eficiente",
             "ok": false,
             "weight": 10.0,
-            "detail": "PRÊMIO"
+            "detail": "ACIMA DO RANGE"
           },
           {
             "name": "Sweep coerente",
             "ok": false,
             "weight": 8.0,
-            "detail": "Sem sweep recente"
+            "detail": "SWEEP BSL"
           },
           {
             "name": "Killzone ativa",
@@ -684,15 +694,15 @@
       "adr": {
         "available": true,
         "adr": 0.003828571428571459,
-        "today_range": 0.0008599999999999719,
-        "used_pct": 22.462686567163267,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "today_range": 0.007769999999999944,
+        "used_pct": 202.94776119402678,
+        "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 22.462686567163267,
+      "adr_used_pct": 202.94776119402678,
       "intraday_opens": {
         "available": true,
-        "current": 0.83227,
+        "current": 0.83617,
         "day_open": 0.83209,
         "week_open": 0.83002,
         "above_day_open": true,
@@ -702,9 +712,9 @@
     },
     "NZD/USD": {
       "pair": "NZD/USD",
-      "updated_at": "2026-10-14T07:31:46.893458+00:00",
-      "candle_m15": "2026-10-14T07:15:00+00:00",
-      "price": 0.56251,
+      "updated_at": "2026-10-14T17:58:26.051017+00:00",
+      "candle_m15": "2026-10-14T17:30:00+00:00",
+      "price": 0.55831,
       "macro_direction": "🔴 VENDA NZD/USD",
       "macro_score": 82.0,
       "quality": 91.0,
@@ -1138,42 +1148,42 @@
         "Asia Low": 0.56125
       },
       "premium_discount": {
-        "zone": "PRÊMIO",
-        "position": 78.64768683273887,
+        "zone": "DESCONTO",
+        "position": 3.9145907473308768,
         "equilibrium": 0.5609,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "Asia High",
-        0.56301
+        "PDH",
+        0.56193
       ],
       "ssl": [
-        "Asia Low",
-        0.56125
+        "EQL",
+        0.558155
       ],
       "latest_sweep": {
-        "level": "PML",
+        "level": "PDL",
         "type": "SWEEP SSL",
-        "datetime": "2026-10-14 05:00:00+00:00",
-        "price": 0.56262,
-        "high": 0.56273,
-        "low": 0.56251,
-        "close": 0.5627,
-        "excess_abs": 0.0001100000000000545,
+        "datetime": "2026-10-14 17:30:00+00:00",
+        "price": 0.55798,
+        "high": 0.55835,
+        "low": 0.55793,
+        "close": 0.55831,
+        "excess_abs": 4.999999999999449e-05,
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-10-14 03:33:56.996193-04:00",
+        "now_ny": "2026-10-14 13:59:33.238817-04:00",
         "active": {
-          "name": "London Killzone",
-          "start": "2026-10-14 02:00:00-04:00",
-          "end": "2026-10-14 05:00:00-04:00"
+          "name": "New York PM",
+          "start": "2026-10-14 13:30:00-04:00",
+          "end": "2026-10-14 16:00:00-04:00"
         },
         "next": {
-          "name": "New York AM",
-          "start": "2026-10-14 07:00:00-04:00",
-          "end": "2026-10-14 10:00:00-04:00"
+          "name": "Asian Range",
+          "start": "2026-10-14 20:00:00-04:00",
+          "end": "2026-10-15 00:00:00-04:00"
         },
         "windows": [
           {
@@ -1267,7 +1277,7 @@
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 60/100",
+            "detail": "USD 61/100",
             "weight": 25.0
           },
           {
@@ -1293,7 +1303,7 @@
         "quality": 91.0
       },
       "readiness": {
-        "score": 69.0,
+        "score": 67.0,
         "grade": "B",
         "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
         "checks": [
@@ -1329,9 +1339,9 @@
           },
           {
             "name": "Localização eficiente",
-            "ok": true,
+            "ok": false,
             "weight": 10.0,
-            "detail": "PRÊMIO"
+            "detail": "DESCONTO"
           },
           {
             "name": "Sweep coerente",
@@ -1355,32 +1365,32 @@
         "hard_conflict": true
       },
       "readiness_grade": "B",
-      "readiness_score": 69.0,
+      "readiness_score": 67.0,
       "event_risk": "ALTO",
       "adr": {
         "available": true,
         "adr": 0.0037257142857142845,
-        "today_range": 0.0010300000000000864,
-        "used_pct": 27.64570552147472,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "today_range": 0.006230000000000069,
+        "used_pct": 167.21625766871355,
+        "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 27.64570552147472,
+      "adr_used_pct": 167.21625766871355,
       "intraday_opens": {
         "available": true,
-        "current": 0.56251,
+        "current": 0.55831,
         "day_open": 0.56211,
         "week_open": 0.56079,
-        "above_day_open": true,
-        "above_week_open": true
+        "above_day_open": false,
+        "above_week_open": false
       },
       "autopilot_v107": true
     },
     "USD/JPY": {
       "pair": "USD/JPY",
-      "updated_at": "2026-10-14T07:31:44.872387+00:00",
-      "candle_m15": "2026-10-14T07:15:00+00:00",
-      "price": 158.22945,
+      "updated_at": "2026-10-14T17:58:24.336301+00:00",
+      "candle_m15": "2026-10-14T17:30:00+00:00",
+      "price": 158.59026,
       "macro_direction": "🟢 COMPRA USD/JPY",
       "macro_score": 87.0,
       "quality": 84.0,
@@ -1866,42 +1876,42 @@
         "Asia Low": 158.17288
       },
       "premium_discount": {
-        "zone": "PRÊMIO",
-        "position": 87.04195231809437,
+        "zone": "ACIMA DO RANGE",
+        "position": 104.11290742291526,
         "equilibrium": 157.44653499999998,
-        "inside_range": true,
-        "expansion_pct": 0.0
+        "inside_range": false,
+        "expansion_pct": 4.1129074229152565
       },
       "bsl": [
-        "EQH",
-        158.48503499999998
+        "PDH",
+        158.69471
       ],
       "ssl": [
         "Asia Low",
         158.17288
       ],
       "latest_sweep": {
-        "level": "Asia Low",
-        "type": "SWEEP SSL",
-        "datetime": "2026-10-14 05:15:00+00:00",
-        "price": 158.17288,
-        "high": 158.28484,
-        "low": 158.17076,
-        "close": 158.28095,
-        "excess_abs": 0.002119999999990796,
-        "rejection": "fechou de volta acima do nível"
+        "level": "PDH",
+        "type": "SWEEP BSL",
+        "datetime": "2026-10-14 17:15:00+00:00",
+        "price": 158.69471,
+        "high": 158.73454,
+        "low": 158.58375,
+        "close": 158.5903,
+        "excess_abs": 0.03983000000002335,
+        "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-10-14 03:33:57.261334-04:00",
+        "now_ny": "2026-10-14 13:59:33.377683-04:00",
         "active": {
-          "name": "London Killzone",
-          "start": "2026-10-14 02:00:00-04:00",
-          "end": "2026-10-14 05:00:00-04:00"
+          "name": "New York PM",
+          "start": "2026-10-14 13:30:00-04:00",
+          "end": "2026-10-14 16:00:00-04:00"
         },
         "next": {
-          "name": "New York AM",
-          "start": "2026-10-14 07:00:00-04:00",
-          "end": "2026-10-14 10:00:00-04:00"
+          "name": "Asian Range",
+          "start": "2026-10-14 20:00:00-04:00",
+          "end": "2026-10-15 00:00:00-04:00"
         },
         "windows": [
           {
@@ -1995,7 +2005,7 @@
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 60/100",
+            "detail": "USD 61/100",
             "weight": 25.0
           },
           {
@@ -2021,7 +2031,7 @@
         "quality": 84.0
       },
       "readiness": {
-        "score": 60.0,
+        "score": 52.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -2059,13 +2069,13 @@
             "name": "Localização eficiente",
             "ok": false,
             "weight": 10.0,
-            "detail": "PRÊMIO"
+            "detail": "ACIMA DO RANGE"
           },
           {
             "name": "Sweep coerente",
-            "ok": true,
+            "ok": false,
             "weight": 8.0,
-            "detail": "SWEEP SSL"
+            "detail": "SWEEP BSL"
           },
           {
             "name": "Killzone ativa",
@@ -2083,32 +2093,32 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 60.0,
+      "readiness_score": 52.0,
       "event_risk": "ALTO",
       "adr": {
         "available": true,
         "adr": 0.8091557142857145,
-        "today_range": 0.22818000000000893,
-        "used_pct": 28.19976377494111,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "today_range": 0.8331400000000144,
+        "used_pct": 102.9641125052762,
+        "state": "🟠 DIA ESTICADO",
         "length": 14
       },
-      "adr_used_pct": 28.19976377494111,
+      "adr_used_pct": 102.9641125052762,
       "intraday_opens": {
         "available": true,
-        "current": 158.22945,
+        "current": 158.59026,
         "day_open": 158.25244,
         "week_open": 158.23457,
-        "above_day_open": false,
-        "above_week_open": false
+        "above_day_open": true,
+        "above_week_open": true
       },
       "autopilot_v107": true
     },
     "EUR/USD": {
       "pair": "EUR/USD",
-      "updated_at": "2026-10-14T07:31:40.831157+00:00",
-      "candle_m15": "2026-10-14T07:15:00+00:00",
-      "price": 1.12065,
+      "updated_at": "2026-10-14T17:58:20.326769+00:00",
+      "candle_m15": "2026-10-14T17:30:00+00:00",
+      "price": 1.11399,
       "macro_direction": "🔴 VENDA EUR/USD",
       "macro_score": 88.0,
       "quality": 70.0,
@@ -2570,42 +2580,29 @@
         "Asia Low": 1.11985
       },
       "premium_discount": {
-        "zone": "DESCONTO",
-        "position": 38.323353293411685,
+        "zone": "ABAIXO DO RANGE",
+        "position": -18.6484174508133,
         "equilibrium": 1.1220150000000002,
-        "inside_range": true,
-        "expansion_pct": 0.0
+        "inside_range": false,
+        "expansion_pct": 18.6484174508133
       },
       "bsl": [
-        "Asia High",
-        1.12116
+        "PDH",
+        1.12046
       ],
-      "ssl": [
-        "Asia Low",
-        1.11985
-      ],
-      "latest_sweep": {
-        "level": "PDH",
-        "type": "SWEEP BSL",
-        "datetime": "2026-10-14 07:00:00+00:00",
-        "price": 1.12046,
-        "high": 1.12099,
-        "low": 1.12016,
-        "close": 1.12021,
-        "excess_abs": 0.0005299999999999194,
-        "rejection": "fechou de volta abaixo do nível"
-      },
+      "ssl": null,
+      "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-10-14 03:33:56.415481-04:00",
+        "now_ny": "2026-10-14 13:59:32.766164-04:00",
         "active": {
-          "name": "London Killzone",
-          "start": "2026-10-14 02:00:00-04:00",
-          "end": "2026-10-14 05:00:00-04:00"
+          "name": "New York PM",
+          "start": "2026-10-14 13:30:00-04:00",
+          "end": "2026-10-14 16:00:00-04:00"
         },
         "next": {
-          "name": "New York AM",
-          "start": "2026-10-14 07:00:00-04:00",
-          "end": "2026-10-14 10:00:00-04:00"
+          "name": "Asian Range",
+          "start": "2026-10-14 20:00:00-04:00",
+          "end": "2026-10-15 00:00:00-04:00"
         },
         "windows": [
           {
@@ -2699,7 +2696,7 @@
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 60/100",
+            "detail": "USD 61/100",
             "weight": 25.0
           },
           {
@@ -2725,7 +2722,7 @@
         "quality": 70.0
       },
       "readiness": {
-        "score": 60.0,
+        "score": 52.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -2763,13 +2760,13 @@
             "name": "Localização eficiente",
             "ok": false,
             "weight": 10.0,
-            "detail": "DESCONTO"
+            "detail": "ABAIXO DO RANGE"
           },
           {
             "name": "Sweep coerente",
-            "ok": true,
+            "ok": false,
             "weight": 8.0,
-            "detail": "SWEEP BSL"
+            "detail": "Sem sweep recente"
           },
           {
             "name": "Killzone ativa",
@@ -2787,20 +2784,20 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 60.0,
+      "readiness_score": 52.0,
       "event_risk": "ALTO",
       "adr": {
         "available": true,
         "adr": 0.006099285714285656,
-        "today_range": 0.0012300000000000644,
-        "used_pct": 20.166295819183823,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "today_range": 0.010739999999999972,
+        "used_pct": 176.0861927626198,
+        "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 20.166295819183823,
+      "adr_used_pct": 176.0861927626198,
       "intraday_opens": {
         "available": true,
-        "current": 1.12065,
+        "current": 1.11399,
         "day_open": 1.12069,
         "week_open": 1.12094,
         "above_day_open": false,
@@ -2810,9 +2807,9 @@
     },
     "USD/CAD": {
       "pair": "USD/CAD",
-      "updated_at": "2026-10-14T07:31:49.016306+00:00",
-      "candle_m15": "2026-10-14T07:15:00+00:00",
-      "price": 1.42068,
+      "updated_at": "2026-10-14T17:58:28.018813+00:00",
+      "candle_m15": "2026-10-14T17:30:00+00:00",
+      "price": 1.42534,
       "macro_direction": "🟢 COMPRA USD/CAD",
       "macro_score": 87.0,
       "quality": 91.0,
@@ -3226,42 +3223,42 @@
         "Asia Low": 1.4199
       },
       "premium_discount": {
-        "zone": "DESCONTO",
-        "position": 36.0998650472331,
+        "zone": "PRÊMIO",
+        "position": 67.54385964912306,
         "equilibrium": 1.4227400000000001,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "Asia High",
-        1.42194
+        "PDH",
+        1.42869
       ],
       "ssl": [
         "PDL",
         1.42042
       ],
       "latest_sweep": {
-        "level": "PDL",
-        "type": "SWEEP SSL",
-        "datetime": "2026-10-14 06:45:00+00:00",
-        "price": 1.42042,
-        "high": 1.42078,
-        "low": 1.42041,
-        "close": 1.4207,
-        "excess_abs": 1.0000000000065512e-05,
-        "rejection": "fechou de volta acima do nível"
+        "level": "PDH",
+        "type": "SWEEP BSL",
+        "datetime": "2026-10-14 15:15:00+00:00",
+        "price": 1.42869,
+        "high": 1.42875,
+        "low": 1.4277,
+        "close": 1.42779,
+        "excess_abs": 5.999999999994898e-05,
+        "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-10-14 03:33:57.652339-04:00",
+        "now_ny": "2026-10-14 13:59:33.647935-04:00",
         "active": {
-          "name": "London Killzone",
-          "start": "2026-10-14 02:00:00-04:00",
-          "end": "2026-10-14 05:00:00-04:00"
+          "name": "New York PM",
+          "start": "2026-10-14 13:30:00-04:00",
+          "end": "2026-10-14 16:00:00-04:00"
         },
         "next": {
-          "name": "New York AM",
-          "start": "2026-10-14 07:00:00-04:00",
-          "end": "2026-10-14 10:00:00-04:00"
+          "name": "Asian Range",
+          "start": "2026-10-14 20:00:00-04:00",
+          "end": "2026-10-15 00:00:00-04:00"
         },
         "windows": [
           {
@@ -3355,7 +3352,7 @@
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 60/100",
+            "detail": "USD 61/100",
             "weight": 25.0
           },
           {
@@ -3417,15 +3414,15 @@
           },
           {
             "name": "Localização eficiente",
-            "ok": true,
+            "ok": false,
             "weight": 10.0,
-            "detail": "DESCONTO"
+            "detail": "PRÊMIO"
           },
           {
             "name": "Sweep coerente",
-            "ok": true,
+            "ok": false,
             "weight": 8.0,
-            "detail": "SWEEP SSL"
+            "detail": "SWEEP BSL"
           },
           {
             "name": "Killzone ativa",
@@ -3448,15 +3445,15 @@
       "adr": {
         "available": true,
         "adr": 0.006574999999999982,
-        "today_range": 0.0020000000000000018,
-        "used_pct": 30.418250950570453,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "today_range": 0.01075999999999988,
+        "used_pct": 163.65019011406707,
+        "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 30.418250950570453,
+      "adr_used_pct": 163.65019011406707,
       "intraday_opens": {
         "available": true,
-        "current": 1.42068,
+        "current": 1.42534,
         "day_open": 1.42026,
         "week_open": 1.42571,
         "above_day_open": true,
@@ -3466,9 +3463,9 @@
     },
     "GBP/USD": {
       "pair": "GBP/USD",
-      "updated_at": "2026-10-14T07:31:38.935424+00:00",
-      "candle_m15": "2026-10-14T07:15:00+00:00",
-      "price": 1.32643,
+      "updated_at": "2026-10-14T17:58:18.478920+00:00",
+      "candle_m15": "2026-10-14T17:30:00+00:00",
+      "price": 1.31708,
       "macro_direction": "🔴 VENDA GBP/USD",
       "macro_score": 75.0,
       "quality": 70.0,
@@ -3958,42 +3955,29 @@
         "Asia Low": 1.32543
       },
       "premium_discount": {
-        "zone": "PRÊMIO",
-        "position": 78.52882703777388,
+        "zone": "ABAIXO DO RANGE",
+        "position": -14.413518886679496,
         "equilibrium": 1.32356,
-        "inside_range": true,
-        "expansion_pct": 0.0
+        "inside_range": false,
+        "expansion_pct": 14.413518886679496
       },
       "bsl": [
-        "Asia High",
-        1.32753
+        "PDH",
+        1.32593
       ],
-      "ssl": [
-        "Asia Low",
-        1.32543
-      ],
-      "latest_sweep": {
-        "level": "Asia High",
-        "type": "SWEEP BSL",
-        "datetime": "2026-10-14 05:00:00+00:00",
-        "price": 1.32753,
-        "high": 1.32754,
-        "low": 1.3271,
-        "close": 1.32743,
-        "excess_abs": 9.999999999843467e-06,
-        "rejection": "fechou de volta abaixo do nível"
-      },
+      "ssl": null,
+      "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-10-14 03:33:56.606821-04:00",
+        "now_ny": "2026-10-14 13:59:32.902490-04:00",
         "active": {
-          "name": "London Killzone",
-          "start": "2026-10-14 02:00:00-04:00",
-          "end": "2026-10-14 05:00:00-04:00"
+          "name": "New York PM",
+          "start": "2026-10-14 13:30:00-04:00",
+          "end": "2026-10-14 16:00:00-04:00"
         },
         "next": {
-          "name": "New York AM",
-          "start": "2026-10-14 07:00:00-04:00",
-          "end": "2026-10-14 10:00:00-04:00"
+          "name": "Asian Range",
+          "start": "2026-10-14 20:00:00-04:00",
+          "end": "2026-10-15 00:00:00-04:00"
         },
         "windows": [
           {
@@ -4087,7 +4071,7 @@
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 60/100",
+            "detail": "USD 61/100",
             "weight": 25.0
           },
           {
@@ -4113,7 +4097,7 @@
         "quality": 70.0
       },
       "readiness": {
-        "score": 55.0,
+        "score": 37.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -4149,15 +4133,15 @@
           },
           {
             "name": "Localização eficiente",
-            "ok": true,
+            "ok": false,
             "weight": 10.0,
-            "detail": "PRÊMIO"
+            "detail": "ABAIXO DO RANGE"
           },
           {
             "name": "Sweep coerente",
-            "ok": true,
+            "ok": false,
             "weight": 8.0,
-            "detail": "SWEEP BSL"
+            "detail": "Sem sweep recente"
           },
           {
             "name": "Killzone ativa",
@@ -4175,32 +4159,32 @@
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 55.0,
+      "readiness_score": 37.0,
       "event_risk": "ALTO",
       "adr": {
         "available": true,
         "adr": 0.005817857142857129,
-        "today_range": 0.0018400000000000638,
-        "used_pct": 31.626764886434568,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "today_range": 0.015819999999999945,
+        "used_pct": 271.9214241866173,
+        "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 31.626764886434568,
+      "adr_used_pct": 271.9214241866173,
       "intraday_opens": {
         "available": true,
-        "current": 1.32643,
+        "current": 1.31708,
         "day_open": 1.32701,
         "week_open": 1.32451,
         "above_day_open": false,
-        "above_week_open": true
+        "above_week_open": false
       },
       "autopilot_v107": true
     },
     "AUD/USD": {
       "pair": "AUD/USD",
-      "updated_at": "2026-10-14T07:31:42.942112+00:00",
-      "candle_m15": "2026-10-14T07:15:00+00:00",
-      "price": 0.70074,
+      "updated_at": "2026-10-14T17:58:22.457705+00:00",
+      "candle_m15": "2026-10-14T17:30:00+00:00",
+      "price": 0.69641,
       "macro_direction": "⚪ AGUARDAR",
       "macro_score": 52.0,
       "quality": 91.0,
@@ -4681,42 +4665,32 @@
         "Asia Low": 0.69825
       },
       "premium_discount": {
-        "zone": "ACIMA DO RANGE",
-        "position": 131.09540636042377,
+        "zone": "EQUILÍBRIO",
+        "position": 54.59363957597044,
         "equilibrium": 0.69615,
-        "inside_range": false,
-        "expansion_pct": 31.095406360423766
+        "inside_range": true,
+        "expansion_pct": 0.0
       },
       "bsl": [
-        "PMH",
-        0.72381
+        "PDH",
+        0.69875
       ],
       "ssl": [
-        "Asia Low",
-        0.69825
+        "PDL",
+        0.69502
       ],
-      "latest_sweep": {
-        "level": "Asia High",
-        "type": "SWEEP BSL",
-        "datetime": "2026-10-14 06:15:00+00:00",
-        "price": 0.70017,
-        "high": 0.70031,
-        "low": 0.70009,
-        "close": 0.70012,
-        "excess_abs": 0.000140000000000029,
-        "rejection": "fechou de volta abaixo do nível"
-      },
+      "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-10-14 03:33:56.801674-04:00",
+        "now_ny": "2026-10-14 13:59:33.036256-04:00",
         "active": {
-          "name": "London Killzone",
-          "start": "2026-10-14 02:00:00-04:00",
-          "end": "2026-10-14 05:00:00-04:00"
+          "name": "New York PM",
+          "start": "2026-10-14 13:30:00-04:00",
+          "end": "2026-10-14 16:00:00-04:00"
         },
         "next": {
-          "name": "New York AM",
-          "start": "2026-10-14 07:00:00-04:00",
-          "end": "2026-10-14 10:00:00-04:00"
+          "name": "Asian Range",
+          "start": "2026-10-14 20:00:00-04:00",
+          "end": "2026-10-15 00:00:00-04:00"
         },
         "windows": [
           {
@@ -4810,7 +4784,7 @@
           {
             "name": "Regime macro USD",
             "ok": null,
-            "detail": "USD 60/100",
+            "detail": "USD 61/100",
             "weight": 25.0
           },
           {
@@ -4874,13 +4848,13 @@
             "name": "Localização eficiente",
             "ok": null,
             "weight": 10.0,
-            "detail": "ACIMA DO RANGE"
+            "detail": "EQUILÍBRIO"
           },
           {
             "name": "Sweep coerente",
             "ok": null,
             "weight": 8.0,
-            "detail": "SWEEP BSL"
+            "detail": "Sem sweep recente"
           },
           {
             "name": "Killzone ativa",
@@ -4903,22 +4877,22 @@
       "adr": {
         "available": true,
         "adr": 0.003919285714285713,
-        "today_range": 0.0013199999999999878,
-        "used_pct": 33.679606342263234,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "today_range": 0.007489999999999997,
+        "used_pct": 191.10625113905593,
+        "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 33.679606342263234,
+      "adr_used_pct": 191.10625113905593,
       "intraday_opens": {
         "available": true,
-        "current": 0.70074,
+        "current": 0.69641,
         "day_open": 0.69946,
         "week_open": 0.69818,
-        "above_day_open": true,
-        "above_week_open": true
+        "above_day_open": false,
+        "above_week_open": false
       },
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-10-14T13:04:40.070982+00:00"
+  "autopilot_updated_at": "2026-10-14T17:59:33.777700+00:00"
 }
