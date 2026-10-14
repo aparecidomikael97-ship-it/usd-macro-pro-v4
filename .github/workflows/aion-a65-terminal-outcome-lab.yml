@@ -1,0 +1,49 @@
+name: AION A65 LAB unverified terminal Saga outcomes
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a64-saga-forward-outbox-binding-20261014]
+    paths:
+      - atlasquant_aion_execution_saga.py
+      - test_atlasquant_aion_saga_unverified_terminal_a65.py
+      - .github/workflows/aion-a65-terminal-outcome-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  unverified-terminal-denial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Use existing project dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: A65 with A64-A60 targeted regressions (no network)
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import socket, unittest
+          def deny(*args, **kwargs):
+              raise AssertionError("A65_EXTERNAL_NETWORK_DENIED")
+          socket.socket.connect = deny
+          selectors = [
+              "test_atlasquant_aion_saga_unverified_terminal_a65",
+              "test_atlasquant_aion_saga_outbox_binding_a64",
+              "test_atlasquant_aion_saga_outcome_snapshot_a63",
+              "test_atlasquant_aion_saga_outcome_local_trust_a62",
+              "test_atlasquant_aion_saga_outbox_atomic_a61",
+              "test_atlasquant_aion_saga_pre_enqueue_integrity_a60",
+          ]
+          result = unittest.TextTestRunner(verbosity=2).run(
+              unittest.defaultTestLoader.loadTestsFromNames(selectors)
+          )
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY

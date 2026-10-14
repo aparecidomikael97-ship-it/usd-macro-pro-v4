@@ -554,6 +554,13 @@ class ExecutionSagaCoordinator:
             raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
         if state == "FAILED":
             raise PermissionError("INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED")
+        # A65: persisted REVOKED / BLOCKED_REAPPROVAL are also LOCAL
+        # annotations. Even if a local authorization callback produced them
+        # before a send, SQLite cannot independently prove a producer-enforced
+        # terminal no-effect fence. Do not claim FAILED / compensation eligibility
+        # from these rows while the independent producer is unenrolled.
+        if state in {"REVOKED", "BLOCKED_REAPPROVAL"}:
+            raise PermissionError("INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED")
         mapped = {
             "PENDING": "ENQUEUED",
             "CLAIMED": "ENQUEUED",
