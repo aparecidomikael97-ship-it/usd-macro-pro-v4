@@ -1,0 +1,54 @@
+name: AION A59 LAB live evidence anti-self-assertion
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014]
+    paths:
+      - test_atlasquant_aion_live_self_report_a59.py
+      - .github/workflows/aion-a59-live-evidence-lab.yml
+      - atlasquant_aion_global_worker_live_verification.py
+
+permissions:
+  contents: read
+
+jobs:
+  live-self-assertion-negative:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing project deps
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: Assert no self-reported LIVE evidence; no network
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import socket, unittest
+          def deny(*args, **kwargs):
+              raise AssertionError("A59_NETWORK_CALL_DENIED")
+          socket.socket.connect = deny
+          cases = [
+              "test_atlasquant_aion_live_self_report_a59",
+              "test_atlasquant_aion_inflight_untrusted_receipts_a58",
+              "test_atlasquant_aion_f1_cross_boundary_a57",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_flag_must_be_enabled",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_activation_boundary_uses_later_trusted_timestamp",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_activation_boundary_requires_timestamp_evidence",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_awaiting_live_evidence_before_timeout",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_unresolved_inflight_blocks_live_before_stale_lease",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_stale_owned_lease_blocks_live_claim",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_timeout_without_shared_heartbeat_is_explicit",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_admin_ui_never_equates_enabled_with_live",
+              "test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_verifier_is_read_only_and_has_no_mutation_api",
+          ]
+          result = unittest.TextTestRunner(verbosity=2).run(
+              unittest.defaultTestLoader.loadTestsFromNames(cases)
+          )
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY

@@ -72,6 +72,9 @@ A54_PINNED_LAB_BASES = {
         "60c61d959c81d50f6a9d6b5d1f1f932abf14844d",
     "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013":
         "b36830e1733ce5c7e91fe67f730b4e061574b3eb",
+    # A59 PR base is an immutable A58 LAB head. Unknown bases still DENY.
+    "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014":
+        "2eda461d4a9076807d3c0a1fea2b904f5c7d9e62",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -109,7 +112,11 @@ def _production_base():
     if target != "main":
         # A54 -> A52 -> A49 needs depth three for the pinned ancestor.
         # Earlier pinned bases need at most depth two. Never omit ancestry.
-        pinned_depth = "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013" else "2"
+        pinned_depth = (
+            "64" if target == "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014"
+            else "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013"
+            else "2"
+        )
         fetched = _git([
             "fetch", "--no-tags", "--depth", pinned_depth, "origin",
             f"+refs/heads/{target}:refs/remotes/origin/{target}",

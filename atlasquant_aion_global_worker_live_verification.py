@@ -290,18 +290,39 @@ def verify_global_worker_live_activation(
         status = "AWAITING_LIVE_EVIDENCE"
         reason = ""
 
-    live_confirmed = status in {
+    # A59: Last heartbeat/tick and executor receipts come from the same
+    # caller-supplied local checkpoint. Even an internally consistent digest
+    # and a claimed ENABLED flag are not independent evidence of a live Worker.
+    # Keep read-only diagnostic/negative states, but NEVER certify LIVE until
+    # a separately enrolled, current-head/owner authority can be verified.
+    # Do not add a caller-provided "verified" boolean as a bypass.
+    if status in {
         "LIVE_CONFIRMED_WITH_WORK",
         "LIVE_CONFIRMED_IDLE",
-    }
+        "LIVE_HEARTBEAT_CONFIRMED_AWAITING_TICK",
+    }:
+        status = "BLOCKED_UNVERIFIED_LIVE_EVIDENCE"
+        reason = "INDEPENDENT_LIVE_ATTESTATION_NOT_ENROLLED"
+        heartbeat_after_activation = False
+        tick_after_activation = False
+        live_receipts = []
+
+    # A59 residual truth boundary: negative statuses (INFLIGHT, STALE_LEASE,
+    # UNSAFE_RECEIPT) may still contain self-reported local heartbeat/tick/
+    # receipt values. These are DIAGNOSTIC OBSERVATIONS, not confirmations.
+    # No independent LIVE attestor is enrolled; never present them as proven.
+    live_confirmed = False
+    heartbeat_confirmed = False
+    tick_confirmed = False
+    work_receipt_confirmed = False
     return {
         "schema": SCHEMA,
         "status": status,
         "reason": reason,
         "live_confirmed": live_confirmed,
-        "heartbeat_confirmed": heartbeat_after_activation,
-        "tick_confirmed": tick_after_activation,
-        "work_receipt_confirmed": bool(live_receipts),
+        "heartbeat_confirmed": heartbeat_confirmed,
+        "tick_confirmed": tick_confirmed,
+        "work_receipt_confirmed": work_receipt_confirmed,
         "global_receipts_after_activation": len(live_receipts),
         "unsafe_receipts_after_activation": len(unsafe_receipts),
         "activation_boundary": activated_at.isoformat(),
