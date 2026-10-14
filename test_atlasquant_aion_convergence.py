@@ -99,6 +99,9 @@ A54_PINNED_LAB_BASES = {
     # A67 must target exactly A66's audited immutable parent, not a moving ref.
     "lab/aion-v16-a66-empty-inflight-no-witness-20261014":
         "1dc406122e172e309d036b87d56d29adc2be28e7",
+    # A68 requires exactly the reviewed A67 HEAD, with no floating parent.
+    "lab/aion-v16-a67-autopilot-data-branch-pin-20261014":
+        "7ffb2d15c89e1f3be2bb9e44ca744672353324b5",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -142,7 +145,9 @@ def _production_base():
             # never relax A54_A49_PARENT_NOT_VERIFIED on shallow clones.
             # A67 A66 parent is 77 commits ahead of A49; this preserves
             # an actual merge-base ancestry proof even on a shallow checkout.
-            "112" if target == "lab/aion-v16-a66-empty-inflight-no-witness-20261014"
+            # A68 pinned A67 parent is 84 commits beyond the A49 trust base.
+            "120" if target == "lab/aion-v16-a67-autopilot-data-branch-pin-20261014"
+            else "112" if target == "lab/aion-v16-a66-empty-inflight-no-witness-20261014"
             else "96" if target == "lab/aion-v16-a65-saga-unverified-terminal-state-20261014"
             else "64" if target in {
                 "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014",
