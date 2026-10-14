@@ -1,0 +1,33 @@
+name: AION A68 LAB Render deploy hard-stop proof
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a67-autopilot-data-branch-pin-20261014]
+    paths:
+      - ".github/workflows/render-deploy-control.yml"
+      - ".github/workflows/aion-a68-render-deploy-hard-stop-lab.yml"
+      - "test_atlasquant_render_deploy_hard_stop_a68.py"
+      - ".github/workflows/quality-tests.yml"
+      - "test_atlasquant_aion_convergence.py"
+
+permissions:
+  contents: read
+
+jobs:
+  a68-inert-deploy-proof:
+    name: A68 offline deploy cannot start (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Source-only safety checks; no token, hook or network
+        run: python -m unittest -v test_atlasquant_render_deploy_hard_stop_a68 test_atlasquant_render_deploy_hook test_atlasquant_render_blueprint
