@@ -463,6 +463,14 @@ class ExecutionSagaCoordinator:
         reauth_ref: Any = "",
     ) -> dict[str, Any]:
         saga = self.get(saga_id)
+        # A60: a local step projection is not trustworthy merely because
+        # it is present in SQLite. Require existing local plan/genesis/event
+        # integrity BEFORE staging an Outbox intent from its data.
+        # This is defense-in-depth, NOT a witness against a coherent DB
+        # rollback or a privileged writer who rehashes the entire chain.
+        # Positive producer and HUMAN_OWNER enrollment remain unavailable.
+        if self.integrity_report(saga["saga_id"])["state"] != "MATCH":
+            raise PermissionError("SAGA_LOCAL_INTEGRITY_MISMATCH")
         candidate = select_forward_step(saga["state"], saga["steps"])
         pending = saga["steps"][candidate]
         # A.41: the pure selector only sees SQLite projection. The real
