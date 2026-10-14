@@ -84,6 +84,9 @@ A54_PINNED_LAB_BASES = {
     # A62 source PR must use exact A61 parent, not a floating LAB ref.
     "lab/aion-v16-a61-saga-outbox-local-atomicity-20261014":
         "07e95f6b1abd2acdf6e6c2331329b5e392ac3b65",
+    # A63 parent A62 must match its reviewed immutable SHA.
+    "lab/aion-v16-a62-saga-outcome-untrusted-local-20261014":
+        "2449548771545dee00b715a22309c33635909831",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -127,6 +130,7 @@ def _production_base():
                 "lab/aion-v16-a59-live-self-reported-status-red-20261014",
                 "lab/aion-v16-a60-saga-pre-enqueue-local-integrity-20261014",
                 "lab/aion-v16-a61-saga-outbox-local-atomicity-20261014",
+                "lab/aion-v16-a62-saga-outcome-untrusted-local-20261014",
             }
             else "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013"
             else "2"
