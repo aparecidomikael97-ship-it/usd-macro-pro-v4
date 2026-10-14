@@ -462,43 +462,42 @@ class ExecutionSagaCoordinator:
         requires_reauth: bool = False,
         reauth_ref: Any = "",
     ) -> dict[str, Any]:
-        saga = self.get(saga_id)
-        # A60: a local step projection is not trustworthy merely because
-        # it is present in SQLite. Require existing local plan/genesis/event
-        # integrity BEFORE staging an Outbox intent from its data.
-        # This is defense-in-depth, NOT a witness against a coherent DB
-        # rollback or a privileged writer who rehashes the entire chain.
-        # Positive producer and HUMAN_OWNER enrollment remain unavailable.
-        if self.integrity_report(saga["saga_id"])["state"] != "MATCH":
-            raise PermissionError("SAGA_LOCAL_INTEGRITY_MISMATCH")
-        candidate = select_forward_step(saga["state"], saga["steps"])
-        pending = saga["steps"][candidate]
-        # A.41: the pure selector only sees SQLite projection. The real
-        # coordinator has NO enrolled external producer verification yet.
-        # Never allow a locally forged prior CONFIRMED to enqueue a later
-        # forward step. Fail BEFORE Outbox enqueue or any Saga mutation.
-        if candidate > 0:
-            raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
-
-        item = self.outbox.enqueue(
-            intent_ref=f"{saga['saga_id']}:{pending['step_key']}:forward",
-            action=pending["action"],
-            payload=pending["payload"],
-            aggregate_key=f"saga:{saga['saga_id']}:forward",
-            policy_version=self.authority_budget.policy_version,
-            authorization_ref=authorization_ref,
-            valid_until=valid_until,
-            created_at=created_at,
-            requires_reauth=requires_reauth,
-            reauth_ref=reauth_ref,
-            transaction_id=saga["saga_id"],
-            authority_budget_ref=self.authority_budget.authority_budget_ref,
-            risk_points=pending["risk_points"],
-            capability_class=pending["capability_class"],
-        )
-        now_iso = _iso(_utc(created_at))
+        # A61: Outbox and Saga share one SQLite connection. Begin the OUTER
+        # IMMEDIATE transaction before reading the plan, verifying integrity,
+        # choosing the step, or staging the Outbox row. Outbox.enqueue uses a
+        # nested SAVEPOINT and does not independently commit this operation.
+        # A failed Saga projection or event append must roll back both tables.
+        # This is only local durability; it does not prove independent effects.
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            saga = self.get(saga_id)
+            # A60: forged local plan/genesis/event must not stage an intent.
+            if self.integrity_report(saga["saga_id"])["state"] != "MATCH":
+                raise PermissionError("SAGA_LOCAL_INTEGRITY_MISMATCH")
+            candidate = select_forward_step(saga["state"], saga["steps"])
+            pending = saga["steps"][candidate]
+            # A41: a locally forged preceding CONFIRMED step must not
+            # authorize a later forward action without producer proof.
+            if candidate > 0:
+                raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
+
+            item = self.outbox.enqueue(
+                intent_ref=f"{saga['saga_id']}:{pending['step_key']}:forward",
+                action=pending["action"],
+                payload=pending["payload"],
+                aggregate_key=f"saga:{saga['saga_id']}:forward",
+                policy_version=self.authority_budget.policy_version,
+                authorization_ref=authorization_ref,
+                valid_until=valid_until,
+                created_at=created_at,
+                requires_reauth=requires_reauth,
+                reauth_ref=reauth_ref,
+                transaction_id=saga["saga_id"],
+                authority_budget_ref=self.authority_budget.authority_budget_ref,
+                risk_points=pending["risk_points"],
+                capability_class=pending["capability_class"],
+            )
+            now_iso = _iso(_utc(created_at))
             self.db.execute(
                 """UPDATE aion_execution_saga_steps
                    SET state='ENQUEUED',outbox_key=?,last_error=''
