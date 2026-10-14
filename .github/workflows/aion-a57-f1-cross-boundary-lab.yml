@@ -1,0 +1,47 @@
+name: AION A57 F1 LAB cross-boundary denial
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a56-direct-human-click-route-guard-20261013]
+    paths:
+      - test_atlasquant_aion_f1_cross_boundary_a57.py
+      - .github/workflows/aion-a57-f1-cross-boundary-lab.yml
+      - docs/aion/AION_V16_A57_F1_CROSS_BOUNDARY_TEST_CONTRACT_2026-10-14.md
+
+permissions:
+  contents: read
+
+jobs:
+  f1-real-entrypoint-negative:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned project dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: Exact HEAD and fail-closed entrypoint tests with network denied
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import socket, unittest
+          def deny(*args, **kwargs):
+              raise AssertionError("A57_LAB_SOCKET_CONNECT_DENIED")
+          socket.socket.connect = deny
+          names = [
+              "test_atlasquant_aion_f1_cross_boundary_a57",
+              "test_atlasquant_aion_human_click_route_a56",
+              "test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness",
+              "test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_feature_true_cannot_claim_cas_or_execute_without_source_witness",
+              "test_atlasquant_aion_global_worker_activation.A53IndependentActivationBoundaryTests",
+          ]
+          result = unittest.TextTestRunner(verbosity=2).run(
+              unittest.defaultTestLoader.loadTestsFromNames(names)
+          )
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
