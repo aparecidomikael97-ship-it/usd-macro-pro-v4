@@ -1,0 +1,48 @@
+name: AION A64 LAB Saga Outbox binding
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a63-saga-outcome-locked-snapshot-20261014]
+    paths:
+      - atlasquant_aion_execution_saga.py
+      - test_atlasquant_aion_saga_outbox_binding_a64.py
+      - .github/workflows/aion-a64-saga-outbox-binding-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  binding-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: A64 plus A63 to A60, disable socket connections
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import socket, unittest
+          def no_network(*a, **kw):
+              raise AssertionError("A64_NETWORK_FORBIDDEN")
+          socket.socket.connect = no_network
+          names = [
+              "test_atlasquant_aion_saga_outbox_binding_a64",
+              "test_atlasquant_aion_saga_outcome_snapshot_a63",
+              "test_atlasquant_aion_saga_outcome_local_trust_a62",
+              "test_atlasquant_aion_saga_outbox_atomic_a61",
+              "test_atlasquant_aion_saga_pre_enqueue_integrity_a60",
+          ]
+          result = unittest.TextTestRunner(verbosity=2).run(
+              unittest.defaultTestLoader.loadTestsFromNames(names)
+          )
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
