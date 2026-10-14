@@ -6,9 +6,8 @@ A guarded frontend route is not proof of a real physical click or HUMAN_OWNER.
 import unittest
 from copy import deepcopy
 from unittest.mock import patch
-from test_atlasquant_aion_background_executor import (
-    AionBackgroundExecutorTests, DUE_NOW,
-)
+import test_atlasquant_aion_background_executor as _fixture_module
+DUE_NOW = _fixture_module.DUE_NOW
 from atlasquant_aion_background_executor import (
     _execute_due_local_work_authorized, execute_due_local_work,
 )
@@ -23,7 +22,7 @@ NO_EXTERNAL_EFFECT = {
 
 class A56DirectHumanEntryTests(unittest.TestCase):
     def setUp(self):
-        self.fixture = AionBackgroundExecutorTests()
+        self.fixture = _fixture_module.AionBackgroundExecutorTests()
         self.fixture.setUp()
         self.checkpoint = self.fixture.schedule()
 
