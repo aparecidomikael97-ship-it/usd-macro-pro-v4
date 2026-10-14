@@ -78,6 +78,9 @@ A54_PINNED_LAB_BASES = {
     # A60 parent A59 is explicitly SHA-pinned, not an arbitrary PR base.
     "lab/aion-v16-a59-live-self-reported-status-red-20261014":
         "3c1e05ac3e497f37aa1473d7b7f3ab5d9633c22f",
+    # A61 requires precisely the reviewed A60 parent, no unknown fallback.
+    "lab/aion-v16-a60-saga-pre-enqueue-local-integrity-20261014":
+        "a9c8e5bb491174aeaf6305732eb56ec5d6e26166",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -119,6 +122,7 @@ def _production_base():
             "64" if target in {
                 "lab/aion-v16-a58-inflight-local-receipt-trust-red-20261014",
                 "lab/aion-v16-a59-live-self-reported-status-red-20261014",
+                "lab/aion-v16-a60-saga-pre-enqueue-local-integrity-20261014",
             }
             else "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013"
             else "2"
