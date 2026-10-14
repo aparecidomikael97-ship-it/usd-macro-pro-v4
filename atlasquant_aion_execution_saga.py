@@ -606,6 +606,11 @@ class ExecutionSagaCoordinator:
 
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            # A62: re-evaluate local plan/genesis/event consistency under
+            # the SQLite writer lock immediately before writing outcomes.
+            # Caller-supplied or rehashed local data are never producer proof.
+            if self.integrity_report(saga["saga_id"])["state"] != "MATCH":
+                raise PermissionError("SAGA_LOCAL_INTEGRITY_MISMATCH")
             self.db.execute(
                 """UPDATE aion_execution_saga_steps
                    SET state=?,effect_ref=?,last_error=?
@@ -806,6 +811,12 @@ class ExecutionSagaCoordinator:
             raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
         if out_state == "FAILED":
             raise PermissionError("INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED")
+        # A62: compensation admission and independent producer no-effect/
+        # effect receipts are not enrolled. A local compensation_outbox_key,
+        # REVOCATION or UNCERTAIN status can be forged in SQLite; it MUST NOT
+        # promote Saga into MANUAL_INTERVENTION or RECONCILIATION_REQUIRED.
+        # Do not turn this into a caller-controlled "verified" switch.
+        raise PermissionError("INDEPENDENT_PRODUCER_COMPENSATION_NOT_ENROLLED")
         if out_state == "BLOCKED_PRODUCER":
             mapped = "BLOCKED_PRODUCER"
             saga_state = "PRODUCER_ENROLLMENT_REQUIRED"
