@@ -26,8 +26,12 @@ from atlasquant_aion_global_worker_inflight_reconciliation import (
 
 SCHEMA = "ATLASQUANT_AION_GLOBAL_INFLIGHT_RESOLUTION_CEREMONY_V1"
 CONFIRMATION_PHRASE = "CONFIRMAR LIMPEZA INFLIGHT RECONCILIADO"
+# A66: a local EMPTY_BATCH is never proof of no effect, even when the
+# checkpoint's self-contained checksums are internally consistent. Do not
+# stage a conditional clear while independent F1/T1 custody is unenrolled.
+# The remaining historical terminal label is also unreachable without
+# independent receipt proof under the current conservative assessor.
 CLEARABLE_STATUSES = frozenset({
-    "EMPTY_BATCH_READY_FOR_HUMAN_CLEAR",
     "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR",
 })
 
