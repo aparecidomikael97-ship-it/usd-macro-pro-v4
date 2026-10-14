@@ -65,34 +65,71 @@ def _repository_is_shallow():
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
-def _production_base():
-    """Resolve main without requiring a historical SHA in the local clone.
+A54_PINNED_LAB_BASES = {
+    "lab/aion-v16-a49-worker-pure-transition-simulation-20261013":
+        "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2",
+    "lab/aion-v16-a52-a50-a51-integrated-containment-20261013":
+        "60c61d959c81d50f6a9d6b5d1f1f932abf14844d",
+}
+A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
+A54_ORIGIN_URLS = {
+    "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4",
+    "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4.git",
+}
 
-    A full checkout already has origin/main. A shallow Actions checkout does
-    not, so fetch only that branch tip. The tree diff does not need the
-    commits in between.
+
+def _production_base():
+    """A54: validate stacked target, but ALWAYS snapshot true origin/main.
+
+    Git source selection is not independent owner/producer/witness enrollment.
+    Never use a cached lab ref or local main as a production-main substitute.
     """
     base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
-    candidates = []
-    if base_ref:
-        candidates.append(f"origin/{base_ref}")
-    candidates.extend(["origin/main", "main"])
-    for name in candidates:
-        if _commit_exists(name):
-            return name
-    ref = base_ref or "main"
-    destination = f"refs/remotes/origin/{ref}"
+    if os.environ.get("GITHUB_EVENT_NAME") == "pull_request" and not base_ref:
+        raise AssertionError("A54_PR_BASE_REQUIRED")
+    target = base_ref or "main"
+    if target != "main" and target not in A54_PINNED_LAB_BASES:
+        raise AssertionError("A54_UNKNOWN_PR_BASE")
+    origin = _git(["remote", "get-url", "origin"])
+    if origin.returncode != 0 or origin.stdout.strip() not in A54_ORIGIN_URLS:
+        raise AssertionError("A54_ORIGIN_NOT_APPROVED")
     fetched = _git([
-        "fetch", "--depth", "1", "origin",
-        f"refs/heads/{ref}:{destination}",
+        "fetch", "--no-tags", "--depth", "1", "origin",
+        "+refs/heads/main:refs/remotes/origin/main",
     ])
-    candidate = f"origin/{ref}"
-    if fetched.returncode == 0 and _commit_exists(candidate):
-        return candidate
-    detail = (fetched.stderr or fetched.stdout or "git fetch falhou").strip()
-    raise AssertionError(
-        "Não foi possível obter a base main para a comparação de produção.\n" + detail
-    )
+    if fetched.returncode != 0:
+        raise AssertionError("A54_TRUE_MAIN_UNAVAILABLE")
+    resolved = _git(["rev-parse", "--verify", "origin/main^{commit}"])
+    main_sha = resolved.stdout.strip()
+    if (resolved.returncode != 0 or len(main_sha) != 40
+            or any(c not in "0123456789abcdef" for c in main_sha)):
+        raise AssertionError("A54_MAIN_COMMIT_INVALID")
+    if target != "main":
+        # Depth two includes A52's immediate pinned A49 parent. No wildcards.
+        fetched = _git([
+            "fetch", "--no-tags", "--depth", "2", "origin",
+            f"+refs/heads/{target}:refs/remotes/origin/{target}",
+        ])
+        if fetched.returncode != 0:
+            raise AssertionError("A54_PINNED_BASE_UNAVAILABLE")
+        actual = _git(["rev-parse", "--verify", f"origin/{target}^{{commit}}"])
+        if actual.returncode != 0 or actual.stdout.strip() != A54_PINNED_LAB_BASES[target]:
+            raise AssertionError("A54_LAB_BASE_SHA_MISMATCH")
+        ancestry = _git(["merge-base", "--is-ancestor", A54_A49_PARENT, actual.stdout.strip()])
+        if ancestry.returncode != 0:
+            raise AssertionError("A54_A49_PARENT_NOT_VERIFIED")
+    # Return immutable main SHA: later ref changes cannot redirect the diff.
+    return main_sha
+
+
+def _assert_production_surfaces(base):
+    # NUL avoids quoted/newline path ambiguities; no-renames retains old paths.
+    diff = _git(["diff", "--no-renames", "--name-only", "-z", base])
+    if diff.returncode != 0:
+        raise AssertionError("A54_MAIN_SURFACE_DIFF_UNAVAILABLE")
+    forbidden = _forbidden_production_paths(diff.stdout.split("\x00"))
+    if forbidden:
+        raise AssertionError("A54_FORBIDDEN_PRODUCTION_SURFACE:" + repr(forbidden))
 
 
 def _forbidden_production_paths(paths):
@@ -101,7 +138,7 @@ def _forbidden_production_paths(paths):
         path = line.strip()
         if not path:
             continue
-        if path == "render.yaml" or path.startswith("deploy/") or "secret" in path.lower():
+        if path.lower() == "render.yaml" or path.lower().startswith("deploy/") or "secret" in path.lower():
             forbidden.append(path)
     return forbidden
 
@@ -339,9 +376,6 @@ class AionConvergenceTests(unittest.TestCase):
         self.assertIn("durable_task_continuity", (ROOT / "atlasquant_aion_status_board.py").read_text(encoding="utf-8"))
 
     def test_main_and_production_surfaces_stay_untouched(self):
-        base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
-        if base_ref:
-            self.assertEqual(base_ref, "main")
         base = _production_base()
         # Ancestry of the pinned base is enforced only when this clone can
         # actually walk that history. Shallow CI does not have the object.
@@ -353,12 +387,7 @@ class AionConvergenceTests(unittest.TestCase):
                 "A base main não contém mais o commit canônico da convergência.\n"
                 + ancestor.stderr,
             )
-        diff = _git(["diff", "--name-only", base])
-        self.assertEqual(diff.returncode, 0, diff.stderr)
-        forbidden=_forbidden_production_paths(diff.stdout.splitlines())
-        if "render.yaml" in forbidden and _render_manual_deploy_hardening_only(base):
-            forbidden.remove("render.yaml")
-        self.assertEqual(forbidden, [])
+        _assert_production_surfaces(base)
         checkpoint = default_checkpoint()
         self.assertFalse(checkpoint["aion"]["real_trading"])
         self.assertFalse(guardian_decision("deploy_production", ADMIN, approved=True)["allowed"])
