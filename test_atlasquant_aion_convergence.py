@@ -90,6 +90,9 @@ A54_PINNED_LAB_BASES = {
     # A64 parent A63 verified exact SHA; other branches remain denied.
     "lab/aion-v16-a63-saga-outcome-locked-snapshot-20261014":
         "d14c9ec14502d9b84852934a9ef0cd485fbcf95a",
+    # A65 parent A64 approved for LAB testing only at exact immutable SHA.
+    "lab/aion-v16-a64-saga-forward-outbox-binding-20261014":
+        "e577d59c65f2541e41155b525337800fe71cbb46",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -135,6 +138,7 @@ def _production_base():
                 "lab/aion-v16-a61-saga-outbox-local-atomicity-20261014",
                 "lab/aion-v16-a62-saga-outcome-untrusted-local-20261014",
                 "lab/aion-v16-a63-saga-outcome-locked-snapshot-20261014",
+                "lab/aion-v16-a64-saga-forward-outbox-binding-20261014",
             }
             else "3" if target == "lab/aion-v16-a54-stacked-ci-main-boundary-windows-20261013"
             else "2"
