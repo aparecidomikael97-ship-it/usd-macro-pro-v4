@@ -1,0 +1,38 @@
+name: AION A67 LAB Autopilot dedicated runtime branch pin
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a66-empty-inflight-no-witness-20261014]
+    paths:
+      - "autopilot_v107.py"
+      - ".github/workflows/quality-tests.yml"
+      - "test_atlasquant_autopilot_runtime_branch_guard_a67.py"
+      - ".github/workflows/aion-a67-autopilot-branch-pin-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  a67-autopilot-branch-pin:
+    name: A67 zero-network branch pin (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install the existing project dependencies only
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: Compile unchanged production and new A67 tests
+        run: python -m py_compile autopilot_v107.py atlasquant_runtime_store.py test_atlasquant_autopilot_runtime_branch_guard_a67.py
+      - name: Run A67 privileged writer negative contracts and original resolver tests
+        run: python -m unittest -v test_atlasquant_autopilot_runtime_branch_guard_a67 test_atlasquant_runtime_store test_atlasquant_runtime_branch_contract
