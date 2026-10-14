@@ -3,7 +3,7 @@ name: AION Core Security Gate
 on:
   workflow_dispatch:
   pull_request:
-    branches: [lab/aion-v16-a49-worker-pure-transition-simulation-20261013, main, integration/aion-unified-core-v2-20261003, integration/aion-core-v21-hardening-adapters-20261003]
+    branches: [lab/aion-v16-a52-a50-a51-integrated-containment-20261013, lab/aion-v16-a49-worker-pure-transition-simulation-20261013, main, integration/aion-unified-core-v2-20261003, integration/aion-core-v21-hardening-adapters-20261003]
 
 permissions:
   contents: read
@@ -145,6 +145,8 @@ jobs:
             test_atlasquant_aion_v224_owner_signature_ceremony.py \
             test_atlasquant_aion_v225_explicit_owner_decision_record.py \
             test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+      - name: A54 pinned stacked targets always inspect true origin main
+        run: python -m unittest -q test_atlasquant_aion_ci_main_boundary_a54.py
       - name: A51 direct autonomous executor admission denies absent independent witness
         run: |
           python -m unittest -q \
@@ -384,3 +386,37 @@ jobs:
           path: /tmp/aion-sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
+
+  a54-windows-ephemeral:
+    name: A54 Windows hosted ephemeral ten containment tests (not owner installation)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies only inside ephemeral runner venv
+        shell: pwsh
+        run: |
+          python -m venv .a54-windows-venv
+          $a54python = Join-Path $PWD '.a54-windows-venv/Scripts/python.exe'
+          & $a54python -m pip install pip==26.2.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $a54python -m pip install -r requirements.txt tzdata==2026.3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $a54python -c "import sys,sqlite3,importlib.metadata as m; print(sys.version); print('SQLite',sqlite3.sqlite_version); print('cryptography',m.version('cryptography')); assert m.version('cryptography') == '50.0.2'"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run intact A50 seven and A51 three with external sockets denied
+        shell: pwsh
+        run: |
+          $a54python = Join-Path $PWD '.a54-windows-venv/Scripts/python.exe'
+          @'
+          import sys,socket,unittest
+          socket.socket.connect=lambda *a,**k:(_ for _ in ()).throw(AssertionError('A54_HOSTED_TEST_EXTERNAL_NETWORK_DENIED'))
+          socket.socket.connect_ex=socket.socket.connect
+          names=['test_atlasquant_aion_saga_plan_integrity_a50','test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness','test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt','test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_explicit_human_click_remains_usable']
+          result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromNames(names))
+          sys.exit(not result.wasSuccessful())
+          '@ | & $a54python -B -
+          exit $LASTEXITCODE
