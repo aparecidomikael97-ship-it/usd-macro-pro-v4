@@ -72,7 +72,53 @@ class A59LiveEvidenceSourceTrustTests(unittest.TestCase):
         self.assertFalse(report.get("work_receipt_confirmed"))
         self.assertNotIn(report["status"], {"LIVE_CONFIRMED_IDLE", "LIVE_CONFIRMED_WITH_WORK"})
 
-    def test_03_feature_off_is_not_live_even_with_self_asserted_stats(self):
+    def test_03_heartbeat_only_cannot_assert_verified_heartbeat(self):
+        checkpoint = self.v.with_stats(
+            self.v.armed_checkpoint(),
+            heartbeat_at=live_fixture.TICK.isoformat(),
+            tick_at="",
+            runtime_id="gha-self-asserted-heartbeat",
+            ticks=0,
+        )
+        report = verify_global_worker_live_activation(
+            self.v.access, self.v.runtime(checkpoint),
+            live_fixture._flag(),
+            activation_result=live_fixture._activation_result(),
+            now=live_fixture.TICK + timedelta(seconds=10),
+        )
+        self.assertEqual(report["status"], "BLOCKED_UNVERIFIED_LIVE_EVIDENCE")
+        self.assertFalse(report["heartbeat_confirmed"])
+        self.assertFalse(report["live_confirmed"])
+        self.assertFalse(report["feature_flag_modified"])
+
+    def test_04_claims_in_loaded_metadata_cannot_enroll_live_authority(self):
+        checkpoint = self.v.with_stats(
+            self.v.armed_checkpoint(),
+            heartbeat_at=live_fixture.TICK.isoformat(),
+            tick_at=live_fixture.TICK.isoformat(),
+            runtime_id="gha-fake-attestor",
+            ticks=1,
+        )
+        runtime = self.v.runtime(checkpoint)
+        runtime.update({
+            "independent_witness_verified": True,
+            "owner_authorized": True,
+            "source_attested": True,
+            "producer_receipt_verified": True,
+        })
+        report = verify_global_worker_live_activation(
+            self.v.access, runtime,
+            live_fixture._flag(),
+            activation_result=live_fixture._activation_result(),
+            now=live_fixture.TICK + timedelta(seconds=10),
+        )
+        self.assertEqual(report["status"], "BLOCKED_UNVERIFIED_LIVE_EVIDENCE")
+        for key in ("live_confirmed", "heartbeat_confirmed", "tick_confirmed",
+                    "work_receipt_confirmed"):
+            self.assertFalse(report[key])
+        self.assertEqual(report["reason"], "INDEPENDENT_LIVE_ATTESTATION_NOT_ENROLLED")
+
+    def test_05_feature_off_is_not_live_even_with_self_asserted_stats(self):
         checkpoint = self.v.with_stats(
             self.v.armed_checkpoint(),
             heartbeat_at=live_fixture.TICK.isoformat(),
