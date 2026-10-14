@@ -611,6 +611,14 @@ class ExecutionSagaCoordinator:
             # Caller-supplied or rehashed local data are never producer proof.
             if self.integrity_report(saga["saga_id"])["state"] != "MATCH":
                 raise PermissionError("SAGA_LOCAL_INTEGRITY_MISMATCH")
+            # A63: the previous Saga and Outbox reads happened BEFORE the
+            # IMMEDIATE writer lock. A legitimate writer may commit between
+            # those reads and BEGIN; do not apply any stale mapping. Compare
+            # actual locked snapshots, not a caller-supplied "fresh" flag.
+            if self.get(saga["saga_id"]) != saga:
+                raise PermissionError("SAGA_SNAPSHOT_STALE")
+            if self.outbox.get(step["outbox_key"]) != out:
+                raise PermissionError("SAGA_OUTBOX_SNAPSHOT_STALE")
             self.db.execute(
                 """UPDATE aion_execution_saga_steps
                    SET state=?,effect_ref=?,last_error=?
