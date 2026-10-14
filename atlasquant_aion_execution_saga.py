@@ -883,6 +883,38 @@ class ExecutionSagaCoordinator:
         ).fetchall()
         previous = GENESIS_HASH
         blockers = []
+        # Reconstruct immutable plan material from the persisted projection.
+        # This detects local drift only; it is never producer/rollback proof.
+        plan_fields = (
+            "ordinal", "step_key", "action", "payload", "capability_class",
+            "risk_points", "reversible", "compensation_action",
+            "compensation_payload", "compensation_risk_points",
+        )
+        planned_steps = [{key: step[key] for key in plan_fields} for step in saga["steps"]]
+        forward_risk = sum(step["risk_points"] for step in planned_steps)
+        worst_case_risk = sum(
+            step["risk_points"] + step["compensation_risk_points"] for step in planned_steps
+        )
+        worst_case_effects = len(planned_steps) + sum(
+            1 for step in planned_steps if step["reversible"]
+        )
+        plan = {
+            "schema": SCHEMA, "saga_id": saga["saga_id"],
+            "scope": [saga["owner_id"], saga["tenant_id"], saga["workspace_id"]],
+            "authority_budget_ref": saga["authority_budget_ref"],
+            "policy_version": saga["policy_version"], "steps": planned_steps,
+            "forward_risk_points": forward_risk,
+            "worst_case_risk_points": worst_case_risk,
+            "worst_case_effects": worst_case_effects,
+        }
+        if _digest(plan) != saga["plan_digest"]:
+            blockers.append("PLAN_DIGEST_MISMATCH")
+        if rows and rows[0]["detail_digest"] != _digest({
+            "plan_digest": saga["plan_digest"], "forward_risk_points": forward_risk,
+            "worst_case_risk_points": worst_case_risk,
+            "worst_case_effects": worst_case_effects,
+        }):
+            blockers.append("GENESIS_PLAN_BINDING_MISMATCH")
         # A.43: an empty chain is not a valid intact saga merely because
         # there are no rows whose hashes can mismatch. Every created Saga
         # must have a SAGA_CREATED genesis event. This is local consistency,
