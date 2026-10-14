@@ -145,6 +145,12 @@ jobs:
             test_atlasquant_aion_v224_owner_signature_ceremony.py \
             test_atlasquant_aion_v225_explicit_owner_decision_record.py \
             test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+      - name: A51 direct autonomous executor admission denies absent independent witness
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_explicit_human_click_remains_usable
       - name: Run authority, injection, isolation and recovery tests
         run: |
           python -m unittest -q \
