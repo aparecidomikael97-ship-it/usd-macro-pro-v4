@@ -1,0 +1,38 @@
+name: AION A69 LAB checkpoint writers hard-stop
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a68-render-deploy-hard-stop-20261014]
+    paths:
+      - ".github/workflows/aion-a69-checkpoint-writers-hard-stop-lab.yml"
+      - ".github/workflows/aion-runtime-checkpoint-bootstrap.yml"
+      - ".github/workflows/aion-runtime-checkpoint-migrate.yml"
+      - "test_atlasquant_checkpoint_writers_hard_stop_a69.py"
+      - "test_atlasquant_aion_convergence.py"
+      - ".github/workflows/quality-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  a69-checkpoint-writers-denied:
+    name: A69 writer denied offline (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install unchanged project dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: Run original bootstrap/migration and A69 negative contracts OFFLINE
+        run: python -m unittest -v test_atlasquant_checkpoint_writers_hard_stop_a69 test_atlasquant_aion_runtime_bootstrap test_atlasquant_aion_runtime_migration_workflow test_atlasquant_aion_runtime_migrate

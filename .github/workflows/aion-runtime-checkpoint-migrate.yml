@@ -21,6 +21,11 @@ concurrency:
 
 jobs:
   migrate:
+    # A69 temporary HARD NO-GO: runtime checkpoint write/create/migrate
+    # requires independent F1/T1 current-head witness and F2 owner ceremony.
+    # Neither workflow_dispatch nor push to main is owner attestation.
+    # Preserve original code and CAS checks for separately reviewed recovery.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout canonical main
