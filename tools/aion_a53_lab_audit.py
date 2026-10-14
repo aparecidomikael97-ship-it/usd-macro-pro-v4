@@ -15,6 +15,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
+class AuditResult(unittest.TextTestResult):
+    """Count successful methods directly; subtest errors may share a method."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.passed_methods = 0
+
+    def addSuccess(self, test):
+        super().addSuccess(test)
+        self.passed_methods += 1
+
+
 def workflow_selection(path: str, step_name: str) -> list[str]:
     lines = (ROOT / path).read_text(encoding="utf-8").splitlines()
     marker = "      - name: " + step_name
@@ -76,12 +88,15 @@ def main() -> int:
         import requests
         stack.enter_context(patch.object(requests.sessions.Session, "request", side_effect=no_network))
         suite = unittest.defaultTestLoader.loadTestsFromNames(names)
-        result = unittest.TextTestRunner(verbosity=2 if args.suite == "focused" else 1).run(suite)
+        result = unittest.TextTestRunner(
+            verbosity=2 if args.suite == "focused" else 1,
+            resultclass=AuditResult,
+        ).run(suite)
     summary = {
         "suite": args.suite,
         "python": sys.version,
         "total": result.testsRun,
-        "pass": result.testsRun - len(result.failures) - len(result.errors) - len(result.skipped) - len(result.expectedFailures) - len(result.unexpectedSuccesses),
+        "pass": result.passed_methods,
         "fail": len(result.failures),
         "error": len(result.errors),
         "skip": len(result.skipped),
