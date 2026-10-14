@@ -307,18 +307,22 @@ def verify_global_worker_live_activation(
         tick_after_activation = False
         live_receipts = []
 
-    live_confirmed = status in {
-        "LIVE_CONFIRMED_WITH_WORK",
-        "LIVE_CONFIRMED_IDLE",
-    }
+    # A59 residual truth boundary: negative statuses (INFLIGHT, STALE_LEASE,
+    # UNSAFE_RECEIPT) may still contain self-reported local heartbeat/tick/
+    # receipt values. These are DIAGNOSTIC OBSERVATIONS, not confirmations.
+    # No independent LIVE attestor is enrolled; never present them as proven.
+    live_confirmed = False
+    heartbeat_confirmed = False
+    tick_confirmed = False
+    work_receipt_confirmed = False
     return {
         "schema": SCHEMA,
         "status": status,
         "reason": reason,
         "live_confirmed": live_confirmed,
-        "heartbeat_confirmed": heartbeat_after_activation,
-        "tick_confirmed": tick_after_activation,
-        "work_receipt_confirmed": bool(live_receipts),
+        "heartbeat_confirmed": heartbeat_confirmed,
+        "tick_confirmed": tick_confirmed,
+        "work_receipt_confirmed": work_receipt_confirmed,
         "global_receipts_after_activation": len(live_receipts),
         "unsafe_receipts_after_activation": len(unsafe_receipts),
         "activation_boundary": activated_at.isoformat(),
