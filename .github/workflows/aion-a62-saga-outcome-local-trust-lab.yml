@@ -1,0 +1,45 @@
+name: AION A62 LAB Saga outcome local trust
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a61-saga-outbox-local-atomicity-20261014]
+    paths:
+      - atlasquant_aion_execution_saga.py
+      - test_atlasquant_aion_saga_outcome_local_trust_a62.py
+      - .github/workflows/aion-a62-saga-outcome-local-trust-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  saga-outcome-local-denials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Existing project dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: A62 with A61 and A60 regressions, external network denied
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import socket, unittest
+          def no_network(*args, **kwargs):
+              raise AssertionError("A62_EXTERNAL_NETWORK_DENIED")
+          socket.socket.connect = no_network
+          suites = [
+              "test_atlasquant_aion_saga_outcome_local_trust_a62",
+              "test_atlasquant_aion_saga_outbox_atomic_a61",
+              "test_atlasquant_aion_saga_pre_enqueue_integrity_a60",
+          ]
+          tests = unittest.defaultTestLoader.loadTestsFromNames(suites)
+          result = unittest.TextTestRunner(verbosity=2).run(tests)
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
