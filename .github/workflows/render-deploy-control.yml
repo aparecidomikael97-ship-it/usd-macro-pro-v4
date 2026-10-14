@@ -15,7 +15,8 @@ on:
 
 permissions:
   contents: read
-  actions: write
+  # A68: Disabled deploy workflow must not carry workflow-dispatch privileges.
+  actions: read
 
 concurrency:
   group: atlasquant-render-deploy-control
@@ -23,6 +24,11 @@ concurrency:
 
 jobs:
   redeploy:
+    # A68 temporary HARD NO-GO: GitHub dispatch/reconcile-hook/secret presence
+    # are NOT independently verified owner authorization. Deny every event.
+    # Re-enablement needs a separately reviewed F1/T1/F2 ceremony, approval,
+    # immutable source checks, branch protection and an auditable new patch.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
