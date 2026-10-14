@@ -1,0 +1,45 @@
+name: AION A61 LAB Saga Outbox atomic staging
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a60-saga-pre-enqueue-local-integrity-20261014]
+    paths:
+      - atlasquant_aion_execution_saga.py
+      - atlasquant_aion_execution_outbox.py
+      - test_atlasquant_aion_saga_outbox_atomic_a61.py
+      - .github/workflows/aion-a61-saga-outbox-atomic-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  atomic-local-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install existing project dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+      - name: Run A61 and A60 isolated tests with sockets disabled
+        run: |
+          git rev-parse HEAD
+          python - <<'PY'
+          import socket, unittest
+          def deny(*args, **kwargs):
+              raise AssertionError("A61_LAB_NETWORK_FORBIDDEN")
+          socket.socket.connect = deny
+          suites = [
+              "test_atlasquant_aion_saga_outbox_atomic_a61",
+              "test_atlasquant_aion_saga_pre_enqueue_integrity_a60",
+          ]
+          tests = unittest.defaultTestLoader.loadTestsFromNames(suites)
+          result = unittest.TextTestRunner(verbosity=2).run(tests)
+          raise SystemExit(0 if result.wasSuccessful() else 1)
+          PY
