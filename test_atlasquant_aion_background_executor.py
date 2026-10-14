@@ -8,6 +8,7 @@ from atlasquant_aion_background_executor import (
     EXECUTOR_NAMESPACE,
     MAX_ATTEMPTS,
     execute_due_local_work,
+    _execute_due_local_work_authorized,
     executor_integrity,
     executor_snapshot,
     load_executor_receipts,
@@ -98,6 +99,72 @@ class AionBackgroundExecutorTests(unittest.TestCase):
             max_jobs=max_jobs,
             now=now,
         )
+
+    def test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness(self):
+        # A locally asserted digest never constitutes independent source authority.
+        checkpoint = self.schedule()
+        original = deepcopy(checkpoint)
+        with patch(
+            "atlasquant_aion_background_executor.handle_runtime_intent",
+            return_value={"status": "COMPLETED", "external_action_executed": False},
+        ) as handler:
+            result = _execute_due_local_work_authorized(
+                self.access, checkpoint,
+                authorization_mode="GLOBAL_WORKER",
+                authorization_digest="self-asserted-local-digest-not-proof",
+                execution_principal="a51-local-only",
+                now=DUE_NOW,
+            )
+        handler.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "INDEPENDENT_AUTONOMOUS_AUTHORITY_NOT_ENROLLED")
+        self.assertEqual(result["processed"], 0)
+        self.assertEqual(result["action_receipts"], [])
+        self.assertFalse(result["autonomous_worker_started"])
+        self.assertFalse(result["requires_checkpoint_save"])
+        self.assertFalse(result["independent_witness_verified"])
+        self.assertEqual(checkpoint, original)
+
+    def test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt(self):
+        checkpoint = self.schedule()
+        checkpoint["independent_witness"] = {
+            "status": "VERIFIED", "source": "a51-fake-local-marker",
+        }
+        with patch(
+            "atlasquant_aion_background_executor.handle_runtime_intent",
+            side_effect=AssertionError("A51_HANDLER_MUST_NOT_RUN"),
+        ) as handler, patch(
+            "atlasquant_aion_background_executor.seal_executor_receipt_envelope",
+            side_effect=AssertionError("A51_NO_RECEIPTS"),
+        ) as envelopes:
+            result = _execute_due_local_work_authorized(
+                self.access, checkpoint,
+                authorization_mode="ARMED_WORKER",
+                authorization_digest="fake-digest" * 3,
+                execution_principal="a51-self-asserted-worker",
+                now=DUE_NOW,
+            )
+        handler.assert_not_called()
+        envelopes.assert_not_called()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "INDEPENDENT_AUTONOMOUS_AUTHORITY_NOT_ENROLLED")
+        self.assertEqual(result["processed"], 0)
+        self.assertEqual(result["action_receipts"], [])
+        self.assertFalse(result["external_action_executed"])
+
+    def test_a51_explicit_human_click_remains_usable(self):
+        # The gate must not regress legitimate manual non-provider workflow.
+        with patch("atlasquant_aion_background_executor.handle_runtime_intent",
+                   return_value={"status": "COMPLETED", "provider_called": False,
+                                 "external_action_executed": False,
+                                 "real_trading_enabled": False,
+                                 "execution_authorized": False}) as handler:
+            result = self.execute(self.schedule())
+        handler.assert_called_once()
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertEqual(result["authorization_mode"], "HUMAN_CLICK")
+        self.assertEqual(result["processed"], 1)
+        self.assertFalse(result["external_action_executed"])
 
     def test_explicit_confirmation_is_required(self):
         checkpoint = self.schedule()
