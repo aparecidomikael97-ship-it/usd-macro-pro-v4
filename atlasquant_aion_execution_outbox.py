@@ -78,6 +78,17 @@ def _digest(value: Any) -> str:
     return sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
+def _outbox_key(value: Any) -> str:
+    """Accept only the exact canonical 64-char lowercase SHA-256 intent key.
+
+    Truncation or whitespace normalization can turn a distinct caller key
+    into an existing action's identity. Reject BEFORE any lookup or mutation.
+    """
+    if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise ValueError("invalid idempotency_key")
+    return value
+
+
 def _utc(value: Any | None = None) -> datetime:
     if value is None:
         return datetime.now(timezone.utc)
@@ -219,7 +230,7 @@ class ExecutionOutbox:
         }
 
     def get(self, idempotency_key: str) -> dict[str, Any]:
-        return self._view(self._outbox_row(_clean(idempotency_key, 64)))
+        return self._view(self._outbox_row(_outbox_key(idempotency_key)))
 
     def list(self, *, state: str = "") -> list[dict[str, Any]]:
         args: list[Any] = [*self._scope_args()]
@@ -600,7 +611,7 @@ class ExecutionOutbox:
         now: Any | None = None,
     ) -> dict[str, Any]:
         """Dispatch one claimed intent; uncertain outcomes require reconciliation."""
-        key = _clean(idempotency_key, 64)
+        key = _outbox_key(idempotency_key)
         worker = _token(worker_id, "worker_id")
         # A callable clock supports deterministic staging tests. A real host must
         # supply trusted time/lease fencing; caller-supplied values are NOT proof.
@@ -868,7 +879,7 @@ class ExecutionOutbox:
         now: Any | None = None,
     ) -> dict[str, Any]:
         """Resolve SENT/UNCERTAIN without ever blind-resending an ambiguous effect."""
-        key = _clean(idempotency_key, 64)
+        key = _outbox_key(idempotency_key)
         now_dt = _utc(now)
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
