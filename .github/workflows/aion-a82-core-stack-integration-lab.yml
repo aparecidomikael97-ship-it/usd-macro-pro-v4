@@ -70,7 +70,7 @@ jobs:
           from pathlib import Path
           import re, subprocess, sys
           source=Path(".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
-          block=source.split("python -m unittest -q \\\n",1)[1].split("python -m pytest",1)[0]
+          block=source.split("python -m unittest -q",1)[1].split("python -m pytest",1)[0]
           modules=re.findall(r"(?m)^\s+(test_[A-Za-z0-9_]+\.py)\s*\\?$",block)
           if not modules or len(modules)!=len(set(modules)):
               sys.exit("A82_CANONICAL_UNITTTEST_SELECTION_INVALID")
