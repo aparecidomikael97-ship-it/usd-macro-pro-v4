@@ -152,7 +152,13 @@ class A75SourceWitnessIntakeHardStopTests(unittest.TestCase):
         c = deepcopy(CLAIM)
         del c["signature_b64"]
         self.assertIn("WITNESS_CLAIM_SHAPE_MISMATCH", assess(c)["blockers"])
-        self.assert_denied(assess(None))
+        # Passing None through assess() would select its default good fixture;
+        # call the intake directly to prove an actual missing claim is denied.
+        missing = inspect_untrusted_witness_claim(
+            None, expected_scope=deepcopy(SCOPE), now_ts=NOW,
+        )
+        self.assert_denied(missing)
+        self.assertIn("WITNESS_CLAIM_NOT_MAPPING", missing["blockers"])
         self.assert_denied(assess("fake-receipt-string"))
 
     def test_11_wrong_expected_scope_cannot_be_trusted(self):
