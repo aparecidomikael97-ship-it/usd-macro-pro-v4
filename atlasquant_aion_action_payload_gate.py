@@ -24,6 +24,10 @@ CREDENTIAL_KEY_ALIASES = frozenset({
     "privatekey", "sessiontoken", "bearertoken", "authtoken",
     "apikey", "xapikey", "cookie", "setcookie",
     "password", "senha", "token", "credential", "secret",
+    # A96: concrete credential-bearing HTTP and cloud API field names.
+    # Do not confuse these with harmless *_ref metadata fields.
+    "proxyauthorization", "xauthtoken", "xamzsecuritytoken",
+    "xgoogapikey", "awssecretaccesskey",
 })
 
 
