@@ -23,8 +23,8 @@ import re
 from typing import Any, Callable, Mapping
 
 from aion_chat.models import Scope
-from aion_chat.privacy import redact
 from aion_chat.store import SQLiteChatStore
+from atlasquant_aion_action_payload_gate import clean_action_payload
 
 SCHEMA = "ATLASQUANT_AION_EXECUTION_OUTBOX_V1"
 MAX_AUTHORITY_TTL_SECONDS = 900
@@ -280,17 +280,9 @@ class ExecutionOutbox:
             _token(budget_ref, "authority_budget_ref")
             _token(capability, "capability_class")
 
-        # A88: redaction is for privacy, NOT an identity-preserving transform.
-        # For example, two distinct API keys both become "[REDACTED]" and
-        # otherwise collide on payload_digest/idempotency_key. Without an
-        # independently enrolled vault-bound canonical payload commitment,
-        # reject such actions *before* staging, rather than silently treat
-        # different intended external effects as one logical action. Do not
-        # persist the original secret or its unsalted fingerprint.
-        raw_payload = dict(payload or {})
-        safe_payload = redact(raw_payload)
-        if safe_payload != raw_payload:
-            raise ValueError("REDACTED_PAYLOAD_NOT_STAGEABLE")
+        # A89: typed JSON boundary + A88 no-redaction contract shared with Saga.
+        # Never persist lossy stringifications or undetected tuple-borne secrets.
+        safe_payload = clean_action_payload(payload)
         payload_digest = _digest(safe_payload)
         key_material = {
             "scope": [owner, tenant, workspace],
