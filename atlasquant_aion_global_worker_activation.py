@@ -1,18 +1,17 @@
-"""AION Global Worker Activation Ceremony V1.
+"""AION Global Worker Activation Ceremony V1 — authority NOT enrolled.
 
-This module prepares the final repository-variable activation step after a
-Global Worker ARMED state is already persisted and Activation Readiness reports
-READY_FOR_FLAG_ENABLE.
+Readiness, plans, and approval tickets built from local data are diagnostic
+only. The public enable writer, plan/approval creation, ticket validation and
+activation wrapper hard-stop before any feature-flag-enabling write.
 
-Building/importing this module does nothing. The feature flag is mutated only
-through an explicit ADMIN activation function guarded by a short-lived ticket
-and a final confirmation. A successful flag write is reported only as
-ACTIVATED_PENDING_LIVE_EVIDENCE; it never proves that a worker heartbeat ran.
+The separately gated disable/rollback path is retained for safety. Importing
+this module performs no network or Worker action. No status from this module
+proves F1/T1 custody, real HUMAN_OWNER approval or Worker execution.
 """
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
