@@ -26,3 +26,9 @@ There is **no** external custody, externally approved signer/trust anchor, real 
 5. Wire witness to the pre-CAS/Worker gate ONLY after red-team/CI, hardware owner F2, external producer and original historical A12/A16. Never open positive path based on the LAB intake schema itself.
 
 No account signup, payments, TPM, Worker, config changes, merges, production data updates, deploy or original tests modified. Legacy Quality/Security remain RED, no A75 full-suite claim until run on exact SHA.
+
+## A80 LAB amendment — signature encoding is NOT cryptographic validity
+
+The A75 diagnostic originally accepted any bounded nonempty `signature_b64` text as locally format-consistent, even `NOT_A_VERIFIED_CRYPTOGRAPHIC_SIGNATURE` (not Base64). A80 now requires **canonical standard RFC4648 Base64** with strict ASCII decoding, no whitespace, valid padding/pad bits, nonempty decoded bytes and a bounded encoded text field. Invalid text adds the diagnostic blocker `WITNESS_SIGNATURE_BASE64_INVALID`; every output remains `BLOCKED`.
+
+The A75 fixture's signature field is now the canonical Base64 encoding of 64 **zero bytes**. It is a deliberately **unsigned synthetic placeholder**, not produced by any signing key, and neither the field's 64 decoded bytes nor its encoding says anything about actual algorithm, key custody, issuer enrollment, freshness, owner identity, trusted time, replay prevention or external monotonicity. No signature verification, key, network, runtime authorization, Worker or external actor was added. The existing 12 tests remain and four additional A80 adversarial cases were added to the same test module. This is a diagnostic truthfulness correction, **not F1/T1 implementation**.
