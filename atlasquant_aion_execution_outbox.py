@@ -267,12 +267,23 @@ class ExecutionOutbox:
             raise ValueError("authority must expire after creation")
         if (valid_dt - created_dt).total_seconds() > MAX_AUTHORITY_TTL_SECONDS:
             raise ValueError("authority validity exceeds staging maximum")
-        reauth = _clean(reauth_ref, 160)
+        # A107: these values bind transaction authority and idempotency.
+        # Silently truncated suffixes would alias different approvals/budgets.
+        reauth = _clean(reauth_ref, 161)
+        if len(reauth) > 160:
+            raise ValueError("invalid reauth_ref")
         if requires_reauth and not reauth:
             raise ValueError("transaction reauthentication reference required")
-        transaction = _clean(transaction_id, 128)
-        budget_ref = _clean(authority_budget_ref, 128)
-        capability = _clean(capability_class, 80).upper()
+        transaction = _clean(transaction_id, 129)
+        budget_ref = _clean(authority_budget_ref, 129)
+        capability = _clean(capability_class, 81).upper()
+        for claim_name, claim_value, bound in (
+            ("transaction_id", transaction, 128),
+            ("authority_budget_ref", budget_ref, 128),
+            ("capability_class", capability, 80),
+        ):
+            if len(claim_value) > bound:
+                raise ValueError("invalid " + claim_name)
         if isinstance(risk_points, bool) or not isinstance(risk_points, int) or not 0 <= risk_points <= 100:
             raise ValueError("risk_points must be an integer from 0 to 100")
         if transaction or budget_ref or risk_points or capability:
@@ -508,26 +519,28 @@ class ExecutionOutbox:
             return False, "REVOKED", {"reason": "AUTHORITY_REVALIDATION_FAILED"}
         if current.get("allowed") is not True:
             return False, "REVOKED", {"reason": "AUTHORITY_REVOKED"}
-        if _clean(current.get("actor_id"), 128) != self.scope.owner_id:
+        # Evaluate one character past the admitted bound, so a forged suffix
+        # cannot compare equal to a valid maximum-length identity (A107).
+        if _clean(current.get("actor_id"), 129) != self.scope.owner_id:
             return False, "REVOKED", {"reason": "ACTOR_MISMATCH"}
         for field, wanted in (
             ("tenant_id", self.scope.tenant_id),
             ("workspace_id", self.scope.workspace_id),
         ):
-            supplied = _clean(current.get(field), 128)
+            supplied = _clean(current.get(field), 129)
             # An absent/blank scope is not a valid authorization assertion.
             if not supplied:
                 return False, "REVOKED", {"reason": field.upper() + "_MISSING"}
             if supplied != wanted:
                 return False, "REVOKED", {"reason": field.upper() + "_MISMATCH"}
-        if _clean(current.get("policy_version"), 128) != _clean(decision.get("policy_version"), 128):
+        if _clean(current.get("policy_version"), 129) != _clean(decision.get("policy_version"), 129):
             return False, "BLOCKED_REAPPROVAL", {"reason": "POLICY_VERSION_CHANGED"}
-        if _clean(current.get("authorization_ref"), 128) != _clean(decision.get("authorization_ref"), 128):
+        if _clean(current.get("authorization_ref"), 129) != _clean(decision.get("authorization_ref"), 129):
             return False, "BLOCKED_REAPPROVAL", {"reason": "AUTHORIZATION_CHANGED"}
         if decision.get("requires_reauth") is True:
             if current.get("reauthenticated") is not True:
                 return False, "BLOCKED_REAPPROVAL", {"reason": "REAUTH_REQUIRED"}
-            if _clean(current.get("reauth_ref"), 160) != _clean(decision.get("reauth_ref"), 160):
+            if _clean(current.get("reauth_ref"), 161) != _clean(decision.get("reauth_ref"), 161):
                 return False, "BLOCKED_REAPPROVAL", {"reason": "REAUTH_TRANSACTION_MISMATCH"}
         return True, "ALLOW", current
 
