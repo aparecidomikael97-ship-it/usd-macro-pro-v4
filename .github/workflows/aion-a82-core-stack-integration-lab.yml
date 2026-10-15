@@ -78,6 +78,10 @@ jobs:
           sys.exit(subprocess.call([sys.executable,"-B","-m","unittest","-q",*modules]))
           PY
 
+      - name: A82 clean Python A79 cross-process matrix (unwaived)
+        if: always()
+        run: python -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
+
   historical_security:
     name: A82 retained A74 Security 365 selection RED (ubuntu)
     runs-on: ubuntu-latest
