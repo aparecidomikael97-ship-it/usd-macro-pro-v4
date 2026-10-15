@@ -8,12 +8,32 @@ from __future__ import annotations
 
 from math import isfinite
 from typing import Any, Mapping
+from unicodedata import normalize
 
 from aion_chat.privacy import redact
 
 INVALID = "ACTION_PAYLOAD_NOT_CANONICAL_JSON"
 REDACTED = "REDACTED_PAYLOAD_NOT_STAGEABLE"
 MAX_PAYLOAD_DEPTH = 32
+
+# Names of credential-bearing JSON fields in common HTTP/API payloads.
+# This is an intentionally conservative staging gate, NOT general DLP.
+# Do not redact first and hash/store a credential-derived action identity.
+CREDENTIAL_KEY_ALIASES = frozenset({
+    "authorization", "accesstoken", "refreshtoken", "clientsecret",
+    "privatekey", "sessiontoken", "bearertoken", "authtoken",
+    "apikey", "xapikey", "cookie", "setcookie",
+    "password", "senha", "token", "credential", "secret",
+})
+
+
+def _credential_key(name: str) -> bool:
+    # Recognize ordinary snake/kebab/camel/HTTP-header variants, including
+    # Unicode compatibility forms. Benign suffixes (e.g. authorization_ref)
+    # are NOT matched; field-name matching is exact after normalization.
+    normalized = normalize("NFKC", name).casefold()
+    compact = "".join(c for c in normalized if c.isascii() and c.isalnum())
+    return compact in CREDENTIAL_KEY_ALIASES
 
 
 def _validate_json(value: Any, *, depth: int, active: set[int]) -> None:
@@ -37,6 +57,11 @@ def _validate_json(value: Any, *, depth: int, active: set[int]) -> None:
                 for name, item in value.items():
                     if type(name) is not str:
                         raise ValueError(INVALID)
+                    # A95: privacy.redact does not recognize every standard
+                    # credential HEADER/KEY. Deny before any SQLite mutation
+                    # regardless of the value's formatting or nesting.
+                    if _credential_key(name):
+                        raise ValueError(REDACTED)
                     _validate_json(item, depth=depth + 1, active=active)
             else:
                 for item in value:
