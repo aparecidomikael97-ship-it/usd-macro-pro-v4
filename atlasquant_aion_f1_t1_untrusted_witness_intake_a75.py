@@ -8,6 +8,8 @@ A locally consistent claim is NOT evidence of an independently held witness.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import base64
+import binascii
 import re
 from typing import Any, Mapping
 
@@ -42,6 +44,23 @@ def _str(value: Any, maximum: int = 256) -> bool:
 
 def _uint(value: Any, minimum: int = 0) -> bool:
     return type(value) is int and minimum <= value <= _HEX_LIMIT
+
+
+def _canonical_signature_b64(value: Any) -> bool:
+    """Strict RFC4648 canonical Base64 syntax ONLY; never signature trust.
+
+    Signature algorithm/key/issuer is deliberately not inferred. There are
+    no key reads, cryptographic signature verification or authority grants.
+    """
+    if not _str(value):
+        return False
+    try:
+        raw = base64.b64decode(value.encode("ascii"), validate=True)
+    except (UnicodeEncodeError, binascii.Error, ValueError):
+        return False
+    # The existing maximum text size bounds decoded data to <= 192 bytes.
+    # Non-empty payload and round-trip reject empty and non-canonical pad bits.
+    return bool(raw) and base64.b64encode(raw).decode("ascii") == value
 
 
 def inspect_untrusted_witness_claim(
@@ -101,6 +120,8 @@ def inspect_untrusted_witness_claim(
                     "witness_issuer", "key_id", "signature_b64"):
             if not _str(data[key]):
                 errors.append(f"WITNESS_TEXT_INVALID:{key}")
+        if not _canonical_signature_b64(data["signature_b64"]):
+            errors.append("WITNESS_SIGNATURE_BASE64_INVALID")
         for key in ("head_sha", "checkpoint_blob_sha"):
             if type(data[key]) is not str or not _GIT_SHA.fullmatch(data[key]):
                 errors.append(f"WITNESS_GIT_SHA_INVALID:{key}")

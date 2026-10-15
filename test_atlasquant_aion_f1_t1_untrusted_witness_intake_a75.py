@@ -34,7 +34,7 @@ CLAIM = {
     "expires_at": "2026-10-14T17:02:30Z",
     "witness_issuer": "synthetic-external-witness",
     "key_id": "synthetic-key-id",
-    "signature_b64": "NOT_A_VERIFIED_CRYPTOGRAPHIC_SIGNATURE",
+    "signature_b64": "A" * 86 + "==",  # 64 zero bytes, canonical Base64; NOT a signature
 }
 SNAPSHOT = {"head_sha": "a" * 40, "checkpoint_blob_sha": "b" * 40}
 
@@ -173,6 +173,64 @@ class A75SourceWitnessIntakeHardStopTests(unittest.TestCase):
                 r = assess(c)
                 self.assert_denied(r)
                 self.assertIn("WITNESS_ID_INVALID:" + field, r["blockers"])
+
+    def test_a80_malformed_base64_signature_cannot_be_format_consistent(self):
+        # Exactly the A75 diagnostic gap: a non-empty string was accepted
+        # as a "signature_b64" even if it is not base64 at all.
+        invalid = (
+            "NOT_A_VERIFIED_CRYPTOGRAPHIC_SIGNATURE",
+            "not-base64***",
+            "YQ",
+            "YQ=",
+            "YQ====",
+            "YR==",  # non-canonical pad bits
+            "____",  # URL-safe, not RFC4648 standard base64
+            " YQ==",
+            "YQ== ",
+            "YQ==\\n",
+            "",
+        )
+        for value in invalid:
+            with self.subTest(value=value):
+                claim = deepcopy(CLAIM)
+                claim["signature_b64"] = value
+                outcome = assess(claim)
+                self.assert_denied(outcome)
+                self.assertIs(outcome["local_format_consistent"], False)
+                self.assertIn("WITNESS_SIGNATURE_BASE64_INVALID", outcome["blockers"])
+
+    def test_a80_wrong_signature_types_and_overlength_remain_blocked(self):
+        for value in (None, True, 1, 0, b"YQ==", [], {}, "A" * 260):
+            with self.subTest(value=repr(value)[:50]):
+                claim = deepcopy(CLAIM)
+                claim["signature_b64"] = value
+                outcome = assess(claim)
+                self.assert_denied(outcome)
+                self.assertIs(outcome["local_format_consistent"], False)
+                self.assertIn("WITNESS_SIGNATURE_BASE64_INVALID", outcome["blockers"])
+
+    def test_a80_canonical_synthetic_signature_is_still_zero_authority(self):
+        # b64 of 64 ZERO bytes. No secret signing key or valid issuer.
+        claim = deepcopy(CLAIM)
+        claim["signature_b64"] = "A" * 86 + "=="
+        outcome = assess(claim)
+        self.assert_denied(outcome)
+        self.assertIs(outcome["local_format_consistent"], True)
+        self.assertIs(outcome["claim_signature_verified"], False)
+        self.assertIs(outcome["external_custody_verified"], False)
+
+    def test_a80_encoding_correctness_is_not_crypto_proof(self):
+        # An attacker can format arbitrary bytes as canonical base64.
+        for value in ("YQ==", "YWJj", "A" * 86 + "=="):
+            with self.subTest(value=value):
+                claim = deepcopy(CLAIM)
+                claim["signature_b64"] = value
+                outcome = assess(claim)
+                self.assert_denied(outcome)
+                self.assertIs(outcome["claim_signature_verified"], False)
+                self.assertIs(outcome["external_activation_allowed"], False)
+                self.assertIs(outcome["worker_execution_allowed"], False)
+
 
 
 if __name__ == "__main__":

@@ -1,18 +1,17 @@
-"""AION Global Worker Activation Ceremony V1.
+"""AION Global Worker Activation Ceremony V1 — authority NOT enrolled.
 
-This module prepares the final repository-variable activation step after a
-Global Worker ARMED state is already persisted and Activation Readiness reports
-READY_FOR_FLAG_ENABLE.
+Readiness, plans, and approval tickets built from local data are diagnostic
+only. The public enable writer, plan/approval creation, ticket validation and
+activation wrapper hard-stop before any feature-flag-enabling write.
 
-Building/importing this module does nothing. The feature flag is mutated only
-through an explicit ADMIN activation function guarded by a short-lived ticket
-and a final confirmation. A successful flag write is reported only as
-ACTIVATED_PENDING_LIVE_EVIDENCE; it never proves that a worker heartbeat ran.
+The separately gated disable/rollback path is retained for safety. Importing
+this module performs no network or Worker action. No status from this module
+proves F1/T1 custody, real HUMAN_OWNER approval or Worker execution.
 """
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -373,7 +372,7 @@ def prepare_global_worker_activation_plan(
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Prepare a read-only activation plan. Never mutates a repository variable."""
+    """Diagnose readiness, but never mint an activation plan without external authority."""
     current = utc(now or _now())
     context = authenticated_context(access, Domain.ADMIN)
     if context.role != "ADMIN":
@@ -465,58 +464,6 @@ def prepare_global_worker_activation_plan(
         "global_worker_executed": False,
     }
 
-    expires = current + timedelta(seconds=ttl)
-    plan = {
-        "schema": PLAN_SCHEMA,
-        "actor_id": context.actor_id,
-        "scope": _scope_payload(context),
-        "runtime_sha": runtime["runtime_sha"],
-        "runtime_checkpoint_digest": runtime["runtime_checkpoint_digest"],
-        "arm_digest": runtime["arm_digest"],
-        "arming_plan_digest": runtime["arming_plan_digest"],
-        "arming_approval_digest": runtime["arming_approval_digest"],
-        "resource_budgets": runtime["resource_budgets"],
-        "max_jobs": runtime["max_jobs"],
-        "lease_seconds": runtime["lease_seconds"],
-        "readiness_stage": READY_STAGE,
-        "readiness_checked_at": ready["checked_at"],
-        "readiness_pulse_state": ready["pulse_state"],
-        "readiness_shadow_state": ready["shadow_state"],
-        "feature_flag_state": flag_state,
-        "feature_flag_target_state": "ENABLED",
-        "feature_flag_name": FEATURE_FLAG_NAME,
-        "post_incident_gate_required": bool(
-            gate_validation.get("gate_required")
-        ),
-        "post_incident_gate_digest_at_plan": str(
-            gate_validation.get("gate_digest") or ""
-        ),
-        "post_incident_closure_ledger_digest": str(
-            gate_validation.get("closure_ledger_digest") or ""
-        ),
-        "post_incident_latest_closure_record_id": str(
-            gate_validation.get("latest_closure_record_id") or ""
-        ),
-        "created_at": current.isoformat(),
-        "expires_at": expires.isoformat(),
-        "ttl_seconds": ttl,
-        "requires_live_evidence_after_activation": True,
-        "activation_does_not_execute_worker_tick": True,
-        "runtime_checkpoint_modified": False,
-        "feature_flag_modified": False,
-        "global_worker_executed": False,
-        "real_trading_enabled": False,
-    }
-    plan["plan_digest"] = _payload_digest(plan, "plan_digest")
-    return {
-        "schema": SCHEMA,
-        "status": "ACTIVATION_PLAN_READY",
-        "plan": plan,
-        "runtime_checkpoint_modified": False,
-        "feature_flag_modified": False,
-        "global_worker_executed": False,
-    }
-
 
 def approve_global_worker_activation_plan(
     access: Mapping[str, Any] | None,
@@ -526,7 +473,7 @@ def approve_global_worker_activation_plan(
     confirmation_phrase: str,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Create a short-lived activation ticket; still no repository mutation."""
+    """Diagnose legacy plan/confirmation; never mint a locally authorized ticket."""
     current = utc(now or _now())
     context = authenticated_context(access, Domain.ADMIN)
     if confirmation is not True:
@@ -547,47 +494,6 @@ def approve_global_worker_activation_plan(
         "schema": SCHEMA,
         "status": "BLOCKED",
         "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
-        "feature_flag_modified": False,
-        "global_worker_executed": False,
-    }
-
-    ticket = {
-        "schema": APPROVAL_SCHEMA,
-        "plan_digest": str(plan.get("plan_digest") or ""),
-        "actor_id": context.actor_id,
-        "scope": _scope_payload(context),
-        "runtime_sha": str(plan.get("runtime_sha") or ""),
-        "runtime_checkpoint_digest": str(plan.get("runtime_checkpoint_digest") or ""),
-        "arm_digest": str(plan.get("arm_digest") or ""),
-        "arming_plan_digest": str(plan.get("arming_plan_digest") or ""),
-        "arming_approval_digest": str(plan.get("arming_approval_digest") or ""),
-        "feature_flag_state_at_plan": str(plan.get("feature_flag_state") or ""),
-        "feature_flag_target_state": "ENABLED",
-        "post_incident_gate_required": bool(
-            plan.get("post_incident_gate_required")
-        ),
-        "post_incident_gate_digest_at_plan": str(
-            plan.get("post_incident_gate_digest_at_plan") or ""
-        ),
-        "post_incident_closure_ledger_digest": str(
-            plan.get("post_incident_closure_ledger_digest") or ""
-        ),
-        "post_incident_latest_closure_record_id": str(
-            plan.get("post_incident_latest_closure_record_id") or ""
-        ),
-        "issued_at": current.isoformat(),
-        "expires_at": str(plan.get("expires_at") or ""),
-        "confirmation_phrase_digest": digest(CONFIRMATION_PHRASE),
-        "runtime_checkpoint_modified": False,
-        "feature_flag_modified": False,
-        "global_worker_executed": False,
-    }
-    ticket["approval_digest"] = _payload_digest(ticket, "approval_digest")
-    return {
-        "schema": SCHEMA,
-        "status": "APPROVED_FOR_ACTIVATION",
-        "approval": ticket,
-        "runtime_checkpoint_modified": False,
         "feature_flag_modified": False,
         "global_worker_executed": False,
     }
