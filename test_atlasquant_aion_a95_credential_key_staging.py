@@ -37,9 +37,9 @@ class A95CredentialKeyStagingTests(unittest.TestCase):
             self.store, self.scope, outbox=self.outbox, authority_budget=budget,
         )
 
-    def send_intent(self, payload):
+    def send_intent(self, payload, *, intent_ref="A95_INTENT"):
         return self.outbox.enqueue(
-            intent_ref="A95_INTENT", action="send_email",
+            intent_ref=intent_ref, action="send_email",
             payload=payload, aggregate_key="A95_AGG",
             policy_version="A95_POLICY", authorization_ref="A95_APPROVAL",
             created_at=NOW, valid_until=NOW + timedelta(minutes=5),
@@ -66,23 +66,23 @@ class A95CredentialKeyStagingTests(unittest.TestCase):
                 self.assertEqual(value, 0, table)
 
     def test_01_outbox_header_authorization_basic_denied(self):
-        for payload in (
+        for index, payload in enumerate((
             {"authorization": "Basic A95_FAKE_ONLY"},
             {"Authorization": "Basic A95_FAKE_ONLY"},
             {"headers": {"ACCESS_TOKEN": "A95_FAKE_ONLY"}},
             {"headers": {"X-Api-Key": "A95_FAKE_ONLY"}},
-        ):
+        )):
             with self.subTest(case=str(list(payload.keys()))):
                 with self.assertRaisesRegex(ValueError, DENIED):
-                    self.send_intent(payload)
+                    self.send_intent(payload, intent_ref=f"A95_HEADER_{index}")
                 self.assert_no_rows()
 
     def test_02_outbox_nested_aliases_and_camel_case_denied(self):
-        for name in ("refreshToken", "client-secret", "private_key",
-                     "session_token", "Set-Cookie", "x_api_key"):
+        for index, name in enumerate(("refreshToken", "client-secret", "private_key",
+                     "session_token", "Set-Cookie", "x_api_key")):
             with self.subTest(key=name):
                 with self.assertRaisesRegex(ValueError, DENIED):
-                    self.send_intent({"meta": [{"headers": {name: "A95_FAKE_ONLY"}}]})
+                    self.send_intent({"meta": [{"headers": {name: "A95_FAKE_ONLY"}}]}, intent_ref=f"A95_ALIAS_{index}")
                 self.assert_no_rows()
 
     def test_03_saga_forward_credential_denied_without_sql_rows(self):
