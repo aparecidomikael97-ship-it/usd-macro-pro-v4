@@ -120,6 +120,15 @@ A54_PINNED_LAB_BASES = {
     # A74 is attached to the exact audited A73 immutable commit.
     "lab/aion-v16-a73-readiness-requires-external-source-witness-20261014":
         "1b9466509e13a24f60a611453e41c905896da585",
+    # A75 targets the reviewed A74 commit, not a moving LAB ref.
+    "lab/aion-v16-a74-activation-plan-ticket-authority-hard-stop-20261014":
+        "d2c3f6deaa0af4170be3abf4bdccb6c4fca7ab64",
+    # A76 and A77 are siblings pinned to A75 exactly; no authority is enabled.
+    "lab/aion-v16-a75-f1-t1-untrusted-witness-intake-20261014":
+        "373618865d8b7b7d2497e319db0c7c7926daa4fe",
+    # A78 QA-only integration targets the immutable reviewed A76 HEAD.
+    "lab/aion-v16-a76-activation-coverage-recovery-20261014":
+        "092eb60bd9b4f6f66035d1f71ee6ee8add9441cd",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -170,7 +179,14 @@ def _production_base():
             # A72 needs A71 and the unchanged A49 ancestor.
             # A73 includes A72 and the trusted A49 historical ancestor.
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
-            "208" if target == "lab/aion-v16-a73-readiness-requires-external-source-witness-20261014"
+            # A74/A75/A76 retain the same A49 provenance ancestry with
+            # a bounded depth; no shallow-clone bypass or local-main fallback.
+            "256" if target in {
+                "lab/aion-v16-a74-activation-plan-ticket-authority-hard-stop-20261014",
+                "lab/aion-v16-a75-f1-t1-untrusted-witness-intake-20261014",
+                "lab/aion-v16-a76-activation-coverage-recovery-20261014",
+            }
+            else "208" if target == "lab/aion-v16-a73-readiness-requires-external-source-witness-20261014"
             else "192" if target == "lab/aion-v16-a72-inflight-attempt-malformed-hard-stop-20261014"
             else "176" if target == "lab/aion-v16-a71-inflight-receipt-missing-unsafe-20261014"
             else "160" if target == "lab/aion-v16-a70-main-ruleset-contract-20261014"
