@@ -1,0 +1,39 @@
+name: AION A81 LAB Windows SQLite lifecycle with historical RED unchanged
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a79-h0-producer-receipt-causal-denial-20261014]
+    paths:
+      - "test_atlasquant_aion_saga_outcome_local_trust_a62.py"
+      - ".github/workflows/aion-a81-windows-a62-sqlite-cleanup-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: A81 ${{ matrix.selection }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        selection: [a62, historical]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Existing dependencies only
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: Validate exact SHA, source and isolated historic expectations
+        env:
+          A81_SELECTION: ${{ matrix.selection }}
+          A79_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python -c "import os,subprocess,sys; mode=os.environ['A81_SELECTION']; cmd=[sys.executable,'-B','-m','unittest','-v','test_atlasquant_aion_saga_outcome_local_trust_a62'] if mode=='a62' else [sys.executable,'-B','test_atlasquant_aion_h0_causal_denial_a79.py','--historical']; sys.exit(subprocess.call(cmd))"
