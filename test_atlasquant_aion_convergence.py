@@ -144,6 +144,9 @@ A54_PINNED_LAB_BASES = {
     # A89 accepts only the reviewed A88 immutable parent HEAD for LAB.
     "lab/aion-v16-a88-outbox-redacted-payload-identity-20261015":
         "70d7c0f57cd9b25cc011181453594c83df8fbbbc",
+    # A90 CI-only rehearsal is pinned to the reviewed A89 immutable parent.
+    "lab/aion-v16-a89-json-action-payload-canonical-gate-20261015":
+        "0a5422504822cadbe6ee1ed5ac70bcc5158a8254",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -196,7 +199,8 @@ def _production_base():
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
             # A74/A75/A76 retain the same A49 provenance ancestry with
             # a bounded depth; no shallow-clone bypass or local-main fallback.
-            "416" if target == "lab/aion-v16-a88-outbox-redacted-payload-identity-20261015"
+            "448" if target == "lab/aion-v16-a89-json-action-payload-canonical-gate-20261015"
+            else "416" if target == "lab/aion-v16-a88-outbox-redacted-payload-identity-20261015"
             else "384" if target == "lab/aion-v16-a84-inflight-staging-independent-proof-20261014"
             else "352" if target == "lab/aion-v16-a83-inflight-local-failed-proof-truthfulness-20261014"
             else "320" if target == "lab/aion-v16-a82-core-stack-integration-rehearsal-20261014"
