@@ -153,6 +153,9 @@ A54_PINNED_LAB_BASES = {
     # A96 is stacked only on the audited immutable A95 final HEAD.
     "lab/aion-v16-a95-credential-key-stage-denial-20261015":
         "8a29fb4099f2893f2bd84126085a94d3bf277c71",
+    # A100 audits only immutable A96 without modifying production behavior.
+    "lab/aion-v16-a96-extended-auth-header-denial-20261015":
+        "f503f23a5a1dbb7adb59db899b6639f8d304ae21",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -205,7 +208,8 @@ def _production_base():
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
             # A74/A75/A76 retain the same A49 provenance ancestry with
             # a bounded depth; no shallow-clone bypass or local-main fallback.
-            "512" if target == "lab/aion-v16-a95-credential-key-stage-denial-20261015"
+            "544" if target == "lab/aion-v16-a96-extended-auth-header-denial-20261015"
+            else "512" if target == "lab/aion-v16-a95-credential-key-stage-denial-20261015"
             else "480" if target == "lab/aion-v16-a90-historical-quality-security-rebaseline-20261015"
             else "448" if target == "lab/aion-v16-a89-json-action-payload-canonical-gate-20261015"
             else "416" if target == "lab/aion-v16-a88-outbox-redacted-payload-identity-20261015"
