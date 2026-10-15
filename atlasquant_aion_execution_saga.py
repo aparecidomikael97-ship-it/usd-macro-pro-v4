@@ -68,7 +68,8 @@ def _clean(value: Any, limit: int = 500) -> str:
 
 
 def _token(value: Any, name: str) -> str:
-    text = _clean(value, 128)
+    # Saga/step identities must not collide by silent 128-char truncation.
+    text = _clean(value, 129)
     if not _SAFE_TOKEN.fullmatch(text):
         raise ValueError(f"invalid {name}")
     return text
