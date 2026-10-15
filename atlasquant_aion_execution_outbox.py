@@ -56,8 +56,10 @@ def _clean(value: Any, limit: int = 500) -> str:
 
 
 def _token(value: Any, name: str, limit: int = 128) -> str:
-    text = _clean(value, limit)
-    if not _SAFE_TOKEN.fullmatch(text):
+    # Preserve opaque identity: reject overlong references; never alias distinct
+    # intent, authorization, policy or effect IDs by truncating them.
+    text = _clean(value, limit + 1)
+    if len(text) > limit or not _SAFE_TOKEN.fullmatch(text):
         raise ValueError(f"invalid {name}")
     return text
 
