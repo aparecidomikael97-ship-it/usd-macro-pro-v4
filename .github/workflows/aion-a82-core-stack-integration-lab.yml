@@ -37,16 +37,16 @@ jobs:
           python -m pip install pip==26.2.1
           pip install -r requirements.txt
       - name: Combined A77/A80/A79/A76/A74/A62 and provenance contracts
-        run: |
-          python -m unittest -q \
-            test_atlasquant_aion_a77_no_dormant_activation_constructors.py \
-            test_atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py \
-            test_atlasquant_aion_activation_denial_coverage_a76.py \
-            test_atlasquant_aion_h0_causal_denial_a79.py \
-            test_atlasquant_aion_saga_outcome_local_trust_a62.py \
-            test_atlasquant_aion_activation_authority_a74.py \
-            test_atlasquant_aion_convergence.py \
-            test_quality_workflow_coverage.py
+        run: >-
+          python -m unittest -q
+          test_atlasquant_aion_a77_no_dormant_activation_constructors.py
+          test_atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py
+          test_atlasquant_aion_activation_denial_coverage_a76.py
+          test_atlasquant_aion_h0_causal_denial_a79.py
+          test_atlasquant_aion_saga_outcome_local_trust_a62.py
+          test_atlasquant_aion_activation_authority_a74.py
+          test_atlasquant_aion_convergence.py
+          test_quality_workflow_coverage.py
 
   historical_quality:
     name: A82 canonical Quality unittest portion retained RED (ubuntu)
