@@ -1,0 +1,40 @@
+name: AION A79 LAB causal producer denial and recovery
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a78-pinned-lab-base-and-quality-coverage-20261014]
+    paths:
+      - test_atlasquant_aion_h0_causal_denial_a79.py
+      - .github/workflows/aion-a79-h0-causal-denial-lab.yml
+      - docs/aion/AION_A79_H0_CAUSAL_DENIAL_2026-10-14.md
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: A79 ${{ matrix.selection }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        selection: [directed, historical]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Existing pinned runtime only in ephemeral runner
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: No-network synthetic SQLite matrix (no historical waivers)
+        env:
+          A79_HEAD: ${{ github.event.pull_request.head.sha }}
+          A79_SELECTION: ${{ matrix.selection }}
+        run: |
+          python -c "import os,subprocess,sys; args=['--historical'] if os.environ['A79_SELECTION']=='historical' else []; sys.exit(subprocess.call([sys.executable,'-B','test_atlasquant_aion_h0_causal_denial_a79.py',*args]))"
