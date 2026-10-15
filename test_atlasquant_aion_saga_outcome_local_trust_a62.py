@@ -18,6 +18,9 @@ class A62UntrustedSagaOutcomeTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.store, self.outbox, self.budget, self.saga = self.f._components(self.tmp.name)
+        # addCleanup runs LIFO. Close SQLite before TemporaryDirectory
+        # cleanup, including if setUp or a test raises (Windows WinError 32).
+        self.addCleanup(self.store.close)
         self.f._create(self.saga)
         self.first = self.f._enqueue_forward(self.saga)
         self.assertEqual(self.saga.integrity_report("saga-1")["state"], "MATCH")
