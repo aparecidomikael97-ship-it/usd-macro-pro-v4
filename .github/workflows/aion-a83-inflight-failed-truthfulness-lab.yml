@@ -5,6 +5,8 @@ on:
     branches: [lab/aion-v16-a82-core-stack-integration-rehearsal-20261014]
     paths:
       - "atlasquant_aion_global_worker_inflight_reconciliation.py"
+      - "test_atlasquant_aion_convergence.py"
+      - ".github/workflows/quality-tests.yml"
       - "test_atlasquant_aion_a83_untrusted_failed_receipt.py"
       - ".github/workflows/aion-a83-inflight-failed-truthfulness-lab.yml"
 
@@ -38,3 +40,5 @@ jobs:
           test_atlasquant_aion_inflight_untrusted_receipts_a58
           test_atlasquant_aion_inflight_empty_witness_a66
           test_atlasquant_aion_inflight_receipt_safety_a71
+          test_atlasquant_aion_convergence
+          test_quality_workflow_coverage
