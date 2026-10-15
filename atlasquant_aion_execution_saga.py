@@ -20,8 +20,8 @@ import re
 from typing import Any, Mapping, Sequence
 
 from aion_chat.models import Scope
-from aion_chat.privacy import redact
 from aion_chat.store import SQLiteChatStore
+from atlasquant_aion_action_payload_gate import clean_action_payload
 from atlasquant_aion_cumulative_authority_budget import (
     CAPABILITY_CLASSES,
     CumulativeAuthorityBudget,
@@ -346,8 +346,10 @@ class ExecutionSagaCoordinator:
             else:
                 compensation_action = ""
                 compensation_risk = 0
-            payload = redact(dict(raw.get("payload") or {}))
-            compensation_payload = redact(dict(raw.get("compensation_payload") or {}))
+            # A89: both forward and rollback actions need the same
+            # identity-preserving pre-staging admission as the Outbox.
+            payload = clean_action_payload(raw.get("payload"))
+            compensation_payload = clean_action_payload(raw.get("compensation_payload"))
             normalized.append({
                 "ordinal": ordinal,
                 "step_key": key,
