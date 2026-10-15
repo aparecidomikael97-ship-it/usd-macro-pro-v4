@@ -1,0 +1,43 @@
+name: AION A84 LAB inflight clear cannot trust positive assessment alone
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a83-inflight-local-failed-proof-truthfulness-20261014]
+    paths:
+      - "atlasquant_aion_global_worker_inflight_resolution.py"
+      - "test_atlasquant_aion_a84_independent_inflight_staging.py"
+      - ".github/workflows/aion-a84-inflight-staging-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: A84 independent clear-staging authority (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Original dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: A84 with original A58, A66, A71, A83, A54 and Quality inventory
+        run: >-
+          python -m unittest -q
+          test_atlasquant_aion_a84_independent_inflight_staging
+          test_atlasquant_aion_inflight_untrusted_receipts_a58
+          test_atlasquant_aion_inflight_empty_witness_a66
+          test_atlasquant_aion_inflight_receipt_safety_a71
+          test_atlasquant_aion_a83_untrusted_failed_receipt
+          test_atlasquant_aion_convergence
+          test_quality_workflow_coverage
