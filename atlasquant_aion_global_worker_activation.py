@@ -158,9 +158,10 @@ def _runtime_armed_contract(
     }
 
 
-def _readiness_contract(
+def _readiness_local_diagnostic(
     readiness: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    """Structural local check only: READY here grants ZERO activation authority."""
     report = dict(readiness or {})
     blockers = list(report.get("blockers") or [])
     if (
@@ -191,9 +192,32 @@ def _readiness_contract(
     if checked_at is None:
         return {"state": "BLOCKED", "reason": "READINESS_TIMESTAMP_REQUIRED"}
 
-    # A74: a caller-supplied PASS/READY, even with four claimed True witness
-    # bits, is not an authenticated F1/T1 source/owner proof. Do not admit it.
-    # Keep structural failures above for diagnostics, never signal authority.
+    return {
+        "state": "READY",
+        "reason": "",
+        "checked_at": checked_at.isoformat(),
+        "feature_flag_state": str(feature.get("state") or ""),
+        "runtime_checkpoint_integrity": str(runtime.get("checkpoint_integrity") or ""),
+        "pulse_state": str(
+            ((report.get("pulse") or {}) if isinstance(report.get("pulse"), Mapping) else {}).get("state")
+            or ""
+        ),
+        "shadow_state": str(
+            ((report.get("shadow_protocol") or {}) if isinstance(report.get("shadow_protocol"), Mapping) else {}).get("state")
+            or ""
+        ),
+    }
+
+
+def _readiness_contract(
+    readiness: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Operational boundary: local structural READY can never imply F1/T1."""
+    diagnostic = _readiness_local_diagnostic(readiness)
+    if diagnostic.get("state") != "READY":
+        return diagnostic
+    # Even 'four True' in the caller mapping are forgeable without outside
+    # custody. This hard-stop cannot be overridden by caller-supplied evidence.
     return {
         "state": "BLOCKED",
         "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
@@ -371,7 +395,10 @@ def prepare_global_worker_activation_plan(
             "global_worker_executed": False,
         }
 
-    ready = _readiness_contract(readiness)
+    # Allow only structural diagnostics to evaluate later flag/reactivation
+    # error reasons. This helper is NEVER an operational authorization;
+    # the plan creation boundary below independently stays HARD BLOCKED.
+    ready = _readiness_local_diagnostic(readiness)
     if ready.get("state") != "READY":
         return {
             "schema": SCHEMA,
