@@ -34,7 +34,7 @@ CLAIM = {
     "expires_at": "2026-10-14T17:02:30Z",
     "witness_issuer": "synthetic-external-witness",
     "key_id": "synthetic-key-id",
-    "signature_b64": "NOT_A_VERIFIED_CRYPTOGRAPHIC_SIGNATURE",
+    "signature_b64": "A" * 86 + "==",  # 64 zero bytes, canonical Base64; NOT a signature
 }
 SNAPSHOT = {"head_sha": "a" * 40, "checkpoint_blob_sha": "b" * 40}
 
