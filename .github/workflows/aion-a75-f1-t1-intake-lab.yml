@@ -1,0 +1,31 @@
+name: AION A75 LAB F1 T1 untrusted witness intake
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a74-activation-plan-ticket-authority-hard-stop-20261014]
+    paths:
+      - "atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py"
+      - "test_atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py"
+      - ".github/workflows/aion-a75-f1-t1-intake-lab.yml"
+permissions:
+  contents: read
+jobs:
+  a75-deny-only:
+    name: A75 untrusted source remains blocked (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile A75 offline source
+        run: python -m py_compile atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py test_atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py
+      - name: Adversarial deny-only A75 suite
+        run: python -m unittest -v test_atlasquant_aion_f1_t1_untrusted_witness_intake_a75
