@@ -10,13 +10,10 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from atlasquant_aion_core_intelligence.context import Domain
-from atlasquant_aion_core_intelligence.evidence import digest, utc
+from atlasquant_aion_core_intelligence.evidence import utc
 from atlasquant_aion_core_runtime_bridge import authenticated_context
 from atlasquant_aion_global_worker import (
     _delegated_access,
-    _empty_lease,
-    _mutated,
-    attach_global_worker_state,
     load_global_worker_state,
 )
 from atlasquant_aion_global_worker_inflight_reconciliation import (
@@ -29,8 +26,9 @@ CONFIRMATION_PHRASE = "CONFIRMAR LIMPEZA INFLIGHT RECONCILIADO"
 # A66: a local EMPTY_BATCH is never proof of no effect, even when the
 # checkpoint's self-contained checksums are internally consistent. Do not
 # stage a conditional clear while independent F1/T1 custody is unenrolled.
-# The remaining historical terminal label is also unreachable without
-# independent receipt proof under the current conservative assessor.
+# Historical terminal label remains a recognized diagnosis, not an
+# authorization to clear. No independently enrolled proof can presently
+# certify terminal no-effect for a Global Worker inflight occurrence.
 CLEARABLE_STATUSES = frozenset({
     "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR",
 })
@@ -61,7 +59,7 @@ def stage_resolved_inflight_clear(
     confirmation_phrase: str,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Stage a clear only when recomputed evidence proves a clearable state."""
+    """Deny unsafe clear staging until external producer/source custody exists."""
     current = utc(now or _now())
     runtime = dict(runtime_result or {})
     checkpoint = runtime.get("checkpoint")
@@ -182,66 +180,32 @@ def stage_resolved_inflight_clear(
             "executes_action": False,
         }
 
-    if assessment_status == "UNVERIFIED_EMPTY_BATCH_REVIEW_REQUIRED":
-        return {
-            "schema": SCHEMA,
-            "status": "BLOCKED",
-            "reason": "INFLIGHT_RECONCILIATION_NOT_CLEARABLE",
-            "assessment_status": assessment_status,
-            "assessment": assessment,
-            "checkpoint": dict(checkpoint),
-            "requires_checkpoint_save": False,
-            "external_persisted": False,
-            "automatic_retry_allowed": False,
-            "executes_action": False,
-        }
-
-    resolution_payload = {
-        "runtime_sha": expected_sha,
-        "assessment_digest": str(assessment.get("reconciliation_digest") or ""),
-        "assessment_status": assessment_status,
-        "inflight_intent_id": str(inflight.get("intent_id") or ""),
-        "work_intent_digest": str(inflight.get("work_intent_digest") or ""),
-        "resolved_at": current.isoformat(),
-        "resolution": "CLEAR_RECONCILED_INFLIGHT",
-        "actor_id": context.actor_id,
-    }
-    resolution_digest = digest(resolution_payload)
-
-    next_state = _mutated(
-        state,
-        lease=_empty_lease(),
-        inflight_tick={},
-    )
-    staged_checkpoint = attach_global_worker_state(
-        checkpoint,
-        next_state,
-    )
+    # A84: no trusted producer terminal fence or F1/T1 external source
+    # witness is enrolled. A locally recomputed terminal-ready label can
+    # never authorize erasing in-flight state, even after human confirmation,
+    # expiry and matching delegation. These checks are necessary, not a
+    # substitute for independently authenticated causal absence evidence.
+    #
+    # In particular do NOT preserve a dormant positive checkpoint builder
+    # that could be revived by a future assessor-refactor or forged return.
     return {
         "schema": SCHEMA,
-        "status": "STAGED_CLEAR_READY",
-        "reason": "",
-        "checkpoint": staged_checkpoint,
-        "expected_sha": expected_sha,
+        "status": "BLOCKED",
+        "reason": (
+            "INDEPENDENT_INFLIGHT_CLEAR_PROOF_NOT_ENROLLED"
+            if assessment_status in CLEARABLE_STATUSES
+            else "INFLIGHT_RECONCILIATION_NOT_CLEARABLE"
+        ),
         "assessment_status": assessment_status,
-        "assessment_digest": str(assessment.get("reconciliation_digest") or ""),
-        "resolution_digest": resolution_digest,
-        "resolved_work_intent_digest": str(inflight.get("work_intent_digest") or ""),
-        "resolved_work_intent_count": int(inflight.get("work_intent_count") or 0),
-        "resolution": "CLEAR_RECONCILED_INFLIGHT",
-        "requires_checkpoint_save": True,
-        "conditional_write_required": True,
+        "assessment": assessment,
+        "checkpoint": dict(checkpoint),
+        "requires_checkpoint_save": False,
         "external_persisted": False,
-        "automatic_retry_allowed": False,
-        "automatic_clear_executed": False,
-        "global_worker_tick_executed": False,
-        "feature_flag_modified": False,
         "runtime_modified": False,
-        "external_business_action_executed": False,
-        "real_trading_enabled": False,
+        "feature_flag_modified": False,
+        "automatic_retry_allowed": False,
         "executes_action": False,
     }
-
 
 __all__ = [
     "SCHEMA",
