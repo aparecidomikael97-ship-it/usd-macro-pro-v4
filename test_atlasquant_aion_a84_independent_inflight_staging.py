@@ -4,6 +4,7 @@ The fixture is an offline claimed checkpoint. There are no provider calls,
 no real authority enrollment, and no Runtime CAS. This contract does not
 assert that monkeypatching a trusted Python module is a real external attack.
 """
+import inspect
 import unittest
 from copy import deepcopy
 from unittest.mock import patch
@@ -61,21 +62,20 @@ class A84IndependentInflightStagingGateTests(unittest.TestCase):
                 self.assertEqual(self.claimed, self.original)
 
     def test_02_patched_positive_label_never_invokes_checkpoint_mutation(self):
-        with patch(
-            "atlasquant_aion_global_worker_inflight_resolution._mutated",
-            side_effect=AssertionError("A84_CLEAR_MUTATION_FORBIDDEN"),
-        ) as mutate:
-            result = self.stage({
-                "status": "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR",
-                "terminal_proven": 1,
-                "reconciliation_digest": "A84-FORGED-LOCAL",
-                "automatic_clear_allowed": False,
-            })
-        mutate.assert_not_called()
+        result = self.stage({
+            "status": "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR",
+            "terminal_proven": 1,
+            "reconciliation_digest": "A84-FORGED-LOCAL",
+            "automatic_clear_allowed": False,
+        })
         self.assertEqual(result["status"], "BLOCKED")
         self.assertFalse(result["requires_checkpoint_save"])
         self.assertEqual(self.claimed, self.original)
-
+        # A dormant positive constructor must not survive beneath a gate:
+        # a future change to the assessor cannot revive the stale pathway.
+        source = inspect.getsource(stage_resolved_inflight_clear)
+        self.assertNotIn('"STAGED_CLEAR_READY"', source)
+        self.assertNotIn("attach_global_worker_state(", source)
 
 if __name__ == "__main__":
     unittest.main()
