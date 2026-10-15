@@ -158,9 +158,10 @@ def _runtime_armed_contract(
     }
 
 
-def _readiness_contract(
+def _readiness_local_diagnostic(
     readiness: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    """Structural local check only: READY here grants ZERO activation authority."""
     report = dict(readiness or {})
     blockers = list(report.get("blockers") or [])
     if (
@@ -205,6 +206,21 @@ def _readiness_contract(
             ((report.get("shadow_protocol") or {}) if isinstance(report.get("shadow_protocol"), Mapping) else {}).get("state")
             or ""
         ),
+    }
+
+
+def _readiness_contract(
+    readiness: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Operational boundary: local structural READY can never imply F1/T1."""
+    diagnostic = _readiness_local_diagnostic(readiness)
+    if diagnostic.get("state") != "READY":
+        return diagnostic
+    # Even 'four True' in the caller mapping are forgeable without outside
+    # custody. This hard-stop cannot be overridden by caller-supplied evidence.
+    return {
+        "state": "BLOCKED",
+        "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
     }
 
 
@@ -379,7 +395,10 @@ def prepare_global_worker_activation_plan(
             "global_worker_executed": False,
         }
 
-    ready = _readiness_contract(readiness)
+    # Allow only structural diagnostics to evaluate later flag/reactivation
+    # error reasons. This helper is NEVER an operational authorization;
+    # the plan creation boundary below independently stays HARD BLOCKED.
+    ready = _readiness_local_diagnostic(readiness)
     if ready.get("state") != "READY":
         return {
             "schema": SCHEMA,
@@ -434,6 +453,17 @@ def prepare_global_worker_activation_plan(
             "feature_flag_modified": False,
             "global_worker_executed": False,
         }
+
+    # A74: _readiness_contract denial is necessary but NOT sufficient.
+    # Hard-stop the direct public plan creator even if a future refactor or
+    # patched caller supplies synthetic READY or a mocked local result.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
+        "feature_flag_modified": False,
+        "global_worker_executed": False,
+    }
 
     expires = current + timedelta(seconds=ttl)
     plan = {
@@ -511,6 +541,16 @@ def approve_global_worker_activation_plan(
     if expires is None or current >= expires:
         return {"schema": SCHEMA, "status": "BLOCKED", "reason": "ACTIVATION_PLAN_EXPIRED"}
 
+    # A74: legacy/self-hashed plans must not mint an operational approval.
+    # Actor, phrase, hash and TTL are structural diagnostics only.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
+        "feature_flag_modified": False,
+        "global_worker_executed": False,
+    }
+
     ticket = {
         "schema": APPROVAL_SCHEMA,
         "plan_digest": str(plan.get("plan_digest") or ""),
@@ -587,11 +627,11 @@ def validate_global_worker_activation_approval(
     if str(ticket.get("confirmation_phrase_digest") or "") != digest(CONFIRMATION_PHRASE):
         return {"state": "BLOCKED", "reason": "ACTIVATION_APPROVAL_CONFIRMATION_PROOF_MISMATCH"}
 
+    # A74: validation is also callable directly, including for a previously
+    # self-hashed ticket. Rechecking local SHA/TTL is not witness custody.
     return {
-        "state": "APPROVED",
-        "reason": "",
-        "approval_digest": str(ticket.get("approval_digest") or ""),
-        "runtime_sha": runtime["runtime_sha"],
+        "state": "BLOCKED",
+        "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
     }
 
 

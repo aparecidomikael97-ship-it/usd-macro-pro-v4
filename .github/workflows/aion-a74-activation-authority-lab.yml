@@ -1,0 +1,35 @@
+name: AION A74 LAB activation authority hard stop
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a73-readiness-requires-external-source-witness-20261014]
+    paths:
+      - "atlasquant_aion_global_worker_activation.py"
+      - "test_atlasquant_aion_activation_authority_a74.py"
+      - ".github/workflows/aion-a74-activation-authority-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  a74:
+    name: A74 deny forged plans and legacy tickets (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Existing pinned dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: A74 + A73/A72/A71/A58 negative security tests
+        run: python -m unittest -v test_atlasquant_aion_activation_authority_a74 test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_inflight_attempt_a72 test_atlasquant_aion_inflight_receipt_safety_a71 test_atlasquant_aion_inflight_untrusted_receipts_a58
