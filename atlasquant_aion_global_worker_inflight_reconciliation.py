@@ -180,7 +180,8 @@ def assess_global_inflight_reconciliation(
     # Until independent receipt custody is enrolled, terminal-looking rows
     # are observations only and may not authorize an inflight clear.
     local_terminal_unverified = 0
-    failed_proven = 0
+    failed_proven = 0  # Never incremented from mutable local checkpoints.
+    local_failed_unverified = 0
     no_terminal_evidence = 0
     inconsistent = 0
 
@@ -235,8 +236,12 @@ def assess_global_inflight_reconciliation(
             local_terminal_unverified += 1
             no_terminal_evidence += 1
         elif failed:
-            classification = "FAILED_PROVEN"
-            failed_proven += 1
+            # A83: even a digest-consistent, locally persisted FAILED row is
+            # neither authenticated producer absence nor a terminal fence.
+            # Do not advertise FAILED_PROVEN to an operator or later consumer.
+            classification = "LOCAL_FAILED_UNVERIFIED"
+            local_failed_unverified += 1
+            no_terminal_evidence += 1
         else:
             classification = "NO_TERMINAL_EVIDENCE"
             no_terminal_evidence += 1
@@ -317,6 +322,7 @@ def assess_global_inflight_reconciliation(
         "terminal_proven": terminal_proven,
         "local_terminal_unverified": local_terminal_unverified,
         "failed_proven": failed_proven,
+        "local_failed_unverified": local_failed_unverified,
         "no_terminal_evidence": no_terminal_evidence,
         "inconsistent_evidence": inconsistent,
         "unsafe_evidence": unsafe_evidence,

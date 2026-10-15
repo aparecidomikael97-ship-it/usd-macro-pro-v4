@@ -132,6 +132,9 @@ A54_PINNED_LAB_BASES = {
     # A82 integrated LAB review may target only the pinned A81 parent.
     "lab/aion-v16-a81-windows-a62-sqlite-cleanup-20261014":
         "881c0c1e45e0695591894bec234efbac6d563f27",
+    # A83 may target ONLY reviewed A82 head, not a mutable branch.
+    "lab/aion-v16-a82-core-stack-integration-rehearsal-20261014":
+        "70c1c59236e00ff6b11b7f7dec6e32913997720a",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -184,7 +187,8 @@ def _production_base():
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
             # A74/A75/A76 retain the same A49 provenance ancestry with
             # a bounded depth; no shallow-clone bypass or local-main fallback.
-            "288" if target == "lab/aion-v16-a81-windows-a62-sqlite-cleanup-20261014"
+            "320" if target == "lab/aion-v16-a82-core-stack-integration-rehearsal-20261014"
+            else "288" if target == "lab/aion-v16-a81-windows-a62-sqlite-cleanup-20261014"
             else "256" if target in {
                 "lab/aion-v16-a74-activation-plan-ticket-authority-hard-stop-20261014",
                 "lab/aion-v16-a75-f1-t1-untrusted-witness-intake-20261014",
