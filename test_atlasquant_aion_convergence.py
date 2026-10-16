@@ -162,6 +162,9 @@ A54_PINNED_LAB_BASES = {
     # A104 rechecks the historical suite on the exact completed A103 laboratory HEAD.
     "lab/aion-v16-a103-bounded-json-action-stage-20261015":
         "7bc29d1b023043b14681a09174538511e9b8e097",
+    # A112 checks only the exact A111 historical rebaseline snapshot; no floating lab branch.
+    "lab/aion-v16-a111-historical-rebaseline-a110-20261016":
+        "a0cc38d62aa9fce9e3eef14c3eb74c84145e3b27",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -214,7 +217,8 @@ def _production_base():
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
             # A74/A75/A76 retain the same A49 provenance ancestry with
             # a bounded depth; no shallow-clone bypass or local-main fallback.
-            "608" if target == "lab/aion-v16-a103-bounded-json-action-stage-20261015"
+            "704" if target == "lab/aion-v16-a111-historical-rebaseline-a110-20261016"
+            else "608" if target == "lab/aion-v16-a103-bounded-json-action-stage-20261015"
             else "576" if target == "lab/aion-v16-a100-qa-security-rebaseline-a96-20261015"
             else "544" if target == "lab/aion-v16-a96-extended-auth-header-denial-20261015"
             else "512" if target == "lab/aion-v16-a95-credential-key-stage-denial-20261015"
