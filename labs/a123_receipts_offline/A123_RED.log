@@ -1,0 +1,109 @@
+test_01_allows_preparation_with_binding (test_contract.ContractTests.test_01_allows_preparation_with_binding) ... ok
+test_02_issuance_marks_unknown_before_fake_call (test_contract.ContractTests.test_02_issuance_marks_unknown_before_fake_call) ... ok
+test_03_second_issue_never_auto_resends (test_contract.ContractTests.test_03_second_issue_never_auto_resends) ... ok
+test_04_preparation_cannot_reopen_consumed (test_contract.ContractTests.test_04_preparation_cannot_reopen_consumed) ... ok
+test_05_reject_tenant_swap (test_contract.ContractTests.test_05_reject_tenant_swap) ... ok
+test_06_reject_destination_swap (test_contract.ContractTests.test_06_reject_destination_swap) ... ok
+test_07_reject_payload_swap (test_contract.ContractTests.test_07_reject_payload_swap) ... ok
+test_08_reject_epoch_replay (test_contract.ContractTests.test_08_reject_epoch_replay) ... ok
+test_09_reject_wrong_account_and_owner (test_contract.ContractTests.test_09_reject_wrong_account_and_owner) ... ok
+test_10_no_unenrolled_operation (test_contract.ContractTests.test_10_no_unenrolled_operation) ... ok
+test_11_enrollment_mock_off (test_contract.ContractTests.test_11_enrollment_mock_off) ... ok
+test_12_vault_offline_before_prepare (test_contract.ContractTests.test_12_vault_offline_before_prepare) ... ok
+test_13_prepare_crash_before_anchor_can_resume (test_contract.ContractTests.test_13_prepare_crash_before_anchor_can_resume) ... ok
+test_14_prepare_crash_after_anchor_can_resume (test_contract.ContractTests.test_14_prepare_crash_after_anchor_can_resume) ... ok
+test_15_prepare_crash_after_commit_can_resume (test_contract.ContractTests.test_15_prepare_crash_after_commit_can_resume) ... ok
+test_16_issue_crash_after_local_marker_is_no_retry (test_contract.ContractTests.test_16_issue_crash_after_local_marker_is_no_retry) ... ok
+test_17_issue_crash_after_worm_mark_is_no_retry (test_contract.ContractTests.test_17_issue_crash_after_worm_mark_is_no_retry) ... ok
+test_18_issue_crash_before_sender_is_no_retry (test_contract.ContractTests.test_18_issue_crash_before_sender_is_no_retry) ... ok
+test_19_issue_crash_after_sender_is_no_retry (test_contract.ContractTests.test_19_issue_crash_after_sender_is_no_retry) ... ok
+test_20_response_timeout_is_unknown_and_no_retry (test_contract.ContractTests.test_20_response_timeout_is_unknown_and_no_retry) ... ok
+test_21_five_xx_failure_no_retry (test_contract.ContractTests.test_21_five_xx_failure_no_retry) ... ok
+test_22_signer_down_on_issue_no_sender (test_contract.ContractTests.test_22_signer_down_on_issue_no_sender) ... ok
+test_23_signer_fails_after_db_mark_blocks_retry (test_contract.ContractTests.test_23_signer_fails_after_db_mark_blocks_retry) ... ok
+test_24_vault_offline_after_db_mark_no_effect (test_contract.ContractTests.test_24_vault_offline_after_db_mark_no_effect) ... ok
+test_25_fake_receipt_modified_rejected (test_contract.ContractTests.test_25_fake_receipt_modified_rejected) ... /usr/lib/python3.13/dataclasses.py:1323: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f41f9a80>
+  return tuple(f for f in fields.values() if f._field_type is _FIELD)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_26_receipt_cross_tenant_rejected (test_contract.ContractTests.test_26_receipt_cross_tenant_rejected) ... ok
+test_27_provider_commit_claim_never_derived (test_contract.ContractTests.test_27_provider_commit_claim_never_derived) ... ok
+test_28_audit_event_tamper_rejected (test_contract.ContractTests.test_28_audit_event_tamper_rejected) ... ok
+test_29_deleted_audit_event_rejected (test_contract.ContractTests.test_29_deleted_audit_event_rejected) ... ok
+test_30_replay_nonce_denied (test_contract.ContractTests.test_30_replay_nonce_denied) ... ERROR
+test_31_pre_fence_then_issue_denied (test_contract.ContractTests.test_31_pre_fence_then_issue_denied) ... ok
+test_32_issue_then_pre_fence_denied (test_contract.ContractTests.test_32_issue_then_pre_fence_denied) ... ok
+test_33_simulated_worm_rollback_with_surviving_local_marker_denies (test_contract.ContractTests.test_33_simulated_worm_rollback_with_surviving_local_marker_denies) ... ok
+test_34_simulated_local_rollback_with_surviving_vault_mark_denies (test_contract.ContractTests.test_34_simulated_local_rollback_with_surviving_vault_mark_denies) ... ok
+test_35_known_counterexample_joint_rollback_allows_duplicate (test_contract.ContractTests.test_35_known_counterexample_joint_rollback_allows_duplicate)
+Expected PASS when proving NOT independent custody; remains P0 OPEN. ... ok
+test_36_key_rotated_without_verifier_fails_closed (test_contract.ContractTests.test_36_key_rotated_without_verifier_fails_closed) ... ok
+test_37_zero_prod_permission (test_contract.ContractTests.test_37_zero_prod_permission) ... ok
+test_38_32_local_processes_only_one_issues (test_contract.ContractTests.test_38_32_local_processes_only_one_issues) ... /usr/lib/python3.13/multiprocessing/popen_fork.py:67: DeprecationWarning: This process (pid=9714) is multi-threaded, use of fork() may lead to deadlocks in the child.
+  self.pid = os.fork()
+/usr/lib/python3.13/multiprocessing/popen_fork.py:25: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  def poll(self, flag=os.WNOHANG):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/multiprocessing/popen_fork.py:25: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  def poll(self, flag=os.WNOHANG):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/weakref.py:216: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  yield k, v
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/weakref.py:216: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  yield k, v
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/multiprocessing/process.py:302: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  _parent_process = _ParentProcess(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/multiprocessing/process.py:302: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  _parent_process = _ParentProcess(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/functools.py:36: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  def update_wrapper(wrapper,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/functools.py:36: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  def update_wrapper(wrapper,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/contextlib.py:112: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  doc = getattr(func, "__doc__", None)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/contextlib.py:112: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  doc = getattr(func, "__doc__", None)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/dataclasses.py:1323: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  return tuple(f for f in fields.values() if f._field_type is _FIELD)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/dataclasses.py:1323: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  return tuple(f for f in fields.values() if f._field_type is _FIELD)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/mnt/data/aion_a123/labs/a123_receipts_offline/contract.py:105: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  db.execute("INSERT OR IGNORE INTO metadata VALUES(1,0,'GENESIS')")
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/mnt/data/aion_a123/labs/a123_receipts_offline/contract.py:105: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  db.execute("INSERT OR IGNORE INTO metadata VALUES(1,0,'GENESIS')")
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/json/encoder.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d3790>
+  _iterencode = c_make_encoder(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/json/encoder.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7fb1f43d33d0>
+  _iterencode = c_make_encoder(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+
+======================================================================
+ERROR: test_30_replay_nonce_denied (test_contract.ContractTests.test_30_replay_nonce_denied)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/aion_a123/labs/a123_receipts_offline/test_contract.py", line 219, in test_30_replay_nonce_denied
+    with self.assertRaises(Denied):self.vault.record(self.intent,"ISSUE_ONCE","PREPARE-NONCE-00001")
+                                   ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/aion_a123/labs/a123_receipts_offline/contract.py", line 160, in record
+    db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?)",(seq+1,intent.intent_id,intent.binding,kind,nonce,head,commitment,signature,self.signer.key_id))
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: events.nonce
+
+----------------------------------------------------------------------
+Ran 38 tests in 0.276s
+
+FAILED (errors=1)
