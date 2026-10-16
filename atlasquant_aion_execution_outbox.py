@@ -558,23 +558,41 @@ class ExecutionOutbox:
     def _set_blocked(
         self, key: str, state: str, reason: str, *, expected: Mapping[str, Any],
     ) -> dict[str, Any]:
-        """Block only the same observed state and lease, never a later effect."""
+        """Revoke only an unchanged pre-dispatch claim; never an ambiguous effect.
+
+        Local authorization may forbid a not-yet-dispatched CLAIMED intent,
+        but cannot certify that UNCERTAIN/SENT has no possible late effect.
+        An already persisted effect row or dispatch metadata also prevents a
+        terminal-looking local downgrade, even when an injected caller supplies
+        a matching claim snapshot. This is not a producer receipt verifier.
+        """
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
-        if _clean(expected.get("idempotency_key"), 64) != key:
+        if _outbox_key(expected.get("idempotency_key")) != key:
             raise ValueError("expected intent key mismatch")
         seen_state = _clean(expected.get("state"), 32)
-        if seen_state not in {"CLAIMED", "UNCERTAIN", "SENT"}:
+        if seen_state in {"UNCERTAIN", "SENT"}:
+            raise PermissionError("UNCERTAIN_EFFECT_STATE_CANNOT_BE_REVOKED")
+        if seen_state != "CLAIMED":
             raise ValueError("expected state cannot be blocked")
         with self.db:
             changed = self.db.execute(
                 """UPDATE action_outbox
                    SET state=?,lease_owner='',lease_until='',last_error=?
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state=? AND lease_owner=? AND lease_until=?""",
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?
+                     AND dispatch_started_at='' AND sent_at=''
+                     AND confirmed_at='' AND effect_ref=''
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                           AND e.owner=action_outbox.owner
+                           AND e.tenant=action_outbox.tenant
+                           AND e.workspace=action_outbox.workspace
+                     )""",
                 (
                     state, _clean(reason, 240), key, *self._scope_args(),
-                    seen_state, _clean(expected.get("lease_owner"), 128),
+                    _clean(expected.get("lease_owner"), 128),
                     _clean(expected.get("lease_until"), 128),
                 ),
             )
