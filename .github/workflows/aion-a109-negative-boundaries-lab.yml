@@ -1,0 +1,41 @@
+name: AION A109 LAB deny-only inflight and witness boundary tests
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a108-strict-outbox-keys-20261015]
+    paths:
+      - "test_atlasquant_aion_a109_negative_boundary_chain.py"
+      - ".github/workflows/aion-a109-negative-boundaries-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  denial_matrix:
+    name: A109 fail-closed only (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install previously pinned dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: A109 denial-only contracts and existing A84/A66/A71/A83/A108
+        run: >-
+          python -m unittest -q
+          test_atlasquant_aion_a109_negative_boundary_chain
+          test_atlasquant_aion_a84_independent_inflight_staging
+          test_atlasquant_aion_inflight_empty_witness_a66
+          test_atlasquant_aion_inflight_receipt_safety_a71
+          test_atlasquant_aion_a83_untrusted_failed_receipt
+          test_atlasquant_aion_a108_exact_outbox_key
