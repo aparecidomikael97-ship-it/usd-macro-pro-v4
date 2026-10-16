@@ -446,7 +446,16 @@ class ExecutionOutbox:
                    SET state='RETRY',lease_owner='',lease_until='',
                        last_error='CLAIM_LEASE_EXPIRED_BEFORE_DISPATCH'
                    WHERE owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_until<>'' AND lease_until<?""",
+                     AND state='CLAIMED' AND lease_until<>'' AND lease_until<?
+                     -- A113: only a clearly pre-dispatch lease may be recycled.
+                     -- Any possible-effect marker or ledger row is quarantined
+                     -- as CLAIMED rather than silently re-entering RETRY.
+                     AND dispatch_started_at='' AND sent_at=''
+                     AND confirmed_at='' AND effect_ref=''
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                     )""",
                 (*self._scope_args(), current),
             )
             count = int(cursor.rowcount)
@@ -480,6 +489,16 @@ class ExecutionOutbox:
                    JOIN action_decisions d ON d.decision_id=o.decision_id
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
                      AND o.state IN ('PENDING','RETRY')
+                     -- A113: do not reclaim even a locally forged PENDING/
+                     -- RETRY if effect evidence or dispatch metadata exists.
+                     -- This is only a local fence, not an independent receipt.
+                     AND o.dispatch_started_at='' AND o.sent_at=''
+                     AND o.confirmed_at='' AND o.effect_ref=''
+                     AND o.lease_owner='' AND o.lease_until=''
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=o.idempotency_key
+                     )
                      -- A.45: while no independently verifiable producer
                      -- admission exists, ONLY the first ordinal of each
                      -- scoped aggregate may be claimed. A previous Outbox row
@@ -501,7 +520,15 @@ class ExecutionOutbox:
                 """UPDATE action_outbox
                    SET state='CLAIMED',lease_owner=?,lease_until=?,attempts=attempts+1,last_error=''
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state IN ('PENDING','RETRY')""",
+                     AND state IN ('PENDING','RETRY')
+                     -- Recheck the exact admission contract in this CAS.
+                     AND dispatch_started_at='' AND sent_at=''
+                     AND confirmed_at='' AND effect_ref=''
+                     AND lease_owner='' AND lease_until=''
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                     )""",
                 (worker, lease_until, key, owner, tenant, workspace),
             )
             if cursor.rowcount != 1:
