@@ -395,6 +395,11 @@ class ExecutionSagaCoordinator:
             current = self.get(sid)
             if current["plan_digest"] != plan_digest:
                 raise ValueError("saga idempotency collision")
+            # A114: a matching plan digest alone cannot validate a corrupt
+            # existing event chain or forged terminal local Saga projection.
+            # This proves only local consistency, not external effect custody.
+            if self.integrity_report(sid)["state"] != "MATCH":
+                raise PermissionError("SAGA_LOCAL_INTEGRITY_MISMATCH")
             return {**current, "create_state": "IDEMPOTENT"}
 
         created = _iso(_utc(created_at))
@@ -972,6 +977,19 @@ class ExecutionSagaCoordinator:
         }
         if _digest(plan) != saga["plan_digest"]:
             blockers.append("PLAN_DIGEST_MISMATCH")
+        # A114: the immutable PLAN digest excludes mutable step projections.
+        # Enqueued work cannot silently be rewritten to PENDING while keeping
+        # its Outbox key, nor can ENQUEUED survive without its stored binding.
+        # This is a local consistency fence; a full coordinated SQLite
+        # rewrite still requires an independent external witness to detect.
+        for step in saga["steps"]:
+            if step["state"] == "PENDING" and (
+                step["outbox_key"] or step["effect_ref"]
+                or step["compensation_outbox_key"] or step["compensation_effect_ref"]
+            ):
+                blockers.append("PENDING_STEP_HAS_OUTBOX_BINDING")
+            if step["state"] == "ENQUEUED" and not step["outbox_key"]:
+                blockers.append("ENQUEUED_STEP_WITHOUT_OUTBOX_BINDING")
         if rows and rows[0]["detail_digest"] != _digest({
             "plan_digest": saga["plan_digest"], "forward_risk_points": forward_risk,
             "worst_case_risk_points": worst_case_risk,
