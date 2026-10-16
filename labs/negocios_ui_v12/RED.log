@@ -1,0 +1,85 @@
+test_01_qualification_revoked_after_changed_evidence (__main__.AdversarialUI.test_01_qualification_revoked_after_changed_evidence) ... FAIL
+test_02_qualified_metric_tracks_simulated_stage (__main__.AdversarialUI.test_02_qualified_metric_tracks_simulated_stage) ... FAIL
+test_03_payment_third_decimal_not_silently_rounded (__main__.AdversarialUI.test_03_payment_third_decimal_not_silently_rounded) ... FAIL
+test_04_payment_exponent_not_silently_accepted (__main__.AdversarialUI.test_04_payment_exponent_not_silently_accepted) ... FAIL
+test_05_quantity_exponent_not_silently_accepted (__main__.AdversarialUI.test_05_quantity_exponent_not_silently_accepted) ... FAIL
+test_06_missed_reverse_guarantee_phrase (__main__.AdversarialUI.test_06_missed_reverse_guarantee_phrase) ... FAIL
+test_07_missed_sales_percentage_phrase (__main__.AdversarialUI.test_07_missed_sales_percentage_phrase) ... FAIL
+test_08_mobile_navigation_exposes_active_page (__main__.AdversarialUI.test_08_mobile_navigation_exposes_active_page) ... FAIL
+
+======================================================================
+FAIL: test_01_qualification_revoked_after_changed_evidence (__main__.AdversarialUI.test_01_qualification_revoked_after_changed_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 29, in test_01_qualification_revoked_after_changed_evidence
+    self.assertNotIn('OPORTUNIDADE',p.locator('#triage-stage').inner_text(), 'stale qualification cannot survive withdrawn evidence')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'OPORTUNIDADE' unexpectedly found in 'OPORTUNIDADE (SIMULADA)' : stale qualification cannot survive withdrawn evidence
+
+======================================================================
+FAIL: test_02_qualified_metric_tracks_simulated_stage (__main__.AdversarialUI.test_02_qualified_metric_tracks_simulated_stage)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 35, in test_02_qualified_metric_tracks_simulated_stage
+    self.assertNotEqual(initial,p.locator('#metric-qualified').inner_text())
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '02' == '02'
+
+======================================================================
+FAIL: test_03_payment_third_decimal_not_silently_rounded (__main__.AdversarialUI.test_03_payment_third_decimal_not_silently_rounded)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 41, in test_03_payment_third_decimal_not_silently_rounded
+    self.assertIn('INVÁLIDO',p.locator('#payment-badge').inner_text())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'INVÁLIDO' not found in 'PARCIAL NO EXEMPLO'
+
+======================================================================
+FAIL: test_04_payment_exponent_not_silently_accepted (__main__.AdversarialUI.test_04_payment_exponent_not_silently_accepted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 45, in test_04_payment_exponent_not_silently_accepted
+    self.assertIn('INVÁLIDO',p.locator('#payment-badge').inner_text())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'INVÁLIDO' not found in 'PARCIAL NO EXEMPLO'
+
+======================================================================
+FAIL: test_05_quantity_exponent_not_silently_accepted (__main__.AdversarialUI.test_05_quantity_exponent_not_silently_accepted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 49, in test_05_quantity_exponent_not_silently_accepted
+    self.assertIn('INVÁLIDO',p.locator('#stock-badge').inner_text())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'INVÁLIDO' not found in 'SUFICIENTE NO EXEMPLO'
+
+======================================================================
+FAIL: test_06_missed_reverse_guarantee_phrase (__main__.AdversarialUI.test_06_missed_reverse_guarantee_phrase)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 54, in test_06_missed_reverse_guarantee_phrase
+    self.assertIn('ALERTA',p.locator('#proposal-result').inner_text())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'ALERTA' not found in 'Nenhuma expressão proibida encontrada pelo filtro simplificado. Ainda é rascunho fictício NÃO ENVIADO; exige revisão humana integral. Aviso obrigatório: Nosso compromisso é organizar processos, registros e acompanhamento de oportunidades, com entregas e indicadores definidos no escopo. Isso pode contribuir para um atendimento melhor, mas não garantimos aumento de vendas, faturamento ou lucro.'
+
+======================================================================
+FAIL: test_07_missed_sales_percentage_phrase (__main__.AdversarialUI.test_07_missed_sales_percentage_phrase)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 59, in test_07_missed_sales_percentage_phrase
+    self.assertIn('ALERTA',p.locator('#proposal-result').inner_text())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'ALERTA' not found in 'Nenhuma expressão proibida encontrada pelo filtro simplificado. Ainda é rascunho fictício NÃO ENVIADO; exige revisão humana integral. Aviso obrigatório: Nosso compromisso é organizar processos, registros e acompanhamento de oportunidades, com entregas e indicadores definidos no escopo. Isso pode contribuir para um atendimento melhor, mas não garantimos aumento de vendas, faturamento ou lucro.'
+
+======================================================================
+FAIL: test_08_mobile_navigation_exposes_active_page (__main__.AdversarialUI.test_08_mobile_navigation_exposes_active_page)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/atlasquant_negocios_ui_v12/test_adversarial.py", line 62, in test_08_mobile_navigation_exposes_active_page
+    self.assertEqual(p.locator('.bottom-nav [data-tab="triagem"]').get_attribute('aria-current'),'page')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: None != 'page'
+
+----------------------------------------------------------------------
+Ran 8 tests in 3.819s
+
+FAILED (failures=8)
