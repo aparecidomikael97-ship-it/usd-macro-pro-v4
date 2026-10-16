@@ -1,0 +1,5 @@
+option,atomic_admission,immutable_evidence,admin_independence,notable_limitation,decision,external_validation
+AWS DynamoDB plus S3 Object Lock Compliance plus KMS,Regional conditional transactions,S3 protected object version with retention,Separate account and policies REQUIRED,No atomic DB-S3 commit and protected versions can be superseded,PRIORITY FOR FUTURE DESIGN REVIEW,NOT_EXECUTED
+Google Firestore plus Cloud Storage Bucket Lock,Serializable Firestore transactions,Locked bucket retention,Separate project and roles REQUIRED,No atomic Firestore-Storage commit and irreversible retention,ALTERNATIVE FOR FUTURE DESIGN REVIEW,NOT_EXECUTED
+Cloudflare Durable Objects alone,Strongly consistent transactional SQLite,NO INDEPENDENT WORM IN THIS DESIGN,Separate account not sufficient without immutable witness,PITR can restore embedded SQLite state,NOT SUFFICIENT ALONE,NOT_EXECUTED
+Local SQLite or same-admin GitHub or SQS FIFO,Varies,NO INDEPENDENT ANTIROLLBACK,FAIL SAME TRUST DOMAIN,Replay-rollback-or-TTL bypass class,NOT QUALIFIED,NOT_EXECUTED
