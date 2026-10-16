@@ -165,6 +165,9 @@ A54_PINNED_LAB_BASES = {
     # A112 checks only the exact A111 historical rebaseline snapshot; no floating lab branch.
     "lab/aion-v16-a111-historical-rebaseline-a110-20261016":
         "a0cc38d62aa9fce9e3eef14c3eb74c84145e3b27",
+    # A113 trusts ONLY the immutable A112 HEAD as LAB base, still checking A49.
+    "lab/aion-v16-a112-canonical-qa-and-base-pin-20261016":
+        "1350a45a31c9b53185d5a8771b437a49c580772d",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -217,7 +220,8 @@ def _production_base():
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
             # A74/A75/A76 retain the same A49 provenance ancestry with
             # a bounded depth; no shallow-clone bypass or local-main fallback.
-            "704" if target == "lab/aion-v16-a111-historical-rebaseline-a110-20261016"
+            "736" if target == "lab/aion-v16-a112-canonical-qa-and-base-pin-20261016"
+            else "704" if target == "lab/aion-v16-a111-historical-rebaseline-a110-20261016"
             else "608" if target == "lab/aion-v16-a103-bounded-json-action-stage-20261015"
             else "576" if target == "lab/aion-v16-a100-qa-security-rebaseline-a96-20261015"
             else "544" if target == "lab/aion-v16-a96-extended-auth-header-denial-20261015"
