@@ -1,0 +1,44 @@
+name: AION A110 LAB ambiguous Outbox states never locally revoked
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a109-negative-boundaries-20261016]
+    paths:
+      - "atlasquant_aion_execution_outbox.py"
+      - "test_atlasquant_aion_a110_outbox_ambiguous_block.py"
+      - ".github/workflows/aion-a110-ambiguous-state-denial-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  negative_authority:
+    name: A110 negative state fences (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: A110 with A109 A108 and A107 negative regressions
+        run: >-
+          python -m unittest -q
+          test_atlasquant_aion_a110_outbox_ambiguous_block
+          test_atlasquant_aion_a109_negative_boundary_chain
+          test_atlasquant_aion_a108_exact_outbox_key
+          test_atlasquant_aion_a107_bounded_authority_claims
+          test_atlasquant_aion_outbox_fifo_local_terminal_denial
+          test_atlasquant_aion_outbox_missing_predecessor_denial
+          test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_revocation_at_use_blocks_without_calling_adapter
+          test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_policy_change_forces_reapproval_before_external_boundary
