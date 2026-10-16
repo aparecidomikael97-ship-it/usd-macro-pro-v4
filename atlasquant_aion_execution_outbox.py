@@ -746,6 +746,18 @@ class ExecutionOutbox:
                WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                  AND state='CLAIMED' AND lease_owner=?
                  AND lease_until=? AND lease_until>?
+                 -- A118: an inconsistent CLAIMED row with any possible-effect
+                 -- marker is NOT pre-dispatch, even if its lease and policy
+                 -- still pass. This local guard is not producer attestation.
+                 AND dispatch_started_at='' AND sent_at=''
+                 AND confirmed_at='' AND effect_ref=''
+                 AND NOT EXISTS (
+                     SELECT 1 FROM action_effects e
+                     WHERE e.idempotency_key=action_outbox.idempotency_key
+                       AND e.owner=action_outbox.owner
+                       AND e.tenant=action_outbox.tenant
+                       AND e.workspace=action_outbox.workspace
+                 )
                  AND EXISTS (
                      SELECT 1 FROM action_decisions d
                      WHERE d.decision_id=action_outbox.decision_id
@@ -781,6 +793,10 @@ class ExecutionOutbox:
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                      AND state='CLAIMED' AND lease_owner=? AND lease_until=?
                      AND lease_until>?
+                     -- Repeat the A118 clean pre-dispatch fence under the
+                     -- same transactional CAS that persists BLOCKED_PRODUCER.
+                     AND dispatch_started_at='' AND sent_at=''
+                     AND confirmed_at='' AND effect_ref=''
                      AND NOT EXISTS (
                          SELECT 1 FROM action_effects e
                          WHERE e.idempotency_key=action_outbox.idempotency_key
