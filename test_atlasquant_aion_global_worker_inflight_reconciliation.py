@@ -125,20 +125,29 @@ class GlobalInflightReconciliationTests(unittest.TestCase):
         self.assertFalse(result["executes_action"])
 
     def test_empty_batch_is_prepared_for_human_clear_without_auto_mutation(self):
+        # Historical name retained for ID tracking. A66 superseded local
+        # EMPTY_BATCH_READY: an empty, mutable checkpoint cannot certify no
+        # work or no effect. Never restore the former clear-ready expectation.
         checkpoint = self.arm({})
         claimed, intent = self.claimed(checkpoint)
         self.assertEqual(intent["count"], 0)
+        original = deepcopy(claimed)
         result = assess_global_inflight_reconciliation(
             self.runtime(claimed),
             now=TICK + timedelta(minutes=20),
         )
-        self.assertEqual(result["status"], "EMPTY_BATCH_READY_FOR_HUMAN_CLEAR")
+        self.assertEqual(result["status"], "UNVERIFIED_EMPTY_BATCH_REVIEW_REQUIRED")
         self.assertEqual(result["work_intent_count"], 0)
-        self.assertEqual(result["suggested_resolution"], "CLEAR_INFLIGHT_NO_WORK")
-        self.assertFalse(result["automatic_clear_allowed"])
-        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertEqual(result["terminal_proven"], 0)
+        self.assertEqual(result["suggested_resolution"], "PRESERVE_AND_ESCALATE")
+        self.assertTrue(result["reconciliation_required"])
         self.assertTrue(result["human_review_required"])
-        self.assertFalse(result["runtime_modified"])
+        for flag in ("automatic_clear_allowed", "automatic_retry_allowed",
+                     "runtime_modified", "feature_flag_modified",
+                     "global_worker_tick_executed", "external_business_action_executed",
+                     "executes_action"):
+            self.assertIs(result[flag], False, flag)
+        self.assertEqual(claimed, original)
 
     def test_missing_receipt_is_reported_as_ambiguous_not_retried(self):
         checkpoint, intent = self.claimed(self.due_checkpoint())
@@ -156,7 +165,11 @@ class GlobalInflightReconciliationTests(unittest.TestCase):
         self.assertNotIn("title", result["occurrences"][0])
 
     def test_persisted_terminal_receipt_is_bound_to_inflight_occurrence(self):
+        # Historical name retained. Autonomous executor is deliberately
+        # denied before it can emit an authenticated GLOBAL_WORKER receipt.
         checkpoint, intent = self.claimed(self.due_checkpoint())
+        self.assertEqual(intent["count"], 1)
+        original = deepcopy(checkpoint)
         executed = _execute_due_local_work_authorized(
             self.access,
             checkpoint,
@@ -167,22 +180,32 @@ class GlobalInflightReconciliationTests(unittest.TestCase):
             max_jobs=5,
             now=TICK,
         )
+        self.assertEqual(executed["status"], "BLOCKED")
+        self.assertEqual(
+            executed["reason"], "INDEPENDENT_AUTONOMOUS_AUTHORITY_NOT_ENROLLED"
+        )
+        self.assertEqual(executed["action_receipts"], [])
+        self.assertNotIn("aion_core_executor_v1", executed["checkpoint"])
+        self.assertFalse(executed["external_action_executed"])
+        self.assertEqual(executed["checkpoint"], original)
         result = assess_global_inflight_reconciliation(
             self.runtime(executed["checkpoint"]),
             now=TICK + timedelta(minutes=20),
         )
-        self.assertEqual(
-            result["status"],
-            "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR",
-        )
-        self.assertEqual(result["terminal_proven"], 1)
-        self.assertEqual(result["no_terminal_evidence"], 0)
-        self.assertEqual(
-            result["occurrences"][0]["occurrence_key"],
-            intent["occurrences"][0]["occurrence_key"],
-        )
-        self.assertTrue(result["occurrences"][0]["latest_receipt_id"])
-        self.assertFalse(result["automatic_clear_allowed"])
+        self.assertEqual(result["status"], "AMBIGUOUS_EXECUTION_REVIEW_REQUIRED")
+        self.assertEqual(result["terminal_proven"], 0)
+        self.assertEqual(result["no_terminal_evidence"], 1)
+        self.assertEqual(result["occurrences"][0]["occurrence_key"],
+                         intent["occurrences"][0]["occurrence_key"])
+        self.assertEqual(result["occurrences"][0]["receipt_count"], 0)
+        self.assertEqual(result["occurrences"][0]["latest_receipt_id"], "")
+        self.assertTrue(result["human_review_required"])
+        for flag in ("automatic_clear_allowed", "automatic_retry_allowed",
+                     "runtime_modified", "feature_flag_modified",
+                     "global_worker_tick_executed", "external_business_action_executed",
+                     "executes_action"):
+            self.assertIs(result[flag], False, flag)
+        self.assertEqual(checkpoint, original)
 
     def test_unsafe_or_malformed_receipt_evidence_blocks_reconciliation(self):
         checkpoint, _ = self.claimed(self.due_checkpoint())
