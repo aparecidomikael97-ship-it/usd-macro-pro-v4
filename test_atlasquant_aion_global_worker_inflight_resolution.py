@@ -183,32 +183,48 @@ class GlobalInflightResolutionTests(unittest.TestCase):
         self.assertEqual(claimed, original)
 
     def test_terminal_evidence_can_stage_clear_after_expiry(self):
-        claimed, _ = self.claim(self.due_checkpoint())
+        # Historical name retained; autonomous receipts cannot be minted
+        # without independent producer and source custody.
+        claimed, intent = self.claim(self.due_checkpoint())
+        self.assertEqual(intent["count"], 1)
+        original = deepcopy(claimed)
         executed = _execute_due_local_work_authorized(
-            self.access,
-            claimed,
+            self.access, claimed,
             authorization_mode="GLOBAL_WORKER",
             authorization_digest="resolution-auth",
             execution_principal="aion-global-worker:gha-resolution",
             capability_allowlist=("ADMINISTRATION",),
-            max_jobs=5,
-            now=TICK,
+            max_jobs=5, now=TICK,
         )
+        self.assertEqual(executed["status"], "BLOCKED")
+        self.assertEqual(
+            executed["reason"], "INDEPENDENT_AUTONOMOUS_AUTHORITY_NOT_ENROLLED"
+        )
+        self.assertEqual(executed["action_receipts"], [])
+        self.assertNotIn("aion_core_executor_v1", executed["checkpoint"])
+        self.assertIs(executed["external_action_executed"], False)
+        self.assertEqual(executed["checkpoint"], original)
         result = stage_resolved_inflight_clear(
-            self.access,
-            self.runtime(executed["checkpoint"]),
-            confirmation=True,
-            confirmation_phrase=CONFIRMATION_PHRASE,
+            self.access, self.runtime(executed["checkpoint"]),
+            confirmation=True, confirmation_phrase=CONFIRMATION_PHRASE,
             now=AFTER_EXPIRY,
         )
-        self.assertEqual(result["status"], "STAGED_CLEAR_READY")
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["reason"], "INFLIGHT_RECONCILIATION_NOT_CLEARABLE")
         self.assertEqual(
-            result["assessment_status"],
-            "TERMINAL_EVIDENCE_READY_FOR_HUMAN_CLEAR",
+            result["assessment_status"], "AMBIGUOUS_EXECUTION_REVIEW_REQUIRED"
         )
-        self.assertEqual(result["resolved_work_intent_count"], 1)
-        self.assertTrue(result["resolution_digest"])
-        self.assertFalse(result["runtime_modified"])
+        for flag in (
+            "requires_checkpoint_save", "external_persisted",
+            "automatic_retry_allowed", "executes_action",
+        ):
+            self.assertIs(result[flag], False, flag)
+        self.assertEqual(result["checkpoint"], original)
+        self.assertNotIn("resolution_digest", result)
+        self.assertNotIn("resolved_work_intent_count", result)
+        state, _ = load_global_worker_state(result["checkpoint"])
+        self.assertTrue(state["inflight_tick"])
+        self.assertEqual(claimed, original)
 
     def test_ambiguous_execution_cannot_be_cleared_by_safe_ceremony(self):
         claimed, _ = self.claim(self.due_checkpoint())
