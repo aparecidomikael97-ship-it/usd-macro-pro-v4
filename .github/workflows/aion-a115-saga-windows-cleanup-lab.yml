@@ -1,0 +1,46 @@
+name: AION A115 LAB Windows SQLite cleanup of Saga A63-A65
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a114-saga-projection-integrity-20261016]
+    paths:
+      - "test_atlasquant_aion_saga_outcome_snapshot_a63.py"
+      - "test_atlasquant_aion_saga_outbox_binding_a64.py"
+      - "test_atlasquant_aion_saga_unverified_terminal_a65.py"
+      - ".github/workflows/aion-a115-saga-windows-cleanup-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unchanged_assertions:
+    name: A115 legacy Saga assertions with clean teardown (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: All original A63 A64 A65 plus A114 A113 A110 denial contracts
+        run: >-
+          python -m unittest -q
+          test_atlasquant_aion_a114_saga_projection_integrity
+          test_atlasquant_aion_saga_outcome_local_trust_a62
+          test_atlasquant_aion_saga_outcome_snapshot_a63
+          test_atlasquant_aion_saga_outbox_binding_a64
+          test_atlasquant_aion_saga_unverified_terminal_a65
+          test_atlasquant_aion_a113_expired_claim_quarantine
+          test_atlasquant_aion_a110_outbox_ambiguous_block
+          test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_event_chain_detects_tamper
+          test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_entire_event_chain_is_mismatch_not_false_match
