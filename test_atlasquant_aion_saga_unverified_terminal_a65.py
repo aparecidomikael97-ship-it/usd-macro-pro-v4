@@ -16,6 +16,8 @@ class A65UnverifiedTerminalStateTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.store, self.outbox, self.budget, self.saga = self.fx._components(self.tmp.name)
+        # LIFO cleanup: close SQLite/WAL handles BEFORE removing temp folder (Windows).
+        self.addCleanup(self.store.close)
         self.fx._create(self.saga)
         self.item = self.fx._enqueue_forward(self.saga)["outbox"]
         self.key = self.item["idempotency_key"]

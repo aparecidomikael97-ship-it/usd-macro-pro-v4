@@ -14,6 +14,8 @@ class A64SagaOutboxBindingTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.store, self.outbox, self.budget, self.saga = self.f._components(self.tmp.name)
+        # LIFO cleanup: close SQLite/WAL handles BEFORE removing temp folder (Windows).
+        self.addCleanup(self.store.close)
         for sid in ("saga-1", "saga-2"):
             self.f._create(self.saga, saga_id=sid)
         self.one = self.f._enqueue_forward(self.saga, saga_id="saga-1")["outbox"]

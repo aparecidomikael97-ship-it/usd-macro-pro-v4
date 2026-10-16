@@ -171,6 +171,9 @@ A54_PINNED_LAB_BASES = {
     # A114 derives only from the immutable verified A113 LAB snapshot.
     "lab/aion-v16-a113-expired-claim-causal-quarantine-20261016":
         "bb891246506b3eb1dbc677405e2015c011854a2d",
+    # A115 validation only on exact immutable A114 LAB parent, no floating refs.
+    "lab/aion-v16-a114-saga-projection-integrity-20261016":
+        "fd3183b291561b033be6a2f65450e873d7af65f9",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -223,7 +226,8 @@ def _production_base():
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
             # A74/A75/A76 retain the same A49 provenance ancestry with
             # a bounded depth; no shallow-clone bypass or local-main fallback.
-            "768" if target == "lab/aion-v16-a113-expired-claim-causal-quarantine-20261016"
+            "800" if target == "lab/aion-v16-a114-saga-projection-integrity-20261016"
+            else "768" if target == "lab/aion-v16-a113-expired-claim-causal-quarantine-20261016"
             else "736" if target == "lab/aion-v16-a112-canonical-qa-and-base-pin-20261016"
             else "704" if target == "lab/aion-v16-a111-historical-rebaseline-a110-20261016"
             else "608" if target == "lab/aion-v16-a103-bounded-json-action-stage-20261015"

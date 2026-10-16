@@ -18,6 +18,8 @@ class A63SagaOutboxSnapshotRaceTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.store, self.outbox, self.budget, self.saga = self.fixture._components(self.tmp.name)
+        # LIFO cleanup: close SQLite/WAL handles BEFORE removing temp folder (Windows).
+        self.addCleanup(self.store.close)
         self.fixture._create(self.saga)
         self.staged = self.fixture._enqueue_forward(self.saga)
         self.key = self.staged["outbox"]["idempotency_key"]

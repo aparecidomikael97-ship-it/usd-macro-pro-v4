@@ -1,0 +1,79 @@
+name: AION A115 LAB canonical Quality Security rebaseline after SQLite cleanup (READ ONLY)
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a114-saga-projection-integrity-20261016]
+    paths:
+      - ".github/workflows/aion-a115-canonical-rebaseline-lab.yml"
+      - "test_atlasquant_aion_saga_outcome_snapshot_a63.py"
+      - "test_atlasquant_aion_saga_outbox_binding_a64.py"
+      - "test_atlasquant_aion_saga_unverified_terminal_a65.py"
+      - "atlasquant_aion_execution_saga.py"
+      - "test_atlasquant_aion_a114_saga_projection_integrity.py"
+      - "test_atlasquant_aion_a113_expired_claim_quarantine.py"
+      - "atlasquant_aion_execution_outbox.py"
+      - ".github/workflows/quality-tests.yml"
+      - "test_atlasquant_aion_convergence.py"
+      - "test_atlasquant_aion_convergence.py"
+
+permissions:
+  contents: read
+
+jobs:
+  canonical_quality_unittest:
+    name: A115 A114 canonical Quality unittest selection (historical RED)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Existing pinned dependencies only
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+      - name: Compile current Python (before historical Quality)
+        run: python -m compileall -q .
+      - name: Run exact source-of-truth Quality unittest root-file selection, no waivers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, sys
+          src=Path(".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
+          if src.count("- name: Run quality suite")!=1:
+              sys.exit("A115_MISSING_UNIQUE_CANONICAL_QUALITY_SELECTION")
+          raw=src.split("- name: Run quality suite",1)[1].split("python -m unittest -q",1)[1].split("- name: Run reference interface contracts",1)[0]
+          modules=re.findall(r"(?m)^\s+((?:test_[A-Za-z0-9_]+|tests/test_[A-Za-z0-9_]+)\.py)\s*\\?$",raw)
+          if len(modules)<500 or len(set(modules))!=len(modules):
+              sys.exit("A115_INVALID_CANONICAL_QUALITY_ROOT_LIST")
+          print("A115_CANONICAL_UNITTEST_ROOT_FILES",len(modules),flush=True)
+          # A79 cross-process spawn runs separately below due to polluted
+          # __main__ in the huge suite; its exit remains independently enforced.
+          sys.exit(subprocess.call([sys.executable,"-B","-m","unittest","-q",*modules]))
+          PY
+      - name: Isolated A79 true cross-process checks after historical Quality (not waived) (not waived)
+        if: always()
+        run: python -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
+
+  canonical_security_historical:
+    name: A115 A114 original A74 canonical Security selection
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Existing pinned requirements only
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Original 365-case Security A74 selection (no waiver)
+        run: python -B test_atlasquant_aion_activation_denial_coverage_a76.py --canonical --security
