@@ -180,6 +180,9 @@ A54_PINNED_LAB_BASES = {
     # A117 only permits the exact reviewed A116 HEAD; never a floating branch.
     "lab/aion-v16-a116-inflight-corrupt-receipt-fixture-20261016":
         "9c13fa9bce1290a56716714c9991979edb02e3dd",
+    # A118 bound to exact A117 safe-denial read-only audit HEAD.
+    "lab/aion-v16-a117-historic-inflight-deny-contract-20261016":
+        "f6c3c6d25c78fcd3d127fc0d11007f84f1a4faf1",
 }
 A54_A49_PARENT = "c1c7f5940eef913d60ff2f77e3bc1de3181db2f2"
 A54_ORIGIN_URLS = {
@@ -232,7 +235,8 @@ def _production_base():
             # A74 includes A73 and deep true-origin-main/A49 ancestry.
             # A74/A75/A76 retain the same A49 provenance ancestry with
             # a bounded depth; no shallow-clone bypass or local-main fallback.
-            "864" if target == "lab/aion-v16-a116-inflight-corrupt-receipt-fixture-20261016"
+            "896" if target == "lab/aion-v16-a117-historic-inflight-deny-contract-20261016"
+            else "864" if target == "lab/aion-v16-a116-inflight-corrupt-receipt-fixture-20261016"
             else "832" if target == "lab/aion-v16-a115-windows-saga-sqlite-cleanup-20261016"
             else "800" if target == "lab/aion-v16-a114-saga-projection-integrity-20261016"
             else "768" if target == "lab/aion-v16-a113-expired-claim-causal-quarantine-20261016"
