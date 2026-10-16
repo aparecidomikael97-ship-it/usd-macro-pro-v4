@@ -1,0 +1,46 @@
+name: AION A113 LAB expired claim possible-effect quarantine
+
+on:
+  pull_request:
+    branches: [lab/aion-v16-a112-canonical-qa-and-base-pin-20261016]
+    paths:
+      - "test_atlasquant_aion_a113_expired_claim_quarantine.py"
+      - "atlasquant_aion_execution_outbox.py"
+      - ".github/workflows/aion-a113-expired-claim-quarantine-lab.yml"
+      - ".github/workflows/quality-tests.yml"
+      - "test_atlasquant_aion_convergence.py"
+
+permissions:
+  contents: read
+
+jobs:
+  negative_claim_lifecycle:
+    name: A113 no blind retry (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Pinned dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+      - name: A113 negative lifecycle and existing regression contracts
+        run: >-
+          python -m unittest -q
+          test_atlasquant_aion_a113_expired_claim_quarantine
+          test_atlasquant_aion_a110_outbox_ambiguous_block
+          test_atlasquant_aion_a109_negative_boundary_chain
+          test_atlasquant_aion_a108_exact_outbox_key
+          test_atlasquant_aion_outbox_fifo_local_terminal_denial
+          test_atlasquant_aion_outbox_missing_predecessor_denial
+          test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_expired_claim_before_dispatch_is_retryable_because_boundary_not_crossed
+          test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_cross_scope_cannot_read_or_claim_foreign_intent
