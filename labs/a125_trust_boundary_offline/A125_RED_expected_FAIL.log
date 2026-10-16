@@ -1,0 +1,15 @@
+test_post_send_identity_check_cannot_undo_fake_effect (red_baseline.ExpectedRed.test_post_send_identity_check_cannot_undo_fake_effect) ... FAIL
+
+======================================================================
+FAIL: test_post_send_identity_check_cannot_undo_fake_effect (red_baseline.ExpectedRed.test_post_send_identity_check_cannot_undo_fake_effect)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/aion_a125/labs/a125_trust_boundary_offline/red_baseline.py", line 18, in test_post_send_identity_check_cannot_undo_fake_effect
+    self.assertEqual(len(provider.sent),0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

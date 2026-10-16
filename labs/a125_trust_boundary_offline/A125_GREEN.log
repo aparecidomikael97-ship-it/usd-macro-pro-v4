@@ -1,0 +1,34 @@
+test_01_valid_mock_issue_is_unknown_not_effect (test_contract.ContractTests.test_01_valid_mock_issue_is_unknown_not_effect) ... ok
+test_02_duplicate_never_auto_resends (test_contract.ContractTests.test_02_duplicate_never_auto_resends) ... ok
+test_03_tenant_change_denied_before_provider (test_contract.ContractTests.test_03_tenant_change_denied_before_provider) ... ok
+test_04_workspace_change_denied_before_provider (test_contract.ContractTests.test_04_workspace_change_denied_before_provider) ... ok
+test_05_owner_change_denied_before_provider (test_contract.ContractTests.test_05_owner_change_denied_before_provider) ... ok
+test_06_provider_account_change_denied_before_provider (test_contract.ContractTests.test_06_provider_account_change_denied_before_provider) ... ok
+test_07_epoch_change_denied_before_provider (test_contract.ContractTests.test_07_epoch_change_denied_before_provider) ... ok
+test_08_issuer_change_denied_before_provider (test_contract.ContractTests.test_08_issuer_change_denied_before_provider) ... ok
+test_09_endpoint_change_denied_before_provider (test_contract.ContractTests.test_09_endpoint_change_denied_before_provider) ... ok
+test_10_identical_metadata_new_signer_without_key_denied_pre_send (test_contract.ContractTests.test_10_identical_metadata_new_signer_without_key_denied_pre_send) ... ok
+test_11_identity_challenge_is_bound_to_nonce (test_contract.ContractTests.test_11_identity_challenge_is_bound_to_nonce) ... ok
+test_12_wrong_receipt_signature_denied (test_contract.ContractTests.test_12_wrong_receipt_signature_denied) ... ok
+test_13_receipt_rebound_to_other_payload_denied (test_contract.ContractTests.test_13_receipt_rebound_to_other_payload_denied) ... ok
+test_14_receipt_wrong_nonce_denied (test_contract.ContractTests.test_14_receipt_wrong_nonce_denied) ... ok
+test_15_receipt_false_delivery_claim_denied (test_contract.ContractTests.test_15_receipt_false_delivery_claim_denied) ... ok
+test_16_receipt_false_noeffect_claim_denied (test_contract.ContractTests.test_16_receipt_false_noeffect_claim_denied) ... ok
+test_17_reservation_crash_consumes_no_send (test_contract.ContractTests.test_17_reservation_crash_consumes_no_send) ... ok
+test_18_response_lost_after_fake_send_no_retry (test_contract.ContractTests.test_18_response_lost_after_fake_send_no_retry) ... ok
+test_19_provider_direct_call_without_secret_denied (test_contract.ContractTests.test_19_provider_direct_call_without_secret_denied) ... ok
+test_20_custodian_outage_denies (test_contract.ContractTests.test_20_custodian_outage_denies) ... ok
+test_21_same_intent_different_payload_denied (test_contract.ContractTests.test_21_same_intent_different_payload_denied) ... ok
+test_22_global_nonce_replay_denied (test_contract.ContractTests.test_22_global_nonce_replay_denied) ... ok
+test_23_32_threads_at_most_one_fake_send (test_contract.ContractTests.test_23_32_threads_at_most_one_fake_send) ... ok
+test_24_malformed_digest_denied (test_contract.ContractTests.test_24_malformed_digest_denied) ... ok
+test_25_revocation_not_automatic_ready (test_contract.ContractTests.test_25_revocation_not_automatic_ready) ... ok
+test_26_OPEN_stolen_provider_credential_bypasses_all_guards (test_contract.OpenCounterexampleTests.test_26_OPEN_stolen_provider_credential_bypasses_all_guards) ... ok
+test_27_OPEN_restoring_the_custodian_reenables_same_intent (test_contract.OpenCounterexampleTests.test_27_OPEN_restoring_the_custodian_reenables_same_intent) ... ok
+test_28_OPEN_stolen_signing_key_permits_impostor_with_same_pins (test_contract.OpenCounterexampleTests.test_28_OPEN_stolen_signing_key_permits_impostor_with_same_pins) ... ok
+test_29_OPEN_direct_custodian_call_bypasses_client_scope_pinning (test_contract.OpenCounterexampleTests.test_29_OPEN_direct_custodian_call_bypasses_client_scope_pinning) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 0.007s
+
+OK

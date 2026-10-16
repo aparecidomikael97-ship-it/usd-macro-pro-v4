@@ -1,0 +1,40 @@
+test_01_unchanged_witness_allows_synthetic_first_issue (test_witness.WitnessBoundaryTests.test_01_unchanged_witness_allows_synthetic_first_issue) ... ok
+test_02_second_attempt_denied_by_surviving_witness (test_witness.WitnessBoundaryTests.test_02_second_attempt_denied_by_surviving_witness) ... ok
+test_03_joint_two_db_rollback_rejected_if_witness_survives (test_witness.WitnessBoundaryTests.test_03_joint_two_db_rollback_rejected_if_witness_survives) ... ok
+test_04_joint_local_rollback_cannot_reprepare (test_witness.WitnessBoundaryTests.test_04_joint_local_rollback_cannot_reprepare) ... ok
+test_05_witness_offline_fail_closed_before_send (test_witness.WitnessBoundaryTests.test_05_witness_offline_fail_closed_before_send) ... ok
+test_06_offline_while_prepare_blocks (test_witness.WitnessBoundaryTests.test_06_offline_while_prepare_blocks) ... ok
+test_07_unenrolled_witness_blocks (test_witness.WitnessBoundaryTests.test_07_unenrolled_witness_blocks) ... ok
+test_08_signer_not_ready_blocks (test_witness.WitnessBoundaryTests.test_08_signer_not_ready_blocks) ... ok
+test_09_scope_binding_owner_tenant_workspace_account (test_witness.WitnessBoundaryTests.test_09_scope_binding_owner_tenant_workspace_account) ... ok
+test_10_independently_attested_nonce_unique (test_witness.WitnessBoundaryTests.test_10_independently_attested_nonce_unique) ... ok
+test_11_forged_receipt_denied (test_witness.WitnessBoundaryTests.test_11_forged_receipt_denied) ... ok
+test_12_truncated_history_rejected_when_head_survives (test_witness.WitnessBoundaryTests.test_12_truncated_history_rejected_when_head_survives) ... ok
+test_13_index_tampering_rejected (test_witness.WitnessBoundaryTests.test_13_index_tampering_rejected) ... ok
+test_14_head_forged_rejected (test_witness.WitnessBoundaryTests.test_14_head_forged_rejected) ... ok
+test_15_issuer_forged_rejected (test_witness.WitnessBoundaryTests.test_15_issuer_forged_rejected) ... ok
+test_16_witness_mark_crash_before_local_issue_never_resend (test_witness.WitnessBoundaryTests.test_16_witness_mark_crash_before_local_issue_never_resend) ... ok
+test_17_local_ledger_cas_fails_after_witness_reserved_no_resend (test_witness.WitnessBoundaryTests.test_17_local_ledger_cas_fails_after_witness_reserved_no_resend) ... ok
+test_18_fake_sender_timeout_retains_witness_reservation (test_witness.WitnessBoundaryTests.test_18_fake_sender_timeout_retains_witness_reservation) ... ok
+test_19_pre_fence_before_issue_fails_closed (test_witness.WitnessBoundaryTests.test_19_pre_fence_before_issue_fails_closed) ... ok
+test_20_no_pre_fence_after_witness_issue (test_witness.WitnessBoundaryTests.test_20_no_pre_fence_after_witness_issue) ... ok
+test_21_proof_does_not_assert_provider_delivery_or_no_effect (test_witness.WitnessBoundaryTests.test_21_proof_does_not_assert_provider_delivery_or_no_effect) ... ok
+test_22_32_threads_one_witness_reservation_and_fake_call (test_witness.WitnessBoundaryTests.test_22_32_threads_one_witness_reservation_and_fake_call) ... ok
+test_23_alternative_guard_same_witness_denies_duplicate (test_witness.WitnessBoundaryTests.test_23_alternative_guard_same_witness_denies_duplicate) ... ok
+test_24_no_production_mode (test_witness.WitnessBoundaryTests.test_24_no_production_mode) ... ok
+test_25_known_counterexample_restore_all_three_allows_second_fake_send (test_witness.WitnessBoundaryTests.test_25_known_counterexample_restore_all_three_allows_second_fake_send)
+PASS = known critical vulnerability still OPEN; toy witness is same-admin! ... ok
+test_26_replacing_toy_witness_without_trust_root_allows_second_fake_send (test_witness.WitnessBoundaryTests.test_26_replacing_toy_witness_without_trust_root_allows_second_fake_send)
+PASS = another known vulnerability; caller controls witness selection. ... ok
+test_27_empty_unobserved_witness_is_not_no_effect_proof (test_witness.WitnessBoundaryTests.test_27_empty_unobserved_witness_is_not_no_effect_proof) ... ok
+test_28_nonce_invalid_denied (test_witness.WitnessBoundaryTests.test_28_nonce_invalid_denied) ... ok
+test_29_witness_index_signature_cannot_be_recomputed_by_AION_in_real_design (test_witness.WitnessBoundaryTests.test_29_witness_index_signature_cannot_be_recomputed_by_AION_in_real_design)
+The simulated key is available: this is a documented limitation. ... ok
+test_30_known_counterexample_bypass_guard_direct_a123_sender_allows_duplicate (test_witness.WitnessBoundaryTests.test_30_known_counterexample_bypass_guard_direct_a123_sender_allows_duplicate)
+PASS = real integration must prevent all direct provider-credential paths. ... ok
+test_31_cross_intent_witness_receipt_rejected (test_witness.WitnessBoundaryTests.test_31_cross_intent_witness_receipt_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 31 tests in 0.098s
+
+OK
