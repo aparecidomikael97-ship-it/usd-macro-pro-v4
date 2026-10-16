@@ -1,0 +1,15 @@
+test_joint_local_restore_should_not_allow_second_issue (red_baseline.RedBeforeExternalWitness.test_joint_local_restore_should_not_allow_second_issue) ... FAIL
+
+======================================================================
+FAIL: test_joint_local_restore_should_not_allow_second_issue (red_baseline.RedBeforeExternalWitness.test_joint_local_restore_should_not_allow_second_issue)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/aion_a124/labs/a124_surviving_witness_offline/red_baseline.py", line 25, in test_joint_local_restore_should_not_allow_second_issue
+    self.assertEqual(len(sink.sink),1,'RED: joint rollback allows second fake send')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 1 : RED: joint rollback allows second fake send
+
+----------------------------------------------------------------------
+Ran 1 test in 0.005s
+
+FAILED (failures=1)
