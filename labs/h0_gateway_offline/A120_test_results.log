@@ -1,0 +1,45 @@
+test_gap_01_simultaneous_database_and_witness_rollback_reissues_fake_call (test_a120_independent_custody_gaps.IndependentCustodyGapsOPEN.test_gap_01_simultaneous_database_and_witness_rollback_reissues_fake_call) ... ok
+test_gap_02_mutable_witness_required_bit_allows_reopen_without_witness (test_a120_independent_custody_gaps.IndependentCustodyGapsOPEN.test_gap_02_mutable_witness_required_bit_allows_reopen_without_witness) ... ok
+test_gap_03_deleting_issued_audit_event_is_not_detected_by_row_witness (test_a120_independent_custody_gaps.IndependentCustodyGapsOPEN.test_gap_03_deleting_issued_audit_event_is_not_detected_by_row_witness) ... ok
+test_gap_04_nonce_journal_deletion_allows_cross_intent_nonce_reuse (test_a120_independent_custody_gaps.IndependentCustodyGapsOPEN.test_gap_04_nonce_journal_deletion_allows_cross_intent_nonce_reuse) ... /usr/lib/python3.13/json/encoder.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f252c4617b0>
+  _iterencode = c_make_encoder(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/json/encoder.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f252c461990>
+  _iterencode = c_make_encoder(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/usr/lib/python3.13/json/encoder.py:252: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x7f252c461a80>
+  _iterencode = c_make_encoder(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_gap_05_same_version_audit_forgery_is_not_detected_by_witness (test_a120_independent_custody_gaps.IndependentCustodyGapsOPEN.test_gap_05_same_version_audit_forgery_is_not_detected_by_witness) ... ok
+test_01_thirty_two_processes_one_issue_one_fake_call (test_gateway.H0GatewayOfflineTests.test_01_thirty_two_processes_one_issue_one_fake_call) ... /usr/lib/python3.13/multiprocessing/popen_fork.py:67: DeprecationWarning: This process (pid=7589) is multi-threaded, use of fork() may lead to deadlocks in the child.
+  self.pid = os.fork()
+ok
+test_02_crash_after_marker_before_fake_call_no_restart_retry (test_gateway.H0GatewayOfflineTests.test_02_crash_after_marker_before_fake_call_no_restart_retry) ... ok
+test_03_after_handoff_lost_response_ttl_expired_never_retry (test_gateway.H0GatewayOfflineTests.test_03_after_handoff_lost_response_ttl_expired_never_retry) ... ok
+test_04_fence_versus_issue_mutually_exclusive (test_gateway.H0GatewayOfflineTests.test_04_fence_versus_issue_mutually_exclusive) ... ok
+test_05_alternative_adapter_and_shared_credentials_fail_closed (test_gateway.H0GatewayOfflineTests.test_05_alternative_adapter_and_shared_credentials_fail_closed) ... ok
+test_06_immutability_scope_payload_destination_channel_key (test_gateway.H0GatewayOfflineTests.test_06_immutability_scope_payload_destination_channel_key) ... ok
+test_07_restore_older_ledger_highwater_detects_rollback (test_gateway.H0GatewayOfflineTests.test_07_restore_older_ledger_highwater_detects_rollback) ... ok
+test_08_signature_issuer_epoch_version_and_nonce_replay (test_gateway.H0GatewayOfflineTests.test_08_signature_issuer_epoch_version_and_nonce_replay) ... ok
+test_09_delivered_then_failed_out_of_order_never_no_effect (test_gateway.H0GatewayOfflineTests.test_09_delivered_then_failed_out_of_order_never_no_effect) ... ok
+test_10_timeout_429_5xx_late_receipt_without_retry (test_gateway.H0GatewayOfflineTests.test_10_timeout_429_5xx_late_receipt_without_retry) ... ok
+test_11_fake_cancel_can_be_followed_by_late_delivery_no_post_send_fence (test_gateway.H0GatewayOfflineTests.test_11_fake_cancel_can_be_followed_by_late_delivery_no_post_send_fence) ... ok
+test_12_signer_restart_missing_key_custody_fail_closed (test_gateway.H0GatewayOfflineTests.test_12_signer_restart_missing_key_custody_fail_closed) ... ok
+test_13_weak_eventual_read_policy_explicitly_rejected (test_gateway.H0GatewayOfflineTests.test_13_weak_eventual_read_policy_explicitly_rejected) ... ok
+test_14_no_lookup_after_lost_provider_id_keeps_unknown (test_gateway.H0GatewayOfflineTests.test_14_no_lookup_after_lost_provider_id_keeps_unknown) ... ok
+test_15_source_h0_owner_gates_independent_worker_always_off (test_gateway.H0GatewayOfflineTests.test_15_source_h0_owner_gates_independent_worker_always_off) ... ok
+test_16_budget_circuit_breaker_no_shortcuts (test_gateway.H0GatewayOfflineTests.test_16_budget_circuit_breaker_no_shortcuts) ... ok
+test_17_same_version_rewrite_to_prepared_must_not_reissue (test_witness_hardening.WitnessHardeningTests.test_17_same_version_rewrite_to_prepared_must_not_reissue) ... ok
+test_18_witness_lags_ledger_must_deny_not_silently_repair (test_witness_hardening.WitnessHardeningTests.test_18_witness_lags_ledger_must_deny_not_silently_repair) ... ok
+test_19_reopen_without_required_witness_must_deny (test_witness_hardening.WitnessHardeningTests.test_19_reopen_without_required_witness_must_deny) ... ok
+test_20_lost_or_unavailable_witness_remains_fail_closed (test_witness_hardening.WitnessHardeningTests.test_20_lost_or_unavailable_witness_remains_fail_closed) ... ok
+test_21_rollback_to_absent_row_cannot_reprepare_old_intent (test_witness_hardening.WitnessHardeningTests.test_21_rollback_to_absent_row_cannot_reprepare_old_intent) ... ok
+test_22_witness_unavailable_mid_transition_rolls_back_state (test_witness_hardening.WitnessHardeningTests.test_22_witness_unavailable_mid_transition_rolls_back_state) ... ok
+test_23_same_version_receipt_boundary_and_operation_fork_denied (test_witness_hardening.WitnessHardeningTests.test_23_same_version_receipt_boundary_and_operation_fork_denied) ... ok
+test_24_no_witness_row_still_safe_original_behavior (test_witness_hardening.WitnessHardeningTests.test_24_no_witness_row_still_safe_original_behavior) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 0.121s
+
+OK
