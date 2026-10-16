@@ -186,6 +186,8 @@ class GlobalInflightReconciliationTests(unittest.TestCase):
 
     def test_unsafe_or_malformed_receipt_evidence_blocks_reconciliation(self):
         checkpoint, _ = self.claimed(self.due_checkpoint())
+        # The GLOBAL_WORKER executor is intentionally denied without external
+        # authority. Its blocked checkpoint must NOT contain a real receipt.
         executed = _execute_due_local_work_authorized(
             self.access,
             checkpoint,
@@ -196,20 +198,41 @@ class GlobalInflightReconciliationTests(unittest.TestCase):
             max_jobs=5,
             now=TICK,
         )
-        tampered = deepcopy(executed["checkpoint"])
-        raw = tampered["aion_core_executor_v1"]
-        raw["receipts"][0]["external_action_executed"] = True
-        raw["digest"] = _executor_bundle_digest(raw)
+        self.assertEqual(executed["status"], "BLOCKED")
+        self.assertEqual(
+            executed["reason"], "INDEPENDENT_AUTONOMOUS_AUTHORITY_NOT_ENROLLED"
+        )
+        self.assertNotIn("aion_core_executor_v1", executed["checkpoint"])
+        self.assertEqual(executed["action_receipts"], [])
+        self.assertFalse(executed["external_action_executed"])
 
+        # Build a deliberately UNTRUSTED LOCAL/HUMAN_CLICK receipt using the
+        # existing A58 synthetic handler: NOT a producer/witness/owner receipt.
+        # Relabel locally as GLOBAL_WORKER and recompute ONLY the local digest
+        # to make the malformed/unsafe branch reachable without bypassing gate.
+        from test_atlasquant_aion_inflight_untrusted_receipts_a58 import (
+            A58LocalTerminalAuthorityDenialTests,
+        )
+        fixture = A58LocalTerminalAuthorityDenialTests(
+            methodName="test_a58_unsafe_local_terminal_must_be_rejected_even_if_redigested"
+        )
+        fixture.setUp()
+        tampered = fixture.locally_relabel_terminal(
+            fixture.local_receipt_checkpoint(), unsafe=True,
+        )
+        before = deepcopy(tampered)
         result = assess_global_inflight_reconciliation(
-            self.runtime(tampered),
-            now=TICK + timedelta(minutes=20),
+            fixture.runtime(tampered), now=fixture.after_expiry,
         )
         self.assertEqual(result["status"], "BLOCKED_UNSAFE_EVIDENCE")
         self.assertTrue(result["unsafe_evidence"])
         self.assertEqual(result["suggested_resolution"], "PRESERVE_AND_ESCALATE")
+        self.assertFalse(result["automatic_clear_allowed"])
         self.assertFalse(result["automatic_retry_allowed"])
         self.assertFalse(result["executes_action"])
+        self.assertFalse(result["runtime_modified"])
+        self.assertEqual(fixture.stage(tampered)["status"], "BLOCKED")
+        self.assertEqual(tampered, before)
 
 
 if __name__ == "__main__":
