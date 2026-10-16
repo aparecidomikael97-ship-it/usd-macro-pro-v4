@@ -44,3 +44,23 @@ No third-party packages, provider accounts, credentials, network connections, SN
 - Positive historical Outbox/Saga integration tests and all **84 historical diagnostics remain outside scope**, not waived or modified. No product module, canonical Quality manifest, PR A118, main branch, CI gates, rollout, budget or account are changed by this laboratory.
 
 **Go/no-go:** synthetic green is a **local design signal only**. HARD NO-GO, `ZERO_AUTO_RESEND`, Worker OFF, no merge or deploy or paid provision or external test. Human-owner authorization must precede any later new infrastructure or provider interactions.
+
+## A119 — witness-hardening cycle (16 Oct 2026, isolated follow-on laboratory)
+
+Run **both** test files (24 tests total):
+
+```bash
+python -m unittest discover -s labs/h0_gateway_offline -p 'test_*.py' -v
+```
+
+The existing tests `01–16` are **unaltered**; `test_witness_hardening.py` adds 8 adversarial checks `17–24`. Local Python 3.13/Linux execution (no hosted CI): before the patch, 5 new cases failed as intended (`17`, `18`, `19`, `21`, `23`), 3 new cases passed; after the patch all **24/24 PASS**.
+
+Changes are confined to the inert `gateway.py` and new lab test/documentation:
+
+- The witness records a commitment to the whole `intents` row, including state, `issued_count`, identity, receipt boundary, operation ID and sequence, instead of recording only the version.
+- A ledger version *behind* or *ahead* of the witness is denied; a state fork at the *same* version is denied. A witness that is missing, unavailable, or has forgotten the identity also denies.
+- A row created with the toy witness persists a `witness_required` bit: reopening the same lab file without passing that witness denies access rather than treating the row as unwitnessed.
+- An attempt to delete the issued row then re-`PREPARE` the same intent is rejected by a surviving witness, including when the original row no longer exists.
+- Prior lab SQLite files without `witness_required` are explicitly rejected (`LEGACY_LAB_SCHEMA_MUST_BE_RECREATED`); do not migrate real data or infer production readiness from this demonstration.
+
+**Limitations of this improvement:** An attacker controlling *both* SQLite and the in-process witness can roll them back together or forge a new matching commitment. A malicious administrator can alter the unauthenticated SQLite `witness_required` bit and omit the witness; the toy model cannot prevent that. The audit table/nonce table are *not* included in the row commitment, and multi-machine/distributed atomicity is not demonstrated. This is NOT F1/T1/H0 custody, live provider proof or worker authorization. Synthetic `NO_EFFECT_FENCED` after handoff remains forbidden; no real send, no automatic retry, no merge/deploy/provider call/cost.

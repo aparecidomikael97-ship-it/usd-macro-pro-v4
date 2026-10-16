@@ -84,24 +84,42 @@ class SimulatedPolicy:
 
 
 class SimulatedHighWater:
-    """Same-process witness only. NOT independent / not crash-atomic with ledger."""
+    """In-memory test oracle only; neither independent nor transactional with SQLite.
+
+    Store the full proposed row commitment as well as a version. A version-only
+    high-water misses a same-version state fork (e.g. ISSUE_ONCE -> PREPARED).
+    Any uncertainty is *denied* rather than silently reconstructed from SQLite.
+    """
     def __init__(self):
         self.values = {}
+        self.commitments = {}
         self.lock = threading.RLock()
         self.available = True
 
-    def observe(self, identity, version):
+    def observe(self, identity, version, commitment):
         with self.lock:
             if not self.available:
                 raise Denied("SIMULATED_WITNESS_UNAVAILABLE")
-            self.values[identity] = max(self.values.get(identity, 0), version)
+            previous = self.values.get(identity)
+            if previous is not None:
+                if version < previous:
+                    raise Denied("ROLLBACK_DETECTED_QUARANTINE")
+                if version == previous and self.commitments.get(identity) != commitment:
+                    raise Denied("SAME_VERSION_FORK_QUARANTINE")
+            self.values[identity] = version
+            self.commitments[identity] = commitment
 
-    def check(self, identity, version):
+    def check(self, identity, version, commitment):
         with self.lock:
-            if not self.available or identity not in self.values:
+            if not self.available or identity not in self.values or identity not in self.commitments:
                 raise Denied("SIMULATED_WITNESS_UNAVAILABLE")
-            if version < self.values[identity]:
+            highest = self.values[identity]
+            if version < highest:
                 raise Denied("ROLLBACK_DETECTED_QUARANTINE")
+            if version > highest:
+                raise Denied("WITNESS_LAG_QUARANTINE")
+            if commitment != self.commitments[identity]:
+                raise Denied("SAME_VERSION_STATE_DIVERGENCE_QUARANTINE")
 
 
 class FakeAdapter:
@@ -166,7 +184,11 @@ class Gateway:
                 state TEXT NOT NULL, version INTEGER NOT NULL,
                 issued_count INTEGER NOT NULL DEFAULT 0,
                 boundary TEXT NOT NULL DEFAULT '', operation_id TEXT NOT NULL DEFAULT '',
-                receipt_seq INTEGER NOT NULL DEFAULT 0)""")
+                receipt_seq INTEGER NOT NULL DEFAULT 0,
+                witness_required INTEGER NOT NULL DEFAULT 0)""")
+            # Fail closed on pre-hardening lab schema: never silently drop witness policy.
+            if "witness_required" not in {r[1] for r in con.execute("PRAGMA table_info(intents)")}:
+                raise Denied("LEGACY_LAB_SCHEMA_MUST_BE_RECREATED")
             con.execute("""CREATE TABLE IF NOT EXISTS seen_nonces (
                 nonce TEXT PRIMARY KEY, intent_id TEXT NOT NULL)""")
             con.execute("""CREATE TABLE IF NOT EXISTS audit (
@@ -189,8 +211,14 @@ class Gateway:
 
     @staticmethod
     def _row(con, intent):
-        return con.execute("SELECT identity_json,state,version,issued_count,boundary,operation_id,receipt_seq FROM intents WHERE intent_id=?",
+        return con.execute("SELECT identity_json,state,version,issued_count,boundary,operation_id,receipt_seq,witness_required FROM intents WHERE intent_id=?",
                            (intent.logical_intent_id,)).fetchone()
+
+    @staticmethod
+    def _row_commitment(row):
+        # Hash covers the *whole* issue/receipt state and exact immutable identity,
+        # including witness-required policy, not merely the integer version.
+        return hashlib.sha256(canonical(list(row)).encode()).hexdigest()
 
     def _validate(self, con, intent):
         row = self._row(con, intent)
@@ -198,8 +226,10 @@ class Gateway:
             raise Denied("UNKNOWN_LOGICAL_INTENT")
         if row[0] != canonical(vars(intent)):
             raise Denied("INTENT_SCOPE_OR_PAYLOAD_CONFLICT")
+        if row[7] and self.witness is None:
+            raise Denied("SIMULATED_WITNESS_REQUIRED_MISSING_QUARANTINE")
         if self.witness is not None:
-            self.witness.check(intent.logical_intent_id, row[2])
+            self.witness.check(intent.logical_intent_id, row[2], self._row_commitment(row))
         return row
 
     def prepare(self, intent: Intent):
@@ -209,14 +239,15 @@ class Gateway:
             if row:
                 self._validate(con, intent)
                 return "ALREADY_PREPARED_OR_TERMINAL"
-            # In this simulator only, witness update precedes initial commit;
-            # this is NOT a distributed atomic commit or independent proof.
-            if self.witness:
-                self.witness.observe(intent.logical_intent_id, 1)
-            con.execute("INSERT INTO intents(intent_id,identity_json,state,version) VALUES(?,?,?,1)",
-                        (intent.logical_intent_id, canonical(vars(intent)), "PREPARED"))
+            con.execute("INSERT INTO intents(intent_id,identity_json,state,version,witness_required) VALUES(?,?,?,1,?)",
+                        (intent.logical_intent_id, canonical(vars(intent)), "PREPARED", int(self.witness is not None)))
             con.execute("INSERT INTO audit(intent_id,event,version) VALUES(?,?,1)",
                         (intent.logical_intent_id, "PREPARED"))
+            # Witness advance precedes SQLite commit: commit failure can cause
+            # quarantine (availability loss), but never a safe-looking resend.
+            if self.witness:
+                committed_row = self._row(con, intent)
+                self.witness.observe(intent.logical_intent_id, committed_row[2], self._row_commitment(committed_row))
         return "PREPARED"
 
     def _transition_pre_handoff(self, intent: Intent, target: str):
@@ -234,7 +265,8 @@ class Gateway:
                          "ISSUE_ONCE" if target == "UNKNOWN" else "FENCED_PRE_HANDOFF", new_version))
             # The independent witness is hypothetical. Local toy witness only.
             if self.witness:
-                self.witness.observe(intent.logical_intent_id, new_version)
+                committed_row = self._row(con, intent)
+                self.witness.observe(intent.logical_intent_id, committed_row[2], self._row_commitment(committed_row))
         return target
 
     def fence_pre_handoff(self, intent: Intent):
@@ -284,7 +316,8 @@ class Gateway:
             con.execute("INSERT INTO audit(intent_id,event,version) VALUES(?,?,?)",
                         (intent.logical_intent_id, "SIMULATED_RECEIPT_" + kind, next_version))
             if self.witness:
-                self.witness.observe(intent.logical_intent_id, next_version)
+                committed_row = self._row(con, intent)
+                self.witness.observe(intent.logical_intent_id, committed_row[2], self._row_commitment(committed_row))
         return state
 
     def inspect(self, intent: Intent):
