@@ -1,0 +1,58 @@
+name: AION P0 H0 third anchor compliance design review (OFFLINE LAB)
+
+on:
+  push:
+    branches: [lab/aion-p0-h0-third-anchor-compliance-review-20261019]
+    paths:
+      - atlasquant_aion_p0_h0_third_anchor_design_review_lab.py
+      - test_aion_p0_h0_third_anchor_design_review_lab.py
+      - .github/workflows/aion-p0-h0-third-anchor-compliance-review-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  third_anchor_review:
+    name: Anchor self-claims do not grant authority (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # pinned
+        with:
+          persist-credentials: false
+          fetch-depth: 60
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # pinned
+        with:
+          python-version: "3.12"
+      - name: Verify existing H0 hardstops were not altered
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object atlasquant_aion_p0_h0_sqlite_startup_observer_lab.py)" = "2ea1b6c9a9c5faa75d677c4a57404513ad2d882a"
+          test "$(git hash-object atlasquant_aion_p0_h0_custody_two_domain_model_lab.py)" = "0915d67f65fbc65c9687db5e159b4474790b15cd"
+          test "$(git hash-object atlasquant_aion_global_worker.py)" = "f4cd9f358aee285747321e96be3db82691e02fe8"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          echo "THIRD_ANCHOR_H0_HARDSTOPS_PINNED"
+      - name: Require precisely 28 new third-anchor safety review contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_h0_third_anchor_design_review_lab'); assert s.countTestCases()==28, s.countTestCases(); print('THIRD_ANCHOR_28_CASES')"
+          python -B -m unittest -v test_aion_p0_h0_third_anchor_design_review_lab
+      - name: Check 20 two-domain CAS/PITR rollback controls
+        run: python -B -m unittest -v test_aion_p0_h0_custody_two_domain_model_lab
+      - name: Install project dependencies for historical A73 A110 suites
+        run: python -m pip install -r requirements.txt
+      - name: Preserve 16 H0 real SQLite boot denial controls
+        run: python -B -m unittest -v test_aion_p0_h0_sqlite_startup_observer_lab
+      - name: Preserve 13 original official-restore hardstops
+        run: python -B -m unittest -v test_aion_p0_sqlite_execution_restore_hardstop_lab
+      - name: Preserve 15 structural guard mutation detections
+        run: python -B -m unittest -v test_aion_p0_h0_boundary_drift_mutations_lab
+      - name: Preserve 5 A73 no-witness and 4 A110 no-resend tests
+        run: python -B -m unittest -v test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_a110_outbox_ambiguous_block
