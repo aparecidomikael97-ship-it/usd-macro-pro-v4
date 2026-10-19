@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import threading
 from typing import Protocol
 from uuid import uuid4
 
@@ -85,6 +86,9 @@ class SQLiteChatStore:
         self._health_state = HEALTHY
         self._health_reason = "OK"
         self.db = None
+        # Keep the SQLite default check_same_thread=True; the connection
+        # belongs to this Python Thread object, not its reusable numeric ID.
+        self._connection_owner_thread = threading.current_thread()
         try:
             self.db = sqlite3.connect(str(self.path), timeout=BUSY_TIMEOUT_MS / 1000)
             self.db.row_factory = sqlite3.Row
@@ -122,18 +126,27 @@ class SQLiteChatStore:
                 raise
             raise StorageUnavailableError("staging store unavailable") from exc
 
+    def _require_connection_thread(self):
+        # Reject caller misuse BEFORE any SQLite I/O and BEFORE mutating the
+        # storage health state. Do not disable native sqlite3 thread checks.
+        if threading.current_thread() is not self._connection_owner_thread:
+            raise StorageUnavailableError("SQLITE_STORE_CONNECTION_THREAD_MISMATCH")
+
     def close(self):
         if self.db is not None:
+            self._require_connection_thread()
             self.db.close()
             self.db = None
 
     def _require_open(self):
+        self._require_connection_thread()
         if self.db is None:
             raise StorageUnavailableError("staging store is closed")
         if self._health_state == FAILED:
             raise StorageUnavailableError("staging store health is failed")
 
     def storage_health(self, *, deep=False):
+        self._require_connection_thread()
         if self.db is None:
             return {
                 "state": FAILED,
@@ -406,6 +419,7 @@ class SQLiteChatStore:
         return self.list_conversations(scope, query=query, **filters)
 
     def archive_conversation(self, scope, conversation_id):
+        self._require_open()
         with self.db:
             c = self.get_conversation(scope, conversation_id)
             c.archived, c.updated_at = True, now()
@@ -473,6 +487,7 @@ class SQLiteChatStore:
         )
 
     def add_attachment_metadata(self, scope, attachment):
+        self._require_open()
         from .attachments import validate_metadata
         validate_metadata(attachment)
         with self.db:
@@ -501,6 +516,7 @@ class SQLiteChatStore:
         return self._latest(scope, conversation_id, "checkpoint", ConversationCheckpoint)
 
     def save_checkpoint(self, scope, checkpoint):
+        self._require_open()
         with self.db:
             prior = self.get_latest_checkpoint(scope, checkpoint.conversation_id)
             if prior and checkpoint.through_sequence <= prior.through_sequence:
@@ -511,6 +527,7 @@ class SQLiteChatStore:
             self._update(c)
 
     def save_context_summary(self, scope, summary):
+        self._require_open()
         with self.db:
             for mid in summary.source_message_ids:
                 if self.get_message(scope, summary.conversation_id, mid).sequence > summary.through_sequence:
