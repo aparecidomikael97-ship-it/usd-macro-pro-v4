@@ -39,6 +39,12 @@ DEFAULT_GATE_TTL_SECONDS = 300
 MIN_GATE_TTL_SECONDS = 120
 MAX_GATE_TTL_SECONDS = 600
 
+# No authentically independent, fresh incident source is enrolled in A118.
+# Only a future separately authenticated source may change this no-go policy.
+INDEPENDENT_CURRENT_INCIDENT_SOURCE_MISSING = (
+    "INDEPENDENT_POST_INCIDENT_CURRENT_STATE_NOT_ENROLLED"
+)
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -453,7 +459,12 @@ def validate_reactivation_gate_for_execution(
     *,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Validate a freshly assessed gate immediately before flag enable."""
+    """Fail-closed pre-flag validation: local gate is NOT a current witness.
+
+    This is a temporary deny-only LAB hardstop, not actual fresh external
+    incident revalidation. No trust root exists, so all otherwise-READY
+    execution states must block until enrollment and end-to-end proof.
+    """
     current = utc(now or _now())
     approval = dict(activation_approval or {})
     gate_required = approval.get("post_incident_gate_required") is True
@@ -471,7 +482,16 @@ def validate_reactivation_gate_for_execution(
             "reason": "POST_INCIDENT_GATE_REQUIREMENT_CHANGED",
         }
     if not gate_required:
-        return {"state": "READY", "reason": "", "gate_required": False}
+        # A rolled-back/missing ledger cannot prove absence of a newer incident.
+        # No current independent source is installed, including for zero rows.
+        return {
+            "state": "BLOCKED",
+            "reason": INDEPENDENT_CURRENT_INCIDENT_SOURCE_MISSING,
+            "gate_required": False,
+            "reactivation_authorized": False,
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+        }
 
     if gate_integrity(gate)["state"] != "MATCH":
         return {
@@ -542,12 +562,17 @@ def validate_reactivation_gate_for_execution(
         if not stored or stored != observed:
             return {"state": "BLOCKED", "reason": reason}
 
+    # All local TTL/digest/approval checks above may match even after an
+    # incident reopens. Until an independently enrolled current incident
+    # source is queried immediately before flag writing, READY is UNSAFE.
+    # Do not accept caller-supplied "verified" maps, booleans or callback.
     return {
-        "state": "READY",
-        "reason": "",
+        "state": "BLOCKED",
+        "reason": INDEPENDENT_CURRENT_INCIDENT_SOURCE_MISSING,
         "gate_required": True,
-        "gate_digest": str(row.get("gate_digest") or ""),
         "reactivation_authorized": False,
+        "feature_flag_modified": False,
+        "global_worker_executed": False,
     }
 
 
