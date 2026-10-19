@@ -1,0 +1,57 @@
+name: AION P0 SQLiteChatStore owner-thread fail closed LAB
+
+on:
+  push:
+    branches: [lab/aion-p0-sqlite-store-owner-thread-20261019]
+    paths:
+      - aion_chat/store.py
+      - test_aion_p0_sqlite_chat_store_owner_thread_lab.py
+      - .github/workflows/aion-p0-sqlite-chat-store-owner-thread-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite_store_thread_boundary:
+    name: SQLiteChatStore 15 + Outbox/Saga 49 + resilience 2 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 50
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify original A118 store and LAB Outbox sources pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:aion_chat/store.py)" = "6df8ad55673acaca6eeeb0bc3e3898d7a10b08ba"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          echo "P0_SQLITE_STORE_A118_AND_OUTBOX_PINNED"
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Execute fifteen new SQLiteChatStore thread/health contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_sqlite_chat_store_owner_thread_lab'); assert s.countTestCases()==15, s.countTestCases(); print('P0_SQLITE_STORE_15_CASES')"
+          python -B -m unittest -v test_aion_p0_sqlite_chat_store_owner_thread_lab
+      - name: Retain twelve original Outbox thread-owner guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_owner_thread_denial_lab
+      - name: Retain seven nested-transaction preservation guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_nested_transaction_denial_lab
+      - name: Retain eight concurrency and actual restore guards
+        run: python -B -m unittest -v test_aion_p0_original_sqlite_compat_concurrency_restore_lab
+      - name: Retain 22 A110 A63 A64 A65 original decision guards
+        run: python -B -m unittest -v test_atlasquant_aion_a110_outbox_ambiguous_block test_atlasquant_aion_saga_outcome_snapshot_a63 test_atlasquant_aion_saga_outbox_binding_a64 test_atlasquant_aion_saga_unverified_terminal_a65
+      - name: Retain original SQLite separate-handle concurrency and WAL health
+        run: |
+          python -B -m unittest -v test_atlasquant_aion_chat_staged_runtime_resilience.SQLiteRuntimeResilienceTests.test_health_exposes_wal_busy_timeout_and_integrity test_atlasquant_aion_chat_staged_runtime_resilience.SQLiteRuntimeResilienceTests.test_concurrent_separate_handles_serialize_without_lost_messages
