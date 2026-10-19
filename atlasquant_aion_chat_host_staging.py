@@ -152,16 +152,24 @@ def close_all_staged_host_stores(session_state: Any) -> int:
         for key in list(session_state.keys())
         if str(key).startswith(_STORE_PREFIX)
     ]
+    # P0: preflight EVERY handle before modifying this session. Otherwise a
+    # cross-thread close throws after pop(), silently detaching a live SQLite
+    # connection; scope/credential switches must fail closed instead.
     for key in keys:
-        holder = session_state.pop(key, None)
-        if not isinstance(holder, Mapping):
-            continue
-        store = holder.get("store")
-        if isinstance(store, SQLiteChatStore):
-            try:
+        holder = session_state.get(key)
+        if isinstance(holder, Mapping):
+            store = holder.get("store")
+            if isinstance(store, SQLiteChatStore):
+                store._require_connection_thread()
+    for key in keys:
+        holder = session_state.get(key)
+        if isinstance(holder, Mapping):
+            store = holder.get("store")
+            if isinstance(store, SQLiteChatStore):
+                # Only remove a handle once close actually returned.
                 store.close()
-            finally:
                 closed += 1
+        session_state.pop(key, None)
     session_state.pop(_ACTIVE_SCOPE_KEY, None)
     return closed
 
@@ -209,10 +217,9 @@ def get_or_create_staged_store(
             session_state[_ACTIVE_SCOPE_KEY] = key
             return existing
         if isinstance(existing, SQLiteChatStore):
-            try:
-                existing.close()
-            except Exception:
-                pass
+            # Never swallow owner-thread/close failures and then orphan the
+            # connection by replacing the session holder.
+            existing.close()
         session_state.pop(key, None)
 
     store = SQLiteChatStore(expected)
@@ -233,15 +240,18 @@ def close_staged_host_store(
 ) -> bool:
     """QA/staging lifecycle helper. It closes only the scoped injected handle."""
     key = _holder_key(scope)
-    holder = session_state.pop(key, None)
+    holder = session_state.get(key)
     if not isinstance(holder, Mapping):
+        session_state.pop(key, None)
         return False
     store = holder.get("store")
     if isinstance(store, SQLiteChatStore):
-        store.close()
+        store.close()  # Do not discard the holder if close was denied.
+        session_state.pop(key, None)
         if session_state.get(_ACTIVE_SCOPE_KEY) == key:
             session_state.pop(_ACTIVE_SCOPE_KEY, None)
         return True
+    session_state.pop(key, None)
     return False
 
 
