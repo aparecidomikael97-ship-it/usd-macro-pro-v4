@@ -1,0 +1,59 @@
+name: AION P0 H0 IAM / FinOps offline preflight (HARD NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-h0-iam-finops-preflight-20261019]
+    paths:
+      - atlasquant_aion_p0_h0_iam_finops_preflight_lab.py
+      - test_aion_p0_h0_iam_finops_preflight_lab.py
+      - .github/workflows/aion-p0-h0-iam-finops-preflight-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  iam_finops:
+    name: H0 budget + IAM 25 and custody regression (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # pinned
+        with:
+          persist-credentials: false
+          fetch-depth: 50
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # pinned
+        with:
+          python-version: "3.12"
+      - name: Verify previous no-authority and H0 source pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object atlasquant_aion_p0_h0_third_anchor_design_review_lab.py)" = "211224170db33ff4ed7225580a6411830fed70fd"
+          test "$(git hash-object atlasquant_aion_p0_h0_custody_two_domain_model_lab.py)" = "0915d67f65fbc65c9687db5e159b4474790b15cd"
+          test "$(git hash-object atlasquant_aion_p0_h0_sqlite_startup_observer_lab.py)" = "2ea1b6c9a9c5faa75d677c4a57404513ad2d882a"
+          test "$(git hash-object atlasquant_aion_global_worker.py)" = "f4cd9f358aee285747321e96be3db82691e02fe8"
+          echo "P0_H0_FINOPS_PRIOR_HARDSTOPS_PINNED"
+      - name: Validate unpriced template must fail closed
+        run: |
+          python -B -c "import json; from atlasquant_aion_p0_h0_iam_finops_preflight_lab import assess_h0_iam_finops_lab; d=json.load(open('docs/aion/AION_P0_H0_IAM_FINOPS_UNPRICED_PROPOSAL_TEMPLATE_20261019.json')); r=assess_h0_iam_finops_lab(d); assert r['state']=='HARD_NO_GO' and r['projected_monthly_brl'] is None and not r['first_effect_allowed']; print('P0_H0_FINOPS_UNKNOWN_COST_BLOCKED')"
+      - name: Run exactly 25 new IAM FinOps math / quota / role contracts
+        run: |
+          python -B -c "import unittest; x=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_h0_iam_finops_preflight_lab'); assert x.countTestCases()==25, x.countTestCases(); print('P0_H0_FINOPS_25_CASES')"
+          python -B -m unittest -v test_aion_p0_h0_iam_finops_preflight_lab
+      - name: Preserve 28 third-anchor compliance version review guards
+        run: python -B -m unittest -v test_aion_p0_h0_third_anchor_design_review_lab
+      - name: Preserve 20 two-domain CAS rollback simulation guards
+        run: python -B -m unittest -v test_aion_p0_h0_custody_two_domain_model_lab
+      - name: Install tracked dependencies for H0 and A73 A110 historical guards
+        run: python -m pip install -r requirements.txt
+      - name: Preserve 16 H0 SQLite boot denial cases
+        run: python -B -m unittest -v test_aion_p0_h0_sqlite_startup_observer_lab
+      - name: Preserve 5 A73 and 4 A110 no-authority guards
+        run: python -B -m unittest -v test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_a110_outbox_ambiguous_block
