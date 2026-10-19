@@ -32,6 +32,7 @@ LAB_ONLY = (
     "test_aion_p0_sqlite_owner_thread_denial_lab",
     "test_aion_p0_sqlite_saga_owner_thread_lab",
     "test_aion_p0_staged_host_sqlite_cleanup_lab",
+    "test_aion_p0_outbox_saga_internal_state_lab",
     "test_aion_p0_quality_lab_coverage_governance_lab",
 )
 
