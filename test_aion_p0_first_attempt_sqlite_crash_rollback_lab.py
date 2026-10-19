@@ -81,12 +81,18 @@ class FirstAttemptSQLiteCrashLabTests(unittest.TestCase):
 
     def direct_fixture_state(self, state, dispatch_marker=""):
         # TEST-ONLY raw fixture, NEVER import as an authorization helper.
-        with sqlite3.connect(str(self.path)) as db:
-            c = db.execute(
-                "UPDATE action_outbox SET state=?,dispatch_started_at=? WHERE idempotency_key=?",
-                (state, dispatch_marker, self.key),
-            )
-            self.assertEqual(c.rowcount, 1)
+        db = sqlite3.connect(str(self.path))
+        try:
+            with db:
+                c = db.execute(
+                    "UPDATE action_outbox SET state=?,dispatch_started_at=? WHERE idempotency_key=?",
+                    (state, dispatch_marker, self.key),
+                )
+                self.assertEqual(c.rowcount, 1)
+        finally:
+            # sqlite3.Connection context manager commits but does NOT close;
+            # Windows keeps the DB file locked during tempdir teardown.
+            db.close()
 
     def crash_after_sql(self, *, committed, state="UNCERTAIN"):
         proc = subprocess.run(
