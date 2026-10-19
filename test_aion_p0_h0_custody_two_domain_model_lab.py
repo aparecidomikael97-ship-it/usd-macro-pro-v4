@@ -51,7 +51,9 @@ class P0TwoDomainCustodyContractTests(unittest.TestCase):
             self.assertIs(value[name], False, name)
         if reason is not None:
             self.assertEqual(value["reason"], reason)
-        self.assertNotIn("READY", str(value))
+        self.assertNotEqual(value["state"], "READY")
+        self.assertIs(value["first_effect_allowed"], False)
+        self.assertIs(value["automatic_retry_allowed"], False)
         return value
 
     def reserve(self, *, intent="synthetic-intent-0001", nonce=N1,
