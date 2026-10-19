@@ -79,6 +79,47 @@ def _validate_database_file(path: Path) -> dict:
             db.close()
 
 
+# P0: the generic chat backup/restore path cannot establish the current
+# first-effect/producer high-water mark. If EITHER file carries an execution
+# schema, restoration requires an independently authenticated witness which
+# is not available to this API; DENY rather than infer safety from quick_check.
+_EXECUTION_LEDGER_TABLES = frozenset({
+    "action_decisions", "action_outbox", "action_effects",
+    "aion_authority_spend", "aion_execution_sagas",
+    "aion_execution_saga_steps", "aion_execution_saga_events",
+})
+
+
+def _require_chat_only_restore_file(path: Path) -> None:
+    db = None
+    try:
+        # Read-only URI: never create a missing source/target while checking.
+        db = sqlite3.connect(path.resolve().as_uri() + "?mode=ro",
+                             uri=True, timeout=BUSY_TIMEOUT_MS / 1000)
+        rows = db.execute(
+            "SELECT name FROM sqlite_schema WHERE type='table'"
+        ).fetchall()
+        if _EXECUTION_LEDGER_TABLES.intersection(str(r[0]) for r in rows):
+            raise StorageUnavailableError(
+                "P0_EXECUTION_RESTORE_REQUIRES_INDEPENDENT_WITNESS"
+            )
+    except sqlite3.DatabaseError as exc:
+        raise StorageUnavailableError("P0_RESTORE_SCHEMA_UNVERIFIABLE") from exc
+    finally:
+        if db is not None:
+            db.close()
+
+
+def _require_restore_target_safe(target: Path) -> None:
+    # No automatic restore over WAL/SHM remnants, even if the main target
+    # vanished. A caller cannot prove what transactions those bytes contain.
+    if any(Path(str(target) + suffix).exists() for suffix in ("-wal", "-shm")):
+        raise StorageUnavailableError("P0_RESTORE_TARGET_SIDECAR_UNVERIFIED")
+    if target.exists():
+        _validate_database_file(target)
+        _require_chat_only_restore_file(target)
+
+
 class SQLiteChatStore:
     def __init__(self, path):
         self.path = Path(path)
@@ -286,6 +327,10 @@ class SQLiteChatStore:
         if source.resolve() == target.resolve():
             raise ValueError("restore target must differ from backup")
         source_report = _validate_database_file(source)
+        # Strictly chat-only. Neither SHA-256 nor quick_check verifies
+        # freshness of an Outbox or independent producer witness.
+        _require_chat_only_restore_file(source)
+        _require_restore_target_safe(target)
         target.parent.mkdir(parents=True, exist_ok=True)
         temp = target.with_name(target.name + ".restore-" + uuid4().hex)
         source_db = None
@@ -300,6 +345,11 @@ class SQLiteChatStore:
             source_db.close()
             source_db = None
             restored_report = _validate_database_file(temp)
+            # Recheck the copied file and destination before replacement.
+            # This is NOT an atomic antirollback witness; racing external
+            # writers and manual filesystem replacement remain HARD NO-GO.
+            _require_chat_only_restore_file(temp)
+            _require_restore_target_safe(target)
             os.replace(temp, target)
             return {
                 "state": "RESTORE_VERIFIED",
