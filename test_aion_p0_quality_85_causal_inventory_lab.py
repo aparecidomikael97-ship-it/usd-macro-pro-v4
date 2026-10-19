@@ -156,6 +156,13 @@ class Quality85CaseInventoryTests(unittest.TestCase):
             old_reactivation._access(),runtime,readiness,flag,
             reactivation_gate=gate,now=old_reactivation.NOW,
         )
+        self.assertEqual(stage["runtime"]["state"],"READY")
+        self.assertEqual(stage["plan_gate"]["state"],"READY")
+        self.assertEqual(stage["readiness"],{
+            "state":"BLOCKED",
+            "reason":"INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
+        })
+        self.assertEqual(result["reason"],"INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED")
         self.assertEqual(result["status"],"BLOCKED",result)
         self.assertIs(result["feature_flag_modified"],False)
         self.assertIs(result["global_worker_executed"],False)
@@ -172,6 +179,10 @@ class Quality85CaseInventoryTests(unittest.TestCase):
         result=prepare_global_worker_activation_plan(
             fixture.access,runtime,readiness,flag,now=old_activation.NOW,
         )
+        self.assertEqual(_runtime_armed_contract(runtime)["state"],"READY")
+        self.assertEqual(_readiness_contract(readiness)["reason"],
+                         "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED")
+        self.assertEqual(result["reason"],"INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED")
         self.assertEqual(result["status"],"BLOCKED")
         self.assertIs(result["feature_flag_modified"],False)
         self.assertIs(result["global_worker_executed"],False)
