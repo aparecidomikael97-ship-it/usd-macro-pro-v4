@@ -1,0 +1,66 @@
+name: AION P0 Quality 85-case causal inventory and no-authority controls LAB
+
+on:
+  push:
+    branches: [lab/aion-p0-quality-85-causal-triage-20261019]
+    paths:
+      - test_aion_p0_quality_85_causal_inventory_lab.py
+      - docs/aion/AION_P0_QUALITY_CANONICAL_85_FAILURES_CASE_REGISTRY_20261019.json
+      - .github/workflows/aion-p0-quality-85-causal-inventory-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  case_triage:
+    name: Preserve 85 canonical RED case names and trace preplan (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 80
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Pin M71 fail-closed validator, independent no-Witness Worker and Outbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object atlasquant_aion_global_worker_reactivation_gate.py)" = "8533ae3c1720d4230dace6478a40f9f11b9677d4"
+          test "$(git hash-object atlasquant_aion_global_worker_activation.py)" = "df43bb4371c784396069f4ede51205b0aa19cc0a"
+          test "$(git hash-object atlasquant_aion_global_worker.py)" = "f4cd9f358aee285747321e96be3db82691e02fe8"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          echo "P0_QUALITY_85_SAFE_SOURCE_PINS_VALIDATED"
+      - name: Install tracked requirements for original fixtures
+        run: python -m pip install -r requirements.txt
+      - name: Verify 12 immutable Quality-cause case inventory contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_quality_85_causal_inventory_lab'); assert s.countTestCases()==12, s.countTestCases(); print('P0_QUALITY_85_CASE_INVENTORY_12_CONTRACTS')"
+          python -B -m unittest -v test_aion_p0_quality_85_causal_inventory_lab
+      - name: Preserve 13 original and new M71 deny-final-execution assertions
+        run: python -B -m unittest -v test_aion_m71_execution_fresh_source_denial_lab test_aion_p0_m71_original_stale_gate_safety_negative_lab
+
+  historical_security:
+    name: Independent canonical Security 365 unmodified
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked dependency graph
+        run: python -m pip install -r requirements.txt
+      - name: Reexecute canonical A76 security with original expectation
+        run: python -B test_atlasquant_aion_activation_denial_coverage_a76.py --canonical --security
