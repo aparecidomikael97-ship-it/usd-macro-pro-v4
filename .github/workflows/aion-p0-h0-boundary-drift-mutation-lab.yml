@@ -1,0 +1,53 @@
+name: AION P0 H0 source gate drift mutation audit (LAB)
+
+on:
+  push:
+    branches: [lab/aion-p0-h0-external-custody-gate-drift-20261019]
+    paths:
+      - atlasquant_aion_p0_h0_boundary_drift_sentinel_lab.py
+      - test_aion_p0_h0_boundary_drift_mutations_lab.py
+      - .github/workflows/aion-p0-h0-boundary-drift-mutation-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  p0_h0_gate_mutations:
+    name: Structural no-witness producer/restore gate audit (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 70
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Pin A118 original and latest P0 H0 guard sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object atlasquant_aion_global_worker.py)" = "f4cd9f358aee285747321e96be3db82691e02fe8"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          test "$(git hash-object aion_chat/store.py)" = "951428ac5e76a0185c58121aa4fdb6823271b5b7"
+          test "$(git hash-object atlasquant_aion_p0_h0_sqlite_startup_observer_lab.py)" = "2ea1b6c9a9c5faa75d677c4a57404513ad2d882a"
+          echo "P0_H0_FOUR_SAFETY_SOURCES_PINNED"
+      - name: Check real code AST hardstop ordering before test mutations
+        run: python -B atlasquant_aion_p0_h0_boundary_drift_sentinel_lab.py
+      - name: Verify 15 in-memory source mutations are caught
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_h0_boundary_drift_mutations_lab'); assert s.countTestCases()==15, s.countTestCases(); print('P0_H0_SOURCE_MUTATION_15_CASES')"
+          python -B -m unittest -v test_aion_p0_h0_boundary_drift_mutations_lab
+      - name: Check no-witness H0 / fallback real SQLite diagnostics
+        run: |
+          python -B -m unittest -v test_aion_p0_h0_sqlite_startup_observer_lab
+      - name: Check A73 witness and A110 producer ambiguous defenses
+        run: python -B -m unittest -v test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_a110_outbox_ambiguous_block
