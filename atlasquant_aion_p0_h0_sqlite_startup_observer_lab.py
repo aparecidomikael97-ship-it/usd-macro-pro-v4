@@ -12,6 +12,7 @@ The underlying A118 dispatch remains hard-denied by producer enrollment.
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -82,7 +83,7 @@ def observe_h0_sqlite_first_effect_lab(
         # WAL mode can still require SQLite-managed sidecar files; this is
         # not evidence of external immutability or physical read-only media.
         uri = path.resolve().as_uri() + "?mode=ro"
-        with sqlite3.connect(uri, uri=True, timeout=2) as db:
+        with closing(sqlite3.connect(uri, uri=True, timeout=2)) as db:
             db.execute("PRAGMA query_only=ON")
             quick = db.execute("PRAGMA quick_check(1)").fetchone()
             if quick is None or str(quick[0]).lower() != "ok":
