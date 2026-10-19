@@ -89,7 +89,10 @@ def _direct_raise(fn: ast.FunctionDef | None, reason: str) -> list[ast.Raise]:
 def _check_worker(tree: ast.Module, errors: list[str]) -> None:
     writer = _function(tree, "_persist_runtime_checkpoint_cas")
     blocks = _direct_return_reason(writer, BLOCK_SOURCE)
-    if writer is None or not writer.body or writer.body[0] not in blocks:
+    body = list(writer.body) if writer is not None else []
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and type(body[0].value.value) is str:
+        body = body[1:]  # A Python docstring does not execute any effect.
+    if not body or body[0] not in blocks:
         errors.append("WORKER_WRITER_NOT_UNCONDITIONALLY_BLOCKED")
     worker = _function(tree, "run_global_worker_once")
     if worker is None:
