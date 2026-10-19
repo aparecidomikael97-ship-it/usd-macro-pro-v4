@@ -471,7 +471,15 @@ def validate_reactivation_gate_for_execution(
             "reason": "POST_INCIDENT_GATE_REQUIREMENT_CHANGED",
         }
     if not gate_required:
-        return {"state": "READY", "reason": "", "gate_required": False}
+        # Absence of a closure record in the caller's runtime cannot prove
+        # no incident was reopened, nor exclude a rollback of local history.
+        # A fresh, independently authenticated incident source is NOT enrolled.
+        return {
+            "state": "BLOCKED",
+            "reason": "FRESH_INDEPENDENT_INCIDENT_SOURCE_NOT_ENROLLED",
+            "gate_required": False,
+            "reactivation_authorized": False,
+        }
 
     if gate_integrity(gate)["state"] != "MATCH":
         return {
@@ -542,9 +550,15 @@ def validate_reactivation_gate_for_execution(
         if not stored or stored != observed:
             return {"state": "BLOCKED", "reason": reason}
 
+    # M71: a digest-bound READY gate can predate an incident reopened WITHIN
+    # its TTL. The caller can replay an old gate and a local checkpoint can
+    # itself be rolled back. No authenticated, monotonic independent incident
+    # witness is wired into this execution validator. Fail CLOSED after all
+    # structural/expiry/binding checks; none of those are freshness proofs.
+    # Do not add a caller-provided "verified" switch or a mock bypass.
     return {
-        "state": "READY",
-        "reason": "",
+        "state": "BLOCKED",
+        "reason": "FRESH_INDEPENDENT_INCIDENT_SOURCE_NOT_ENROLLED",
         "gate_required": True,
         "gate_digest": str(row.get("gate_digest") or ""),
         "reactivation_authorized": False,
