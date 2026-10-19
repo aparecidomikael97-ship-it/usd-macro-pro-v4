@@ -1,0 +1,56 @@
+name: AION P0 Owner Enrollment Deny-only LAB (READ ONLY)
+
+on:
+  push:
+    branches: [lab/aion-p0-owner-enrollment-contract-20261019]
+    paths:
+      - "atlasquant_aion_p0_owner_enrollment_intake_lab.py"
+      - "test_atlasquant_aion_p0_owner_enrollment_intake_lab.py"
+      - ".github/workflows/aion-p0-owner-enrollment-contract-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deny_only_enrollment:
+    name: Owner enrollment claims deny-only (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Original A118 owner source must remain untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            actual="$(git hash-object "$1")"
+            test "$actual" = "$2" || { echo "OWNER_ORIGINAL_DRIFT $1"; exit 1; }
+          }
+          check_blob atlasquant_aion_owner_signature_ceremony.py eac8091ed9c80d838e069b16130c65530bde6652
+          check_blob atlasquant_aion_owner_decision_record.py 2d0ae10f33dc4a4cafdc0241074829a7a4d97b57
+          check_blob atlasquant_aion_trust_root.py 2d3b102893303751b2faf9a34b069ffb387ebce0
+          check_blob atlasquant_aion_global_worker_activation.py df43bb4371c784396069f4ede51205b0aa19cc0a
+          echo "P0_A118_4_BLOBS_ORIGINAL"
+      - name: Original dependency set + pytest
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Owner enrollment contract 27 exact cases, no authority
+        run: |
+          python -B -m pytest -q test_atlasquant_aion_p0_owner_enrollment_intake_lab.py
+      - name: Prior P0 original owner tests and A74 denial controls
+        run: |
+          python -B -m pytest -q test_atlasquant_aion_v224_owner_signature_ceremony.py test_atlasquant_aion_v225_explicit_owner_decision_record.py test_aion_p0_owner_root_custody_lab.py
+          python -B -m unittest -q test_atlasquant_aion_activation_authority_a74
