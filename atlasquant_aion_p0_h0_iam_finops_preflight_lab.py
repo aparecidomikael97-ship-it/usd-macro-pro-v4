@@ -18,7 +18,7 @@ SCHEMA = "AION_P0_H0_IAM_FINOPS_OFFLINE_PREFLIGHT_V1"
 MAX_CAP_BRL = Decimal("200")
 CAUTION_RATIO = Decimal("0.80")
 DAYS_BILLED = Decimal("31")
-GIGA = Decimal("1000000000")
+GIGA = Decimal("1073741824")  # AWS S3 GB is binary GiB (2**30 bytes).
 AWS_ACTIONS_BY_ROLE = {
     "aion_executor": frozenset(),
     "cloudflare_cas_runtime": frozenset(),
@@ -129,11 +129,11 @@ def assess_h0_iam_finops_lab(proposal: Any, *, as_of: date | None = None) -> dic
         issues.append("AS_OF_DATE_INVALID")
         return report
 
-    if proposal.get("schema") != SCHEMA:
+    if type(proposal.get("schema")) is not str or proposal.get("schema") != SCHEMA:
         issues.append("SCHEMA_INVALID")
-    if proposal.get("aws_region") != "sa-east-1":
+    if type(proposal.get("aws_region")) is not str or proposal.get("aws_region") != "sa-east-1":
         issues.append("AWS_REGION_NOT_PRICED_FOR_SAO_PAULO")
-    if proposal.get("cloudflare_plan") != "Workers Free - SQLite Durable Objects":
+    if type(proposal.get("cloudflare_plan")) is not str or proposal.get("cloudflare_plan") != "Workers Free - SQLite Durable Objects":
         issues.append("CLOUDFLARE_PLAN_NOT_MODELED")
     if _number(proposal.get("global_cap_brl")) != MAX_CAP_BRL:
         issues.append("GLOBAL_CAP_CHANGE_NOT_AUTHORIZED")
