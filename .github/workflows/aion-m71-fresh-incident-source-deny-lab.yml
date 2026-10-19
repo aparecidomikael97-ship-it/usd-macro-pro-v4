@@ -1,0 +1,54 @@
+name: AION M71 fail-closed reactivation validation RED GREEN LAB
+
+on:
+  push:
+    branches: [lab/aion-m71-postincident-fresh-source-deny-20261019]
+    paths:
+      - atlasquant_aion_global_worker_reactivation_gate.py
+      - test_aion_p0_m71_original_stale_gate_safety_negative_lab.py
+      - test_aion_m71_unenrolled_current_incident_source_lab.py
+      - test_aion_p0_original_six_evidence_matrix_lab.py
+      - .github/workflows/aion-m71-fresh-incident-source-deny-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  m71_hardstop:
+    name: M71 original replay gate and untrusted incident evidence (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 75
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Check source invariants unrelated to M71 before tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object atlasquant_aion_global_worker_incident_reconciliation.py)" = "85541bb2d10f0b97b096df10b5184851160cfec9"
+          test "$(git hash-object atlasquant_aion_global_worker_activation.py)" = "df43bb4371c784396069f4ede51205b0aa19cc0a"
+          test "$(git hash-object atlasquant_aion_global_worker.py)" = "f4cd9f358aee285747321e96be3db82691e02fe8"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          echo "M71_A118_OTHER_HARDSTOPS_PINNED"
+      - name: Install tracked dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Original M71 SECURITY EXPECTATION WITHOUT XFAIL
+        run: python -B -m unittest -v test_aion_p0_m71_original_stale_gate_safety_negative_lab
+      - name: Additional M71 trust-source fail-closed contracts
+        run: python -B -m unittest -v test_aion_m71_unenrolled_current_incident_source_lab
+      - name: Ten 6-P0 audit assertions for CURRENT M71 posture
+        run: python -B -m unittest -v test_aion_p0_original_six_evidence_matrix_lab
+      - name: Original A73 independent source / A110 no auto resend
+        run: python -B -m unittest -v test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_a110_outbox_ambiguous_block
