@@ -61,13 +61,14 @@ def assess_third_anchor_design_lab(proposal: Any) -> dict[str, Any]:
     else:
         vendor = proposal.get("technology")
         if type(vendor) is not str or vendor != "AWS_S3_OBJECT_LOCK":
-            if vendor == "CLOUDFLARE_R2_BUCKET_LOCK":
+            if type(vendor) is str and vendor == "CLOUDFLARE_R2_BUCKET_LOCK":
                 findings.append("R2_BUCKET_LOCK_RULES_ADMIN_REMOVABLE")
-            elif vendor == "CLOUDFLARE_DURABLE_OBJECTS":
+            elif type(vendor) is str and vendor == "CLOUDFLARE_DURABLE_OBJECTS":
                 findings.append("DO_PITR_SAME_CUSTODIAN_ROLLBACK_DOMAIN")
             else:
                 findings.append("THIRD_ANCHOR_TECHNOLOGY_NOT_ASSESSED")
-        if proposal.get("retention_mode") != "COMPLIANCE":
+        retention = proposal.get("retention_mode")
+        if type(retention) is not str or retention != "COMPLIANCE":
             findings.append("RETENTION_NOT_S3_COMPLIANCE")
         for control in FIELDS:
             if proposal.get(control) is not True:
