@@ -140,7 +140,13 @@ class CumulativeAuthorityBudget:
               ON aion_authority_spend(owner,tenant,workspace,transaction_id,confirmed_at);
             """)
 
+    def _require_connection_thread(self) -> None:
+        # This ledger retains a direct reference to store.db; direct access
+        # otherwise skips the SQLiteChatStore owner-thread health boundary.
+        self.store._require_connection_thread()
+
     def _scope_args(self) -> tuple[str, str, str]:
+        self._require_connection_thread()
         return _scope(self.scope)
 
     def _validate_decision(self, decision: Mapping[str, Any]) -> dict[str, Any]:
@@ -201,6 +207,9 @@ class CumulativeAuthorityBudget:
         *,
         now: Any | None = None,
     ) -> dict[str, Any]:
+        # Fail before invalid-binding fallbacks or a direct SQLite read so
+        # wrong-thread caller misuse never becomes a normal policy decision.
+        self._require_connection_thread()
         current = _utc(now)
         try:
             bound = self._validate_decision(decision)
@@ -278,6 +287,11 @@ class CumulativeAuthorityBudget:
         effect_ref: Any,
         confirmed_at: Any | None = None,
     ) -> dict[str, Any]:
+        self._require_connection_thread()
+        # This method owns its transaction. Refuse nested caller transactions
+        # *before* BEGIN/COMMIT/ROLLBACK; never borrow or undo Saga's work.
+        if self.db.in_transaction:
+            raise RuntimeError("AUTHORITY_BUDGET_NESTED_TRANSACTION_UNSUPPORTED")
         bound = self._validate_decision(decision)
         key = _token(idempotency_key, "idempotency_key")
         effect = _token(effect_ref, "effect_ref")
