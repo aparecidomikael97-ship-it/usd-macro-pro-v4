@@ -6,7 +6,6 @@ cannot turn historical unit-test PASS into real-world certification.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -27,8 +26,13 @@ def load():
 
 
 def blob_sha(path: Path):
-    content = path.read_bytes()
-    return hashlib.sha1(b"blob " + str(len(content)).encode("ascii") + b"\0" + content).hexdigest()
+    # Git applies the repo's text conversion rules; hashing checkout bytes
+    # manually fails on Windows CRLF even if the *tracked Git blob* is pinned.
+    p = subprocess.run(
+        ["git", "hash-object", str(path)], cwd=ROOT,
+        capture_output=True, text=True, check=True,
+    )
+    return p.stdout.strip()
 
 
 class AionP0OriginalEvidenceAuditTests(unittest.TestCase):
