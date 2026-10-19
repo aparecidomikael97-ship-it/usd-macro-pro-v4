@@ -438,6 +438,13 @@ class ExecutionOutbox:
         return {**out, "enqueue_state": "ENQUEUED"}
 
     def release_expired_claims(self, *, now: Any | None = None) -> int:
+        # P0 SQLite contract: this API owns its transaction. The Saga or
+        # another caller may already own this SQLite connection's transaction.
+        # Deny explicitly BEFORE BEGIN/COMMIT/ROLLBACK, leaving any parent
+        # transaction and SAVEPOINT intact; never borrow or undo it.
+        # claim_next calls this guard before starting its own claim transaction.
+        if self.db.in_transaction:
+            raise RuntimeError("OUTBOX_NESTED_TRANSACTION_UNSUPPORTED")
         current = _iso(_utc(now))
         self.db.execute("BEGIN IMMEDIATE")
         try:
