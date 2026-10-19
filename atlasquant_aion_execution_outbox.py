@@ -129,7 +129,7 @@ class ExecutionOutbox:
         self.db = store.db
         # sqlite3 default check_same_thread=True; do NOT attempt database IO
         # from another thread or poison store health with a driver exception.
-        self._connection_thread_id = threading.get_ident()
+        self._connection_owner_thread = threading.current_thread()
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
@@ -190,9 +190,10 @@ class ExecutionOutbox:
             """)
 
     def _require_connection_thread(self) -> None:
-        # Explicit P0 contract at the Outbox boundary. Never alter the
-        # connection's check_same_thread mode or health to hide caller misuse.
-        if threading.get_ident() != self._connection_thread_id:
+        # Compare Thread object identity rather than OS thread ID, which can
+        # be recycled after a thread exits. Never alter the SQLite connection's
+        # check_same_thread mode or health to hide caller misuse.
+        if threading.current_thread() is not self._connection_owner_thread:
             raise RuntimeError("OUTBOX_SQLITE_CONNECTION_THREAD_MISMATCH")
 
     def _scope_args(self) -> tuple[str, str, str]:
