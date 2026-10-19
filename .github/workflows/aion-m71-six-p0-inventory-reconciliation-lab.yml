@@ -1,0 +1,49 @@
+name: AION M71 current six-P0 inventory reconciliation LAB
+
+on:
+  push:
+    branches: [lab/aion-m71-fresh-incident-execution-hardstop-20261019]
+    paths:
+      - docs/aion/AION_P0_SIX_BLOCKERS_CANONICAL_EVIDENCE_REGISTER_20261019.json
+      - test_aion_p0_original_six_evidence_matrix_lab.py
+      - .github/workflows/aion-m71-six-p0-inventory-reconciliation-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  m71_p0_inventory:
+    name: Six still OPEN with M71 historical RED preserved / LAB GREEN (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 90
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Confirm safety-critical original and revised blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:atlasquant_aion_global_worker_reactivation_gate.py)" = "8412ada82761de37a72a8f29af7f8672cfb5b082"
+          test "$(git hash-object atlasquant_aion_global_worker_reactivation_gate.py)" = "8533ae3c1720d4230dace6478a40f9f11b9677d4"
+          test "$(git hash-object atlasquant_aion_global_worker_activation.py)" = "df43bb4371c784396069f4ede51205b0aa19cc0a"
+          echo "M71_A118_RED_AND_CURRENT_LAB_GREEN_GUARDS_PINNED"
+      - name: Install tracked dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Validate 10 current evidence-register contracts
+        run: |
+          python -B -c "import unittest; x=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_original_six_evidence_matrix_lab'); assert x.countTestCases()==10, x.countTestCases(); print('P0_OPEN_SIX_EVIDENCE_AUDIT_10_CASES')"
+          python -B -m unittest -v test_aion_p0_original_six_evidence_matrix_lab
+      - name: Preserve 13 direct M71 RED to GREEN exact safety contracts
+        run: python -B -m unittest -v test_aion_m71_execution_fresh_source_denial_lab test_aion_p0_m71_original_stale_gate_safety_negative_lab
