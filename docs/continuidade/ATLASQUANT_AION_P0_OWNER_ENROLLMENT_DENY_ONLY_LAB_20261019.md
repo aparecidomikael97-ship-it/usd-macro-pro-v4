@@ -12,9 +12,10 @@ Esta rodada executou um **validador somente de triagem de envelope sintático n�
 - Workflow leitura somente `.github/workflows/aion-p0-owner-enrollment-contract-lab.yml` commit `9bdd16448a3c52e7992c0823a41173d495e55625`, matriz Ubuntu/Windows e checks de hash de quatro originais.
 - [GitHub Actions run #39303709098](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39303709098).
 
-## Evidência apurada até o registro
+## Evidência final comprovada em ambos os sistemas
 - Ubuntu job `118235209129`: original A118 verificado `P0_A118_4_BLOBS_ORIGINAL`; 27 novos testes PASS; regressões 69 pytest PASS (61 históricos V2.24/V2.25 + 8 anteriores P0); 6 A74 unittest PASS. **102/102 PASS**, sem credencial real.
-- Windows job `118235209430`: **ainda sem conclusão observada ao criar este checkpoint**. Verificar no GitHub antes de declarar cobertura Windows ou 204 execuções.
+- Windows job `118235209430`: `P0_A118_4_BLOBS_ORIGINAL`; 27 novos testes PASS; 69 regressões pytest PASS; 6 A74 unittest PASS. **102/102 PASS**.
+- Resultado da matriz: Ubuntu e Windows jobs SUCCESS; **102 casos distintos observados em dois sistemas = 204 execuções PASS**, sem prova de matrícula real.
 
 ## O que a triagem nega/inspeciona
 Envelope ausente, campos omitidos/extras, privado enviado no payload, bool usado como versão, tenant/workspace/owner trocado, falsa biometria/verificação/witness, nonce inválido, janela vencida ou futura, fingerprint inválido, tipo de credencial não suportado, intent ROTATE/REVOKE/RECOVER na cerimônia incorreta. Envelope coerente também retorna BLOCKED: `format_consistent=True` não é permissão.
