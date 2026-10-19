@@ -1,0 +1,60 @@
+name: AION P0 AuthorityBudget SQLite ownership RED GREEN LAB
+
+on:
+  push:
+    branches: [lab/aion-p0-sqlite-budget-owner-thread-20261019]
+    paths:
+      - atlasquant_aion_cumulative_authority_budget.py
+      - test_aion_p0_sqlite_authority_budget_owner_thread_lab.py
+      - .github/workflows/aion-p0-sqlite-authority-budget-owner-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  budget_sqlite_owner:
+    name: P0 budget 15 + original guard/ledger regressions (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 80
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Confirm original AuthorityBudget and LAB safe-store pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:atlasquant_aion_cumulative_authority_budget.py)" = "be87fb5361c37f3e30c08558b804861c461ef9ea"
+          test "$(git hash-object aion_chat/store.py)" = "faafd3b61e90f3a4b3c863dcfc97b83ba32a0f3b"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          test "$(git hash-object atlasquant_aion_execution_saga.py)" = "c34c27aa399f9744f6395e40d0277bc9f648cabf"
+          echo "P0_BUDGET_A118_AND_LAB_BASE_PINNED"
+      - name: Install tracked project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Freeze and run 15 budget thread / nested ownership contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_sqlite_authority_budget_owner_thread_lab'); assert s.countTestCases()==15, s.countTestCases(); print('P0_BUDGET_15_CASES')"
+          python -B -m unittest -v test_aion_p0_sqlite_authority_budget_owner_thread_lab
+      - name: Preserve original cumulative budget authority limits
+        run: python -B -m unittest -v test_atlasquant_aion_cumulative_authority_budget
+      - name: Preserve P0 Saga SQLite thread guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_saga_owner_thread_lab
+      - name: Preserve P0 Outbox SQLite thread guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_owner_thread_denial_lab
+      - name: Preserve nested SQLite caller transaction protection
+        run: python -B -m unittest -v test_aion_p0_sqlite_nested_transaction_denial_lab
+      - name: Preserve staged host SQLite lifecycle and Store health
+        run: python -B -m unittest -v test_aion_p0_staged_host_sqlite_cleanup_lab test_aion_p0_sqlite_chat_store_owner_thread_lab
+      - name: Preserve original Saga reconciliation uncertainty controls
+        run: python -B -m unittest -v test_atlasquant_aion_saga_outcome_snapshot_a63 test_atlasquant_aion_saga_outbox_binding_a64 test_atlasquant_aion_saga_unverified_terminal_a65
