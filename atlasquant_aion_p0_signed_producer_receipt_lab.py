@@ -23,19 +23,19 @@ SCHEMA = "AION_P0_PRODUCER_RECEIPT_SIGNED_LAB_V1"
 KINDS = frozenset(("POSITIVE_COMMITTED", "NEGATIVE_NO_EFFECT_FENCED"))
 REQUIRED = frozenset((
     "schema", "kind", "owner_id", "tenant_id", "workspace_id",
-    "host_id", "producer_issuer_id", "producer_account_id", "action_class",
+    "host_id", "producer_issuer_id", "producer_account_id", "producer_key_id", "producer_key_version", "action_class",
     "intent_digest", "idempotency_key", "attempt", "epoch",
     "witness_sequence", "witness_head", "nonce", "receipt_id",
     "effect_or_fence_ref", "issued_at", "expires_at",
 ))
 SCOPE = frozenset((
     "owner_id", "tenant_id", "workspace_id", "host_id",
-    "producer_issuer_id", "producer_account_id", "action_class",
+    "producer_issuer_id", "producer_account_id", "producer_key_id", "producer_key_version", "action_class",
     "intent_digest", "idempotency_key", "attempt", "epoch",
 ))
 HEX = re.compile(r"^[0-9a-f]{64}$")
 TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
-KEY_FIELDS = frozenset(("issuer_id", "public_key_b64", "status", "key_version"))
+KEY_FIELDS = frozenset(("issuer_id", "key_id", "public_key_b64", "status", "key_version"))
 
 
 def canonical_receipt_bytes(row: Mapping[str, Any]) -> bytes:
@@ -104,7 +104,7 @@ def inspect_signed_producer_receipt_lab(
     used_receipt_ids: frozenset[str] | None,
     now: str,
 ) -> dict[str, Any]:
-    if type(claimed) is not dict or set(claimed) != {"receipt", "signature_b64"}:
+    if (type(claimed) is not dict or any(type(k) is not str for k in claimed)\n            or set(claimed) != {"receipt", "signature_b64"}):
         return _out("P0_ENVELOPE_INVALID")
     receipt = claimed["receipt"]
     if type(receipt) is not dict or any(type(k) is not str for k in receipt):
@@ -114,24 +114,24 @@ def inspect_signed_producer_receipt_lab(
     if (type(receipt["schema"]) is not str or receipt["schema"] != SCHEMA
             or type(receipt["kind"]) is not str or receipt["kind"] not in KINDS):
         return _out("P0_DOMAIN_OR_OUTCOME_KIND_INVALID")
-    for field in REQUIRED - {"schema", "kind", "attempt", "epoch", "witness_sequence", "issued_at", "expires_at"}:
+    for field in REQUIRED - {"schema", "kind", "attempt", "epoch", "witness_sequence", "producer_key_version", "issued_at", "expires_at"}:
         value = receipt[field]
         if type(value) is not str or len(value) > 128 or not TOKEN.fullmatch(value):
             return _out("P0_FIELD_INVALID:" + field)
     for field in ("intent_digest", "witness_head"):
         if not HEX.fullmatch(receipt[field]):
             return _out("P0_DIGEST_INVALID:" + field)
-    for field in ("attempt", "epoch", "witness_sequence"):
+    for field in ("attempt", "epoch", "witness_sequence", "producer_key_version"):
         value = receipt[field]
         if type(value) is not int or value < 1:
             return _out("P0_COUNTER_INVALID:" + field)
-    if type(expected_scope) is not dict or set(expected_scope) != SCOPE:
+    if (type(expected_scope) is not dict or any(type(k) is not str for k in expected_scope)\n            or set(expected_scope) != SCOPE):
         return _out("P0_EXPECTED_SCOPE_UNAVAILABLE")
     for field in SCOPE:
         expected = expected_scope[field]
         if type(expected) is not type(receipt[field]) or expected != receipt[field]:
             return _out("P0_SCOPE_MISMATCH:" + field)
-    if type(pinned_issuer) is not dict or set(pinned_issuer) != KEY_FIELDS:
+    if (type(pinned_issuer) is not dict or any(type(k) is not str for k in pinned_issuer)\n            or set(pinned_issuer) != KEY_FIELDS):
         return _out("P0_ISSUER_PIN_UNAVAILABLE")
     if pinned_issuer["status"] != "ACTIVE":
         return _out("P0_ISSUER_REVOKED_OR_INACTIVE")
