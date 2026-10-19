@@ -71,8 +71,11 @@ class Quality85CaseInventoryTests(unittest.TestCase):
 
     def test_03_no_duplicate_error_name_or_unwaived_case(self):
         entries=registry()["entries"]
-        ids=[(e["module"],e["case"]) for e in entries]
+        # unittest subTest failures share the same method and class while
+        # recording independently failed parameter cases (retryable True/False).
+        ids=[(e["module"],e["test_class"],e["case"],e["subtest_context"]) for e in entries]
         self.assertEqual(len(ids),len(set(ids)))
+        self.assertEqual(sum(e["subtest_context"] is not None for e in entries),4)
         self.assertTrue(all(e["triage_status"]=="OPEN_NOT_WAIVED" for e in entries))
         self.assertTrue(all(e["kind"] in ("FAIL","ERROR") for e in entries))
 
