@@ -140,7 +140,10 @@ def inspect_signed_producer_receipt_lab(
         return _out("P0_ISSUER_REVOKED_OR_INACTIVE")
     if (type(pinned_issuer["issuer_id"]) is not str or
             receipt["producer_issuer_id"] != pinned_issuer["issuer_id"] or
-            type(pinned_issuer["key_version"]) is not int or pinned_issuer["key_version"] < 1):
+            type(pinned_issuer["key_id"]) is not str or
+            receipt["producer_key_id"] != pinned_issuer["key_id"] or
+            type(pinned_issuer["key_version"]) is not int or pinned_issuer["key_version"] < 1 or
+            receipt["producer_key_version"] != pinned_issuer["key_version"]):
         return _out("P0_ISSUER_PIN_MISMATCH")
     if type(used_receipt_ids) is not frozenset:
         return _out("P0_REPLAY_STATE_MISSING")
