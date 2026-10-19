@@ -39,7 +39,7 @@ LAB_ONLY = (
 class AIONP0QualityLabCoverageGovernanceTests(unittest.TestCase):
     def test_no_unclassified_root_test_file(self):
         quality = QUALITY.read_text(encoding="utf-8")
-        listed = set(re.findall(r"(?m)^\\s+(test_[A-Za-z0-9_]+\\.py)\\s*\\\\?$", quality))
+        listed = set(re.findall(r"(?m)^\s+(test_[A-Za-z0-9_]+\.py)\s*\\?$", quality))
         discovered = {p.name for p in ROOT.glob("test_*.py")}
         omitted = discovered - listed
         expected = {module + ".py" for module in LAB_ONLY}
@@ -51,7 +51,7 @@ class AIONP0QualityLabCoverageGovernanceTests(unittest.TestCase):
     def test_every_omitted_module_has_real_unittest_step(self):
         content = DEDICATED.read_text(encoding="utf-8")
         executed = re.findall(
-            r"(?m)^\\s+run:\\s+python -B -m unittest -v (test_[A-Za-z0-9_]+)\\s*$",
+            r"(?m)^\s+run:\s+python -B -m unittest -v (test_[A-Za-z0-9_]+)\s*$",
             content,
         )
         self.assertEqual(set(executed), set(LAB_ONLY),
@@ -61,8 +61,8 @@ class AIONP0QualityLabCoverageGovernanceTests(unittest.TestCase):
 
     def test_runner_is_read_only_two_os_and_branch_scoped(self):
         content = DEDICATED.read_text(encoding="utf-8")
-        self.assertIn("on:\\n  push:\\n    branches: [lab/aion-p0-quality-governance-20261019]", content)
-        self.assertIn("permissions:\\n  contents: read", content)
+        self.assertIn("on:\n  push:\n    branches: [lab/aion-p0-quality-governance-20261019]", content)
+        self.assertIn("permissions:\n  contents: read", content)
         self.assertIn("os: [ubuntu-latest, windows-latest]", content)
         self.assertIn("persist-credentials: false", content)
         self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", content)
