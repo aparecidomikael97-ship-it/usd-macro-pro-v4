@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
+import threading
 from typing import Any, Callable, Mapping
 
 from aion_chat.models import Scope
@@ -126,6 +127,9 @@ class ExecutionOutbox:
         self.store = store
         self.scope = scope
         self.db = store.db
+        # sqlite3 default check_same_thread=True; do NOT attempt database IO
+        # from another thread or poison store health with a driver exception.
+        self._connection_thread_id = threading.get_ident()
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
@@ -185,7 +189,14 @@ class ExecutionOutbox:
                 ON action_effects(owner,tenant,workspace,confirmed_at,idempotency_key);
             """)
 
+    def _require_connection_thread(self) -> None:
+        # Explicit P0 contract at the Outbox boundary. Never alter the
+        # connection's check_same_thread mode or health to hide caller misuse.
+        if threading.get_ident() != self._connection_thread_id:
+            raise RuntimeError("OUTBOX_SQLITE_CONNECTION_THREAD_MISMATCH")
+
     def _scope_args(self) -> tuple[str, str, str]:
+        self._require_connection_thread()
         return _scope(self.scope)
 
     def _decision_row(self, decision_id: str):
@@ -265,6 +276,7 @@ class ExecutionOutbox:
         risk_points: Any = 0,
         capability_class: Any = "",
     ) -> dict[str, Any]:
+        self._require_connection_thread()
         self.store.require_healthy()
         owner, tenant, workspace = self._scope_args()
         intent = _token(intent_ref, "intent_ref")
@@ -438,6 +450,7 @@ class ExecutionOutbox:
         return {**out, "enqueue_state": "ENQUEUED"}
 
     def release_expired_claims(self, *, now: Any | None = None) -> int:
+        self._require_connection_thread()
         # P0 SQLite contract: this API owns its transaction. The Saga or
         # another caller may already own this SQLite connection's transaction.
         # Deny explicitly BEFORE BEGIN/COMMIT/ROLLBACK, leaving any parent
