@@ -1,0 +1,52 @@
+name: AION M73 incident revision diagnostic LAB (READ ONLY)
+
+on:
+  push:
+    branches: [lab/aion-m73-fresh-revision-fence-20261019]
+    paths:
+      - "aion_m73_freshness_fence_lab.py"
+      - "test_aion_m73_fresh_revision_fence_lab.py"
+      - ".github/workflows/aion-m73-fresh-revision-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  m73_lab:
+    name: M73 prototype + M70 original guard controls (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Pin four unchanged original A118 blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            actual="$(git hash-object "$1")"
+            test "$actual" = "$2" || { echo "SOURCE_DRIFT $1"; exit 1; }
+          }
+          check_blob test_atlasquant_aion_global_worker_reactivation_gate.py 6c66e11b4c29b2bef1ff277a0c47740cdb0bf220
+          check_blob atlasquant_aion_global_worker_activation.py df43bb4371c784396069f4ede51205b0aa19cc0a
+          check_blob atlasquant_aion_global_worker_reactivation_gate.py 8412ada82761de37a72a8f29af7f8672cfb5b082
+          check_blob atlasquant_aion_global_worker_incident_reconciliation.py 85541bb2d10f0b97b096df10b5184851160cfec9
+          echo "A118_ORIGINAL_4_BLOBS_MATCH"
+      - name: Install original dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify test matrix counts
+        run: |
+          python -B -c "import unittest; l=unittest.defaultTestLoader; a=l.loadTestsFromName('test_aion_m73_fresh_revision_fence_lab'); b=l.loadTestsFromName('test_aion_m70_reactivation_gate_migration_candidate'); c=l.loadTestsFromName('test_aion_m68_original_a118_negative'); assert (a.countTestCases(),b.countTestCases(),c.countTestCases())==(18,15,2),(a.countTestCases(),b.countTestCases(),c.countTestCases()); print('M73_18_M70_15_M68_2_CASES')"
+      - name: Execute experimental M73 plus preserved guards (35 cases)
+        run: python -B -m unittest -v test_aion_m73_fresh_revision_fence_lab test_aion_m70_reactivation_gate_migration_candidate test_aion_m68_original_a118_negative
