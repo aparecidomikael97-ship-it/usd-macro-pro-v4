@@ -52,3 +52,5 @@ jobs:
         run: python -B -m unittest -v test_aion_p0_original_six_evidence_matrix_lab
       - name: Original A73 independent source / A110 no auto resend
         run: python -B -m unittest -v test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_a110_outbox_ambiguous_block
+      - name: Preserve original canonical 365 Security cases after M71 guard
+        run: python -B test_atlasquant_aion_activation_denial_coverage_a76.py --canonical --security
