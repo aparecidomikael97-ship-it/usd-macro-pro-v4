@@ -1,0 +1,61 @@
+{
+  "schema": "AION_P0_H0_IAM_FINOPS_OFFLINE_PREFLIGHT_V1",
+  "aws_region": "sa-east-1",
+  "cloudflare_plan": "Workers Free - SQLite Durable Objects",
+  "global_cap_brl": "200",
+  "regional_aws_quote_date": null,
+  "usd_brl_observed_date": null,
+  "quotes_source": "https://aws.amazon.com/pt/s3/pricing/",
+  "quotes": {
+    "s3_standard_gb_month_usd": null,
+    "s3_put_per_1000_usd": null,
+    "s3_get_per_1000_usd": null,
+    "kms_key_month_usd": null,
+    "kms_per_10000_usd": null,
+    "audit_logging_monthly_usd": null,
+    "other_cloud_monthly_usd": null,
+    "usd_brl_stress_rate": null,
+    "existing_ecosystem_monthly_brl": null,
+    "tax_fx_uncertainty_fraction": "0.30"
+  },
+  "workload": {
+    "anchors_per_day": null,
+    "retention_days": null,
+    "versions_per_anchor": null,
+    "bytes_per_version": null,
+    "s3_puts_per_anchor": null,
+    "s3_gets_per_anchor": null,
+    "kms_calls_per_anchor": null,
+    "cloudflare_account_requests_per_day": null,
+    "cloudflare_account_gbs_per_day": null,
+    "cloudflare_account_rows_read_per_day": null,
+    "cloudflare_account_rows_written_per_day": null,
+    "cloudflare_account_sqlite_gb": null,
+    "workers_account_requests_per_day": null
+  },
+  "proposed_aws_actions_by_role": {
+    "aion_executor": [],
+    "cloudflare_cas_runtime": [],
+    "aws_anchor_writer": ["s3:PutObject"],
+    "aws_anchor_reader": [
+      "s3:GetBucketObjectLockConfiguration",
+      "s3:GetObjectRetention",
+      "s3:GetObjectVersion",
+      "s3:ListBucketVersions"
+    ]
+  },
+  "proposed_controls": {
+    "separate_aws_account_administration": false,
+    "separate_cloudflare_administration": false,
+    "s3_bucket_versioning_enabled": false,
+    "s3_object_lock_default_compliance": false,
+    "retention_floor_ceiling_reviewed": false,
+    "exact_s3_version_id_readback": false,
+    "check_delete_markers_and_forks": false,
+    "deny_on_failed_anchor_readback": false,
+    "deny_on_cf_free_quota": false,
+    "avoid_pii_and_review_lgpd": false,
+    "kms_and_key_recovery_plan_reviewed": false,
+    "offline_no_auto_resend": true
+  }
+}
