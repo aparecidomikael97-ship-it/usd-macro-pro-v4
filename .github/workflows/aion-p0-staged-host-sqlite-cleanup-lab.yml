@@ -1,0 +1,55 @@
+name: AION P0 staged host SQLite cleanup integrity RED GREEN LAB
+
+on:
+  push:
+    branches: [lab/aion-p0-sqlite-staged-host-cleanup-20261019]
+    paths:
+      - atlasquant_aion_chat_host_staging.py
+      - test_aion_p0_staged_host_sqlite_cleanup_lab.py
+      - .github/workflows/aion-p0-staged-host-sqlite-cleanup-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  staged_host_thread_cleanup:
+    name: Staged host 10 + historical store/Outbox 46 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 60
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Confirm original host and LAB SQLite guard were frozen
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:atlasquant_aion_chat_host_staging.py)" = "18c05d150d6e95cd134c530e801917e54cb1c2ff"
+          test "$(git hash-object aion_chat/store.py)" = "faafd3b61e90f3a4b3c863dcfc97b83ba32a0f3b"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          echo "P0_STAGED_HOST_A118_BASE_AND_STORE_PINNED"
+      - name: Install tracked project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Execute 10 staged session cross-thread lifecycle contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_staged_host_sqlite_cleanup_lab'); assert s.countTestCases()==10, s.countTestCases(); print('P0_STAGED_HOST_10_CASES')"
+          python -B -m unittest -v test_aion_p0_staged_host_sqlite_cleanup_lab
+      - name: Preserve 4 historical host binding / session switch cases
+        run: python -B -m unittest -v test_atlasquant_aion_chat_staged_runtime_resilience.StagedHostIdentityLifecycleTests
+      - name: Preserve 15 SQLiteChatStore thread/health guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_chat_store_owner_thread_lab
+      - name: Preserve 12 Outbox thread-ownership guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_owner_thread_denial_lab
+      - name: Preserve 7 nested transaction and 8 restore/claim controls
+        run: python -B -m unittest -v test_aion_p0_sqlite_nested_transaction_denial_lab test_aion_p0_original_sqlite_compat_concurrency_restore_lab
