@@ -12,8 +12,12 @@ permissions:
 
 jobs:
   negative_original_a118:
-    name: M68 original A118 denial and reopened-incident checks
-    runs-on: ubuntu-latest
+    name: M68 A118 denial and reopened incident (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     env:
       PYTHONDONTWRITEBYTECODE: "1"
