@@ -1,0 +1,57 @@
+name: AION P0 Twilio readback UNKNOWN no-resend LAB (READ ONLY)
+
+on:
+  push:
+    branches: [lab/aion-p0-twilio-readback-triage-20261019]
+    paths:
+      - atlasquant_aion_p0_twilio_readback_triage_lab.py
+      - test_atlasquant_aion_p0_twilio_readback_triage_lab.py
+      - .github/workflows/aion-p0-twilio-readback-triage-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  twilio_message_readback_readonly:
+    name: Twilio readback 36 + receipt/outbox historical tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Confirm original A118 receipt, uncertain effect and Outbox guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify() {
+            test "$(git hash-object "$1")" = "$2" || { echo "ORIGINAL_DRIFT: $1"; exit 1; }
+          }
+          verify atlasquant_aion_producer_receipt_untrusted_precheck.py 4fba14585c87591f2195a312600ad30e3f7eafe9
+          verify atlasquant_aion_b2b_external_effect_outcome_receipt_contract_v1.py 49ad7329ae3311c4878f988a988ddd424a93f967
+          verify atlasquant_aion_execution_outbox.py 6bad4ee9ba5909bbb49c609a5d3ac3c05c16ab83
+          verify test_atlasquant_aion_a110_outbox_ambiguous_block.py 2ca086e315ee629026968924bae8e64cafd3a1f1
+          echo "P0_TWILIO_ORIGINAL_4_BLOBS_MATCH"
+      - name: Install original project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Discover 36 isolated readback scenarios before execution
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_atlasquant_aion_p0_twilio_readback_triage_lab'); assert s.countTestCases()==36, s.countTestCases(); print('P0_TWILIO_READBACK_36_CASES')"
+      - name: Execute 36 readback uncertainty scenarios
+        run: python -B -m unittest -v test_atlasquant_aion_p0_twilio_readback_triage_lab
+      - name: Recheck 32 signed producer receipt LAB guards
+        run: python -B -m unittest -v test_atlasquant_aion_p0_signed_producer_receipt_lab
+      - name: Preserve original A37 A83 and B2B contract denials
+        run: python -B -m unittest -v test_atlasquant_aion_producer_receipt_untrusted_precheck test_atlasquant_aion_a83_untrusted_failed_receipt test_atlasquant_aion_b2b_real_receipt_authenticator_contract_v1
+      - name: Preserve A110 ambiguous Outbox nonclearance
+        run: python -B -m unittest -v test_atlasquant_aion_a110_outbox_ambiguous_block
