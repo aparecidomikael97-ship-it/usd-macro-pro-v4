@@ -104,7 +104,8 @@ def inspect_signed_producer_receipt_lab(
     used_receipt_ids: frozenset[str] | None,
     now: str,
 ) -> dict[str, Any]:
-    if (type(claimed) is not dict or any(type(k) is not str for k in claimed)\n            or set(claimed) != {"receipt", "signature_b64"}):
+    if (type(claimed) is not dict or any(type(k) is not str for k in claimed)
+            or set(claimed) != {"receipt", "signature_b64"}):
         return _out("P0_ENVELOPE_INVALID")
     receipt = claimed["receipt"]
     if type(receipt) is not dict or any(type(k) is not str for k in receipt):
@@ -125,13 +126,15 @@ def inspect_signed_producer_receipt_lab(
         value = receipt[field]
         if type(value) is not int or value < 1:
             return _out("P0_COUNTER_INVALID:" + field)
-    if (type(expected_scope) is not dict or any(type(k) is not str for k in expected_scope)\n            or set(expected_scope) != SCOPE):
+    if (type(expected_scope) is not dict or any(type(k) is not str for k in expected_scope)
+            or set(expected_scope) != SCOPE):
         return _out("P0_EXPECTED_SCOPE_UNAVAILABLE")
     for field in SCOPE:
         expected = expected_scope[field]
         if type(expected) is not type(receipt[field]) or expected != receipt[field]:
             return _out("P0_SCOPE_MISMATCH:" + field)
-    if (type(pinned_issuer) is not dict or any(type(k) is not str for k in pinned_issuer)\n            or set(pinned_issuer) != KEY_FIELDS):
+    if (type(pinned_issuer) is not dict or any(type(k) is not str for k in pinned_issuer)
+            or set(pinned_issuer) != KEY_FIELDS):
         return _out("P0_ISSUER_PIN_UNAVAILABLE")
     if pinned_issuer["status"] != "ACTIVE":
         return _out("P0_ISSUER_REVOKED_OR_INACTIVE")
