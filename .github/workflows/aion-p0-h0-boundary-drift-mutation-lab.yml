@@ -49,5 +49,7 @@ jobs:
       - name: Check no-witness H0 / fallback real SQLite diagnostics
         run: |
           python -B -m unittest -v test_aion_p0_h0_sqlite_startup_observer_lab
+      - name: Install tracked application dependencies for historic A73 readiness imports
+        run: python -m pip install -r requirements.txt
       - name: Check A73 witness and A110 producer ambiguous defenses
         run: python -B -m unittest -v test_atlasquant_aion_readiness_source_witness_a73 test_atlasquant_aion_a110_outbox_ambiguous_block
