@@ -196,8 +196,14 @@ class H0SQLiteStartupObservationTests(unittest.TestCase):
         self.assertEqual(after["outbox_states_observed"]["PENDING"], 1)
         self.assertFalse(after["local_rollback_detected"])
         self.assertFalse(after["local_rollback_ruled_out"])
-        with SQLiteChatStore(path) as _unused:
-            pass
+        reopened = SQLiteChatStore(path)
+        try:
+            restored_box = ExecutionOutbox(reopened, SCOPE)
+            self.assertEqual(restored_box.get(key)["state"], "PENDING")
+            # The local outbox is claimable after a manual rollback; this
+            # read-only observer neither repairs that fact nor enables send.
+        finally:
+            reopened.close()
 
     def test_15_cli_exit_code_never_reports_ready(self):
         path, store, _, _ = self.create_outbox()
