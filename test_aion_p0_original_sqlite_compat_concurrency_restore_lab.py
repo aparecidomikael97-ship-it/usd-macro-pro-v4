@@ -141,15 +141,18 @@ class P0OriginalSQLiteCompatibilityTests(unittest.TestCase):
         self.assertEqual(outbox.get(self.key)["state"], "UNCERTAIN")
         later.close()
 
-        restored = SQLiteChatStore.restore_from_backup(backup, self.path)
-        self.assertEqual(restored["state"], "RESTORE_VERIFIED")
+        # The original A118 restore accepted this valid but stale backup
+        # and reopened PENDING; the new LAB guard must deny the official API
+        # without discarding UNCERTAIN. This does not stop manual file copy.
+        from aion_chat.store import StorageUnavailableError
+        with self.assertRaisesRegex(
+            StorageUnavailableError,
+            "P0_EXECUTION_RESTORE_REQUIRES_INDEPENDENT_WITNESS",
+        ):
+            SQLiteChatStore.restore_from_backup(backup, self.path)
         check, post = self.open_store()
-        self.assertEqual(post.get(self.key)["state"], "PENDING")
-        re_lease = post.claim_next("worker-after-restore", now=NOW + timedelta(seconds=2))
-        self.assertIsNotNone(re_lease)
-        self.assertEqual(re_lease["state"], "CLAIMED")
-        # Real A118 dispatch is still denied separately; this test does not
-        # show a production duplicate effect or bypass of the hard stop.
+        self.assertEqual(post.get(self.key)["state"], "UNCERTAIN")
+        self.assertIsNone(post.claim_next("worker-after-denied-restore", now=NOW+timedelta(seconds=2)))
         check.close()
 
     def test_07_pending_in_one_scope_not_claimed_from_foreign_scope(self):
