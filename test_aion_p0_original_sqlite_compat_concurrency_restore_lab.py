@@ -87,7 +87,7 @@ class P0OriginalSQLiteCompatibilityTests(unittest.TestCase):
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
                 result = pool.submit(lambda: outbox.get(self.key))
-                with self.assertRaises(sqlite3.ProgrammingError):
+                with self.assertRaisesRegex(RuntimeError, "OUTBOX_SQLITE_CONNECTION_THREAD_MISMATCH"):
                     result.result(timeout=10)
             self.assertEqual(outbox.get(self.key)["state"], "PENDING")
         finally:
