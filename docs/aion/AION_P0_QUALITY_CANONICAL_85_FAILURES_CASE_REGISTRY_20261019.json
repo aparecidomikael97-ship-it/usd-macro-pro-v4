@@ -1,0 +1,736 @@
+{
+  "schema": "AION_P0_QUALITY_85_CANONICAL_FAILURES_UNWAIVED_TRIAGE_V1",
+  "snapshot": "2026-10-19",
+  "source_job_id": 118339499707,
+  "source_run_url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39334210568",
+  "source_commit": "44a4de01817d896e056810025d6c68ec8e34112f",
+  "quality_total": 6562,
+  "fail_total": 51,
+  "error_total": 34,
+  "entries_total": 85,
+  "module_totals": {
+    "test_atlasquant_aion_global_worker_reactivation_gate": {
+      "fail": 1,
+      "error": 2
+    },
+    "test_atlasquant_aion_execution_outbox": {
+      "fail": 0,
+      "error": 23
+    },
+    "test_atlasquant_aion_execution_saga": {
+      "fail": 0,
+      "error": 9
+    },
+    "test_atlasquant_aion_worker_runtime": {
+      "fail": 6,
+      "error": 0
+    },
+    "test_atlasquant_aion_global_worker": {
+      "fail": 21,
+      "error": 0
+    },
+    "test_atlasquant_aion_global_worker_readiness": {
+      "fail": 2,
+      "error": 0
+    },
+    "test_atlasquant_aion_global_worker_activation": {
+      "fail": 15,
+      "error": 0
+    },
+    "test_atlasquant_aion_global_worker_live_verification": {
+      "fail": 5,
+      "error": 0
+    },
+    "test_quality_workflow_coverage": {
+      "fail": 1,
+      "error": 0
+    }
+  },
+  "scope": "Only original Quality selection errors; no new test files added and no expectation waivers",
+  "status": "RED_CANONICAL_HARD_NO_GO",
+  "p0_homologated": 0,
+  "external_authority_enrolled": false,
+  "case_level_root_cause_not_final": true,
+  "entries": [
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_adapter_rejection_boolean_does_not_release_aggregate",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_adapter_rejection_boolean_does_not_release_aggregate",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_confirmed_adapter_response_cannot_overwrite_revoked",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_exception_after_peer_confirmation_never_clobbers_it",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_existing_unverified_negative_remains_quarantined",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_fake_positive_cannot_release_followup_same_aggregate",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_false_authoritative_absence_remains_quarantined",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_lost_response_after_effect_requires_reconcile_and_never_blind_resends",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_private_confirm_is_closed_without_independent_producer_receipt",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_reconcile_confirmed_cannot_revive_revoked",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_reconcile_late_block_cannot_clobber_confirmation",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_same_aggregate_is_ordered_until_previous_intent_is_terminal",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_sent_without_confirmation_is_reconciled_not_redispatched",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_stale_absence_cannot_reopen_revoked_state",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_stale_absence_must_not_reopen_confirmed_effect",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_stale_adapter_reject_cannot_reopen_confirmed_as_retry_or_failed",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_stale_adapter_reject_cannot_reopen_confirmed_as_retry_or_failed",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_stale_sent_response_cannot_overwrite_confirmed",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_unexpired_claim_still_dispatches_once",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_unverified_absence_cannot_invoke_authorize_or_reopen_retry",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_unverified_absence_never_allows_retry_even_if_fixture_knows_no_effect",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_unverified_positive_from_reconcile_must_not_record_real_effect",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_outbox",
+      "case": "test_unverified_positive_from_send_must_not_record_real_effect",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_all_forward_steps_confirm_in_order_and_complete",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_budget_guard_blocks_external_send_before_adapter",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_compensation_unverified_failure_requires_external_review_before_manual_terminal",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_irreversible_confirmed_effect_escalates_manual_and_never_prepares_rollback",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_scope_window_budget_blocks_second_transaction_even_with_separate_approval",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_second_step_failure_requires_explicit_compensation_then_compensates",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_three_step_failure_compensates_confirmed_effects_in_reverse_order",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_uncertain_compensation_freezes_remaining_rollback_until_reconciled",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_execution_saga",
+      "case": "test_uncertain_forward_effect_freezes_saga_until_reconciliation",
+      "kind": "ERROR",
+      "exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "triage_group": "PRODUCER_NOT_ENROLLED_HARDSTOP_OBSERVED",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_claim_cas_conflict_blocks_executor",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_CONFLICT'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_claim_cas_conflict_blocks_executor",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_CONFLICT'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_due_work_is_governed_before_a_non_authoritative_receipt",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_allowlist_blocks_voice_schedule_before_provider",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_allowlist_blocks_voice_schedule_before_provider",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_cas_transport_exception_is_ambiguous_and_never_retryable",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ERROR'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_cas_transport_exception_is_ambiguous_and_never_retryable",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ERROR'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_cas_unverified_write_returns_reconciliation_receipt",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'UNVERIFIED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_cas_unverified_write_returns_reconciliation_receipt",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'UNVERIFIED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_claim_persists_bounded_safe_work_intent",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_claim_persists_bounded_safe_work_intent",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_tick_claims_fence_executes_and_persists_receipt",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_global_tick_claims_fence_executes_and_persists_receipt",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_release_fence_failure_blocks_final_persistence",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'FENCE_RELEASE_FAILED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_release_fence_failure_blocks_final_persistence",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'FENCE_RELEASE_FAILED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_sensitive_publication_is_blocked_in_global_mode",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_sensitive_publication_is_blocked_in_global_mode",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_successful_global_tick_clears_inflight_guard_in_final_checkpoint",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_successful_global_tick_clears_inflight_guard_in_final_checkpoint",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_UNVERIFIED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker",
+      "case": "test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_UNVERIFIED'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_a53_local_ticket_cannot_authorize_injected_activation_writer",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_activation_blocks_if_flag_changes_before_write",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_activation_reloads_runtime_and_blocks_stale_ticket_before_flag_write",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_activation_requires_final_confirmation_before_any_reads_or_writes",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_activation_ticket_is_integrity_protected_and_scope_bound",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_critical_status_when_safety_disable_cannot_be_confirmed",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_failed_post_write_flag_verification_rolls_back",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_live_readiness_collector_is_read_only_and_can_return_ready_for_flag_enable",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'PASS'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_plan_is_read_only_and_bound_to_persisted_armed_runtime",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_runtime_change_after_flag_write_rolls_activation_back",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_success_enables_only_flag_and_requires_future_live_evidence",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_ticket_fails_if_runtime_sha_or_digest_changes",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_uncertain_write_that_observes_enabled_attempts_safety_disable",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_writer_creates_when_unset_and_updates_when_disabled",
+      "kind": "FAIL",
+      "exception": "AssertionError: Expected 'post' to have been called once. Called 0 times.",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "case": "test_wrong_phrase_and_expired_plan_do_not_create_ticket",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "case": "test_completed_tick_with_global_receipt_confirms_live_work",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "case": "test_completed_tick_without_due_work_confirms_live_idle_runner",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED_UNVERIFIED_LIVE_EVIDENCE' != 'LIVE_CONFIRMED_IDLE'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "case": "test_fresh_gha_heartbeat_without_completed_tick_is_not_full_live",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED_UNVERIFIED_LIVE_EVIDENCE' != 'LIVE_HEARTBEAT_CONFIRMED_AWAITING_TICK'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "case": "test_other_admin_context_cannot_read_receipts",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "case": "test_unsafe_global_receipt_blocks_live_claim",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_reactivation_gate",
+      "case": "test_activation_plan_binds_green_post_incident_gate",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "triage_group": "PLAN_NOT_CREATED_LEGACY_FIXTURE_PRECONDITION",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_reactivation_gate",
+      "case": "test_execution_validation_rejects_reopened_gate",
+      "kind": "ERROR",
+      "exception": "KeyError: 'plan'",
+      "triage_group": "PLAN_NOT_CREATED_LEGACY_FIXTURE_PRECONDITION",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_reactivation_gate",
+      "case": "test_final_activation_execution_requires_fresh_gate",
+      "kind": "ERROR",
+      "exception": "KeyError: 'plan'",
+      "triage_group": "PLAN_NOT_CREATED_LEGACY_FIXTURE_PRECONDITION",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_readiness",
+      "case": "test_persisted_armed_state_with_disabled_flag_is_ready_for_flag_enable",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'PASS'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_global_worker_readiness",
+      "case": "test_readiness_before_arming_is_safe_and_explicit",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'BLOCKED' != 'PASS'",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_worker_runtime",
+      "case": "test_armed_worker_executes_due_local_work_without_external_authority",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_worker_runtime",
+      "case": "test_executor_snapshot_reports_observed_armed_worker_mode_truthfully",
+      "kind": "FAIL",
+      "exception": "AssertionError: 'ARMED_WORKER' not found in []",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_worker_runtime",
+      "case": "test_failed_local_handler_populates_retry_queue",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_worker_runtime",
+      "case": "test_retry_queue_clears_after_successful_retry",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_worker_runtime",
+      "case": "test_same_occurrence_remains_idempotent_under_worker_ticks",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_atlasquant_aion_worker_runtime",
+      "case": "test_worker_returns_non_authoritative_action_receipts",
+      "kind": "FAIL",
+      "exception": "AssertionError: 0 != 1",
+      "triage_group": "LEGACY_EXPECTED_POSITIVE_VS_BLOCKED_NEEDS_CASE_BY_CASE_TRIAGE",
+      "triage_status": "OPEN_NOT_WAIVED"
+    },
+    {
+      "module": "test_quality_workflow_coverage",
+      "case": "test_every_root_test_file_is_executed_by_quality_workflow",
+      "kind": "FAIL",
+      "exception": "AssertionError: Lists differ: ['test_aion_p0_h0_boundary_drift_mutations[761 chars].py'] != []",
+      "triage_group": "QUALITY_COVERAGE_MISSING_LAB_FILES",
+      "triage_status": "OPEN_NOT_WAIVED"
+    }
+  ]
+}
