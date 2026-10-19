@@ -1,0 +1,59 @@
+name: AION P0 HUMAN_OWNER root custody boundary LAB (READ ONLY)
+
+on:
+  push:
+    branches: [lab/aion-p0-owner-root-custody-20261019]
+    paths:
+      - test_aion_p0_owner_root_custody_lab.py
+      - .github/workflows/aion-p0-owner-root-custody-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  owner_identity_boundary:
+    name: P0 owner signature and source custody (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Confirm unchanged original V224/V225 and A74 source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            actual="$(git hash-object "$1")"
+            test "$actual" = "$2" || { echo "P0_BASELINE_DRIFT: $1"; exit 1; }
+          }
+          check_blob atlasquant_aion_owner_signature_ceremony.py eac8091ed9c80d838e069b16130c65530bde6652
+          check_blob atlasquant_aion_owner_decision_record.py 2d0ae10f33dc4a4cafdc0241074829a7a4d97b57
+          check_blob atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py efaf025d198e67acc24fda7fb05de46a064509b2
+          check_blob test_atlasquant_aion_v224_owner_signature_ceremony.py 383f7044c7535368b94e1333f5687a93bd13d25e
+          check_blob test_atlasquant_aion_v225_explicit_owner_decision_record.py 2c150d5e9cf15dba07718fcc30270e733de3b86d
+          check_blob test_atlasquant_aion_activation_authority_a74.py 884a046f7e01ed9ebdef85209be0a8bf98b2990e
+          echo "P0_ORIGINAL_OWNER_6_BLOBS_MATCH"
+      - name: Install original dependency set and pytest for the historical tests
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Run unchanged V224/V225 owner signature and decision contracts
+        run: |
+          python -B -m pytest -q test_atlasquant_aion_v224_owner_signature_ceremony.py test_atlasquant_aion_v225_explicit_owner_decision_record.py
+      - name: Run 8 additional P0 negative and untrusted-root boundary cases
+        run: |
+          python -B -m pytest -q test_aion_p0_owner_root_custody_lab.py
+      - name: Run unchanged A74 authority-denial controls
+        run: |
+          python -B -m unittest -v test_atlasquant_aion_activation_authority_a74
