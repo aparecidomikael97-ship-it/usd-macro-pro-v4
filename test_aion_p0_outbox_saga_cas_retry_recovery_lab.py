@@ -252,7 +252,7 @@ class SagaPureStateRecoveryLAB(unittest.TestCase):
                 "UPDATE aion_execution_saga_steps SET state='CONFIRMED' "
                 "WHERE saga_id='saga-1' AND step_key='one'")
         with self.assertRaisesRegex(
-            PermissionError,"SAGA_LOCAL_INTEGRITY_MISMATCH"
+            PermissionError,"INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED"
         ):
             self.stage(offset=2)
         self.assertEqual(len(self.outbox.list()),1)
