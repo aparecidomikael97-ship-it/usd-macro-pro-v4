@@ -1,0 +1,56 @@
+name: AION M71 fresh independent incident source hardstop RED GREEN LAB
+
+on:
+  push:
+    branches: [lab/aion-m71-fresh-incident-execution-hardstop-20261019]
+    paths:
+      - atlasquant_aion_global_worker_reactivation_gate.py
+      - test_aion_m71_execution_fresh_source_denial_lab.py
+      - .github/workflows/aion-m71-fresh-incident-execution-hardstop-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  m71_fresh_source_gate:
+    name: Original M71 replay plus 12 fresh-source denial contracts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 85
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Freeze original A118 gate and activation hardstop
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:atlasquant_aion_global_worker_reactivation_gate.py)" = "8412ada82761de37a72a8f29af7f8672cfb5b082"
+          test "$(git hash-object atlasquant_aion_global_worker_activation.py)" = "df43bb4371c784396069f4ede51205b0aa19cc0a"
+          test "$(git hash-object atlasquant_aion_global_worker_incident_reconciliation.py)" = "85541bb2d10f0b97b096df10b5184851160cfec9"
+          echo "M71_A118_ORIGINAL_AND_ACTIVATION_UNCHANGED"
+      - name: Install tracked project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Freeze count and execute 12 M71 non-authority contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_m71_execution_fresh_source_denial_lab'); assert s.countTestCases()==12, s.countTestCases(); print('M71_NO_FRESH_SOURCE_12_CASES')"
+          python -B -m unittest -v test_aion_m71_execution_fresh_source_denial_lab
+      - name: Preserve original UNMODIFIED M71 stale gate negative expectation
+        if: always()
+        run: python -B -m unittest -v test_aion_p0_m71_original_stale_gate_safety_negative_lab
+      - name: Preserve 13 original post-incident reactivation contracts
+        if: always()
+        run: python -B -m unittest -v test_atlasquant_aion_global_worker_reactivation_gate
+      - name: Preserve original activation hardstop end-to-end tests
+        if: always()
+        run: python -B -m unittest -v test_atlasquant_aion_global_worker_activation
