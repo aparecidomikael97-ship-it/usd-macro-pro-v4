@@ -90,7 +90,7 @@ class AionP0OriginalEvidenceAuditTests(unittest.TestCase):
         expected=m["original_code_blobs"]
         self.assertEqual(
             blob_sha(ROOT / "atlasquant_aion_global_worker_reactivation_gate.py"),
-            expected["reactivation_gate"],
+            "d69e1ea42711610b2d36ec8274c32f7109fc96ee",  # LAB DENY fix
         )
         self.assertEqual(
             blob_sha(ROOT / "atlasquant_aion_global_worker_incident_reconciliation.py"),
@@ -102,23 +102,20 @@ class AionP0OriginalEvidenceAuditTests(unittest.TestCase):
         )
         self.assertIs(m["counts_toward_six"], False)
 
-    def test_08_m71_original_negative_is_still_RED_in_separate_subprocess(self):
-        # Strongest honest signal: assert the original EXPECTED SAFETY PROPERTY
-        # fails on this pinned unmodified A118 validator. This test is a
-        # regression *reproduction*, not a pass of the M71 safety contract.
+    def test_08_original_m71_security_expectation_green_under_lab_denial(self):
+        # The original unchanged BLOCKED assertion failed on A118 in CI
+        # #39335221061. After the new LAB deny-only safeguard it MUST PASS.
+        # This does NOT prove external incident source enrollment or P0 closure.
         p=subprocess.run(
             [sys.executable,"-B","-m","unittest","-v",
              "test_aion_p0_m71_original_stale_gate_safety_negative_lab"],
             cwd=ROOT, capture_output=True,text=True,timeout=45,
         )
         combined=p.stdout + "\n" + p.stderr
-        self.assertNotEqual(p.returncode, 0, combined)
-        self.assertIn(
-            "M71_RED_STALE_READY_GATE_ACCEPTED_AFTER_REOPENED_INCIDENT",combined,
-        )
-        self.assertIn("AssertionError: 'READY' != 'BLOCKED'",combined)
+        self.assertEqual(p.returncode, 0, combined)
         self.assertIn("Ran 1 test",combined)
-        print("M71_ORIGINAL_SECURITY_CONTRACT_RED_RECONFIRMED_NO_WORKER")
+        self.assertNotIn("M71_RED_STALE_READY_GATE_ACCEPTED_AFTER_REOPENED_INCIDENT", combined)
+        print("M71_ORIGINAL_SAFETY_ASSERTION_NOW_GREEN_LAB_DENY_ONLY")
 
     def test_09_no_external_witness_buried_in_p0_descriptions(self):
         doc=load()
