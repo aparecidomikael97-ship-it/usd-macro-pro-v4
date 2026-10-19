@@ -116,7 +116,7 @@ class P0H0IAMFinOpsPreflightTests(unittest.TestCase):
     def test_08_missing_real_fx_rate_denied(self):
         p=fixture()
         p["quotes"]["usd_brl_stress_rate"]=None
-        self.assertIn("STRESS_FX_RATE_MUST_BE_POSITIVE",self.check(p)["issues"]) if False else self.assertIn("NO_COMPLETE_COST_PROJECTION",self.check(p)["issues"])
+        self.assertIn("NO_COMPLETE_COST_PROJECTION",self.check(p)["issues"])
 
     def test_09_high_existing_bill_blocks_caution_threshold(self):
         p=fixture()
