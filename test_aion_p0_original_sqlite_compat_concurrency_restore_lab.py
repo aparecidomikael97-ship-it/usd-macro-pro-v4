@@ -4,7 +4,7 @@ Tests execute REAL A118 SQLiteChatStore/ExecutionOutbox methods in temp folders.
 No provider, adapter, network, owner credential, Worker, send or merge.
 Two intentionally reproduced limitations are not counted as fixed:
   1. A single SQLite connection is bound to its constructing thread;
-  2. Outbox claim nested under an existing transaction cannot BEGIN IMMEDIATE.
+  2. Outbox claim nested under an existing transaction is explicitly denied.
 And restore_from_backup validates SQLite integrity, NOT an independent action
 high-water mark: restoring an old *valid* DB loses later UNCERTAIN evidence.
 """
@@ -97,8 +97,11 @@ class P0OriginalSQLiteCompatibilityTests(unittest.TestCase):
         store, outbox = self.open_store()
         try:
             store.db.execute("BEGIN IMMEDIATE")
-            with self.assertRaisesRegex(sqlite3.OperationalError, "within a transaction"):
+            with self.assertRaisesRegex(RuntimeError, "OUTBOX_NESTED_TRANSACTION_UNSUPPORTED"):
                 outbox.claim_next("worker-a", now=NOW + timedelta(seconds=1))
+            # The caller transaction remains open and is still owned by the
+            # caller; this LAB updates its expected diagnostic only.
+            self.assertTrue(store.db.in_transaction)
             store.db.rollback()
             self.assertEqual(outbox.get(self.key)["state"], "PENDING")
             self.assertEqual(outbox.get(self.key)["attempts"], 0)
