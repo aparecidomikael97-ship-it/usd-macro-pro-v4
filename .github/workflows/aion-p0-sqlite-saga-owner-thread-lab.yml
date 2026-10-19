@@ -1,0 +1,57 @@
+name: AION P0 Saga SQLite owner-thread RED GREEN LAB
+
+on:
+  push:
+    branches: [lab/aion-p0-sqlite-saga-owner-thread-20261019]
+    paths:
+      - atlasquant_aion_execution_saga.py
+      - test_aion_p0_sqlite_saga_owner_thread_lab.py
+      - .github/workflows/aion-p0-sqlite-saga-owner-thread-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  saga_owner_thread:
+    name: P0 Saga 12 + Store/Outbox/Host 62 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 70
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Original Saga A118 + guarded SQLite LAB baseline pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:atlasquant_aion_execution_saga.py)" = "f4fed4639930e10cd3ce7f6f724b920b9a642b26"
+          test "$(git hash-object aion_chat/store.py)" = "faafd3b61e90f3a4b3c863dcfc97b83ba32a0f3b"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          echo "P0_SAGA_A118_BASE_STORE_OUTBOX_PINNED"
+      - name: Install tracked project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Execute twelve Saga direct-SQLite thread contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_sqlite_saga_owner_thread_lab'); assert s.countTestCases()==12, s.countTestCases(); print('P0_SAGA_OWNER_THREAD_12_CASES')"
+          python -B -m unittest -v test_aion_p0_sqlite_saga_owner_thread_lab
+      - name: Preserve original A63 A64 A65 Saga and Outbox reconciliation denials
+        run: python -B -m unittest -v test_atlasquant_aion_saga_outcome_snapshot_a63 test_atlasquant_aion_saga_outbox_binding_a64 test_atlasquant_aion_saga_unverified_terminal_a65
+      - name: Preserve ten session cleanup fail-closed tests
+        run: python -B -m unittest -v test_aion_p0_staged_host_sqlite_cleanup_lab
+      - name: Preserve fifteen SQLiteChatStore owner-thread/health guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_chat_store_owner_thread_lab
+      - name: Preserve twelve Outbox owner-thread guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_owner_thread_denial_lab
+      - name: Preserve seven nested transaction controls
+        run: python -B -m unittest -v test_aion_p0_sqlite_nested_transaction_denial_lab
