@@ -88,10 +88,19 @@ class AionP0OriginalEvidenceAuditTests(unittest.TestCase):
         doc=load()
         m=doc["cross_cutting_unresolved"][0]
         expected=m["original_code_blobs"]
+        # The historical A118 original is pinned in Git history, while
+        # this LAB checkout contains the deliberate M71 fail-closed fix.
+        original = subprocess.run(
+            ["git", "rev-parse",
+             "c62fab663c6349d7320f7843c8d09587c514426b:atlasquant_aion_global_worker_reactivation_gate.py"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        self.assertEqual(original, expected["reactivation_gate"])
         self.assertEqual(
             blob_sha(ROOT / "atlasquant_aion_global_worker_reactivation_gate.py"),
-            expected["reactivation_gate"],
+            m["current_lab_gate_blob"],
         )
+        self.assertIn("LAB_DIRECT_VALIDATOR_HARDSTOP_GREEN", m["status"])
         self.assertEqual(
             blob_sha(ROOT / "atlasquant_aion_global_worker_incident_reconciliation.py"),
             expected["incident_reconciliation"],
@@ -102,23 +111,24 @@ class AionP0OriginalEvidenceAuditTests(unittest.TestCase):
         )
         self.assertIs(m["counts_toward_six"], False)
 
-    def test_08_m71_original_negative_is_still_RED_in_separate_subprocess(self):
-        # Strongest honest signal: assert the original EXPECTED SAFETY PROPERTY
-        # fails on this pinned unmodified A118 validator. This test is a
-        # regression *reproduction*, not a pass of the M71 safety contract.
+    def test_08_m71_original_safety_assertion_is_now_green_on_lab_fix(self):
+        # SAME original M71 safety assertion is never weakened or xfailed.
+        # Its PRE-FIX RED is retained by the immutable Actions run below;
+        # on this LAB patch the assertion must return GREEN (BLOCKED).
         p=subprocess.run(
             [sys.executable,"-B","-m","unittest","-v",
              "test_aion_p0_m71_original_stale_gate_safety_negative_lab"],
             cwd=ROOT, capture_output=True,text=True,timeout=45,
         )
         combined=p.stdout + "\n" + p.stderr
-        self.assertNotEqual(p.returncode, 0, combined)
-        self.assertIn(
-            "M71_RED_STALE_READY_GATE_ACCEPTED_AFTER_REOPENED_INCIDENT",combined,
-        )
-        self.assertIn("AssertionError: 'READY' != 'BLOCKED'",combined)
-        self.assertIn("Ran 1 test",combined)
-        print("M71_ORIGINAL_SECURITY_CONTRACT_RED_RECONFIRMED_NO_WORKER")
+        self.assertEqual(p.returncode, 0, combined)
+        self.assertNotIn("M71_RED_STALE_READY_GATE_ACCEPTED_AFTER_REOPENED_INCIDENT", combined)
+        self.assertIn("Ran 1 test", combined)
+        m=load()["cross_cutting_unresolved"][0]
+        self.assertIn("/actions/runs/39335321672", m["original_red_baseline_run"])
+        self.assertIn("/actions/runs/39335745839", m["fixed_focused_lab_run"])
+        self.assertIs(m["counts_toward_six"], False)
+        print("M71_A118_HISTORICAL_RED_RETAINED_LAB_DIRECT_VALIDATOR_GREEN_NO_GO")
 
     def test_09_no_external_witness_buried_in_p0_descriptions(self):
         doc=load()
