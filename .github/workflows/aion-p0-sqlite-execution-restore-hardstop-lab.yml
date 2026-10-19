@@ -1,0 +1,58 @@
+name: AION P0 execution SQLite restore hardstop (LAB only)
+
+on:
+  push:
+    branches: [lab/aion-p0-sqlite-execution-restore-hardstop-20261019]
+    paths:
+      - aion_chat/store.py
+      - test_aion_p0_sqlite_execution_restore_hardstop_lab.py
+      - test_aion_p0_original_sqlite_compat_concurrency_restore_lab.py
+      - .github/workflows/aion-p0-sqlite-execution-restore-hardstop-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  restore_hardstop:
+    name: P0 restore source/target witness requirements (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 100
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Pin immutable A118 SQLite and current LAB producer gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:aion_chat/store.py)" = "6df8ad55673acaca6eeeb0bc3e3898d7a10b08ba"
+          test "$(git hash-object atlasquant_aion_execution_outbox.py)" = "cd78ed43ad63888408eb599e28379c193c541de2"
+          echo "P0_RESTORE_A118_BASE_OUTBOX_PINNED"
+      - name: Install tracked project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify and run 13 immutable P0 execution-restore scenarios
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_sqlite_execution_restore_hardstop_lab'); assert s.countTestCases()==13, s.countTestCases(); print('P0_RESTORE_13_CASES')"
+          python -B -m unittest -v test_aion_p0_sqlite_execution_restore_hardstop_lab
+      - name: Preserve 8 original SQLite concurrent-claim and restore behaviors
+        run: python -B -m unittest -v test_aion_p0_original_sqlite_compat_concurrency_restore_lab
+      - name: Preserve chat-only verified backup/restore and corruption refusal
+        run: |
+          python -B -m unittest -v test_atlasquant_aion_chat_staged_runtime_resilience.SQLiteRuntimeResilienceTests.test_verified_backup_restore_is_snapshot_not_live_copy test_atlasquant_aion_chat_staged_runtime_resilience.SQLiteRuntimeResilienceTests.test_corrupted_backup_is_rejected_without_replacing_target test_atlasquant_aion_chat_staged_runtime_resilience.SQLiteRuntimeResilienceTests.test_corrupt_database_fails_startup_instead_of_recreating_blank_store
+      - name: Preserve original A110 ambiguous action guards
+        run: python -B -m unittest -v test_atlasquant_aion_a110_outbox_ambiguous_block
+      - name: Preserve 15 Store and 12 Outbox thread guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_chat_store_owner_thread_lab test_aion_p0_sqlite_owner_thread_denial_lab
+      - name: Preserve Saga and budget first-effect guards
+        run: python -B -m unittest -v test_aion_p0_sqlite_saga_owner_thread_lab test_aion_p0_sqlite_authority_budget_owner_thread_lab
