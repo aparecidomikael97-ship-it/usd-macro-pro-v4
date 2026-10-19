@@ -138,19 +138,22 @@
   "cross_cutting_unresolved": [
     {
       "id": "M71_STALE_REACTIVATION_GATE_REPLAY",
-      "status": "RED_ORIGINAL_RECONFIRM_PENDING",
+      "status": "LAB_DIRECT_VALIDATOR_HARDSTOP_GREEN_CANONICAL_HOMOLOGATION_PENDING",
       "counts_toward_six": false,
       "reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39264761619",
       "original_code_blobs": {
         "reactivation_gate": "8412ada82761de37a72a8f29af7f8672cfb5b082",
         "incident_reconciliation": "85541bb2d10f0b97b096df10b5184851160cfec9"
       },
-      "meaning": "Old READY gate validates after incident REOPENED in isolated validator; independent activation gate still NO-GO",
+      "meaning": "Original A118 stale READY replay demonstrably RED; now execution validator denies READY without independent current incident witness in isolated LAB, 13/13 PASS each OS. Source not enrolled and historical Quality remains RED; no activation authorized.",
       "missing": [
-        "latest authoritative incident state checked immediately before any activation commit",
-        "monotonic incident epoch and source freshness pinned independently",
-        "race/replay tests and canonical gate validation; keep original negative assertion"
-      ]
+        "authenticated independent current incident source enrolled and verified before any real activation attempt",
+        "monotonic incident epoch and trust source freshness bound to actual activation and recovery",
+        "full canonical Quality/Security and independent audit of integrated Worker, with prior historical failures preserved"
+      ],
+      "original_red_baseline_run": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39335321672",
+      "fixed_focused_lab_run": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39335745839",
+      "current_lab_gate_blob": "8533ae3c1720d4230dace6478a40f9f11b9677d4"
     }
   ],
   "decision": "NO_PROMOTION_WITHOUT_EXACT_CANONICAL_FAILURE_MAPPING_AND_INDEPENDENT_EVIDENCE"
