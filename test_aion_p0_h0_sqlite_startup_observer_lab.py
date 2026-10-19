@@ -78,7 +78,7 @@ class H0SQLiteStartupObservationTests(unittest.TestCase):
             authorization_ref="fake-lab-approval",
             policy_version="lab",
             created_at=NOW,
-            valid_until=NOW + timedelta(hours=1),
+            valid_until=NOW + timedelta(minutes=5),
         )["idempotency_key"]
         if state != "PENDING":
             with store.db:
