@@ -111,13 +111,16 @@ def _require_chat_only_restore_file(path: Path) -> None:
 
 
 def _require_restore_target_safe(target: Path) -> None:
-    # No automatic restore over WAL/SHM remnants, even if the main target
-    # vanished. A caller cannot prove what transactions those bytes contain.
-    if any(Path(str(target) + suffix).exists() for suffix in ("-wal", "-shm")):
-        raise StorageUnavailableError("P0_RESTORE_TARGET_SIDECAR_UNVERIFIED")
-    if target.exists():
-        _validate_database_file(target)
-        _require_chat_only_restore_file(target)
+    # An orphaned WAL/SHM with NO main database is ambiguous: fail closed.
+    # If the main target exists, SQLite's actual read transaction below sees
+    # committed WAL records while checking its integrity and schema. A WAL
+    # pathname alone does not prove the file is an execution ledger.
+    if not target.exists():
+        if any(Path(str(target) + s).exists() for s in ("-wal", "-shm")):
+            raise StorageUnavailableError("P0_RESTORE_TARGET_SIDECAR_UNVERIFIED")
+        return
+    _validate_database_file(target)
+    _require_chat_only_restore_file(target)
 
 
 class SQLiteChatStore:
