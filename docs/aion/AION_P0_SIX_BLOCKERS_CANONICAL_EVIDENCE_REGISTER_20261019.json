@@ -1,0 +1,157 @@
+{
+  "schema": "AION_P0_CANONICAL_EVIDENCE_REGISTER_LAB_V1",
+  "basis_a118_commit": "c62fab663c6349d7320f7843c8d09587c514426b",
+  "audit_head_before_new_files": "db10738a6fb7fa874a5fad15a3aebcc9a4328029",
+  "as_of": "2026-10-19",
+  "status": "HARD_NO_GO",
+  "operational_worker_authorized": false,
+  "automatic_retry_authorized": false,
+  "p0_total": 6,
+  "p0_homologated": 0,
+  "lab_pass_is_homologation": false,
+  "historical_quality": {
+    "run_id": 38919546692,
+    "recorded_cases": 6562,
+    "failures": 50,
+    "errors": 34,
+    "evidence_status": "HISTORICAL_NOT_RERUN_AS_CURRENT",
+    "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/38919546692"
+  },
+  "historical_security": {
+    "run_id": 38919546692,
+    "recorded_cases": 365,
+    "evidence_status": "HISTORICAL_NOT_RERUN_AS_CURRENT",
+    "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/38919546692"
+  },
+  "p0": [
+    {
+      "id": "OWNER_REAL_IDENTITY",
+      "canonical_tracker_id": null,
+      "status": "OPEN_REAL_ENROLLMENT_REQUIRED",
+      "source": [
+        "atlasquant_aion_owner_signature_ceremony.py",
+        "atlasquant_aion_owner_decision_record.py"
+      ],
+      "lab_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39308275545",
+      "lab_fact": "WebAuthn/ES256 synthetic cryptographic assertion passed; no real owner/credential enrollment",
+      "missing": [
+        "out-of-band enrollment under independently pinned owner trust root",
+        "real Windows Hello/FIDO2 WebAuthn origin RP/device and challenge durability",
+        "real account identity custody revocation and recovery",
+        "authoritative owner approval and end-to-end negative tests"
+      ],
+      "independent_evidence_obtained": false
+    },
+    {
+      "id": "PRODUCER_RECEIPT_AUTHENTICITY",
+      "canonical_tracker_id": null,
+      "status": "OPEN_ISSUER_AND_EFFECT_PROOF_REQUIRED",
+      "source": [
+        "atlasquant_aion_execution_outbox.py",
+        "atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py"
+      ],
+      "lab_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39309509077",
+      "lab_fact": "Ed25519 receipt math in LAB; issuer root was injected by same fixture; no actual producer",
+      "missing": [
+        "producer account/issuer pinned independently of the caller",
+        "real producer-bound receipt and readback of effect",
+        "terminal no-effect fence excluding delayed/queued effects",
+        "independent nonce epoch source and revocation"
+      ],
+      "independent_evidence_obtained": false
+    },
+    {
+      "id": "FIRST_ATTEMPT_UNCERTAIN_RECOVERY",
+      "canonical_tracker_id": null,
+      "status": "OPEN_NO_AUTO_RESEND",
+      "source": [
+        "atlasquant_aion_execution_outbox.py",
+        "atlasquant_aion_execution_saga.py"
+      ],
+      "lab_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39312063253",
+      "lab_fact": "A118 local UNCERTAIN denial and reproducible old-backup rollback; no actual provider proof",
+      "missing": [
+        "durable first-effect fence independent of executor",
+        "real uncertainty reconciliation under authenticated external producer",
+        "crash before/after external effect with loss of response, provider no-effect fence",
+        "first-intent idempotency across two hosts and no automatic resend"
+      ],
+      "independent_evidence_obtained": false
+    },
+    {
+      "id": "H0_POST_RESTART_AVAILABILITY",
+      "canonical_tracker_id": null,
+      "status": "OPEN_BOOT_WITNESS_AND_REAL_REBOOT",
+      "source": [
+        "atlasquant_aion_global_worker.py",
+        "atlasquant_aion_global_worker_readiness.py",
+        "aion_chat/store.py"
+      ],
+      "lab_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39323959715",
+      "lab_fact": "readonly SQLite H0 observer always blocks; manual rollback locally undetectable",
+      "missing": [
+        "authoritatively enrolled independent high-water witness outside rollback domain",
+        "startup and first-effect obligatory gate with trusted epoch and sequence",
+        "physical Windows reboot/power-loss and multisystem recovery validation",
+        "durable anti-PITR third anchor and real custody proofs"
+      ],
+      "independent_evidence_obtained": false
+    },
+    {
+      "id": "SQLITE_COMPAT_READ_PATH",
+      "canonical_tracker_id": null,
+      "status": "OPEN_CANONICAL_FAIL_ID_UNMAPPED",
+      "source": [
+        "aion_chat/store.py",
+        "atlasquant_aion_execution_outbox.py"
+      ],
+      "lab_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39316307777",
+      "lab_fact": "SQLiteChatStore cross-thread RAW failure was reproduced, a LAB guard passed later; this is NOT evidence the original read-path P0 is closed",
+      "missing": [
+        "exact historic failing job/test identifier mapped to read path",
+        "original contract reproduced RED against A118 and pass against same code path in LAB",
+        "full compatibility and real Windows persistent storage/read concurrency under failure",
+        "canonical Quality/Security and independent evidence review"
+      ],
+      "independent_evidence_obtained": false
+    },
+    {
+      "id": "SQLITE_COMPAT_WRITE_PATH",
+      "canonical_tracker_id": null,
+      "status": "OPEN_CANONICAL_FAIL_ID_UNMAPPED",
+      "source": [
+        "aion_chat/store.py",
+        "atlasquant_aion_execution_saga.py",
+        "atlasquant_aion_cumulative_authority_budget.py"
+      ],
+      "lab_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39320080553",
+      "lab_fact": "Outbox/Saga/Budget nested transaction/owner-thread guards passed LAB; legacy write-path P0 still not canonically identified",
+      "missing": [
+        "exact historic failing job/test identifier mapped to write path",
+        "original failure reproduced against A118 and fixed without weakening transaction ownership",
+        "WAL/rollback multi-process and physical crash proof with real boot",
+        "canonical Quality/Security and independent audit approval"
+      ],
+      "independent_evidence_obtained": false
+    }
+  ],
+  "cross_cutting_unresolved": [
+    {
+      "id": "M71_STALE_REACTIVATION_GATE_REPLAY",
+      "status": "RED_ORIGINAL_RECONFIRM_PENDING",
+      "counts_toward_six": false,
+      "reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39264761619",
+      "original_code_blobs": {
+        "reactivation_gate": "8412ada82761de37a72a8f29af7f8672cfb5b082",
+        "incident_reconciliation": "85541bb2d10f0b97b096df10b5184851160cfec9"
+      },
+      "meaning": "Old READY gate validates after incident REOPENED in isolated validator; independent activation gate still NO-GO",
+      "missing": [
+        "latest authoritative incident state checked immediately before any activation commit",
+        "monotonic incident epoch and source freshness pinned independently",
+        "race/replay tests and canonical gate validation; keep original negative assertion"
+      ]
+    }
+  ],
+  "decision": "NO_PROMOTION_WITHOUT_EXACT_CANONICAL_FAILURE_MAPPING_AND_INDEPENDENT_EVIDENCE"
+}
