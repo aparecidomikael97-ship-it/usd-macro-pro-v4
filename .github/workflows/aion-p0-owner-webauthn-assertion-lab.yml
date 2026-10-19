@@ -1,0 +1,58 @@
+name: AION P0 Owner WebAuthn ES256 Assertion LAB (READ ONLY)
+
+on:
+  push:
+    branches: [lab/aion-p0-owner-webauthn-assertion-20261019]
+    paths:
+      - atlasquant_aion_p0_webauthn_assertion_lab.py
+      - test_atlasquant_aion_p0_webauthn_assertion_lab.py
+      - .github/workflows/aion-p0-owner-webauthn-assertion-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  webauthn_diagnostic:
+    name: P0 WebAuthn 40 + legacy 141 controls (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Assert A118 original owner and activation guards unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            test "$(git hash-object "$1")" = "$2" || { echo "A118_SOURCE_DRIFT $1"; exit 1; }
+          }
+          check_blob atlasquant_aion_owner_signature_ceremony.py eac8091ed9c80d838e069b16130c65530bde6652
+          check_blob atlasquant_aion_owner_decision_record.py 2d0ae10f33dc4a4cafdc0241074829a7a4d97b57
+          check_blob atlasquant_aion_trust_root.py 2d3b102893303751b2faf9a34b069ffb387ebce0
+          check_blob atlasquant_aion_global_worker_activation.py df43bb4371c784396069f4ede51205b0aa19cc0a
+          echo "P0_WEBAUTHN_ORIGINAL_A118_BLOBS_MATCH"
+      - name: Install existing tracked dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Execute 40 WebAuthn ES256 assertion adversarial tests
+        run: python -B -m pytest -q test_atlasquant_aion_p0_webauthn_assertion_lab.py
+      - name: Preserve 39 signed-enrollment negative tests
+        run: python -B -m pytest -q test_atlasquant_aion_p0_signed_enrollment_proof_lab.py
+      - name: Preserve 27 owner enrollment denies
+        run: python -B -m pytest -q test_atlasquant_aion_p0_owner_enrollment_intake_lab.py
+      - name: Preserve 69 original owner and P0 custody guards
+        run: python -B -m pytest -q test_atlasquant_aion_v224_owner_signature_ceremony.py test_atlasquant_aion_v225_explicit_owner_decision_record.py test_aion_p0_owner_root_custody_lab.py
+      - name: Preserve six A74 independent authority hard stops
+        run: python -B -m unittest -v test_atlasquant_aion_activation_authority_a74
