@@ -1,0 +1,51 @@
+name: AION P0 first attempt SQLite crash rollback evidence (READ ONLY)
+
+on:
+  push:
+    branches: [lab/aion-p0-first-attempt-sqlite-crash-rollback-20261019]
+    paths:
+      - test_aion_p0_first_attempt_sqlite_crash_rollback_lab.py
+      - .github/workflows/aion-p0-first-attempt-crash-rollback-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  p0_first_attempt_original:
+    name: Original Outbox crash and restore (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Original A118 Outbox and SQLite store SHA verified
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify() {
+            test "$(git hash-object "$1")" = "$2" || { echo "ORIGINAL_DRIFT $1"; exit 1; }
+          }
+          verify atlasquant_aion_execution_outbox.py 6bad4ee9ba5909bbb49c609a5d3ac3c05c16ab83
+          verify test_atlasquant_aion_a110_outbox_ambiguous_block.py 2ca086e315ee629026968924bae8e64cafd3a1f1
+          echo "P0_FIRST_ATTEMPT_ORIGINAL_A118_BLOBS_MATCH"
+      - name: Install pinned project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Original SQLite crash and restore cases (10)
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_first_attempt_sqlite_crash_rollback_lab'); assert s.countTestCases()==10, s.countTestCases(); print('P0_ORIGINAL_FIRST_ATTEMPT_10_CASES')"
+          python -B -m unittest -v test_aion_p0_first_attempt_sqlite_crash_rollback_lab
+      - name: Original A110 ambiguous state regression
+        run: python -B -m unittest -v test_atlasquant_aion_a110_outbox_ambiguous_block
+      - name: Original A83 FAILED local receipt cannot prove no effect
+        run: python -B -m unittest -v test_atlasquant_aion_a83_untrusted_failed_receipt
