@@ -190,7 +190,14 @@ class ExecutionSagaCoordinator:
             );
             """)
 
+    def _require_connection_thread(self) -> None:
+        # Saga holds a direct store.db reference; unlike SQLiteChatStore
+        # methods, direct sqlite3 calls otherwise bypass the central guard.
+        # Fail before any cursor, BEGIN/COMMIT/ROLLBACK or authority operation.
+        self.store._require_connection_thread()
+
     def _scope_args(self) -> tuple[str, str, str]:
+        self._require_connection_thread()
         return _scope(self.scope)
 
     def _saga_row(self, saga_id: str):
@@ -470,6 +477,7 @@ class ExecutionSagaCoordinator:
         requires_reauth: bool = False,
         reauth_ref: Any = "",
     ) -> dict[str, Any]:
+        self._require_connection_thread()
         # A61: Outbox and Saga share one SQLite connection. Begin the OUTER
         # IMMEDIATE transaction before reading the plan, verifying integrity,
         # choosing the step, or staging the Outbox row. Outbox.enqueue uses a
@@ -537,6 +545,8 @@ class ExecutionSagaCoordinator:
         }
 
     def authority_guard(self, decision: Mapping[str, Any], *, now: Any | None = None) -> dict[str, Any]:
+        # Prevent cross-thread calls from reaching the budget's direct SQLite.
+        self._require_connection_thread()
         return self.authority_budget.guard(decision, now=now)
 
     def sync_forward_outcome(
