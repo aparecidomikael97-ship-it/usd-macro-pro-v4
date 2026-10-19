@@ -1,0 +1,105 @@
+name: AION P0 canonical evidence audit + original RED baseline LAB
+
+on:
+  push:
+    branches: [lab/aion-p0-six-blocker-evidence-audit-20261019]
+    paths:
+      - test_aion_p0_original_six_evidence_matrix_lab.py
+      - test_aion_p0_m71_original_stale_gate_safety_negative_lab.py
+      - docs/aion/AION_P0_SIX_BLOCKERS_CANONICAL_EVIDENCE_REGISTER_20261019.json
+      - .github/workflows/aion-p0-six-blockers-canonical-evidence-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  six_open_p0_and_m71:
+    name: Six OPEN P0 and original M71 expected RED (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 75
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Original A118 four source blobs must remain pinned
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object atlasquant_aion_global_worker_reactivation_gate.py)" = "8412ada82761de37a72a8f29af7f8672cfb5b082"
+          test "$(git hash-object atlasquant_aion_global_worker_incident_reconciliation.py)" = "85541bb2d10f0b97b096df10b5184851160cfec9"
+          test "$(git hash-object atlasquant_aion_global_worker_activation.py)" = "df43bb4371c784396069f4ede51205b0aa19cc0a"
+          test "$(git hash-object test_atlasquant_aion_global_worker_reactivation_gate.py)" = "6c66e11b4c29b2bef1ff277a0c47740cdb0bf220"
+          echo "A118_M71_FOUR_ORIGINAL_SOURCE_BLOBS_MATCH"
+      - name: Install existing tracked requirements for old A118 import graph
+        run: python -m pip install -r requirements.txt
+      - name: Run ten evidence-matrix contracts and explicitly reproduce M71 RED
+        run: |
+          python -B -c "import unittest; x=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_original_six_evidence_matrix_lab'); assert x.countTestCases()==10, x.countTestCases(); print('P0_SIX_OPEN_M71_RED_10_CASES')"
+          python -B -m unittest -v test_aion_p0_original_six_evidence_matrix_lab
+
+  canonical_security_a118:
+    name: Original 365-case canonical security (never waived)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install original requirements
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Original 365 Security A74 selection, fail on any violation
+        run: python -B test_atlasquant_aion_activation_denial_coverage_a76.py --canonical --security
+
+  canonical_quality_a118:
+    name: Full historical Quality root-file selection (RED stays RED)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install original Quality dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+      - name: Compile repository before Quality tests
+        run: python -m compileall -q .
+      - name: Run exact existing Quality source-of-truth modules, no omissions or xfail
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, sys
+          source=Path(".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
+          if source.count("- name: Run quality suite") != 1:
+              sys.exit("P0_CANONICAL_QUALITY_ROOT_MARKER_MISSING")
+          raw=source.split("- name: Run quality suite",1)[1].split("python -m unittest -q",1)[1].split("- name: Run reference interface contracts",1)[0]
+          modules=re.findall(r"(?m)^\s+((?:test_[A-Za-z0-9_]+|tests/test_[A-Za-z0-9_]+)\.py)\s*\\?$",raw)
+          if len(modules)<500 or len(modules)!=len(set(modules)):
+              sys.exit("P0_CANONICAL_QUALITY_SELECTION_INVALID")
+          print("P0_CANONICAL_QUALITY_ROOT_FILE_COUNT",len(modules),flush=True)
+          sys.exit(subprocess.call([sys.executable,"-B","-m","unittest","-q",*modules]))
+          PY
+      - name: Independently execute A79 true subprocess suite after canonical RED
+        if: always()
+        run: python -B -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
