@@ -202,17 +202,26 @@ class OutboxHistoricReconcileDenialLAB(unittest.TestCase):
 
     def test_08_self_attested_rejection_both_retry_flags_cannot_clear_fifo(self):
         for retryable in (True,False):
-            with self.subTest(retryable=retryable):
-                # Adapter is not even accessed, regardless of its fabricated
-                # local retry flag, because producer enrollment is absent.
-                class ClaimingReject:
-                    send_calls=0
-                    def send(self, _decision, _key):
-                        self.send_calls+=1
-                        return {"accepted":False,"retryable":retryable}
-                if retryable is True:
-                    self.outbox.claim_next("fixture-worker",
-                        now=NOW+timedelta(seconds=1))
+            with self.subTest(retryable=retryable), tempfile.TemporaryDirectory() as raw:
+                store=SQLiteChatStore(Path(raw) / "isolated-rejection.sqlite3")
+                try:
+                    outbox=ExecutionOutbox(store,self.scope)
+                    def enqueue(ref):
+                        return outbox.enqueue(
+                            intent_ref=ref,action="local_only",
+                            payload={"ref":ref},aggregate_key="client-local",
+                            policy_version="local-v1",
+                            authorization_ref="local-fixture-not-proof",
+                            created_at=NOW,valid_until=NOW+timedelta(minutes=5))
+                    first=enqueue("first")
+                    second=enqueue("second")
+                    self.assertEqual(outbox.claim_next("fixture-worker",
+                        now=NOW+timedelta(seconds=1))["state"],"CLAIMED")
+                    class ClaimingReject:
+                        def __init__(self): self.send_calls=0
+                        def send(self,_decision,_key):
+                            self.send_calls+=1
+                            return {"accepted":False,"retryable":retryable}
                     adapter=ClaimingReject()
                     def authorize(_):
                         return {
@@ -228,15 +237,20 @@ class OutboxHistoricReconcileDenialLAB(unittest.TestCase):
                     with self.assertRaisesRegex(
                         PermissionError,"INDEPENDENT_PRODUCER_NOT_ENROLLED"
                     ):
-                        self.outbox.dispatch_claimed(
-                            self.key,worker_id="fixture-worker",
+                        outbox.dispatch_claimed(
+                            first["idempotency_key"],worker_id="fixture-worker",
                             adapter=adapter,authorize=authorize,
                             now=NOW+timedelta(seconds=2))
                     self.assertEqual(adapter.send_calls,0)
-                self.assertEqual(self.outbox.get(self.later)["state"],"PENDING")
-                self.assertIsNone(self.outbox.claim_next(
-                    "another-worker",now=NOW+timedelta(seconds=3)))
-                self.assertEqual(self.outbox.effect_count(),0)
+                    self.assertEqual(outbox.get(first["idempotency_key"])["state"],
+                                     "BLOCKED_PRODUCER")
+                    self.assertEqual(outbox.get(second["idempotency_key"])["state"],
+                                     "PENDING")
+                    self.assertIsNone(outbox.claim_next(
+                        "another-worker",now=NOW+timedelta(seconds=3)))
+                    self.assertEqual(outbox.effect_count(),0)
+                finally:
+                    store.close()
 
     def test_09_historical_names_remain_red_in_source_registry(self):
         data=json.loads(REGISTRY.read_text(encoding="utf-8"))
