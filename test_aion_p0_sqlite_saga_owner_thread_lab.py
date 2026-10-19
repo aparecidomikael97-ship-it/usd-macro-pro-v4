@@ -13,9 +13,9 @@ import tempfile
 import unittest
 
 from aion_chat.store import StorageUnavailableError, HEALTHY
-from test_atlasquant_aion_execution_saga import (
-    ExecutionSagaTests as HistoricalFixture, NOW,
-)
+import test_atlasquant_aion_execution_saga as historical
+
+NOW = historical.NOW
 
 DENIAL = "SQLITE_STORE_CONNECTION_THREAD_MISMATCH"
 
@@ -24,7 +24,7 @@ class P0SagaSQLiteOwnerThreadTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="p0-saga-sqlite-owner-")
         self.addCleanup(self.temp.cleanup)
-        self.fixture = HistoricalFixture()
+        self.fixture = historical.ExecutionSagaTests()
         self.fixture.setUp()
         self.store, self.outbox, self.budget, self.saga = self.fixture._components(self.temp.name)
         self.addCleanup(self.store.close)  # close before removing folder on Windows
