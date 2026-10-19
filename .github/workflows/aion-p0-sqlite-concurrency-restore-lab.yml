@@ -1,0 +1,50 @@
+name: AION P0 original SQLite concurrent and restore audit (LAB)
+
+on:
+  push:
+    branches: [lab/aion-p0-sqlite-compat-concurrent-restore-20261019]
+    paths:
+      - test_aion_p0_original_sqlite_compat_concurrency_restore_lab.py
+      - .github/workflows/aion-p0-sqlite-concurrency-restore-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  original_sqlite_audit:
+    name: A118 SQLite 8 original behaviors (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Pin unchanged source and historical guard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          check() { test "$(git hash-object "$1")" = "$2" || { echo "ORIGINAL_SOURCE_DRIFT $1"; exit 1; }; }
+          check aion_chat/store.py 6df8ad55673acaca6eeeb0bc3e3898d7a10b08ba
+          check atlasquant_aion_execution_outbox.py 6bad4ee9ba5909bbb49c609a5d3ac3c05c16ab83
+          check test_atlasquant_aion_a110_outbox_ambiguous_block.py 2ca086e315ee629026968924bae8e64cafd3a1f1
+          echo "P0_SQLITE_3_ORIGINAL_BLOBS_MATCH"
+      - name: Install exact tracked runtime dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Original A118 SQLite compatibility (eight cases)
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_original_sqlite_compat_concurrency_restore_lab'); assert s.countTestCases()==8, s.countTestCases(); print('P0_SQLITE_COMPAT_8_CASES')"
+          python -B -m unittest -v test_aion_p0_original_sqlite_compat_concurrency_restore_lab
+      - name: Preserve A110 local outbox ambiguity regression
+        run: python -B -m unittest -v test_atlasquant_aion_a110_outbox_ambiguous_block
+      - name: Preserve original A63 A64 A65 SQLite Saga guards
+        run: python -B -m unittest -v test_atlasquant_aion_saga_outcome_snapshot_a63 test_atlasquant_aion_saga_outbox_binding_a64 test_atlasquant_aion_saga_unverified_terminal_a65
