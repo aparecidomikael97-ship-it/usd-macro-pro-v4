@@ -1,0 +1,55 @@
+name: AION P0 producer receipt signature LAB (READ ONLY)
+
+on:
+  push:
+    branches: [lab/aion-p0-producer-receipt-signature-20261019]
+    paths:
+      - atlasquant_aion_p0_signed_producer_receipt_lab.py
+      - test_atlasquant_aion_p0_signed_producer_receipt_lab.py
+      - .github/workflows/aion-p0-signed-producer-receipt-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  p0_receipt_math_only:
+    name: P0 signed receipt no-authority (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify unchanged original effect-claim boundary and Outbox guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            test "$(git hash-object "$1")" = "$2" || { echo "A118_SOURCE_DRIFT $1"; exit 1; }
+          }
+          check_blob atlasquant_aion_producer_receipt_untrusted_precheck.py 4fba14585c87591f2195a312600ad30e3f7eafe9
+          check_blob test_atlasquant_aion_producer_receipt_untrusted_precheck.py b42dc8d0eab94f3fc24a91eb6aa5818ca90a33b5
+          check_blob atlasquant_aion_b2b_real_receipt_authenticator_contract_v1.py 08053fde57772ef113d21f74675483e024551ea3
+          check_blob test_atlasquant_aion_a83_untrusted_failed_receipt.py f3a94b68be62ed285a1af0d12827efb85c6afc0a
+          echo "A118_RECEIPT_SOURCE_4_BLOBS_MATCH"
+      - name: Install pinned project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify 32 new adversarial test cases discovered
+        run: |
+          python -B -c "import unittest; suite=unittest.defaultTestLoader.loadTestsFromName('test_atlasquant_aion_p0_signed_producer_receipt_lab'); assert suite.countTestCases()==32, suite.countTestCases(); print('P0_RECEIPT_32_CASES')"
+      - name: Verify signed producer receipt cryptographic denial (32)
+        run: python -B -m unittest -v test_atlasquant_aion_p0_signed_producer_receipt_lab
+      - name: Preserve A37 untrusted receipt and A83 negative proof controls
+        run: python -B -m unittest -v test_atlasquant_aion_producer_receipt_untrusted_precheck test_atlasquant_aion_a83_untrusted_failed_receipt
+      - name: Preserve B2B real-receipt design-only boundary
+        run: python -B -m unittest -v test_atlasquant_aion_b2b_real_receipt_authenticator_contract_v1
