@@ -1,0 +1,50 @@
+name: AION P0 SQLite parent transaction integrity RED GREEN LAB
+
+on:
+  push:
+    branches: [lab/aion-p0-sqlite-nested-tx-safe-denial-20261019]
+    paths:
+      - atlasquant_aion_execution_outbox.py
+      - test_aion_p0_sqlite_nested_transaction_denial_lab.py
+      - test_aion_p0_original_sqlite_compat_concurrency_restore_lab.py
+      - .github/workflows/aion-p0-sqlite-parent-transaction-lab.yml
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite_nested_boundary:
+    name: P0 nested transaction 7 + 30 controls (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Confirm original A118 code is frozen in Git baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse c62fab663c6349d7320f7843c8d09587c514426b:atlasquant_aion_execution_outbox.py)" = "6bad4ee9ba5909bbb49c609a5d3ac3c05c16ab83"
+          test "$(git hash-object aion_chat/store.py)" = "6df8ad55673acaca6eeeb0bc3e3898d7a10b08ba"
+          echo "P0_SQLITE_BASE_A118_PINNED_UNMODIFIED_STORE"
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Seven immutable P0 nested transaction contracts
+        run: |
+          python -B -c "import unittest; s=unittest.defaultTestLoader.loadTestsFromName('test_aion_p0_sqlite_nested_transaction_denial_lab'); assert s.countTestCases()==7, s.countTestCases(); print('P0_SQLITE_NESTED_7_CASES')"
+          python -B -m unittest -v test_aion_p0_sqlite_nested_transaction_denial_lab
+      - name: Original SQLite concurrency and verified restore baselines
+        run: python -B -m unittest -v test_aion_p0_original_sqlite_compat_concurrency_restore_lab
+      - name: Original A110 uncertainty and A63-A65 Saga integrity regressions
+        run: python -B -m unittest -v test_atlasquant_aion_a110_outbox_ambiguous_block test_atlasquant_aion_saga_outcome_snapshot_a63 test_atlasquant_aion_saga_outbox_binding_a64 test_atlasquant_aion_saga_unverified_terminal_a65
