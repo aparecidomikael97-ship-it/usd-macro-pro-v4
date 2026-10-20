@@ -93,7 +93,7 @@ def inspect_signed_incident_envelope_lab(
                 defects.append("ENVELOPE_FIELDS_MISMATCH")
             else:
                 envelope = decoded
-        except (ValueError, UnicodeError, TypeError, OverflowError):
+        except (ValueError, UnicodeError, TypeError, OverflowError, RecursionError):
             defects.append("ENVELOPE_PARSE_INVALID")
     if type(signature) is not bytes or len(signature) != 64:
         defects.append("SIGNATURE_BYTES_INVALID")
