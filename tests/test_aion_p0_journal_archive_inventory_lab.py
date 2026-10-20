@@ -32,7 +32,7 @@ class JournalEvidenceInventoryLAB(unittest.TestCase):
         expected = hashlib.sha256(b"manifest\n").hexdigest()
         with patch.object(inventory, "PUBLISHED_MANIFEST_SHA256", expected):
             r = inspect(self.root)
-        self.assertEqual(r["status"], "FILES_CAPTURED_REQUIRE_INDEPENDENT_COMPARISON_AND_REEXECUTION")
+        self.assertEqual(r["status"], "FILES_CAPTURED_REQUIRE_INDEPENDENT_COMPARISON_AND_REEXECUTION", repr(r["gaps"]))
         self.assertTrue(r["files"]["manifest"]["matches_published_checkpoint_digest"])
         self.assertFalse(r["sources_authenticated"])
         self.assertFalse(r["historical_76_result_reproduced"])
@@ -85,7 +85,9 @@ class JournalEvidenceInventoryLAB(unittest.TestCase):
         p = self.root / "tests" / REQUIRED["original_journal_a"]
         first = inspect(self.root)["files"]["original_journal_a"]["sha256"]
         p.write_bytes(b"new distinct bytes")
-        second = inspect(self.root)["files"]["original_journal_a"]["sha256"]
+        check = inspect(self.root)["files"]["original_journal_a"]
+        self.assertIn("sha256", check, repr(check))
+        second = check["sha256"]
         self.assertNotEqual(first, second)
 
 
