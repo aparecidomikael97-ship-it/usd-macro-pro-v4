@@ -211,7 +211,7 @@ class KeyLifecycleLAB(unittest.TestCase):
     def test_30_invalid_input_types_fail_closed(self):
         for events, views in ((None, None), (True, []), ("events", "views")):
             with self.subTest(value=type(events).__name__):
-                r = self.denied(self.check(events, views))
+                r = self.denied(audit_key_lifecycle_claims_lab(events, views))
                 self.assertFalse(r["synthetic_sequence_structurally_consistent"])
 
     def test_31_recovered_old_key_cannot_be_reused(self):
