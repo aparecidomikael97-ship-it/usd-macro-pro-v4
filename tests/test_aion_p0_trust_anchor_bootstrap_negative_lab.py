@@ -290,5 +290,17 @@ class TrustAnchorBootstrapNegativeLAB(unittest.TestCase):
         self.denied(self.check())
 
 
+    def test_31_hostile_pin_key_id_never_invokes_inequality_code(self):
+        class Evil:
+            def __eq__(self,other):
+                raise AssertionError("pin key ID __eq__ invoked")
+            def __ne__(self,other):
+                raise AssertionError("pin key ID __ne__ invoked")
+        r=self.denied(self.check(pin={**self.pin,"key_id":Evil()}))
+        self.assertIn("PIN_FIELD_INVALID:key_id",r["blockers"])
+        self.assertIn("PIN_ENVELOPE_KEY_ID_MISMATCH",r["blockers"])
+
+
+
 if __name__=="__main__":
     unittest.main()
