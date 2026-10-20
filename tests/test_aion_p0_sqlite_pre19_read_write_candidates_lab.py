@@ -57,14 +57,14 @@ class PriorSQLiteReadCandidateOnCurrentHeadLAB(unittest.TestCase):
         first=self.binding()
         store=first["store"]
         conversation=store.create_conversation(first["scope"],"lab-only")
+        keys_before=set(self.session)
         with self.assertRaisesRegex(
             StorageUnavailableError,"SQLITE_STORE_CONNECTION_THREAD_MISMATCH"):
             self.foreign_thread(self.binding)
+        self.assertEqual(set(self.session),keys_before)
         self.assertIs(self.binding()["store"],store)
         self.assertEqual(store.get_conversation(first["scope"],conversation.id).id,
                          conversation.id)
-        self.assertEqual(len([k for k in self.session if str(k).startswith("aion")]),len([
-            k for k in self.session if str(k).startswith("aion")]))
 
     def test_03_foreign_thread_close_all_denied_before_holder_mutation(self):
         first=self.binding()
