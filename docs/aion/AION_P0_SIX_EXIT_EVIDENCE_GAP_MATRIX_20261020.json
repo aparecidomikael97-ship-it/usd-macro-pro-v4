@@ -1,0 +1,259 @@
+{
+  "schema": "AION_P0_SIX_EXIT_EVIDENCE_GAP_AUDIT_LAB_V1",
+  "dated": "2026-10-20",
+  "scope": "Crosswalk of pinned original six-P0 register vs newer 85-event Quality baseline. Does not reattribute events or close a P0.",
+  "sources": {
+    "original_six": "docs/aion/AION_P0_SIX_BLOCKERS_CANONICAL_EVIDENCE_REGISTER_20261019.json",
+    "quality85": "docs/aion/AION_P0_QUALITY_CANONICAL_85_FAILURES_CASE_REGISTRY_20261019.json",
+    "outbox_saga32": "docs/aion/AION_P0_32_EXTERNAL_PRODUCER_EVIDENCE_MATRIX_20261020.json",
+    "previous_lab_run": "39415147568"
+  },
+  "historical_quality_register": {
+    "run": "38919546692",
+    "fail": 50,
+    "error": 34,
+    "cases": 6562,
+    "state": "HISTORICAL_NOT_CURRENT"
+  },
+  "newer_quality_baseline": {
+    "run": "39334210568",
+    "commit": "44a4de01817d896e056810025d6c68ec8e34112f",
+    "fail": 51,
+    "error": 34,
+    "cases": 6562,
+    "state": "RED_NOT_RERUN"
+  },
+  "difference_fail": 1,
+  "difference_error": 0,
+  "quality85_module_names": [
+    "test_atlasquant_aion_execution_outbox",
+    "test_atlasquant_aion_execution_saga",
+    "test_atlasquant_aion_global_worker",
+    "test_atlasquant_aion_global_worker_activation",
+    "test_atlasquant_aion_global_worker_live_verification",
+    "test_atlasquant_aion_global_worker_reactivation_gate",
+    "test_atlasquant_aion_global_worker_readiness",
+    "test_atlasquant_aion_worker_runtime",
+    "test_quality_workflow_coverage"
+  ],
+  "latest_85_not_an_original_sqlite_pair_identification": true,
+  "original_sqlite_read_failure_tracked_exactly": false,
+  "original_sqlite_write_failure_tracked_exactly": false,
+  "outbox_saga_32": {
+    "total": 32,
+    "first_gate_counts": {
+      "PRE_ADAPTER_PRODUCER_ENROLLMENT": 23,
+      "CAUSAL_COMMITTED_EFFECT_RECEIPT": 8,
+      "TERMINAL_NO_EFFECT_FENCE": 1
+    },
+    "case_status": "ALL_OPEN_NOT_WAIVED"
+  },
+  "status": "HARD_NO_GO",
+  "homologated_p0": 0,
+  "full_quality_green": false,
+  "full_security_green": false,
+  "independent_human_owner_enrolled": false,
+  "independent_producer_enrolled": false,
+  "external_highwater_enrolled": false,
+  "automatic_retry_allowed": false,
+  "worker_allowed": false,
+  "provider_sends_approved": false,
+  "cloud_provisioning_approved": false,
+  "authorized_new_spend_brl": 0,
+  "p0": [
+    {
+      "id": "OWNER_REAL_IDENTITY",
+      "priority": 1,
+      "status": "OPEN_EXTERNAL_OR_CANONICAL_EVIDENCE_REQUIRED",
+      "historical_register_status": "OPEN_REAL_ENROLLMENT_REQUIRED",
+      "historical_source_files": [
+        "atlasquant_aion_owner_signature_ceremony.py",
+        "atlasquant_aion_owner_decision_record.py"
+      ],
+      "historical_lab_evidence_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39308275545",
+      "historical_lab_fact": "WebAuthn/ES256 synthetic cryptographic assertion passed; no real owner/credential enrollment",
+      "canonical_85_case_id": null,
+      "canonical_85_case_mapping_status": "NOT_REPRESENTED_AS_AN_INDEPENDENT_CLOSURE",
+      "no_unjustified_mapping_from_85": true,
+      "gate_owner_role": "Proprietário humano + revisor externo",
+      "independent_acceptance_contract": "Identidade e autoridade do proprietário autenticadas fora do aplicativo",
+      "required_evidence": [
+        "Cerimônia real FIDO2/Windows Hello com RP/origin e challenge durável",
+        "Raiz de identidade inscrita fora do executor com recuperação e revogação",
+        "Negativas de replay, delegação, tentativa por outra identidade e reinício físico",
+        "Revisão independente da origem do consentimento e evidência verificável"
+      ],
+      "next_permitted_action": "Revisar contrato de prova e equipamentos disponíveis sem credencial real nem ativação",
+      "blocking_evidence_category": "REAL_HUMAN_CREDENTIAL_AND_INDEPENDENT_ENROLLMENT",
+      "external_proof_enrolled": false,
+      "canonical_original_red_green_pair_verified": false,
+      "authentic_owner_approval_verified": false,
+      "security_full_green_verified": false,
+      "quality_full_green_verified": false,
+      "production_allowed": false,
+      "closed": false
+    },
+    {
+      "id": "PRODUCER_RECEIPT_AUTHENTICITY",
+      "priority": 1,
+      "status": "OPEN_EXTERNAL_OR_CANONICAL_EVIDENCE_REQUIRED",
+      "historical_register_status": "OPEN_ISSUER_AND_EFFECT_PROOF_REQUIRED",
+      "historical_source_files": [
+        "atlasquant_aion_execution_outbox.py",
+        "atlasquant_aion_f1_t1_untrusted_witness_intake_a75.py"
+      ],
+      "historical_lab_evidence_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39309509077",
+      "historical_lab_fact": "Ed25519 receipt math in LAB; issuer root was injected by same fixture; no actual producer",
+      "canonical_85_case_id": null,
+      "canonical_85_case_mapping_status": "NOT_REPRESENTED_AS_AN_INDEPENDENT_CLOSURE",
+      "no_unjustified_mapping_from_85": true,
+      "gate_owner_role": "Fornecedor de mensagens + revisor de segurança",
+      "independent_acceptance_contract": "Produtor real e provas de efeito e de não efeito independentes",
+      "required_evidence": [
+        "Prova do emissor/conta/escopo da operação a partir de raiz externa",
+        "Recibo causal COMMITTED_EFFECT vinculado a intent+digest+epoch",
+        "Garantia terminal NO_EFFECT_FENCED para efeitos tardios ou declarar não suportado",
+        "Testes adversariais de falsificação, expiração, duplicidade, cancelamento e replay"
+      ],
+      "next_permitted_action": "Obter por escrito as capacidades exatas dos endpoints antes de qualquer teste de envio",
+      "blocking_evidence_category": "PROVIDER_TRUST_ROOT_AND_EFFECT_RECEIPTS",
+      "external_proof_enrolled": false,
+      "canonical_original_red_green_pair_verified": false,
+      "authentic_owner_approval_verified": false,
+      "security_full_green_verified": false,
+      "quality_full_green_verified": false,
+      "production_allowed": false,
+      "closed": false
+    },
+    {
+      "id": "FIRST_ATTEMPT_UNCERTAIN_RECOVERY",
+      "priority": 1,
+      "status": "OPEN_EXTERNAL_OR_CANONICAL_EVIDENCE_REQUIRED",
+      "historical_register_status": "OPEN_NO_AUTO_RESEND",
+      "historical_source_files": [
+        "atlasquant_aion_execution_outbox.py",
+        "atlasquant_aion_execution_saga.py"
+      ],
+      "historical_lab_evidence_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39312063253",
+      "historical_lab_fact": "A118 local UNCERTAIN denial and reproducible old-backup rollback; no actual provider proof",
+      "canonical_85_case_id": null,
+      "canonical_85_case_mapping_status": "NOT_REPRESENTED_AS_AN_INDEPENDENT_CLOSURE",
+      "no_unjustified_mapping_from_85": true,
+      "gate_owner_role": "Arquitetura de execução + fornecedor + revisor independente",
+      "independent_acceptance_contract": "Um único primeiro efeito e recuperação após ACK perdido sem novo efeito",
+      "required_evidence": [
+        "Reserva de primeira tentativa durável e externa ao SQLite do executor",
+        "Teste de timeout POST, queda de energia e reinício com efeito desconhecido",
+        "Reconciliador real autenticado; sem autorização por busca vazia ou recibo local",
+        "Cerca terminal explícita para não-efeito ou manutenção de UNCERTAIN sem reenvio"
+      ],
+      "next_permitted_action": "Especificar protocolo e casos de crash sem autorizar retry; manter ZERO_AUTO_RESEND",
+      "blocking_evidence_category": "INDEPENDENT_INTENT_RESERVATION_AND_RECONCILIATION",
+      "external_proof_enrolled": false,
+      "canonical_original_red_green_pair_verified": false,
+      "authentic_owner_approval_verified": false,
+      "security_full_green_verified": false,
+      "quality_full_green_verified": false,
+      "production_allowed": false,
+      "closed": false
+    },
+    {
+      "id": "H0_POST_RESTART_AVAILABILITY",
+      "priority": 1,
+      "status": "OPEN_EXTERNAL_OR_CANONICAL_EVIDENCE_REQUIRED",
+      "historical_register_status": "OPEN_BOOT_WITNESS_AND_REAL_REBOOT",
+      "historical_source_files": [
+        "atlasquant_aion_global_worker.py",
+        "atlasquant_aion_global_worker_readiness.py",
+        "aion_chat/store.py"
+      ],
+      "historical_lab_evidence_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39323959715",
+      "historical_lab_fact": "readonly SQLite H0 observer always blocks; manual rollback locally undetectable",
+      "canonical_85_case_id": null,
+      "canonical_85_case_mapping_status": "NOT_REPRESENTED_AS_AN_INDEPENDENT_CLOSURE",
+      "no_unjustified_mapping_from_85": true,
+      "gate_owner_role": "Custódia/infraestrutura + auditor independente",
+      "independent_acceptance_contract": "Boot seguro com high-water vigente após rollback físico e distribuído",
+      "required_evidence": [
+        "Principal, root e IAM de custódia distintos autenticados",
+        "Leitura da versão WORM exata com retenção COMPLIANCE e head assinado fresco",
+        "Teste com PITR, perda de SQLite, perda simultânea de executor/custodiador e rotação",
+        "Ensaios reais Windows power loss/reboot antes de Worker/primeiro efeito"
+      ],
+      "next_permitted_action": "Revisar papéis administrativos reais e preços sem provisionamento; exigir root externo",
+      "blocking_evidence_category": "EXTERNAL_MONOTONIC_HIGHWATER_AND_REAL_REBOOT",
+      "external_proof_enrolled": false,
+      "canonical_original_red_green_pair_verified": false,
+      "authentic_owner_approval_verified": false,
+      "security_full_green_verified": false,
+      "quality_full_green_verified": false,
+      "production_allowed": false,
+      "closed": false
+    },
+    {
+      "id": "SQLITE_COMPAT_READ_PATH",
+      "priority": 0,
+      "status": "OPEN_EXTERNAL_OR_CANONICAL_EVIDENCE_REQUIRED",
+      "historical_register_status": "OPEN_CANONICAL_FAIL_ID_UNMAPPED",
+      "historical_source_files": [
+        "aion_chat/store.py",
+        "atlasquant_aion_execution_outbox.py"
+      ],
+      "historical_lab_evidence_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39316307777",
+      "historical_lab_fact": "SQLiteChatStore cross-thread RAW failure was reproduced, a LAB guard passed later; this is NOT evidence the original read-path P0 is closed",
+      "canonical_85_case_id": null,
+      "canonical_85_case_mapping_status": "UNMAPPED_EXACT_ORIGINAL_INCIDENT",
+      "no_unjustified_mapping_from_85": true,
+      "gate_owner_role": "Engenharia de testes e SQLite",
+      "independent_acceptance_contract": "Identificar e reproduzir o teste original de leitura que motivou P0",
+      "required_evidence": [
+        "URL run/job, classe, método e stack exatos do incidente ORIGINAL",
+        "Baseline RED reexecutado no commit exato da época, sem trocar a asserção",
+        "Correção reproduzida PASS no mesmo contrato, mantendo owner-thread e tenant scope",
+        "Validação cruzada Windows/Ubuntu, concorrência real e canonical Quality/Security"
+      ],
+      "next_permitted_action": "Investigação forense do primeiro run original com stack, sem atribuição inventada dos 85 casos",
+      "blocking_evidence_category": "ORIGINAL_CANONICAL_SQLITE_READ_CASE_UNMAPPED",
+      "external_proof_enrolled": false,
+      "canonical_original_red_green_pair_verified": false,
+      "authentic_owner_approval_verified": false,
+      "security_full_green_verified": false,
+      "quality_full_green_verified": false,
+      "production_allowed": false,
+      "closed": false
+    },
+    {
+      "id": "SQLITE_COMPAT_WRITE_PATH",
+      "priority": 0,
+      "status": "OPEN_EXTERNAL_OR_CANONICAL_EVIDENCE_REQUIRED",
+      "historical_register_status": "OPEN_CANONICAL_FAIL_ID_UNMAPPED",
+      "historical_source_files": [
+        "aion_chat/store.py",
+        "atlasquant_aion_execution_saga.py",
+        "atlasquant_aion_cumulative_authority_budget.py"
+      ],
+      "historical_lab_evidence_reference": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39320080553",
+      "historical_lab_fact": "Outbox/Saga/Budget nested transaction/owner-thread guards passed LAB; legacy write-path P0 still not canonically identified",
+      "canonical_85_case_id": null,
+      "canonical_85_case_mapping_status": "UNMAPPED_EXACT_ORIGINAL_INCIDENT",
+      "no_unjustified_mapping_from_85": true,
+      "gate_owner_role": "Engenharia de testes e SQLite",
+      "independent_acceptance_contract": "Identificar e reproduzir o teste original de escrita que motivou P0",
+      "required_evidence": [
+        "URL run/job, classe, método e stack exatos do incidente ORIGINAL",
+        "Baseline RED no commit originário e demonstração da correção com mesma asserção",
+        "CAS, rollback, owner-thread e nested transaction preservados sem autoridade extra",
+        "WAL/recovery em Windows após interrupção e Quality/Security canônica verificada"
+      ],
+      "next_permitted_action": "Investigação forense do primeiro run original; correlacionar falha e patch sem relaxar transação",
+      "blocking_evidence_category": "ORIGINAL_CANONICAL_SQLITE_WRITE_CASE_UNMAPPED",
+      "external_proof_enrolled": false,
+      "canonical_original_red_green_pair_verified": false,
+      "authentic_owner_approval_verified": false,
+      "security_full_green_verified": false,
+      "quality_full_green_verified": false,
+      "production_allowed": false,
+      "closed": false
+    }
+  ]
+}
