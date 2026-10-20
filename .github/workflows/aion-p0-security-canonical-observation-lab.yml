@@ -1,0 +1,423 @@
+name: AION P0 Canonical Core Security Gate OBSERVATION (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-post1353-canonical-evidence-20261020]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-core-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adversarial-contracts:
+    name: AION adversarial contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Compile security-critical modules
+        run: |
+          python -m py_compile \
+            atlasquant_aion_core.py \
+            atlasquant_aion_fortress.py \
+            atlasquant_aion_resilience.py \
+            atlasquant_aion_chaos_campaign.py \
+            atlasquant_aion_execution_outbox.py \
+            test_atlasquant_aion_execution_outbox.py \
+            test_atlasquant_aion_outbox_fifo_local_terminal_denial.py \
+            test_atlasquant_aion_outbox_missing_predecessor_denial.py \
+            atlasquant_aion_producer_receipt_untrusted_precheck.py \
+            test_atlasquant_aion_producer_receipt_untrusted_precheck.py \
+            atlasquant_aion_execution_saga.py \
+            atlasquant_aion_saga_sequence_policy.py \
+            test_atlasquant_aion_saga_sequence_policy.py \
+            test_atlasquant_aion_saga_compensation_admission.py \
+            test_atlasquant_aion_execution_saga.py \
+            test_atlasquant_aion_saga_pure_simulation_reference.py \
+            atlasquant_aion_mission_control.py \
+            atlasquant_aion_drift_monitor.py \
+            atlasquant_aion_blast_radius_gate.py \
+            atlasquant_aion_recovery.py \
+            atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
+            atlasquant_aion_core_health_adapter.py \
+            atlasquant_aion_provenance_trust_lifecycle.py \
+            atlasquant_aion_trusted_readiness_authority.py \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_authority_verifier.py \
+            atlasquant_aion_trusted_authority_bridge.py \
+            atlasquant_aion_durable_execution_kernel.py \
+            atlasquant_aion_capability_isolation_gate.py \
+            atlasquant_aion_operational_resilience_kernel.py \
+            atlasquant_aion_multiagent_memory_governor.py \
+            atlasquant_aion_policy_kernel.py \
+            atlasquant_aion_model_gateway_v2.py \
+            atlasquant_aion_core_certification.py \
+            atlasquant_aion_core_completion_review.py \
+            atlasquant_aion_core_freeze_preflight.py \
+            atlasquant_aion_external_persistence_attestation.py \
+            atlasquant_aion_owner_signature_ceremony.py \
+            atlasquant_aion_owner_decision_record.py \
+            atlasquant_aion_owner_decision_persistence_attestation.py \
+            atlasquant_aion_vault.py \
+            atlasquant_aion_vault_physical_backend.py \
+            atlasquant_aion_tool_supply_chain.py \
+            atlasquant_aion_tool_governance_gateway.py \
+            atlasquant_aion_tool_sandbox.py \
+            atlasquant_aion_credential_proxy.py \
+            atlasquant_aion_tenant.py \
+            atlasquant_aion_tenant_crypto.py \
+            atlasquant_aion_tenant_durable_store.py \
+            atlasquant_aion_library_index.py \
+            atlasquant_aion_portable.py \
+            atlasquant_aion_durable_tasks.py \
+            atlasquant_aion_digital_twin.py \
+            atlasquant_aion_dev_fusion.py \
+            atlasquant_aion_chat_checkpoint_adapter.py \
+            atlasquant_aion_chat_library_adapter.py \
+            atlasquant_aion_unified_runtime.py \
+            atlasquant_aion_unified_journal.py \
+            atlasquant_aion_unified_durable_bridge.py \
+            atlasquant_aion_unified_journal_store.py \
+            atlasquant_aion_unified_mission.py \
+            atlasquant_aion_unified_taskgraph.py \
+            atlasquant_aion_unified_taskgraph_store.py \
+            atlasquant_aion_role_authority.py \
+            atlasquant_aion_truth_mapping.py \
+            test_atlasquant_aion_chat_checkpoint_adapter.py \
+            test_atlasquant_aion_chat_library_adapter.py \
+            test_atlasquant_aion_unified_hardening_v21.py \
+            test_atlasquant_aion_unified_journal_store.py \
+            test_atlasquant_aion_unified_journal_store_governance.py \
+            test_atlasquant_aion_unified_mission.py \
+            test_atlasquant_aion_security_adversarial.py \
+            test_atlasquant_aion_chaos_recovery.py \
+            atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_global_worker_inflight_reconciliation.py \
+            test_atlasquant_aion_global_worker_inflight_resolution.py \
+            test_atlasquant_aion_resource_bounds.py \
+            test_atlasquant_aion_resource_bounds_residual.py \
+            test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_tool_supply_chain_security.py \
+            test_atlasquant_aion_tool_governance_gateway.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
+            test_atlasquant_aion_v26_memory_recovery_redteam.py \
+            test_atlasquant_aion_observability.py \
+            test_atlasquant_aion_core_hardening_v24.py \
+            test_atlasquant_aion_v26_core_health_adapter.py \
+            test_atlasquant_aion_v26_evidence_wiring_status_truth.py \
+            test_atlasquant_aion_v27_durable_store_crash_isolation_redteam.py \
+            test_atlasquant_aion_v27_health_attestation_redteam.py \
+            test_atlasquant_aion_v28_system_invariants_integration_audit.py \
+            test_atlasquant_aion_v28_runtime_persistence_cas_recovery_redteam.py \
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py \
+            test_atlasquant_aion_v28_global_snapshot_consistency_redteam.py \
+            test_atlasquant_aion_v29_provenance_truth_redteam.py \
+            test_atlasquant_aion_v210_trust_root_readiness_redteam.py \
+            test_atlasquant_aion_v210_trust_readiness_independent_redteam.py \
+            test_atlasquant_aion_v211_provenance_trust_lifecycle_redteam.py \
+            test_atlasquant_aion_v212_trusted_readiness_authority_boundary_redteam.py \
+            test_atlasquant_aion_v213_real_trust_authority_redteam.py \
+            test_atlasquant_aion_v214_durable_execution_redteam.py \
+            test_atlasquant_aion_v215_capability_isolation_redteam.py \
+            test_atlasquant_aion_v216_operational_resilience_redteam.py \
+            test_atlasquant_aion_v217_multiagent_memory_governance_redteam.py \
+            test_atlasquant_aion_v218_policy_kernel_redteam.py \
+            test_atlasquant_aion_v219_provider_neutral_gateway_redteam.py \
+            test_atlasquant_aion_v220_core_certification.py \
+            test_atlasquant_aion_v221_core_completion_review.py \
+            test_atlasquant_aion_v222_core_freeze_preflight.py \
+            test_atlasquant_aion_v223_external_persistence_attestation.py \
+            test_atlasquant_aion_v224_owner_signature_ceremony.py \
+            test_atlasquant_aion_v225_explicit_owner_decision_record.py \
+            test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+      - name: A54 pinned stacked targets always inspect true origin main
+        run: python -m unittest -q test_atlasquant_aion_ci_main_boundary_a54.py
+      - name: A53 direct repository flag activation refuses missing independent authority
+        run: python -m unittest -q test_atlasquant_aion_global_worker_activation.A53IndependentActivationBoundaryTests
+      - name: A51 direct autonomous executor admission denies absent independent witness
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt \
+            test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_explicit_human_click_remains_usable
+      - name: A50 persisted Saga plan and genesis binding integrity must detect SQLite tamper
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_plan_integrity_a50.py
+      - name: Run authority, injection, isolation and recovery tests
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_security_adversarial.py \
+            test_atlasquant_aion_chaos_recovery.py \
+            test_atlasquant_aion_critical_review.py \
+            test_atlasquant_aion_fortress.py \
+            test_atlasquant_aion_resilience.py \
+            test_atlasquant_aion_chaos_campaign.py \
+            test_atlasquant_aion_mission_control.py \
+            test_atlasquant_aion_drift_monitor.py \
+            test_atlasquant_aion_recovery.py \
+            test_atlasquant_aion_tenant.py \
+            test_atlasquant_aion_tenant_privacy.py \
+            test_atlasquant_aion_tenant_crypto_derived_data.py \
+            test_atlasquant_aion_blast_radius_gate.py \
+            test_atlasquant_aion_vault.py \
+            test_atlasquant_aion_vault_physical_backend.py \
+            test_atlasquant_aion_durable_tasks.py \
+            test_atlasquant_aion_global_worker_inflight_reconciliation.py \
+            test_atlasquant_aion_global_worker_inflight_resolution.py \
+            test_atlasquant_aion_resource_bounds.py \
+            test_atlasquant_aion_resource_bounds_residual.py \
+            test_atlasquant_aion_supply_chain_pinning.py \
+            test_atlasquant_aion_tool_supply_chain_security.py \
+            test_atlasquant_aion_tool_governance_gateway.py \
+            test_atlasquant_aion_core_v23_memory_checkpoint.py \
+            test_atlasquant_aion_v26_memory_recovery_redteam.py \
+            test_atlasquant_aion_observability.py \
+            test_atlasquant_aion_core_hardening_v24.py
+      - name: Prove AION Outbox no-producer hard denials independently of legacy Quality
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_no_enrolled_producer_must_block_before_adapter_send \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_self_attested_adapter_enrollment_cannot_enable_send \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_pre_send_gate_rejects_before_accessing_adapter_descriptor \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_access_dynamic_adapter_descriptor \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_invoke_side_effecting_callback \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_block_survives_lease_expiry_and_store_reopen \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_block_keeps_same_aggregate_fifo_but_not_unrelated_work
+      - name: A44 refuse same-aggregate FIFO release on locally forged terminal rows
+        run: |
+          python -m unittest -q test_atlasquant_aion_outbox_fifo_local_terminal_denial.py
+      - name: A45 missing predecessor local Outbox row never releases same-aggregate FIFO
+        run: |
+          python -m unittest -q test_atlasquant_aion_outbox_missing_predecessor_denial.py
+      - name: Prove external producer receipt claims never admit without independent trust
+        run: |
+          python -m unittest -q test_atlasquant_aion_producer_receipt_untrusted_precheck.py
+
+      - name: Prove Saga refuses local forged external effects independently of Quality
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_confirmed_cannot_supply_external_producer_receipt \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_failed_cannot_supply_terminal_no_effect_fence \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a39_compensation_cannot_promote_local_confirmed_or_failed
+      - name: Simulate historical Saga liveness in nonproductive pure model
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_pure_simulation_reference.py
+      - name: A41 verify pure shared sequence policy and forged SQLite denial
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_sequence_policy.py
+      - name: A42 real Saga compensation refuses forged SQLite claims and owner refs
+        run: |
+          python -m unittest -q test_atlasquant_aion_saga_compensation_admission.py
+      - name: A43 verify Saga local event chain gaps never masquerade as external proof
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_entire_event_chain_is_mismatch_not_false_match \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_deleted_tail_event_cannot_mask_running_saga \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_direct_saga_state_rewrite_mismatches_event_tip \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority
+      - name: A49 non-authorizing offline Global Worker state-transition simulation
+        run: |
+          python -m unittest -q test_atlasquant_aion_global_worker_pure_simulation_lab.py
+      - name: A48 direct Global Worker CAS writer fails closed without independent witness
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a48_direct_writer_denies_valid_local_checkpoint_before_put \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a48_forged_local_witness_marker_cannot_activate_direct_writer \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a48_direct_writer_does_not_read_hostile_config_properties
+      - name: A47 hard stop if independent source witness is not enrolled
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_feature_true_cannot_claim_cas_or_execute_without_source_witness \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_enabled_environment_cannot_claim_cas_without_source_witness \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a47_no_untrusted_runtime_config_property_read_without_source
+      - name: A46 reject tampered loaded checkpoint before Global Worker CAS or executor
+        run: |
+          python -m unittest -q \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a46_corrupted_checkpoint_get_success_does_not_execute_or_write \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a46_corrupted_global_worker_digest_does_not_reach_claim \
+            test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_a46_confirmed_read_without_checkpoint_is_untrusted
+      - name: Run AION v2.1 scope and quarantine tests
+        run: |
+          python -m pytest -q \
+            test_atlasquant_aion_chat_checkpoint_adapter.py \
+            test_atlasquant_aion_chat_library_adapter.py \
+            test_atlasquant_aion_unified_hardening_v21.py \
+            test_atlasquant_aion_unified_journal_store.py \
+            test_atlasquant_aion_unified_journal_store_governance.py \
+            test_atlasquant_aion_unified_mission.py \
+            test_atlasquant_aion_unified_taskgraph.py \
+            test_atlasquant_aion_v26_core_health_adapter.py \
+            test_atlasquant_aion_v26_evidence_wiring_status_truth.py \
+            test_atlasquant_aion_v27_durable_store_crash_isolation_redteam.py \
+            test_atlasquant_aion_v27_health_attestation_redteam.py \
+            test_atlasquant_aion_v28_system_invariants_integration_audit.py \
+            test_atlasquant_aion_v28_runtime_persistence_cas_recovery_redteam.py \
+            test_atlasquant_aion_v28_cross_contract_readiness_redteam.py \
+            test_atlasquant_aion_v28_global_snapshot_consistency_redteam.py \
+            test_atlasquant_aion_v29_provenance_truth_redteam.py \
+            test_atlasquant_aion_v210_trust_root_readiness_redteam.py \
+            test_atlasquant_aion_v210_trust_readiness_independent_redteam.py \
+            test_atlasquant_aion_v211_provenance_trust_lifecycle_redteam.py \
+            test_atlasquant_aion_v212_trusted_readiness_authority_boundary_redteam.py \
+            test_atlasquant_aion_v213_real_trust_authority_redteam.py \
+            test_atlasquant_aion_v214_durable_execution_redteam.py \
+            test_atlasquant_aion_v215_capability_isolation_redteam.py \
+            test_atlasquant_aion_v216_operational_resilience_redteam.py \
+            test_atlasquant_aion_v217_multiagent_memory_governance_redteam.py \
+            test_atlasquant_aion_v218_policy_kernel_redteam.py \
+            test_atlasquant_aion_v219_provider_neutral_gateway_redteam.py \
+            test_atlasquant_aion_v220_core_certification.py \
+            test_atlasquant_aion_v221_core_completion_review.py \
+            test_atlasquant_aion_v222_core_freeze_preflight.py \
+            test_atlasquant_aion_v223_external_persistence_attestation.py \
+            test_atlasquant_aion_v224_owner_signature_ceremony.py \
+            test_atlasquant_aion_v225_explicit_owner_decision_record.py \
+            test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+
+  supply-chain-audit:
+    name: Supply-chain audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install project and audit tooling
+        run: |
+          python -m pip install pip==26.2.1
+          pip install -r requirements.txt
+          pip install pip-audit==2.10.1 bandit==1.9.4 cyclonedx-bom==7.4.0
+          python -m pip check
+      - name: Audit Python dependencies
+        run: pip-audit -r requirements.txt
+      - name: Scan AION security-critical Python for high severity findings
+        run: |
+          bandit -q -lll \
+            atlasquant_aion_core.py \
+            atlasquant_aion_fortress.py \
+            atlasquant_aion_resilience.py \
+            atlasquant_aion_chaos_campaign.py \
+            atlasquant_aion_mission_control.py \
+            atlasquant_aion_drift_monitor.py \
+            atlasquant_aion_blast_radius_gate.py \
+            atlasquant_aion_recovery.py \
+            atlasquant_aion_memory.py \
+            atlasquant_aion_memory_contract.py \
+            atlasquant_aion_checkpoint_master.py \
+            atlasquant_aion_trust_root.py \
+            atlasquant_aion_nonce_registry.py \
+            atlasquant_aion_authority_verifier.py \
+            atlasquant_aion_trusted_authority_bridge.py \
+            atlasquant_aion_durable_execution_kernel.py \
+            atlasquant_aion_capability_isolation_gate.py \
+            atlasquant_aion_operational_resilience_kernel.py \
+            atlasquant_aion_multiagent_memory_governor.py \
+            atlasquant_aion_policy_kernel.py \
+            atlasquant_aion_model_gateway_v2.py \
+            atlasquant_aion_core_certification.py \
+            atlasquant_aion_core_completion_review.py \
+            atlasquant_aion_core_freeze_preflight.py \
+            atlasquant_aion_external_persistence_attestation.py \
+            atlasquant_aion_owner_signature_ceremony.py \
+            atlasquant_aion_owner_decision_record.py \
+            atlasquant_aion_owner_decision_persistence_attestation.py \
+            atlasquant_aion_vault.py \
+            atlasquant_aion_vault_physical_backend.py \
+            atlasquant_aion_tenant.py \
+            atlasquant_aion_tenant_crypto.py \
+            atlasquant_aion_tenant_durable_store.py \
+            atlasquant_aion_library_index.py \
+            atlasquant_aion_portable.py \
+            atlasquant_aion_durable_tasks.py \
+            atlasquant_aion_digital_twin.py \
+            atlasquant_aion_dev_fusion.py \
+            atlasquant_aion_chat_checkpoint_adapter.py \
+            atlasquant_aion_chat_library_adapter.py \
+            atlasquant_aion_unified_runtime.py \
+            atlasquant_aion_unified_journal.py \
+            atlasquant_aion_unified_durable_bridge.py \
+            atlasquant_aion_unified_journal_store.py \
+            atlasquant_aion_unified_mission.py \
+            atlasquant_aion_unified_taskgraph.py \
+            atlasquant_aion_unified_taskgraph_store.py \
+            atlasquant_aion_role_authority.py \
+            atlasquant_aion_truth_mapping.py \
+            atlasquant_aion_observability.py
+      - name: Generate and validate reproducible CycloneDX SBOM from resolved environment
+        run: |
+          python -m pip freeze --all > /tmp/aion-resolved-requirements.txt
+          cyclonedx-py requirements \
+            --output-reproducible \
+            --validate \
+            -o /tmp/aion-sbom.cdx.json \
+            /tmp/aion-resolved-requirements.txt
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path('/tmp/aion-sbom.cdx.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          if data.get('bomFormat') != 'CycloneDX':
+              raise SystemExit('invalid CycloneDX SBOM')
+          components = data.get('components') or []
+          if not components:
+              raise SystemExit('empty CycloneDX SBOM')
+          digest = hashlib.sha256(path.read_bytes()).hexdigest()
+          print(f'CycloneDX components={len(components)} sha256={digest}')
+          PY
+      - name: Upload CycloneDX SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: aion-sbom-${{ github.sha }}
+          path: /tmp/aion-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+  a54-windows-ephemeral:
+    name: A54 Windows hosted ephemeral ten containment tests (not owner installation)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies only inside ephemeral runner venv
+        shell: pwsh
+        run: |
+          python -m venv .a54-windows-venv
+          $a54python = Join-Path $PWD '.a54-windows-venv/Scripts/python.exe'
+          & $a54python -m pip install pip==26.2.1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $a54python -m pip install -r requirements.txt tzdata==2026.3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $a54python -c "import sys,sqlite3,importlib.metadata as m; print(sys.version); print('SQLite',sqlite3.sqlite_version); print('cryptography',m.version('cryptography')); assert m.version('cryptography') == '50.0.2'"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run intact A50 seven and A51 three with external sockets denied
+        shell: pwsh
+        run: |
+          $a54python = Join-Path $PWD '.a54-windows-venv/Scripts/python.exe'
+          @'
+          import sys,socket,unittest
+          socket.socket.connect=lambda *a,**k:(_ for _ in ()).throw(AssertionError('A54_HOSTED_TEST_EXTERNAL_NETWORK_DENIED'))
+          socket.socket.connect_ex=socket.socket.connect
+          names=['test_atlasquant_aion_saga_plan_integrity_a50','test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_global_worker_direct_kernel_cannot_invoke_handler_without_witness','test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_direct_armed_worker_with_forged_digest_must_not_issue_receipt','test_atlasquant_aion_background_executor.AionBackgroundExecutorTests.test_a51_explicit_human_click_remains_usable']
+          result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromNames(names))
+          sys.exit(not result.wasSuccessful())
+          '@ | & $a54python -B -
+          exit $LASTEXITCODE
