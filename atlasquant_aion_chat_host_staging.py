@@ -313,11 +313,19 @@ def build_staged_host_binding(
     scope = _authenticated_scope(access, cfg)
     session_binding = _session_binding_digest(access, scope)
     root = _staging_directory(cfg)
+    if runtime_context is not None and not isinstance(runtime_context, Mapping):
+        raise TypeError("STAGED_RUNTIME_CONTEXT_MAPPING_REQUIRED")
     runtime = (
         dict(runtime_context)
         if isinstance(runtime_context, Mapping)
         else build_staged_runtime_context()
     )
+    # A caller-supplied context cannot opt the local STAGING chat into a
+    # producer, network or production persistence. Check before opening SQLite:
+    # denying an inconsistent claim must not create a session holder.
+    for forbidden in ("provider_enabled", "network_enabled", "production_persistence"):
+        if forbidden in runtime and runtime[forbidden] is not False:
+            raise PermissionError("STAGED_RUNTIME_FORBIDDEN_FLAG:" + forbidden)
     store = get_or_create_staged_store(
         session_state,
         scope,
