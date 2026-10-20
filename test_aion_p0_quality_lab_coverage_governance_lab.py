@@ -36,6 +36,7 @@ LAB_ONLY = (
     "test_aion_p0_outbox_saga_cas_retry_recovery_lab",
     "test_aion_p0_outbox_saga_historical_reconcile_cas_lab",
     "test_aion_p0_budget_saga_trust_boundary_lab",
+    "test_aion_p0_quality_32_external_evidence_gates_lab",
     "test_aion_p0_quality_lab_coverage_governance_lab",
 )
 
