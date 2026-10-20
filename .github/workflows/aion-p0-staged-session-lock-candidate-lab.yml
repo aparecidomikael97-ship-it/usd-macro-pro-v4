@@ -32,6 +32,8 @@ jobs:
       # The original nine-case diagnostic suite explicitly expects the old
       # native-connection rerun DENIAL. Keep its earlier RED/diagnostic proof
       # unchanged on #1347 and test the inverted availability contract here.
+      - name: Install canonical Quality pytest dependency for chat regression imports
+        run: python -m pip install pytest==9.1.1
       - name: Twelve normative cross-thread session transition and revocation tests
         run: python -B -m unittest discover -s tests -p test_aion_p0_staged_session_atomicity_candidate_lab.py -v
       - name: Additional original chat identity, data isolation and red-team regressions
