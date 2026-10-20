@@ -76,6 +76,8 @@ jobs:
         run: python -B -m unittest -v test_aion_p0_budget_saga_trust_boundary_lab
       - name: LAB root module 23 test_aion_p0_quality_32_external_evidence_gates_lab
         run: python -B -m unittest -v test_aion_p0_quality_32_external_evidence_gates_lab
+      - name: LAB root module 24 test_aion_p0_h0_real_outbox_restore_claim_negative_lab
+        run: python -B -m unittest -v test_aion_p0_h0_real_outbox_restore_claim_negative_lab
       - name: LAB additional STAGING facade #1195 lifecycle (17)
         run: python -B -m unittest -v test_aion_p0_staged_facade_port_lifecycle_lab
       - name: LAB additional current native-denial and staged safety (8)
