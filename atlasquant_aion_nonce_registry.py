@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -54,11 +55,25 @@ class PersistentNonceRegistry:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
+    @contextmanager
     def _connect(self):
-        conn = sqlite3.connect(str(self.path), timeout=10.0, isolation_level=None)
-        conn.execute("PRAGMA synchronous=FULL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        return conn
+        """Keep connection lifetime scoped to each operation on every OS.
+
+        sqlite3.Connection.__exit__ only commits/rolls back, it does NOT
+        close the handle. Explicit closure prevents retained WAL/DB handles
+        and Windows cleanup/share-lock failures. Transaction policy remains
+        unchanged: claim() still uses BEGIN IMMEDIATE + explicit COMMIT.
+        """
+        conn = sqlite3.connect(
+            str(self.path), timeout=10.0, isolation_level=None,
+        )
+        try:
+            conn.execute("PRAGMA synchronous=FULL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _initialize(self):
         with self._connect() as conn:
