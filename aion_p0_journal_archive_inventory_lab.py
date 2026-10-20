@@ -75,7 +75,8 @@ def sha256_regular_file(path: Path) -> str:
     O_NOFOLLOW is used where supported; Windows still needs isolated trusted
     recovery media and human review for reparse-point/race guarantees.
     """
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+             | getattr(os, "O_NONBLOCK", 0))
     fd = os.open(path, flags)
     with os.fdopen(fd, "rb") as stream:
         initial = os.fstat(stream.fileno())
