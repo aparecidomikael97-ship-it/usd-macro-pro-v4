@@ -21,6 +21,15 @@ O dispositivo am12 segue offline na última inspeção. A pasta original relatad
 - aion_p0_journal_migration_static_review_lab.py: comparação AST inerte dos nomes e assertions dos dois casos, sem import nem execução de código recuperado; resultado sempre REVIEW_REQUIRED e saída 3.
 - Ambos aceitam --root CAMINHO_DA_COPIA_ORIGINAL e imprimem JSON. Gerar relatório fora da pasta original, em local isolado, depois de autorização. Não executar o material diretamente na pasta histórica.
 
+
+## Contenção adicional do inventário em LAB — rodada ampliada de 20/10
+
+O utilitário de captura foi fortalecido com **limites de percurso** (até 10.000 entradas e 12 níveis) e **limite aplicado durante a leitura SHA-256**, não apenas pela declaração prévia do tamanho (máximo 256 MiB por arquivo). Rejeita links simbólicos/junctions observados na árvore, abertura de objetos não regulares, crescimento/troca de identidade ou alteração dos metadados entre a leitura e o relatório. Usa abertura sem seguir symlinks e não bloqueante onde disponível no sistema; a ferramenta não escreve na fonte nem executa testes históricos.
+
+**Limite de segurança:** a comparação por estatísticas de arquivo não elimina todas as condições de corrida, especialmente em Windows/volumes compartilhados, nem autentica a origem. Usar cópia isolada de evidências, verificar hash pré/pós e exigir revisão humana independente; não transformar um inventário íntegro em autorização de execução. Os casos novos são testes sintéticos do capturador (15 no total), não reproduções da bateria de 76 nem solução dos dois P0.
+
+**Governança:** atualizar o estado da CI **somente depois** de verificar o SHA exato dos jobs Ubuntu/Windows. Até então, registrar como PENDENTE — mesmo que versões anteriores deste PR tenham passado.
+
 ## Oito critérios de aceite sequenciais
 
 1. Capturar **cópia imutável** de fontes originais, migradas, log e manifesto, com hashes e procedência; rejeitar duplicatas até adjudicação manual.
