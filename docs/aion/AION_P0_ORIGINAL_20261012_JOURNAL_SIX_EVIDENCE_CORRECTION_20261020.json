@@ -1,0 +1,150 @@
+{
+  "schema": "AION_P0_ORIGINAL_SIX_20261012_JOURNAL_COMPATIBILITY_CORRECTION_LAB_V1",
+  "as_of": "2026-10-20",
+  "status": "HARD_NO_GO",
+  "original_p0_homologated": 0,
+  "automatic_retry_allowed": false,
+  "worker_allowed": false,
+  "authorized_new_spend_brl": 0,
+  "historical_primary_sources": [
+    {
+      "kind": "ORIGINAL_SIX_EXPLICIT_ACCEPTANCE",
+      "comment_id": 6130979775,
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/1190#issuecomment-6130979775",
+      "date": "2026-10-12"
+    },
+    {
+      "kind": "DIRECT_SIX_BASELINE_WITH_TWO_LEGACY_ERRORS",
+      "comment_id": 6130912462,
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/1190#issuecomment-6130912462",
+      "date": "2026-10-12"
+    },
+    {
+      "kind": "TWO_LEGACY_MODULES_MIGRATED_ONLY_IN_LOCAL_LAB",
+      "comment_id": 6132259470,
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/1190#issuecomment-6132259470",
+      "date": "2026-10-12"
+    },
+    {
+      "kind": "ROOTS_REMAIN_OPEN",
+      "comment_id": 6132086468,
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/1190#issuecomment-6132086468",
+      "date": "2026-10-12"
+    }
+  ],
+  "first_p0_observation": "First explicitly enumerated six-case acceptance contract located in #1190 comment 6130979775; not claimed to be chronologically first across all systems.",
+  "original_76_baseline": {
+    "pass": 70,
+    "fail": 4,
+    "error": 2,
+    "skipped": 0,
+    "total": 76,
+    "scope": "LOCAL_LAB_AQ_LAB_SIX_P0_20261012_NOT_GITHUB_CANONICAL_QUALITY"
+  },
+  "later_same_originals_lab": {
+    "pass": 73,
+    "fail": 1,
+    "error": 2,
+    "total": 76,
+    "scope": "LOCAL_LAB_CANDIDATE_ONLY"
+  },
+  "migrated_lab_comparison": {
+    "pass": 75,
+    "fail": 1,
+    "error": 0,
+    "total": 76,
+    "scope": "LOCAL_LAB_MIGRATED_TWO_TEST_MODULE_COPIES_ONLY"
+  },
+  "original_cases": [
+    {
+      "slot": "P0_ORIGINAL_OWNER",
+      "kind": "FAIL",
+      "symptom": "Caller-asserted verified issuer/owner can pass bound state without independent owner evidence",
+      "legacy_test_full_name": null,
+      "fully_homologated": false
+    },
+    {
+      "slot": "P0_ORIGINAL_RECEIPT",
+      "kind": "FAIL",
+      "symptom": "Self-hash or fabricated Golden Path receipt is not independent effect attestation",
+      "legacy_test_full_name": null,
+      "fully_homologated": false
+    },
+    {
+      "slot": "P0_ORIGINAL_INBOX_UNKNOWN",
+      "kind": "FAIL",
+      "symptom": "First insertion UNKNOWN and unproven durable claim can permit unsafe admission after reset",
+      "legacy_test_full_name": null,
+      "fully_homologated": false
+    },
+    {
+      "slot": "P0_ORIGINAL_H0_RESTART",
+      "kind": "FAIL",
+      "symptom": "After reboot, H0 cannot be safely distinguished from lost UNKNOWN without external witness",
+      "legacy_test_full_name": null,
+      "fully_homologated": false
+    },
+    {
+      "slot": "P0_ORIGINAL_JOURNAL_COMPAT_A",
+      "kind": "ERROR",
+      "legacy_test_full_name": "test_lab_journal.JournalTests.test_readback_rejects_forged_content",
+      "symptom": "Legacy test writes UPDATE using publicly read-only Journal.db() while injecting forged content",
+      "fully_homologated": false
+    },
+    {
+      "slot": "P0_ORIGINAL_JOURNAL_COMPAT_B",
+      "kind": "ERROR",
+      "legacy_test_full_name": "test_conservative_journal.ConservativeJournal.test_direct_SQL_still_bypasses_limit_characterization",
+      "symptom": "Legacy test writes UPDATE using publicly read-only Journal.db() while characterizing direct SQL bypass",
+      "fully_homologated": false
+    }
+  ],
+  "migration_observation": {
+    "fixture_only": true,
+    "source_available_in_current_repo": false,
+    "original_unmodified": true,
+    "migrates_test_behavior_only": true,
+    "write_channel_before": "Journal.db() public read-only interface, legacy test attempted UPDATE",
+    "write_channel_after": "test fixture uses independent raw sqlite3.connect(db_path) to mutate the isolated database",
+    "security_boundary": "Public Journal.db() remains read-only; direct SQL is an adversarial bypass characterization, not an allowed product interface",
+    "test_migration_paths": [
+      "tests_migrated/test_lab_journal_migrated_v2.py",
+      "tests_migrated/test_conservative_journal_migrated_v2.py"
+    ],
+    "lab_folder_original": "C:/Users/apare/Downloads/AQ_LAB_COMPAT_MIGRATE_20261012",
+    "evidence_only_not_verified_in_this_branch": "Local source tests and full log not in GitHub tree; migration effectiveness supported by historical checkpoint note, not reexecuted originals"
+  },
+  "october19_overlay_mapping": {
+    "document": "docs/aion/AION_P0_SIX_EXIT_EVIDENCE_GAP_MATRIX_20261020.json",
+    "labels": [
+      "SQLITE_COMPAT_READ_PATH",
+      "SQLITE_COMPAT_WRITE_PATH"
+    ],
+    "status": "HYPOTHESIS_INCOMPATIBLE_WITH_THE_EARLIER_EXPLICIT_JOURNAL_TEST_IDENTITIES",
+    "reason": "Neither original Journal compatibility ERROR is the SQLiteChatStore cross-thread test or Saga/Outbox atomicity test; both Journal ERROR cases attempt UPDATE via read-only Journal.db(). No source or reference proves a one-to-one original-Journal-case to later READ/WRITE label mapping.",
+    "must_not_rewrite_historical_register_without_review": true,
+    "allowed_future_action": "Audit initial six-case fixture source and map exact test identities; propose versioned correction to the crosswalk only after independent review, preserve old register and IDs."
+  },
+  "later_independent_sqlite_candidacies": [
+    {
+      "pr": 1195,
+      "scope": "STAGED_HOST_THREAD_AFFINITY",
+      "status": "VALID_DIFFERENT_HISTORICAL_BUG_NOT_THE_TWO_OCT12_JOURNAL_ERRORS"
+    },
+    {
+      "pr": 1281,
+      "scope": "SAGA_OUTBOX_ATOMIC_STAGING",
+      "status": "VALID_DIFFERENT_HISTORICAL_BUG_NOT_THE_TWO_OCT12_JOURNAL_ERRORS"
+    }
+  ],
+  "evidence_to_close": [
+    "Obtain original lab source for two Journal tests and exact SHA256 in immutable local archive",
+    "Obtain original log for 76 tests and verify 70 PASS, 4 FAIL and 2 ERROR against same source",
+    "Reexecute both unmodified legacy tests in hermetic throwaway lab to reproduce conflicts",
+    "Perform reviewed versioned migration of test fixtures with raw SQLite test-only corruption",
+    "Prove actual Journal.db() public API remains read-only and cannot be bypassed via wrapper",
+    "Run migrated negative and legitimate flows under Windows and Linux, document residual raw SQL threat",
+    "Reconcile crosswalk original six with later READ/WRITE overlay without waiving any historical case",
+    "Re-run full canonical Quality and Security and finish external-owner/source/producer/H0 evidence"
+  ]
+}
