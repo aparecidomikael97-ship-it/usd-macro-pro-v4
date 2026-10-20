@@ -116,6 +116,40 @@ def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
 
+def _local_decision_coherence_sql(outbox_alias: str) -> str:
+    """SQL-only local mismatch fence, NOT a signed or external witness.
+
+    Both caller sites use constant, reviewed aliases, never user data. The
+    SQLite metadata columns AND serialized decision must agree before a
+    local CLAIMED mutation. CASE avoids parsing malformed JSON as an error
+    after the claim has already been committed.
+    """
+    if outbox_alias not in {"o", "action_outbox"}:
+        raise ValueError("unsupported fixed SQL outbox alias")
+    return f"""CASE WHEN json_valid(d.data)=1 THEN (
+               d.owner={outbox_alias}.owner
+               AND d.tenant={outbox_alias}.tenant
+               AND d.workspace={outbox_alias}.workspace
+               AND d.decision_id=json_extract(d.data,'$.decision_id')
+               AND d.owner=json_extract(d.data,'$.owner_id')
+               AND d.tenant=json_extract(d.data,'$.tenant_id')
+               AND d.workspace=json_extract(d.data,'$.workspace_id')
+               AND d.intent_ref=json_extract(d.data,'$.intent_ref')
+               AND d.action=json_extract(d.data,'$.action')
+               AND d.aggregate_key=json_extract(d.data,'$.aggregate_key')
+               AND d.aggregate_seq=json_extract(d.data,'$.aggregate_seq')
+               AND json_type(d.data,'$.aggregate_seq')='integer'
+               AND d.payload_digest=json_extract(d.data,'$.payload_digest')
+               AND d.policy_version=json_extract(d.data,'$.policy_version')
+               AND d.authorization_ref=json_extract(d.data,'$.authorization_ref')
+               AND d.valid_until=json_extract(d.data,'$.valid_until')
+               AND d.created_at=json_extract(d.data,'$.created_at')
+               AND {outbox_alias}.idempotency_key=json_extract(d.data,'$.idempotency_key')
+               AND json_extract(d.data,'$.schema')='{SCHEMA}'
+               AND json_type(d.data,'$.grants_authority')='false'
+           ) ELSE 0 END"""
+
+
 class ExecutionOutbox:
     """Scoped outbox bound to the same SQLite database as staged chat state."""
 
@@ -500,12 +534,14 @@ class ExecutionOutbox:
         now_iso = _iso(now_dt)
         lease_until = _iso(now_dt + timedelta(seconds=int(lease_seconds)))
         owner, tenant, workspace = self._scope_args()
+        selected_coherence = _local_decision_coherence_sql("o")
+        claimed_coherence = _local_decision_coherence_sql("action_outbox")
 
         self.release_expired_claims(now=now_dt)
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.db.execute(
-                """SELECT o.idempotency_key
+                f"""SELECT o.idempotency_key
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
@@ -538,6 +574,9 @@ class ExecutionOutbox:
                      -- creation instant. This is a local chronology fence,
                      -- not trusted time or independent H0 provenance.
                      AND d.created_at<=?
+                     -- Ignore corrupted columns, malformed decision JSON or
+                     -- pointer swaps instead of granting a local claim.
+                     AND {selected_coherence}
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
                 (owner, tenant, workspace, now_iso, now_iso),
@@ -547,7 +586,7 @@ class ExecutionOutbox:
                 return None
             key = row["idempotency_key"]
             cursor = self.db.execute(
-                """UPDATE action_outbox
+                f"""UPDATE action_outbox
                    SET state='CLAIMED',lease_owner=?,lease_until=?,attempts=attempts+1,last_error=''
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                      AND state IN ('PENDING','RETRY')
@@ -570,6 +609,9 @@ class ExecutionOutbox:
                            AND d.aggregate_seq=1
                            AND d.valid_until>?
                            AND d.created_at<=?
+                           -- Repeat integrity under the same transactional
+                           -- compare-and-swap, never just before selection.
+                           AND {claimed_coherence}
                      )""",
                 (worker, lease_until, key, owner, tenant, workspace,
                  now_iso, now_iso),
