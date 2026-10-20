@@ -105,11 +105,12 @@ def assess_trust_anchor_bootstrap_lab(
     for field in ("policy_epoch","minimum_sequence","minimum_revocation_epoch"):
         if not _unsigned(pin.get(field)):
             findings.append("PIN_FIELD_INVALID:" + field)
-    if pin.get("key_status") not in ("ACTIVE","REVOKED","UNKNOWN") or (
-        type(pin.get("key_status")) is not str
+    key_status=pin.get("key_status")
+    if type(key_status) is not str or key_status not in (
+        "ACTIVE","REVOKED","UNKNOWN"
     ):
         findings.append("PIN_KEY_STATUS_INVALID")
-    elif pin["key_status"]!="ACTIVE":
+    elif key_status!="ACTIVE":
         findings.append("PIN_KEY_REVOKED_OR_UNKNOWN")
 
     if type(candidate_public_key) is not bytes or len(candidate_public_key)!=32:
