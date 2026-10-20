@@ -106,9 +106,18 @@ class PriorSQLiteReadCandidateOnCurrentHeadLAB(unittest.TestCase):
         self.assertFalse(reopened["grants_authority"])
 
 
+class _A61ClosedConnectionWrapper(atomic.A61SagaOutboxAtomicStagingTests):
+    def setUp(self):
+        super().setUp()
+        # LIFO cleanup: release the real SQLite handle BEFORE the original
+        # fixture's TemporaryDirectory cleanup (Windows denies deleting open DB).
+        # Do not modify the inherited A61 assertions or business logic.
+        self.addCleanup(self.store.close)
+
+
 class PriorSQLiteWriteCandidateOnCurrentHeadLAB(unittest.TestCase):
     def test_07_existing_a61_saga_event_exception_rolls_back_outbox(self):
-        test=atomic.A61SagaOutboxAtomicStagingTests(
+        test=_A61ClosedConnectionWrapper(
             "test_01_event_append_failure_leaves_no_orphan_outbox_or_decision")
         result=unittest.TestResult()
         test.run(result)
@@ -117,7 +126,7 @@ class PriorSQLiteWriteCandidateOnCurrentHeadLAB(unittest.TestCase):
         self.assertEqual(result.errors,[])
 
     def test_08_existing_a61_nested_savepoint_rollback_preserves_outer_tx(self):
-        test=atomic.A61SagaOutboxAtomicStagingTests(
+        test=_A61ClosedConnectionWrapper(
             "test_06_nested_enqueue_sql_failure_preserves_parent_transaction")
         result=unittest.TestResult()
         test.run(result)
