@@ -41,8 +41,17 @@ MAX_TREE_DEPTH = 12
 
 
 def _identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
-    """Best-effort stability fingerprint; not a cryptographic provenance proof."""
-    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    """Same-file identity, normalized across Windows path/handle stat APIs.
+
+    On CPython Windows 3.12+, path lstat may expose creation time in
+    st_ctime_ns while fstat exposes metadata-change time there. Comparing
+    those two values incorrectly rejects genuine unchanged regular files.
+    st_birthtime_ns is the documented creation timestamp for BOTH APIs.
+    Separately retain fstat st_ctime_ns before/after as a change-time fence.
+    This is only a local stability check, never proof of external provenance.
+    """
+    origin_ns = info.st_birthtime_ns if os.name == "nt" else info.st_ctime_ns
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, origin_ns)
 
 
 def _discover_evidence(root: Path) -> dict[str, list[Path]]:
@@ -95,7 +104,10 @@ def sha256_regular_file(path: Path) -> str:
         final = os.fstat(stream.fileno())
         path_final = path.lstat()
         if (total != initial.st_size or _identity(initial) != _identity(final)
-                or _identity(initial) != _identity(path_final)):
+                or _identity(initial) != _identity(path_final)
+                or (os.name == "nt" and initial.st_ctime_ns != final.st_ctime_ns)):
+            # Windows fstat ChangeTime is not comparable to path lstat ctime,
+            # but comparing the SAME HANDLE before/after remains useful.
             raise ValueError("EVIDENCE_CHANGED_DURING_READ")
         return digest.hexdigest()
 
@@ -118,7 +130,8 @@ def inspect(root: Path) -> dict:
         "files": {},
         "gaps": [],
     }
-    if not root.is_dir() or root.is_symlink():
+    if (not root.is_dir() or root.is_symlink()
+            or (hasattr(root, "is_junction") and root.is_junction())):
         result["gaps"].append("EVIDENCE_ROOT_MISSING_OR_SYMLINK")
         return result
     root = root.resolve()
