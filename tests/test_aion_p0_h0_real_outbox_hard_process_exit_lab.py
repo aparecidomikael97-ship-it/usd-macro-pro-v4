@@ -99,7 +99,7 @@ class P0RealOutboxHardProcessExitLAB(unittest.TestCase):
         proc = subprocess.run(
             [sys.executable, "-B", "-c", textwrap.dedent(CHILD),
              str(self.path), mode],
-            cwd=str(Path(__file__).resolve().parent),
+            cwd=str(Path(__file__).resolve().parents[1]),
             capture_output=True, text=True, timeout=35, check=False,
         )
         self.assertEqual(proc.stdout, "", "os._exit child must not claim success via stdout")
