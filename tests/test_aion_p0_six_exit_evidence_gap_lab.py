@@ -173,9 +173,9 @@ class SixP0ExitEvidenceGapIntegrityLAB(unittest.TestCase):
                     self.assertTrue((ROOT/f).is_file(),f)
 
     def test_12_crosswalk_does_not_depend_on_real_network_or_provider(self):
-        self.assertEqual(self.audit["sources"]["original_six"],str(ORIGINAL.relative_to(ROOT)))
-        self.assertEqual(self.audit["sources"]["quality85"],str(QUALITY.relative_to(ROOT)))
-        self.assertEqual(self.audit["sources"]["outbox_saga32"],str(RECEIPTS.relative_to(ROOT)))
+        self.assertEqual(self.audit["sources"]["original_six"],ORIGINAL.relative_to(ROOT).as_posix())
+        self.assertEqual(self.audit["sources"]["quality85"],QUALITY.relative_to(ROOT).as_posix())
+        self.assertEqual(self.audit["sources"]["outbox_saga32"],RECEIPTS.relative_to(ROOT).as_posix())
         self.assertEqual(self.audit["sources"]["previous_lab_run"],"39415147568")
         self.assertEqual(self.audit["homologated_p0"],0)
         self.assertEqual(self.audit["status"],"HARD_NO_GO")
