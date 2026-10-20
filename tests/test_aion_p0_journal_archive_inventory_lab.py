@@ -1,6 +1,7 @@
 """Negative acceptance tests for evidence inventory ONLY (no P0 closure)."""
 from __future__ import annotations
 import hashlib
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -93,6 +94,14 @@ class JournalEvidenceInventoryLAB(unittest.TestCase):
         with patch.object(inventory, "MAX_BYTES_PER_FILE", 4):
             with self.assertRaisesRegex(ValueError, "OVERSIZED_EVIDENCE_FILE"):
                 inventory.sha256_regular_file(sample)
+
+    def test_named_pipe_is_not_opened_as_blocking_evidence(self):
+        if not hasattr(os, "mkfifo") or not hasattr(os, "O_NONBLOCK"):
+            self.skipTest("FIFO test only supported on POSIX")
+        pipe = self.root / "not-a-regular-file"
+        os.mkfifo(pipe)
+        with self.assertRaisesRegex(ValueError, "EVIDENCE_NOT_STABLE_REGULAR_FILE"):
+            inventory.sha256_regular_file(pipe)
 
     def test_tree_entry_budget_fails_closed(self):
         self.populate()
