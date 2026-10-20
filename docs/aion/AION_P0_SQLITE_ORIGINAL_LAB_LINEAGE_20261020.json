@@ -1,0 +1,116 @@
+{
+  "schema": "AION_P0_SQLITE_ORIGINAL_VS_LAB_CAUSAL_LINEAGE_V1",
+  "dated": "2026-10-20",
+  "status": "HARD_NO_GO_ORIGINAL_TWO_SQLITE_P0_UNMAPPED",
+  "scope": "Pinned Git graph and Actions job traces from 19-Oct LAB. Does not locate earlier original P0 incident ticket/test/stack.",
+  "original_p0_inventory": "docs/aion/AION_P0_SIX_BLOCKERS_CANONICAL_EVIDENCE_REGISTER_20261019.json",
+  "original_six_sqlite_read_case_identified": false,
+  "original_six_sqlite_write_case_identified": false,
+  "source_test_families": [
+    {
+      "source": "test_aion_p0_original_sqlite_compat_concurrency_restore_lab.py",
+      "initial_commit": "6df1cc7e096f0374468bfdbe9e23edc3b8dea257",
+      "created_on": "2026-10-19T19:41:30Z",
+      "current_test_blob": "5f84be37d0cc9082dc4782d6cb115844e24220bd",
+      "original_in_filename_means": "Original API compatibility behaviors, NOT proven first two canonical P0 incident IDs",
+      "dated_oct19_lab_not_a_proven_original_canonical_incident": true
+    },
+    {
+      "source": "test_aion_p0_sqlite_chat_store_owner_thread_lab.py",
+      "initial_commit": "20ec5fc8547d90c722113752d3c4226aca9fa96e",
+      "created_on": "2026-10-19T20:04:18Z",
+      "original_in_filename_means": "The first version of a later 15-case owner-thread LAB suite",
+      "dated_oct19_lab_not_a_proven_original_canonical_incident": true
+    },
+    {
+      "source": "test_aion_p0_sqlite_execution_restore_hardstop_lab.py",
+      "initial_commit": "042d83d8a5e6ffd71bf13934f52e8b8d37636c0c",
+      "created_on": "2026-10-19T20:42:15Z",
+      "original_in_filename_means": "The first version of a later 13-case restore security suite",
+      "dated_oct19_lab_not_a_proven_original_canonical_incident": true
+    }
+  ],
+  "red_observed": {
+    "run": "39316307777",
+    "run_url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39316307777",
+    "commit": "4f9c6acb4d3d1c081ad13c98434c52bdd78b861e",
+    "suite": "test_aion_p0_sqlite_chat_store_owner_thread_lab.py",
+    "suite_blob": "878efd12a4348cbc8beef3093b9685116ce1a8cd",
+    "store_blob": "6df8ad55673acaca6eeeb0bc3e3898d7a10b08ba",
+    "jobs": [
+      {
+        "os": "Ubuntu",
+        "job_id": "118278592328",
+        "total": 15,
+        "failures": 4,
+        "errors": 9,
+        "passes": 2
+      },
+      {
+        "os": "Windows",
+        "job_id": "118278593012",
+        "total": 15,
+        "failures": 4,
+        "errors": 9,
+        "passes": 2
+      }
+    ],
+    "observed_error": "sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread; wrong-thread safety surface lacked SQLITE_STORE_CONNECTION_THREAD_MISMATCH"
+  },
+  "patches": [
+    {
+      "commit": "2eed980be36143535ef94e3f52f53852030708b1",
+      "parent": "4f9c6acb4d3d1c081ad13c98434c52bdd78b861e",
+      "file": "aion_chat/store.py",
+      "additions": 17,
+      "deletions": 0,
+      "safety_contract": "Enforce Python thread ownership before SQLite health, close, query and write methods; keep check_same_thread enabled"
+    },
+    {
+      "commit": "0f0ba9f033c2d1e257e542b4bc695a595c680eac",
+      "parent": "e89737093f764e8897564b48c886f50682f8ae11",
+      "file": "aion_chat/store.py",
+      "additions": 50,
+      "deletions": 0,
+      "safety_contract": "Reject official restoration of execution-ledger source or target without independent witness"
+    },
+    {
+      "commit": "543a47e0d3a897a6a5a6903826d6255307d18d37",
+      "parent": "2dafeb7d7d84fa12ccd3ebd1cdd2a3c4754b1951",
+      "file": "aion_chat/store.py",
+      "additions": 10,
+      "deletions": 7,
+      "safety_contract": "Check existing target's SQLite WAL snapshot; deny orphan WAL/SHM target without main database"
+    }
+  ],
+  "green_observed": {
+    "run": "39416850779",
+    "run_url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39416850779",
+    "commit": "2c2cefd12d3f4783e93d6d27158b85e27e9a1296",
+    "store_blob": "951428ac5e76a0185c58121aa4fdb6823271b5b7",
+    "owner_thread_suite_blob": "878efd12a4348cbc8beef3093b9685116ce1a8cd",
+    "owner_thread_suite_same_as_red": true,
+    "suite_green_ubuntu": true,
+    "suite_green_windows": true,
+    "status": "LAB_ONLY"
+  },
+  "current_state": {
+    "original_two_sqlite_p0_open": true,
+    "new_suite_green_does_not_map_original_incidents": true,
+    "complete_quality_last_run": "39334210568",
+    "complete_quality_last_fail": 51,
+    "complete_quality_last_error": 34,
+    "outbox_saga_error_open": 32,
+    "p0_homologated": 0,
+    "worker_enabled": false,
+    "automatic_resend_enabled": false,
+    "producer_issuer_enrolled": false,
+    "real_physical_reboot_verified": false
+  },
+  "next_missing_evidence": [
+    "Find dated original report before 19 October identifying each SQLite P0 read/write failing job, test and stack, not merely a filename containing 'original'",
+    "Show same incident original RED and corresponding correction on untouched assertion or mark original attribution unavailable",
+    "Rerun full Quality and Security after independent owner, producer and highwater enrollment; do not waive historical failure",
+    "Require actual Windows physical reboot, power-loss, WAL recovery and credential provenance before H0"
+  ]
+}
