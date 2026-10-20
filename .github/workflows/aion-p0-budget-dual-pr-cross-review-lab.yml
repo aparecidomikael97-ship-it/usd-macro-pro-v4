@@ -42,18 +42,8 @@ jobs:
       - name: Independent combined-PR budget contract and consumer cases (14)
         run: python -B -m unittest discover -s tests -p test_aion_p0_dual_pr_cross_review_lab.py -v
       - name: Original canonical Outbox negative producer / CAS selections (5)
-        run: |
-          python -B -m unittest -v \
-            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_no_enrolled_producer_must_block_before_adapter_send \
-            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_self_attested_adapter_enrollment_cannot_enable_send \
-            test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_cross_scope_cannot_read_or_claim_foreign_intent \
-            test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_confirm_rejects_claimed_without_send \
-            test_atlasquant_aion_execution_outbox.OutboxStaleStateBlockCASP0Tests.test_late_revocation_cannot_revoke_reclaimed_claim
+        run: python -B -m unittest -v test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_no_enrolled_producer_must_block_before_adapter_send test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_self_attested_adapter_enrollment_cannot_enable_send test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_cross_scope_cannot_read_or_claim_foreign_intent test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_confirm_rejects_claimed_without_send test_atlasquant_aion_execution_outbox.OutboxStaleStateBlockCASP0Tests.test_late_revocation_cannot_revoke_reclaimed_claim
       - name: Original canonical Saga independent effect boundary selections (3)
-        run: |
-          python -B -m unittest -v \
-            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_confirmed_cannot_supply_external_producer_receipt \
-            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority \
-            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_saga_plan_rejects_critical_capability_and_over_budget_shape
+        run: python -B -m unittest -v test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_confirmed_cannot_supply_external_producer_receipt test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a43_valid_local_chain_never_claims_external_authority test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_saga_plan_rejects_critical_capability_and_over_budget_shape
       - name: Owner-thread original LAB budget contracts
         run: python -B -m unittest -v test_aion_p0_sqlite_authority_budget_owner_thread_lab
