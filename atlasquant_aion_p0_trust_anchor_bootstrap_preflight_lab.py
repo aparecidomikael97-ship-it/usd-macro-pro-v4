@@ -158,7 +158,9 @@ def assess_trust_anchor_bootstrap_lab(
         except (UnicodeError,ValueError,TypeError,RecursionError):
             decoded={}
         if type(decoded) is dict:
-            if type(decoded.get("key_id")) is not str or decoded.get("key_id")!=pin.get("key_id"):
+            supplied_key_id=decoded.get("key_id")
+            pinned_key_id=pin.get("key_id")
+            if not (_id(supplied_key_id) and _id(pinned_key_id)) or supplied_key_id!=pinned_key_id:
                 findings.append("PIN_ENVELOPE_KEY_ID_MISMATCH")
             for k,pinned in (
                 ("epoch","policy_epoch"),
