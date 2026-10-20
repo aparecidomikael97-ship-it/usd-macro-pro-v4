@@ -71,9 +71,9 @@ class OwnerSignatureCanonicalLAB(unittest.TestCase):
         self.assert_denied_without_nonce_claim(alt)
 
     def test_03_ignored_punctuation_cannot_alias_same_signature(self):
-        alt=self.canonical[:13]+"*"+self.canonical[13:]
+        alt=self.canonical[:13]+"****"+self.canonical[13:]
         self.assertEqual(
-            base64.urlsafe_b64decode(alt+"="*(-len(alt)%4)),
+            base64.urlsafe_b64decode(alt+"=="),
             base64.urlsafe_b64decode(self.canonical+"=="),
         )
         self.assert_denied_without_nonce_claim(alt)
