@@ -226,6 +226,7 @@ class CumulativeAuthorityBudget:
                     "workspace_id": self.scope.workspace_id,
                 },
                 "grants_authority": False,
+                "execution_allowed_by_this_component": False,
                 "executes_action": False,
             }
         before = self._snapshot(transaction_id=bound["transaction_id"], now=current)
