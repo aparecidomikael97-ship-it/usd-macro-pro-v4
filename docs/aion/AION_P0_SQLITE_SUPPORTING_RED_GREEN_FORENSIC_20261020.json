@@ -1,0 +1,63 @@
+{
+  "schema": "AION_P0_SQLITE_OWNER_THREAD_SUPPORTING_RED_GREEN_FORENSIC_LAB_V1",
+  "dated": "2026-10-20",
+  "purpose": "A supporting unchanged-test-suite RED/GREEN reconstruction, not the original two P0 incident identities, no P0 closure.",
+  "test_source": "test_aion_p0_sqlite_chat_store_owner_thread_lab.py",
+  "unchanged_test_blob_sha": "878efd12a4348cbc8beef3093b9685116ce1a8cd",
+  "test_source_same_between_snapshots": true,
+  "red": {
+    "run_id": "39316307777",
+    "commit": "4f9c6acb4d3d1c081ad13c98434c52bdd78b861e",
+    "jobs": {
+      "ubuntu": {
+        "job_id": "118278592328",
+        "total": 15,
+        "fail": 4,
+        "error": 9,
+        "pass": 2
+      },
+      "windows": {
+        "job_id": "118278593012",
+        "total": 15,
+        "fail": 4,
+        "error": 9,
+        "pass": 2
+      }
+    },
+    "store_source_blob": "6df8ad55673acaca6eeeb0bc3e3898d7a10b08ba",
+    "observed_root": "sqlite3.ProgrammingError on cross-thread access and incorrect StorageUnavailableError / SQLITE_STORE_CONNECTION_THREAD_MISMATCH surfaces",
+    "observed_read_examples": [
+      "test_01_health_probe_denies_foreign_thread_without_failed_state",
+      "test_06_get_conversation_denies_foreign_thread",
+      "test_08_list_conversations_denies_foreign_thread",
+      "test_11_list_messages_denies_foreign_thread"
+    ],
+    "observed_write_examples": [
+      "test_05_backup_to_denies_foreign_thread_before_file_is_created",
+      "test_07_create_conversation_denies_foreign_thread_before_write",
+      "test_09_append_message_denies_before_begin_and_rollback",
+      "test_10_archive_conversation_denies_foreign_thread"
+    ]
+  },
+  "lab_green": {
+    "run_id": "39415147568",
+    "commit": "1147974b64264b9aefb21986765b9f0d22e61ec0",
+    "root_module_index": 12,
+    "root_module_name": "test_aion_p0_sqlite_chat_store_owner_thread_lab",
+    "ubuntu": "PASS",
+    "windows": "PASS",
+    "store_source_blob": "951428ac5e76a0185c58121aa4fdb6823271b5b7",
+    "same_test_source_sha_as_red": true,
+    "source_code_changed": true
+  },
+  "historical_original_sqlite_read_p0_exact_case_mapped": false,
+  "historical_original_sqlite_write_p0_exact_case_mapped": false,
+  "supports_only": "A later LAB owner-thread read/write failure family has a same-tests cross-platform RED/GREEN pair; does not prove the original six-P0 SQLite read or write incidents were identified or homologated.",
+  "current_producer_enrolled": false,
+  "worker_allowed": false,
+  "real_external_effect_tested": false,
+  "quality_full_reexecuted_for_this_comparison": false,
+  "security_full_reexecuted_for_this_comparison": false,
+  "p0_homologated": 0,
+  "status": "SUPPORTING_LAB_ONLY__TWO_SQLITE_P0_STILL_OPEN_UNMAPPED"
+}
