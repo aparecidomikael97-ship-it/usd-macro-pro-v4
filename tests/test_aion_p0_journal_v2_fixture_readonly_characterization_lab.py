@@ -7,6 +7,7 @@ does NOT mean the production API, legacy 76, or antirollback is fixed.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from hashlib import sha256
 from pathlib import Path
 import sqlite3
@@ -38,46 +39,46 @@ class SyntheticJournalV2FixtureLAB(unittest.TestCase):
         return connection.execute("SELECT content FROM journal WHERE id=1").fetchone()[0]
 
     def simulated_integrity(self):
-        with self.public_readonly_view() as con:
+        with closing(self.public_readonly_view()) as con:
             data=self.read(con)
         return sha256(data.encode("utf-8")).hexdigest()==self.expected
 
     def test_01_synthetic_public_readonly_can_read(self):
-        with self.public_readonly_view() as con:
+        with closing(self.public_readonly_view()) as con:
             self.assertEqual(self.read(con),"original-entry")
 
     def test_02_synthetic_public_readonly_rejects_update(self):
-        with self.public_readonly_view() as con:
+        with closing(self.public_readonly_view()) as con:
             with self.assertRaises(sqlite3.OperationalError):
                 con.execute("UPDATE journal SET content='forged' WHERE id=1")
         self.assertTrue(self.simulated_integrity())
 
     def test_03_synthetic_public_readonly_rejects_insert(self):
-        with self.public_readonly_view() as con:
+        with closing(self.public_readonly_view()) as con:
             with self.assertRaises(sqlite3.OperationalError):
                 con.execute("INSERT INTO journal(id,content) VALUES(2,'x')")
 
     def test_04_synthetic_public_readonly_rejects_delete(self):
-        with self.public_readonly_view() as con:
+        with closing(self.public_readonly_view()) as con:
             with self.assertRaises(sqlite3.OperationalError):
                 con.execute("DELETE FROM journal WHERE id=1")
 
     def test_05_test_only_raw_connection_can_intentionally_corrupt(self):
-        with self.fixture_raw_writer() as con:
+        with closing(self.fixture_raw_writer()) as con, con:
             con.execute("UPDATE journal SET content='forged-entry' WHERE id=1")
         self.assertFalse(self.simulated_integrity())
 
     def test_06_corrupt_content_does_not_change_test_only_expected_hash(self):
         before=self.expected
-        with self.fixture_raw_writer() as con:
+        with closing(self.fixture_raw_writer()) as con, con:
             con.execute("UPDATE journal SET content='forged-entry' WHERE id=1")
         self.assertEqual(self.expected,before)
         self.assertFalse(self.simulated_integrity())
 
     def test_07_migration_does_not_make_public_view_writable(self):
-        with self.fixture_raw_writer() as con:
+        with closing(self.fixture_raw_writer()) as con, con:
             con.execute("UPDATE journal SET content='attacker' WHERE id=1")
-        with self.public_readonly_view() as con:
+        with closing(self.public_readonly_view()) as con:
             self.assertEqual(self.read(con),"attacker")
             with self.assertRaises(sqlite3.OperationalError):
                 con.execute("UPDATE journal SET content='second' WHERE id=1")
@@ -93,9 +94,9 @@ class SyntheticJournalV2FixtureLAB(unittest.TestCase):
         self.assertTrue(self.simulated_integrity())
 
     def test_09_explicit_commit_of_test_corruption_is_visible_to_new_read_handle(self):
-        with self.fixture_raw_writer() as con:
+        with closing(self.fixture_raw_writer()) as con, con:
             con.execute("UPDATE journal SET content='bad' WHERE id=1")
-        with self.public_readonly_view() as con:
+        with closing(self.public_readonly_view()) as con:
             self.assertEqual(self.read(con),"bad")
         self.assertFalse(self.simulated_integrity())
 
@@ -106,7 +107,7 @@ class SyntheticJournalV2FixtureLAB(unittest.TestCase):
         self.assertFalse(missing.exists())
 
     def test_11_db_replacement_can_defeat_local_expectation_and_is_not_external_proof(self):
-        with self.fixture_raw_writer() as con:
+        with closing(self.fixture_raw_writer()) as con, con:
             con.execute("UPDATE journal SET content='attacker' WHERE id=1")
         # This test deliberately illustrates detectable tampering under a
         # preserved expected hash, NOT durable external witness authenticity.
