@@ -31,7 +31,7 @@ Sequência documental antes da próxima decisão de custo: (1) revisor técnico 
 
 ## 4. Evidência desta branch
 
-A suíte `tests/test_aion_p0_independent_incident_witness_proposal_lab.py` possui **26 verificações** de formato malicioso, dicionários hostis, mismatch de issuer/tenant/epoch/sequence/revocation/head/nonce, domínios administrativos declarados, claims booleanos, imutabilidade de entrada e execução real dos gates A53/A76 em modo de negação. O workflow Ubuntu/Windows repete também **12 verificações A53/A76 da PR #1356, A74/M71 canônicos, 22 IAM/H0, 17 rollback multi-domínio, 17 testes SQLite #1195, oito hardstops STAGING e os 23 módulos LAB raiz**.
+A suíte `tests/test_aion_p0_independent_incident_witness_proposal_lab.py` possui **30 verificações** de formato malicioso, dicionários hostis, callbacks de igualdade maliciosos, mismatch de issuer/tenant/epoch/sequence/revocation/head/nonce, domínios administrativos declarados, claims booleanos, imutabilidade de entrada e execução real dos gates A53/A76 em modo de negação. O workflow Ubuntu/Windows repete também **12 verificações A53/A76 da PR #1356, A74/M71 canônicos, 22 IAM/H0, 17 rollback multi-domínio, 17 testes SQLite #1195, oito hardstops STAGING e os 23 módulos LAB raiz**.
 
 **Interpretação obrigatória:** `PASS` prova que os modelos offline permaneceram conservadores, **não que exista assinatura real verificada, emissor enrolado ou fonte de último incidente fora do host**. Nenhuma regra positiva de `READY` foi acrescentada ao executor.
 
