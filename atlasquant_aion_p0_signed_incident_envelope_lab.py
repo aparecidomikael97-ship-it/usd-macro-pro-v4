@@ -55,6 +55,32 @@ def _utc(value: Any) -> datetime | None:
         return None
 
 
+def _json_depth_at_most(payload: bytes, limit: int = 64) -> bool:
+    """Bound JSON nesting without confusing brackets in quoted JSON strings."""
+    depth = 0
+    quoted = False
+    escaped = False
+    for ch in payload:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif ch == 92:  # backslash escape
+                escaped = True
+            elif ch == 34:  # closing quote
+                quoted = False
+        elif ch == 34:
+            quoted = True
+        elif ch in (91, 123):  # [ {
+            depth += 1
+            if depth > limit:
+                return False
+        elif ch in (93, 125):  # ] }
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0 and not quoted
+
+
 def _str_id(v: Any) -> bool:
     return type(v) is str and bool(ID.fullmatch(v))
 
@@ -79,6 +105,8 @@ def inspect_signed_incident_envelope_lab(
     envelope: dict[str, Any] = {}
     if type(payload) is not bytes or not (1 <= len(payload) <= 4096):
         defects.append("ENVELOPE_BYTES_INVALID")
+    elif not _json_depth_at_most(payload):
+        defects.append("ENVELOPE_NESTING_LIMIT_EXCEEDED")
     else:
         try:
             decoded = json.loads(payload.decode("utf-8"),
