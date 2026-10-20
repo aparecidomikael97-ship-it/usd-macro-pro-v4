@@ -64,6 +64,8 @@ jobs:
         run: python -B -m unittest discover -s tests -p test_aion_p0_a53_a76_legacy_ready_mismatch_lab.py -v
       - name: Original A74 and M71 source-denial contracts unchanged
         run: python -B -m unittest -q test_atlasquant_aion_activation_authority_a74 test_aion_m71_execution_fresh_source_denial_lab test_aion_p0_m71_original_stale_gate_safety_negative_lab
+      - name: Four actual SQLite Outbox restore and first-claim counterexamples (NO-GO)
+        run: python -B -m unittest -v test_aion_p0_h0_real_outbox_restore_claim_negative_lab
       - name: H0 twenty-two IAM and seventeen three-domain rollback case regressions
         run: python -B -m unittest discover -s tests -p test_aion_p0_h0_iam_issuer_freshness_separation_lab.py -v
       - name: H0 seventeen domain rollback cases
