@@ -1,0 +1,53 @@
+name: AION P0 Canonical Full Quality OBSERVATION (NO-GO, no waivers)
+
+on:
+  push:
+    branches: [lab/aion-p0-post1353-canonical-evidence-20261020]
+
+permissions:
+  contents: read
+
+jobs:
+  full_quality_historical_compare:
+    name: Execute unchanged Quality primary suite (Ubuntu only, expected RED)
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install exact canonical Quality test dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+      - name: Compile all tracked Python source as canonical Quality does
+        run: python -m compileall -q .
+      - name: Run EXACT declared canonical Quality suite from unchanged quality-tests.yml
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess,sys
+          source=Path(".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
+          marker="      - name: Run quality suite\n        run: |\n"
+          if source.count(marker)!=1:
+              raise SystemExit("CANONICAL_QUALITY_STEP_NOT_UNIQUE")
+          payload=source.split(marker,1)[1].split("\n      - name:",1)[0]
+          if "\\" not in payload:
+              raise SystemExit("CANONICAL_QUALITY_CONTINUATIONS_MISSING")
+          command=" ".join(s.strip().rstrip("\\").strip() for s in payload.splitlines())
+          words=command.split()
+          if words[:4]!=["python","-m","unittest","-q"]:
+              raise SystemExit("CANONICAL_QUALITY_COMMAND_CHANGED")
+          if len(words)<500:
+              raise SystemExit("CANONICAL_QUALITY_MODULE_SELECTION_SHRUNK")
+          print("UNCHANGED_CANONICAL_MODULES",len(words)-4,flush=True)
+          print("QUALITY_RUN_IS_OBSERVATION_NOT_GATE_WAIVER",flush=True)
+          sys.exit(subprocess.call([sys.executable,*words[1:]]))
+          PY
