@@ -8,6 +8,7 @@ OPEN. No owner decision, Worker, provider, network or production effects.
 from __future__ import annotations
 
 import base64
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -159,8 +160,8 @@ class OwnerNonceRollbackGapLAB(unittest.TestCase):
 
     def snapshot(self):
         backup=self.root/"before-first-nonce-claim.sqlite3"
-        with sqlite3.connect(str(self.db)) as source:
-            with sqlite3.connect(str(backup)) as dest:
+        with closing(sqlite3.connect(str(self.db))) as source:
+            with closing(sqlite3.connect(str(backup))) as dest:
                 source.backup(dest)
         return backup
 
@@ -175,8 +176,8 @@ class OwnerNonceRollbackGapLAB(unittest.TestCase):
         first=self.verify()
         self.assertEqual(first["state"],"READY_FOR_EXPLICIT_OWNER_DECISION")
         self.assertEqual(self.registry.count(),1)
-        with sqlite3.connect(str(backup)) as source:
-            with sqlite3.connect(str(self.db)) as dest:
+        with closing(sqlite3.connect(str(backup))) as source:
+            with closing(sqlite3.connect(str(self.db))) as dest:
                 source.backup(dest)
         self.assertEqual(self.registry.count(),0)
         again=self.verify()
