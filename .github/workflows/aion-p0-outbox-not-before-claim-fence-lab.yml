@@ -1,0 +1,41 @@
+name: AION P0 LAB Outbox Not-before and Expiry Claim Fences (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-outbox-created-at-claim-fence-20261020]
+
+permissions:
+  contents: read
+
+jobs:
+  claim_boundaries:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 28
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Five real Outbox not-before claim tests (RED before candidate fix)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_outbox_not_before_claim_fence_lab.py -v
+      - name: Previous expiry claim 5 tests unchanged
+        run: python -B -m unittest discover -s tests -p test_aion_p0_outbox_expired_authority_claim_fence_lab.py -v
+      - name: A113 stale pre-dispatch claim and uncertainty quarantine
+        run: python -B -m unittest -v test_atlasquant_aion_a113_expired_claim_quarantine
+      - name: Outbox Saga CAS recovery unchanged
+        run: python -B -m unittest -v test_aion_p0_outbox_saga_cas_retry_recovery_lab
+      - name: Eight H0 real Outbox rollback counterexamples still OPEN
+        run: python -B -m unittest -v test_aion_p0_h0_real_outbox_restore_claim_negative_lab
+      - name: A110 ambiguous effect denial unchanged
+        run: python -B -m unittest -v test_atlasquant_aion_a110_outbox_ambiguous_block
