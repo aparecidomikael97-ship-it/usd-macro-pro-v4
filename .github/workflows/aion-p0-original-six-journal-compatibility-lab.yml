@@ -38,7 +38,7 @@ jobs:
         run: python -B -m unittest discover -s tests -p test_aion_p0_original_20261012_journal_six_taxonomy_lab.py -v
       - name: Twelve disposable SQLite read-only and raw-tamper characterizations (NOT production Journal)
         run: python -B -m unittest discover -s tests -p test_aion_p0_journal_v2_fixture_readonly_characterization_lab.py -v
-      - name: Fifteen bounded Journal archive inventory negative tests (no real files)
+      - name: Seventeen bounded Journal archive inventory negative tests (no real files)
         run: python -B -m unittest discover -s tests -p test_aion_p0_journal_archive_inventory_lab.py -v
       - name: Eleven inert AST original-vs-migrated Journal test assertions (no recovered code executed)
         run: python -B -m unittest discover -s tests -p test_aion_p0_journal_migration_static_review_lab.py -v
