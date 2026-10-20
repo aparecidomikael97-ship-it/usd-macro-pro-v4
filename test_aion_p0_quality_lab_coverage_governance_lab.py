@@ -40,6 +40,7 @@ LAB_ONLY = (
     "test_aion_p0_budget_saga_trust_boundary_lab",
     "test_aion_p0_quality_32_external_evidence_gates_lab",
     "test_aion_p0_quality_lab_coverage_governance_lab",
+    "test_aion_p0_h0_real_outbox_restore_claim_negative_lab",
 )
 
 
