@@ -8,10 +8,12 @@ It does not call providers, connectors, network endpoints or production stores.
 """
 from __future__ import annotations
 
+from functools import wraps
 from hashlib import sha256
 import os
 from pathlib import Path
 import re
+from threading import RLock
 from typing import Any, Mapping
 
 from aion_chat.models import Scope
@@ -34,6 +36,21 @@ _ALLOWED_ENVIRONMENTS = frozenset(
 _SAFE_SCOPE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$")
 _STORE_PREFIX = "aq_aion_chat_staged_store_"
 _ACTIVE_SCOPE_KEY = "aq_aion_chat_staged_active_scope"
+
+# LAB containment: session_state may be a mutable Streamlit proxy or plain
+# unhashable dict. A coarse reentrant lock serializes ALL STAGING holder
+# transitions (including both closing helpers) without persisting a lock in
+# session_state, requiring weakrefs, or changing identity data.
+# A global lock limits STAGING throughput; it grants NO production authority.
+_SESSION_STATE_CHANGE_LOCK = RLock()
+
+
+def _serialized_staged_session_mutation(action):
+    @wraps(action)
+    def wrapped(*args, **kwargs):
+        with _SESSION_STATE_CHANGE_LOCK:
+            return action(*args, **kwargs)
+    return wrapped
 
 
 def _clean(value: Any, limit: int = 240) -> str:
@@ -145,6 +162,7 @@ def _store_path(scope: Scope, root: Path) -> Path:
     return root / ("aion-chat-" + _scope_digest(scope) + ".sqlite3")
 
 
+@_serialized_staged_session_mutation
 def close_all_staged_host_stores(session_state: Any) -> int:
     """Close every staged SQLite handle in the current UI session."""
     closed = 0
@@ -188,6 +206,7 @@ def _validate_live_store(store: SQLiteChatStore | OperationScopedSQLiteChatStore
     return health
 
 
+@_serialized_staged_session_mutation
 def get_or_create_staged_store(
     session_state: Any,
     scope: Scope,
@@ -237,6 +256,7 @@ def get_or_create_staged_store(
     return store
 
 
+@_serialized_staged_session_mutation
 def close_staged_host_store(
     session_state: Any,
     scope: Scope,
