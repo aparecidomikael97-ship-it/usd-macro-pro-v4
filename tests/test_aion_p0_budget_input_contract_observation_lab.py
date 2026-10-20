@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
 
@@ -110,6 +111,25 @@ class BudgetInputContractObservationsLAB(unittest.TestCase):
                   {**self.decision(), "risk_points": 100}]
         for item in values:
             self.budget.guard(item, now=NOW)
+        self.assert_no_effects()
+
+
+    def test_10_hostile_mapping_diagnostic_get_cannot_raise_or_approve(self):
+        class HostileMapping(Mapping):
+            def __len__(self):
+                return 1
+            def __iter__(self):
+                raise RuntimeError("LOCAL_ITER_NOT_TRUSTED")
+            def __getitem__(self, key):
+                raise RuntimeError("LOCAL_INDEX_NOT_TRUSTED")
+            def get(self, key, default=None):
+                raise RuntimeError("LOCAL_GET_NOT_TRUSTED")
+        out = self.budget.guard(HostileMapping(), now=NOW)
+        self.assertIs(out["allowed"], False)
+        self.assertEqual(out["transaction_id"], "")
+        self.assertTrue(out["reason"].startswith(
+            "AUTHORITY_BUDGET_BINDING_INVALID:"))
+        self.assert_no_external_authority(out)
         self.assert_no_effects()
 
 
