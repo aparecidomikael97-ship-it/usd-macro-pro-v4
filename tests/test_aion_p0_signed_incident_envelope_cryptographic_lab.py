@@ -257,5 +257,46 @@ class SignedIncidentLabOnlyContracts(unittest.TestCase):
         self.denied(self.verify())
 
 
+    def test_31_attacker_owned_matching_key_is_not_out_of_band_enrollment(self):
+        attacker=Ed25519PrivateKey.generate()
+        attacker_pub=attacker.public_key().public_bytes(
+            serialization.Encoding.Raw,serialization.PublicFormat.Raw)
+        p=lab.canonical_json_lab(self.packet)
+        r=self.denied(self.verify(p,attacker.sign(lab.DOMAIN+p),
+                                  public_key=attacker_pub))
+        self.assertTrue(r["signature_mathematically_valid_with_caller_key_in_lab"])
+        self.assertFalse(r["external_signature_trust_verified"])
+
+    def test_32_consistent_rolled_back_packet_and_head_still_cannot_prove_latest(self):
+        older={**self.packet,"epoch":2,"sequence":3,
+               "credential_revocation_epoch":1,"head_digest":"f"*64}
+        signed,sig=self.signed(older)
+        rolled_back_head={key:older[key] for key in
+                          ("epoch","sequence","credential_revocation_epoch","head_digest")}
+        r=self.denied(self.verify(signed,sig,observed_head=rolled_back_head))
+        self.assertTrue(r["signature_mathematically_valid_with_caller_key_in_lab"])
+        self.assertFalse(r["external_highwater_authenticated"])
+        self.assertIn("INDEPENDENT_LATEST_HEAD_NOT_AUTHENTICATED",r["blockers"])
+
+    def test_33_deep_json_is_always_denied_with_no_recursion_crash(self):
+        nested=b"["*1400+b"0"+b"]"*1400
+        self.assertLess(len(nested),4096)
+        sig=self.private.sign(lab.DOMAIN+nested)
+        result=self.denied(self.verify(nested,sig))
+        self.assertIn("ENVELOPE_PARSE_INVALID",result["blockers"])
+
+    def test_34_untrusted_expected_issuer_object_does_not_invoke_comparison(self):
+        class Evil:
+            def __eq__(self,other): raise AssertionError("expected claim __eq__")
+            def __ne__(self,other): raise AssertionError("expected claim __ne__")
+            def __str__(self): raise AssertionError("expected claim __str__")
+        for name in ("expected_issuer","expected_scope","expected_nonce"):
+            with self.subTest(field=name):
+                r=self.denied(self.verify(**{name:Evil()}))
+                field={"expected_issuer":"issuer_id","expected_scope":"scope",
+                       "expected_nonce":"nonce"}[name]
+                self.assertIn("EXPECTED_BINDING_MISMATCH:"+field,r["blockers"])
+
+
 if __name__=="__main__":
     unittest.main()
