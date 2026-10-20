@@ -534,9 +534,13 @@ class ExecutionOutbox:
                      -- Caller-provided time remains UNTRUSTED, and this does
                      -- not detect H0 rollback or authorize a producer.
                      AND d.valid_until>?
+                     -- Do not reserve an intent BEFORE its persisted
+                     -- creation instant. This is a local chronology fence,
+                     -- not trusted time or independent H0 provenance.
+                     AND d.created_at<=?
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
-                (owner, tenant, workspace, now_iso),
+                (owner, tenant, workspace, now_iso, now_iso),
             ).fetchone()
             if row is None:
                 self.db.commit()
@@ -565,8 +569,10 @@ class ExecutionOutbox:
                            AND d.workspace=action_outbox.workspace
                            AND d.aggregate_seq=1
                            AND d.valid_until>?
+                           AND d.created_at<=?
                      )""",
-                (worker, lease_until, key, owner, tenant, workspace, now_iso),
+                (worker, lease_until, key, owner, tenant, workspace,
+                 now_iso, now_iso),
             )
             if cursor.rowcount != 1:
                 self.db.rollback()
