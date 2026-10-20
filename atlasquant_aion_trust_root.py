@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import base64
 import json
+import os
+import re
+import stat
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,13 +43,24 @@ def _parse_ts(value: str) -> datetime:
 
 
 def _b64url_decode(value: str) -> bytes:
-    if not isinstance(value, str) or not value:
-        raise ValueError("base64url value required")
+    """Accept one byte-exact, UNPADDED Base64URL spelling of a public key.
+
+    Python's permissive decoder accepts alias encodings (padding and nonzero
+    unused bits), which make two registry strings refer to the same Ed25519
+    key. This is only local parsing, not independent key enrollment.
+    """
+    if type(value) is not str or re.fullmatch(r"[A-Za-z0-9_-]{43}", value) is None:
+        raise ValueError("noncanonical Ed25519 public key base64url")
     try:
-        raw = value.encode("ascii")
-        return base64.urlsafe_b64decode(raw + b"=" * (-len(raw) % 4))
-    except Exception as exc:
+        encoded = value.encode("ascii")
+        raw = base64.b64decode(
+            encoded + b"=", altchars=b"-_", validate=True,
+        )
+    except (ValueError, UnicodeError) as exc:
         raise ValueError("invalid base64url") from exc
+    if len(raw) != 32 or base64.urlsafe_b64encode(raw).rstrip(b"=") != encoded:
+        raise ValueError("noncanonical Ed25519 public key base64url")
+    return raw
 
 
 @dataclass(frozen=True)
@@ -126,10 +140,48 @@ class TrustRootRegistry:
 
     @classmethod
     def from_json_file(cls, path: str | Path) -> "TrustRootRegistry":
+        """Read at most MAX_FILE_BYTES+1 from a regular, stable local file.
+
+        lstat + O_NOFOLLOW (where supported), fstat of the opened handle,
+        and a same-handle after-read identity check reduce local path swap
+        risks. They are NOT an independently enrolled or rollback-proof root.
+        """
         p = Path(path)
-        if p.is_symlink():
-            raise ValueError("trust root file must not be a symlink")
-        data = p.read_bytes()
+        before = p.lstat()
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("trust root must be a regular non-symlink file")
+        if before.st_size > MAX_FILE_BYTES:
+            raise ValueError("trust root file oversized")
+        # Nonblocking open also denies a swapped-in FIFO on POSIX instead
+        # of hanging forever after the original regular-file lstat check.
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        flags |= getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+        fd = os.open(p, flags)
+        try:
+            with os.fdopen(fd, "rb") as stream:
+                initial = os.fstat(stream.fileno())
+                if not stat.S_ISREG(initial.st_mode):
+                    raise ValueError("opened trust root is not regular")
+                def identity(s):
+                    origin = (s.st_birthtime_ns if os.name == "nt"
+                              else s.st_ctime_ns)
+                    return (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, origin)
+                if identity(before) != identity(initial):
+                    raise ValueError("trust root changed between stat and open")
+                data = stream.read(MAX_FILE_BYTES + 1)
+                final = os.fstat(stream.fileno())
+                if identity(initial) != identity(final):
+                    raise ValueError("trust root changed during read")
+        except Exception:
+            # fdopen owns the descriptor after it succeeds; close an fd only
+            # when wrapping failed, without masking the original exception.
+            try:
+                os.fstat(fd)
+            except OSError:
+                pass
+            else:
+                os.close(fd)
+            raise
         if len(data) > MAX_FILE_BYTES:
             raise ValueError("trust root file oversized")
         try:
