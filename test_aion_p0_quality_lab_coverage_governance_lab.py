@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 QUALITY = ROOT / ".github" / "workflows" / "quality-tests.yml"
-DEDICATED = ROOT / ".github" / "workflows" / "aion-p0-quality-lab-coverage-governance.yml"
+DEDICATED = ROOT / ".github" / "workflows" / "aion-p0-quality-32-receipt-gates-lab.yml"
 LEGACY = ROOT / "test_quality_workflow_coverage.py"
 LAB_ONLY = (
     "test_aion_m71_execution_fresh_source_denial_lab",
@@ -36,6 +36,7 @@ LAB_ONLY = (
     "test_aion_p0_outbox_saga_cas_retry_recovery_lab",
     "test_aion_p0_outbox_saga_historical_reconcile_cas_lab",
     "test_aion_p0_budget_saga_trust_boundary_lab",
+    "test_aion_p0_quality_32_external_evidence_gates_lab",
     "test_aion_p0_quality_lab_coverage_governance_lab",
 )
 
@@ -65,7 +66,7 @@ class AIONP0QualityLabCoverageGovernanceTests(unittest.TestCase):
 
     def test_runner_is_read_only_two_os_and_branch_scoped(self):
         content = DEDICATED.read_text(encoding="utf-8")
-        self.assertIn("on:\n  push:\n    branches: [lab/aion-p0-quality-governance-20261019]", content)
+        self.assertIn("on:\n  push:\n    branches: [lab/aion-p0-quality-32-receipt-gate-evidence-20261020]", content)
         self.assertIn("permissions:\n  contents: read", content)
         self.assertIn("os: [ubuntu-latest, windows-latest]", content)
         self.assertIn("persist-credentials: false", content)
