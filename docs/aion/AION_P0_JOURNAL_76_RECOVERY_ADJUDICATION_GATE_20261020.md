@@ -26,9 +26,17 @@ O dispositivo am12 segue offline na última inspeção. A pasta original relatad
 
 O utilitário de captura foi fortalecido com **limites de percurso** (até 10.000 entradas e 12 níveis) e **limite aplicado durante a leitura SHA-256**, não apenas pela declaração prévia do tamanho (máximo 256 MiB por arquivo). Rejeita links simbólicos/junctions observados na árvore, abertura de objetos não regulares, crescimento/troca de identidade ou alteração dos metadados entre a leitura e o relatório. Usa abertura sem seguir symlinks e não bloqueante onde disponível no sistema; a ferramenta não escreve na fonte nem executa testes históricos.
 
-**Limite de segurança:** a comparação por estatísticas de arquivo não elimina todas as condições de corrida, especialmente em Windows/volumes compartilhados, nem autentica a origem. Usar cópia isolada de evidências, verificar hash pré/pós e exigir revisão humana independente; não transformar um inventário íntegro em autorização de execução. Os casos novos são testes sintéticos do capturador (15 no total), não reproduções da bateria de 76 nem solução dos dois P0.
+**Limite de segurança:** a comparação por estatísticas de arquivo não elimina todas as condições de corrida, especialmente em Windows/volumes compartilhados, nem autentica a origem. Usar cópia isolada de evidências, verificar hash pré/pós e exigir revisão humana independente; não transformar um inventário íntegro em autorização de execução. Os casos novos são testes sintéticos do capturador (17 no total), não reproduções da bateria de 76 nem solução dos dois P0.
 
 **Governança:** atualizar o estado da CI **somente depois** de verificar o SHA exato dos jobs Ubuntu/Windows. Até então, registrar como PENDENTE — mesmo que versões anteriores deste PR tenham passado.
+
+## Compatibilidade Windows do inventário (evidência CI)
+
+A execução push do SHA `072b4b82` apresentou Ubuntu PASS e Windows FAIL no inventário (run 39484513206). O diagnóstico mais recente reproduziu a rejeição `EVIDENCE_NOT_STABLE_REGULAR_FILE` em fixtures legítimas imediatamente escritas no Windows (run 39485448157). Isso é diferente de um P0 original fechado ou de um teste oficial reexecutado.
+
+Em CPython 3.12+ no Windows, `os.fstat(fd).st_ctime_ns` pode representar alteração de metadados, enquanto `Path.lstat().st_ctime_ns` pode representar criação: a comparação direta de ambos não é uma identidade de arquivo estável. O candidato LAB normaliza a comparação entre caminho e handle para `st_birthtime_ns` (quando Windows), **mantém** identidade do volume/inode, tamanho e mtime, e compara ainda o `fstat().st_ctime_ns` do mesmo handle antes/depois da leitura como barreira adicional contra mutações. Na entrada, o root do inventário também rejeita junctions.
+
+Fontes de comportamento de Python: https://docs.python.org/3.12/library/os.html e https://github.com/python/cpython/issues/157671 . Não aceitar essa correção apenas por leitura estática: verificar explicitamente o novo HEAD de ambos os jobs e investigar qualquer FAIL. Mesmo totalmente verde, captura local/assinatura/hash não são uma testemunha externa, a janela de corrida Windows não está integralmente eliminada, e o gate P0 não muda.
 
 ## Oito critérios de aceite sequenciais
 
