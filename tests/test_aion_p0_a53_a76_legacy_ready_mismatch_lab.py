@@ -126,8 +126,7 @@ class A53A76NoExternalIncidentSourceAuditLAB(unittest.TestCase):
         with patch.object(activation,"write_repository_feature_flag_enabled",
                           side_effect=AssertionError("WRITER_MUST_NOT_RUN")) as writer:
             outcome=activation.validate_global_worker_activation_approval(
-                f.fixture.access,ticket,f.fixture.runtime,
-                prior._safe_flag("UNSET"),now=f.now)
+                f.fixture.access,f.fixture.runtime,ticket,now=f.now)
             self.assertEqual(outcome["state"],"BLOCKED")
             writer.assert_not_called()
 
