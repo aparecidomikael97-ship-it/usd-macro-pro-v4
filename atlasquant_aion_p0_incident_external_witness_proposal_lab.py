@@ -104,7 +104,8 @@ def screen_external_incident_witness_proposal(
         or packet["incident_state"] not in STATES
     ):
         blockers.append("PACKET_INVALID:incident_state")
-    if packet.get("incident_state") != "NO_OPEN_INCIDENTS":
+    incident_state = packet.get("incident_state")
+    if type(incident_state) is not str or incident_state != "NO_OPEN_INCIDENTS":
         blockers.append("INCIDENT_STATE_UNSAFE_OR_UNKNOWN")
 
     for key in CONTROLLERS:
@@ -128,17 +129,32 @@ def screen_external_incident_witness_proposal(
     for field, observed in expected.items():
         if field not in pinned_head:
             blockers.append("PINNED_HEAD_MISSING:" + field)
-        elif type(pinned_head[field]) is not type(observed) or pinned_head[field] != observed:
+            continue
+        actual = pinned_head[field]
+        valid = (
+            _nonnegative_int(observed) and _nonnegative_int(actual)
+            if field in ("epoch", "sequence", "credential_revocation_epoch")
+            else _digest(observed) and _digest(actual)
+            if field == "head_digest"
+            else _string(observed) and _string(actual)
+        )
+        # Values can be attacker-crafted objects with arbitrary __eq__ code:
+        # never invoke their comparison methods when they are not canonical.
+        if not valid or actual != observed:
             blockers.append("HEAD_MISMATCH:" + field)
 
     # Same metadata is not a cryptographically anchored, external monotonic head.
     for field in ("latest_external_version_id", "witnessed_nonce"):
         if not _string(pinned_head.get(field)):
             blockers.append("LATEST_HEAD_READBACK_MISSING:" + field)
-    if pinned_head.get("witnessed_nonce") != packet.get("nonce"):
+    witnessed_nonce = pinned_head.get("witnessed_nonce")
+    challenge_nonce = packet.get("nonce")
+    if not (_string(witnessed_nonce) and _string(challenge_nonce)) or witnessed_nonce != challenge_nonce:
         blockers.append("NONCE_NOT_BOUND_TO_HEAD")
 
-    if packet.get("credential_revocation_epoch") != pinned_head.get("credential_revocation_epoch"):
+    credential_epoch = packet.get("credential_revocation_epoch")
+    pinned_credential_epoch = pinned_head.get("credential_revocation_epoch")
+    if not (_nonnegative_int(credential_epoch) and _nonnegative_int(pinned_credential_epoch)) or credential_epoch != pinned_credential_epoch:
         blockers.append("CREDENTIAL_REVOCATION_EPOCH_MISMATCH")
 
     # These optimistic booleans are attacker-provided and never grant authority.
