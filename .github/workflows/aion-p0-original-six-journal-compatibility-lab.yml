@@ -38,7 +38,7 @@ jobs:
         run: python -B -m unittest discover -s tests -p test_aion_p0_original_20261012_journal_six_taxonomy_lab.py -v
       - name: Twelve disposable SQLite read-only and raw-tamper characterizations (NOT production Journal)
         run: python -B -m unittest discover -s tests -p test_aion_p0_journal_v2_fixture_readonly_characterization_lab.py -v
-      - name: Twenty-four original candidate Git-object and unchanged RED test AST forensic assertions
+      - name: Nine read-only Journal archive evidence inventory negative tests (no real files)\n        run: python -B -m unittest discover -s tests -p test_aion_p0_journal_archive_inventory_lab.py -v\n      - name: Twenty-four original candidate Git-object and unchanged RED test AST forensic assertions
         run: python -B -m unittest discover -s tests -p test_aion_p0_sqlite_pre19_candidate_adjudication_lab.py -v
       - name: Fifty-five multi-source evidence bundle proof-admission tests (always BLOCKED)
         run: python -B -m unittest discover -s tests -p test_aion_p0_external_evidence_admission_lab.py -v
