@@ -19,7 +19,7 @@ class SyntheticJournalV2FixtureLAB(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(prefix="aion_p0_journal_lab_")
         self.path=Path(self.tmp.name)/"fixture.sqlite3"
-        with sqlite3.connect(self.path) as con:
+        with closing(sqlite3.connect(self.path)) as con, con:
             con.execute("CREATE TABLE journal (id INTEGER PRIMARY KEY, content TEXT NOT NULL)")
             con.execute("INSERT INTO journal(id,content) VALUES (1,'original-entry')")
         self.expected=sha256(b"original-entry").hexdigest()
