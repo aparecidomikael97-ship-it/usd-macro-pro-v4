@@ -150,6 +150,52 @@ def _local_decision_coherence_sql(outbox_alias: str) -> str:
            ) ELSE 0 END"""
 
 
+def _local_decision_raw_integrity(row: Mapping[str, Any],
+                                  scoped: tuple[str, str, str]) -> bool:
+    """Deny JSON split-view or changed key material before local claim commit.
+
+    SQLite's json_extract selects FIRST duplicate field; Python json.loads
+    selects LAST. All legitimate decisions are produced by _canonical, so an
+    exact roundtrip both rejects duplicate keys/noncanonical representations
+    and binds the object later consumed by Python to the SQLite predicate.
+    Digest checking here is LOCAL consistency only, not independent signing.
+    """
+    try:
+        raw = row["decision_data"]
+        key = row["idempotency_key"]
+        if not isinstance(raw, str) or not isinstance(key, str):
+            return False
+        decision = json.loads(raw)
+        if not isinstance(decision, dict) or _canonical(decision) != raw:
+            return False
+        if (decision.get("schema") != SCHEMA
+                or decision.get("grants_authority") is not False
+                or decision.get("idempotency_key") != key
+                or decision.get("decision_id") != row["stored_decision_id"]
+                or decision.get("decision_id") != "DEC-" + key[:24].upper()
+                or tuple(decision.get(k) for k in
+                         ("owner_id", "tenant_id", "workspace_id")) != scoped):
+            return False
+        digest = _digest(decision["payload"])
+        if (digest != decision.get("payload_digest")
+                or digest != row["stored_payload_digest"]):
+            return False
+        material = {
+            "scope": list(scoped),
+            "intent_ref": decision["intent_ref"],
+            "action": decision["action"],
+            "aggregate_key": decision["aggregate_key"],
+            "payload_digest": digest,
+            "transaction_id": decision["transaction_id"],
+            "authority_budget_ref": decision["authority_budget_ref"],
+            "risk_points": decision["risk_points"],
+            "capability_class": decision["capability_class"],
+        }
+        return _digest(material) == key
+    except (ValueError, TypeError, KeyError, OverflowError, RecursionError):
+        return False
+
+
 class ExecutionOutbox:
     """Scoped outbox bound to the same SQLite database as staged chat state."""
 
@@ -541,7 +587,9 @@ class ExecutionOutbox:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.db.execute(
-                f"""SELECT o.idempotency_key
+                f"""SELECT o.idempotency_key,d.data AS decision_data,
+                          d.payload_digest AS stored_payload_digest,
+                          d.decision_id AS stored_decision_id
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
@@ -582,6 +630,15 @@ class ExecutionOutbox:
                 (owner, tenant, workspace, now_iso, now_iso),
             ).fetchone()
             if row is None:
+                self.db.commit()
+                return None
+            # Protect the Python consumer from SQLite JSON1 duplicate-key
+            # first-vs-last ambiguity and from locally changed payload/key
+            # material. The IMMEDIATE transaction holds the writer lock until
+            # CAS, so there is no intermediate other-connection rewrite.
+            # A rejected earliest candidate blocks this claim rather than
+            # silently skipping an ambiguous FIFO predecessor.
+            if not _local_decision_raw_integrity(row, (owner, tenant, workspace)):
                 self.db.commit()
                 return None
             key = row["idempotency_key"]
