@@ -1,0 +1,40 @@
+name: AION P0 LAB A53 A76 Independent Source Denial Review (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-a53-a76-canonical-mismatch-review-20261020]
+
+permissions:
+  contents: read
+
+jobs:
+  fresh_incident_contract:
+    name: A53 A76 fail-closed forensic checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Twelve A53 A76 negative admission and trust-boundary checks
+        run: python -B -m unittest discover -s tests -p test_aion_p0_a53_a76_legacy_ready_mismatch_lab.py -v
+      - name: Run original A74 denial suite unchanged
+        run: python -B -m unittest -v test_atlasquant_aion_activation_authority_a74
+      - name: M71 stale gate independent source negative tests unchanged
+        run: python -B -m unittest -v test_aion_p0_m71_original_stale_gate_safety_negative_lab
+      - name: M71 source-fresh admission deny suite unchanged
+        run: python -B -m unittest -v test_aion_m71_execution_fresh_source_denial_lab
+      - name: Original SQLite and Saga staging denial tests
+        run: python -B -m unittest -q test_aion_p0_sqlite_saga_owner_thread_lab test_aion_p0_sqlite_execution_restore_hardstop_lab
