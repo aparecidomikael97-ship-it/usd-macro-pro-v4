@@ -1,0 +1,34 @@
+name: AION P0 LAB STAGING Session Race Diagnostic (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-staged-session-race-review-20261020]
+
+permissions:
+  contents: read
+
+jobs:
+  staged_session_race:
+    name: Concurrency diagnostic on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install existing dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Deterministic race diagnostic (4 tests, green reproduces unsafe gap)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_staged_concurrent_session_race_lab.py -v
+      - name: Confirm original facade lifecycle and native hardstops
+        run: python -B -m unittest -q test_aion_p0_staged_facade_port_lifecycle_lab test_aion_p0_staged_facade_latest_hardstops_lab test_atlasquant_aion_chat_host_staging
