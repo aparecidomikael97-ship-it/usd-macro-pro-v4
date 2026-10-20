@@ -1,0 +1,146 @@
+{
+  "schema": "AION_P0_EXTERNAL_EVIDENCE_ADMISSION_CROSSWALK_LAB_V1",
+  "dated": "2026-10-20",
+  "origin": "LAB_READ_ONLY_NON_AUTHORITATIVE",
+  "canonical_reference": "docs/aion/AION_P0_SIX_EXIT_EVIDENCE_GAP_MATRIX_20261020.json",
+  "global_status": "HARD_NO_GO",
+  "homologated_p0": 0,
+  "worker_allowed": false,
+  "automatic_retry_allowed": false,
+  "external_signer_enrolled": false,
+  "independent_head_verified": false,
+  "independent_producer_receipt_verified": false,
+  "quality_full_green": false,
+  "security_full_green": false,
+  "authorized_new_spend_brl": 0,
+  "latest_baseline": {
+    "quality_tests": 6562,
+    "fail": 52,
+    "error": 34,
+    "outbox_saga_unwaived": 32,
+    "source": "PR1361 canonical history; not rerun by this LAB"
+  },
+  "admission_gaps": [
+    "ISSUER_ROOT_NOT_INDEPENDENTLY_ENROLLED",
+    "SIGNED_LATEST_HEAD_AND_CONSISTENCY_NOT_AUTHENTICATED",
+    "VERIFIER_NONCE_DURABILITY_NOT_ATTESTED",
+    "CREDENTIAL_REVOCATION_NOT_EXTERNALLY_AUTHENTICATED",
+    "PRODUCER_EFFECT_OR_NO_EFFECT_NOT_AUTHENTICATED",
+    "HUMAN_OWNER_APPROVAL_NOT_ESTABLISHED",
+    "H0_PHYSICAL_RESTART_ROLLBACK_NOT_VERIFIED",
+    "QUALITY_AND_SECURITY_CANONICAL_NOT_GREEN"
+  ],
+  "p0": [
+    {
+      "id": "OWNER_REAL_IDENTITY",
+      "evidence_class": "EXTERNAL_PHYSICAL",
+      "title": "Autenticação física HUMAN_OWNER e revogação externa",
+      "required_independent_artifacts": [
+        "identidade por dispositivo e canal físico aprovada por revisor independente",
+        "recibo de consentimento com desafio de operação e escopo",
+        "epoch de credencial e estado de revogação fora do host"
+      ],
+      "blocking_admission_gaps": [
+        "ISSUER_ROOT_NOT_INDEPENDENTLY_ENROLLED",
+        "CREDENTIAL_REVOCATION_NOT_EXTERNALLY_AUTHENTICATED"
+      ],
+      "external_proof_enrolled": false,
+      "original_test_mapping_closed": false,
+      "approved_for_runtime": false,
+      "homologated": false,
+      "notes": "LAB-only validation does not authenticate external proof."
+    },
+    {
+      "id": "PRODUCER_RECEIPT_AUTHENTICITY",
+      "evidence_class": "EXTERNAL_PROVIDER",
+      "title": "Recibo causal autenticado do fornecedor",
+      "required_independent_artifacts": [
+        "contrato formal de autenticidade e vínculo request/intent do provedor",
+        "recibo real COMMITTED_EFFECT validado por fonte independente",
+        "rejeição auditável de recibo falso e positivo não confiável"
+      ],
+      "blocking_admission_gaps": [
+        "PRODUCER_EFFECT_OR_NO_EFFECT_NOT_AUTHENTICATED"
+      ],
+      "external_proof_enrolled": false,
+      "original_test_mapping_closed": false,
+      "approved_for_runtime": false,
+      "homologated": false,
+      "notes": "LAB-only validation does not authenticate external proof."
+    },
+    {
+      "id": "FIRST_ATTEMPT_UNCERTAIN_RECOVERY",
+      "evidence_class": "EXTERNAL_PROVIDER",
+      "title": "Reconciliar tentativa incerta sem reenvio",
+      "required_independent_artifacts": [
+        "evidência causal terminal do provedor NO_EFFECT_FENCED ou COMMITTED_EFFECT",
+        "recovery pós-crash com durable request id e status da primeira tentativa",
+        "teste de cenário incerto sem auto resend e sem clears presumidos"
+      ],
+      "blocking_admission_gaps": [
+        "PRODUCER_EFFECT_OR_NO_EFFECT_NOT_AUTHENTICATED",
+        "VERIFIER_NONCE_DURABILITY_NOT_ATTESTED"
+      ],
+      "external_proof_enrolled": false,
+      "original_test_mapping_closed": false,
+      "approved_for_runtime": false,
+      "homologated": false,
+      "notes": "LAB-only validation does not authenticate external proof."
+    },
+    {
+      "id": "H0_POST_RESTART_AVAILABILITY",
+      "evidence_class": "EXTERNAL_PHYSICAL",
+      "title": "Root independente após reinício e rollback físico",
+      "required_independent_artifacts": [
+        "readback externo latest-head e prova de consistência contra checkpoint anterior",
+        "segregação administrativa auditada de custódia, emissor e verificador",
+        "ensaio físico Windows/PITR e revogação de token após reboot"
+      ],
+      "blocking_admission_gaps": [
+        "SIGNED_LATEST_HEAD_AND_CONSISTENCY_NOT_AUTHENTICATED",
+        "H0_PHYSICAL_RESTART_ROLLBACK_NOT_VERIFIED"
+      ],
+      "external_proof_enrolled": false,
+      "original_test_mapping_closed": false,
+      "approved_for_runtime": false,
+      "homologated": false,
+      "notes": "LAB-only validation does not authenticate external proof."
+    },
+    {
+      "id": "SQLITE_COMPAT_READ_PATH",
+      "evidence_class": "CANONICAL_FORENSIC",
+      "title": "Rastrear falha original da rota SQLite de leitura",
+      "required_independent_artifacts": [
+        "identificador e stack da falha exata original de leitura",
+        "mesmo teste fonte antes e depois da correção sem alteração",
+        "reexecução canônica Windows/Linux e evidência de no unsafe bypass"
+      ],
+      "blocking_admission_gaps": [
+        "QUALITY_AND_SECURITY_CANONICAL_NOT_GREEN"
+      ],
+      "external_proof_enrolled": false,
+      "original_test_mapping_closed": false,
+      "approved_for_runtime": false,
+      "homologated": false,
+      "notes": "Original failed test case lineage not yet proven. Do not replace with STAGING LAB results."
+    },
+    {
+      "id": "SQLITE_COMPAT_WRITE_PATH",
+      "evidence_class": "CANONICAL_FORENSIC",
+      "title": "Rastrear falha original da rota SQLite de escrita",
+      "required_independent_artifacts": [
+        "identificador e stack da falha exata original de escrita",
+        "mesmo teste fonte antes e depois da correção sem alteração",
+        "reexecução canônica com transação, concorrência e rollback"
+      ],
+      "blocking_admission_gaps": [
+        "QUALITY_AND_SECURITY_CANONICAL_NOT_GREEN"
+      ],
+      "external_proof_enrolled": false,
+      "original_test_mapping_closed": false,
+      "approved_for_runtime": false,
+      "homologated": false,
+      "notes": "Original failed test case lineage not yet proven. Do not replace with STAGING LAB results."
+    }
+  ]
+}
