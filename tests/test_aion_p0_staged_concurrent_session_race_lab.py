@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, Lock
 from unittest.mock import patch
 import tempfile
 import unittest
@@ -37,9 +37,13 @@ class SessionRaceDiagnosticLAB(unittest.TestCase):
 
     def concurrent(self,*credentials):
         gate=Barrier(2,timeout=12)
+        initialize_one_at_a_time=Lock()
         class ForcedOverlap(OperationScopedSQLiteChatStore):
             def __init__(self,path):
-                super().__init__(path)
+                # The test isolates SESSION mutation interleaving, avoiding
+                # concurrent CREATE TABLE on the same freshly initialized DB.
+                with initialize_one_at_a_time:
+                    super().__init__(path)
                 gate.wait()
         def worker(cred):
             return host.build_staged_host_binding(
