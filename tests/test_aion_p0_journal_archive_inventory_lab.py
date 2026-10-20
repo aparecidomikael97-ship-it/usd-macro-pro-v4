@@ -67,6 +67,7 @@ class JournalEvidenceInventoryLAB(unittest.TestCase):
         self.populate()
         r = inspect(self.root)
         self.assertEqual(len(r["files"]), len(REQUIRED))
+        self.assertIn("sha256", r["files"]["original_journal_a"], repr(r["files"]["original_journal_a"]))
         self.assertEqual(r["files"]["original_journal_a"]["sha256"], hashlib.sha256(b"original_journal_a\n").hexdigest())
         self.assertFalse(r["production_allowed"])
         self.assertFalse(r["automatic_retry_authorized"])
