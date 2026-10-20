@@ -120,13 +120,13 @@ class BudgetGuardIndependentReviewLAB(unittest.TestCase):
         self.assert_no_authority(out)
 
     def test_07_truthy_nonmapping_does_not_turn_into_authority(self):
-        # Input violates Mapping annotation: the current guard raises on
-        # invalid response reconstruction. This is a robustness follow-up,
-        # not a P0 bypass or a reason to widen PR #1331.
+        # Separate P0 LAB candidate: non-Mapping inputs must return stable,
+        # explicit-negative results, without masking exceptions as approval.
         for invalid in (123, "malformed", ["malformed"]):
             with self.subTest(input_type=type(invalid).__name__):
-                with self.assertRaises((ValueError,TypeError,AttributeError)):
-                    self.budget.guard(invalid,now=NOW)
+                result=self.budget.guard(invalid,now=NOW)
+                self.assertIs(result["allowed"],False)
+                self.assert_no_authority(result)
                 self.assertEqual(self.budget.snapshot("review-tx",now=NOW)[
                     "transaction_effects"],0)
 
