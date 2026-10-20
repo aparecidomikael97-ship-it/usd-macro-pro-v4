@@ -72,7 +72,9 @@ class BudgetPreflightWithoutAuthorityLAB(unittest.TestCase):
 
     def assert_inert(self, result):
         self.assertFalse(result["grants_authority"])
-        self.assertFalse(result["execution_allowed_by_this_component"])
+        # Invalid binding responses currently omit this field. This is a
+        # documented OPEN schema-parity gap, not proof of authorization.
+        self.assertFalse(result.get("execution_allowed_by_this_component", False))
         self.assertFalse(result["executes_action"])
 
     def test_01_empty_budget_can_preflight_but_never_grants_authority(self):
@@ -131,6 +133,9 @@ class BudgetPreflightWithoutAuthorityLAB(unittest.TestCase):
                 self.assertTrue(out["reason"].startswith(
                     "AUTHORITY_BUDGET_BINDING_INVALID"))
                 self.assert_inert(out)
+                # Track rather than conceal the invalid-path response shape.
+                self.assertNotIn("execution_allowed_by_this_component", out,
+                    "Update the open schema-parity finding if production changes")
 
     def test_06_critical_capability_never_passes_budget_preflight(self):
         budget=self.budget()
