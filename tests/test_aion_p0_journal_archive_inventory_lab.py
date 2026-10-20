@@ -87,5 +87,59 @@ class JournalEvidenceInventoryLAB(unittest.TestCase):
         self.assertNotEqual(first, second)
 
 
+    def test_direct_hash_refuses_oversized_stream(self):
+        sample = self.root / "oversized.bin"
+        sample.write_bytes(b"12345")
+        with patch.object(inventory, "MAX_BYTES_PER_FILE", 4):
+            with self.assertRaisesRegex(ValueError, "OVERSIZED_EVIDENCE_FILE"):
+                inventory.sha256_regular_file(sample)
+
+    def test_tree_entry_budget_fails_closed(self):
+        self.populate()
+        with patch.object(inventory, "MAX_TREE_ENTRIES", 3):
+            result = inspect(self.root)
+        self.assertEqual(result["status"], "BLOCKED_EVIDENCE_INCOMPLETE")
+        self.assertTrue(any("EVIDENCE_TREE_ENTRY_LIMIT_EXCEEDED" in x for x in result["gaps"]))
+        self.assertFalse(result["sources_authenticated"])
+
+    def test_deep_tree_fails_closed(self):
+        self.populate()
+        nested = self.root
+        for i in range(inventory.MAX_TREE_DEPTH + 1):
+            nested = nested / ("layer_" + str(i))
+            nested.mkdir()
+        result = inspect(self.root)
+        self.assertTrue(any("EVIDENCE_TREE_DEPTH_LIMIT_EXCEEDED" in x for x in result["gaps"]))
+
+    def test_symlink_directory_prevents_false_complete_inventory(self):
+        self.populate()
+        destination = self.root / "tests"
+        link = self.root / "untrusted-link"
+        try:
+            link.symlink_to(destination, target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest("symlink creation not permitted on this runner: " + str(exc))
+        result = inspect(self.root)
+        self.assertEqual(result["status"], "BLOCKED_EVIDENCE_INCOMPLETE")
+        self.assertTrue(any("EVIDENCE_TREE_LINK_OR_JUNCTION_UNTRUSTED" in x for x in result["gaps"]))
+
+    def test_mutation_after_digest_before_report_is_denied(self):
+        self.populate()
+        prior_hash = inventory.sha256_regular_file
+        def mutate_after_hash(path):
+            digest = prior_hash(path)
+            if path.name == REQUIRED["original_journal_a"]:
+                # Simulates a post-read replacement. A hash alone cannot prove
+                # the bytes stayed stable during evidence collection.
+                path.write_bytes(path.read_bytes() + b"appended-after-hash")
+            return digest
+        with patch.object(inventory, "sha256_regular_file", side_effect=mutate_after_hash):
+            result = inspect(self.root)
+        self.assertEqual(result["files"]["original_journal_a"]["state"], "UNSAFE_OR_UNREADABLE")
+        self.assertIn("original_journal_a:UNSAFE_OR_UNREADABLE", result["gaps"])
+        self.assertFalse(result["historical_76_result_reproduced"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
