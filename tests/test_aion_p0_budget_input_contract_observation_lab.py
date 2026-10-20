@@ -179,7 +179,7 @@ class BudgetInputRealConsumerObservationsLAB(unittest.TestCase):
             adapter=adapter, now=NOW + timedelta(seconds=2))
         self.assertEqual(called, [True])
         self.assertEqual(result["state"], "BLOCKED_REAPPROVAL")
-        self.assertEqual(result["last_error"], "CUMULATIVE_AUTHORITY_GUARD_FAILED")
+        self.assertEqual(result["last_error"], "AUTHORITY_BUDGET_BINDING_INVALID:TypeError")
         self.assertEqual(adapter.descriptor_reads, 0)
         self.assertEqual(self.outbox.effect_count(), 0)
 
