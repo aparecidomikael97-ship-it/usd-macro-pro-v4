@@ -529,9 +529,14 @@ class ExecutionOutbox:
                      -- This is local fail-closed FIFO, not a witness against
                      -- rewriting the ordinal or rolling back the whole DB.
                      AND d.aggregate_seq=1
+                     -- P0 defensive fence: never claim a staged action once
+                     -- its persisted authority window has already expired.
+                     -- Caller-provided time remains UNTRUSTED, and this does
+                     -- not detect H0 rollback or authorize a producer.
+                     AND d.valid_until>?
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
-                (owner, tenant, workspace),
+                (owner, tenant, workspace, now_iso),
             ).fetchone()
             if row is None:
                 self.db.commit()
@@ -549,8 +554,19 @@ class ExecutionOutbox:
                      AND NOT EXISTS (
                          SELECT 1 FROM action_effects e
                          WHERE e.idempotency_key=action_outbox.idempotency_key
+                     )
+                     -- Repeat expiry + scope under the actual write CAS;
+                     -- a selection alone is not an admission boundary.
+                     AND EXISTS (
+                         SELECT 1 FROM action_decisions d
+                         WHERE d.decision_id=action_outbox.decision_id
+                           AND d.owner=action_outbox.owner
+                           AND d.tenant=action_outbox.tenant
+                           AND d.workspace=action_outbox.workspace
+                           AND d.aggregate_seq=1
+                           AND d.valid_until>?
                      )""",
-                (worker, lease_until, key, owner, tenant, workspace),
+                (worker, lease_until, key, owner, tenant, workspace, now_iso),
             )
             if cursor.rowcount != 1:
                 self.db.rollback()
