@@ -91,6 +91,39 @@ class JournalEvidenceInventoryLAB(unittest.TestCase):
         self.assertNotEqual(first, second)
 
 
+    def test_path_and_open_descriptor_share_normalized_identity(self):
+        # Regression for CPython Windows 3.12+: path lstat ctime and handle
+        # fstat ctime can mean different things. Keep inode, birthtime, size,
+        # mtime and stable before/after observations without weakening denial.
+        sample = self.root / "same-file-identity.dat"
+        sample.write_bytes(b"same file identity")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        fd = os.open(sample, flags)
+        try:
+            self.assertEqual(
+                inventory._identity(os.fstat(fd)),
+                inventory._identity(sample.lstat()),
+            )
+        finally:
+            os.close(fd)
+        self.assertEqual(
+            inventory.sha256_regular_file(sample),
+            hashlib.sha256(b"same file identity").hexdigest(),
+        )
+
+    def test_junction_root_blocked_before_traversal(self):
+        if not hasattr(Path, "is_junction"):
+            self.skipTest("pathlib junction support requires Python 3.12")
+        self.populate()
+        # Simulate a junction at the selected evidence root. No real Windows
+        # junction or external file access is created in this regression.
+        with patch.object(Path, "is_junction", autospec=True,
+                          side_effect=lambda path: path == self.root):
+            result = inspect(self.root)
+        self.assertEqual(result["status"], "BLOCKED_EVIDENCE_INCOMPLETE")
+        self.assertIn("EVIDENCE_ROOT_MISSING_OR_SYMLINK", result["gaps"])
+        self.assertFalse(result["sources_authenticated"])
+
     def test_direct_hash_refuses_oversized_stream(self):
         sample = self.root / "oversized.bin"
         sample.write_bytes(b"12345")
