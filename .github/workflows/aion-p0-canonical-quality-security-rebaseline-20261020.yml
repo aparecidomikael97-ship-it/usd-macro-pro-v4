@@ -1,0 +1,78 @@
+name: AION P0 LAB Canonical Quality Security Historical Rebaseline (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-canonical-quality-security-rebaseline-20261020]
+
+permissions:
+  contents: read
+
+jobs:
+  canonical_quality:
+    name: Canonical Quality exact tracked modules (RED remains failure)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install exact historical Quality dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0
+      - name: Compile Python tree, no code executed
+        run: python -m compileall -q .
+      - name: Run EXACT tracked canonical Quality module selection, no waivers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+
+          source=Path(".github/workflows/quality-tests.yml").read_text(encoding="utf-8")
+          if source.count("- name: Run quality suite")!=1:
+              sys.exit("CANONICAL_QUALITY_SELECTION_NOT_UNIQUE")
+          raw=source.split("- name: Run quality suite",1)[1].split("python -m unittest -q",1)[1].split("- name: Run reference interface contracts",1)[0]
+          modules=re.findall(r"(?m)^\s+((?:test_[A-Za-z0-9_]+|tests/test_[A-Za-z0-9_]+)\.py)\s*\\?$",raw)
+          if len(modules)<500 or len(set(modules))!=len(modules):
+              sys.exit("CANONICAL_QUALITY_SELECTION_INVALID")
+          if any(not Path(p).is_file() for p in modules):
+              sys.exit("CANONICAL_QUALITY_SOURCE_MISSING")
+          print("AION_P0_CANONICAL_UNMODIFIED_MODULES",len(modules),flush=True)
+          print("AION_P0_CANONICAL_ROOT_HEAD",subprocess.check_output(
+              ["git","rev-parse","HEAD"],text=True).strip(),flush=True)
+          sys.exit(subprocess.call([sys.executable,"-B","-m","unittest","-q",*modules]))
+          PY
+      - name: Run independent original H0 A79 after canonical Quality (no waivers)
+        if: always()
+        run: python -B -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
+
+  canonical_security:
+    name: Canonical A74 Security original 365 methods (RED remains failure)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install same pinned Security prerequisites
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Run ORIGINAL Security A74 365 methods without waivers
+        run: python -B test_atlasquant_aion_activation_denial_coverage_a76.py --canonical --security
