@@ -1,0 +1,131 @@
+name: AION P0 LAB KMS Ed25519 RAW Offline Interop (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-kms-ed25519-raw-interop-offline-20261020]
+
+permissions:
+  contents: read
+
+jobs:
+  lab_root_coverage:
+    name: Execute every declared LAB-only root module (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked Python dependencies
+        run: python -m pip install -r requirements.txt
+      # The original nine-case diagnostic suite explicitly expects the old
+      # native-connection rerun DENIAL. Keep its earlier RED/diagnostic proof
+      # unchanged on #1347 and test the inverted availability contract here.
+      - name: Install canonical Quality pytest dependency for chat regression imports
+        run: python -m pip install pytest==9.1.1
+      - name: Eighteen AWS KMS Ed25519 RAW syntax and anti-trust checks (no AWS calls)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_kms_ed25519_raw_interop_lab.py -v
+      - name: Thirty-one trust-anchor enrollment and revoked key red-team checks (BLOCKED)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_trust_anchor_bootstrap_negative_lab.py -v
+      - name: Thirty-four Ed25519 synthetic signed incident envelope tests (not authentic issuer)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_signed_incident_envelope_cryptographic_lab.py -v
+      - name: Original two-domain SQLite rollback demonstration NO-GO
+        run: python -B -m unittest -q test_aion_p0_h0_custody_two_domain_model_lab
+      - name: External incident source 30 adversarial proposal checks and real A53 A76 gates
+        run: python -B -m unittest discover -s tests -p test_aion_p0_independent_incident_witness_proposal_lab.py -v
+      - name: Previous 12 A53 A76 trust boundary tests unchanged
+        run: python -B -m unittest discover -s tests -p test_aion_p0_a53_a76_legacy_ready_mismatch_lab.py -v
+      - name: Original A74 and M71 source-denial contracts unchanged
+        run: python -B -m unittest -q test_atlasquant_aion_activation_authority_a74 test_aion_m71_execution_fresh_source_denial_lab test_aion_p0_m71_original_stale_gate_safety_negative_lab
+      - name: H0 twenty-two IAM and seventeen three-domain rollback case regressions
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_iam_issuer_freshness_separation_lab.py -v
+      - name: H0 seventeen domain rollback cases
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_three_domain_rollback_scenarios_lab.py -v
+      - name: Twelve normative cross-thread session transition and revocation tests
+        run: python -B -m unittest discover -s tests -p test_aion_p0_staged_session_atomicity_candidate_lab.py -v
+      - name: Additional original chat identity, data isolation and red-team regressions
+        run: python -B -m unittest -q test_atlasquant_aion_chat_foundation test_atlasquant_aion_chat_golden_path test_atlasquant_aion_chat_product_bridge test_atlasquant_aion_chat_surface_redteam test_atlasquant_aion_chat_resource_boundaries test_atlasquant_aion_chat_load
+      - name: Imported 17 original #1195 lifecycle regression tests unchanged
+        run: python -B -m unittest -v test_aion_p0_staged_facade_port_lifecycle_lab
+      - name: Eight current-branch native-denial and STAGING availability security checks
+        run: python -B -m unittest -v test_aion_p0_staged_facade_latest_hardstops_lab
+      - name: Existing canonical STAGING host and storage resilience suites unchanged
+        run: python -B -m unittest -v test_atlasquant_aion_chat_host_staging test_atlasquant_aion_chat_staged_runtime_resilience
+      - name: Original vs later SQLite Git commit parent-child causality (12)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_sqlite_original_vs_lab_commit_lineage.py -v
+      - name: Exact six P0 exit evidence and historical Quality 50-to-51 provenance (12)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_six_exit_evidence_gap_lab.py -v
+      - name: SQLite unchanged test-source red-green supporting evidence (8)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_sqlite_supporting_red_green_forensic_lab.py -v
+      - name: Independent H0 IAM two-sided separation and highwater freshness (22)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_iam_issuer_freshness_separation_lab.py -v
+      - name: Independent S3 version readback and retention shape adversarial tests (22)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_s3_version_readback_evidence_lab.py -v
+      - name: NEW three-domain H0 rollback and actual Outbox lost-history cases (17)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_three_domain_rollback_scenarios_lab.py -v
+      - name: LAB root module 01 test_aion_m71_execution_fresh_source_denial_lab
+        run: python -B -m unittest -v test_aion_m71_execution_fresh_source_denial_lab
+      - name: LAB root module 02 test_aion_p0_h0_boundary_drift_mutations_lab
+        run: python -B -m unittest -v test_aion_p0_h0_boundary_drift_mutations_lab
+      - name: LAB root module 03 test_aion_p0_h0_custody_two_domain_model_lab
+        run: python -B -m unittest -v test_aion_p0_h0_custody_two_domain_model_lab
+      - name: LAB root module 04 test_aion_p0_h0_iam_finops_preflight_lab
+        run: python -B -m unittest -v test_aion_p0_h0_iam_finops_preflight_lab
+      - name: LAB root module 05 test_aion_p0_h0_sqlite_startup_observer_lab
+        run: python -B -m unittest -v test_aion_p0_h0_sqlite_startup_observer_lab
+      - name: LAB root module 06 test_aion_p0_h0_third_anchor_design_review_lab
+        run: python -B -m unittest -v test_aion_p0_h0_third_anchor_design_review_lab
+      - name: LAB root module 07 test_aion_p0_m71_original_stale_gate_safety_negative_lab
+        run: python -B -m unittest -v test_aion_p0_m71_original_stale_gate_safety_negative_lab
+      - name: LAB root module 08 test_aion_p0_original_six_evidence_matrix_lab
+        run: python -B -m unittest -v test_aion_p0_original_six_evidence_matrix_lab
+      - name: LAB root module 09 test_aion_p0_original_sqlite_compat_concurrency_restore_lab
+        run: python -B -m unittest -v test_aion_p0_original_sqlite_compat_concurrency_restore_lab
+      - name: LAB root module 10 test_aion_p0_quality_85_causal_inventory_lab
+        run: python -B -m unittest -v test_aion_p0_quality_85_causal_inventory_lab
+      - name: LAB root module 11 test_aion_p0_sqlite_authority_budget_owner_thread_lab
+        run: python -B -m unittest -v test_aion_p0_sqlite_authority_budget_owner_thread_lab
+      - name: LAB root module 12 test_aion_p0_sqlite_chat_store_owner_thread_lab
+        run: python -B -m unittest -v test_aion_p0_sqlite_chat_store_owner_thread_lab
+      - name: LAB root module 13 test_aion_p0_sqlite_execution_restore_hardstop_lab
+        run: python -B -m unittest -v test_aion_p0_sqlite_execution_restore_hardstop_lab
+      - name: LAB root module 14 test_aion_p0_sqlite_nested_transaction_denial_lab
+        run: python -B -m unittest -v test_aion_p0_sqlite_nested_transaction_denial_lab
+      - name: LAB root module 15 test_aion_p0_sqlite_owner_thread_denial_lab
+        run: python -B -m unittest -v test_aion_p0_sqlite_owner_thread_denial_lab
+      - name: LAB root module 16 test_aion_p0_sqlite_saga_owner_thread_lab
+        run: python -B -m unittest -v test_aion_p0_sqlite_saga_owner_thread_lab
+      - name: LAB root module 17 test_aion_p0_staged_host_sqlite_cleanup_lab
+        run: python -B -m unittest -v test_aion_p0_staged_host_sqlite_cleanup_lab
+      - name: LAB root module 18 test_aion_p0_quality_lab_coverage_governance_lab
+        run: python -B -m unittest -v test_aion_p0_quality_lab_coverage_governance_lab
+
+      - name: LAB root module 19 test_aion_p0_outbox_saga_internal_state_lab
+        run: python -B -m unittest -v test_aion_p0_outbox_saga_internal_state_lab
+      - name: LAB root module 20 test_aion_p0_outbox_saga_cas_retry_recovery_lab
+        run: python -B -m unittest -v test_aion_p0_outbox_saga_cas_retry_recovery_lab
+      - name: LAB root module 21 test_aion_p0_outbox_saga_historical_reconcile_cas_lab
+        run: python -B -m unittest -v test_aion_p0_outbox_saga_historical_reconcile_cas_lab
+      - name: LAB root module 22 test_aion_p0_budget_saga_trust_boundary_lab
+        run: python -B -m unittest -v test_aion_p0_budget_saga_trust_boundary_lab
+      - name: LAB root module 23 test_aion_p0_quality_32_external_evidence_gates_lab
+        run: python -B -m unittest -v test_aion_p0_quality_32_external_evidence_gates_lab
+      - name: Twilio readonly observation contract matrix and real AION negative gates
+        run: python -B -m unittest discover -s tests -p test_aion_p0_twilio_readonly_observation_lab.py -v
+      - name: Independent 14-case Twilio Classic Bulk cross-product provenance review
+        run: python -B -m unittest discover -s tests -p test_aion_p0_twilio_classic_bulk_contract_lab.py -v
+      - name: OneSignal idempotency vs Twilio external effect no-go contracts (11)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_sms_provider_comparison_lab.py -v
+      - name: Time-shifted 30d idempotency and lost SQLite history evidence (12)
+        run: python -B -m unittest discover -s tests -p test_aion_p0_sms_provider_key_expiry_local_history_lab.py -v
