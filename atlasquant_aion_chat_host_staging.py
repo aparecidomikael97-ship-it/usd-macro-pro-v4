@@ -15,6 +15,7 @@ import re
 from typing import Any, Mapping
 
 from aion_chat.models import Scope
+from aion_chat.staged_store import OperationScopedSQLiteChatStore
 from aion_chat.store import HEALTHY, SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_chat_product_bridge import validate_product_binding
 from atlasquant_aion_chat_storage_resilience import (
@@ -152,7 +153,7 @@ def close_all_staged_host_stores(session_state: Any) -> int:
         for key in list(session_state.keys())
         if str(key).startswith(_STORE_PREFIX)
     ]
-    # P0: preflight EVERY handle before modifying this session. Otherwise a
+    # P0: preflight EVERY NATIVE handle before modifying this session. Otherwise a
     # cross-thread close throws after pop(), silently detaching a live SQLite
     # connection; scope/credential switches must fail closed instead.
     for key in keys:
@@ -165,7 +166,7 @@ def close_all_staged_host_stores(session_state: Any) -> int:
         holder = session_state.get(key)
         if isinstance(holder, Mapping):
             store = holder.get("store")
-            if isinstance(store, SQLiteChatStore):
+            if isinstance(store, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
                 # Only remove a handle once close actually returned.
                 store.close()
                 closed += 1
@@ -174,7 +175,7 @@ def close_all_staged_host_stores(session_state: Any) -> int:
     return closed
 
 
-def _validate_live_store(store: SQLiteChatStore) -> dict[str, Any]:
+def _validate_live_store(store: SQLiteChatStore | OperationScopedSQLiteChatStore) -> dict[str, Any]:
     health = store.storage_health(deep=True)
     if health.get("state") != HEALTHY:
         try:
@@ -193,11 +194,13 @@ def get_or_create_staged_store(
     root: Path,
     *,
     session_binding_digest: str = "",
-) -> SQLiteChatStore:
-    """Keep one healthy local staging handle for the active authenticated scope."""
+    connection_free: bool = False,
+) -> SQLiteChatStore | OperationScopedSQLiteChatStore:
+    """Cache a staged handle; the UI opts into connection-free per-call SQLite."""
     key = _holder_key(scope)
     expected = str(_store_path(scope, root))
     expected_binding = _clean(session_binding_digest, 64)
+    store_type = OperationScopedSQLiteChatStore if connection_free else SQLiteChatStore
 
     active = _clean(session_state.get(_ACTIVE_SCOPE_KEY), 160)
     if active and active != key:
@@ -211,18 +214,18 @@ def get_or_create_staged_store(
         if (
             existing_path == expected
             and existing_binding == expected_binding
-            and isinstance(existing, SQLiteChatStore)
+            and isinstance(existing, store_type)
         ):
             _validate_live_store(existing)
             session_state[_ACTIVE_SCOPE_KEY] = key
             return existing
-        if isinstance(existing, SQLiteChatStore):
+        if isinstance(existing, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
             # Never swallow owner-thread/close failures and then orphan the
             # connection by replacing the session holder.
             existing.close()
         session_state.pop(key, None)
 
-    store = SQLiteChatStore(expected)
+    store = store_type(expected)
     _validate_live_store(store)
     session_state[key] = {
         "schema": SCHEMA,
@@ -245,7 +248,7 @@ def close_staged_host_store(
         session_state.pop(key, None)
         return False
     store = holder.get("store")
-    if isinstance(store, SQLiteChatStore):
+    if isinstance(store, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
         store.close()  # Do not discard the holder if close was denied.
         session_state.pop(key, None)
         if session_state.get(_ACTIVE_SCOPE_KEY) == key:
@@ -300,6 +303,7 @@ def build_staged_host_binding(
         scope,
         root,
         session_binding_digest=session_binding,
+        connection_free=True,  # Staged UI never caches a native SQLite connection.
     )
     health = _validate_live_store(store)
 

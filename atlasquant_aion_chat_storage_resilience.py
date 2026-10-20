@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from aion_chat.staged_store import OperationScopedSQLiteChatStore
 from aion_chat.store import HEALTHY, SQLiteChatStore, StorageUnavailableError
 
 SCHEMA = "ATLASQUANT_AION_CHAT_STORAGE_RESILIENCE_V1"
@@ -40,13 +41,13 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def create_verified_staging_backup(
-    store: SQLiteChatStore,
+    store: SQLiteChatStore | OperationScopedSQLiteChatStore,
     backup_path: str | Path,
     *,
     manifest_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """Checkpoint, backup via SQLite API, verify, and persist a sidecar manifest."""
-    if not isinstance(store, SQLiteChatStore):
+    if not isinstance(store, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
         raise TypeError("SQLiteChatStore required")
     health = store.require_healthy()
     report = store.backup_to(backup_path)
