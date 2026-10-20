@@ -212,14 +212,29 @@ class CumulativeAuthorityBudget:
         self._require_connection_thread()
         current = _utc(now)
         try:
+            # A P0 preflight accepts only a real Mapping, not arbitrary
+            # iterables that dict(...) silently promotes to an authority
+            # decision. The type annotation alone is not a runtime gate.
+            if not isinstance(decision, Mapping):
+                raise TypeError("budget decision requires Mapping")
             bound = self._validate_decision(decision)
         except Exception as exc:
+            # Diagnostic fields are never authority. An invalid/malicious
+            # Mapping may itself throw from get(); do not let the denial
+            # formatter change a fail-closed result into an exception.
+            try:
+                diagnostic_transaction = (
+                    _clean(decision.get("transaction_id"), 128)
+                    if isinstance(decision, Mapping) else ""
+                )
+            except Exception:
+                diagnostic_transaction = ""
             return {
                 "schema": SCHEMA,
                 "allowed": False,
                 "reason": "AUTHORITY_BUDGET_BINDING_INVALID:" + type(exc).__name__,
                 "authority_budget_ref": self.authority_budget_ref,
-                "transaction_id": _clean((decision or {}).get("transaction_id"), 128),
+                "transaction_id": diagnostic_transaction,
                 "scope": {
                     "owner_id": self.scope.owner_id,
                     "tenant_id": self.scope.tenant_id,

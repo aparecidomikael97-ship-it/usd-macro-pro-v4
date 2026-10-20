@@ -1,15 +1,14 @@
-"""AION LAB observations for the OPEN Budget.guard input type contract gap.
+"""AION LAB candidate: normative negative budget input contract.
 
-DO NOT TREAT A GREEN RESULT HERE AS APPROVAL. Several tests deliberately
-*detect* the current malformed-input behavior (including a non-Mapping
-preflight accepted as allowed=True). They are diagnostic sentinels, NOT
-safety requirements, production fixes, trusted receipts or waivers.
-No external sender/worker is executed.
+This file is adapted from diagnostic tests in a separate review branch.
+It now REQUIRES non-Mapping denial rather than accepting previous observed
+gaps. No external sender/worker, receipt or real effect is executed.
 """
 from __future__ import annotations
 
 import tempfile
 import unittest
+from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
 
@@ -63,31 +62,32 @@ class BudgetInputContractObservationsLAB(unittest.TestCase):
         self.assert_no_effects()
 
     def test_02_observed_gap_list_of_field_pairs_is_accepted_as_preflight(self):
-        # KNOWN GAP: Mapping annotation is not enforced. This test detects
-        # unwanted local allowed=True, NOT a desirable safety property.
+        # Normative candidate: a list of pairs is not a Mapping and must deny.
         malformed = list(self.decision().items())
         self.assertNotIsInstance(malformed, dict)
         out = self.budget.guard(malformed, now=NOW)
-        self.assertIs(out["allowed"], True, "observed non-Mapping acceptance changed")
+        self.assertIs(out["allowed"], False, "non-Mapping input must be denied")
         self.assert_no_external_authority(out)
         self.assert_no_effects()
 
     def test_03_observed_gap_tuple_of_field_pairs_is_also_accepted(self):
-        # KNOWN GAP: tuple-of-pairs is not a Mapping; same preflight behavior.
+        # Normative candidate: a tuple of pairs is not a Mapping and must deny.
         malformed = tuple(self.decision().items())
         self.assertNotIsInstance(malformed, dict)
         out = self.budget.guard(malformed, now=NOW)
-        self.assertIs(out["allowed"], True, "observed non-Mapping acceptance changed")
+        self.assertIs(out["allowed"], False, "non-Mapping input must be denied")
         self.assert_no_external_authority(out)
         self.assert_no_effects()
 
     def test_04_truthy_nonmapping_malformed_values_raise_without_effect(self):
-        # KNOWN GAP: after the validation exception, constructing the
-        # negative return incorrectly calls decision.get on non-Mapping.
+        # Normative candidate: malformed truthy inputs never throw or allow.
         for malformed in (37, "not-a-mapping", True, [("owner_id", "wrong")]):
             with self.subTest(type=type(malformed).__name__):
-                with self.assertRaises(AttributeError):
-                    self.budget.guard(malformed, now=NOW)
+                out = self.budget.guard(malformed, now=NOW)
+                self.assertIs(out["allowed"], False)
+                self.assert_no_external_authority(out)
+                self.assertTrue(out["reason"].startswith(
+                    "AUTHORITY_BUDGET_BINDING_INVALID:"))
                 self.assert_no_effects()
 
     def test_05_falsy_nonmapping_values_return_explicit_denial(self):
@@ -114,6 +114,25 @@ class BudgetInputContractObservationsLAB(unittest.TestCase):
         self.assert_no_effects()
 
 
+    def test_10_hostile_mapping_diagnostic_get_cannot_raise_or_approve(self):
+        class HostileMapping(Mapping):
+            def __len__(self):
+                return 1
+            def __iter__(self):
+                raise RuntimeError("LOCAL_ITER_NOT_TRUSTED")
+            def __getitem__(self, key):
+                raise RuntimeError("LOCAL_INDEX_NOT_TRUSTED")
+            def get(self, key, default=None):
+                raise RuntimeError("LOCAL_GET_NOT_TRUSTED")
+        out = self.budget.guard(HostileMapping(), now=NOW)
+        self.assertIs(out["allowed"], False)
+        self.assertEqual(out["transaction_id"], "")
+        self.assertTrue(out["reason"].startswith(
+            "AUTHORITY_BUDGET_BINDING_INVALID:"))
+        self.assert_no_external_authority(out)
+        self.assert_no_effects()
+
+
 class BudgetInputRealConsumerObservationsLAB(unittest.TestCase):
     def setUp(self):
         self.fx = saga_fx.ExecutionSagaTests()
@@ -130,8 +149,8 @@ class BudgetInputRealConsumerObservationsLAB(unittest.TestCase):
     def test_08_saga_direct_nonmapping_preflight_is_only_local_not_authority(self):
         decision = self.first["outbox"]["decision"]
         preflight = self.saga.authority_guard(list(decision.items()), now=NOW)
-        # KNOWN GAP: local preflight accepts list, NOT effect authorization.
-        self.assertIs(preflight["allowed"], True)
+        # Normative candidate: non-Mapping list must deny at Saga facade.
+        self.assertIs(preflight["allowed"], False)
         for name in ("grants_authority", "execution_allowed_by_this_component",
                      "executes_action"):
             self.assertIs(preflight[name], False)
@@ -160,7 +179,7 @@ class BudgetInputRealConsumerObservationsLAB(unittest.TestCase):
             adapter=adapter, now=NOW + timedelta(seconds=2))
         self.assertEqual(called, [True])
         self.assertEqual(result["state"], "BLOCKED_REAPPROVAL")
-        self.assertEqual(result["last_error"], "CUMULATIVE_AUTHORITY_GUARD_FAILED")
+        self.assertEqual(result["last_error"], "AUTHORITY_BUDGET_BINDING_INVALID:TypeError")
         self.assertEqual(adapter.descriptor_reads, 0)
         self.assertEqual(self.outbox.effect_count(), 0)
 
