@@ -13,7 +13,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 import sys
 
 SOURCE = "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/issues/1190#issuecomment-6132259470"
@@ -34,15 +36,67 @@ REQUIRED = {
     "manifest": "SHA256_MANIFEST.json",
 }
 MAX_BYTES_PER_FILE = 256 * 1024 * 1024
+MAX_TREE_ENTRIES = 10000
+MAX_TREE_DEPTH = 12
+
+
+def _identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    """Best-effort stability fingerprint; not a cryptographic provenance proof."""
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _discover_evidence(root: Path) -> dict[str, list[Path]]:
+    """Walk a bounded tree without following links or loading an unbounded glob."""
+    found: dict[str, list[Path]] = {name: [] for name in REQUIRED.values()}
+    stack: list[tuple[Path, int]] = [(root, 0)]
+    visited = 0
+    while stack:
+        folder, depth = stack.pop()
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                visited += 1
+                if visited > MAX_TREE_ENTRIES:
+                    raise ValueError("EVIDENCE_TREE_ENTRY_LIMIT_EXCEEDED")
+                # Windows junctions are separate from standard symlinks.
+                if entry.is_symlink() or (hasattr(entry, "is_junction") and entry.is_junction()):
+                    raise ValueError("EVIDENCE_TREE_LINK_OR_JUNCTION_UNTRUSTED")
+                if entry.is_dir(follow_symlinks=False):
+                    if depth >= MAX_TREE_DEPTH:
+                        raise ValueError("EVIDENCE_TREE_DEPTH_LIMIT_EXCEEDED")
+                    stack.append((Path(entry.path), depth + 1))
+                elif entry.name in found and entry.is_file(follow_symlinks=False):
+                    found[entry.name].append(Path(entry.path))
+    return found
 
 
 def sha256_regular_file(path: Path) -> str:
-    """Never execute file contents; cap bytes to avoid massive untrusted input."""
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        while block := f.read(1024 * 1024):
-            h.update(block)
-    return h.hexdigest()
+    """Bound an opened regular file, checking metadata before/after the read.
+
+    O_NOFOLLOW is used where supported; Windows still needs isolated trusted
+    recovery media and human review for reparse-point/race guarantees.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    with os.fdopen(fd, "rb") as stream:
+        initial = os.fstat(stream.fileno())
+        path_initial = path.stat(follow_symlinks=False)
+        if not stat.S_ISREG(initial.st_mode) or _identity(initial) != _identity(path_initial):
+            raise ValueError("EVIDENCE_NOT_STABLE_REGULAR_FILE")
+        if initial.st_size > MAX_BYTES_PER_FILE:
+            raise ValueError("OVERSIZED_EVIDENCE_FILE")
+        digest = hashlib.sha256()
+        total = 0
+        while block := stream.read(min(1024 * 1024, MAX_BYTES_PER_FILE - total + 1)):
+            total += len(block)
+            if total > MAX_BYTES_PER_FILE:
+                raise ValueError("EVIDENCE_READ_LIMIT_EXCEEDED")
+            digest.update(block)
+        final = os.fstat(stream.fileno())
+        path_final = path.stat(follow_symlinks=False)
+        if (total != initial.st_size or _identity(initial) != _identity(final)
+                or _identity(initial) != _identity(path_final)):
+            raise ValueError("EVIDENCE_CHANGED_DURING_READ")
+        return digest.hexdigest()
 
 
 def inspect(root: Path) -> dict:
@@ -68,9 +122,15 @@ def inspect(root: Path) -> dict:
         return result
     root = root.resolve()
     result["root_exists"] = True
-    # rglob returns path names only. Do NOT import, parse, or execute historic Python.
+    # Single bounded walk; reject reparse points and ambiguous tree structure.
+    # Never import, parse or execute historic Python.
+    try:
+        discovered = _discover_evidence(root)
+    except (OSError, ValueError) as exc:
+        result["gaps"].append(f"EVIDENCE_SCAN_BLOCKED:{type(exc).__name__}:{exc}")
+        return result
     for label, basename in REQUIRED.items():
-        matches = sorted(p for p in root.rglob(basename) if p.name == basename)
+        matches = sorted(discovered[basename])
         if len(matches) != 1:
             code = "NOT_FOUND" if not matches else "AMBIGUOUS_MULTIPLE_COPIES"
             result["files"][label] = {"state": code, "copies_found": len(matches)}
@@ -82,10 +142,13 @@ def inspect(root: Path) -> dict:
                 raise ValueError("SYMLINKED_EVIDENCE_PATH")
             if not p.is_file() or not p.resolve().is_relative_to(root):
                 raise ValueError("UNSAFE_OR_NON_REGULAR_FILE")
-            size = p.stat().st_size
+            before = p.stat(follow_symlinks=False)
+            size = before.st_size
             if size > MAX_BYTES_PER_FILE:
                 raise ValueError("OVERSIZED_EVIDENCE_FILE")
             digest = sha256_regular_file(p)
+            if _identity(before) != _identity(p.stat(follow_symlinks=False)):
+                raise ValueError("EVIDENCE_CHANGED_DURING_READ")
             item = {"state": "CAPTURED_UNAUTHENTICATED", "relative_path": p.relative_to(root).as_posix(), "bytes": size, "sha256": digest}
             if label == "manifest":
                 item["matches_published_checkpoint_digest"] = (digest == PUBLISHED_MANIFEST_SHA256)
