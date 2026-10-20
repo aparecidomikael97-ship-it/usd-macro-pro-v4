@@ -173,7 +173,17 @@ class P0RealOutboxHardProcessExitLAB(unittest.TestCase):
                 raise AssertionError("NO_EXTERNAL_PROVIDER_ADAPTER_MAY_BE_TOUCHED")
 
         def pretend_authorized(_):
-            raise AssertionError("NO_CALLER_AUTHORIZATION_CALLBACK_MAY_BE_TOUCHED")
+            # Local authorization checks intentionally run twice before the
+            # unconditional external producer hardstop. These fixture claims
+            # are untrusted and MUST NOT grant real producer enrollment.
+            return {
+                "allowed": True,
+                "actor_id": SCOPE.owner_id,
+                "tenant_id": SCOPE.tenant_id,
+                "workspace_id": SCOPE.workspace_id,
+                "policy_version": "lab-only",
+                "authorization_ref": "non-authoritative-test",
+            }
 
         with self.assertRaisesRegex(
                 PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED"):
