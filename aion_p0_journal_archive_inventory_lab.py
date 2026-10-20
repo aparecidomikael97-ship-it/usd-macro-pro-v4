@@ -79,7 +79,7 @@ def sha256_regular_file(path: Path) -> str:
     fd = os.open(path, flags)
     with os.fdopen(fd, "rb") as stream:
         initial = os.fstat(stream.fileno())
-        path_initial = path.stat(follow_symlinks=False)
+        path_initial = path.lstat()
         if not stat.S_ISREG(initial.st_mode) or _identity(initial) != _identity(path_initial):
             raise ValueError("EVIDENCE_NOT_STABLE_REGULAR_FILE")
         if initial.st_size > MAX_BYTES_PER_FILE:
@@ -92,7 +92,7 @@ def sha256_regular_file(path: Path) -> str:
                 raise ValueError("EVIDENCE_READ_LIMIT_EXCEEDED")
             digest.update(block)
         final = os.fstat(stream.fileno())
-        path_final = path.stat(follow_symlinks=False)
+        path_final = path.lstat()
         if (total != initial.st_size or _identity(initial) != _identity(final)
                 or _identity(initial) != _identity(path_final)):
             raise ValueError("EVIDENCE_CHANGED_DURING_READ")
@@ -142,12 +142,12 @@ def inspect(root: Path) -> dict:
                 raise ValueError("SYMLINKED_EVIDENCE_PATH")
             if not p.is_file() or not p.resolve().is_relative_to(root):
                 raise ValueError("UNSAFE_OR_NON_REGULAR_FILE")
-            before = p.stat(follow_symlinks=False)
+            before = p.lstat()
             size = before.st_size
             if size > MAX_BYTES_PER_FILE:
                 raise ValueError("OVERSIZED_EVIDENCE_FILE")
             digest = sha256_regular_file(p)
-            if _identity(before) != _identity(p.stat(follow_symlinks=False)):
+            if _identity(before) != _identity(p.lstat()):
                 raise ValueError("EVIDENCE_CHANGED_DURING_READ")
             item = {"state": "CAPTURED_UNAUTHENTICATED", "relative_path": p.relative_to(root).as_posix(), "bytes": size, "sha256": digest}
             if label == "manifest":
