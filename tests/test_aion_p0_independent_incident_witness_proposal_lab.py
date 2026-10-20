@@ -55,7 +55,7 @@ class IndependentIncidentWitnessContractLAB(unittest.TestCase):
         self.assertIs(result["allowed"],False)
         self.assertTrue(result["blockers"])
         self.assertEqual(result["blockers"],sorted(set(result["blockers"])))
-        self.assertEqual(result["reason"],result["blockers"][0] if not result["blockers"] else result["reason"])
+        self.assertIn(result["reason"],result["blockers"])
         self.assertIn("INDEPENDENT_EXTERNAL_WITNESS_NOT_ENROLLED",result["blockers"])
         self.assertIn("EXTERNAL_SIGNER_AND_REVOCATION_ROOT_NOT_ENROLLED",result["blockers"])
         self.assertIn("LATEST_HEAD_AND_NONCE_REPLAY_PROOF_NOT_ENROLLED",result["blockers"])
@@ -252,6 +252,60 @@ class IndependentIncidentWitnessContractLAB(unittest.TestCase):
                           "write_repository_feature_flag_enabled(", "automatic_retry_allowed\": True"):
             self.assertNotIn(forbidden,source)
         self.denied(self.result())
+
+
+    def test_27_hostile_eq_on_incident_state_is_rejected_not_executed(self):
+        class Evil:
+            def __eq__(self,other):
+                raise AssertionError("hostile-incident-equality-executed")
+            def __ne__(self,other):
+                raise AssertionError("hostile-incident-inequality-executed")
+            def __str__(self):
+                raise AssertionError("hostile-incident-str-executed")
+        r=self.result({**self.packet,"incident_state":Evil()})
+        self.denied(r)
+        self.assertIn("PACKET_INVALID:incident_state",r["blockers"])
+
+    def test_28_hostile_eq_on_head_version_is_rejected_not_executed(self):
+        class Evil:
+            def __eq__(self,other):
+                raise AssertionError("hostile-head-equality-executed")
+            def __ne__(self,other):
+                raise AssertionError("hostile-head-inequality-executed")
+        for name in ("issuer_id","scope","head_digest","epoch","sequence","credential_revocation_epoch"):
+            with self.subTest(field=name):
+                h={**self.head,name:Evil()}
+                r=self.result(head=h)
+                self.denied(r)
+                self.assertIn("HEAD_MISMATCH:"+name,r["blockers"])
+
+    def test_29_hostile_nonce_never_receives_inequality_callback(self):
+        class Evil:
+            def __ne__(self,other):
+                raise AssertionError("untrusted nonce comparison executed")
+        for packet_value,head_value in (
+            (Evil(), self.head["witnessed_nonce"]),
+            (self.packet["nonce"],Evil()),
+        ):
+            p={**self.packet,"nonce":packet_value}
+            h={**self.head,"witnessed_nonce":head_value}
+            r=self.result(p,h)
+            self.denied(r)
+            self.assertIn("NONCE_NOT_BOUND_TO_HEAD",r["blockers"])
+
+    def test_30_credential_revocation_malformed_values_do_not_call_eq(self):
+        class Evil:
+            def __eq__(self,other):
+                raise AssertionError("revocation equality executed")
+            def __ne__(self,other):
+                raise AssertionError("revocation inequality executed")
+        for pval,hval in ((Evil(),8),(8,Evil()),(Evil(),Evil())):
+            with self.subTest(orientation=type(pval).__name__+type(hval).__name__):
+                p={**self.packet,"credential_revocation_epoch":pval}
+                h={**self.head,"credential_revocation_epoch":hval}
+                r=self.result(p,h)
+                self.denied(r)
+                self.assertIn("CREDENTIAL_REVOCATION_EPOCH_MISMATCH",r["blockers"])
 
 
 if __name__=="__main__":
