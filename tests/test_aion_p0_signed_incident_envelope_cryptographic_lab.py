@@ -283,7 +283,7 @@ class SignedIncidentLabOnlyContracts(unittest.TestCase):
         self.assertLess(len(nested),4096)
         sig=self.private.sign(lab.DOMAIN+nested)
         result=self.denied(self.verify(nested,sig))
-        self.assertIn("ENVELOPE_PARSE_INVALID",result["blockers"])
+        self.assertIn("ENVELOPE_NESTING_LIMIT_EXCEEDED",result["blockers"])
 
     def test_34_untrusted_expected_issuer_object_does_not_invoke_comparison(self):
         class Evil:
