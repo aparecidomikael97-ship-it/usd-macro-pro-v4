@@ -76,15 +76,25 @@ def _parse_ts(value: Any) -> datetime:
 
 
 def _decode_signature(value: Any) -> bytes:
-    if not isinstance(value, str) or not value:
-        raise ValueError("signature required")
+    """Decode ONE canonical unpadded Base64URL spelling of 64 signature bytes.
+
+    Reject ignored punctuation, extra padding and modified unused pad bits,
+    rather than letting syntactically different owner signature strings
+    verify as identical. This remains a LOCAL syntax/cryptography check:
+    nonce custody, owner key enrollment and rollback safety are separate.
+    """
+    if type(value) is not str or re.fullmatch(r"[A-Za-z0-9_-]{86}", value) is None:
+        raise ValueError("noncanonical Ed25519 signature encoding")
     try:
         raw = value.encode("ascii")
-        decoded = base64.urlsafe_b64decode(raw + b"=" * (-len(raw) % 4))
-    except Exception as exc:
+        decoded = base64.b64decode(
+            raw + b"==", altchars=b"-_", validate=True,
+        )
+    except (ValueError, UnicodeError) as exc:
         raise ValueError("invalid signature encoding") from exc
-    if len(decoded) != 64:
-        raise ValueError("Ed25519 signature must be 64 bytes")
+    if (len(decoded) != 64
+            or base64.urlsafe_b64encode(decoded).rstrip(b"=") != raw):
+        raise ValueError("noncanonical Ed25519 signature encoding")
     return decoded
 
 
