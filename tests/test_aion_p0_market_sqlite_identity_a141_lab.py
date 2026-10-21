@@ -158,5 +158,39 @@ class A141StorageIdentityLAB(unittest.TestCase):
         self.assertFalse(a.human_owner_verified)
 
 
+    def test_15_same_inode_sqlite_content_rewind_blocks_balance_read(self):
+        a=self.ledger()
+        stale=self.work/"stale-bytes.sqlite3"
+        shutil.copyfile(self.lab/DB_FILENAME,stale)
+        self.assertTrue(a.reserve(self.run,1))
+        identity=(self.lab/DB_FILENAME).stat().st_ino
+        # copyfile truncates/writes, preserving current file identity;
+        # inode-only checks do NOT detect this.
+        shutil.copyfile(stale,self.lab/DB_FILENAME)
+        self.assertEqual((self.lab/DB_FILENAME).stat().st_ino,identity)
+        with self.assertRaises(QuotaLabUnavailable):
+            _=a.reserved_units
+
+    def test_16_same_inode_rewind_denies_any_new_reservation(self):
+        a=self.ledger()
+        stale=self.work/"stale-bytes.sqlite3"
+        shutil.copyfile(self.lab/DB_FILENAME,stale)
+        self.assertTrue(a.reserve(self.run,1))
+        shutil.copyfile(stale,self.lab/DB_FILENAME)
+        self.assertFalse(a.reserve("a141runtwo",1))
+
+    def test_17_new_process_unprotected_against_in_place_stale_db(self):
+        # Negative documented limit: process-only high-water does not have
+        # external trust/persistence. A new ledger trusts a valid stale DB.
+        a=self.ledger()
+        stale=self.work/"stale-bytes.sqlite3"
+        shutil.copyfile(self.lab/DB_FILENAME,stale)
+        self.assertTrue(a.reserve(self.run,1))
+        shutil.copyfile(stale,self.lab/DB_FILENAME)
+        b=self.ledger()
+        self.assertEqual(b.reserved_units,0)
+        self.assertTrue(b.reserve(self.run,1))
+
+
 if __name__=="__main__":
     unittest.main()
