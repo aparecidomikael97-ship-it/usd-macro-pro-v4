@@ -1,0 +1,47 @@
+name: AION P0 LAB M71 A74 Legacy Reactivation Fail-Closed Migration (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-legacy-reactivation-failclosed-contract-20261021]
+
+permissions:
+  contents: read
+
+jobs:
+  reactivation_never_mints_authority:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked requirements
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Three migrated strict no-authority tests (not skip/xfail)
+        shell: bash
+        run: |
+          python -B -m unittest -v \
+            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_activation_plan_binds_green_post_incident_gate \
+            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_final_activation_execution_requires_fresh_gate \
+            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_execution_validation_rejects_reopened_gate
+      - name: Historical Quality 85-case registry remains traceable
+        run: python -B -m unittest -v test_aion_p0_quality_85_causal_inventory_lab.py
+      - name: Existing A74 activation authorization denial contract
+        run: python -B -m unittest -q test_atlasquant_aion_activation_authority_a74.py
+      - name: H0 causal denial after restored local snapshots
+        run: python -B -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
