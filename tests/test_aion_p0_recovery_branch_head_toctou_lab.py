@@ -61,7 +61,7 @@ class RecoveryBranchHeadTOCTOUFenceLAB(unittest.TestCase):
             )
         return result,target,compare,history,save,git_get
 
-    def blocked(self,response,*,raised=None,ancestry_head=HEAD):
+    def blocked(self,response,*,raised=None,ancestry_head=HEAD,expect_git_get=True):
         result,target,compare,history,save,git_get=self.call(
             response,raised=raised,ancestry_head=ancestry_head,
         )
@@ -74,7 +74,10 @@ class RecoveryBranchHeadTOCTOUFenceLAB(unittest.TestCase):
         compare.assert_called_once()
         history.assert_called_once()
         save.assert_not_called()
-        git_get.assert_called_once()
+        if expect_git_get:
+            git_get.assert_called_once()
+        else:
+            git_get.assert_not_called()
         return result
 
     def test_01_changed_branch_head_blocks_save(self):
@@ -108,7 +111,7 @@ class RecoveryBranchHeadTOCTOUFenceLAB(unittest.TestCase):
         self.blocked(None,raised=TimeoutError("synthetic timeout"))
 
     def test_10_missing_compared_head_blocks_save(self):
-        self.blocked(self.branch_ref(),ancestry_head=None)
+        self.blocked(self.branch_ref(),ancestry_head=None,expect_git_get=False)
 
     def test_11_match_reaches_conditional_save_mock(self):
         result,target,compare,history,save,git_get=self.call(
