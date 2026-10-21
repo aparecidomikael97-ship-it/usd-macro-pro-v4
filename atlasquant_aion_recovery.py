@@ -266,6 +266,17 @@ def recovery_preflight(
             "schema":SCHEMA,"allowed":False,"reason":"Current runtime SHA is invalid.",
             "executes_action":False,
         }
+    # A128 LAB: a current SHA is a conditional Git object identifier, not
+    # evidence that the current runtime checkpoint was actually observed.
+    # Do not admit restoration when the current payload is absent, empty,
+    # or structurally not a mapping. An existing MISMATCH is still repairable.
+    current_checkpoint = current.get("checkpoint")
+    if not isinstance(current_checkpoint, Mapping) or not current_checkpoint:
+        return {
+            "schema": SCHEMA, "allowed": False,
+            "reason": "Current runtime checkpoint is missing or invalid.",
+            "executes_action": False,
+        }
     if str(selected.get("status") or "").upper()!="CONFIRMED":
         return {
             "schema":SCHEMA,"allowed":False,"reason":"Recovery candidate is not confirmed.",
