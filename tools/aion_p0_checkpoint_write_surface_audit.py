@@ -148,7 +148,7 @@ def reviewed_alternate_transport(root: Path, path: str) -> str:
     if path == "atlasquant_aion_global_worker_activation.py":
         if (
             "def force_disable_repository_feature_flag(" in text
-            and "/actions/variables/" in text
+            and "/actions/variables" in text
             and '"value": DISABLED_VALUE' in text
             and "def write_repository_feature_flag_enabled(" in text
             and "return _independent_activation_authority_denial()" in text
