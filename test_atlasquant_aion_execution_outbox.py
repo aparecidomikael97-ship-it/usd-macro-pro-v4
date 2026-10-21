@@ -1012,7 +1012,7 @@ class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
 
 
 class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
-    """Reentrant fixture interleavings. No real provider/authoritative receipt."""
+    """NO-GO reconstruction of old snapshots; no real readback or issuer."""
 
     def setUp(self):
         self.scope = Scope("owner-test", "tenant-a", "workspace-a")
@@ -1032,82 +1032,140 @@ class OutboxReconcileStaleRetryCASP0Tests(unittest.TestCase):
         self.key = self.item["idempotency_key"]
         self.outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
         self.adapter = FakeIdempotentAdapter("sent")
-        self.assertEqual(self.outbox.dispatch_claimed(
-            self.key, worker_id="worker-1",
-            authorize=policy(self.scope), adapter=self.adapter,
-            now=NOW + timedelta(seconds=1),
-        )["state"], "SENT")
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self.outbox.dispatch_claimed(
+                self.key, worker_id="worker-1",
+                authorize=policy(self.scope), adapter=self.adapter,
+                now=NOW + timedelta(seconds=1),
+            )
+        self.assertEqual(self.adapter.send_calls, 0)
+        self.assertEqual(self.outbox.get(self.key)["state"], "BLOCKED_PRODUCER")
+        # Test ONLY: emulate a preexisting historical SENT row. Not a real
+        # send, not an enrolled source, not a replacement for provenance.
+        with self.store.db:
+            self.store.db.execute(
+                "UPDATE action_outbox SET state='SENT',sent_at=?,"
+                "dispatch_started_at=?,last_error='AION_TEST_ONLY_SYNTHETIC_SENT' "
+                "WHERE idempotency_key=?",
+                (NOW.isoformat(), NOW.isoformat(), self.key),
+            )
+        self.assertEqual(self.outbox.get(self.key)["state"], "SENT")
+        self.assertEqual(self.outbox.effect_count(), 0)
 
     def tearDown(self):
         self.store.close()
         self.tempdir.cleanup()
 
     def test_stale_absence_must_not_reopen_confirmed_effect(self):
-        outbox, key = self.outbox, self.key
+        # Reconciliation is not trusted BEFORE accessing the adapter method.
+        class NoReconcileProperty:
+            property_reads = 0
 
-        class LateAbsence:
-            def reconcile(self, _key, _decision):
-                _fixture_simulate_independent_positive_review(
-                    outbox, key, "EFFECT-VERIFIED",
-                )
-                return {"found": False, "authoritative_absence": True}
+            @property
+            def reconcile(self):
+                self.property_reads += 1
+                raise AssertionError("untrusted descriptor must never be accessed")
 
-        observed = outbox.reconcile(
-            key, adapter=LateAbsence(),
-            authorize=policy(self.scope),
-            now=NOW + timedelta(seconds=3),
+        adapter = NoReconcileProperty()
+        before = self.outbox.get(self.key)
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=policy(self.scope),
+                now=NOW + timedelta(seconds=2),
+            )
+        self.assertEqual(adapter.property_reads, 0)
+        self.assertEqual(self.outbox.get(self.key), before)
+        # Synthetic peer review is an inert stale-CAS fixture, not an
+        # issuer receipt. A local confirmed state cannot be reopened.
+        _fixture_simulate_independent_positive_review(
+            self.outbox, self.key, "EFFECT-TEST-ONLY",
         )
-        self.assertEqual(observed["reconcile_state"], "STALE_OBSERVATION_IGNORED")
-        self.assertEqual(outbox.get(key)["state"], "CONFIRMED")
-        self.assertEqual(outbox.get(key)["effect_ref"], "EFFECT-VERIFIED")
-        self.assertEqual(outbox.effect_count(), 1)
-        self.assertEqual(self.adapter.send_calls, 1)
+        confirmed = self.outbox.get(self.key)
+        with self.assertRaisesRegex(ValueError, "only SENT or UNCERTAIN"):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=policy(self.scope),
+                now=NOW + timedelta(seconds=3),
+            )
+        self.assertEqual(self.outbox.get(self.key), confirmed)
+        self.assertEqual(self.outbox.get(self.key)["state"], "CONFIRMED")
+        self.assertEqual(adapter.property_reads, 0)
+        self.assertEqual(self.adapter.send_calls, 0)
+        self.assertEqual(self.outbox.effect_count(), 1)
 
     def test_stale_absence_cannot_reopen_revoked_state(self):
-        outbox, key = self.outbox, self.key
-
-        class LateAbsence:
+        class HostileAdapter:
+            calls = 0
             def reconcile(self, _key, _decision):
-                with outbox.db:
-                    outbox.db.execute(
-                        "UPDATE action_outbox SET state='REVOKED' "
-                        "WHERE idempotency_key=?",
-                        (key,),
-                    )
-                return {"found": False, "authoritative_absence": True}
+                self.calls += 1
+                raise AssertionError("untrusted readback")
 
-        observed = outbox.reconcile(
-            key, adapter=LateAbsence(),
-            authorize=policy(self.scope),
-            now=NOW + timedelta(seconds=3),
-        )
-        self.assertEqual(observed["reconcile_state"], "STALE_OBSERVATION_IGNORED")
-        self.assertEqual(outbox.get(key)["state"], "REVOKED")
-        self.assertEqual(self.adapter.send_calls, 1)
+        adapter = HostileAdapter()
+        before = self.outbox.get(self.key)
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=policy(self.scope),
+                now=NOW + timedelta(seconds=2),
+            )
+        self.assertEqual(self.outbox.get(self.key), before)
+        # Simulate local revocation by a peer only AFTER an earlier
+        # denied readback, never by an adapter callback.
+        with self.store.db:
+            self.store.db.execute(
+                "UPDATE action_outbox SET state='REVOKED' "
+                "WHERE idempotency_key=?", (self.key,),
+            )
+        revoked = self.outbox.get(self.key)
+        with self.assertRaisesRegex(ValueError, "only SENT or UNCERTAIN"):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=policy(self.scope),
+                now=NOW + timedelta(seconds=3),
+            )
+        self.assertEqual(self.outbox.get(self.key), revoked)
+        self.assertEqual(revoked["state"], "REVOKED")
+        self.assertEqual(self.outbox.effect_count(), 0)
+        self.assertEqual(self.adapter.send_calls, 0)
+        self.assertEqual(adapter.calls, 0)
 
     def test_unverified_absence_cannot_invoke_authorize_or_reopen_retry(self):
-        outbox, key = self.outbox, self.key
-
         class Absence:
+            reconcile_calls = 0
             def reconcile(self, _key, _decision):
+                self.reconcile_calls += 1
                 return {"found": False, "authoritative_absence": True}
 
+        adapter = Absence()
         authorize_calls = []
         def observed_authorize(_decision):
             authorize_calls.append("unexpected")
             return policy(self.scope)({})
-
-        outcome = outbox.reconcile(
-            key, adapter=Absence(), authorize=observed_authorize,
-            now=NOW + timedelta(seconds=3),
-        )
-        self.assertEqual(outcome["state"], "SENT")
-        self.assertEqual(outcome["reconcile_state"], "INDEPENDENT_ABSENCE_PROOF_REQUIRED")
+        before = self.outbox.get(self.key)
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=observed_authorize,
+                now=NOW + timedelta(seconds=3),
+            )
         self.assertEqual(authorize_calls, [])
-        self.assertEqual(outbox.get(key)["state"], "SENT")
-        self.assertEqual(self.adapter.send_calls, 1)
-
-
+        self.assertEqual(adapter.reconcile_calls, 0)
+        self.assertEqual(self.adapter.send_calls, 0)
+        self.assertEqual(self.outbox.get(self.key), before)
+        self.assertEqual(self.outbox.get(self.key)["state"], "SENT")
+        self.assertEqual(self.outbox.effect_count(), 0)
+        self.assertIsNone(self.outbox.claim_next(
+            "worker-after-untrusted-absence", now=NOW + timedelta(seconds=4),
+        ))
 
 
 class OutboxPostSendStateCASP0Tests(unittest.TestCase):
