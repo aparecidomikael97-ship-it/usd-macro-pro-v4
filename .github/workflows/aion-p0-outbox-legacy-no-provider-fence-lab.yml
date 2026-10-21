@@ -54,5 +54,7 @@ jobs:
             test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_confirm_rejects_claimed_without_send
       - name: Historical 85-case audit names retained exactly
         run: python -B -m unittest -q test_aion_p0_quality_85_causal_inventory_lab.py
+      - name: Pinned 32-case original source coordinates AND current method presence
+        run: python -B -m unittest -v test_aion_p0_quality_32_external_evidence_gates_lab.py
       - name: 64 cross-process H0 causality denial tests
         run: python -B -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
