@@ -36,6 +36,7 @@ jobs:
       - name: Check complete Quality canonical file enumeration without waiver
         run: python -B -m unittest -v test_quality_workflow_coverage.py
       - name: Execute all 26 historically missing root P0 LAB modules
+        shell: bash
         run: |
           python -B -m unittest -q \
             test_aion_m71_execution_fresh_source_denial_lab.py \
