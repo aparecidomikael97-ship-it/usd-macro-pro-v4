@@ -18,6 +18,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = 2
+# Conservative non-authorizing LOCAL admission ceiling. This is a count
+# limit, not a guarantee of on-disk bytes. No automatic tombstone eviction.
+MAX_NONCE_CLAIMS = 100_000
 _TS_RE = re.compile(
     r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?Z$"
 )
