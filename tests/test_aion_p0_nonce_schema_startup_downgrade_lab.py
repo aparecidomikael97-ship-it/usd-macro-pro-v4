@@ -7,6 +7,8 @@ Uses ONLY disposable SQLite fixtures. No real owner, issuer, producer or send.
 from __future__ import annotations
 
 from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -185,6 +187,34 @@ class NonceRegistryStartupCompatibilityLAB(unittest.TestCase):
         # Local anti-replay != external witness or owner attestation.
         self.assertFalse(hasattr(PersistentNonceRegistry,"authenticate_owner"))
         self.assertFalse(hasattr(PersistentNonceRegistry,"authorize_dispatch"))
+
+
+    def test_15_eight_simultaneous_fresh_initializers_do_not_forge_reset(self):
+        for cycle in range(3):
+            path=Path(self.tmp.name)/f"simultaneous-{cycle}.sqlite3"
+            barrier=Barrier(8)
+            def initialize(_):
+                barrier.wait(timeout=12)
+                r=PersistentNonceRegistry(path)
+                return (r.schema_version(),r.count())
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                results=list(pool.map(initialize,range(8)))
+            self.assertEqual(results,[(SCHEMA_VERSION,0)]*8)
+
+    def test_16_eight_simultaneous_restarts_preserve_consumed_nonce(self):
+        registry=PersistentNonceRegistry(self.db)
+        self.assertTrue(registry.claim(scope="owner",nonce="already-consumed",
+                                       expires_at=EXP,now_ts=NOW))
+        barrier=Barrier(8)
+        def reopen_and_retry(_):
+            barrier.wait(timeout=12)
+            r=PersistentNonceRegistry(self.db)
+            return r.claim(scope="owner",nonce="already-consumed",
+                           expires_at=EXP,now_ts=NOW)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            accepted=list(pool.map(reopen_and_retry,range(8)))
+        self.assertEqual(accepted,[False]*8)
+        self.assertEqual(PersistentNonceRegistry(self.db).count(),1)
 
 
 if __name__=="__main__":
