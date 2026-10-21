@@ -79,7 +79,7 @@ class OutboxReadIntegrityHardstopLab(unittest.TestCase):
                 (value,self.key),
             )
 
-    def _denied_both(self):
+    def _denied_both(self, *, assert_no_claim=True):
         before=tuple(self.db.iterdump())
         with self.assertRaisesRegex(PermissionError,DENY):
             self.outbox.get(self.key)
@@ -89,7 +89,8 @@ class OutboxReadIntegrityHardstopLab(unittest.TestCase):
             self.outbox.list(state="PENDING")
         self.assertEqual(before,tuple(self.db.iterdump()))
         self.assertEqual(self.outbox.effect_count(),0)
-        self.assertIsNone(self.outbox.claim_next("lab-worker",now=NOW))
+        if assert_no_claim:
+            self.assertIsNone(self.outbox.claim_next("lab-worker",now=NOW))
 
     def test_01_healthy_local_read_projections_unchanged(self):
         self.assertEqual(self.outbox.get(self.key)["decision"]["payload"]["label"],"one")
@@ -175,7 +176,9 @@ class OutboxReadIntegrityHardstopLab(unittest.TestCase):
         second=self._enqueue("two")
         self.assertEqual(len(self.outbox.list()),2)
         self._field("grants_authority",True)
-        self._denied_both()
+        # A second independent, healthy aggregate may still be locally
+        # claimable; integrity of list() does not imply disabling it.
+        self._denied_both(assert_no_claim=False)
         self.assertEqual(self.outbox.get(second["idempotency_key"])["decision"]["payload"]["label"],"two")
 
     def test_21_invalid_row_is_not_misreported_as_no_effect(self):
