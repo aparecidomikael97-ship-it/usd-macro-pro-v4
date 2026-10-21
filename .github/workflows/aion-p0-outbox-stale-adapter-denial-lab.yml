@@ -1,0 +1,60 @@
+name: AION P0 H0 LAB Stale Adapter Readback Denial (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-outbox-stale-observation-denial-20261021]
+
+permissions:
+  contents: read
+
+jobs:
+  stale_adapter_denial:
+    name: Historical stale adapter and FIFO denials - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Six original method IDs (seven historical ERROR occurrences) deny adapter callbacks
+        shell: bash
+        run: |
+          python -B -m unittest -v \
+            test_atlasquant_aion_execution_outbox.OutboxStaleStateBlockCASP0Tests.test_reconcile_late_block_cannot_clobber_confirmation \
+            test_atlasquant_aion_execution_outbox.OutboxReconcileStaleRetryCASP0Tests.test_stale_absence_must_not_reopen_confirmed_effect \
+            test_atlasquant_aion_execution_outbox.OutboxReconcileStaleRetryCASP0Tests.test_stale_absence_cannot_reopen_revoked_state \
+            test_atlasquant_aion_execution_outbox.OutboxReconcileStaleRetryCASP0Tests.test_unverified_absence_cannot_invoke_authorize_or_reopen_retry \
+            test_atlasquant_aion_execution_outbox.OutboxUnverifiedAdapterResultP0Tests.test_adapter_rejection_boolean_does_not_release_aggregate \
+            test_atlasquant_aion_execution_outbox.OutboxUnverifiedAdapterResultP0Tests.test_false_authoritative_absence_remains_quarantined
+      - name: Existing no-provider and no-readback controls
+        shell: bash
+        run: |
+          python -B -m unittest -v \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_no_enrolled_producer_must_block_before_adapter_send \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_access_dynamic_adapter_descriptor \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_invoke_side_effecting_callback \
+            test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_block_keeps_same_aggregate_fifo_but_not_unrelated_work \
+            test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_confirm_rejects_claimed_without_send
+      - name: Quality 85-case historical inventory
+        run: python -B -m unittest -q test_aion_p0_quality_85_causal_inventory_lab.py
+      - name: Producer 32-case pinned historical coordinates and current AST
+        run: python -B -m unittest -q test_aion_p0_quality_32_external_evidence_gates_lab.py
+      - name: H0 cold/restart negative causality controls
+        run: python -B -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
