@@ -1029,16 +1029,20 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
     def test_runtime_public_read_does_not_require_write_token(self):
         cfg=RuntimeConfig(token="",repo="owner/repo",branch="atlasquant-runtime")
         cp=default_checkpoint()
-        import base64, json
-        encoded=base64.b64encode(json.dumps(cp).encode("utf-8")).decode("ascii")
+        import base64, hashlib, json
+        raw=json.dumps(cp).encode("utf-8")
+        encoded=base64.b64encode(raw).decode("ascii")
+        sha=hashlib.sha1(
+            b"blob "+str(len(raw)).encode("ascii")+b"\x00"+raw
+        ).hexdigest()
         get=MagicMock()
         get.status_code=200
         get.raise_for_status.return_value=None
-        get.json.return_value={"content":encoded,"sha":"publicsha"}
+        get.json.return_value={"content":encoded,"sha":sha}
         with patch("requests.get",return_value=get) as get_call:
             result=load_runtime_checkpoint(cfg)
         self.assertEqual(result["status"],"CONFIRMED")
-        self.assertEqual(result["sha"],"publicsha")
+        self.assertEqual(result["sha"],sha)
         self.assertNotIn("Authorization",get_call.call_args.kwargs["headers"])
 
     def test_runtime_write_without_token_remains_unavailable(self):
