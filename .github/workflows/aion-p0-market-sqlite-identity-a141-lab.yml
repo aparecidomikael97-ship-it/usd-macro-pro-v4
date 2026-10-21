@@ -1,0 +1,48 @@
+name: AION P0 A141 LAB SQLite identity and pathname race reduction (NO-GO)
+on:
+  push:
+    branches:
+      - lab/aion-p0-market-sqlite-file-identity-a141-20261021
+permissions:
+  contents: read
+jobs:
+  sqlite-identity-only:
+    name: A141 sqlite identity no-provider - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      AION_LAB_MODE: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: A141 identity and rollback RED-first
+        run: python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_identity_a141_lab.py -v
+      - name: A140 SQLite reservations and crash regression
+        run: python -B -m unittest discover -s tests -p test_aion_p0_sqlite_durable_market_quota_a140_lab.py -v
+      - name: A139 and A138 synthetic data tests
+        shell: bash
+        run: |
+          python -B -m unittest discover -s tests -p test_aion_p0_market_acquisition_isolation_a139_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_only_a138_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_workflow_contract_a138_lab.py -v
+      - name: No networking or external write in A141 subject
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path("atlasquant_market_sqlite_quota_a140.py").read_text("utf-8")
+          for forbidden in ("requests.", "httpx.", "subprocess.", "github.token", "save_runtime_checkpoint", "urllib.request"):
+              assert forbidden not in s, forbidden
+          print("No detected provider or GitHub write code in offline SQLite ledger")
+          PY
