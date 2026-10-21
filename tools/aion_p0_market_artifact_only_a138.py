@@ -120,9 +120,16 @@ def build_market_bundle(*,source_root,output_path,source_sha,requested_paths=Non
         size=file.stat().st_size
         if size>MAX_FILE_BYTES:
             raise ValueError("Market file exceeds size limit.")
-        content=file.read_bytes()
-        if len(content)!=size or len(content)>MAX_FILE_BYTES:
+        raw_content=file.read_bytes()
+        if len(raw_content)!=size or len(raw_content)>MAX_FILE_BYTES:
             raise ValueError("Market file changed or exceeded size budget.")
+        # Git for Windows may convert checkout JSON newlines to CRLF while
+        # Ubuntu retains LF for the SAME commit. JSON forbids literal control
+        # newlines inside strings, so canonical LF conversion of structural
+        # whitespace preserves the parsed JSON while stabilizing the bundle.
+        # All manifest hashes below bind to NORMALIZED export bytes, not
+        # operating-system-specific checkout file bytes.
+        content=raw_content.replace(b"\r\n",b"\n")
         _strict_load(content)
         total+=len(content)
         if total>MAX_TOTAL_BYTES:
@@ -138,6 +145,7 @@ def build_market_bundle(*,source_root,output_path,source_sha,requested_paths=Non
         "status":"OFFLINE_ARTIFACT_ONLY",
         "source_commit":source_sha.lower(),
         "source_sha_authority":"SELF_REPORTED_REPOSITORY_SHA_NOT_INDEPENDENT",
+        "content_encoding":"UTF8_JSON_LF_NORMALIZED",
         "freshness_status":"NOT_VERIFIED_STORED_REPOSITORY_COPY",
         "provider_fetch_performed":False,
         "runtime_write_authorized":False,
@@ -176,6 +184,7 @@ def inspect_bundle(path):
         if (
             manifest.get("schema")!=SCHEMA
             or manifest.get("status")!="OFFLINE_ARTIFACT_ONLY"
+            or manifest.get("content_encoding")!="UTF8_JSON_LF_NORMALIZED"
             or manifest.get("provider_fetch_performed") is not False
             or manifest.get("runtime_write_authorized") is not False
             or manifest.get("independent_witness_enrolled") is not False
@@ -189,6 +198,8 @@ def inspect_bundle(path):
             if not isinstance(item,dict) or item.get("path")!=n:
                 raise ValueError("Market file path mismatch.")
             raw=archive.read(n)
+            if b"\r\n" in raw:
+                raise ValueError("Artifact JSON violates canonical LF encoding.")
             _strict_load(raw)
             if (
                 hashlib.sha256(raw).hexdigest()!=item.get("sha256")
