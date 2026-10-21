@@ -90,9 +90,11 @@ def _normal_inputs(requested_paths):
 
 def _zip_entry(name:str,content:bytes,archive:zipfile.ZipFile):
     info=zipfile.ZipInfo(name,date_time=(1980,1,1,0,0,0))
-    info.compress_type=zipfile.ZIP_DEFLATED
+    # Prevent Windows ZIP host-OS header drift; no zlib version drift.
+    info.create_system=3
+    info.compress_type=zipfile.ZIP_STORED
     info.external_attr=0o600 << 16
-    archive.writestr(info,content,compress_type=zipfile.ZIP_DEFLATED,compresslevel=9)
+    archive.writestr(info,content,compress_type=zipfile.ZIP_STORED)
 
 
 def build_market_bundle(*,source_root,output_path,source_sha,requested_paths=None):
@@ -160,8 +162,7 @@ def build_market_bundle(*,source_root,output_path,source_sha,requested_paths=Non
                                sort_keys=True,separators=(",",":"))+"\n").encode("utf-8")
     out.parent.mkdir(parents=True,exist_ok=True)
     # All validations finish BEFORE the archive can be created.
-    with zipfile.ZipFile(out,mode="x",compression=zipfile.ZIP_DEFLATED,
-                         compresslevel=9) as archive:
+    with zipfile.ZipFile(out,mode="x",compression=zipfile.ZIP_STORED) as archive:
         _zip_entry(MANIFEST_NAME,manifest_bytes,archive)
         for name in paths:
             _zip_entry(name,payloads[name],archive)
