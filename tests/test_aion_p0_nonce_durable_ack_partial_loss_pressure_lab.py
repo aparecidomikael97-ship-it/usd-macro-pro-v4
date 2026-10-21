@@ -72,13 +72,13 @@ class NonceDurableAckAndPartialLossLAB(unittest.TestCase):
 
     def test_02_before_insert_ignore_cannot_produce_false_durable_ack(self):
         self.trigger_ignore()
-        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not durably written|not durable after commit|write"):
+        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not durably written|not durable after commit|write|unauthorized trigger"):
             self.claim("never-written")
         self.assertEqual(self.count_raw(),0)
 
     def test_03_after_insert_delete_cannot_produce_false_durable_ack(self):
         self.trigger_delete()
-        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not durably written|not durable after commit|write"):
+        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not durably written|not durable after commit|write|unauthorized trigger"):
             self.claim("deleted-in-the-same-transaction")
         self.assertEqual(self.count_raw(),0)
 
@@ -163,7 +163,9 @@ class NonceDurableAckAndPartialLossLAB(unittest.TestCase):
             "CREATE TRIGGER synthetic_abort BEFORE INSERT ON nonce_claims "
             "BEGIN SELECT RAISE(ABORT,'SIMULATED_DISK_IO_WRITE_ERROR'); END"
         )
-        with self.assertRaises(sqlite3.IntegrityError):
+        # The new fail-closed schema gate may reject the trigger before
+        # its synthetic IntegrityError executes. Both paths must deny.
+        with self.assertRaises((sqlite3.IntegrityError,RuntimeError)):
             self.claim("not-duplicate")
         self.assertEqual(self.count_raw(),0)
 
