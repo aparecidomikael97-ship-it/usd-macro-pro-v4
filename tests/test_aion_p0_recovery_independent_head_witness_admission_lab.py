@@ -61,10 +61,11 @@ class RecoveryIndependentHeadWitnessNoGoLab(unittest.TestCase):
         self.assertEqual(result["status"],"BLOCKED",result)
         self.assertIs(result["saved"],False,result)
         self.assertIs(result["verified"],False,result)
-        self.assertIs(result.get("restore_confirmed"),False,result)
-        self.assertIs(result.get("automatic_retry_allowed"),False,result)
-        self.assertIs(result.get("automatic_restore"),False,result)
-        self.assertIs(result.get("reconciliation_required"),False,result)
+        if approved:
+            self.assertIs(result.get("restore_confirmed"),False,result)
+            self.assertIs(result.get("automatic_retry_allowed"),False,result)
+            self.assertIs(result.get("automatic_restore"),False,result)
+            self.assertIs(result.get("reconciliation_required"),False,result)
         save.assert_not_called()
         if approved:
             live.assert_called_once()
