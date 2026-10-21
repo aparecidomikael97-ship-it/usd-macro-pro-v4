@@ -743,6 +743,13 @@ class ExecutionOutbox:
         terminal-looking local downgrade, even when an injected caller supplies
         a matching claim snapshot. This is not a producer receipt verifier.
         """
+        # A120: sqlite3.Connection context manager COMMITs *any* active
+        # transaction, including a transaction/SAVEPOINT owned by a caller.
+        # This private denial is not a borrowed-transaction primitive.
+        # Deny before policy mutation, CAS or an implicit outer COMMIT/ROLLBACK.
+        self._require_connection_thread()
+        if self.db.in_transaction:
+            raise RuntimeError("OUTBOX_NESTED_TRANSACTION_UNSUPPORTED")
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
         if _outbox_key(expected.get("idempotency_key")) != key:
@@ -808,6 +815,12 @@ class ExecutionOutbox:
         """Dispatch one claimed intent; uncertain outcomes require reconciliation."""
         key = _outbox_key(idempotency_key)
         worker = _token(worker_id, "worker_id")
+        # A120: dispatch may enter _set_blocked or other sqlite3 context
+        # managers. Reject a caller-owned transaction before consulting any
+        # callback or adapter, so policy denial cannot COMMIT parent work.
+        self._require_connection_thread()
+        if self.db.in_transaction:
+            raise RuntimeError("OUTBOX_NESTED_TRANSACTION_UNSUPPORTED")
         # A callable clock supports deterministic staging tests. A real host must
         # supply trusted time/lease fencing; caller-supplied values are NOT proof.
         def read_clock() -> datetime:
