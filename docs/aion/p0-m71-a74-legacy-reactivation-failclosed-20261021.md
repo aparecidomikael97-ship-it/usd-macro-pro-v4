@@ -30,3 +30,5 @@ O workflow dedicado executa esses três métodos em Windows/Ubuntu junto com os 
 
 ### Identidade histórica dos testes
 A primeira execução desta PR mostrou que renomear os três métodos gerava 3 FAIL adicionais em `test_aion_p0_quality_85_causal_inventory_lab`: o registro de 85 casos exige que os nomes originais continuem presentes. A correção mantém os nomes históricos e preserva o novo corpo de asserções estritamente negativas, sem dispensar a verificação do inventário.
+
+A CI dedicada passa a rodar explicitamente os 12 testes do inventário histórico de 85 casos, além dos três testes migrados e das baterias A74/A79. As entradas históricas ficam registradas com seu resultado original, e a execução atual é relatada em paralelo; **não** se apagam nem se dispensam falhas pretéritas.
