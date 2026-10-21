@@ -537,6 +537,25 @@ class ExecutionSagaCoordinator:
                 risk_points=pending["risk_points"],
                 capability_class=pending["capability_class"],
             )
+            # A124: a previously persisted first attempt is NOT a new
+            # Saga stage, regardless of whether its local Outbox state says
+            # PENDING, CLAIMED, RETRY, UNCERTAIN, SENT, CONFIRMED or blocked.
+            # In particular, IDEMPOTENT is only a read-only lookup of the
+            # same intent, never evidence that no external effect occurred.
+            # With this Saga step still PENDING, the Outbox history and the
+            # Saga projection disagree. Reject before touching Saga steps,
+            # writing another event, or committing this transaction.
+            if (
+                item.get("enqueue_state") != "ENQUEUED"
+                or item.get("state") != "PENDING"
+                or item.get("local_integrity") != "MATCH"
+                or item.get("attempts") != 0
+                or item.get("dispatch_started_at")
+                or item.get("effect_ref")
+            ):
+                raise PermissionError(
+                    "SAGA_FIRST_INTENT_REENTRY_REQUIRES_RECONCILIATION"
+                )
             # A119: Outbox.enqueue may execute SQLite triggers, including
             # hostile triggers in a damaged/local-admin-controlled DB. The
             # saga snapshot checked before enqueue is NOT sufficient after
