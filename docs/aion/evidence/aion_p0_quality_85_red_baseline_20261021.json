@@ -1,0 +1,622 @@
+{
+  "schema": "aion.p0.quality.red_ledger.v1",
+  "baseline": {
+    "repository": "aparecidomikael97-ship-it/usd-macro-pro-v4",
+    "head_sha": "0630441417fb1ec0e42a06ca0b104a311a6de399",
+    "workflow_run": 39636432738,
+    "job_id": 119348084463,
+    "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39636432738",
+    "date": "2026-10-21",
+    "modules": 588,
+    "tests": 6895,
+    "pass": 6810,
+    "fail": 51,
+    "error": 34
+  },
+  "rules": {
+    "interpretation": "Observed canonical failures only. Family labels are triage categories, not proof that all underlying implementations are correct.",
+    "workflow_governance": "HARD_NO_GO",
+    "worker_enabled": false,
+    "automatic_resend_allowed": false,
+    "legacy_tests_waived": false,
+    "identical_identifiers_do_not_prove_identical_stack_traces": true,
+    "removing_failures_requires_manual_evidence": true
+  },
+  "entries": [
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_adapter_rejection_boolean_does_not_release_aggregate (test_atlasquant_aion_execution_outbox.OutboxUnverifiedAdapterResultP0Tests.test_adapter_rejection_boolean_does_not_release_aggregate) (retryable=False)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_adapter_rejection_boolean_does_not_release_aggregate (test_atlasquant_aion_execution_outbox.OutboxUnverifiedAdapterResultP0Tests.test_adapter_rejection_boolean_does_not_release_aggregate) (retryable=True)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_all_forward_steps_confirm_in_order_and_complete (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_all_forward_steps_confirm_in_order_and_complete)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_budget_guard_blocks_external_send_before_adapter (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_budget_guard_blocks_external_send_before_adapter)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_compensation_unverified_failure_requires_external_review_before_manual_terminal (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_compensation_unverified_failure_requires_external_review_before_manual_terminal)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_confirmed_adapter_response_cannot_overwrite_revoked (test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_confirmed_adapter_response_cannot_overwrite_revoked)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_exception_after_peer_confirmation_never_clobbers_it (test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_exception_after_peer_confirmation_never_clobbers_it)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_execution_validation_rejects_reopened_gate (test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_execution_validation_rejects_reopened_gate)",
+      "module": "test_atlasquant_aion_global_worker_reactivation_gate",
+      "observed_exception": "KeyError: 'plan'",
+      "family": "LEGACY_ACTIVATION_PLAN_EXPECTATION"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_existing_unverified_negative_remains_quarantined (test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_existing_unverified_negative_remains_quarantined)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_fake_positive_cannot_release_followup_same_aggregate (test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_fake_positive_cannot_release_followup_same_aggregate)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_false_authoritative_absence_remains_quarantined (test_atlasquant_aion_execution_outbox.OutboxUnverifiedAdapterResultP0Tests.test_false_authoritative_absence_remains_quarantined)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_final_activation_execution_requires_fresh_gate (test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_final_activation_execution_requires_fresh_gate)",
+      "module": "test_atlasquant_aion_global_worker_reactivation_gate",
+      "observed_exception": "KeyError: 'plan'",
+      "family": "LEGACY_ACTIVATION_PLAN_EXPECTATION"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_irreversible_confirmed_effect_escalates_manual_and_never_prepares_rollback (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_irreversible_confirmed_effect_escalates_manual_and_never_prepares_rollback)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_lost_response_after_effect_requires_reconcile_and_never_blind_resends (test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_lost_response_after_effect_requires_reconcile_and_never_blind_resends)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_private_confirm_is_closed_without_independent_producer_receipt (test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_private_confirm_is_closed_without_independent_producer_receipt)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_reconcile_confirmed_cannot_revive_revoked (test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_reconcile_confirmed_cannot_revive_revoked)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_reconcile_late_block_cannot_clobber_confirmation (test_atlasquant_aion_execution_outbox.OutboxStaleStateBlockCASP0Tests.test_reconcile_late_block_cannot_clobber_confirmation)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_same_aggregate_is_ordered_until_previous_intent_is_terminal (test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_same_aggregate_is_ordered_until_previous_intent_is_terminal)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_scope_window_budget_blocks_second_transaction_even_with_separate_approval (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_scope_window_budget_blocks_second_transaction_even_with_separate_approval)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_second_step_failure_requires_explicit_compensation_then_compensates (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_second_step_failure_requires_explicit_compensation_then_compensates)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_sent_without_confirmation_is_reconciled_not_redispatched (test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_sent_without_confirmation_is_reconciled_not_redispatched)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_stale_absence_cannot_reopen_revoked_state (test_atlasquant_aion_execution_outbox.OutboxReconcileStaleRetryCASP0Tests.test_stale_absence_cannot_reopen_revoked_state)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_stale_absence_must_not_reopen_confirmed_effect (test_atlasquant_aion_execution_outbox.OutboxReconcileStaleRetryCASP0Tests.test_stale_absence_must_not_reopen_confirmed_effect)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_stale_adapter_reject_cannot_reopen_confirmed_as_retry_or_failed (test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_stale_adapter_reject_cannot_reopen_confirmed_as_retry_or_failed) (retryable=False)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_stale_adapter_reject_cannot_reopen_confirmed_as_retry_or_failed (test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_stale_adapter_reject_cannot_reopen_confirmed_as_retry_or_failed) (retryable=True)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_stale_sent_response_cannot_overwrite_confirmed (test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_stale_sent_response_cannot_overwrite_confirmed)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_three_step_failure_compensates_confirmed_effects_in_reverse_order (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_three_step_failure_compensates_confirmed_effects_in_reverse_order)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_uncertain_compensation_freezes_remaining_rollback_until_reconciled (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_uncertain_compensation_freezes_remaining_rollback_until_reconciled)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_uncertain_forward_effect_freezes_saga_until_reconciliation (test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_uncertain_forward_effect_freezes_saga_until_reconciliation)",
+      "module": "test_atlasquant_aion_execution_saga",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_unexpired_claim_still_dispatches_once (test_atlasquant_aion_execution_outbox.OutboxTimeOfUseFenceP0Tests.test_unexpired_claim_still_dispatches_once)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_unverified_absence_cannot_invoke_authorize_or_reopen_retry (test_atlasquant_aion_execution_outbox.OutboxReconcileStaleRetryCASP0Tests.test_unverified_absence_cannot_invoke_authorize_or_reopen_retry)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_unverified_absence_never_allows_retry_even_if_fixture_knows_no_effect (test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.test_unverified_absence_never_allows_retry_even_if_fixture_knows_no_effect)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_unverified_positive_from_reconcile_must_not_record_real_effect (test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unverified_positive_from_reconcile_must_not_record_real_effect)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "ERROR",
+      "identifier": "ERROR: test_unverified_positive_from_send_must_not_record_real_effect (test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unverified_positive_from_send_must_not_record_real_effect)",
+      "module": "test_atlasquant_aion_execution_outbox",
+      "observed_exception": "PermissionError: INDEPENDENT_PRODUCER_NOT_ENROLLED",
+      "family": "INDEPENDENT_PRODUCER_GATE"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_a53_local_ticket_cannot_authorize_injected_activation_writer (test_atlasquant_aion_global_worker_activation.A53IndependentActivationBoundaryTests.test_a53_local_ticket_cannot_authorize_injected_activation_writer)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_activation_blocks_if_flag_changes_before_write (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_activation_blocks_if_flag_changes_before_write)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_activation_plan_binds_green_post_incident_gate (test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_activation_plan_binds_green_post_incident_gate)",
+      "module": "test_atlasquant_aion_global_worker_reactivation_gate",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_ACTIVATION_PLAN_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_activation_reloads_runtime_and_blocks_stale_ticket_before_flag_write (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_activation_reloads_runtime_and_blocks_stale_ticket_before_flag_write)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_activation_requires_final_confirmation_before_any_reads_or_writes (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_activation_requires_final_confirmation_before_any_reads_or_writes)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_activation_ticket_is_integrity_protected_and_scope_bound (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_activation_ticket_is_integrity_protected_and_scope_bound)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_armed_worker_executes_due_local_work_without_external_authority (test_atlasquant_aion_worker_runtime.AionWorkerRuntimeTests.test_armed_worker_executes_due_local_work_without_external_authority)",
+      "module": "test_atlasquant_aion_worker_runtime",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_claim_cas_conflict_blocks_executor (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_claim_cas_conflict_blocks_executor)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_CONFLICT'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_claim_cas_conflict_blocks_executor (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_claim_cas_conflict_blocks_executor)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_CONFLICT'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_completed_tick_with_global_receipt_confirms_live_work (test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_completed_tick_with_global_receipt_confirms_live_work)",
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_completed_tick_without_due_work_confirms_live_idle_runner (test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_completed_tick_without_due_work_confirms_live_idle_runner)",
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "observed_exception": "AssertionError: 'BLOCKED_UNVERIFIED_LIVE_EVIDENCE' != 'LIVE_CONFIRMED_IDLE'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_critical_status_when_safety_disable_cannot_be_confirmed (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_critical_status_when_safety_disable_cannot_be_confirmed)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_due_work_is_governed_before_a_non_authoritative_receipt (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_due_work_is_governed_before_a_non_authoritative_receipt)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_executor_snapshot_reports_observed_armed_worker_mode_truthfully (test_atlasquant_aion_worker_runtime.AionWorkerRuntimeTests.test_executor_snapshot_reports_observed_armed_worker_mode_truthfully)",
+      "module": "test_atlasquant_aion_worker_runtime",
+      "observed_exception": "AssertionError: 'ARMED_WORKER' not found in []",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_failed_local_handler_populates_retry_queue (test_atlasquant_aion_worker_runtime.AionWorkerRuntimeTests.test_failed_local_handler_populates_retry_queue)",
+      "module": "test_atlasquant_aion_worker_runtime",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_failed_post_write_flag_verification_rolls_back (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_failed_post_write_flag_verification_rolls_back)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_fresh_gha_heartbeat_without_completed_tick_is_not_full_live (test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_fresh_gha_heartbeat_without_completed_tick_is_not_full_live)",
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "observed_exception": "AssertionError: 'BLOCKED_UNVERIFIED_LIVE_EVIDENCE' != 'LIVE_HEARTBEAT_CONFIRMED_AWAITING_TICK'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_gate_green (test_atlasquant_aion_activation_denial_coverage_a76.A76ActivationDenialCoverage.test_gate_green)",
+      "module": "test_atlasquant_aion_activation_denial_coverage_a76",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_allowlist_blocks_voice_schedule_before_provider (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_global_allowlist_blocks_voice_schedule_before_provider)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_allowlist_blocks_voice_schedule_before_provider (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_global_allowlist_blocks_voice_schedule_before_provider)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_cas_transport_exception_is_ambiguous_and_never_retryable (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_global_cas_transport_exception_is_ambiguous_and_never_retryable)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ERROR'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_cas_transport_exception_is_ambiguous_and_never_retryable (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_global_cas_transport_exception_is_ambiguous_and_never_retryable)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ERROR'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_cas_unverified_write_returns_reconciliation_receipt (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_global_cas_unverified_write_returns_reconciliation_receipt)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'UNVERIFIED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_cas_unverified_write_returns_reconciliation_receipt (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_global_cas_unverified_write_returns_reconciliation_receipt)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'UNVERIFIED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_claim_persists_bounded_safe_work_intent (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_global_claim_persists_bounded_safe_work_intent)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_claim_persists_bounded_safe_work_intent (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_global_claim_persists_bounded_safe_work_intent)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_tick_claims_fence_executes_and_persists_receipt (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_global_tick_claims_fence_executes_and_persists_receipt)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_global_tick_claims_fence_executes_and_persists_receipt (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_global_tick_claims_fence_executes_and_persists_receipt)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_live_readiness_collector_is_read_only_and_can_return_ready_for_flag_enable (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_live_readiness_collector_is_read_only_and_can_return_ready_for_flag_enable)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'PASS'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_other_admin_context_cannot_read_receipts (test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_other_admin_context_cannot_read_receipts)",
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_persisted_armed_state_with_disabled_flag_is_ready_for_flag_enable (test_atlasquant_aion_global_worker_readiness.GlobalWorkerActivationReadinessTests.test_persisted_armed_state_with_disabled_flag_is_ready_for_flag_enable)",
+      "module": "test_atlasquant_aion_global_worker_readiness",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'PASS'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_plan_is_read_only_and_bound_to_persisted_armed_runtime (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_plan_is_read_only_and_bound_to_persisted_armed_runtime)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_readiness_before_arming_is_safe_and_explicit (test_atlasquant_aion_global_worker_readiness.GlobalWorkerActivationReadinessTests.test_readiness_before_arming_is_safe_and_explicit)",
+      "module": "test_atlasquant_aion_global_worker_readiness",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'PASS'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_release_fence_failure_blocks_final_persistence (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_release_fence_failure_blocks_final_persistence)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'FENCE_RELEASE_FAILED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_release_fence_failure_blocks_final_persistence (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_release_fence_failure_blocks_final_persistence)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'FENCE_RELEASE_FAILED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_retry_queue_clears_after_successful_retry (test_atlasquant_aion_worker_runtime.AionWorkerRuntimeTests.test_retry_queue_clears_after_successful_retry)",
+      "module": "test_atlasquant_aion_worker_runtime",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_runtime_change_after_flag_write_rolls_activation_back (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_runtime_change_after_flag_write_rolls_activation_back)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_same_occurrence_remains_idempotent_under_worker_ticks (test_atlasquant_aion_worker_runtime.AionWorkerRuntimeTests.test_same_occurrence_remains_idempotent_under_worker_ticks)",
+      "module": "test_atlasquant_aion_worker_runtime",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_sensitive_publication_is_blocked_in_global_mode (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_sensitive_publication_is_blocked_in_global_mode)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_sensitive_publication_is_blocked_in_global_mode (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_sensitive_publication_is_blocked_in_global_mode)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_success_enables_only_flag_and_requires_future_live_evidence (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_success_enables_only_flag_and_requires_future_live_evidence)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_successful_global_tick_clears_inflight_guard_in_final_checkpoint (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_successful_global_tick_clears_inflight_guard_in_final_checkpoint)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_successful_global_tick_clears_inflight_guard_in_final_checkpoint (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_successful_global_tick_clears_inflight_guard_in_final_checkpoint)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'CONFIRMED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_ticket_fails_if_runtime_sha_or_digest_changes (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_ticket_fails_if_runtime_sha_or_digest_changes)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_uncertain_write_that_observes_enabled_attempts_safety_disable (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_uncertain_write_that_observes_enabled_attempts_safety_disable)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_unsafe_global_receipt_blocks_live_claim (test_atlasquant_aion_global_worker_live_verification.GlobalWorkerLiveVerificationTests.test_unsafe_global_receipt_blocks_live_claim)",
+      "module": "test_atlasquant_aion_global_worker_live_verification",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry (test_atlasquant_aion_global_worker.AionGlobalDurableWorkerTests.test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_UNVERIFIED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry (test_atlasquant_aion_global_worker.GlobalWorkerSafetyBridgeTests.test_unverified_lease_claim_blocks_executor_and_surfaces_no_retry)",
+      "module": "test_atlasquant_aion_global_worker",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'LEASE_CLAIM_UNVERIFIED'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_worker_returns_non_authoritative_action_receipts (test_atlasquant_aion_worker_runtime.AionWorkerRuntimeTests.test_worker_returns_non_authoritative_action_receipts)",
+      "module": "test_atlasquant_aion_worker_runtime",
+      "observed_exception": "AssertionError: 0 != 1",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_writer_creates_when_unset_and_updates_when_disabled (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_writer_creates_when_unset_and_updates_when_disabled)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: Expected 'post' to have been called once. Called 0 times.",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    },
+    {
+      "kind": "FAIL",
+      "identifier": "FAIL: test_wrong_phrase_and_expired_plan_do_not_create_ticket (test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.test_wrong_phrase_and_expired_plan_do_not_create_ticket)",
+      "module": "test_atlasquant_aion_global_worker_activation",
+      "observed_exception": "AssertionError: 'BLOCKED' != 'ACTIVATION_PLAN_READY'",
+      "family": "LEGACY_WORKER_EXPECTATION"
+    }
+  ]
+}
