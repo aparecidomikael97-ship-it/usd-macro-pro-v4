@@ -15,8 +15,8 @@ from atlasquant_aion_local_traceability import SCHEMA as TRACE_SCHEMA, SOURCE_CA
 
 SCHEMA = "ATLASQUANT_AION_RECOVERY_TRACEABILITY_GATE_V1"
 
-_TRACE_ID = re.compile(r"LCL-EV-[0-9A-F]{12}\\Z")
-_FINGERPRINT = re.compile(r"AION-LCL-[0-9A-F]{16}\\Z")
+_TRACE_ID = re.compile(r"LCL-EV-[0-9A-F]{12}\Z")
+_FINGERPRINT = re.compile(r"AION-LCL-[0-9A-F]{16}\Z")
 
 
 def _trace_projection_coherent(trace: Mapping[str, Any]) -> bool:
