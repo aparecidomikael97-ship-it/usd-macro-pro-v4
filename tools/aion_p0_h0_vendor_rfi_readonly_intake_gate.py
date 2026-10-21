@@ -85,7 +85,7 @@ def audit(manifest:dict[str,Any],document:str)->dict[str,Any]:
         require(row_id not in seen,"INTAKE_DUPLICATE_QUESTION_ID")
         seen.add(row_id)
         counts[subject]+=1
-        require(bool(re.search(rf"\*\*{re.escape(row_id)}\.",document)),
+        require(bool(re.search(rf"\*\*{re.escape(row_id)}(?:\.|:\*\*)",document)),
                 "INTAKE_UNDOCUMENTED_QUESTION")
         require(isinstance(row.get("critical"),bool),"INTAKE_CRITICALITY_MISSING")
         codes=row.get("related_h0_producer_gate_classes")
