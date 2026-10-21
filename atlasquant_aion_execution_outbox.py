@@ -511,13 +511,16 @@ class ExecutionOutbox:
             if existing is not None:
                 if existing["idempotency_key"] != idempotency_key:
                     raise ValueError("intent_ref idempotency collision")
+                # A123: verify stored material BEFORE ending either a
+                # standalone transaction or a borrowed caller SAVEPOINT.
+                # A rejected duplicate must not commit unrelated caller work.
+                out = self.get(idempotency_key)
+                if out.get("local_integrity") != "MATCH":
+                    raise PermissionError("OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH")
                 if owns_transaction:
                     self.db.commit()
                 else:
                     self.db.execute("RELEASE SAVEPOINT aion_outbox_enqueue")
-                out = self.get(idempotency_key)
-                if out.get("local_integrity") != "MATCH":
-                    raise PermissionError("OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH")
                 return {**out, "enqueue_state": "IDEMPOTENT"}
 
             seq = int(
@@ -594,6 +597,30 @@ class ExecutionOutbox:
                     }),
                 ),
             )
+            # A123: a SQLite AFTER INSERT trigger can mutate either the
+            # decision or the Outbox row while both still live in this exact
+            # transaction. Admission based on a read AFTER COMMIT is too
+            # late: Saga may stage an invalid decision as ENQUEUED.
+            # Verify *before* COMMIT / SAVEPOINT RELEASE and abort atomically.
+            out = self.get(idempotency_key)
+            clean_staging = (
+                out.get("local_integrity") == "MATCH"
+                and out.get("decision") == decision
+                and out.get("state") == "PENDING"
+                and out.get("attempts") == 0
+                and out.get("lease_owner") == ""
+                and out.get("lease_until") == ""
+                and out.get("dispatch_started_at") == ""
+                and out.get("sent_at") == ""
+                and out.get("confirmed_at") == ""
+                and out.get("effect_ref") == ""
+                and out.get("last_error") == ""
+            )
+            if not clean_staging or self.db.execute(
+                "SELECT 1 FROM action_effects WHERE idempotency_key=? LIMIT 1",
+                (idempotency_key,),
+            ).fetchone() is not None:
+                raise PermissionError("OUTBOX_ENQUEUE_LOCAL_INTEGRITY_MISMATCH")
             if owns_transaction:
                 self.db.commit()
             else:
@@ -605,7 +632,6 @@ class ExecutionOutbox:
                 self.db.execute("ROLLBACK TO SAVEPOINT aion_outbox_enqueue")
                 self.db.execute("RELEASE SAVEPOINT aion_outbox_enqueue")
             raise
-        out = self.get(idempotency_key)
         return {**out, "enqueue_state": "ENQUEUED"}
 
     def release_expired_claims(self, *, now: Any | None = None) -> int:
