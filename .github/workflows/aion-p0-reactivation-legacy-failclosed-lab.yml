@@ -39,6 +39,8 @@ jobs:
             test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_activation_plan_binds_green_post_incident_gate \
             test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_final_activation_execution_requires_fresh_gate \
             test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_execution_validation_rejects_reopened_gate
+      - name: Historical Quality 85-case registry remains traceable
+        run: python -B -m unittest -v test_aion_p0_quality_85_causal_inventory_lab.py
       - name: Existing A74 activation authorization denial contract
         run: python -B -m unittest -q test_atlasquant_aion_activation_authority_a74.py
       - name: H0 causal denial after restored local snapshots
