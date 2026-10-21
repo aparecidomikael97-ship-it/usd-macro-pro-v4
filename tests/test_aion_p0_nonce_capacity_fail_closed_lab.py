@@ -8,6 +8,7 @@ No external witness, actual owner enrollment or worker authorization.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 import sqlite3
@@ -106,11 +107,12 @@ class NonceBoundedRetentionLAB(unittest.TestCase):
 
     def test_10_refuse_when_existing_db_already_above_cap_no_prune(self):
         self.fill()
-        with sqlite3.connect(self.db) as conn:
-            conn.execute(
-                "INSERT INTO nonce_claims(scope,nonce,expires_at,expires_at_us,created_at)"
-                " VALUES(?,?,?,?,?)", ("owner.test","c",END,1,NOW)
-            )
+        with closing(sqlite3.connect(self.db)) as conn:
+            with conn:
+                conn.execute(
+                    "INSERT INTO nonce_claims(scope,nonce,expires_at,expires_at_us,created_at)"
+                    " VALUES(?,?,?,?,?)", ("owner.test","c",END,1,NOW)
+                )
         self.assertEqual(self.nonces.count(),3)
         with self.assertRaisesRegex(RuntimeError, "capacity"):
             self.claim("d")
@@ -159,6 +161,66 @@ class NonceBoundedRetentionLAB(unittest.TestCase):
     def test_16_no_caller_parameter_to_silently_raise_safety_cap(self):
         self.assertFalse(hasattr(self.nonces, "set_capacity_without_approval"))
         self.assertEqual(nonce_mod.SCHEMA_VERSION,2)
+
+
+    def install_synthetic_write_fault(self):
+        # Abort only the disposable fixture's INSERT. This is an IntegrityError,
+        # but emphatically NOT a UNIQUE(scope,nonce) replay event.
+        with closing(sqlite3.connect(self.db)) as conn:
+            with conn:
+                conn.execute(
+                    "CREATE TRIGGER synthetic_write_fault BEFORE INSERT "
+                    "ON nonce_claims BEGIN "
+                    "SELECT RAISE(ABORT,'SIMULATED_STORAGE_WRITE_FAILURE'); END"
+                )
+
+    def clear_synthetic_write_fault(self):
+        with closing(sqlite3.connect(self.db)) as conn:
+            with conn:
+                conn.execute("DROP TRIGGER synthetic_write_fault")
+
+    def test_17_nonunique_storage_integrity_failure_must_not_look_like_replay(self):
+        self.install_synthetic_write_fault()
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "SIMULATED_STORAGE_WRITE_FAILURE"):
+            self.claim("new-never-consumed")
+        self.assertEqual(self.nonces.count(),0)
+
+    def test_18_real_owner_reports_storage_fault_not_nonce_replay(self):
+        import test_atlasquant_aion_v224_owner_signature_ceremony as v224
+        secret,roots=v224.owner_keypair()
+        evidence,built=v224.request_for(roots)
+        self.install_synthetic_write_fault()
+        r=v224.verify(
+            built["request"],v224.sign(secret,built["request"]),
+            roots,self.nonces,e=evidence,
+        )
+        self.assertEqual(r["state"],"BLOCKED")
+        self.assertIn("OWNER_SIGNATURE_NONCE_REGISTRY_FAILURE",r["blockers"])
+        self.assertNotIn("OWNER_SIGNATURE_NONCE_REPLAYED",r["blockers"])
+        self.assertFalse(r["execution_allowed"])
+        self.assertFalse(r["worker_armed"])
+        self.assertEqual(self.nonces.count(),0)
+
+    def test_19_clearing_synthetic_fault_allows_next_safe_claim(self):
+        self.install_synthetic_write_fault()
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "SIMULATED_STORAGE_WRITE_FAILURE"):
+            self.claim("faulted")
+        self.clear_synthetic_write_fault()
+        self.assertTrue(self.claim("faulted"))
+        self.assertFalse(self.claim("faulted"))
+        self.assertEqual(self.nonces.count(),1)
+
+    def test_20_missing_claim_table_fails_closed_without_self_recreating(self):
+        with closing(sqlite3.connect(self.db)) as conn:
+            with conn:
+                conn.execute("DROP TABLE nonce_claims")
+        with self.assertRaises(sqlite3.DatabaseError):
+            self.claim("lost-table")
+        with closing(sqlite3.connect(self.db)) as conn:
+            self.assertIsNone(conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name='nonce_claims'"
+            ).fetchone())
 
 
 if __name__=="__main__":
