@@ -155,5 +155,32 @@ class MarketArtifactOnlyA138LAB(unittest.TestCase):
         self.rejects()
 
 
+    def test_23_windows_style_crlf_inputs_yield_same_zip(self):
+        self.build()
+        reference=self.out.read_bytes()
+        for name in M.ALLOWLIST:
+            f=self.root/name
+            f.write_bytes(f.read_bytes().replace(b"\n",b"\r\n"))
+        self.out.unlink()
+        self.build()
+        self.assertEqual(self.out.read_bytes(),reference)
+
+    def test_24_manifest_explicitly_labels_normalized_bytes(self):
+        report=self.build()
+        self.assertEqual(report["content_encoding"],"UTF8_JSON_LF_NORMALIZED")
+        self.assertEqual(M.inspect_bundle(self.out)["content_encoding"],
+                         "UTF8_JSON_LF_NORMALIZED")
+
+    def test_25_exported_json_contains_no_crlf_after_windows_input(self):
+        for name in M.ALLOWLIST:
+            f=self.root/name
+            f.write_bytes(f.read_bytes().replace(b"\n",b"\r\n"))
+        self.build()
+        with zipfile.ZipFile(self.out) as archive:
+            for name in M.ALLOWLIST:
+                self.assertNotIn(b"\r\n",archive.read(name))
+
+
+
 if __name__=="__main__":
     unittest.main()
