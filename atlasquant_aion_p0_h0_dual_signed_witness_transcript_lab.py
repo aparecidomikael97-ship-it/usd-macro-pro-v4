@@ -116,6 +116,10 @@ def _valid_payload(payload: Any, *, readback: bool) -> bool:
     keys = READ_FIELDS if readback else RES_FIELDS
     if type(payload) is not dict or frozenset(payload) != keys:
         return False
+    # Never execute untrusted Python objects' __eq__/__ne__ on schema/kind.
+    # Reject them before any canonical JSON serialization or comparisons.
+    if type(payload["schema"]) is not str or type(payload["kind"]) is not str:
+        return False
     if any(not _is_id(payload[k]) for k in (
         "issuer_id", "key_id", "request_id", "intent_id", "attempt_nonce",
         "version_id",
