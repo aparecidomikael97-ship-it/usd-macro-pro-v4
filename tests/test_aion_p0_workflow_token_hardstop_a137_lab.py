@@ -75,5 +75,21 @@ class A137WorkflowTokenHardstopLab(unittest.TestCase):
         self.assertTrue(r["all_source_lines_ignored_execution"])
         self.assertTrue(r["evidence_limited_to_repository_source"])
 
+    def test_14_autopilot_repo_token_is_read_only_in_lab_candidate(self):
+        r=A.audit(ROOT)["critical_jobs"]["autopilot-v107.yml"]
+        self.assertFalse(r["contents_write_declared"],r)
+        self.assertTrue(r["job_disabled_unconditionally"])
+
+    def test_15_coleta_repo_token_is_read_only_in_lab_candidate(self):
+        r=A.audit(ROOT)["critical_jobs"]["coleta_automatica.yml"]
+        self.assertFalse(r["contents_write_declared"],r)
+        self.assertTrue(r["job_disabled_unconditionally"])
+
+    def test_16_scheduled_writer_with_disabled_job_but_write_token_is_still_denied(self):
+        text="""on:\n  schedule:\n    - cron: '7 * * * *'\npermissions:\n  contents: write\njobs:\n  autopilot:\n    if: ${{ false }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: python autopilot_setup_audit_v114.py\n"""
+        result=A.inspect_one("autopilot-v107.yml",text)
+        self.assertFalse(result["target_p0_fence_ok"],result)
+
+
 if __name__=="__main__":
     unittest.main()
