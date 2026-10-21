@@ -51,13 +51,16 @@ class RecoveryLiveDestinationBindingLab(unittest.TestCase):
             )
         return result, runtime_get, history_get, save
 
-    def assert_blocked_without_history(self, live):
+    def assert_blocked_without_history(self, live, *, expect_live_read=True):
         result, runtime_get, history_get, save = self.call(live)
         self.assertEqual(result["status"], "BLOCKED", result)
         self.assertIs(result["saved"], False)
         self.assertIs(result["verified"], False)
         self.assertIs(result.get("automatic_retry_allowed"), False)
-        runtime_get.assert_called_once_with(self.config, timeout=12.0)
+        if expect_live_read:
+            runtime_get.assert_called_once_with(self.config, timeout=12.0)
+        else:
+            runtime_get.assert_not_called()
         history_get.assert_not_called()
         save.assert_not_called()
 
@@ -126,11 +129,11 @@ class RecoveryLiveDestinationBindingLab(unittest.TestCase):
 
     def test_13_caller_source_foreign_branch_is_blocked(self):
         self.current["source"] = "GitHub:foreign-branch:" + self.config.path
-        self.assert_blocked_without_history(self.live())
+        self.assert_blocked_without_history(self.live(), expect_live_read=False)
 
     def test_14_caller_source_foreign_path_is_blocked(self):
         self.current["source"] = "GitHub:" + self.config.branch + ":other.json"
-        self.assert_blocked_without_history(self.live())
+        self.assert_blocked_without_history(self.live(), expect_live_read=False)
 
     def test_15_no_explicit_approval_must_not_read_live(self):
         with patch("atlasquant_aion_recovery.load_runtime_checkpoint") as runtime, patch(
@@ -160,7 +163,7 @@ class RecoveryLiveDestinationBindingLab(unittest.TestCase):
         live = self.live()
         self.assertEqual(live["sha"], self.current["sha"])
         self.assertEqual(live["checkpoint"], self.current["checkpoint"])
-        self.assert_blocked_without_history(live)
+        self.assert_blocked_without_history(live, expect_live_read=False)
 
 
     def test_18_exception_during_live_readback_is_blocked_without_retry(self):
