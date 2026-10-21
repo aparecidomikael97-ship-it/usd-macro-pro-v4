@@ -7,10 +7,15 @@ on:
       timezone: "America/Cuiaba"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   coletar:
+    # A137 PROPOSED LAB ONLY: without independent custodian enrollment,
+    # stop scheduled/manual write-capable operations before any credentials,
+    # data-provider usage or Global Worker code. This freezes benign data
+    # collection too; DO NOT MERGE/DEPLOY without separate owner approval.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
