@@ -16,6 +16,7 @@ A138 demonstra um caminho ALTERNATIVO de saída: copiar dois JSON de mercado já
 - Lista fechada de dois arquivos. Rejeita Checkpoint Mestre, caminhos adicionais/absolutos/traversal/URL encoded/duplicados, symlinks e escape do checkout.
 - Limite 2 MB por arquivo e 4 MB agregados, JSON UTF-8 estrito (nega duplicatas e NaN), mapeamento na raiz e nomes explícitos de chaves de credenciais. Não constitui auditoria formal de dados sensíveis.
 - ZIP determinístico, validação cruzada do manifesto/hashes, escrita apenas em runner.temp e recusa de sobrescrita; artefato Actions com retenção de três dias.
+- Diferença real de checkout detectada em A138: Windows adicionava um CR por linha dos JSON (4.876 bytes de diferença no Market Map e 2.176 no Currency News, mesmo commit). A138 agora normaliza CRLF para LF antes da validação/hashes da CÓPIA exportada e padroniza o header ZIP (host Unix e modo STORE), preservando os arquivos de origem intactos. O SHA-256 do manifesto refere-se a esses bytes normalizados, não aos bytes específicos do sistema operacional. O hash do ZIP interno é impresso separadamente para comparação entre SOs; o hash externo do artefato Actions não é equivalente.
 - Workflow de teste contents:read, persist-credentials:false, sem segredos de provedor, sem agenda e sem executar programas de mercado/Worker. Não foi feita gravação do checkpoint.
 
 ## Evidência e interpretação
