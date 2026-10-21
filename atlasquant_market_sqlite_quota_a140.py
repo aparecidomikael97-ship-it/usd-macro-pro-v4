@@ -67,6 +67,9 @@ class SQLiteLabReservationLedger:
         # malicious local DB rollback or establish independent monotonicity.
         self._dir_identity=self._identity(self.path.parent,expect_dir=True)
         self._db_identity=None
+        # Observed high-water protects ONLY this process instance from
+        # lower-balance in-place rollback. Restart loses the witness.
+        self._highwater_units=0
         self._initialize()
 
     @staticmethod
@@ -195,6 +198,14 @@ class SQLiteLabReservationLedger:
         ).fetchone()
         if policy!=(SCHEMA,self.limit):
             raise QuotaLabUnavailable("Untrusted or changed quota policy")
+        if self._highwater_units:
+            count=db.execute(
+                "SELECT COALESCE(SUM(units),0) FROM reservations"
+            ).fetchone()[0]
+            if type(count) is not int or count<self._highwater_units:
+                raise QuotaLabUnavailable(
+                    "Same-process observed quota high-water regressed"
+                )
 
     def reserve(self, run_id, units)->bool:
         if (
@@ -221,6 +232,7 @@ class SQLiteLabReservationLedger:
                 " VALUES(?,?,'RESERVED_UNCERTAIN',NULL)",(run_id,units),
             )
             db.execute("COMMIT")
+            self._highwater_units=max(self._highwater_units,used+units)
             # A separate connection read confirms our own SQLite state.
             # If this fails, return denial, do NOT resend the source read.
             state=self.reservation_state(run_id)
@@ -304,6 +316,7 @@ class SQLiteLabReservationLedger:
                 ).fetchone()[0]
                 if type(result) is not int or not 0<=result<=self.limit:
                     raise QuotaLabUnavailable("Quota sum out of bounds")
+                self._highwater_units=max(self._highwater_units,result)
                 return result
         except (sqlite3.Error,OSError) as exc:
             raise QuotaLabUnavailable("Quota balance unreadable") from exc
