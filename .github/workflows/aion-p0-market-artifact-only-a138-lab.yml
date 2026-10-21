@@ -29,13 +29,13 @@ jobs:
       - name: A138 offline artifact-only security tests
         run: python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_only_a138_lab.py -v
       - name: Export public repository market data snapshots WITHOUT fetching data
-        run: python -B tools/aion_p0_market_artifact_only_a138.py --source-root . --out market-artifact-only.zip --source-sha ${{ github.sha }}
+        run: python -B tools/aion_p0_market_artifact_only_a138.py --source-root . --out "${{ runner.temp }}/aion-a138-market-artifact-only.zip" --source-sha ${{ github.sha }}
       - name: Inspect exported manifest and refuse checkpoint entries
-        run: python -B tools/aion_p0_market_artifact_only_a138.py --inspect market-artifact-only.zip
+        run: python -B tools/aion_p0_market_artifact_only_a138.py --inspect "${{ runner.temp }}/aion-a138-market-artifact-only.zip"
       - name: Upload offline market sample as short-lived Actions artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: aion-a138-stored-market-sample-${{ matrix.os }}-${{ github.sha }}
-          path: market-artifact-only.zip
+          path: ${{ runner.temp }}/aion-a138-market-artifact-only.zip
           if-no-files-found: error
           retention-days: 3
