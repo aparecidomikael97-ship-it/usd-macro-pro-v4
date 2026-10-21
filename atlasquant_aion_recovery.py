@@ -229,6 +229,21 @@ def recovery_preflight(
     normal writes are blocked in that condition. The candidate itself must
     never be MISMATCH or UNKNOWN.
     """
+    # A127: reject caller-supplied non-mapping recovery envelopes rather
+    # than leaking TypeError through dict(value). A missing envelope may
+    # still be represented by {} and must fail the ordinary status gate.
+    if current_runtime is not None and not isinstance(current_runtime, Mapping):
+        return {
+            "schema": SCHEMA, "allowed": False,
+            "reason": "Current runtime envelope is invalid.",
+            "executes_action": False,
+        }
+    if candidate is not None and not isinstance(candidate, Mapping):
+        return {
+            "schema": SCHEMA, "allowed": False,
+            "reason": "Recovery candidate envelope is invalid.",
+            "executes_action": False,
+        }
     current=dict(current_runtime or {})
     selected=dict(candidate or {})
     if str(current.get("status") or "").upper()!="CONFIRMED":
@@ -236,10 +251,19 @@ def recovery_preflight(
             "schema":SCHEMA,"allowed":False,"reason":"Current runtime is not confirmed.",
             "executes_action":False,
         }
-    current_sha=str(current.get("sha") or "").strip()
+    # GitHub Contents API conditional writes use a 40-character blob SHA.
+    # A truthy but malformed value must never reach history readback or a
+    # restore attempt as an expected_sha (boolean/int coercion is unsafe).
+    raw_current_sha = current.get("sha")
+    current_sha = raw_current_sha if type(raw_current_sha) is str else ""
     if not current_sha:
         return {
-            "schema":SCHEMA,"allowed":False,"reason":"Current runtime SHA is missing.",
+            "schema":SCHEMA,"allowed":False,"reason":"Current runtime SHA is missing or invalid.",
+            "executes_action":False,
+        }
+    if re.fullmatch(r"[0-9a-fA-F]{40}", current_sha) is None:
+        return {
+            "schema":SCHEMA,"allowed":False,"reason":"Current runtime SHA is invalid.",
             "executes_action":False,
         }
     if str(selected.get("status") or "").upper()!="CONFIRMED":
