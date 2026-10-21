@@ -256,10 +256,13 @@ class PersistentNonceRegistry:
                 )
                 conn.execute("COMMIT")
                 return True
-            except sqlite3.IntegrityError:
-                conn.execute("ROLLBACK")
-                return False
             except Exception:
+                # A duplicate was checked above under the same IMMEDIATE
+                # transaction. Other IntegrityErrors (trigger, CHECK,
+                # corruption, write failure) are NOT evidence of replay.
+                # Surface storage failure so the OWNER verifier fails closed
+                # with OWNER_SIGNATURE_NONCE_REGISTRY_FAILURE, not a false
+                # OWNER_SIGNATURE_NONCE_REPLAYED diagnosis.
                 conn.execute("ROLLBACK")
                 raise
 
