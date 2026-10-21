@@ -29,6 +29,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.12"
+      - name: A136b other generic GitHub writers RED-first
+        run: python -B -m unittest discover -s tests -p test_aion_p0_other_generic_writers_path_lab.py -v
       - name: A136 generic writer path confinement RED-first
         run: python -B -m unittest discover -s tests -p test_aion_p0_generic_github_writer_paths_lab.py -v
       - name: Synthetic AST detector regressions
