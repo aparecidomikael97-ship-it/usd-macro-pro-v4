@@ -208,10 +208,18 @@ class ExecutionSagaCoordinator:
         ).fetchone()
 
     def _step_rows(self, saga_id: str):
+        # Internal helper must not expose foreign Saga step payloads when
+        # called directly in a shared multi-tenant SQLite connection.
         return self.db.execute(
-            """SELECT * FROM aion_execution_saga_steps
-               WHERE saga_id=? ORDER BY ordinal""",
-            (saga_id,),
+            """SELECT st.* FROM aion_execution_saga_steps st
+               WHERE st.saga_id=?
+                 AND EXISTS (
+                     SELECT 1 FROM aion_execution_sagas s
+                     WHERE s.saga_id=st.saga_id
+                       AND s.owner=? AND s.tenant=? AND s.workspace=?
+                 )
+               ORDER BY st.ordinal""",
+            (saga_id, *self._scope_args()),
         ).fetchall()
 
     @staticmethod
@@ -271,6 +279,11 @@ class ExecutionSagaCoordinator:
         detail: Mapping[str, Any] | None = None,
         created_at: Any | None = None,
     ) -> None:
+        # A private helper is still callable by scope-confused in-process
+        # code. Verify the parent Saga belongs to this coordinator BEFORE
+        # reading its event chain, even for a non-existent or hostile ID.
+        if self._saga_row(saga_id) is None:
+            raise LookupError("saga unavailable")
         previous = self.db.execute(
             """SELECT sequence,event_hash FROM aion_execution_saga_events
                WHERE saga_id=? ORDER BY sequence DESC LIMIT 1""",
@@ -290,11 +303,18 @@ class ExecutionSagaCoordinator:
             "created_at": _iso(_utc(created_at)),
         }
         event_hash = _digest(event)
-        self.db.execute(
+        # Enforce the same scope in the INSERT statement itself. A
+        # validation SELECT alone is not a write-time isolation boundary.
+        inserted = self.db.execute(
             """INSERT INTO aion_execution_saga_events(
                 saga_id,sequence,event_type,step_key,state,detail_digest,
                 previous_hash,event_hash,created_at
-            ) VALUES (?,?,?,?,?,?,?,?,?)""",
+            )
+            SELECT ?,?,?,?,?,?,?,?,?
+            WHERE EXISTS (
+                SELECT 1 FROM aion_execution_sagas s
+                WHERE s.saga_id=? AND s.owner=? AND s.tenant=? AND s.workspace=?
+            )""",
             (
                 saga_id,
                 sequence,
@@ -305,8 +325,12 @@ class ExecutionSagaCoordinator:
                 previous_hash,
                 event_hash,
                 event["created_at"],
+                saga_id,
+                *self._scope_args(),
             ),
         )
+        if inserted.rowcount != 1:
+            raise LookupError("saga unavailable")
 
     def create(
         self,
