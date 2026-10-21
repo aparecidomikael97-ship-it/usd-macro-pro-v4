@@ -620,6 +620,37 @@ class ExecutionOutbox:
         current = _iso(_utc(now))
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            # A122: a candidate CLAIMED lease can contain a corrupted local
+            # decision, even with clean dispatch markers. Releasing the
+            # lease to RETRY before checking its decision would advance an
+            # untrusted operation's state. Verify every eligible candidate
+            # under the SAME SQLite IMMEDIATE write lock, before ANY update.
+            # An unavailable cross-scope decision is unsafe too. Reject the
+            # whole batch atomically rather than partly recycling leases.
+            expired = self.db.execute(
+                """SELECT idempotency_key FROM action_outbox
+                   WHERE owner=? AND tenant=? AND workspace=?
+                     AND state='CLAIMED' AND lease_until<>'' AND lease_until<?
+                     AND dispatch_started_at='' AND sent_at=''
+                     AND confirmed_at='' AND effect_ref=''
+                     AND NOT EXISTS (
+                         SELECT 1 FROM action_effects e
+                         WHERE e.idempotency_key=action_outbox.idempotency_key
+                     )
+                   ORDER BY idempotency_key""",
+                (*self._scope_args(), current),
+            ).fetchall()
+            for candidate in expired:
+                try:
+                    observed = self.get(candidate["idempotency_key"])
+                except (LookupError, PermissionError, ValueError, TypeError) as exc:
+                    raise PermissionError(
+                        "OUTBOX_EXPIRED_CLAIM_LOCAL_INTEGRITY_MISMATCH"
+                    ) from exc
+                if observed.get("local_integrity") != "MATCH":
+                    raise PermissionError(
+                        "OUTBOX_EXPIRED_CLAIM_LOCAL_INTEGRITY_MISMATCH"
+                    )
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='RETRY',lease_owner='',lease_until='',
