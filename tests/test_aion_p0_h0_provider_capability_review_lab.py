@@ -203,7 +203,7 @@ class ProviderCapabilityReviewLab(unittest.TestCase):
     def test_38_hostile_key_eq_not_called(self):
         class Poison:
             def __hash__(self):
-                return hash("claims")
+                return hash("poison-not-an-existing-manifest-field")
             def __eq__(self, _):
                 raise AssertionError("nonstring key must not be compared")
         p=fixture();p[Poison()]="fake"
