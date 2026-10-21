@@ -644,6 +644,23 @@ class ExecutionSagaCoordinator:
                 raise PermissionError("SAGA_SNAPSHOT_STALE")
             if self.outbox.get(step["outbox_key"]) != out:
                 raise PermissionError("SAGA_OUTBOX_SNAPSHOT_STALE")
+            # P0/H0: an older or locally restored Outbox row may claim
+            # PENDING/RETRY/CLAIMED even though the durable Saga already
+            # recorded an uncertain possible effect or missing producer.
+            # Re-projecting that earlier row would move the Saga back to
+            # RUNNING and could make its sequence eligible for reuse.
+            # Local SQLite cannot supply a producer-enforced no-effect fence.
+            # Check AFTER acquiring the writer lock and snapshot consistency,
+            # BEFORE changing the Saga step, event chain or authority budget.
+            if state in {"PENDING", "RETRY", "CLAIMED"} and (
+                saga["state"] in {
+                    "RECONCILIATION_REQUIRED", "PRODUCER_ENROLLMENT_REQUIRED",
+                }
+                or step["state"] in {"UNCERTAIN", "BLOCKED_PRODUCER"}
+            ):
+                raise PermissionError(
+                    "SAGA_UNCERTAIN_HISTORY_REGRESSION_NO_EXTERNAL_FENCE"
+                )
             # A64: a locally mutable step.outbox_key is not authorization to
             # consume any row in the same tenant. Check the decision's exact
             # Saga/step/action/budget binding while holding SQLite writer lock.
