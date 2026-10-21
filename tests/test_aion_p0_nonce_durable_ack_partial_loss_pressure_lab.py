@@ -72,13 +72,13 @@ class NonceDurableAckAndPartialLossLAB(unittest.TestCase):
 
     def test_02_before_insert_ignore_cannot_produce_false_durable_ack(self):
         self.trigger_ignore()
-        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not (?:persisted|durable|written)|write"):
+        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not durably written|not durable after commit|write"):
             self.claim("never-written")
         self.assertEqual(self.count_raw(),0)
 
     def test_03_after_insert_delete_cannot_produce_false_durable_ack(self):
         self.trigger_delete()
-        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not (?:persisted|durable|written)|write"):
+        with self.assertRaisesRegex((RuntimeError,sqlite3.Error),"not durably written|not durable after commit|write"):
             self.claim("deleted-in-the-same-transaction")
         self.assertEqual(self.count_raw(),0)
 
@@ -236,6 +236,43 @@ class NonceDurableAckAndPartialLossLAB(unittest.TestCase):
         self.assertFalse(hasattr(self.registry,"enroll_external_issuer"))
         self.assertFalse(hasattr(self.registry,"independent_antirollback"))
         self.assertFalse(hasattr(self.registry,"authorize_external_dispatch"))
+
+
+    def test_17_report_real_ascii_vs_unicode_sqlite_bytes(self):
+        measurements={}
+        for kind in ("ascii","utf8"):
+            other=self.base/f"{kind}.sqlite3"
+            reg=PersistentNonceRegistry(other)
+            for n in range(80):
+                prefix="a"*120 if kind=="ascii" else "🐢"*120
+                self.assertTrue(reg.claim(
+                    scope="synthetic-owner",nonce=f"{kind}-{n:03d}-{prefix}",
+                    now_ts=NOW,expires_at=END,
+                ))
+            self.assertEqual(reg.count(),80)
+            measurements[kind]=other.stat().st_size
+            self.assertGreater(measurements[kind],0)
+        # Same number of logical claims can require dramatically different
+        # physical file sizes; MAX_NONCE_CLAIMS is NOT a byte budget.
+        self.assertGreater(measurements["utf8"],measurements["ascii"])
+        print("AION_LAB_NONCE_DB_BYTES "+str(measurements),flush=True)
+
+    def test_18_pinned_reader_wal_growth_is_observed_not_pruned(self):
+        self.assertTrue(self.claim("before-reader"))
+        with closing(sqlite3.connect(self.db)) as reader:
+            reader.execute("BEGIN")
+            self.assertEqual(reader.execute(
+                "SELECT COUNT(*) FROM nonce_claims"
+            ).fetchone()[0],1)
+            for n in range(96):
+                self.assertTrue(self.claim(f"wal-pressure-{n:03d}-"+("Z"*175)))
+            wal=self.db.with_name(self.db.name+"-wal")
+            self.assertTrue(wal.exists())
+            wal_bytes=wal.stat().st_size
+            self.assertGreater(wal_bytes,0)
+            print("AION_LAB_NONCE_WAL_BYTES_PINNED_READER "+str(wal_bytes),flush=True)
+            self.assertEqual(self.registry.count(),97)
+        self.assertFalse(self.claim("before-reader"))
 
 
 if __name__ == "__main__":
