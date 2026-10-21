@@ -386,5 +386,96 @@ class H0ReadOnlyRealOutboxRecoveryLab(unittest.TestCase):
         self.assertEqual(self.outbox.effect_count(),0)
 
 
+    def test_45_revoked_terminal_to_pending_is_regression(self):
+        key = self.enqueue()
+        self.check(self.manifest(key, state="REVOKED"),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+
+    def test_46_failed_terminal_to_retry_is_regression(self):
+        key = self.enqueue()
+        self.set_state(key, "RETRY")
+        self.check(self.manifest(key, state="FAILED"),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+
+    def test_47_blocked_reapproval_terminal_to_claimed_is_regression(self):
+        key = self.enqueue()
+        self.set_state(key, "CLAIMED")
+        self.check(self.manifest(key, state="BLOCKED_REAPPROVAL"),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+
+    def test_48_terminal_to_other_terminal_is_regression(self):
+        key = self.enqueue()
+        self.set_state(key, "FAILED")
+        self.check(self.manifest(key, state="CONFIRMED"),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+
+    def test_49_same_terminal_state_not_local_regression_proof(self):
+        key = self.enqueue()
+        self.set_state(key, "REVOKED")
+        self.check(self.manifest(key, state="REVOKED"),
+                   expected="LOCAL_RECORD_NOT_EXTERNAL_AUTHORITY",
+                   regression=False)
+
+    def test_50_pending_with_dispatch_marker_is_suspect(self):
+        key = self.enqueue()
+        self.set_state(key, "PENDING", started=T0.isoformat())
+        self.check(self.manifest(key),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+
+    def test_51_retry_with_sent_marker_is_suspect_and_readonly(self):
+        key = self.enqueue()
+        self.set_state(key, "RETRY")
+        with self.store.db:
+            self.store.db.execute(
+                "UPDATE action_outbox SET sent_at=? WHERE idempotency_key=?",
+                (T0.isoformat(), key),
+            )
+        before = tuple(self.store.db.iterdump())
+        self.check(self.manifest(key),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+        self.assertEqual(before, tuple(self.store.db.iterdump()))
+
+    def test_52_claimed_with_effect_reference_is_suspect(self):
+        key = self.enqueue()
+        self.set_state(key, "CLAIMED")
+        with self.store.db:
+            self.store.db.execute(
+                "UPDATE action_outbox SET effect_ref=? WHERE idempotency_key=?",
+                ("lab-effect-001", key),
+            )
+        self.check(self.manifest(key, state="CLAIMED"),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+
+    def test_53_differing_dispatch_timestamp_is_suspect(self):
+        key = self.enqueue()
+        self.set_state(key, "UNCERTAIN",
+                       started=(T0 + timedelta(seconds=1)).isoformat())
+        self.check(self.manifest(key, state="UNCERTAIN",
+                                 dispatch=T0.isoformat()),
+                   expected="POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM",
+                   regression=True)
+
+    def test_54_corrupt_local_dispatch_timestamp_is_unreadable(self):
+        key = self.enqueue()
+        self.set_state(key, "PENDING", started="not-a-utc-time")
+        self.check(self.manifest(key),
+                   expected="LOCAL_HISTORY_SCHEMA_OR_VALUE_INVALID",
+                   regression=True)
+
+    def test_55_claimed_with_dispatch_start_may_be_in_flight(self):
+        key = self.enqueue()
+        self.set_state(key, "CLAIMED", started=T0.isoformat())
+        self.check(self.manifest(key, state="CLAIMED"),
+                   expected="LOCAL_RECORD_NOT_EXTERNAL_AUTHORITY",
+                   regression=False)
+
+
 if __name__ == "__main__":
     unittest.main()
