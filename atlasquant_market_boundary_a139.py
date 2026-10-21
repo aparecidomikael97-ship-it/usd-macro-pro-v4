@@ -20,6 +20,8 @@ from pathlib import Path
 import re
 from typing import Any
 
+from atlasquant_market_sqlite_quota_a140 import SQLiteLabReservationLedger
+
 SCHEMA="AION_P0_MARKET_SYNTHETIC_ACQUISITION_BOUNDARY_V1"
 SYMBOL_ALLOWLIST=frozenset({"EUR/USD","USD/JPY","GBP/USD"})
 RUN_ID_PATTERN=re.compile(r"[a-z][a-z0-9_-]{7,47}")
@@ -161,8 +163,8 @@ def collect_synthetic_market(
         filename=output_name(run_id)
         if type(feed) is not SyntheticMarketFeed:
             raise ValueError("Only the explicit in-memory fake is admissible")
-        if type(quota) is not MemoryOnlyReservationLedger:
-            raise ValueError("Only the in-memory LAB ledger is admissible")
+        if type(quota) not in (MemoryOnlyReservationLedger,SQLiteLabReservationLedger):
+            raise ValueError("Only typed offline LAB quota ledgers are admissible")
         if type(symbols) not in (tuple,list) or len(symbols)==0:
             raise ValueError("At least one literal market symbol is needed")
         if (
@@ -229,6 +231,12 @@ def collect_synthetic_market(
     except (OSError,FileExistsError) as exc:
         # No provider retry. A filesystem write error may be ambiguous.
         return _blocked("UNCERTAIN_SINK_NOT_COMMITTED",type(exc).__name__)
+    if type(quota) is SQLiteLabReservationLedger:
+        # Separate DB transaction records LOCAL output only, NEVER provider
+        # execution. If DB readback fails after the file was written, the
+        # outcome stays UNCERTAIN; do not replay or refund the reservation.
+        if not quota.record_local_output(run_id,envelope["payload_sha256"]):
+            return _blocked("UNCERTAIN_SINK_NOT_COMMITTED","SQLITE_OUTPUT_READBACK_UNKNOWN")
     return {
         "schema":SCHEMA,
         "status":"SYNTHETIC_OUTPUT_NOT_LIVE",
