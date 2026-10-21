@@ -1,0 +1,54 @@
+name: AION P0 H0 LAB Seven Signed Provider Receipt Fence (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-h0-provider-causal-readback-fence-20261021]
+
+permissions:
+  contents: read
+
+jobs:
+  no_go_seven_envelopes:
+    name: Synthetic provider outcome cannot authorize - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies and pytest
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Sixty simulated signed provider effect fence and readback adversarial cases
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_seven_signed_provider_receipt_lab.py -v
+      - name: Forty-four parent five signed-envelope cross-binding tests
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_linked_five_envelopes_lab.py -v
+      - name: Fifty-six enrollment revocation nonce signed tests
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_enrollment_revocation_nonce_lab.py -v
+      - name: Thirty-eight authority graph negative cases
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_authority_graph_lab.py -v
+      - name: Thirty-four dual signed witness cases
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_dual_signed_witness_transcript_lab.py -v
+      - name: Fifty-five external evidence structural checks
+        run: python -B -m unittest discover -s tests -p test_aion_p0_external_evidence_admission_lab.py -v
+      - name: Twenty-eight third anchor negative static checks
+        run: python -B -m unittest -v test_aion_p0_h0_third_anchor_design_review_lab
+      - name: Twenty two domain custody antirollback tests
+        run: python -B -m unittest -v test_aion_p0_h0_custody_two_domain_model_lab
+      - name: Sixty-four H0 A79 causality blocks
+        run: python -B -m unittest -v test_atlasquant_aion_h0_causal_denial_a79
+      - name: Eight real Outbox restore characterization negatives
+        run: python -B -m unittest -v test_aion_p0_h0_real_outbox_restore_claim_negative_lab
