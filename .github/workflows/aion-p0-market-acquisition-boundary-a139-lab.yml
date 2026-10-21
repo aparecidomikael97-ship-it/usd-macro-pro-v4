@@ -44,3 +44,15 @@ jobs:
               assert forbidden not in s, (p,forbidden)
           print("A139 source static boundary: no detected provider/network/GitHub write primitives")
           PY
+      - name: Execute synthetic quota-first capture to runner temp (never provider)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/a139-output"
+          python -B -m tools.aion_p0_market_synthetic_capture_demo_a139 --checkout-root . --output-dir "$RUNNER_TEMP/a139-output" --source-sha ${{ github.sha }}
+      - name: Upload synthetic-only market artifact for evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: aion-a139-synthetic-quota-only-${{ matrix.os }}-${{ github.sha }}
+          path: ${{ runner.temp }}/a139-output/aion_a139_synthetic_market_*.json
+          if-no-files-found: error
+          retention-days: 3
