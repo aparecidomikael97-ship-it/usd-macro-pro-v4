@@ -1,8 +1,9 @@
-"""LAB-only fail-closed Quality root-test coverage governance.
+"""P0 LAB candidate migration: unify full canonical Quality root coverage.
 
-Do not modify the canonical Quality selection or waive the legacy coverage FAIL.
-A missing root test can be LAB-only only if it has an executable step on this
-branch's dedicated, read-only matrix CI. No product capabilities are unlocked.
+All 26 previously LAB-only root tests must now appear in BOTH the canonical
+Quality workflow and their dedicated read-only matrix CI. NO exclusions,
+waivers, skips, trust promotion, Worker changes, merge or production activation.
+The stricter governance prevents returning to selective root-test coverage.
 """
 from __future__ import annotations
 
@@ -52,9 +53,11 @@ class AIONP0QualityLabCoverageGovernanceTests(unittest.TestCase):
         omitted = discovered - listed
         expected = {module + ".py" for module in LAB_ONLY}
         self.assertEqual(len(LAB_ONLY), len(set(LAB_ONLY)), "duplicate LAB audit module")
-        self.assertEqual(omitted, expected,
-                         "No implicit exclusions; update both audit and CI after any change")
-        self.assertFalse(expected & listed, "LAB file included twice")
+        self.assertEqual(omitted, set(),
+                         "No root test may be omitted from canonical Quality")
+        self.assertTrue(expected <= listed,
+                        "Former LAB-only tests must all run in canonical Quality")
+        self.assertEqual(len(LAB_ONLY), 26, "Prior LAB inventory must remain complete")
 
     def test_every_omitted_module_has_real_unittest_step(self):
         content = DEDICATED.read_text(encoding="utf-8")
@@ -80,7 +83,7 @@ class AIONP0QualityLabCoverageGovernanceTests(unittest.TestCase):
             self.assertNotIn(forbidden, content,
                              "LAB runner must not mutate systems or invoke external providers")
 
-    def test_legacy_quality_coverage_red_remains_untouched(self):
+    def test_legacy_quality_coverage_gate_retained_without_waiver(self):
         legacy = LEGACY.read_text(encoding="utf-8")
         self.assertIn("def test_every_root_test_file_is_executed_by_quality_workflow", legacy)
         self.assertIn("self.assertEqual(missing,[],", legacy)
