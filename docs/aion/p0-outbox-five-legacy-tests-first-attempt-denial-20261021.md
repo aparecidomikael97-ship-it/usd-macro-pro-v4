@@ -32,3 +32,11 @@ Os testes anteriores cobriam comportamentos que hoje **não podem executar** sem
 4. Falhas restantes não são dispensadas e nenhuma ação sai para serviço externo.
 
 **Nenhum P0 homologado, Worker desligado, main inalterada, sem merge/deploy nem despesas novas.**
+
+## Auditoria de 32 casos — posições históricas imutáveis
+
+Uma primeira Quality após a migração registrou 72 FAIL + 27 ERROR: os cinco métodos deixaram de lançar exceção, mas **22 subtestes** do guard `test_04_source_lines_ground_all_named_original_methods` falharam porque o registro de 20/10 conserva as **linhas físicas originais**. Não alteramos nem apagamos esse registro.
+
+O teste de proveniência agora lê os blobs Git originais (test Outbox `4d085850cdf9a5cf79fb4ad77a9656e8c3942dee`, test Saga `1a88dafab65085867619aaa601d671bc41f2c23a`), compara o número de linha original e a classe de cada caso histórico, **e ainda verifica no AST do código atual** que o mesmo método continua na mesma classe. Ausência do blob, nome ou método é FAIL. Essa abordagem preserva a evidência antiga e permite evolução da suíte, sem redefinir a verdade histórica nem dar waiver de nenhum teste.
+
+O workflow específico passa a executar integralmente também `test_aion_p0_quality_32_external_evidence_gates_lab.py` em Windows e Ubuntu. Resultados atualizados da Quality completa no SHA final devem ser anexados à PR; os 27 erros restantes não estão homologados.
