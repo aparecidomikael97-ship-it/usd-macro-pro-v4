@@ -1,0 +1,48 @@
+name: AION P0 LAB Durable Nonce Ack, Partial Loss, SQLite Full (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-nonce-durable-ack-schema-loss-20261020]
+
+permissions:
+  contents: read
+
+jobs:
+  durable_ack:
+    name: SQLite durable nonce ACK and disk-loss negatives - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked packages and pinned pytest
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Sixteen actual nonce durable acknowledgement, partial loss and SQLITE_FULL negatives
+        run: python -B -m unittest discover -s tests -p test_aion_p0_nonce_durable_ack_partial_loss_pressure_lab.py -v
+      - name: Twenty capacity and storage fault classifications
+        run: python -B -m unittest discover -s tests -p test_aion_p0_nonce_capacity_fail_closed_lab.py -v
+      - name: Sixteen nonce schema upgrade/downgrade and contention tests
+        run: python -B -m unittest discover -s tests -p test_aion_p0_nonce_schema_startup_downgrade_lab.py -v
+      - name: Fourteen clock rollback and retained nonce tests
+        run: python -B -m unittest discover -s tests -p test_aion_p0_nonce_tombstone_clock_rollback_lab.py -v
+      - name: Fourteen owner signature restore and canonical signature tests
+        run: python -B -m unittest discover -s tests -p test_aion_p0_owner_signature_canonical_nonce_restore_lab.py -v
+      - name: Original 85 V224-V226 owner signature and decision tests
+        run: python -m pytest -q test_atlasquant_aion_v224_owner_signature_ceremony.py test_atlasquant_aion_v225_explicit_owner_decision_record.py test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+      - name: H0 A79 causal denial regressions
+        run: python -B -m unittest -v test_atlasquant_aion_h0_causal_denial_a79
