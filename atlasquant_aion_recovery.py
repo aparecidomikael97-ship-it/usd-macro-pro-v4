@@ -21,6 +21,7 @@ from atlasquant_aion_memory import (
     checkpoint_integrity_report,
     checkpoint_source_digest,
     ensure_operating_checkpoint,
+    load_runtime_checkpoint,
     save_runtime_checkpoint,
     update_operating_checkpoint,
 )
@@ -359,6 +360,64 @@ def recovery_preflight(
     }
 
 
+def _recheck_live_restore_target(
+    current_runtime:Mapping[str,Any],
+    preflight:Mapping[str,Any],
+    config:RuntimeConfig,
+    *,
+    timeout:float,
+)->dict[str,Any]:
+    """Verify the configured destination with a fresh read-only GET.
+
+    A caller-supplied SHA/source is never its own trust evidence. The read
+    is bound to RuntimeConfig's exact repo, branch and path. A conditional
+    GitHub write remains mandatory later. This does not certify branch
+    ancestry, independent monotonic heads, owner authority or effects.
+    """
+    expected_source=f"GitHub:{config.branch}:{config.path}"
+    caller_source=current_runtime.get("source")
+    if caller_source is not None and (
+        type(caller_source) is not str or caller_source!=expected_source
+    ):
+        return {"allowed":False,"reason":"Current runtime source disagrees with the destination."}
+    try:
+        observed=load_runtime_checkpoint(config,timeout=min(float(timeout),12.0))
+    except Exception:
+        return {"allowed":False,"reason":"Current runtime readback failed."}
+    if not isinstance(observed,Mapping):
+        return {"allowed":False,"reason":"Current runtime readback envelope is invalid."}
+    if str(observed.get("status") or "").upper()!="CONFIRMED":
+        return {"allowed":False,"reason":"Current destination runtime could not be confirmed."}
+    if (
+        type(observed.get("source")) is not str
+        or observed.get("source")!=expected_source
+    ):
+        return {"allowed":False,"reason":"Current destination source is inconsistent."}
+    if (
+        type(observed.get("sha")) is not str
+        or observed.get("sha")!=preflight.get("expected_sha")
+    ):
+        return {"allowed":False,"reason":"Current destination SHA changed or is invalid."}
+    seen_checkpoint=observed.get("checkpoint")
+    expected_checkpoint=current_runtime.get("checkpoint")
+    if (
+        not isinstance(seen_checkpoint,Mapping)
+        or not seen_checkpoint
+        or not isinstance(expected_checkpoint,Mapping)
+        or not expected_checkpoint
+    ):
+        return {"allowed":False,"reason":"Current destination checkpoint is incomplete."}
+    try:
+        # Compare the complete observed JSON object, not only the truncated
+        # stable digest (which intentionally omits volatile fields).
+        same_content=seen_checkpoint==expected_checkpoint
+    except Exception:
+        same_content=False
+    if same_content is not True:
+        return {"allowed":False,"reason":"Current destination checkpoint differs from the selected runtime."}
+    return {"allowed":True,"expected_sha":preflight["expected_sha"]}
+
+
 def restore_checkpoint_revision(
     candidate:Mapping[str,Any],
     current_runtime:Mapping[str,Any],
@@ -379,6 +438,23 @@ def restore_checkpoint_revision(
             "schema":SCHEMA,"status":"BLOCKED","saved":False,"verified":False,
             "reason":preflight.get("reason") or "Recovery preflight blocked.",
             "preflight":preflight,
+        }
+
+    # A129 LAB: before reading the historical candidate, re-observe the
+    # exact configured runtime destination. A source label or blob SHA
+    # supplied by the caller is insufficient, even with approved=True.
+    target_check=_recheck_live_restore_target(
+        current_runtime,preflight,config,timeout=timeout,
+    )
+    if target_check.get("allowed") is not True:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED","saved":False,"verified":False,
+            "reason":target_check.get("reason") or "Current destination is unverified.",
+            "preflight":preflight,
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
         }
 
     revision=str(preflight.get("candidate_revision") or "")
