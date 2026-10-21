@@ -6,11 +6,28 @@ one isolated function AST to avoid executing UI top-level side effects.
 from __future__ import annotations
 
 import ast
+import base64
+import json
 from pathlib import Path
 import unittest
 from unittest.mock import MagicMock, patch
 
-import twelve_budget_v1108 as td
+
+def isolated_budget_module():
+    path=ROOT/"twelve_budget_v1108.py"
+    tree=ast.parse(path.read_text(encoding="utf-8"),filename=str(path))
+    cls=[n for n in tree.body
+         if isinstance(n,ast.ClassDef) and n.name=="GitHubStore"]
+    val=[n for n in tree.body
+         if isinstance(n,ast.Assign)
+         and any(isinstance(t,ast.Name) and t.id=="BUDGET_PATH" for t in n.targets)]
+    assert len(cls)==1 and len(val)==1
+    budget_path=ast.literal_eval(val[0].value)
+    budget_error=type("BudgetUnavailable",(RuntimeError,),{})
+    ns={"BUDGET_PATH":budget_path,"BudgetUnavailable":budget_error,
+        "requests":MagicMock(),"base64":base64,"json":json}
+    exec(compile(ast.Module(body=cls,type_ignores=[]),str(path),"exec"),ns)
+    return ns["GitHubStore"],budget_path,budget_error,ns["requests"]
 
 ROOT=Path(__file__).resolve().parents[1]
 CHECKPOINT="dados/aion/checkpoint_master.json"
@@ -35,6 +52,7 @@ def isolated_feedback_helper():
 class GenericGitHubFilePathFenceLAB(unittest.TestCase):
     def setUp(self):
         self.helper,self.config,self.requests=isolated_feedback_helper()
+        self.Store,self.budget_path,self.BudgetUnavailable,self.budget_requests=isolated_budget_module()
 
     def blocked_feedback(self,path):
         result=self.helper(path,b"synthetic","synthetic")
@@ -74,31 +92,31 @@ class GenericGitHubFilePathFenceLAB(unittest.TestCase):
         self.requests.put.assert_called_once()
 
     def test_09_budget_constructor_cannot_use_checkpoint(self):
-        with patch("twelve_budget_v1108.requests.put") as put:
-            with self.assertRaises(td.BudgetUnavailable):
-                td.GitHubStore("unused","example/repo","atlasquant-runtime",path=CHECKPOINT)
+        with patch.object(self.budget_requests,"put") as put:
+            with self.assertRaises(self.BudgetUnavailable):
+                self.Store("unused","example/repo","atlasquant-runtime",path=CHECKPOINT)
         put.assert_not_called()
 
     def test_10_budget_path_is_not_mutable_into_checkpoint_target(self):
-        store=td.GitHubStore("unused","example/repo","atlasquant-runtime")
+        store=self.Store("unused","example/repo","atlasquant-runtime")
         store.path=CHECKPOINT
-        with patch("twelve_budget_v1108.requests.put") as put:
-            with self.assertRaises(td.BudgetUnavailable):
+        with patch.object(self.budget_requests,"put") as put:
+            with self.assertRaises(self.BudgetUnavailable):
                 store.save({"synthetic":True},None)
         put.assert_not_called()
 
     def test_11_budget_normal_path_retained(self):
-        store=td.GitHubStore("unused","example/repo","atlasquant-runtime")
-        self.assertEqual(store.path,td.BUDGET_PATH)
+        store=self.Store("unused","example/repo","atlasquant-runtime")
+        self.assertEqual(store.path,self.budget_path)
 
     def test_12_budget_dotdot_escape_cannot_be_injected(self):
-        with self.assertRaises(td.BudgetUnavailable):
-            td.GitHubStore("unused","example/repo","atlasquant-runtime",
+        with self.assertRaises(self.BudgetUnavailable):
+            self.Store("unused","example/repo","atlasquant-runtime",
                            path="dados/x/../aion/checkpoint_master.json")
 
     def test_13_budget_encoded_path_cannot_be_injected(self):
-        with self.assertRaises(td.BudgetUnavailable):
-            td.GitHubStore("unused","example/repo","atlasquant-runtime",
+        with self.assertRaises(self.BudgetUnavailable):
+            self.Store("unused","example/repo","atlasquant-runtime",
                            path="dados%2Faion%2Fcheckpoint_master.json")
 
 
