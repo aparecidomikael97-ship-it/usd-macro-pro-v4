@@ -70,6 +70,32 @@ class CheckpointWriteSurfaceASTLAB(unittest.TestCase):
         self.assertIs(report["external_witness_enrolled"],False)
         self.assertGreater(report["scanned_python_files"],300)
 
+    def test_14_old_worker_put_is_unreachable_behind_unconditional_return(self):
+        self.assertEqual(
+            mod.reviewed_alternate_transport(ROOT,"atlasquant_aion_global_worker.py"),
+            "DORMANT_GLOBAL_WORKER_WRITER_UNCONDITIONAL_EARLY_RETURN",
+        )
+
+    def test_15_flight_recorder_uses_its_own_jsonl_path(self):
+        self.assertEqual(
+            mod.reviewed_alternate_transport(ROOT,"atlasquant_flight_recorder_store.py"),
+            "SEPARATE_FLIGHT_RECORDER_JSONL_PATH_STATIC_ONLY",
+        )
+
+    def test_16_activation_patch_is_for_safety_disabling_feature_flag(self):
+        self.assertEqual(
+            mod.reviewed_alternate_transport(ROOT,"atlasquant_aion_global_worker_activation.py"),
+            "SAFETY_DISABLE_REPOSITORY_VARIABLE_NOT_CHECKPOINT",
+        )
+
+    def test_17_remaining_generic_writers_explicitly_visible_for_manual_review(self):
+        report=mod.audit_tree(ROOT)
+        candidates={x["path"] for x in report["other_mutators_pending_manual_code_review"]}
+        self.assertIn("twelve_budget_v1108.py",candidates)
+        self.assertIn("usd_macro_pro_v4_cloud.py",candidates)
+        self.assertEqual(report["contextual_mutator_candidates_outside_primary_writer"],[])
+
+
 
 if __name__=="__main__":
     unittest.main()
