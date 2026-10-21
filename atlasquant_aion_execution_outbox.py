@@ -292,6 +292,8 @@ class ExecutionOutbox:
             """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
                FROM action_outbox o
                JOIN action_decisions d ON d.decision_id=o.decision_id
+                   AND d.owner=o.owner AND d.tenant=o.tenant
+                   AND d.workspace=o.workspace
                WHERE o.idempotency_key=? AND
                      o.owner=? AND o.tenant=? AND o.workspace=?""",
             (key, *self._scope_args()),
@@ -329,6 +331,8 @@ class ExecutionOutbox:
         sql = """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
                  FROM action_outbox o
                  JOIN action_decisions d ON d.decision_id=o.decision_id
+                   AND d.owner=o.owner AND d.tenant=o.tenant
+                   AND d.workspace=o.workspace
                  WHERE o.owner=? AND o.tenant=? AND o.workspace=?"""
         normalized = _clean(state, 40).upper()
         if normalized:
@@ -429,6 +433,8 @@ class ExecutionOutbox:
                 """SELECT o.idempotency_key, d.data AS decision_data
                    FROM action_decisions d
                    JOIN action_outbox o ON o.decision_id=d.decision_id
+                     AND o.owner=d.owner AND o.tenant=d.tenant
+                     AND o.workspace=d.workspace
                    WHERE d.owner=? AND d.tenant=? AND d.workspace=? AND d.intent_ref=?""",
                 (owner, tenant, workspace, intent),
             ).fetchone()
@@ -592,6 +598,8 @@ class ExecutionOutbox:
                           d.decision_id AS stored_decision_id
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
+                   AND d.owner=o.owner AND d.tenant=o.tenant
+                   AND d.workspace=o.workspace
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
                      AND o.state IN ('PENDING','RETRY')
                      -- A113: do not reclaim even a locally forged PENDING/
