@@ -9,11 +9,11 @@ Um terceiro teste dessa mesma classe ainda tinha a expectativa antiga `ACTIVATIO
 
 ## Migração rigorosa, sem skip nem falso GO
 
-Nesta branch alteramos somente os três métodos de teste (renomeados para refletir precisamente o veto), mais documentação/CI:
+Nesta branch alteramos somente os três métodos de teste (nomes históricos preservados para o inventário canônico de 85 ocorrências), mais documentação/CI:
 
-1. `test_activation_plan_binds_green_post_incident_gate` → `test_green_local_gate_cannot_mint_activation_plan_without_external_source`: o gate local pode ser READY estruturalmente, mas **não** cria plan, não muda feature flag, não executa Worker e exige autoridade de ativação independente.
-2. `test_final_activation_execution_requires_fresh_gate` → `test_missing_fresh_gate_and_untrusted_ticket_never_write_flag`: não há plano real; mesmo com confirmação explícita e ticket inventado, o validador recusa gate ausente e o writer injetado **não é chamado**.
-3. `test_execution_validation_rejects_reopened_gate` → `test_execution_validation_rejects_reopened_gate_without_synthetic_approval`: gate de reativação local fresco não autoriza a execução por si só, e incidente reaberto permanece bloqueado; não sintetiza prova de proprietário nem approver.
+1. `test_activation_plan_binds_green_post_incident_gate`: o gate local pode ser READY estruturalmente, mas **não** cria plan, não muda feature flag, não executa Worker e exige autoridade de ativação independente.
+2. `test_final_activation_execution_requires_fresh_gate`: não há plano real; mesmo com confirmação explícita e ticket inventado, o validador recusa gate ausente e o writer injetado **não é chamado**.
+3. `test_execution_validation_rejects_reopened_gate`: gate de reativação local fresco não autoriza a execução por si só, e incidente reaberto permanece bloqueado; não sintetiza prova de proprietário nem approver.
 
 **A fronteira mantida é mais restritiva do que a expectativa antiga.** Isso não valida a capacidade de ativar: transforma três testes de cenários não operacionais em asserts explícitos de que a ativação está proibida. O controle positivo de um futuro ambiente homologado precisa de um novo conjunto de testes com evidência independente e revisão apropriada; esse fluxo não existe hoje.
 
@@ -27,3 +27,6 @@ O workflow dedicado executa esses três métodos em Windows/Ubuntu junto com os 
 - `HARD NO-GO`, `0/6 P0`, `ZERO_AUTO_RESEND`, feature flag de Worker desligada.
 
 **Critério de aceitação:** 3 testes transformados PASS e nenhum novo FAIL/ERROR na Quality completa no HEAD final; manter catálogo completo dos restantes. A aprovação desta PR não significa homologação nem liberação do núcleo.
+
+### Identidade histórica dos testes
+A primeira execução desta PR mostrou que renomear os três métodos gerava 3 FAIL adicionais em `test_aion_p0_quality_85_causal_inventory_lab`: o registro de 85 casos exige que os nomes originais continuem presentes. A correção mantém os nomes históricos e preserva o novo corpo de asserções estritamente negativas, sem dispensar a verificação do inventário.
