@@ -351,5 +351,97 @@ class A140SQLiteLedgerAdversarialLAB(unittest.TestCase):
         self.assertTrue(self.ledger().reserve(self.run,1))
 
 
+    def test_41_mutable_symbols_after_reserve_cannot_expand_provider_reads(self):
+        from atlasquant_market_boundary_a139 import MemoryOnlyReservationLedger
+        symbols=["EUR/USD"]
+        fake=SyntheticMarketFeed({
+            "EUR/USD":{"bid":1.1,"ask":1.1002},
+            "USD/JPY":{"bid":150.0,"ask":150.02},
+            "GBP/USD":{"bid":1.3,"ask":1.3003},
+        })
+        quota=MemoryOnlyReservationLedger(limit=1)
+        original=quota.reserve
+        def mutate_after_reserve(run_id,units):
+            ok=original(run_id,units)
+            if ok:
+                symbols.extend(["USD/JPY","GBP/USD"])
+            return ok
+        with patch.object(quota,"reserve",side_effect=mutate_after_reserve):
+            result=collect_synthetic_market(
+                run_id=self.run,symbols=symbols,feed=fake,quota=quota,
+                output_dir=self.out,checkout_root=self.root,
+                observed_at=self.observed,
+            )
+        self.assertEqual(result["status"],"SYNTHETIC_OUTPUT_NOT_LIVE")
+        self.assertEqual(fake.calls,["EUR/USD"])
+        self.assertEqual(quota.reserved_units,1)
+        content=json.loads((self.out/result["filename"]).read_text())
+        self.assertEqual(list(content["quote_payload"]["quotes"]),["EUR/USD"])
+        self.assertEqual(content["reservation_units"],1)
+
+    def test_42_existing_db_without_reservations_table_fails_closed(self):
+        a=self.ledger(limit=1)
+        self.assertTrue(a.reserve(self.run,1))
+        with closing(sqlite3.connect(self.lab/DB_FILENAME)) as conn:
+            conn.execute("DROP TABLE reservations")
+            conn.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.ledger(limit=1)
+
+    def test_43_output_written_but_sqlite_receipt_unknown_is_reported(self):
+        a=self.ledger()
+        with patch.object(a,"record_local_output",return_value=False):
+            result=self.collect(a)
+        self.assertEqual(result["status"],"UNCERTAIN_SINK_NOT_COMMITTED")
+        self.assertEqual(result["market_files_written"],1)
+        self.assertTrue(result["local_file_observed"])
+        self.assertTrue(result["reconciliation_required"])
+        self.assertFalse(result["saved"])
+        self.assertFalse(result["automatic_retry_allowed"])
+        self.assertEqual(self.ledger().reservation_state(self.run)["state"],
+                         "RESERVED_UNCERTAIN")
+
+    def test_44_post_commit_exception_does_not_reopen_an_existing_run(self):
+        a=self.ledger()
+        native=sqlite3.connect
+        class AfterCommitProxy:
+            def __init__(self,wrapped):
+                self.wrapped=wrapped
+            def __getattr__(self,name):
+                return getattr(self.wrapped,name)
+            def execute(self,sql,*args,**kwargs):
+                result=self.wrapped.execute(sql,*args,**kwargs)
+                if sql=="COMMIT":
+                    raise sqlite3.OperationalError("SYNTHETIC_POST_COMMIT_UNKNOWN")
+                return result
+            def close(self):
+                return self.wrapped.close()
+        with patch("atlasquant_market_sqlite_quota_a140.sqlite3.connect",
+                   side_effect=lambda *args,**kw: AfterCommitProxy(native(*args,**kw))):
+            self.assertFalse(a.reserve(self.run,1))
+        self.assertEqual(self.ledger().reserved_units,1)
+        self.assertFalse(self.ledger().reserve(self.run,1))
+
+    def test_45_precommit_exception_rolls_back_and_never_fetches(self):
+        a=self.ledger()
+        native=sqlite3.connect
+        class BeforeCommitProxy:
+            def __init__(self,wrapped):
+                self.wrapped=wrapped
+            def __getattr__(self,name):
+                return getattr(self.wrapped,name)
+            def execute(self,sql,*args,**kwargs):
+                if sql=="COMMIT":
+                    raise sqlite3.OperationalError("SYNTHETIC_PRE_COMMIT_DENY")
+                return self.wrapped.execute(sql,*args,**kwargs)
+            def close(self):
+                return self.wrapped.close()
+        with patch("atlasquant_market_sqlite_quota_a140.sqlite3.connect",
+                   side_effect=lambda *args,**kw: BeforeCommitProxy(native(*args,**kw))):
+            self.assertFalse(a.reserve(self.run,1))
+        self.assertEqual(self.ledger().reserved_units,0)
+        self.assertTrue(self.ledger().reserve(self.run,1))
+
+
 if __name__=="__main__":
     unittest.main()
