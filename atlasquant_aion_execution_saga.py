@@ -537,17 +537,51 @@ class ExecutionSagaCoordinator:
                 risk_points=pending["risk_points"],
                 capability_class=pending["capability_class"],
             )
+            # A119: Outbox.enqueue may execute SQLite triggers, including
+            # hostile triggers in a damaged/local-admin-controlled DB. The
+            # saga snapshot checked before enqueue is NOT sufficient after
+            # staging. Verify again under the same IMMEDIATE writer lock,
+            # before touching any Saga projection. This is only LOCAL
+            # integrity, never external producer receipt or human consent.
+            try:
+                fresh = self.get(saga["saga_id"])
+                local_integrity = self.integrity_report(saga["saga_id"])
+            except (LookupError, ValueError, TypeError) as exc:
+                raise PermissionError("SAGA_STAGE_SNAPSHOT_STALE") from exc
+            if fresh != saga or local_integrity["state"] != "MATCH":
+                raise PermissionError("SAGA_STAGE_SNAPSHOT_STALE")
+
             now_iso = _iso(_utc(created_at))
-            self.db.execute(
+            updated_step = self.db.execute(
                 """UPDATE aion_execution_saga_steps
                    SET state='ENQUEUED',outbox_key=?,last_error=''
-                   WHERE saga_id=? AND step_key=?""",
-                (item["idempotency_key"], saga["saga_id"], pending["step_key"]),
+                   WHERE saga_id=? AND step_key=? AND state=?
+                     AND EXISTS (
+                         SELECT 1 FROM aion_execution_sagas s
+                         WHERE s.saga_id=aion_execution_saga_steps.saga_id
+                           AND s.owner=? AND s.tenant=? AND s.workspace=?
+                           AND s.state=? AND s.plan_digest=?
+                     )""",
+                (
+                    item["idempotency_key"], saga["saga_id"],
+                    pending["step_key"], pending["state"],
+                    *self._scope_args(), saga["state"], saga["plan_digest"],
+                ),
             )
-            self.db.execute(
-                "UPDATE aion_execution_sagas SET state='RUNNING',updated_at=? WHERE saga_id=?",
-                (now_iso, saga["saga_id"]),
+            if updated_step.rowcount != 1:
+                raise PermissionError("SAGA_STAGE_SNAPSHOT_STALE")
+            updated_saga = self.db.execute(
+                """UPDATE aion_execution_sagas
+                   SET state='RUNNING',updated_at=?
+                   WHERE saga_id=? AND owner=? AND tenant=? AND workspace=?
+                     AND state=? AND plan_digest=?""",
+                (
+                    now_iso, saga["saga_id"], *self._scope_args(),
+                    saga["state"], saga["plan_digest"],
+                ),
             )
+            if updated_saga.rowcount != 1:
+                raise PermissionError("SAGA_STAGE_SNAPSHOT_STALE")
             self._append_event(
                 saga["saga_id"],
                 event_type="FORWARD_ENQUEUED",
@@ -556,6 +590,11 @@ class ExecutionSagaCoordinator:
                 detail={"outbox_key": item["idempotency_key"]},
                 created_at=created_at,
             )
+            # A119: a trigger firing on either projection UPDATE can still
+            # corrupt the step or event tip after the first snapshot check.
+            # Never commit even staged local state on a mismatched chain.
+            if self.integrity_report(saga["saga_id"])["state"] != "MATCH":
+                raise PermissionError("SAGA_STAGE_SNAPSHOT_STALE")
             self.db.commit()
         except Exception:
             self.db.rollback()
