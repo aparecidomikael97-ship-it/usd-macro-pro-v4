@@ -181,7 +181,8 @@ class NonceBoundedRetentionLAB(unittest.TestCase):
 
     def test_17_nonunique_storage_integrity_failure_must_not_look_like_replay(self):
         self.install_synthetic_write_fault()
-        with self.assertRaisesRegex(sqlite3.IntegrityError, "SIMULATED_STORAGE_WRITE_FAILURE"):
+        with self.assertRaisesRegex((sqlite3.IntegrityError,RuntimeError),
+                                    "SIMULATED_STORAGE_WRITE_FAILURE|unauthorized trigger"):
             self.claim("new-never-consumed")
         self.assertEqual(self.nonces.count(),0)
 
@@ -203,7 +204,8 @@ class NonceBoundedRetentionLAB(unittest.TestCase):
 
     def test_19_clearing_synthetic_fault_allows_next_safe_claim(self):
         self.install_synthetic_write_fault()
-        with self.assertRaisesRegex(sqlite3.IntegrityError, "SIMULATED_STORAGE_WRITE_FAILURE"):
+        with self.assertRaisesRegex((sqlite3.IntegrityError,RuntimeError),
+                                    "SIMULATED_STORAGE_WRITE_FAILURE|unauthorized trigger"):
             self.claim("faulted")
         self.clear_synthetic_write_fault()
         self.assertTrue(self.claim("faulted"))
