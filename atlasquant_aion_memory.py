@@ -1820,6 +1820,21 @@ def load_runtime_checkpoint(
         raw_bytes = base64.b64decode(encoded, validate=True)
         if len(raw_bytes) > MAX_RUNTIME_BYTES:
             raise ValueError("runtime checkpoint too large")
+        # A132 LAB: never accept an unbound Git blob SHA as CONFIRMED.
+        # Compute identity over the exact decoded bytes, before JSON parsing.
+        # A matching Git SHA is content consistency, not rollback immunity
+        # or independent origin authority.
+        claimed_sha = obj.get("sha")
+        if (
+            type(claimed_sha) is not str
+            or re.fullmatch(r"[0-9a-fA-F]{40}", claimed_sha) is None
+        ):
+            raise ValueError("current runtime Git blob SHA missing or malformed")
+        calculated_sha = hashlib.sha1(
+            b"blob " + str(len(raw_bytes)).encode("ascii") + b"\x00" + raw_bytes
+        ).hexdigest()
+        if calculated_sha != claimed_sha.lower():
+            raise ValueError("current runtime Git blob SHA differs from decoded contents")
         raw = raw_bytes.decode("utf-8")
         payload = json.loads(raw, object_pairs_hook=_strict_json_object)
         if not isinstance(payload, dict):
