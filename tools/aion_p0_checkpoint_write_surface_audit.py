@@ -136,6 +136,17 @@ def reviewed_alternate_transport(root: Path, path: str) -> str:
         ):
             return "DORMANT_GLOBAL_WORKER_WRITER_UNCONDITIONAL_EARLY_RETURN"
         return ""
+    if path == "autopilot_v107.py":
+        # This is still a same-GitHub runtime-data transport; its narrow
+        # path fence was added by A136b. It is NOT independently authenticated.
+        if (
+            "def gh_put_bytes(" in text
+            and 'path == "dados/aion/checkpoint_master.json"' in text
+            and 'any(segment in ("", ".", "..") for segment in path.split("/"))' in text
+            and "requests.put(" in text
+        ):
+            return "AUTOPILOT_DADOS_PATH_RESTRICTED_NO_CHECKPOINT_WITNESS"
+        return ""
     if path == "atlasquant_flight_recorder_store.py":
         if (
             'FLIGHT_RECORDER_PATH="dados/atlasquant_flight_recorder.jsonl"' in text
