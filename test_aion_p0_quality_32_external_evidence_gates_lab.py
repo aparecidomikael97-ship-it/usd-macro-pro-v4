@@ -6,8 +6,10 @@ does not certify any of the original 32 methods or authorize external calls.
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
+import subprocess
 import tempfile
 import unittest
 from collections import Counter
@@ -23,6 +25,27 @@ ROOT = Path(__file__).resolve().parent
 CANONICAL = ROOT / "docs/aion/AION_P0_QUALITY_CANONICAL_85_FAILURES_CASE_REGISTRY_20261019.json"
 MATRIX = ROOT / "docs/aion/AION_P0_32_EXTERNAL_PRODUCER_EVIDENCE_MATRIX_20261020.json"
 NOW = fx.NOW
+
+# Immutable Git blobs from the original Quality-85/32 evidence inventory.
+# original_source_line refers to THIS historical code, never moving HEAD.
+# Current code is independently checked below for unchanged method/class IDs.
+PINNED_ORIGINAL_TEST_BLOBS = {
+    "test_atlasquant_aion_execution_outbox":
+        "4d085850cdf9a5cf79fb4ad77a9656e8c3942dee",
+    "test_atlasquant_aion_execution_saga":
+        "1a88dafab65085867619aaa601d671bc41f2c23a",
+}
+
+
+def _original_test_source(module: str) -> str:
+    blob = PINNED_ORIGINAL_TEST_BLOBS[module]
+    # Git's content-addressed blob is the actual original tracked source.
+    # A missing or inaccessible object fails the audit (no fallback).
+    result = subprocess.run(
+        ["git", "cat-file", "blob", blob],
+        cwd=ROOT, check=True, capture_output=True,
+    )
+    return result.stdout.decode("utf-8")
 
 
 class ProducerEvidenceCaseIntegrityLAB(unittest.TestCase):
@@ -75,11 +98,19 @@ class ProducerEvidenceCaseIntegrityLAB(unittest.TestCase):
                 self.assertEqual(row["status"], "OPEN_NOT_WAIVED")
 
     def test_04_source_lines_ground_all_named_original_methods(self):
+        # Line numbers in the ORIGINAL historical matrix are frozen.
+        # Updating tests must not rewrite the immutable record's positions;
+        # verify those coordinates against the pinned Git blobs instead.
+        original_sources = {
+            module: _original_test_source(module).splitlines()
+            for module in PINNED_ORIGINAL_TEST_BLOBS
+        }
         for row in self.rows:
             with self.subTest(case=row["case_id"]):
-                file = ROOT / (row["module"] + ".py")
+                module = row["module"]
+                file = ROOT / (module + ".py")
                 self.assertTrue(file.is_file())
-                lines = file.read_text(encoding="utf-8").splitlines()
+                lines = original_sources[module]
                 line_no = row["original_source_line"]
                 self.assertGreater(line_no, 0)
                 self.assertLessEqual(line_no, len(lines))
@@ -91,6 +122,19 @@ class ProducerEvidenceCaseIntegrityLAB(unittest.TestCase):
                 classes = re.findall(r"^class\s+(\w+)\(", previous, re.M)
                 self.assertTrue(classes)
                 self.assertEqual(classes[-1], row["class_name"])
+
+                # The CURRENT source must still define the same method in the
+                # same class: moved lines are OK, removed tests are NOT.
+                tree = ast.parse(file.read_text(encoding="utf-8"))
+                methods = {
+                    item.name
+                    for node in tree.body
+                    if isinstance(node, ast.ClassDef)
+                    and node.name == row["class_name"]
+                    for item in node.body
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+                }
+                self.assertIn(row["test_method"], methods)
 
     def test_05_no_fictional_trust_enrollment_or_historical_waiver(self):
         self.assertEqual(self.matrix["status"],
