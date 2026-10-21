@@ -121,7 +121,7 @@ def inspect_provider_capability_review_lab(manifest: Any) -> dict[str, Any]:
     """Inspect only shape and caller-declared gaps; NEVER certify a provider."""
     if not _plain(manifest, MANIFEST_FIELDS):
         return _result({"MANIFEST_SHAPE_INVALID"})
-    if manifest["schema"] != MANIFEST_SCHEMA or type(manifest["schema"]) is not str:
+    if type(manifest["schema"]) is not str or manifest["schema"] != MANIFEST_SCHEMA:
         return _result({"MANIFEST_SCHEMA_INVALID"})
     provider = manifest["provider_id"]
     if type(provider) is not str or PROVIDER_ID.fullmatch(provider) is None:
