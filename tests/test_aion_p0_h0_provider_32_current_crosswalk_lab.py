@@ -131,6 +131,18 @@ class Provider32CurrentQualityCrosswalkTests(unittest.TestCase):
         self.assertFalse(result["terminal_no_effect_fenced"])
         self.assertEqual(result["homologated_p0_count"],0)
 
+    def test_17_provenance_path_is_portable_on_windows_and_ubuntu(self):
+        from aion_p0_h0_provider_32_crosswalk_audit import ROOT, LEDGER, HISTORICAL
+        for file in (LEDGER, HISTORICAL):
+            relative=file.relative_to(ROOT).as_posix()
+            self.assertNotIn("\\\\",relative)
+            self.assertTrue(relative.startswith("docs/aion/"))
+            self.assertIn(relative,(
+                self.proposal["sources"]["current_85_ledger"],
+                self.proposal["sources"]["legacy_32_matrix"],
+            ))
+        self.assertEqual(self.check()["matched_32_provider_errors"],32)
+
 
 if __name__=="__main__":
     unittest.main()
