@@ -28,6 +28,8 @@ jobs:
           python-version: "3.12"
       - name: A138 offline artifact-only security tests
         run: python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_only_a138_lab.py -v
+      - name: A138 read-only CI workflow contract
+        run: python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_workflow_contract_a138_lab.py -v
       - name: Export public repository market data snapshots WITHOUT fetching data
         run: python -B tools/aion_p0_market_artifact_only_a138.py --source-root . --out "${{ runner.temp }}/aion-a138-market-artifact-only.zip" --source-sha ${{ github.sha }}
       - name: Inspect exported manifest and refuse checkpoint entries
