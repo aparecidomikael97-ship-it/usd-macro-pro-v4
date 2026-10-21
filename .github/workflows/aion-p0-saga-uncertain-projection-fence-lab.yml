@@ -1,0 +1,50 @@
+name: AION P0 LAB Saga Uncertain Projection Anti-Downgrade (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-saga-uncertain-projection-fence-20261021]
+
+permissions:
+  contents: read
+
+jobs:
+  saga_projection_fence:
+    name: Real Saga no-downgrade plus H0 negatives - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1
+      - name: Real Saga uncertain-to-local-rollback regression, no provider
+        run: python -B -m unittest -v test_aion_p0_saga_uncertain_projection_no_regression_lab.py
+      - name: Existing A39 no external effect or terminal fence checks
+        shell: bash
+        run: |
+          python -B -m unittest -v \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_confirmed_cannot_supply_external_producer_receipt \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a38_local_sql_failed_cannot_supply_terminal_no_effect_fence \
+            test_atlasquant_aion_execution_saga.ExecutionSagaTests.test_a39_compensation_cannot_promote_local_confirmed_or_failed
+      - name: Preserve canonical 85 historic names and 32 evidence gates
+        shell: bash
+        run: |
+          python -B -m unittest -q test_aion_p0_quality_85_causal_inventory_lab.py
+          python -B -m unittest -q test_aion_p0_quality_32_external_evidence_gates_lab.py
+      - name: H0 causal negative controls
+        run: python -B -m unittest -q test_atlasquant_aion_h0_causal_denial_a79.py
