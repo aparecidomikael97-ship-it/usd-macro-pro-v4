@@ -289,7 +289,15 @@ class ExecutionOutbox:
 
     def _outbox_row(self, key: str):
         return self.db.execute(
-            """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
+            """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq,
+                       d.decision_id AS stored_decision_id,
+                       d.payload_digest AS stored_payload_digest,
+                       d.intent_ref AS stored_intent_ref,
+                       d.action AS stored_action,
+                       d.policy_version AS stored_policy_version,
+                       d.authorization_ref AS stored_authorization_ref,
+                       d.valid_until AS stored_valid_until,
+                       d.created_at AS stored_created_at
                FROM action_outbox o
                JOIN action_decisions d ON d.decision_id=o.decision_id
                    AND d.owner=o.owner AND d.tenant=o.tenant
@@ -303,7 +311,38 @@ class ExecutionOutbox:
     def _view(row) -> dict[str, Any]:
         if row is None:
             raise LookupError("action intent unavailable")
-        decision = json.loads(row["decision_data"])
+        # A121: local reads are used in diagnosis, recovery and coordinator
+        # admission. Do not publish JSON forged after staging as a trusted
+        # decision. The claim path already checks canonical raw decision
+        # material; reuse that check on EVERY read, plus SQLite metadata
+        # coherence. Raise instead of silently hiding a row (which could be
+        # mistaken for proof that no intent/effect exists).
+        try:
+            scoped = (row["owner"], row["tenant"], row["workspace"])
+            if not _local_decision_raw_integrity(row, scoped):
+                raise ValueError("noncanonical or mismatched decision material")
+            decision = json.loads(row["decision_data"])
+            stored = (
+                ("decision_id", "stored_decision_id"),
+                ("aggregate_key", "aggregate_key"),
+                ("aggregate_seq", "aggregate_seq"),
+                ("intent_ref", "stored_intent_ref"),
+                ("action", "stored_action"),
+                ("policy_version", "stored_policy_version"),
+                ("authorization_ref", "stored_authorization_ref"),
+                ("valid_until", "stored_valid_until"),
+                ("created_at", "stored_created_at"),
+                ("payload_digest", "stored_payload_digest"),
+            )
+            if any(decision.get(name) != row[col] for name, col in stored):
+                raise ValueError("SQLite metadata mismatch")
+            if decision["decision_id"] != row["decision_id"]:
+                raise ValueError("outbox pointer mismatch")
+        except (TypeError, ValueError, KeyError, OverflowError,
+                RecursionError, IndexError) as exc:
+            raise PermissionError(
+                "OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH"
+            ) from exc
         return {
             "schema": SCHEMA,
             "idempotency_key": row["idempotency_key"],
@@ -328,7 +367,15 @@ class ExecutionOutbox:
 
     def list(self, *, state: str = "") -> list[dict[str, Any]]:
         args: list[Any] = [*self._scope_args()]
-        sql = """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
+        sql = """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq,
+                       d.decision_id AS stored_decision_id,
+                       d.payload_digest AS stored_payload_digest,
+                       d.intent_ref AS stored_intent_ref,
+                       d.action AS stored_action,
+                       d.policy_version AS stored_policy_version,
+                       d.authorization_ref AS stored_authorization_ref,
+                       d.valid_until AS stored_valid_until,
+                       d.created_at AS stored_created_at
                  FROM action_outbox o
                  JOIN action_decisions d ON d.decision_id=o.decision_id
                    AND d.owner=o.owner AND d.tenant=o.tenant
