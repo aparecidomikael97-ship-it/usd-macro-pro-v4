@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import stat
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,7 +73,33 @@ class PersistentNonceRegistry:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._ready = False
             self._initialize()
+            self._file_identity = self._current_file_identity()
             self._ready = True
+
+    def _current_file_identity(self):
+        """Snapshot same-host path identity, NOT a trusted rollback witness.
+
+        Reject symlinks/non-regular files before opening any SQLite handle.
+        A local attacker who can replace the whole file can also restore
+        snapshots: this only prevents silent path target drift in an instance.
+        """
+        try:
+            st = self.path.lstat()
+        except OSError as exc:
+            raise RuntimeError("nonce registry file identity unavailable") from exc
+        if not stat.S_ISREG(st.st_mode) or self.path.is_symlink():
+            raise RuntimeError("nonce registry file path not regular")
+        return (st.st_dev, st.st_ino)
+
+    @staticmethod
+    def _reject_triggers(conn):
+        """No user-defined triggers may rewrite consumed owner nonce history."""
+        row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='trigger' "
+            "AND tbl_name IN ('nonce_claims','nonce_registry_meta') LIMIT 1"
+        ).fetchone()
+        if row is not None:
+            raise RuntimeError("nonce registry schema has unauthorized trigger")
 
     @contextmanager
     def _connect(self):
@@ -83,12 +110,19 @@ class PersistentNonceRegistry:
         and Windows cleanup/share-lock failures. Transaction policy remains
         unchanged: claim() still uses BEGIN IMMEDIATE + explicit COMMIT.
         """
+        if getattr(self, "_ready", False):
+            if self._current_file_identity() != self._file_identity:
+                raise RuntimeError("nonce registry file identity changed")
         conn = sqlite3.connect(
             str(self.path), timeout=10.0, isolation_level=None,
         )
         try:
             conn.execute("PRAGMA synchronous=FULL")
             conn.execute("PRAGMA foreign_keys=ON")
+            if getattr(self, "_ready", False):
+                if self._current_file_identity() != self._file_identity:
+                    raise RuntimeError("nonce registry file identity changed")
+                self._reject_triggers(conn)
             # Every authorization/readback call after initialization must
             # reject an externally downgraded journal; never assume startup
             # WAL mode is permanent. Startup itself legitimately negotiates
@@ -117,6 +151,7 @@ class PersistentNonceRegistry:
         }
         has_claims = "nonce_claims" in existing
         has_meta = "nonce_registry_meta" in existing
+        self._reject_triggers(conn)
         if not has_claims and not has_meta and not self._bootstrap_if_missing:
             raise ValueError("existing nonce registry tables missing; recovery denied")
         fields = (
@@ -279,6 +314,9 @@ class PersistentNonceRegistry:
                 # cannot change journal_mode while our claim is active.
                 if str(conn.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "wal":
                     raise RuntimeError("nonce registry WAL journal mode downgraded")
+                if self._current_file_identity() != self._file_identity:
+                    raise RuntimeError("nonce registry file identity changed")
+                self._reject_triggers(conn)
                 # This local quota is a fail-closed admission ceiling, NOT
                 # a pruning policy. Check under BEGIN IMMEDIATE so parallel
                 # processes cannot admit past the cap. A known consumed nonce
