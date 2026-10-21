@@ -11,6 +11,7 @@ HUMAN_OWNER identity, exactly-once provider execution or production IAM.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 import re
 import sqlite3
@@ -94,7 +95,7 @@ class SQLiteLabReservationLedger:
                     existed=True
             if self.path.is_symlink():
                 raise ValueError("Symlink quota file denied")
-            with self._connect() as db:
+            with closing(self._connect()) as db:
                 db.execute("BEGIN IMMEDIATE")
                 db.execute(
                     "CREATE TABLE IF NOT EXISTS quota_policy ("
@@ -122,7 +123,7 @@ class SQLiteLabReservationLedger:
                     raise QuotaLabUnavailable("SQLite LAB quota policy missing or changed")
                 db.execute("COMMIT")
             # Detect clearly corrupt pages, not a trusted anti-rollback proof.
-            with self._connect() as db:
+            with closing(self._connect()) as db:
                 check=db.execute("PRAGMA quick_check").fetchone()
                 if check!=("ok",):
                     raise QuotaLabUnavailable("SQLite integrity check failed")
@@ -217,7 +218,7 @@ class SQLiteLabReservationLedger:
         if type(run_id) is not str or RUN_ID_RE.fullmatch(run_id) is None:
             return None
         try:
-            with self._connect() as db:
+            with closing(self._connect()) as db:
                 self._verify_policy(db)
                 row=db.execute(
                     "SELECT units,state,payload_sha256 FROM reservations WHERE run_id=?",
@@ -238,7 +239,7 @@ class SQLiteLabReservationLedger:
     @property
     def reserved_units(self)->int:
         try:
-            with self._connect() as db:
+            with closing(self._connect()) as db:
                 self._verify_policy(db)
                 result=db.execute(
                     "SELECT COALESCE(SUM(units),0) FROM reservations"
