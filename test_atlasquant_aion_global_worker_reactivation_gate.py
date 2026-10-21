@@ -417,68 +417,62 @@ class PostIncidentReactivationGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED")
         self.assertIn("POST_INCIDENT", result["reason"])
 
-    def test_activation_plan_binds_green_post_incident_gate(self):
-        runtime, _ = _post_incident_runtime()
-        readiness = _readiness()
-        flag = _safe_flag()
-        gate = assess_post_incident_reactivation_gate(
-            runtime,
-            _safe_reconciled_snapshot(runtime),
-            readiness,
-            flag,
-            now=NOW,
-        )
-        result = prepare_global_worker_activation_plan(
-            _access(),
-            runtime,
-            readiness,
-            flag,
-            reactivation_gate=gate,
-            now=NOW,
-        )
-        self.assertEqual(result["status"], "ACTIVATION_PLAN_READY")
-        plan = result["plan"]
-        self.assertTrue(plan["post_incident_gate_required"])
-        self.assertEqual(
-            plan["post_incident_latest_closure_record_id"],
-            gate["latest_closure_record_id"],
-        )
-        self.assertFalse(plan["feature_flag_modified"])
+    def test_green_local_gate_cannot_mint_activation_plan_without_external_source(self):
+        """Former READY-plan test: green *local* gates never enroll authority.
 
-    def test_final_activation_execution_requires_fresh_gate(self):
+        A74 intentionally blocks this older positive path. Preserve the local
+        gate check while asserting that it cannot mint any execution ticket.
+        """
         runtime, _ = _post_incident_runtime()
         readiness = _readiness()
         flag = _safe_flag()
         gate = assess_post_incident_reactivation_gate(
-            runtime,
-            _safe_reconciled_snapshot(runtime),
-            readiness,
-            flag,
-            now=NOW,
+            runtime, _safe_reconciled_snapshot(runtime),
+            readiness, flag, now=NOW,
+        )
+        self.assertEqual(gate["status"], READY_STATUS)
+        result = prepare_global_worker_activation_plan(
+            _access(), runtime, readiness, flag,
+            reactivation_gate=gate, now=NOW,
+        )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(
+            result["reason"], "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
+        )
+        self.assertNotIn("plan", result)
+        self.assertIs(result["feature_flag_modified"], False)
+        self.assertIs(result["global_worker_executed"], False)
+
+    def test_missing_fresh_gate_and_untrusted_ticket_never_write_flag(self):
+        """No real plan can exist until independently enrolled authority does.
+
+        Keep the former execution-stage negative assertion with a fake input,
+        and check that no flag writer or worker executes.
+        """
+        runtime, _ = _post_incident_runtime()
+        readiness = _readiness()
+        flag = _safe_flag()
+        gate = assess_post_incident_reactivation_gate(
+            runtime, _safe_reconciled_snapshot(runtime),
+            readiness, flag, now=NOW,
         )
         plan_result = prepare_global_worker_activation_plan(
-            _access(),
-            runtime,
-            readiness,
-            flag,
-            reactivation_gate=gate,
-            now=NOW,
+            _access(), runtime, readiness, flag,
+            reactivation_gate=gate, now=NOW,
         )
-        approval_result = approve_global_worker_activation_plan(
-            _access(),
-            plan_result["plan"],
-            confirmation=True,
-            confirmation_phrase=ACTIVATE_PHRASE,
-            now=NOW,
+        self.assertEqual(plan_result["status"], "BLOCKED")
+        self.assertNotIn("plan", plan_result)
+        untrusted_approval = {"post_incident_gate_required": True}
+        checked = validate_reactivation_gate_for_execution(
+            runtime, flag, untrusted_approval, None, now=NOW,
         )
-        approval = approval_result["approval"]
+        self.assertEqual(checked["state"], "BLOCKED")
+        self.assertEqual(
+            checked["reason"], "FRESH_POST_INCIDENT_GATE_INTEGRITY_MISMATCH",
+        )
         writes = []
-
         result = activate_global_worker_feature_flag(
-            _access(),
-            runtime,
-            approval,
-            _config(),
+            _access(), runtime, untrusted_approval, _config(),
             confirmation=True,
             reactivation_gate=None,
             flag_reader=lambda *args, **kwargs: _safe_flag(),
@@ -488,65 +482,71 @@ class PostIncidentReactivationGateTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(
-            result["reason"],
-            "FRESH_POST_INCIDENT_GATE_INTEGRITY_MISMATCH",
+            result["reason"], "ACTIVATION_APPROVAL_INTEGRITY_MISMATCH",
         )
+        self.assertIs(result["feature_flag_modified"], False)
+        self.assertIs(result["global_worker_executed"], False)
         self.assertEqual(writes, [])
 
-    def test_execution_validation_rejects_reopened_gate(self):
+    def test_execution_validation_rejects_reopened_gate_without_synthetic_approval(self):
+        """A freshly reopened incident cannot produce a valid activation gate.
+
+        The prior version dereferenced a non-existent `plan` after the
+        intentional A74 denial. Directly test the no-authority execution gate.
+        """
         runtime, incident = _post_incident_runtime()
         readiness = _readiness()
         flag = _safe_flag()
         safe_gate = assess_post_incident_reactivation_gate(
-            runtime,
-            _safe_reconciled_snapshot(runtime),
-            readiness,
-            flag,
-            now=NOW,
+            runtime, _safe_reconciled_snapshot(runtime),
+            readiness, flag, now=NOW,
         )
         plan_result = prepare_global_worker_activation_plan(
-            _access(),
-            runtime,
-            readiness,
-            flag,
-            reactivation_gate=safe_gate,
-            now=NOW,
+            _access(), runtime, readiness, flag,
+            reactivation_gate=safe_gate, now=NOW,
         )
-        approval = approve_global_worker_activation_plan(
-            _access(),
-            plan_result["plan"],
-            confirmation=True,
-            confirmation_phrase=ACTIVATE_PHRASE,
-            now=NOW,
-        )["approval"]
-
+        self.assertEqual(plan_result["status"], "BLOCKED")
+        self.assertNotIn("plan", plan_result)
+        # Even an accurately bound, synthetic approval cannot establish a
+        # fresh independent incident source.
+        untrusted_approval = {
+            "post_incident_gate_required": True,
+            "post_incident_closure_ledger_digest":
+                safe_gate["closure_ledger_digest"],
+            "post_incident_latest_closure_record_id":
+                safe_gate["latest_closure_record_id"],
+        }
+        supposedly_green = validate_reactivation_gate_for_execution(
+            runtime, flag, untrusted_approval, safe_gate, now=NOW,
+        )
+        self.assertEqual(supposedly_green["state"], "BLOCKED")
+        self.assertEqual(
+            supposedly_green["reason"],
+            "FRESH_INDEPENDENT_INCIDENT_SOURCE_NOT_ENROLLED",
+        )
         reopened = deepcopy(incident)
         reopened["generated_at"] = (NOW + timedelta(seconds=10)).isoformat()
         reopened_snapshot = reconcile_global_worker_incident_center(
-            {},
-            reopened,
-            runtime,
-            now=NOW + timedelta(seconds=10),
+            {}, reopened, runtime, now=NOW + timedelta(seconds=10),
         )
         blocked_gate = assess_post_incident_reactivation_gate(
-            runtime,
-            reopened_snapshot,
-            readiness,
-            flag,
+            runtime, reopened_snapshot, readiness, flag,
             now=NOW + timedelta(seconds=10),
         )
         self.assertEqual(blocked_gate["status"], BLOCKED_STATUS)
         result = validate_reactivation_gate_for_execution(
-            runtime,
-            flag,
-            approval,
-            blocked_gate,
+            runtime, flag, untrusted_approval, blocked_gate,
             now=NOW + timedelta(seconds=10),
         )
-        self.assertEqual(
-            result["reason"],
-            "FRESH_POST_INCIDENT_GATE_INTEGRITY_MISMATCH",
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn(
+            result["reason"], (
+                "FRESH_POST_INCIDENT_GATE_INTEGRITY_MISMATCH",
+                "FRESH_POST_INCIDENT_GATE_NOT_READY",
+                "FRESH_POST_INCIDENT_GATE_LEDGER_CHANGED",
+            ),
         )
+        self.assertIs(result.get("reactivation_authorized", False), False)
 
     def test_admin_ui_rechecks_gate_before_activation(self):
         source = Path("atlasquant_aion_admin.py").read_text(encoding="utf-8")
