@@ -149,5 +149,11 @@ class VendorRFIReadOnlyIntakeTests(unittest.TestCase):
         self.fails(lambda d:d.__setitem__("source_sha","0"*40),"SOURCE_PR_CHANGED")
 
 
+    def test_27_aws_colon_formatted_question_also_must_exist(self):
+        self.assertIn("**A-04:**",self.doc)
+        with self.assertRaisesRegex(IntakeError,"UNDOCUMENTED_QUESTION"):
+            self.verify(document=self.doc.replace("**A-04:**","**A-XX:**"))
+
+
 if __name__=="__main__":
     unittest.main()
