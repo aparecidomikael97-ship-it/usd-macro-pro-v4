@@ -654,7 +654,7 @@ class ExecutionOutbox:
             # An unavailable cross-scope decision is unsafe too. Reject the
             # whole batch atomically rather than partly recycling leases.
             expired = self.db.execute(
-                """SELECT idempotency_key FROM action_outbox
+                """SELECT idempotency_key,attempts FROM action_outbox
                    WHERE owner=? AND tenant=? AND workspace=?
                      AND state='CLAIMED' AND lease_until<>'' AND lease_until<?
                      AND dispatch_started_at='' AND sent_at=''
@@ -695,6 +695,44 @@ class ExecutionOutbox:
                 (*self._scope_args(), current),
             )
             count = int(cursor.rowcount)
+            # A125: pre-release integrity alone is insufficient. AFTER
+            # UPDATE triggers can corrupt any CLAIMED->RETRY row within
+            # the same transaction. Validate the ENTIRE original batch
+            # and the exact lease clear/result before COMMIT; an invalid
+            # row rolls back even otherwise healthy releases.
+            if count != len(expired):
+                raise PermissionError(
+                    "OUTBOX_RELEASE_POST_CAS_INTEGRITY_MISMATCH"
+                )
+            for candidate in expired:
+                key = candidate["idempotency_key"]
+                try:
+                    released = self.get(key)
+                except (LookupError, TypeError, ValueError, PermissionError) as exc:
+                    raise PermissionError(
+                        "OUTBOX_RELEASE_POST_CAS_INTEGRITY_MISMATCH"
+                    ) from exc
+                clean_release = (
+                    released.get("local_integrity") == "MATCH"
+                    and released.get("idempotency_key") == key
+                    and released.get("state") == "RETRY"
+                    and released.get("attempts") == int(candidate["attempts"])
+                    and released.get("lease_owner") == ""
+                    and released.get("lease_until") == ""
+                    and released.get("dispatch_started_at") == ""
+                    and released.get("sent_at") == ""
+                    and released.get("confirmed_at") == ""
+                    and released.get("effect_ref") == ""
+                    and released.get("last_error")
+                    == "CLAIM_LEASE_EXPIRED_BEFORE_DISPATCH"
+                )
+                if not clean_release or self.db.execute(
+                    "SELECT 1 FROM action_effects WHERE idempotency_key=? LIMIT 1",
+                    (key,),
+                ).fetchone() is not None:
+                    raise PermissionError(
+                        "OUTBOX_RELEASE_POST_CAS_INTEGRITY_MISMATCH"
+                    )
             self.db.commit()
             return count
         except Exception:
@@ -722,7 +760,8 @@ class ExecutionOutbox:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.db.execute(
-                f"""SELECT o.idempotency_key,d.data AS decision_data,
+                f"""SELECT o.idempotency_key,o.attempts AS pre_claim_attempts,
+                          d.data AS decision_data,
                           d.payload_digest AS stored_payload_digest,
                           d.decision_id AS stored_decision_id
                    FROM action_outbox o
@@ -813,8 +852,38 @@ class ExecutionOutbox:
             if cursor.rowcount != 1:
                 self.db.rollback()
                 return None
+            # A125: SQLite AFTER UPDATE triggers execute inside the CAS
+            # transaction and can mutate the decision, lease, claim state
+            # or effect ledger after the SQL WHERE checks have passed.
+            # No first claim may COMMIT based on pre-update checks only.
+            try:
+                staged = self.get(key)
+            except (LookupError, TypeError, ValueError, PermissionError) as exc:
+                raise PermissionError(
+                    "OUTBOX_CLAIM_POST_CAS_INTEGRITY_MISMATCH"
+                ) from exc
+            claim_clean = (
+                staged.get("local_integrity") == "MATCH"
+                and staged.get("state") == "CLAIMED"
+                and staged.get("attempts") == int(row["pre_claim_attempts"]) + 1
+                and staged.get("lease_owner") == worker
+                and staged.get("lease_until") == lease_until
+                and staged.get("dispatch_started_at") == ""
+                and staged.get("sent_at") == ""
+                and staged.get("confirmed_at") == ""
+                and staged.get("effect_ref") == ""
+                and staged.get("last_error") == ""
+                and staged.get("idempotency_key") == key
+            )
+            if not claim_clean or self.db.execute(
+                "SELECT 1 FROM action_effects WHERE idempotency_key=? LIMIT 1",
+                (key,),
+            ).fetchone() is not None:
+                raise PermissionError(
+                    "OUTBOX_CLAIM_POST_CAS_INTEGRITY_MISMATCH"
+                )
             self.db.commit()
-            return self.get(key)
+            return staged
         except Exception:
             self.db.rollback()
             raise
