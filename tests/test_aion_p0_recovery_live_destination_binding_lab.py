@@ -42,6 +42,9 @@ class RecoveryLiveDestinationBindingLab(unittest.TestCase):
             "atlasquant_aion_recovery._recheck_runtime_branch_head_before_save",
             return_value={"allowed":True,"executes_action":False},
         ), patch(
+            "atlasquant_aion_recovery._require_independent_recovery_head_witness",
+            return_value={"allowed":True,"synthetic_test_only":True},
+        ), patch(
             "atlasquant_aion_recovery.load_runtime_checkpoint",
             return_value=live,
         ) as runtime_get, patch(

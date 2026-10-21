@@ -545,6 +545,36 @@ def _recheck_runtime_branch_head_before_save(
     return {"allowed":True,"runtime_branch_head":observed,"executes_action":False}
 
 
+
+def _require_independent_recovery_head_witness(
+    config:RuntimeConfig,
+    *,
+    ancestry:Mapping[str,Any],
+    current_blob_sha:Any,
+    candidate_revision:Any,
+)->dict[str,Any]:
+    """A134 HARD NO-GO until an independently ENROLLED witness exists.
+
+    There is currently no trusted off-GitHub enrollment, revocation, durable
+    monotonic-head READ or authenticated provider-backed CAS in this runtime.
+    Therefore no environmental boolean, caller-supplied certificate, GitHub
+    response, or current blob SHA may authorize a historical restore.
+    This deliberately refuses ALL real restore writes. Positive mock tests
+    of downstream legacy CAS are NOT enrollment or an operational bypass.
+    Implementing a real provider requires a separate reviewed trust ceremony.
+    """
+    return {
+        "allowed":False,
+        "status":"BLOCKED",
+        "reason":"INDEPENDENT_MONOTONIC_HEAD_WITNESS_NOT_ENROLLED",
+        "independent_witness_enrolled":False,
+        "monotonic_head_proven":False,
+        "human_owner_verified":False,
+        "restoration_authorized":False,
+        "executes_action":False,
+    }
+
+
 def restore_checkpoint_revision(
     candidate:Mapping[str,Any],
     current_runtime:Mapping[str,Any],
@@ -673,6 +703,28 @@ def restore_checkpoint_revision(
             "requested_revision":revision,"restored_revision":"",
             "restore_confirmed":False,"reconciliation_required":False,
             "automatic_retry_allowed":False,"automatic_restore":False,
+        }
+    # A134: GitHub branch HEAD agreement is not an independently witnessed
+    # last head. No real custodian/trust enrollment exists, so hard-deny the
+    # recovery write even when approved=True and GitHub checks all agree.
+    witness_admission=_require_independent_recovery_head_witness(
+        config,
+        ancestry=ancestry,
+        current_blob_sha=preflight.get("expected_sha"),
+        candidate_revision=revision,
+    )
+    if witness_admission.get("allowed") is not True:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED","saved":False,"verified":False,
+            "reason":witness_admission.get("reason")
+                or "Independent recovery witness unavailable.",
+            "preflight":preflight,
+            "requested_revision":revision,"restored_revision":"",
+            "restore_confirmed":False,"reconciliation_required":False,
+            "automatic_retry_allowed":False,"automatic_restore":False,
+            "independent_witness_enrolled":False,
+            "monotonic_head_proven":False,
+            "human_owner_verified":False,
         }
     preflight=rebound_preflight
     checkpoint=ensure_operating_checkpoint(rebound_candidate.get("checkpoint"))
