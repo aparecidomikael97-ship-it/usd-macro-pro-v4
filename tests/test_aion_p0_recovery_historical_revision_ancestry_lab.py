@@ -61,6 +61,9 @@ class HistoricalRevisionAncestryFenceLAB(unittest.TestCase):
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             return_value={"status": "CONFLICT", "saved": False, "verified": False},
         ) as save, patch(
+            "atlasquant_aion_recovery._require_independent_recovery_head_witness",
+            return_value={"allowed":True,"synthetic_test_only":True},
+        ), patch(
             "requests.get",
             side_effect=compare_error if compare_error is not None
             else [compare_response,branch_response],

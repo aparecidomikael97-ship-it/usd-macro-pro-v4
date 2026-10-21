@@ -53,6 +53,9 @@ class RecoveryBranchHeadTOCTOUFenceLAB(unittest.TestCase):
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             return_value={"status":"CONFLICT","saved":False,"verified":False},
         ) as save, patch(
+            "atlasquant_aion_recovery._require_independent_recovery_head_witness",
+            return_value={"allowed":True,"synthetic_test_only":True},
+        ), patch(
             "requests.get",return_value=response,side_effect=raised,
         ) as git_get:
             result=restore_checkpoint_revision(
