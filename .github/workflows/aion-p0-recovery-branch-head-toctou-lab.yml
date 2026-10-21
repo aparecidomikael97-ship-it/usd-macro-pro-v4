@@ -1,0 +1,58 @@
+name: AION P0 LAB Recovery Branch Head TOCTOU (NO-GO)
+
+on:
+  push:
+    branches:
+      - lab/aion-p0-recovery-branch-head-toctou-fence-20261021
+
+permissions:
+  contents: read
+
+jobs:
+  historical-blob-identity:
+    name: Recovery branch-head TOCTOU and regressions - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+      AION_LAB_MODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked dependencies
+        run: python -m pip install -r requirements.txt
+      - name: A133 recovery branch HEAD TOCTOU RED-first
+        run: python -B -m unittest discover -s tests -p test_aion_p0_recovery_branch_head_toctou_lab.py -v
+      - name: New A132 current runtime Git blob identity RED-first
+        run: python -B -m unittest discover -s tests -p test_aion_p0_runtime_current_git_blob_identity_lab.py -v
+      - name: Original memory regression
+        run: python -B -m unittest -v test_atlasquant_aion_memory
+      - name: A131 historical blob source identity regression
+        run: python -B -m unittest discover -s tests -p test_aion_p0_recovery_historical_blob_identity_lab.py -v
+      - name: Original historical recovery regression
+        run: python -B -m unittest -v test_atlasquant_aion_recovery
+      - name: A130 historical commit ancestry
+        run: python -B -m unittest discover -s tests -p test_aion_p0_recovery_historical_revision_ancestry_lab.py -v
+      - name: A129 destination readback
+        run: python -B -m unittest discover -s tests -p test_aion_p0_recovery_live_destination_binding_lab.py -v
+      - name: A128 current payload
+        run: python -B -m unittest discover -s tests -p test_aion_p0_recovery_current_envelope_completeness_lab.py -v
+      - name: A127 strict current Git SHA
+        run: python -B -m unittest discover -s tests -p test_aion_p0_recovery_preflight_strict_git_sha_lab.py -v
+      - name: Original recovery traceability
+        run: python -B -m unittest -v test_atlasquant_aion_recovery_traceability_gate
+      - name: A126 trace coherence
+        run: python -B -m unittest discover -s tests -p test_aion_p0_checkpoint_recovery_trace_shape_coherence_lab.py -v
+      - name: H0 A79 causal denial
+        run: python -B -m unittest -v test_atlasquant_aion_h0_causal_denial_a79

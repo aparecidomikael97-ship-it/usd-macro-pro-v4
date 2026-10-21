@@ -40,6 +40,18 @@ class HistoricalRevisionAncestryFenceLAB(unittest.TestCase):
             **deepcopy(self.current),
             "source": "GitHub:" + self.cfg.branch + ":" + self.cfg.path,
         }
+        branch_response = MagicMock()
+        branch_response.raise_for_status.return_value = None
+        compared_head = (
+            compare_response.json.return_value.get("head_commit",{}).get("sha")
+            if compare_response is not None
+            and isinstance(compare_response.json.return_value,dict)
+            else "c"*40
+        )
+        branch_response.json.return_value = {
+            "ref":"refs/heads/atlasquant-runtime",
+            "object":{"type":"commit","sha":compared_head},
+        }
         with patch(
             "atlasquant_aion_recovery.load_runtime_checkpoint", return_value=live
         ) as runtime_get, patch(
@@ -49,8 +61,9 @@ class HistoricalRevisionAncestryFenceLAB(unittest.TestCase):
             "atlasquant_aion_recovery.save_runtime_checkpoint",
             return_value={"status": "CONFLICT", "saved": False, "verified": False},
         ) as save, patch(
-            "requests.get", side_effect=compare_error,
-            return_value=compare_response,
+            "requests.get",
+            side_effect=compare_error if compare_error is not None
+            else [compare_response,branch_response],
         ) as compare_get:
             result = restore_checkpoint_revision(
                 deepcopy(self.candidate), deepcopy(self.current),
@@ -107,7 +120,7 @@ class HistoricalRevisionAncestryFenceLAB(unittest.TestCase):
         target.assert_called_once()
         historical.assert_called_once_with(self.rev, self.cfg, timeout=12.0)
         save.assert_called_once()
-        get.assert_called_once()
+        self.assertEqual(get.call_count,2)
 
     def test_10_revision_identical_to_branch_head_allowed_for_review(self):
         result, target, historical, save, get = self.call(
@@ -116,16 +129,16 @@ class HistoricalRevisionAncestryFenceLAB(unittest.TestCase):
         self.assertEqual(result["status"], "CONFLICT")
         historical.assert_called_once()
         save.assert_called_once()
-        get.assert_called_once()
+        self.assertEqual(get.call_count,2)
 
     def test_11_compare_url_uses_selected_revision_and_runtime_branch(self):
         _, _, _, _, get = self.call(self.compare())
-        get.assert_called_once()
-        url = get.call_args.args[0]
+        self.assertEqual(get.call_count,2)
+        url = get.call_args_list[0].args[0]
         self.assertIn("/repos/example/repo/compare/", url)
         self.assertIn(self.rev, url)
         self.assertIn("atlasquant-runtime", url)
-        self.assertEqual(get.call_args.kwargs["timeout"], 12.0)
+        self.assertEqual(get.call_args_list[0].kwargs["timeout"], 12.0)
 
     def test_12_no_human_approval_skips_ancestry_and_all_reads(self):
         with patch("atlasquant_aion_recovery.load_runtime_checkpoint") as target, patch(

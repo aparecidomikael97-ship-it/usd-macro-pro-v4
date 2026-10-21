@@ -307,6 +307,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             "atlasquant_aion_recovery._verify_runtime_revision_ancestry",
             return_value={"allowed":True,"executes_action":False},
         ), patch(
+            "atlasquant_aion_recovery._recheck_runtime_branch_head_before_save",
+            return_value={"allowed":True,"executes_action":False},
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value=candidate,
         ) as reload_revision, patch(
@@ -347,6 +350,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             "atlasquant_aion_recovery._verify_runtime_revision_ancestry",
             return_value={"allowed":True,"executes_action":False},
         ), patch(
+            "atlasquant_aion_recovery._recheck_runtime_branch_head_before_save",
+            return_value={"allowed":True,"executes_action":False},
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value={
                 "status":"ERROR",
@@ -381,6 +387,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             "atlasquant_aion_recovery._verify_runtime_revision_ancestry",
             return_value={"allowed":True,"executes_action":False},
         ), patch(
+            "atlasquant_aion_recovery._recheck_runtime_branch_head_before_save",
+            return_value={"allowed":True,"executes_action":False},
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value=historical,
         ), patch("atlasquant_aion_recovery.save_runtime_checkpoint") as save:
@@ -404,6 +413,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             return_value=self.live_result(current),
         ), patch(
             "atlasquant_aion_recovery._verify_runtime_revision_ancestry",
+            return_value={"allowed":True,"executes_action":False},
+        ), patch(
+            "atlasquant_aion_recovery._recheck_runtime_branch_head_before_save",
             return_value={"allowed":True,"executes_action":False},
         ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
@@ -445,6 +457,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             return_value=self.live_result(current),
         ), patch(
             "atlasquant_aion_recovery._verify_runtime_revision_ancestry",
+            return_value={"allowed":True,"executes_action":False},
+        ), patch(
+            "atlasquant_aion_recovery._recheck_runtime_branch_head_before_save",
             return_value={"allowed":True,"executes_action":False},
         ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
