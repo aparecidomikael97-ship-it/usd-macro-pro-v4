@@ -121,6 +121,10 @@ class H0ReadOnlyRealOutboxRecoveryLab(unittest.TestCase):
 
     def test_03_unknown_local_row_requires_external_resolution(self):
         key=self.enqueue()
+        # Actual first claim increments attempts in the real SQLite Outbox.
+        claimed=self.outbox.claim_next("lab-worker",now=T0,lease_seconds=60)
+        self.assertEqual(claimed["idempotency_key"],key)
+        self.assertEqual(claimed["attempts"],1)
         self.set_state(key,"UNCERTAIN",started=T0.isoformat())
         self.check(self.manifest(key,state="UNCERTAIN",attempts=1,
                                  dispatch=T0.isoformat()),
