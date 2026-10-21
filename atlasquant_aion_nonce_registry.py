@@ -56,8 +56,12 @@ def _epoch_us(value: datetime) -> int:
 class PersistentNonceRegistry:
     def __init__(self, db_path: str | Path):
         self.path = Path(db_path)
-        if self.path.exists() and self.path.is_symlink():
+        if self.path.is_symlink():
             raise ValueError("nonce registry must not be a symlink")
+        # An existing empty schema cannot mean "safe to forget owner nonces".
+        # New LAB enrollment is permitted only if the path was absent before
+        # opening the registry. Full-file deletion is still an OPEN H0 gap.
+        self._bootstrap_if_missing = not self.path.exists()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
@@ -104,6 +108,8 @@ class PersistentNonceRegistry:
                 }
                 has_claims = "nonce_claims" in existing
                 has_meta = "nonce_registry_meta" in existing
+                if not has_claims and not has_meta and not self._bootstrap_if_missing:
+                    raise ValueError("existing nonce registry tables missing; recovery denied")
                 fields = (
                     {str(row[1]) for row in conn.execute(
                         "PRAGMA table_info(nonce_claims)"
@@ -189,7 +195,14 @@ class PersistentNonceRegistry:
 
                 conn.execute("COMMIT")
             except Exception:
-                conn.execute("ROLLBACK")
+                # SQLITE_FULL/IOERR may already have ended the transaction.
+                # Preserve the original SQLite error rather than masking it
+                # with "cannot rollback - no transaction is active".
+                if conn.in_transaction:
+                    try:
+                        conn.execute("ROLLBACK")
+                    except sqlite3.Error:
+                        pass
                 raise
 
             # journal_mode cannot be changed inside the transaction. A
@@ -246,7 +259,7 @@ class PersistentNonceRegistry:
                     )
                 # Tombstone retention intentionally grows; count is not an
                 # on-disk byte budget. Full-backup rollback is still OPEN P0.
-                conn.execute(
+                inserted = conn.execute(
                     """
                     INSERT INTO nonce_claims(
                         scope, nonce, expires_at, expires_at_us, created_at
@@ -254,16 +267,34 @@ class PersistentNonceRegistry:
                     """,
                     (scope, nonce, expires_at, exp_us, now_ts),
                 )
+                # SQLite triggers can silently IGNORE an INSERT or DELETE
+                # its row without raising. Never report owner nonce usage
+                # based only on a successful execute() call.
+                expected = (expires_at, exp_us, now_ts)
+                if inserted.rowcount != 1 or conn.execute(
+                    "SELECT expires_at,expires_at_us,created_at FROM nonce_claims "
+                    "WHERE scope=? AND nonce=?",
+                    (scope, nonce),
+                ).fetchone() != expected:
+                    raise RuntimeError("nonce claim not durably written")
                 conn.execute("COMMIT")
+                # Local same-DB readback is NOT an independent H0 witness.
+                if conn.execute(
+                    "SELECT expires_at,expires_at_us,created_at FROM nonce_claims "
+                    "WHERE scope=? AND nonce=?",
+                    (scope, nonce),
+                ).fetchone() != expected:
+                    raise RuntimeError("nonce claim not durable after commit")
                 return True
             except Exception:
-                # A duplicate was checked above under the same IMMEDIATE
-                # transaction. Other IntegrityErrors (trigger, CHECK,
-                # corruption, write failure) are NOT evidence of replay.
-                # Surface storage failure so the OWNER verifier fails closed
-                # with OWNER_SIGNATURE_NONCE_REGISTRY_FAILURE, not a false
-                # OWNER_SIGNATURE_NONCE_REPLAYED diagnosis.
-                conn.execute("ROLLBACK")
+                # Not even an unexpected storage failure implies replay.
+                # SQLITE_FULL/IOERR may have automatically rolled back;
+                # never replace the causal error with a second ROLLBACK error.
+                if conn.in_transaction:
+                    try:
+                        conn.execute("ROLLBACK")
+                    except sqlite3.Error:
+                        pass
                 raise
 
     def contains(self, *, scope: str, nonce: str) -> bool:
