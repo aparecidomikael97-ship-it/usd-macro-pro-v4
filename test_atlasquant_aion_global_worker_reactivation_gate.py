@@ -417,7 +417,7 @@ class PostIncidentReactivationGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED")
         self.assertIn("POST_INCIDENT", result["reason"])
 
-    def test_green_local_gate_cannot_mint_activation_plan_without_external_source(self):
+    def test_activation_plan_binds_green_post_incident_gate(self):
         """Former READY-plan test: green *local* gates never enroll authority.
 
         A74 intentionally blocks this older positive path. Preserve the local
@@ -443,7 +443,7 @@ class PostIncidentReactivationGateTests(unittest.TestCase):
         self.assertIs(result["feature_flag_modified"], False)
         self.assertIs(result["global_worker_executed"], False)
 
-    def test_missing_fresh_gate_and_untrusted_ticket_never_write_flag(self):
+    def test_final_activation_execution_requires_fresh_gate(self):
         """No real plan can exist until independently enrolled authority does.
 
         Keep the former execution-stage negative assertion with a fake input,
@@ -488,7 +488,7 @@ class PostIncidentReactivationGateTests(unittest.TestCase):
         self.assertIs(result["global_worker_executed"], False)
         self.assertEqual(writes, [])
 
-    def test_execution_validation_rejects_reopened_gate_without_synthetic_approval(self):
+    def test_execution_validation_rejects_reopened_gate(self):
         """A freshly reopened incident cannot produce a valid activation gate.
 
         The prior version dereferenced a non-existent `plan` after the
