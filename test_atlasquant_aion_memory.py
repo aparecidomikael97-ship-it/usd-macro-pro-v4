@@ -967,6 +967,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         verified=ensure_operating_checkpoint(cp)
         verified["operating"]["dirty"]=False
         with patch("requests.put",return_value=put) as put_call, patch(
+            "atlasquant_aion_memory._require_independent_runtime_write_witness",
+            return_value={"allowed":True,"synthetic_test_only":True},
+        ), patch(
             "atlasquant_aion_memory.load_runtime_checkpoint",
             return_value={
                 "status":"CONFIRMED",
@@ -991,7 +994,10 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         cfg=RuntimeConfig(token="x",repo="owner/repo",branch="atlasquant-runtime")
         put=MagicMock()
         put.status_code=409
-        with patch("requests.put",return_value=put):
+        with patch("requests.put",return_value=put), patch(
+            "atlasquant_aion_memory._require_independent_runtime_write_witness",
+            return_value={"allowed":True,"synthetic_test_only":True},
+        ):
             result=save_runtime_checkpoint(default_checkpoint(),cfg,approved=True,expected_sha="stale")
         self.assertEqual(result["status"],"CONFLICT")
         self.assertFalse(result["saved"])
@@ -1004,6 +1010,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         put.raise_for_status.return_value=None
         put.json.return_value={"content":{"sha":"newsha"}}
         with patch("requests.put",return_value=put), patch(
+            "atlasquant_aion_memory._require_independent_runtime_write_witness",
+            return_value={"allowed":True,"synthetic_test_only":True},
+        ), patch(
             "atlasquant_aion_memory.load_runtime_checkpoint",
             return_value={"status":"ERROR","sha":"","checkpoint":None},
         ):
@@ -1105,6 +1114,9 @@ class AtlasQuantAionMemoryTests(unittest.TestCase):
         put.json.return_value = {"content": {"sha": "newsha"}}
 
         with patch("requests.put", return_value=put) as put_call, patch(
+            "atlasquant_aion_memory._require_independent_runtime_write_witness",
+            return_value={"allowed":True,"synthetic_test_only":True},
+        ), patch(
             "atlasquant_aion_memory.load_runtime_checkpoint",
             return_value={"status": "ERROR", "checkpoint": None, "sha": ""},
         ):

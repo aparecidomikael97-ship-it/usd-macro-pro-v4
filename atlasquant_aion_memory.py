@@ -2115,6 +2115,33 @@ def reconcile_runtime_write(
     }
 
 
+
+def _require_independent_runtime_write_witness(
+    config: RuntimeConfig,
+    *,
+    expected_sha: str,
+    expected_digest: str,
+) -> dict[str, Any]:
+    """A135 P0 hard no-go until real off-GitHub monotonic custody exists.
+
+    The runtime has no independently enrolled issuer, durable fresh signed
+    head READ, revocation root or authenticated atomic witness CAS.
+    Neither approved=True, an OAuth/GitHub token, environment variables,
+    nor caller-provided signatures are a trusted substitute.
+    This gate is *deny only* in the product code. Tests may explicitly
+    mock it to exercise downstream transport semantics, without authority.
+    """
+    return {
+        "allowed": False,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_RUNTIME_WRITE_WITNESS_NOT_ENROLLED",
+        "independent_witness_enrolled": False,
+        "monotonic_head_proven": False,
+        "owner_identity_verified": False,
+        "executes_action": False,
+    }
+
+
 def save_runtime_checkpoint(
     checkpoint: Mapping[str, Any],
     config: RuntimeConfig | None = None,
@@ -2319,6 +2346,32 @@ def save_runtime_checkpoint(
             "saved": False,
             "verified": False,
             "reason": "Checkpoint exceeds size limit.",
+            "checked_at": _now(),
+        }
+
+    # A135: protect the shared direct writer too. A134 seals only the
+    # historical restore entrypoint; otherwise a caller could bypass it by
+    # calling save_runtime_checkpoint with approved=True and old checkpoint
+    # bytes. There is currently NO externally enrolled witness to authorize
+    # either path, so all runtime PUT attempts must remain hard blocked.
+    admission = _require_independent_runtime_write_witness(
+        cfg,
+        expected_sha=str(expected_sha or "").strip(),
+        expected_digest=expected_digest,
+    )
+    if admission.get("allowed") is not True:
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "saved": False,
+            "verified": False,
+            "write_outcome": "NOT_ATTEMPTED",
+            "reconciliation_required": False,
+            "automatic_retry_allowed": False,
+            "reason": admission.get("reason")
+                or "Independent runtime write witness is not enrolled.",
+            "independent_witness_enrolled": False,
+            "monotonic_head_proven": False,
             "checked_at": _now(),
         }
 
