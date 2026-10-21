@@ -44,3 +44,12 @@ Um workflow novo `aion-p0-quality-root-coverage-lab.yml` roda no HEAD isolado em
 4. Nenhum merge/deploy/Worker/custo novo. P0 homologados **0/6**.
 
 **Veredito: cobertura incompleta demonstrada e remediação candidata, ainda não homologada.**
+
+## Resultado da primeira bateria de backfill e correção de causas (sem waiver)
+
+A primeira matriz Ubuntu iniciou 333 testes dos 26 módulos e reportou **1 FAIL + 1 ERROR**. A auditoria de enumeração canônica separada passou (9 testes).
+
+- `test_aion_p0_quality_lab_coverage_governance_lab::test_no_unclassified_root_test_file`: o próprio teste LAB anterior exigia que os 26 fossem classificados como **omitidos**. A revisão da política neste Draft agora exige **zero omitidos**, sem enfraquecer a cobertura, e mantém os 26 na matriz LAB dedicada.
+- `test_aion_p0_original_six_evidence_matrix_lab::test_07_original_m71_reactivation_sources_pinned_a118`: necessita ler o blob de `c62fab663c6349d7320f7843c8d09587c514426b`; o objeto histórico existe no GitHub, mas o checkout superficial não o trazia. A mudança `fetch-depth: 0` é **somente leitura** e permite verificar o hash histórico, sem trocar o pin, eliminar o teste ou alegar confiança externa.
+
+O novo commit também habilita **execução real da Quality completa nesta branch LAB**. Mesmo se a cobertura ficar verde, toda a lista prévia de 85 problemas de Worker/Outbox/Saga segue ativa até reexecução e análise por causa raiz; nenhuma condição de operação está liberada.
