@@ -184,7 +184,15 @@ class NonceBoundedRetentionLAB(unittest.TestCase):
         with self.assertRaisesRegex((sqlite3.IntegrityError,RuntimeError),
                                     "SIMULATED_STORAGE_WRITE_FAILURE|unauthorized trigger"):
             self.claim("new-never-consumed")
-        self.assertEqual(self.nonces.count(),0)
+        # Intentionally poisoned schemas must also deny read APIs.
+        with self.assertRaisesRegex(RuntimeError,"trigger"):
+            self.nonces.count()
+        # Inspect ONLY the disposable LAB fixture through raw sqlite3
+        # to confirm nothing was inserted; never use raw SQL to authorize.
+        with closing(sqlite3.connect(self.db)) as raw:
+            self.assertEqual(raw.execute(
+                "SELECT COUNT(*) FROM nonce_claims"
+            ).fetchone()[0],0)
 
     def test_18_real_owner_reports_storage_fault_not_nonce_replay(self):
         import test_atlasquant_aion_v224_owner_signature_ceremony as v224
@@ -200,7 +208,15 @@ class NonceBoundedRetentionLAB(unittest.TestCase):
         self.assertNotIn("OWNER_SIGNATURE_NONCE_REPLAYED",r["blockers"])
         self.assertFalse(r["execution_allowed"])
         self.assertFalse(r["worker_armed"])
-        self.assertEqual(self.nonces.count(),0)
+        # Intentionally poisoned schemas must also deny read APIs.
+        with self.assertRaisesRegex(RuntimeError,"trigger"):
+            self.nonces.count()
+        # Inspect ONLY the disposable LAB fixture through raw sqlite3
+        # to confirm nothing was inserted; never use raw SQL to authorize.
+        with closing(sqlite3.connect(self.db)) as raw:
+            self.assertEqual(raw.execute(
+                "SELECT COUNT(*) FROM nonce_claims"
+            ).fetchone()[0],0)
 
     def test_19_clearing_synthetic_fault_allows_next_safe_claim(self):
         self.install_synthetic_write_fault()
