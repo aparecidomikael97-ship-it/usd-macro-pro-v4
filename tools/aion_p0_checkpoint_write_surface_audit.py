@@ -108,6 +108,56 @@ def _production_python_files(root: Path):
         yield file
 
 
+def reviewed_alternate_transport(root: Path, path: str) -> str:
+    """Conservative review for three existing non-checkpoint candidates.
+
+    Explicit safe purpose is required. In particular, the old Global Worker
+    checkpoint writer has an unconditional deny-only return before PUT. If that
+    return is ever deleted, fail CI rather than silently approving the writer.
+    """
+    text = (root / path).read_text(encoding="utf-8")
+    tree = ast.parse(text, filename=path)
+    if path == "atlasquant_aion_global_worker.py":
+        fn = [
+            n for n in tree.body
+            if isinstance(n, ast.FunctionDef)
+            and n.name == "_persist_runtime_checkpoint_cas"
+        ]
+        if len(fn) != 1:
+            return ""
+        body = fn[0].body
+        if body and isinstance(body[0], ast.Expr) and isinstance(
+            body[0].value, ast.Constant
+        ) and isinstance(body[0].value.value, str):
+            body = body[1:]
+        if (
+            body and isinstance(body[0], ast.Return)
+            and "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED" in text
+        ):
+            return "DORMANT_GLOBAL_WORKER_WRITER_UNCONDITIONAL_EARLY_RETURN"
+        return ""
+    if path == "atlasquant_flight_recorder_store.py":
+        if (
+            'FLIGHT_RECORDER_PATH="dados/atlasquant_flight_recorder.jsonl"' in text
+            and "/contents/{FLIGHT_RECORDER_PATH}" in text
+            and "def persist_records(" in text
+            and "checkpoint_master.json" not in text
+        ):
+            return "SEPARATE_FLIGHT_RECORDER_JSONL_PATH_STATIC_ONLY"
+        return ""
+    if path == "atlasquant_aion_global_worker_activation.py":
+        if (
+            "def force_disable_repository_feature_flag(" in text
+            and "/actions/variables/" in text
+            and '"value": DISABLED_VALUE' in text
+            and "def write_repository_feature_flag_enabled(" in text
+            and "return _independent_activation_authority_denial()" in text
+        ):
+            return "SAFETY_DISABLE_REPOSITORY_VARIABLE_NOT_CHECKPOINT"
+        return ""
+    return ""
+
+
 def audit_tree(root: Path) -> dict:
     files = []
     parse_errors = []
@@ -126,11 +176,29 @@ def audit_tree(root: Path) -> dict:
             or entry["network_or_mutator_candidates"]
         ):
             files.append(entry)
-    suspicious = [
+    reviewed = []
+    suspicious = []
+    for entry in files:
+        if entry["path"] == TARGET or not entry["network_or_mutator_candidates"]:
+            continue
+        if entry["contextual"]:
+            review = reviewed_alternate_transport(root, entry["path"])
+            item = {
+                "path": entry["path"],
+                "writes": entry["network_or_mutator_candidates"],
+            }
+            if review:
+                reviewed.append({**item, "limited_review": review})
+            else:
+                suspicious.append(item)
+    # Inventory ALL other Python mutators too. Some may use dynamic paths
+    # without mentioning "checkpoint"; this list remains manual review, not
+    # evidence of a clean call graph or absence of other transports.
+    other_mutators = [
         {"path": f["path"], "writes": f["network_or_mutator_candidates"]}
         for f in files
         if f["path"] != TARGET
-        and f["contextual"]
+        and not f["contextual"]
         and f["network_or_mutator_candidates"]
     ]
     runtime_writes = [
@@ -145,6 +213,8 @@ def audit_tree(root: Path) -> dict:
         "scanned_python_files": sum(1 for _ in _production_python_files(root)),
         "entries": files,
         "contextual_mutator_candidates_outside_primary_writer": suspicious,
+        "reviewed_alternate_transport_candidates": reviewed,
+        "other_mutators_pending_manual_code_review": other_mutators,
         "primary_writer_mutators": runtime_writes,
         "parse_errors": parse_errors,
         "external_witness_enrolled": False,
