@@ -2,7 +2,7 @@ name: AION P0 LAB Canonical Quality Security Historical Rebaseline (NO-GO)
 
 on:
   push:
-    branches: [lab/aion-p0-canonical-quality-security-rebaseline-20261020, lab/aion-p0-outbox-sqlite-decision-coherence-20261020, lab/aion-p0-outbox-json-duplicate-keys-canonical-fence-20261020, lab/aion-p0-trust-root-strict-file-admission-20261020, lab/aion-p0-owner-signature-canonical-replay-characterization-20261020, lab/aion-p0-nonce-schema-startup-fail-closed-20261020, lab/aion-p0-nonce-retention-clock-rollback-20261020, lab/aion-p0-nonce-capacity-fail-closed-20261020, lab/aion-p0-nonce-durable-ack-schema-loss-20261020, lab/aion-p0-nonce-journal-mode-failclosed-20261020, lab/aion-p0-nonce-schema-trigger-file-identity-20261020, lab/aion-p0-h0-dual-signed-witness-transcript-20261020, lab/aion-p0-h0-enrollment-revocation-nonce-policy-20261021, lab/aion-p0-h0-linked-five-envelope-chain-20261021, lab/aion-p0-h0-provider-causal-readback-fence-20261021, lab/aion-p0-h0-readonly-recovery-triage-outbox-20261021]
+    branches: [lab/aion-p0-canonical-quality-security-rebaseline-20261020, lab/aion-p0-outbox-sqlite-decision-coherence-20261020, lab/aion-p0-outbox-json-duplicate-keys-canonical-fence-20261020, lab/aion-p0-trust-root-strict-file-admission-20261020, lab/aion-p0-owner-signature-canonical-replay-characterization-20261020, lab/aion-p0-nonce-schema-startup-fail-closed-20261020, lab/aion-p0-nonce-retention-clock-rollback-20261020, lab/aion-p0-nonce-capacity-fail-closed-20261020, lab/aion-p0-nonce-durable-ack-schema-loss-20261020, lab/aion-p0-nonce-journal-mode-failclosed-20261020, lab/aion-p0-nonce-schema-trigger-file-identity-20261020, lab/aion-p0-h0-dual-signed-witness-transcript-20261020, lab/aion-p0-h0-enrollment-revocation-nonce-policy-20261021, lab/aion-p0-h0-linked-five-envelope-chain-20261021, lab/aion-p0-h0-provider-causal-readback-fence-20261021, lab/aion-p0-h0-readonly-recovery-triage-outbox-20261021, lab/aion-p0-quality-unified-root-coverage-20261021]
 
 permissions:
   contents: read
@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.12"
@@ -28,7 +29,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pytest==9.1.1 playwright==1.63.0
       - name: Compile Python tree, no code executed
-        run: python -m compileall -q .
+        run: python -m compileall -q -x '(^|/)\.git(/|$)' .
       - name: Run EXACT tracked canonical Quality module selection, no waivers
         run: |
           python - <<'PY'
@@ -66,6 +67,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.12"
