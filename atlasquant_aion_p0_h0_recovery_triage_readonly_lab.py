@@ -179,6 +179,18 @@ def inspect_execution_outbox_recovery_readonly_lab(
                 "local_regression_suspected": True,
             })
             continue
+        # A121: get() may now return a minimal forensic projection for
+        # corrupted decision JSON. Never treat that projection as a coherent
+        # local history or permit a normal/healthy triage classification.
+        # The local state field remains only an untrusted observation.
+        if row.get("local_integrity") != "MATCH":
+            observations.append({
+                "idempotency_key": handle,
+                "observed_local_state": "UNREADABLE",
+                "reason": "LOCAL_HISTORY_UNAVAILABLE_OR_CORRUPT",
+                "local_regression_suspected": True,
+            })
+            continue
         state = row["state"]
         regression = (
             row["attempts"] < case["last_known_attempts"]
