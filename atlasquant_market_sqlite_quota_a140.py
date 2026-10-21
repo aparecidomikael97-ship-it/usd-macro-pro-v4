@@ -102,6 +102,20 @@ class SQLiteLabReservationLedger:
                 raise ValueError("Symlink quota file denied")
             with closing(self._connect()) as db:
                 db.execute("BEGIN IMMEDIATE")
+                if existed:
+                    # A140 independent audit: an EXISTING database must
+                    # never silently recreate lost quota history. sqlite
+                    # quick_check verifies pages, not missing logical tables.
+                    existing_tables={
+                        row[0] for row in db.execute(
+                            "SELECT name FROM sqlite_master WHERE type='table'"
+                            " AND name IN ('quota_policy','reservations')"
+                        ).fetchall()
+                    }
+                    if existing_tables!={"quota_policy","reservations"}:
+                        raise QuotaLabUnavailable(
+                            "Existing quota database has lost required tables"
+                        )
                 db.execute(
                     "CREATE TABLE IF NOT EXISTS quota_policy ("
                     "singleton INTEGER PRIMARY KEY CHECK (singleton=1),"
