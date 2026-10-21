@@ -1,0 +1,277 @@
+{
+  "schema": "AION_P0_H0_VENDOR_CUSTODIAN_TWO_ROLE_DOCUMENTARY_GATE_V1",
+  "as_of": "2026-10-21",
+  "supersedes_no_existing_contracts": true,
+  "input_sources": [
+    "docs/aion/AION_P0_SMS_PROVIDER_EVIDENCE_COMPARISON_20261020.json",
+    "docs/aion/AION_P0_H0_INDEPENDENT_HIGHWATER_CUSTODIAN_OPTIONS_NO_GO_20261019.md",
+    "docs/aion/evidence/aion_p0_h0_32_provider_errors_current_6895_crosswalk_20261021.json"
+  ],
+  "independent_roles": [
+    "PRODUCER",
+    "CUSTODIAN"
+  ],
+  "global_governance": {
+    "hard_no_go": true,
+    "worker_enabled": false,
+    "automatic_resend_enabled": false,
+    "approved_merchant_or_sms_send": false,
+    "provider_account_connected": false,
+    "custodian_account_provisioned": false,
+    "owner_approval_verified": false,
+    "homologated_p0_count": 0,
+    "new_spend_authorized_brl": 0
+  },
+  "provider_candidates": [
+    {
+      "id": "ONESIGNAL_SMS_NOTIFICATIONS",
+      "role": "PRODUCER",
+      "endpoint": "OneSignal notifications#create target_channel=sms",
+      "official_references": [
+        "https://documentation.onesignal.com/reference/idempotent-notification-requests",
+        "https://documentation.onesignal.com/reference/sms",
+        "https://documentation.onesignal.com/reference/view-messages"
+      ],
+      "documented_capabilities": {
+        "dedupe_key": "idempotency_key UUID",
+        "dedupe_duration_days": 30,
+        "dedupe_scope": "notification_create",
+        "provider_resource_lookup": "message_id_or_filtered_pagination_not_authentic_terminal_absence",
+        "candidate_value": "BEST_DOCUMENTED_CLIENT_CREATE_DEDUPE_ONLY"
+      },
+      "missing_real_h0_guarantees": [
+        "independent_enrollment_not_verified",
+        "provider_bound_causal_effect_receipt_not_verified",
+        "terminal_no_effect_fence_not_verified",
+        "idempotency_lifetime_not_unbounded",
+        "downstream_delivery_not_proven_once",
+        "read_by_key_after_lost_first_response_not_proven"
+      ],
+      "cost_evidence": {
+        "amount_brl_monthly": null,
+        "pricing_verified_for_sms_at_user_scale": false,
+        "live_usage_authorized": false
+      },
+      "independent_enrollment_verified": false,
+      "actual_account_tested": false,
+      "authenticated_external_receipt_verified": false,
+      "terminal_no_effect_verified": false,
+      "approved_for_effects": false,
+      "decision": "DOCUMENTATION_ONLY_HARD_NO_GO"
+    },
+    {
+      "id": "TWILIO_CLASSIC_MESSAGES",
+      "role": "PRODUCER",
+      "endpoint": "POST https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Messages.json",
+      "official_references": [
+        "https://www.twilio.com/docs/messaging/api/message-resource"
+      ],
+      "documented_capabilities": {
+        "dedupe_key": "NO_NATIVE_CLIENT_CREATE_TOKEN_EVIDENCED",
+        "dedupe_duration_days": null,
+        "resource_lookup": "MessageSid_when_known; filtered Messages listing when unknown",
+        "candidate_value": "NOT_ELIGIBLE_FOR_AUTOMATIC_REPLAY_OF_UNCERTAIN_FIRST_ATTEMPT"
+      },
+      "missing_real_h0_guarantees": [
+        "independent_enrollment_not_verified",
+        "native_create_deduplication_not_established",
+        "no_cryptographic_receipt_bound_to_nonce",
+        "terminal_no_effect_fence_not_verified",
+        "negative_list_or_404_not_proof",
+        "queued_messages_not_universally_recallable"
+      ],
+      "cost_evidence": {
+        "amount_brl_monthly": null,
+        "pricing_verified_for_sms_at_user_scale": false,
+        "live_usage_authorized": false
+      },
+      "independent_enrollment_verified": false,
+      "actual_account_tested": false,
+      "authenticated_external_receipt_verified": false,
+      "terminal_no_effect_verified": false,
+      "approved_for_effects": false,
+      "decision": "DOCUMENTATION_ONLY_HARD_NO_GO"
+    },
+    {
+      "id": "TWILIO_BULK_MESSAGES",
+      "role": "PRODUCER",
+      "endpoint": "POST https://comms.twilio.com/v1/Messages",
+      "official_references": [
+        "https://www.twilio.com/docs/bulk-messaging/api/message-resource",
+        "https://www.twilio.com/docs/bulk-messaging/overview"
+      ],
+      "documented_capabilities": {
+        "acceptance": "202 Accepted",
+        "tracking_id": "operationId issued after acceptance",
+        "client_create_idempotency": "NOT_ESTABLISHED_BY_OPERATION_ID",
+        "candidate_value": "ASYNC_OPERATION_TRACKING_NOT_IDEMPOTENCY"
+      },
+      "missing_real_h0_guarantees": [
+        "independent_enrollment_not_verified",
+        "lost_first_response_operation_id_unavailable",
+        "operation_id_not_replay_deduplication",
+        "terminal_no_effect_fence_not_verified",
+        "causal_producer_receipt_cryptographic_provenance_not_verified"
+      ],
+      "cost_evidence": {
+        "amount_brl_monthly": null,
+        "pricing_verified_for_sms_at_user_scale": false,
+        "live_usage_authorized": false
+      },
+      "independent_enrollment_verified": false,
+      "actual_account_tested": false,
+      "authenticated_external_receipt_verified": false,
+      "terminal_no_effect_verified": false,
+      "approved_for_effects": false,
+      "decision": "DOCUMENTATION_ONLY_HARD_NO_GO"
+    }
+  ],
+  "custodian_candidates": [
+    {
+      "id": "CLOUDFLARE_DO_SQLITE",
+      "role": "CUSTODIAN",
+      "endpoint": "Cloudflare Workers Durable Objects SQLite-backed in SEPARATE administrative account",
+      "official_references": [
+        "https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/",
+        "https://developers.cloudflare.com/durable-objects/platform/pricing/",
+        "https://developers.cloudflare.com/durable-objects/platform/limits/"
+      ],
+      "documented_capabilities": {
+        "transactional_consistency": "documented",
+        "free_tier_backend": "sqlite_only",
+        "free_tier_storage_account_gb": 5,
+        "candidate_value": "LOW_COST_ISOLATED_CAS_EXPERIMENT_NOT_EXTERNAL_ATTESTATION"
+      },
+      "missing_real_h0_guarantees": [
+        "separate_administrators_and_credentials_not_created",
+        "rollback_PITR_and_delete_admin_actions_not_fenced",
+        "monotonic_latest_head_external_witness_unavailable",
+        "externally_enrolled_signature_and_revocation_missing",
+        "vendor_effect_receipt_not_provided"
+      ],
+      "cost_evidence": {
+        "amount_brl_monthly": null,
+        "documented_free_tier": true,
+        "limits_need_budget_alerts": true,
+        "live_usage_authorized": false
+      },
+      "independent_enrollment_verified": false,
+      "actual_account_tested": false,
+      "authenticated_external_receipt_verified": false,
+      "terminal_no_effect_verified": false,
+      "approved_for_effects": false,
+      "decision": "DOCUMENTATION_ONLY_HARD_NO_GO"
+    },
+    {
+      "id": "AWS_DYNAMODB_CONDITIONAL",
+      "role": "CUSTODIAN",
+      "endpoint": "DynamoDB PutItem/UpdateItem conditional write plus GetItem ConsistentRead=true in SEPARATE AWS account",
+      "official_references": [
+        "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithItems.html",
+        "https://aws.amazon.com/dynamodb/faqs/",
+        "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-understanding-billing.html"
+      ],
+      "documented_capabilities": {
+        "conditional_write": "documented",
+        "strongly_consistent_read_option": "documented",
+        "idempotent_condition": "condition_must_be_bound_to_expected_attribute",
+        "candidate_value": "SERIALIZABLE_INTENT_CAS_CANDIDATE_NOT_PROOF_OF_LATEST_EXTERNAL_WITNESS"
+      },
+      "missing_real_h0_guarantees": [
+        "separate_IAM_account_admin_not_created",
+        "delete_restore_backup_and_access_fences_not_independently_audited",
+        "monotonic_latest_head_external_witness_unavailable",
+        "externally_enrolled_signature_and_revocation_missing",
+        "vendor_effect_receipt_not_provided"
+      ],
+      "cost_evidence": {
+        "amount_brl_monthly": null,
+        "documented_free_tier": true,
+        "pricing_mode_not_selected": true,
+        "live_usage_authorized": false
+      },
+      "independent_enrollment_verified": false,
+      "actual_account_tested": false,
+      "authenticated_external_receipt_verified": false,
+      "terminal_no_effect_verified": false,
+      "approved_for_effects": false,
+      "decision": "DOCUMENTATION_ONLY_HARD_NO_GO"
+    }
+  ],
+  "cross_role_gate": {
+    "producer_and_custodian_must_be_distinct_authority_domains": true,
+    "local_executor_cannot_administer_both_roots": true,
+    "highwater_must_be_authenticated_from_external_independent_source": true,
+    "provider_receipt_must_be_authenticated_from_provider_source": true,
+    "provider_terminal_no_effect_requires_enforced_future_effect_fence": true,
+    "client_dedupe_not_equal_to_terminal_no_effect": true,
+    "operation_id_not_equal_to_create_idempotency": true,
+    "no_evidence_from_timeout_404_or_empty_list": true,
+    "delivery_status_not_equal_to_first_attempt_effect_receipt": true,
+    "when_any_proof_missing": "UNKNOWN_BLOCKED",
+    "when_lost_first_response": "UNKNOWN_BLOCKED_ZERO_AUTO_RESEND"
+  },
+  "shortlist_for_documentary_RFI_only": {
+    "provider": "ONESIGNAL_SMS_NOTIFICATIONS",
+    "custodian": "CLOUDFLARE_DO_SQLITE",
+    "status": "RESEARCH_PRIORITY_ONLY_NOT_INTEGRATION_GO",
+    "rationale": "OneSignal has explicitly documented 30-day create idempotency for SMS, Cloudflare DO has transactional SQLite and documented free tier; neither provides enrolled external H0 proof or guaranteed terminal no-effect.",
+    "requires_before_any_spend": [
+      "verified_per_message_sms_pricing_region_carrier",
+      "provider_support_written_answers_on_key_readback_cancel_and_retention",
+      "admin_separation_cost_and_IAM_AUDIT",
+      "external_immutable_highwater_and_key_enrollment",
+      "explicit_owner_approval"
+    ]
+  },
+  "non_go_pairs": [
+    {
+      "provider": "ONESIGNAL_SMS_NOTIFICATIONS",
+      "custodian": "CLOUDFLARE_DO_SQLITE",
+      "provisional": "HARD_NO_GO_EXTERNAL_EVIDENCE_MISSING",
+      "can_dispatch": false,
+      "can_retry_uncertain_first_attempt": false,
+      "can_homologate": false
+    },
+    {
+      "provider": "ONESIGNAL_SMS_NOTIFICATIONS",
+      "custodian": "AWS_DYNAMODB_CONDITIONAL",
+      "provisional": "HARD_NO_GO_EXTERNAL_EVIDENCE_MISSING",
+      "can_dispatch": false,
+      "can_retry_uncertain_first_attempt": false,
+      "can_homologate": false
+    },
+    {
+      "provider": "TWILIO_CLASSIC_MESSAGES",
+      "custodian": "CLOUDFLARE_DO_SQLITE",
+      "provisional": "HARD_NO_GO_EXTERNAL_EVIDENCE_MISSING",
+      "can_dispatch": false,
+      "can_retry_uncertain_first_attempt": false,
+      "can_homologate": false
+    },
+    {
+      "provider": "TWILIO_CLASSIC_MESSAGES",
+      "custodian": "AWS_DYNAMODB_CONDITIONAL",
+      "provisional": "HARD_NO_GO_EXTERNAL_EVIDENCE_MISSING",
+      "can_dispatch": false,
+      "can_retry_uncertain_first_attempt": false,
+      "can_homologate": false
+    },
+    {
+      "provider": "TWILIO_BULK_MESSAGES",
+      "custodian": "CLOUDFLARE_DO_SQLITE",
+      "provisional": "HARD_NO_GO_EXTERNAL_EVIDENCE_MISSING",
+      "can_dispatch": false,
+      "can_retry_uncertain_first_attempt": false,
+      "can_homologate": false
+    },
+    {
+      "provider": "TWILIO_BULK_MESSAGES",
+      "custodian": "AWS_DYNAMODB_CONDITIONAL",
+      "provisional": "HARD_NO_GO_EXTERNAL_EVIDENCE_MISSING",
+      "can_dispatch": false,
+      "can_retry_uncertain_first_attempt": false,
+      "can_homologate": false
+    }
+  ]
+}
