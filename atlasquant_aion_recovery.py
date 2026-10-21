@@ -497,6 +497,54 @@ def _verify_runtime_revision_ancestry(
     }
 
 
+
+def _recheck_runtime_branch_head_before_save(
+    ancestry:Mapping[str,Any],
+    config:RuntimeConfig,
+    *,
+    timeout:float,
+)->dict[str,Any]:
+    """Fail closed if configured Git branch moved since the ancestry compare.
+
+    GitHub itself remains ONE trust domain. This is a TOCTOU consistency
+    fence only, never an independent monotonic-head witness.
+    """
+    head=ancestry.get("runtime_branch_head") if isinstance(ancestry,Mapping) else None
+    if type(head) is not str or _REVISION_RE.fullmatch(head) is None:
+        return {"allowed":False,"reason":"Compared runtime branch head is missing or malformed."}
+    try:
+        require_runtime_branch(config.branch)
+        if (
+            type(config.repo) is not str
+            or re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",config.repo) is None
+        ):
+            raise ValueError("Invalid GitHub repository.")
+        import requests
+        response=requests.get(
+            f"https://api.github.com/repos/{config.repo}/git/ref/heads/{quote(config.branch,safe='')}",
+            headers=_headers(config.token),
+            timeout=min(float(timeout),12.0),
+        )
+        response.raise_for_status()
+        raw=response.json()
+    except Exception:
+        return {"allowed":False,"reason":"Runtime branch head readback unavailable."}
+    if not isinstance(raw,Mapping):
+        return {"allowed":False,"reason":"Runtime branch head response is invalid."}
+    obj=raw.get("object")
+    observed=obj.get("sha") if isinstance(obj,Mapping) else None
+    if (
+        raw.get("ref")!=f"refs/heads/{config.branch}"
+        or not isinstance(obj,Mapping)
+        or obj.get("type")!="commit"
+        or type(observed) is not str
+        or _REVISION_RE.fullmatch(observed) is None
+        or observed.lower()!=head.lower()
+    ):
+        return {"allowed":False,"reason":"Runtime branch head moved or was not verified."}
+    return {"allowed":True,"runtime_branch_head":observed,"executes_action":False}
+
+
 def restore_checkpoint_revision(
     candidate:Mapping[str,Any],
     current_runtime:Mapping[str,Any],
@@ -612,6 +660,20 @@ def restore_checkpoint_revision(
             "automatic_restore":False,
         }
 
+    # A133 LAB: even a valid GitHub ancestry response may be stale when the
+    # branch moves during historical readback. Recheck HEAD before any save.
+    branch_head_check=_recheck_runtime_branch_head_before_save(
+        ancestry,config,timeout=timeout,
+    )
+    if branch_head_check.get("allowed") is not True:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED","saved":False,"verified":False,
+            "reason":branch_head_check.get("reason") or "Runtime branch head changed.",
+            "preflight":preflight,
+            "requested_revision":revision,"restored_revision":"",
+            "restore_confirmed":False,"reconciliation_required":False,
+            "automatic_retry_allowed":False,"automatic_restore":False,
+        }
     preflight=rebound_preflight
     checkpoint=ensure_operating_checkpoint(rebound_candidate.get("checkpoint"))
     checkpoint=deepcopy(checkpoint)
