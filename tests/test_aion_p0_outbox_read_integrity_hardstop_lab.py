@@ -81,12 +81,21 @@ class OutboxReadIntegrityHardstopLab(unittest.TestCase):
 
     def _denied_both(self, *, assert_no_claim=True):
         before=tuple(self.db.iterdump())
-        with self.assertRaisesRegex(PermissionError,DENY):
-            self.outbox.get(self.key)
-        with self.assertRaisesRegex(PermissionError,DENY):
-            self.outbox.list()
-        with self.assertRaisesRegex(PermissionError,DENY):
-            self.outbox.list(state="PENDING")
+        one=self.outbox.get(self.key)
+        self.assertEqual(one["local_integrity"],"MISMATCH")
+        self.assertEqual(one["integrity_reason"],DENY)
+        self.assertEqual(one["reconciliation_state"],"UNKNOWN_BLOCKED")
+        self.assertTrue(one["local_state_only"])
+        self.assertIs(one["executes_action"],False)
+        self.assertEqual(one["decision"],{})
+        self.assertEqual(one["effect_ref"],"")
+        entries=self.outbox.list()
+        self.assertTrue(any(row["idempotency_key"]==self.key and
+                            row["local_integrity"]=="MISMATCH" and
+                            row["decision"]=={} for row in entries))
+        pending=self.outbox.list(state="PENDING")
+        self.assertTrue(any(row["idempotency_key"]==self.key and
+                            row["local_integrity"]=="MISMATCH" for row in pending))
         self.assertEqual(before,tuple(self.db.iterdump()))
         self.assertEqual(self.outbox.effect_count(),0)
         if assert_no_claim:
@@ -183,8 +192,11 @@ class OutboxReadIntegrityHardstopLab(unittest.TestCase):
 
     def test_21_invalid_row_is_not_misreported_as_no_effect(self):
         self._field("grants_authority",True)
-        with self.assertRaisesRegex(PermissionError,DENY):
-            self.outbox.list()
+        rows=self.outbox.list()
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["local_integrity"],"MISMATCH")
+        self.assertEqual(rows[0]["reconciliation_state"],"UNKNOWN_BLOCKED")
+        self.assertEqual(rows[0]["decision"],{})
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM action_outbox").fetchone()[0],1)
         self.assertEqual(self.outbox.effect_count(),0)
 
@@ -204,6 +216,36 @@ class OutboxReadIntegrityHardstopLab(unittest.TestCase):
         self.assertFalse(claimed["executes_action"])
         self.assertEqual(self.outbox.effect_count(),0)
 
+
+    def test_25_corrupted_claim_does_not_invoke_policy_or_adapter(self):
+        claimed=self.outbox.claim_next("lab-worker",now=NOW)
+        self.assertEqual(claimed["state"],"CLAIMED")
+        self._field("grants_authority",True)
+        called=[]
+        class HostileAdapter:
+            @property
+            def send(self):
+                raise AssertionError("ADAPTER_SEND_MUST_NEVER_BE_READ")
+        def authorize(_decision):
+            called.append("policy")
+            raise AssertionError("POLICY_MUST_NEVER_BE_CALLED")
+        with self.assertRaisesRegex(PermissionError,DENY):
+            self.outbox.dispatch_claimed(
+                self.key,worker_id="lab-worker",
+                authorize=authorize,adapter=HostileAdapter(),
+                now=NOW+timedelta(seconds=1),
+            )
+        self.assertEqual(called,[])
+        self.assertEqual(self.outbox.get(self.key)["state"],"CLAIMED")
+        self.assertEqual(self.outbox.effect_count(),0)
+
+    def test_26_idempotent_duplicate_does_not_reissue_corrupt_projection(self):
+        self._field("grants_authority",True)
+        before=tuple(self.db.iterdump())
+        with self.assertRaisesRegex(PermissionError,DENY):
+            self._enqueue("one")
+        self.assertEqual(before,tuple(self.db.iterdump()))
+        self.assertEqual(self.outbox.effect_count(),0)
 
 if __name__ == "__main__":
     unittest.main()
