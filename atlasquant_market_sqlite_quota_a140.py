@@ -73,6 +73,7 @@ class SQLiteLabReservationLedger:
 
     def _connect(self):
         self._check_path()
+        db=None
         try:
             db=sqlite3.connect(str(self.path),timeout=0.25,isolation_level=None)
             db.execute("PRAGMA busy_timeout=250")
@@ -80,6 +81,10 @@ class SQLiteLabReservationLedger:
             db.execute("PRAGMA foreign_keys=ON")
             return db
         except sqlite3.Error as exc:
+            # A failed PRAGMA on a corrupt file still leaves an open SQLite
+            # handle unless closed explicitly, especially fatal on Windows.
+            if db is not None:
+                db.close()
             raise QuotaLabUnavailable("SQLite open or PRAGMA failed") from exc
 
     def _initialize(self):
