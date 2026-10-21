@@ -51,7 +51,7 @@ jobs:
             test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_pre_send_gate_rejects_before_accessing_adapter_descriptor \
             test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_block_keeps_same_aggregate_fifo_but_not_unrelated_work \
             test_atlasquant_aion_execution_outbox.AionUntrustedPositiveAdmissionRedTests.test_unenrolled_reconcile_must_not_invoke_side_effecting_callback \
-            test_atlasquant_aion_execution_outbox.OutboxStaleStateBlockCASP0Tests.test_confirm_rejects_claimed_without_send
+            test_atlasquant_aion_execution_outbox.OutboxPostSendStateCASP0Tests.test_confirm_rejects_claimed_without_send
       - name: Historical 85-case audit names retained exactly
         run: python -B -m unittest -q test_aion_p0_quality_85_causal_inventory_lab.py
       - name: 64 cross-process H0 causality denial tests
