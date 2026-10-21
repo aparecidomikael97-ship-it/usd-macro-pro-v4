@@ -892,6 +892,31 @@ class OutboxTimeOfUseFenceP0Tests(unittest.TestCase):
             store.close()
             root.cleanup()
 
+class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
+    """Synthetic interleavings expose stale status/lease overwrite risks."""
+
+    def setUp(self):
+        self.scope = Scope("owner-test", "tenant-a", "workspace-a")
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.store = SQLiteChatStore(Path(self.tempdir.name) / "chat.sqlite3")
+        self.outbox = ExecutionOutbox(self.store, self.scope)
+        self.item = self.outbox.enqueue(
+            intent_ref="intent-stale-block",
+            action="send_email",
+            payload={"fixture": "no-network"},
+            aggregate_key="client-stale-block",
+            policy_version="policy-v1",
+            authorization_ref="approval-1",
+            created_at=NOW,
+            valid_until=NOW + timedelta(minutes=5),
+        )
+        self.key = self.item["idempotency_key"]
+        self.outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+
+    def tearDown(self):
+        self.store.close()
+        self.tempdir.cleanup()
+
     def test_late_revocation_does_not_clobber_confirmed_effect(self):
         def changed_while_callback(_decision):
             # Simulate another actor confirming before this old callback replies.
