@@ -68,7 +68,13 @@ def inspect_one(name:str,text:str)->dict:
     expected_writer_present=(
         EXPECTED_WRITERS[name] in block if job else None
     )
-    guarded_ok=bool(job and job_disabled and expected_writer_present)
+    # Two independent LAB fences on scheduled write-capable jobs:
+    # unconditional skip plus least-privilege repo token. The bootstrap and
+    # migration jobs are unscheduled, already skipped and not changed here.
+    guarded_ok=bool(
+        job and job_disabled and expected_writer_present
+        and (not schedule or not permission_write)
+    )
     return {
         "path":str(WORKFLOWS/name),
         "guarded_job":job,
