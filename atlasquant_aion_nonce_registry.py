@@ -16,11 +16,16 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import RLock
 
 SCHEMA_VERSION = 2
 # Conservative non-authorizing LOCAL admission ceiling. This is a count
 # limit, not a guarantee of on-disk bytes. No automatic tombstone eviction.
 MAX_NONCE_CLAIMS = 100_000
+# Serialize fresh-file recognition and SQLite bootstrap inside a single
+# Python process. Independent processes cannot share this lock: if a second
+# process sees an unfinished existing DB, fail closed instead of re-enrolling.
+_BOOTSTRAP_LOCK = RLock()
 _TS_RE = re.compile(
     r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?Z$"
 )
@@ -56,14 +61,16 @@ def _epoch_us(value: datetime) -> int:
 class PersistentNonceRegistry:
     def __init__(self, db_path: str | Path):
         self.path = Path(db_path)
-        if self.path.is_symlink():
-            raise ValueError("nonce registry must not be a symlink")
-        # An existing empty schema cannot mean "safe to forget owner nonces".
-        # New LAB enrollment is permitted only if the path was absent before
-        # opening the registry. Full-file deletion is still an OPEN H0 gap.
-        self._bootstrap_if_missing = not self.path.exists()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        with _BOOTSTRAP_LOCK:
+            if self.path.is_symlink():
+                raise ValueError("nonce registry must not be a symlink")
+            # Do not confuse another initializer's temporary empty schema
+            # (same process) with damaged history. Existing empty databases
+            # still fail closed; cross-process partial first-start also
+            # fails closed until a valid completed schema is observable.
+            self._bootstrap_if_missing = not self.path.exists()
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._initialize()
 
     @contextmanager
     def _connect(self):
