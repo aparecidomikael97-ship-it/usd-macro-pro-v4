@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import unittest
 from unittest.mock import MagicMock, patch
@@ -17,6 +18,12 @@ from atlasquant_aion_recovery import (
 
 
 class AtlasQuantAionRecoveryTests(unittest.TestCase):
+    @staticmethod
+    def git_blob_sha(raw: bytes) -> str:
+        return hashlib.sha1(
+            b"blob " + str(len(raw)).encode("ascii") + b"\x00" + raw
+        ).hexdigest()
+
     def cfg(self):
         return RuntimeConfig(
             token="token-test",
@@ -121,7 +128,10 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         raw=json.dumps(cp).encode("utf-8")
         response=MagicMock()
         response.raise_for_status.return_value=None
-        response.json.return_value={"content":base64.b64encode(raw).decode("ascii")}
+        response.json.return_value={
+            "content":base64.b64encode(raw).decode("ascii"),
+            "sha":self.git_blob_sha(raw),
+        }
         revision="abcdef1234567890abcdef1234567890abcdef12"
         with patch("requests.get",return_value=response):
             result=load_checkpoint_revision(revision,self.cfg())
@@ -206,7 +216,7 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         )
         response=MagicMock()
         response.raise_for_status.return_value=None
-        response.json.return_value={"content":wrapped}
+        response.json.return_value={"content":wrapped,"sha":self.git_blob_sha(json.dumps(cp).encode("utf-8"))}
         with patch("requests.get",return_value=response):
             result=load_checkpoint_revision("c"*40,self.cfg())
         self.assertEqual(result["status"],"CONFIRMED")
