@@ -72,12 +72,12 @@ def audit(
     quality = ledger.get("baseline", {})
     source = proposal.get("sources", {})
     expected_origin = {
-        "current_85_ledger": str(LEDGER.relative_to(ROOT)),
+        "current_85_ledger": LEDGER.relative_to(ROOT).as_posix(),
         "current_quality_sha": quality.get("head_sha"),
         "current_quality_run": quality.get("workflow_run"),
         "current_quality_job": quality.get("job_id"),
         "current_quality_tests": quality.get("tests"),
-        "legacy_32_matrix": str(HISTORICAL.relative_to(ROOT)),
+        "legacy_32_matrix": HISTORICAL.relative_to(ROOT).as_posix(),
         "legacy_matrix_origin_sha": historical.get("source_commit"),
         "legacy_matrix_origin_run": historical.get("source_run"),
         "legacy_quality_tests": historical.get("historical_quality", {}).get("tests"),
