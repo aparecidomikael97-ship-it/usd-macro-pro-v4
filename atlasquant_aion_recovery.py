@@ -10,6 +10,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 import base64
+import hashlib
 import json
 import re
 from urllib.parse import quote
@@ -198,6 +199,21 @@ def load_checkpoint_revision(
         raw_bytes=base64.b64decode(encoded,validate=True)
         if len(raw_bytes)>MAX_RUNTIME_BYTES:
             raise ValueError("runtime checkpoint too large")
+        # A131 LAB: GitHub Contents exposes a Git blob SHA for these bytes.
+        # A well-formed but inconsistent metadata SHA must never turn the
+        # historical source into CONFIRMED or reach a restore candidate.
+        # This is consistency only; it is NOT independent provenance.
+        metadata_sha=obj.get("sha")
+        if (
+            type(metadata_sha) is not str
+            or _REVISION_RE.fullmatch(metadata_sha) is None
+        ):
+            raise ValueError("historical Git blob SHA missing or malformed")
+        calculated_sha=hashlib.sha1(
+            b"blob "+str(len(raw_bytes)).encode("ascii")+b"\x00"+raw_bytes
+        ).hexdigest()
+        if metadata_sha.lower()!=calculated_sha:
+            raise ValueError("historical Git blob SHA does not match decoded contents")
         raw=raw_bytes.decode("utf-8")
         checkpoint=json.loads(raw,object_pairs_hook=_strict_json_object)
         if not isinstance(checkpoint,dict):
