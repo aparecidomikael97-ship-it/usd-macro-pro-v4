@@ -163,5 +163,25 @@ class RecoveryLiveDestinationBindingLab(unittest.TestCase):
         self.assert_blocked_without_history(live)
 
 
+    def test_18_exception_during_live_readback_is_blocked_without_retry(self):
+        with patch(
+            "atlasquant_aion_recovery.load_runtime_checkpoint",
+            side_effect=TimeoutError("synthetic timeout"),
+        ) as runtime_get, patch(
+            "atlasquant_aion_recovery.load_checkpoint_revision",
+        ) as history_get, patch(
+            "atlasquant_aion_recovery.save_runtime_checkpoint",
+        ) as save:
+            result = restore_checkpoint_revision(
+                self.candidate, self.current, self.config, approved=True
+            )
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIs(result["saved"], False)
+        self.assertIs(result.get("automatic_retry_allowed"), False)
+        runtime_get.assert_called_once()
+        history_get.assert_not_called()
+        save.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
