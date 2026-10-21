@@ -47,6 +47,11 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
             "integrity":integrity,
         }
 
+    def live_result(self, current):
+        """Mock live GET from the configured destination; no network."""
+        cfg=self.cfg()
+        return {**current, "source":f"GitHub:{cfg.branch}:{cfg.path}"}
+
     def test_history_list_is_read_only_and_filters_invalid_revisions(self):
         response=MagicMock()
         response.raise_for_status.return_value=None
@@ -286,6 +291,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         current=self.current(mismatch=True)
         candidate=self.candidate()
         with patch(
+            "atlasquant_aion_recovery.load_runtime_checkpoint",
+            return_value=self.live_result(current),
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value=candidate,
         ) as reload_revision, patch(
@@ -320,6 +328,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         candidate=self.candidate()
         current=self.current(mismatch=True)
         with patch(
+            "atlasquant_aion_recovery.load_runtime_checkpoint",
+            return_value=self.live_result(current),
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value={
                 "status":"ERROR",
@@ -348,6 +359,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         historical["integrity"]=checkpoint_integrity_report(historical["checkpoint"])
         current=self.current(mismatch=True)
         with patch(
+            "atlasquant_aion_recovery.load_runtime_checkpoint",
+            return_value=self.live_result(current),
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value=historical,
         ), patch("atlasquant_aion_recovery.save_runtime_checkpoint") as save:
@@ -367,6 +381,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         candidate=self.candidate()
         current=self.current(mismatch=True)
         with patch(
+            "atlasquant_aion_recovery.load_runtime_checkpoint",
+            return_value=self.live_result(current),
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value=candidate,
         ), patch(
@@ -402,6 +419,9 @@ class AtlasQuantAionRecoveryTests(unittest.TestCase):
         candidate=self.candidate()
         current=self.current(mismatch=True)
         with patch(
+            "atlasquant_aion_recovery.load_runtime_checkpoint",
+            return_value=self.live_result(current),
+        ), patch(
             "atlasquant_aion_recovery.load_checkpoint_revision",
             return_value=candidate,
         ), patch(
