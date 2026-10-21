@@ -305,112 +305,140 @@ class ExecutionOutboxTests(unittest.TestCase):
             store.close()
 
     def test_lost_response_after_effect_requires_reconcile_and_never_blind_resends(self):
+        """Legacy name retained for audit; no real first attempt may happen.
+
+        Simulate an old UNCERTAIN local row ONLY after showing that the actual
+        adapter is blocked before send. A synthetic marker is not a receipt.
+        """
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
-            item = self._enqueue(outbox)
-            outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-            adapter = FakeIdempotentAdapter("lose-after-effect")
-            first = outbox.dispatch_claimed(
-                item["idempotency_key"],
-                worker_id="worker-1",
-                authorize=policy(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(first["state"], "UNCERTAIN")
-            self.assertEqual(first["dispatch_state"], "UNCERTAIN_RECONCILE_REQUIRED")
-            self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(len(adapter.effects), 1)
-            self.assertIsNone(
-                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=2))
-            )
-
-            reconciled = outbox.reconcile(
-                item["idempotency_key"],
-                adapter=adapter,
-                authorize=policy(self.scope),
-                now=NOW + timedelta(seconds=3),
-            )
-            self.assertEqual(reconciled["state"], "UNCERTAIN")
-            self.assertEqual(
-                reconciled["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
-            )
-            self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 0)
-            self.assertIsNone(
-                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=4))
-            )
-            store.close()
+            try:
+                item = self._enqueue(outbox)
+                key = item["idempotency_key"]
+                outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+                adapter = FakeIdempotentAdapter("lose-after-effect")
+                with self.assertRaisesRegex(
+                    PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+                ):
+                    outbox.dispatch_claimed(
+                        key, worker_id="worker-1",
+                        authorize=policy(self.scope), adapter=adapter,
+                        now=NOW + timedelta(seconds=1),
+                    )
+                self.assertEqual(outbox.get(key)["state"], "BLOCKED_PRODUCER")
+                self.assertEqual(adapter.send_calls, 0)
+                self.assertEqual(adapter.effects, {})
+                # Fixture ONLY: model an older ambiguous snapshot, not proof
+                # that anything was sent or that a provider exists.
+                with store.db:
+                    store.db.execute(
+                        "UPDATE action_outbox SET state='UNCERTAIN', "
+                        "dispatch_started_at=? WHERE idempotency_key=?",
+                        (NOW.isoformat(), key),
+                    )
+                before = outbox.get(key)
+                with self.assertRaisesRegex(
+                    PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+                ):
+                    outbox.reconcile(
+                        key, adapter=adapter, authorize=policy(self.scope),
+                        now=NOW + timedelta(seconds=2),
+                    )
+                self.assertEqual(outbox.get(key), before)
+                self.assertEqual(adapter.reconcile_calls, 0)
+                self.assertEqual(adapter.send_calls, 0)
+                self.assertEqual(outbox.effect_count(), 0)
+                self.assertIsNone(outbox.claim_next(
+                    "worker-2", now=NOW + timedelta(seconds=3),
+                ))
+            finally:
+                store.close()
 
     def test_unverified_absence_never_allows_retry_even_if_fixture_knows_no_effect(self):
+        """Simulated absence must not permit readback, release or a second send."""
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
-            item = self._enqueue(outbox)
-            outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-            adapter = FakeIdempotentAdapter("lose-before-effect")
-            first = outbox.dispatch_claimed(
-                item["idempotency_key"],
-                worker_id="worker-1",
-                authorize=policy(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(first["state"], "UNCERTAIN")
-            self.assertEqual(len(adapter.effects), 0)
-
-            # Fixture knowledge is not an authenticated receipt from a real
-            # external producer. The adapter's bool cannot reopen the action.
-            retry = outbox.reconcile(
-                item["idempotency_key"],
-                adapter=adapter,
-                authorize=policy(self.scope),
-                now=NOW + timedelta(seconds=2),
-            )
-            self.assertEqual(retry["state"], "UNCERTAIN")
-            self.assertEqual(retry["reconcile_state"], "INDEPENDENT_ABSENCE_PROOF_REQUIRED")
-            self.assertIsNone(outbox.claim_next(
-                "worker-2", now=NOW + timedelta(seconds=3), lease_seconds=60,
-            ))
-            self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 0)
-            store.close()
+            try:
+                item = self._enqueue(outbox)
+                key = item["idempotency_key"]
+                outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+                adapter = FakeIdempotentAdapter("lose-before-effect")
+                with self.assertRaisesRegex(
+                    PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+                ):
+                    outbox.dispatch_claimed(
+                        key, worker_id="worker-1",
+                        authorize=policy(self.scope), adapter=adapter,
+                        now=NOW + timedelta(seconds=1),
+                    )
+                self.assertEqual(outbox.get(key)["state"], "BLOCKED_PRODUCER")
+                self.assertEqual(adapter.send_calls, 0)
+                self.assertFalse(adapter.effects)
+                # The raw fixture has no producer origin or late-effect fence.
+                with store.db:
+                    store.db.execute(
+                        "UPDATE action_outbox SET state='UNCERTAIN', "
+                        "dispatch_started_at=? WHERE idempotency_key=?",
+                        (NOW.isoformat(), key),
+                    )
+                before = outbox.get(key)
+                with self.assertRaisesRegex(
+                    PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+                ):
+                    outbox.reconcile(
+                        key, adapter=adapter, authorize=policy(self.scope),
+                        now=NOW + timedelta(seconds=2),
+                    )
+                self.assertEqual(outbox.get(key), before)
+                self.assertEqual(adapter.reconcile_calls, 0)
+                self.assertIsNone(outbox.claim_next(
+                    "worker-2", now=NOW + timedelta(seconds=3),
+                ))
+                self.assertEqual(outbox.effect_count(), 0)
+            finally:
+                store.close()
 
     def test_same_aggregate_is_ordered_until_previous_intent_is_terminal(self):
+        """A BLOCKED_PRODUCER predecessor remains nonterminal for FIFO."""
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
-            first = self._enqueue(outbox, ref="intent-1", aggregate="customer-7")
-            second = self._enqueue(
-                outbox,
-                ref="intent-2",
-                aggregate="customer-7",
-                payload={"to": "client@example.com", "template": "second"},
-            )
-            self.assertEqual(first["aggregate_seq"], 1)
-            self.assertEqual(second["aggregate_seq"], 2)
-
-            claimed_first = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-            self.assertEqual(claimed_first["idempotency_key"], first["idempotency_key"])
-            self.assertIsNone(
-                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=1))
-            )
-
-            adapter = FakeIdempotentAdapter()
-            outbox.dispatch_claimed(
-                first["idempotency_key"],
-                worker_id="worker-1",
-                authorize=policy(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=2),
-            )
-            self.assertEqual(outbox.get(first["idempotency_key"])["state"], "UNCERTAIN")
-            self.assertIsNone(outbox.claim_next(
-                "worker-2",
-                now=NOW + timedelta(seconds=3),
-                lease_seconds=60,
-            ))
-            self.assertEqual(outbox.get(second["idempotency_key"])["state"], "PENDING")
-            self.assertEqual(outbox.effect_count(), 0)
-            store.close()
+            try:
+                first = self._enqueue(outbox, ref="intent-1", aggregate="customer-7")
+                second = self._enqueue(
+                    outbox, ref="intent-2", aggregate="customer-7",
+                    payload={"to": "client@example.com", "template": "second"},
+                )
+                self.assertEqual(first["aggregate_seq"], 1)
+                self.assertEqual(second["aggregate_seq"], 2)
+                claimed = outbox.claim_next(
+                    "worker-1", now=NOW, lease_seconds=60,
+                )
+                self.assertEqual(claimed["idempotency_key"], first["idempotency_key"])
+                self.assertIsNone(outbox.claim_next(
+                    "worker-2", now=NOW + timedelta(seconds=1),
+                ))
+                adapter = FakeIdempotentAdapter()
+                with self.assertRaisesRegex(
+                    PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+                ):
+                    outbox.dispatch_claimed(
+                        first["idempotency_key"], worker_id="worker-1",
+                        authorize=policy(self.scope), adapter=adapter,
+                        now=NOW + timedelta(seconds=2),
+                    )
+                self.assertEqual(
+                    outbox.get(first["idempotency_key"])["state"], "BLOCKED_PRODUCER",
+                )
+                self.assertIsNone(outbox.claim_next(
+                    "worker-2", now=NOW + timedelta(seconds=3),
+                ))
+                self.assertEqual(
+                    outbox.get(second["idempotency_key"])["state"], "PENDING",
+                )
+                self.assertEqual(adapter.send_calls, 0)
+                self.assertEqual(outbox.effect_count(), 0)
+            finally:
+                store.close()
 
     def test_expired_claim_before_dispatch_is_retryable_because_boundary_not_crossed(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -465,39 +493,48 @@ class ExecutionOutboxTests(unittest.TestCase):
             store.close()
 
     def test_sent_without_confirmation_is_reconciled_not_redispatched(self):
+        """Historical SENT fixture stays blocked before untrusted reconcile."""
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
-            item = self._enqueue(outbox)
-            outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-            adapter = FakeIdempotentAdapter("sent")
-            sent = outbox.dispatch_claimed(
-                item["idempotency_key"],
-                worker_id="worker-1",
-                authorize=policy(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=1),
-            )
-            self.assertEqual(sent["state"], "SENT")
-            self.assertEqual(adapter.send_calls, 1)
-            self.assertIsNone(
-                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=2))
-            )
-            confirmed = outbox.reconcile(
-                item["idempotency_key"],
-                adapter=adapter,
-                authorize=policy(self.scope),
-                now=NOW + timedelta(seconds=3),
-            )
-            self.assertEqual(confirmed["state"], "SENT")
-            self.assertEqual(
-                confirmed["reconcile_state"], "INDEPENDENT_POSITIVE_PROOF_REQUIRED",
-            )
-            self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 0)
-            self.assertIsNone(
-                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=4))
-            )
-            store.close()
+            try:
+                item = self._enqueue(outbox)
+                key = item["idempotency_key"]
+                outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+                adapter = FakeIdempotentAdapter("sent")
+                with self.assertRaisesRegex(
+                    PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+                ):
+                    outbox.dispatch_claimed(
+                        key, worker_id="worker-1",
+                        authorize=policy(self.scope), adapter=adapter,
+                        now=NOW + timedelta(seconds=1),
+                    )
+                self.assertEqual(adapter.send_calls, 0)
+                # Local historical reconstruction, NOT a real accepted send.
+                with store.db:
+                    store.db.execute(
+                        "UPDATE action_outbox SET state='SENT', "
+                        "dispatch_started_at=?, sent_at=? "
+                        "WHERE idempotency_key=?",
+                        (NOW.isoformat(), NOW.isoformat(), key),
+                    )
+                before = outbox.get(key)
+                with self.assertRaisesRegex(
+                    PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+                ):
+                    outbox.reconcile(
+                        key, adapter=adapter, authorize=policy(self.scope),
+                        now=NOW + timedelta(seconds=3),
+                    )
+                self.assertEqual(outbox.get(key), before)
+                self.assertEqual(adapter.reconcile_calls, 0)
+                self.assertEqual(adapter.send_calls, 0)
+                self.assertEqual(outbox.effect_count(), 0)
+                self.assertIsNone(outbox.claim_next(
+                    "worker-2", now=NOW + timedelta(seconds=4),
+                ))
+            finally:
+                store.close()
 
     def test_module_has_no_built_in_external_execution_capability(self):
         source = Path("atlasquant_aion_execution_outbox.py").read_text(
@@ -818,49 +855,42 @@ class OutboxTimeOfUseFenceP0Tests(unittest.TestCase):
             root.cleanup()
 
     def test_unexpired_claim_still_dispatches_once(self):
+        """Historical method ID: an unexpired claim NEVER sends without issuer."""
         root, store, outbox, item = self.fixture()
         try:
             adapter = FakeIdempotentAdapter()
-            result = outbox.dispatch_claimed(
-                item["idempotency_key"], worker_id="worker-1",
-                authorize=policy(self.scope), adapter=adapter,
-                now=NOW + timedelta(seconds=1),
+            key = item["idempotency_key"]
+            with self.assertRaisesRegex(
+                PermissionError, "INDEPENDENT_PRODUCER_NOT_ENROLLED",
+            ):
+                outbox.dispatch_claimed(
+                    key, worker_id="worker-1",
+                    authorize=policy(self.scope), adapter=adapter,
+                    now=NOW + timedelta(seconds=1),
+                )
+            blocked = outbox.get(key)
+            self.assertEqual(blocked["state"], "BLOCKED_PRODUCER")
+            self.assertEqual(
+                blocked["last_error"], "INDEPENDENT_PRODUCER_NOT_ENROLLED",
             )
-            self.assertEqual(result["state"], "UNCERTAIN")
-            self.assertEqual(result["dispatch_state"], "UNCERTAIN_PROOF_REQUIRED")
-            self.assertEqual(result["last_error"], "ADAPTER_POSITIVE_EFFECT_UNVERIFIED")
-            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(adapter.effects, {})
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(outbox.claim_next(
+                "worker-2", now=NOW + timedelta(seconds=2),
+            ))
+            # A second caller cannot re-dispatch the quarantined intent.
+            with self.assertRaisesRegex(ValueError, "intent must be CLAIMED"):
+                outbox.dispatch_claimed(
+                    key, worker_id="worker-1",
+                    authorize=policy(self.scope), adapter=adapter,
+                    now=NOW + timedelta(seconds=3),
+                )
+            self.assertEqual(adapter.send_calls, 0)
             self.assertEqual(outbox.effect_count(), 0)
         finally:
             store.close()
             root.cleanup()
-
-
-
-class OutboxStaleStateBlockCASP0Tests(unittest.TestCase):
-    """Synthetic interleavings expose stale status/lease overwrite risks."""
-
-    def setUp(self):
-        self.scope = Scope("owner-test", "tenant-a", "workspace-a")
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.store = SQLiteChatStore(Path(self.tempdir.name) / "chat.sqlite3")
-        self.outbox = ExecutionOutbox(self.store, self.scope)
-        self.item = self.outbox.enqueue(
-            intent_ref="intent-stale-block",
-            action="send_email",
-            payload={"fixture": "no-network"},
-            aggregate_key="client-stale-block",
-            policy_version="policy-v1",
-            authorization_ref="approval-1",
-            created_at=NOW,
-            valid_until=NOW + timedelta(minutes=5),
-        )
-        self.key = self.item["idempotency_key"]
-        self.outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-
-    def tearDown(self):
-        self.store.close()
-        self.tempdir.cleanup()
 
     def test_late_revocation_does_not_clobber_confirmed_effect(self):
         def changed_while_callback(_decision):
