@@ -29,7 +29,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pytest==9.1.1 playwright==1.63.0
       - name: Compile Python tree, no code executed
-        run: python -m compileall -q .
+        run: python -m compileall -q -x '(^|/)\\.git(/|$)' .
       - name: Run EXACT tracked canonical Quality module selection, no waivers
         run: |
           python - <<'PY'
