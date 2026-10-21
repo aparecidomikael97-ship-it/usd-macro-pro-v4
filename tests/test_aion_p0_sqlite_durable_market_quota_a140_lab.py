@@ -6,8 +6,13 @@ business logic deployment, live checkpoint, Worker, or paid usage.
 from __future__ import annotations
 
 from contextlib import closing
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import os
+import shutil
+import subprocess
+import sys
 import json
 from pathlib import Path
 import sqlite3
@@ -276,6 +281,74 @@ class A140SQLiteLedgerAdversarialLAB(unittest.TestCase):
         a.record_local_output(self.run,"a"*64)
         self.assertEqual(a.reservation_state(self.run)["state"],"LOCAL_OUTPUT_OBSERVED")
         self.assertFalse(a.external_provider_effect_proven)
+
+
+    def test_36_new_process_sees_committed_reservation_after_abrupt_exit(self):
+        # The child exits without a Python finally/atexit; DB commit already
+        # completed. This is not a sudden hardware power-loss simulation.
+        script=(
+            "import os\n"
+            "from atlasquant_market_sqlite_quota_a140 import SQLiteLabReservationLedger\n"
+            f"db=SQLiteLabReservationLedger(lab_dir={str(self.lab)!r},"
+            f"checkout_root={str(self.root)!r},limit=3)\n"
+            f"os._exit(0 if db.reserve({self.run!r},2) else 5)\n"
+        )
+        p=subprocess.run([sys.executable,"-B","-c",script],
+                         cwd=str(Path(__file__).resolve().parents[1]),
+                         capture_output=True,text=True,timeout=15)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(self.ledger().reserved_units,2)
+        self.assertFalse(self.ledger().reserve(self.run,2))
+
+    def test_37_local_file_exists_but_sqlite_receipt_unknown_no_success(self):
+        a=self.ledger()
+        with patch.object(a,"record_local_output",return_value=False):
+            result=self.collect(a)
+        self.assertEqual(result["status"],"UNCERTAIN_SINK_NOT_COMMITTED")
+        self.assertEqual(self.ledger().reservation_state(self.run)["state"],
+                         "RESERVED_UNCERTAIN")
+        self.assertEqual(len(list(self.out.glob("*.json"))),1)
+        # File presence alone cannot elevate the state or permit a rerun.
+        self.assertFalse(self.ledger().reserve(self.run,1))
+
+    def test_38_post_commit_readback_uncertain_never_refunds_or_refetches(self):
+        a=self.ledger()
+        with patch.object(a,"reservation_state",
+                          side_effect=QuotaLabUnavailable("synthetic readback failure")):
+            self.assertFalse(a.reserve(self.run,1))
+        self.assertEqual(self.ledger().reserved_units,1)
+        self.assertEqual(self.ledger().reservation_state(self.run)["state"],
+                         "RESERVED_UNCERTAIN")
+        self.assertFalse(self.ledger().reserve(self.run,1))
+
+    def test_39_local_sqlite_rollback_remains_unprotected_without_witness(self):
+        # NEGATIVE DEMONSTRATION OF AN UNFIXED TRUST GAP, not a successful
+        # antirollback gate! A file-level attacker can restore an older valid
+        # DB and re-admit an already used run_id. External witness required.
+        self.ledger()
+        snapshot=Path(self.tmp.name)/"rolled_back_copy.sqlite3"
+        shutil.copyfile(self.lab/DB_FILENAME,snapshot)
+        self.assertTrue(self.ledger().reserve(self.run,1))
+        shutil.copyfile(snapshot,self.lab/DB_FILENAME)
+        # This proves the residual rollback vulnerability in LAB.
+        self.assertTrue(self.ledger().reserve(self.run,1))
+
+    def test_40_uncommitted_sqlite_transaction_disappears_after_abrupt_exit(self):
+        self.ledger()
+        script=(
+            "import os,sqlite3\n"
+            f"d=sqlite3.connect({str(self.lab/DB_FILENAME)!r},isolation_level=None)\n"
+            "d.execute('BEGIN IMMEDIATE')\n"
+            f"d.execute('INSERT INTO reservations(run_id,units,state,payload_sha256) "
+            f"VALUES(?,? ,?, NULL)',({self.run!r},1,'RESERVED_UNCERTAIN'))\n"
+            "os._exit(0)\n"
+        )
+        p=subprocess.run([sys.executable,"-B","-c",script],
+                         cwd=str(Path(__file__).resolve().parents[1]),
+                         capture_output=True,text=True,timeout=15)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(self.ledger().reserved_units,0)
+        self.assertTrue(self.ledger().reserve(self.run,1))
 
 
 if __name__=="__main__":
