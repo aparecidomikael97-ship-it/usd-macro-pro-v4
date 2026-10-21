@@ -66,7 +66,7 @@ def audit(manifest:dict[str,Any],document:str)->dict[str,Any]:
             manifest.get("no_private_support_text_in_git") is True,"INTAKE_FALSE_COMMUNICATION_OR_PRIVACY_CLAIM")
     require(set(manifest.get("allowed_response_states",[]))==STATES,"INTAKE_RESPONSE_STATUS_UNSAFE")
     require(isinstance(document,str) and document.startswith("# AION P0/H0"),"INTAKE_RFI_DOCUMENT_MISSING")
-    require("**NOT SENT**" in document and
+    require("(NOT SENT)" in document and
             "No external inquiry or action was submitted in this PR." in document,
             "INTAKE_UNSENT_DISCLOSURE_MISSING")
 
