@@ -1,8 +1,9 @@
 """LAB-only fail-closed Quality root-test coverage governance.
 
-Do not modify the canonical Quality selection or waive the legacy coverage FAIL.
-A missing root test can be LAB-only only if it has an executable step on this
-branch's dedicated, read-only matrix CI. No product capabilities are unlocked.
+Do not waive the original coverage FAIL. Under this candidate, all 26
+previously LAB-only omitted root tests must now be explicit in the canonical
+Quality selection AND retain their dedicated read-only matrix runner.
+No product capabilities or external effects are unlocked.
 """
 from __future__ import annotations
 
@@ -52,9 +53,14 @@ class AIONP0QualityLabCoverageGovernanceTests(unittest.TestCase):
         omitted = discovered - listed
         expected = {module + ".py" for module in LAB_ONLY}
         self.assertEqual(len(LAB_ONLY), len(set(LAB_ONLY)), "duplicate LAB audit module")
-        self.assertEqual(omitted, expected,
-                         "No implicit exclusions; update both audit and CI after any change")
-        self.assertFalse(expected & listed, "LAB file included twice")
+        self.assertEqual(
+            omitted, set(),
+            "Fail-closed coverage: every root test file must be in canonical Quality"
+        )
+        self.assertEqual(
+            expected & listed, expected,
+            "All 26 historically excluded LAB files must also be explicitly tracked"
+        )
 
     def test_every_omitted_module_has_real_unittest_step(self):
         content = DEDICATED.read_text(encoding="utf-8")
