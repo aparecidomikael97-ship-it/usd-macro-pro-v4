@@ -311,12 +311,11 @@ class ExecutionOutbox:
     def _view(row) -> dict[str, Any]:
         if row is None:
             raise LookupError("action intent unavailable")
-        # A121: local reads are used in diagnosis, recovery and coordinator
-        # admission. Do not publish JSON forged after staging as a trusted
-        # decision. The claim path already checks canonical raw decision
-        # material; reuse that check on EVERY read, plus SQLite metadata
-        # coherence. Raise instead of silently hiding a row (which could be
-        # mistaken for proof that no intent/effect exists).
+        # A121: split forensic local state from admissible decision data.
+        # A corrupt JSON row must NEVER appear as an authorized decision, but
+        # returning a minimal flagged local state allows rollback/incident
+        # probes to observe the row without treating it as NO_EFFECT.
+        # A hash check here remains LOCAL only, not issuer authentication.
         try:
             scoped = (row["owner"], row["tenant"], row["workspace"])
             if not _local_decision_raw_integrity(row, scoped):
@@ -339,10 +338,32 @@ class ExecutionOutbox:
             if decision["decision_id"] != row["decision_id"]:
                 raise ValueError("outbox pointer mismatch")
         except (TypeError, ValueError, KeyError, OverflowError,
-                RecursionError, IndexError) as exc:
-            raise PermissionError(
-                "OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH"
-            ) from exc
+                RecursionError, IndexError):
+            # All untrusted serialized decision and derived authorization
+            # metadata are replaced with inert values. Never omit a corrupt
+            # row from list(): absence cannot mean an external NO_EFFECT.
+            return {
+                "schema": SCHEMA,
+                "idempotency_key": row["idempotency_key"],
+                "decision_id": row["decision_id"],
+                "state": row["state"],
+                "attempts": int(row["attempts"]),
+                "lease_owner": row["lease_owner"],
+                "lease_until": row["lease_until"],
+                "dispatch_started_at": row["dispatch_started_at"],
+                "sent_at": row["sent_at"],
+                "confirmed_at": row["confirmed_at"],
+                "last_error": "",
+                "effect_ref": "",
+                "aggregate_key": "",
+                "aggregate_seq": 0,
+                "decision": {},
+                "local_integrity": "MISMATCH",
+                "integrity_reason": "OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH",
+                "reconciliation_state": "UNKNOWN_BLOCKED",
+                "local_state_only": True,
+                "executes_action": False,
+            }
         return {
             "schema": SCHEMA,
             "idempotency_key": row["idempotency_key"],
@@ -359,6 +380,8 @@ class ExecutionOutbox:
             "aggregate_key": row["aggregate_key"],
             "aggregate_seq": int(row["aggregate_seq"]),
             "decision": decision,
+            "local_integrity": "MATCH",
+            "local_state_only": True,
             "executes_action": False,
         }
 
@@ -493,6 +516,8 @@ class ExecutionOutbox:
                 else:
                     self.db.execute("RELEASE SAVEPOINT aion_outbox_enqueue")
                 out = self.get(idempotency_key)
+                if out.get("local_integrity") != "MATCH":
+                    raise PermissionError("OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH")
                 return {**out, "enqueue_state": "IDEMPOTENT"}
 
             seq = int(
@@ -797,6 +822,8 @@ class ExecutionOutbox:
         self._require_connection_thread()
         if self.db.in_transaction:
             raise RuntimeError("OUTBOX_NESTED_TRANSACTION_UNSUPPORTED")
+        if expected.get("local_integrity") != "MATCH":
+            raise PermissionError("OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH")
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
         if _outbox_key(expected.get("idempotency_key")) != key:
@@ -875,6 +902,10 @@ class ExecutionOutbox:
 
         now_dt = read_clock()
         intent = self.get(key)
+        # An incident-only status projection is never dispatch authority.
+        # Refuse before ANY callback or adapter property can run.
+        if intent.get("local_integrity") != "MATCH":
+            raise PermissionError("OUTBOX_LOCAL_DECISION_INTEGRITY_MISMATCH")
         if intent["state"] != "CLAIMED":
             raise ValueError("intent must be CLAIMED before dispatch")
         if intent["lease_owner"] != worker:
