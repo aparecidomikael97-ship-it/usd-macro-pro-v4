@@ -36,6 +36,9 @@ class RecoveryLiveDestinationBindingLab(unittest.TestCase):
 
     def call(self, live):
         with patch(
+            "atlasquant_aion_recovery._verify_runtime_revision_ancestry",
+            return_value={"allowed":True,"executes_action":False},
+        ), patch(
             "atlasquant_aion_recovery.load_runtime_checkpoint",
             return_value=live,
         ) as runtime_get, patch(

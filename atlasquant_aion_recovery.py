@@ -12,6 +12,7 @@ from typing import Any, Mapping
 import base64
 import json
 import re
+from urllib.parse import quote
 
 
 from atlasquant_runtime_store import require_runtime_branch
@@ -418,6 +419,68 @@ def _recheck_live_restore_target(
     return {"allowed":True,"expected_sha":preflight["expected_sha"]}
 
 
+def _verify_runtime_revision_ancestry(
+    revision:Any,
+    config:RuntimeConfig,
+    *,
+    timeout:float,
+)->dict[str,Any]:
+    """Review-only GitHub compare gate for ancestor revision selection.
+
+    This verifies branch ancestry under the configured GitHub repository
+    snapshot. It does NOT provide independent, monotonic-head authority,
+    identity enrollment, revocation, or external no-effect receipts.
+    """
+    rev=_safe_revision(revision)
+    if not rev:
+        return {"allowed":False,"reason":"Historical revision is malformed.","executes_action":False}
+    try:
+        require_runtime_branch(config.branch)
+        if (
+            type(config.repo) is not str
+            or re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",config.repo) is None
+        ):
+            raise ValueError("Invalid configured GitHub repository.")
+        safe_branch=quote(config.branch,safe="")
+        safe_rev=quote(rev,safe="")
+        import requests
+        response=requests.get(
+            f"https://api.github.com/repos/{config.repo}/compare/{safe_rev}...{safe_branch}",
+            headers=_headers(config.token),
+            timeout=min(float(timeout),12.0),
+        )
+        response.raise_for_status()
+        raw=response.json()
+    except Exception:
+        return {"allowed":False,"reason":"Historical revision ancestry could not be verified.","executes_action":False}
+    if not isinstance(raw,Mapping):
+        return {"allowed":False,"reason":"Historical ancestry response is invalid.","executes_action":False}
+    status=raw.get("status")
+    base=raw.get("base_commit")
+    common=raw.get("merge_base_commit")
+    head=raw.get("head_commit")
+    base_sha=base.get("sha") if isinstance(base,Mapping) else None
+    common_sha=common.get("sha") if isinstance(common,Mapping) else None
+    head_sha=head.get("sha") if isinstance(head,Mapping) else None
+    good=bool(
+        status in ("ahead","identical")
+        and type(base_sha) is str and base_sha.lower()==rev.lower()
+        and type(common_sha) is str and common_sha.lower()==rev.lower()
+        and type(head_sha) is str and _REVISION_RE.fullmatch(head_sha)
+        and (status!="identical" or head_sha.lower()==rev.lower())
+    )
+    if not good:
+        return {
+            "allowed":False,
+            "reason":"Historical revision is not proven to be an ancestor of the configured runtime branch.",
+            "executes_action":False,
+        }
+    return {
+        "allowed":True,"revision":rev,"runtime_branch_head":head_sha,
+        "executes_action":False,
+    }
+
+
 def restore_checkpoint_revision(
     candidate:Mapping[str,Any],
     current_runtime:Mapping[str,Any],
@@ -458,6 +521,19 @@ def restore_checkpoint_revision(
         }
 
     revision=str(preflight.get("candidate_revision") or "")
+    ancestry=_verify_runtime_revision_ancestry(
+        revision,config,timeout=timeout,
+    )
+    if ancestry.get("allowed") is not True:
+        return {
+            "schema":SCHEMA,"status":"BLOCKED","saved":False,"verified":False,
+            "reason":ancestry.get("reason") or "Historical ancestry is unverified.",
+            "preflight":preflight,
+            "restore_confirmed":False,
+            "reconciliation_required":False,
+            "automatic_retry_allowed":False,
+            "automatic_restore":False,
+        }
     rebound_candidate=load_checkpoint_revision(
         revision,
         config,
