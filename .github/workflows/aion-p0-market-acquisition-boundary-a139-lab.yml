@@ -1,0 +1,46 @@
+name: AION P0 A139 LAB Market Acquisition Quota and Sink Isolation (NO-GO)
+on:
+  push:
+    branches:
+      - lab/aion-p0-market-read-quota-sink-separation-a139-20261021
+permissions:
+  contents: read
+jobs:
+  lab-market-boundary:
+    name: A139 no-provider read/quota/sink - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+      AION_LAB_MODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: New A139 market-acquisition boundary RED-first
+        run: python -B -m unittest discover -s tests -p test_aion_p0_market_acquisition_isolation_a139_lab.py -v
+      - name: Previous A138 market snapshot and workflow contract regressions
+        shell: bash
+        run: |
+          python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_only_a138_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_workflow_contract_a138_lab.py -v
+      - name: Check producer has no network or GitHub write primitives
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("atlasquant_market_boundary_a139.py")
+          s=p.read_text(encoding="utf-8")
+          for forbidden in ("requests.", "httpx.", "urllib.request", "subprocess.", "github.token", "GITHUB_TOKEN_HISTORICO", "save_runtime_checkpoint", "AppTest"):
+              assert forbidden not in s, (p,forbidden)
+          print("A139 source static boundary: no detected provider/network/GitHub write primitives")
+          PY
