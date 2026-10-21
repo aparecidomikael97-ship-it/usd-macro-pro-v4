@@ -235,6 +235,11 @@ def main():
                          sort_keys=True))
         return 1
     print(json.dumps(result,sort_keys=True,ensure_ascii=False))
+    # Print the hash of OUR stable ZIP, not upload-artifact's outer wrapper.
+    zip_path=a.inspect if a.inspect else a.out
+    print("AION_A138_BUNDLE_SHA256="+hashlib.sha256(
+        Path(zip_path).read_bytes()
+    ).hexdigest())
     return 0
 
 
