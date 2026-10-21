@@ -5,6 +5,9 @@ connection and uses BEGIN IMMEDIATE, allowing safe process/thread contention.
 
 Expiry comparisons use integer UTC microseconds rather than lexicographic
 timestamp text so fractional-second RFC3339 values cannot expire early.
+Consumed nonces remain as local tombstones without automatic expiry pruning:
+a forward clock jump must not enable replay after a later clock rollback.
+This does NOT detect a complete restoration of a previous SQLite snapshot.
 """
 from __future__ import annotations
 
@@ -216,15 +219,17 @@ class PersistentNonceRegistry:
         exp = _parse_ts(expires_at)
         if exp <= now:
             return False
-        now_us = _epoch_us(now)
         exp_us = _epoch_us(exp)
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                conn.execute(
-                    "DELETE FROM nonce_claims WHERE expires_at_us <= ?",
-                    (now_us,),
-                )
+                # A claimed nonce is a consumed, durable tombstone.
+                # Never prune it as a side effect of another claim:
+                # caller-supplied or rolled-back wall-clock time could
+                # otherwise re-admit a previously signed owner request.
+                # Retention/compaction needs independent anti-rollback
+                # custody and an explicit audited policy. Until then,
+                # preserve the original UNIQUE(scope,nonce) boundary.
                 conn.execute(
                     """
                     INSERT INTO nonce_claims(
