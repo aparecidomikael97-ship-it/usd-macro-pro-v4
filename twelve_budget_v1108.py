@@ -49,9 +49,15 @@ class BudgetUnavailable(RuntimeError):
 
 class GitHubStore:
     def __init__(self, token, repo, branch, path=BUDGET_PATH):
+        # A136 P0: configurable file paths must never let budget CAS overwrite
+        # Checkpoint Mestre or any unrelated repository object.
+        if type(path) is not str or path != BUDGET_PATH:
+            raise BudgetUnavailable('Budget GitHub file path is not authorized')
         self.token, self.repo, self.branch, self.path = token, repo, branch, path
 
     def load(self):
+        if type(self.path) is not str or self.path != BUDGET_PATH:
+            raise BudgetUnavailable('Budget GitHub file path is not authorized')
         if not self.token or not self.repo:
             raise BudgetUnavailable('Persistência do orçamento não configurada')
         r=requests.get(f'https://api.github.com/repos/{self.repo}/contents/{self.path}',
@@ -67,6 +73,9 @@ class GitHubStore:
             raise BudgetUnavailable('Arquivo de orçamento inválido') from None
 
     def save(self, state, revision):
+        # Revalidate after construction: a caller can reassign self.path.
+        if type(self.path) is not str or self.path != BUDGET_PATH:
+            raise BudgetUnavailable('Budget GitHub file path is not authorized')
         body={'message':'V11.0.8: reserva de créditos Twelve Data', 'branch':self.branch,
               'content':base64.b64encode(json.dumps(state,ensure_ascii=False).encode()).decode()}
         if revision: body['sha']=revision

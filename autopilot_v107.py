@@ -186,6 +186,18 @@ def gh_get_bytes(path: str) -> tuple[bytes | None, str]:
         return None, f"{type(exc).__name__}: {exc}"
 
 def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
+    # A136b LAB: do not allow raw GitHub Contents target selection to bypass
+    # Checkpoint Mestre A135. This is for ordinary flat/nested 'dados/' files.
+    # Reject encoded characters, query fragments and dot-segment traversal.
+    import re
+    if (
+        type(path) is not str
+        or not path.startswith("dados/")
+        or re.fullmatch(r"[A-Za-z0-9_./-]+", path) is None
+        or any(segment in ("", ".", "..") for segment in path.split("/"))
+        or path == "dados/aion/checkpoint_master.json"
+    ):
+        return False, "Autopilot GitHub destination is not authorized."
     if not TOKEN or not REPO:
         return False, "GitHub token/repo ausente."
     url = f"https://api.github.com/repos/{REPO}/contents/{path}"

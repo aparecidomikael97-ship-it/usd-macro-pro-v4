@@ -4436,6 +4436,19 @@ with st.expander("🧭 Como tomar a decisão no APP", expanded=False):
 # V10.4 — FEEDBACK PERSISTENTE
 # =========================================================
 def _github_put_bytes_v104(path_repo: str, raw: bytes, message: str) -> tuple[bool, str]:
+    # A136 P0: this helper exists solely for screenshot attachments. It must
+    # never become an alternate GitHub Contents writer for the AION runtime.
+    # Strict full match rejects encoded slashes, traversal, query, fragments,
+    # Unicode coercion and any destination outside the issued filename form.
+    import re
+    if (
+        type(path_repo) is not str
+        or re.fullmatch(
+            r"dados/feedback_anexos/[0-9]{8}T[0-9]{6}Z_[0-9a-f]{8}\.(?:png|jpg|jpeg|webp)",
+            path_repo,
+        ) is None
+    ):
+        return False, "Attachment path is outside the dedicated feedback namespace."
     token, repo, branch = _github_cfg_v84()
     if not token or not repo:
         return False, "GitHub persistente não configurado."

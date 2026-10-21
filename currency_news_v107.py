@@ -980,6 +980,10 @@ def _gh_read_csv_v1061(path: str) -> tuple[pd.DataFrame, str]:
 
 
 def _gh_write_csv_v1061(path: str, df: pd.DataFrame, message: str) -> tuple[bool, str]:
+    # A136b LAB: this writer is only used for daily news validation CSV.
+    # Never let an arbitrary caller direct it to AION Checkpoint Mestre.
+    if type(path) is not str or path != _NEWS_VALIDATION_PATH:
+        return False, "News CSV destination is outside the approved snapshot path."
     token, repo, branch = _gh_cfg_v1061()
     if not token or not repo:
         return False, "GitHub persistente não configurado."
