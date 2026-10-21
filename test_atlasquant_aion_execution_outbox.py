@@ -1445,60 +1445,91 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         )
 
     def test_unverified_positive_from_send_must_not_record_real_effect(self):
-        """EXPECTED RED: caller can currently forge CONFIRMED and effect ledger."""
+        """Caller-forged positive must never reach an unenrolled sender."""
         adapter = ClaimsConfirmedWithoutProducer()
-        result = self._dispatch(adapter)
-        self.assertEqual(adapter.calls, 1)
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self._dispatch(adapter)
+        row = self.outbox.get(self.key)
+        self.assertEqual(row["state"], "BLOCKED_PRODUCER")
+        self.assertEqual(row["last_error"], "INDEPENDENT_PRODUCER_NOT_ENROLLED")
+        self.assertEqual(adapter.calls, 0)
         self.assertEqual(adapter.real_effects, 0)
-        self.assertIn(
-            result["state"], ("UNCERTAIN", "SENT"),
-            "an adapter-supplied bool must not be admitted as producer proof",
-        )
         self.assertEqual(self.outbox.effect_count(), 0)
+        self.assertIsNone(self.outbox.claim_next(
+            "worker-fake-issuer", now=NOW + timedelta(seconds=2),
+        ))
 
     def test_unverified_positive_from_reconcile_must_not_record_real_effect(self):
-        """EXPECTED RED: caller can currently forge the reconciling receipt."""
+        """Historical uncertain state cannot use an untrusted reconciler."""
         adapter = ClaimsReconciledWithoutProducer()
-        sent = self._dispatch(adapter)
-        self.assertEqual(sent["state"], "SENT")
-        reconciled = self.outbox.reconcile(
-            self.key,
-            adapter=adapter,
-            authorize=fixture_authority(self.scope),
-            now=NOW + timedelta(seconds=2),
-        )
-        self.assertEqual(adapter.send_calls, 1)
-        self.assertEqual(adapter.reconcile_calls, 1)
+        self._stage_uncertain_readback_without_producer()
+        before = self.outbox.get(self.key)
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self.outbox.reconcile(
+                self.key, adapter=adapter,
+                authorize=fixture_authority(self.scope),
+                now=NOW + timedelta(seconds=2),
+            )
+        self.assertEqual(self.outbox.get(self.key), before)
+        self.assertEqual(adapter.send_calls, 0)
+        self.assertEqual(adapter.reconcile_calls, 0)
         self.assertEqual(adapter.real_effects, 0)
-        self.assertIn(
-            reconciled["state"], ("SENT", "UNCERTAIN"),
-            "a self-attested reconciliation must not prove a real effect",
-        )
         self.assertEqual(self.outbox.effect_count(), 0)
+        self.assertIsNone(self.outbox.claim_next(
+            "worker-no-positive", now=NOW + timedelta(seconds=3),
+        ))
 
     def test_existing_unverified_negative_remains_quarantined(self):
-        """EXPECTED GREEN control: A.20 does not trust negative adapter claims."""
+        """Even a benign-looking negative return cannot be consulted pre-enrollment."""
         adapter = RejectsWithoutProducer()
-        result = self._dispatch(adapter)
-        self.assertEqual(result["state"], "UNCERTAIN")
-        self.assertEqual(result["dispatch_state"], "UNCERTAIN_PROOF_REQUIRED")
-        self.assertEqual(adapter.calls, 1)
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self._dispatch(adapter)
+        row = self.outbox.get(self.key)
+        self.assertEqual(row["state"], "BLOCKED_PRODUCER")
+        self.assertEqual(row["last_error"], "INDEPENDENT_PRODUCER_NOT_ENROLLED")
+        self.assertEqual(adapter.calls, 0)
         self.assertEqual(self.outbox.effect_count(), 0)
+        self.assertIsNone(self.outbox.claim_next(
+            "worker-negative", now=NOW + timedelta(seconds=2),
+        ))
 
     def test_private_confirm_is_closed_without_independent_producer_receipt(self):
-        """Direct calls cannot bypass the missing external trust boundary."""
+        """No Python-private method is a replacement for producer-origin proof."""
         adapter = ClaimsReconciledWithoutProducer()
-        sent = self._dispatch(adapter)
-        self.assertEqual(sent["state"], "SENT")
+        first = self.outbox.get(self.key)
+        self.assertEqual(first["state"], "CLAIMED")
         with self.assertRaisesRegex(
-            PermissionError, "INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED",
+            PermissionError, "^INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED$",
         ):
             self.outbox._confirm(
-                self.key, expected=self.outbox.get(self.key),
+                self.key, expected=first,
                 effect_ref="CALLER-INVENTED",
+                confirmed_at=NOW + timedelta(seconds=1),
+            )
+        self.assertEqual(self.outbox.get(self.key), first)
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self._dispatch(adapter)
+        blocked = self.outbox.get(self.key)
+        self.assertEqual(blocked["state"], "BLOCKED_PRODUCER")
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED$",
+        ):
+            self.outbox._confirm(
+                self.key, expected=blocked,
+                effect_ref="CALLER-SECOND-INVENTED",
                 confirmed_at=NOW + timedelta(seconds=2),
             )
-        self.assertEqual(self.outbox.get(self.key)["state"], "SENT")
+        self.assertEqual(self.outbox.get(self.key), blocked)
+        self.assertEqual(adapter.send_calls, 0)
+        self.assertEqual(adapter.reconcile_calls, 0)
         self.assertEqual(self.outbox.effect_count(), 0)
 
     def test_no_enrolled_producer_must_block_before_adapter_send(self):
@@ -1562,7 +1593,7 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
         self.assertEqual(self.outbox.effect_count(), 0)
 
     def test_fake_positive_cannot_release_followup_same_aggregate(self):
-        """No next aggregate action may run on a merely asserted effect."""
+        """Fake positive must neither send nor release dependent FIFO action."""
         later = self.outbox.enqueue(
             intent_ref="intent-second-after-forged-positive",
             action="send_email",
@@ -1573,8 +1604,14 @@ class AionUntrustedPositiveAdmissionRedTests(unittest.TestCase):
             created_at=NOW + timedelta(seconds=1),
             valid_until=NOW + timedelta(minutes=5),
         )
-        result = self._dispatch(ClaimsConfirmedWithoutProducer())
-        self.assertEqual(result["state"], "UNCERTAIN")
+        adapter = ClaimsConfirmedWithoutProducer()
+        with self.assertRaisesRegex(
+            PermissionError, "^INDEPENDENT_PRODUCER_NOT_ENROLLED$",
+        ):
+            self._dispatch(adapter)
+        self.assertEqual(self.outbox.get(self.key)["state"], "BLOCKED_PRODUCER")
+        self.assertEqual(adapter.calls, 0)
+        self.assertEqual(adapter.real_effects, 0)
         self.assertIsNone(self.outbox.claim_next(
             "worker-followup", now=NOW + timedelta(seconds=2),
         ))
