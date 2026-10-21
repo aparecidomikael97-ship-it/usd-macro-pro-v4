@@ -5,6 +5,7 @@ business logic deployment, live checkpoint, Worker, or paid usage.
 """
 from __future__ import annotations
 
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
@@ -145,15 +146,17 @@ class A140SQLiteLedgerAdversarialLAB(unittest.TestCase):
 
     def test_18_truncated_meta_fails_closed(self):
         self.ledger()
-        with sqlite3.connect(self.lab/DB_FILENAME) as db:
+        with closing(sqlite3.connect(self.lab/DB_FILENAME)) as db:
             db.execute("DELETE FROM quota_policy")
+            db.commit()
         with self.assertRaises(QuotaLabUnavailable):
             self.ledger()
 
     def test_19_unknown_schema_fails_closed(self):
         self.ledger()
-        with sqlite3.connect(self.lab/DB_FILENAME) as db:
+        with closing(sqlite3.connect(self.lab/DB_FILENAME)) as db:
             db.execute("UPDATE quota_policy SET schema='ATTACKER_UPGRADE'")
+            db.commit()
         with self.assertRaises(QuotaLabUnavailable):
             self.ledger()
 
@@ -248,7 +251,7 @@ class A140SQLiteLedgerAdversarialLAB(unittest.TestCase):
 
     def test_32_database_locked_reservation_does_not_fetch(self):
         a=self.ledger()
-        with sqlite3.connect(self.lab/DB_FILENAME,timeout=0,isolation_level=None) as conn:
+        with closing(sqlite3.connect(self.lab/DB_FILENAME,timeout=0,isolation_level=None)) as conn:
             conn.execute("BEGIN EXCLUSIVE")
             try:
                 result=self.collect(a)
