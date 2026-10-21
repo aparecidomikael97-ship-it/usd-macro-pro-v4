@@ -36,8 +36,8 @@ def main()->int:
         symbols=("EUR/USD","USD/JPY"),
         feed=feed,
         quota=ledger,
-        output_dir=Path(args.output_dir),
-        checkout_root=Path(args.checkout_root),
+        output_dir=Path(args.output_dir).resolve(strict=True),
+        checkout_root=Path(args.checkout_root).resolve(strict=True),
         observed_at="2026-10-21T23:00:00Z",
     )
     if result.get("status")!="SYNTHETIC_OUTPUT_NOT_LIVE":
