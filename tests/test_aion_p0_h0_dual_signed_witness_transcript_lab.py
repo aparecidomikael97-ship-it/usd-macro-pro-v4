@@ -110,7 +110,7 @@ class H0TwoSignedIndependentRolesLAB(unittest.TestCase):
         alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
         old=a["signature_b64url"][-1]
         idx=alphabet.index(old)
-        # 64-byte Ed25519 uses two unused bits in its final Base64URL char.
+        # A 64-byte Ed25519 signature has FOUR unused pad bits in the last Base64URL sextet.
         changed=alphabet[(idx & ~3) | ((idx+1) & 3)]
         self.assertNotEqual(changed,old)
         a["signature_b64url"]=a["signature_b64url"][:-1]+changed
@@ -250,6 +250,51 @@ class H0TwoSignedIndependentRolesLAB(unittest.TestCase):
         self.assertEqual(once,twice)
         self.assertIs(once["external_nonce_durably_reserved"],False)
         self.assertIs(once["first_external_effect_allowed"],False)
+
+
+    def test_31_hostile_reservation_schema_must_not_escape_as_exception(self):
+        class HostileField:
+            def __eq__(self,other):
+                return True
+            def __ne__(self,other):
+                return False
+        a,b=self.packet()
+        a["payload"]["schema"]=HostileField()
+        self.deny(self.check(a,b),"RESERVATION_TRANSCRIPT_INVALID",False)
+
+    def test_32_hostile_readback_kind_must_not_escape_as_exception(self):
+        class HostileField:
+            def __eq__(self,other):
+                return True
+            def __ne__(self,other):
+                return False
+        a,b=self.packet()
+        b["payload"]["kind"]=HostileField()
+        self.deny(self.check(a,b),"READBACK_TRANSCRIPT_INVALID",False)
+
+    def test_33_all_15_signature_aliases_in_unused_base64_bits_denied(self):
+        alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        original_a,original_b=self.packet()
+        original=original_a["signature_b64url"][-1]
+        idx=alphabet.index(original)
+        base=idx & ~15  # 512 bits: 2 useful, 4 unused in final sextet
+        aliases=[alphabet[base+i] for i in range(16)
+                 if alphabet[base+i]!=original]
+        self.assertEqual(len(aliases),15)
+        for suffix in aliases:
+            with self.subTest(alias=suffix):
+                a=deepcopy(original_a)
+                a["signature_b64url"]=a["signature_b64url"][:-1]+suffix
+                self.deny(self.check(a,original_b),
+                          "RESERVATION_SIGNATURE_OR_PUBLIC_KEY_ENCODING_INVALID",False)
+
+    def test_34_canonical_json_interoperability_known_minimal_vector(self):
+        # A fixed expected byte vector independent of signing implementation.
+        self.assertEqual(
+            canonical_bytes({"z":2,"a":"á"}),
+            DOMAIN + b'{"a":"\\u00e1","z":2}',
+        )
+
 
 
 if __name__=="__main__":
