@@ -18,6 +18,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = 2
+# Conservative non-authorizing LOCAL admission ceiling. This is a count
+# limit, not a guarantee of on-disk bytes. No automatic tombstone eviction.
+MAX_NONCE_CLAIMS = 100_000
 _TS_RE = re.compile(
     r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?Z$"
 )
@@ -223,13 +226,26 @@ class PersistentNonceRegistry:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                # A claimed nonce is a consumed, durable tombstone.
-                # Never prune it as a side effect of another claim:
-                # caller-supplied or rolled-back wall-clock time could
-                # otherwise re-admit a previously signed owner request.
-                # Retention/compaction needs independent anti-rollback
-                # custody and an explicit audited policy. Until then,
-                # preserve the original UNIQUE(scope,nonce) boundary.
+                # This local quota is a fail-closed admission ceiling, NOT
+                # a pruning policy. Check under BEGIN IMMEDIATE so parallel
+                # processes cannot admit past the cap. A known consumed nonce
+                # remains a replay (False), even when at capacity. Preserve
+                # all historic tombstones including expired ones.
+                if conn.execute(
+                    "SELECT 1 FROM nonce_claims WHERE scope=? AND nonce=?",
+                    (scope, nonce),
+                ).fetchone() is not None:
+                    conn.execute("ROLLBACK")
+                    return False
+                used = int(conn.execute(
+                    "SELECT COUNT(*) FROM nonce_claims"
+                ).fetchone()[0])
+                if used >= MAX_NONCE_CLAIMS:
+                    raise RuntimeError(
+                        "nonce registry capacity exhausted; no tombstone eviction"
+                    )
+                # Tombstone retention intentionally grows; count is not an
+                # on-disk byte budget. Full-backup rollback is still OPEN P0.
                 conn.execute(
                     """
                     INSERT INTO nonce_claims(
@@ -240,10 +256,13 @@ class PersistentNonceRegistry:
                 )
                 conn.execute("COMMIT")
                 return True
-            except sqlite3.IntegrityError:
-                conn.execute("ROLLBACK")
-                return False
             except Exception:
+                # A duplicate was checked above under the same IMMEDIATE
+                # transaction. Other IntegrityErrors (trigger, CHECK,
+                # corruption, write failure) are NOT evidence of replay.
+                # Surface storage failure so the OWNER verifier fails closed
+                # with OWNER_SIGNATURE_NONCE_REGISTRY_FAILURE, not a false
+                # OWNER_SIGNATURE_NONCE_REPLAYED diagnosis.
                 conn.execute("ROLLBACK")
                 raise
 
