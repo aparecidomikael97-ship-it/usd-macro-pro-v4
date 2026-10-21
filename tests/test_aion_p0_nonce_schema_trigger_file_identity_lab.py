@@ -65,7 +65,11 @@ class NonceSchemaTriggersAndFileSwapLAB(unittest.TestCase):
                                     "trigger|schema|integrity|modified"):
             self.claim(self.ra,"new-claim")
         self.assertEqual(self.raws(self.a),["old-claim"])
-        self.assertFalse(self.claim(self.ra,"old-claim"))
+        # While the table contains an unauthorized trigger, EVERY claim
+        # must fail closed, including a repeated known nonce. Returning
+        # False here would falsely imply normal replay adjudication.
+        with self.assertRaisesRegex(RuntimeError,"trigger"):
+            self.claim(self.ra,"old-claim")
 
     def test_03_owner_ceremony_denies_claim_when_schema_has_unexpected_trigger(self):
         self.trigger_delete_prior()
