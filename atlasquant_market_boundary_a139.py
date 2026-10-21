@@ -165,7 +165,13 @@ def collect_synthetic_market(
             raise ValueError("Only the explicit in-memory fake is admissible")
         if type(quota) not in (MemoryOnlyReservationLedger,SQLiteLabReservationLedger):
             raise ValueError("Only typed offline LAB quota ledgers are admissible")
-        if type(symbols) not in (tuple,list) or len(symbols)==0:
+        if type(symbols) not in (tuple,list):
+            raise ValueError("Only tuple/list of literal symbols supported")
+        # A140 Codex review: immediately freeze caller-controlled mutable
+        # lists BEFORE validation, quota reservation and any fake reads.
+        # Every following use MUST refer to immutable local copy.
+        symbols=tuple(symbols)
+        if len(symbols)==0:
             raise ValueError("At least one literal market symbol is needed")
         if (
             len(symbols)>len(SYMBOL_ALLOWLIST)
@@ -236,7 +242,17 @@ def collect_synthetic_market(
         # execution. If DB readback fails after the file was written, the
         # outcome stays UNCERTAIN; do not replay or refund the reservation.
         if not quota.record_local_output(run_id,envelope["payload_sha256"]):
-            return _blocked("UNCERTAIN_SINK_NOT_COMMITTED","SQLITE_OUTPUT_READBACK_UNKNOWN")
+            result=_blocked("UNCERTAIN_SINK_NOT_COMMITTED","SQLITE_OUTPUT_READBACK_UNKNOWN")
+            # Local bytes were fsync'd successfully, but the DB receipt is
+            # unknown. Neither "zero files" nor a confirmed save is true.
+            # Report the observation without granting provider/owner authority.
+            result.update({
+                "market_files_written":1,
+                "local_file_observed":True,
+                "local_filename":filename,
+                "reconciliation_required":True,
+            })
+            return result
     return {
         "schema":SCHEMA,
         "status":"SYNTHETIC_OUTPUT_NOT_LIVE",
