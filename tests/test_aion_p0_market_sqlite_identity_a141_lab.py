@@ -127,7 +127,7 @@ class A141StorageIdentityLAB(unittest.TestCase):
             self.skipTest("Symlink creation not available")
         self.assertFalse(a.reserve(self.run,1))
 
-    def test_12_valid_local_db_rollback_is_still_undetectable_on_new_instance(self):
+    def test_12_valid_local_db_rollback_still_undetectable_after_new_instance(self):
         # This is intentional proof of an UNFIXED external trust gap.
         a=self.ledger()
         source=self.work/"stale-copy.sqlite3"
@@ -179,7 +179,7 @@ class A141StorageIdentityLAB(unittest.TestCase):
         shutil.copyfile(stale,self.lab/DB_FILENAME)
         self.assertFalse(a.reserve("a141runtwo",1))
 
-    def test_17_new_process_unprotected_against_in_place_stale_db(self):
+    def test_17_new_instance_unprotected_against_in_place_stale_db(self):
         # Negative documented limit: process-only high-water does not have
         # external trust/persistence. A new ledger trusts a valid stale DB.
         a=self.ledger()
@@ -190,6 +190,61 @@ class A141StorageIdentityLAB(unittest.TestCase):
         b=self.ledger()
         self.assertEqual(b.reserved_units,0)
         self.assertTrue(b.reserve(self.run,1))
+
+
+    def test_18_reopened_instance_pins_preexisting_history_immediately(self):
+        a=self.ledger()
+        stale=self.work/"stale.sqlite3"
+        shutil.copyfile(self.lab/DB_FILENAME,stale)
+        self.assertTrue(a.reserve(self.run,2))
+        reopened=self.ledger()
+        shutil.copyfile(stale,self.lab/DB_FILENAME)
+        self.assertFalse(reopened.reserve("a141runtwo",1))
+
+    def test_19_read_of_other_process_observation_pins_higher_balance(self):
+        a=self.ledger()
+        self.assertTrue(a.reserve(self.run,1))
+        snapshot=self.work/"before-second.sqlite3"
+        shutil.copyfile(self.lab/DB_FILENAME,snapshot)
+        b=self.ledger()
+        self.assertTrue(b.reserve("a141runtwo",1))
+        self.assertEqual(a.reservation_state("a141runtwo")["units"],1)
+        shutil.copyfile(snapshot,self.lab/DB_FILENAME)
+        self.assertFalse(a.reserve("a141runnew",1))
+
+    def test_20_same_sum_old_local_output_state_is_rejected(self):
+        a=self.ledger()
+        self.assertTrue(a.reserve(self.run,1))
+        stale=self.work/"before-observation.sqlite3"
+        shutil.copyfile(self.lab/DB_FILENAME,stale)
+        self.assertTrue(a.record_local_output(self.run,"a"*64))
+        shutil.copyfile(stale,self.lab/DB_FILENAME)
+        self.assertFalse(a.record_local_output(self.run,"b"*64))
+        with self.assertRaises(QuotaLabUnavailable):
+            a.reservation_state(self.run)
+
+    def test_21_same_sum_different_run_id_is_rejected(self):
+        a=self.ledger()
+        self.assertTrue(a.reserve(self.run,1))
+        # All mutations take place in a synthetic temp SQLite fixture.
+        with closing(sqlite3.connect(self.lab/DB_FILENAME)) as db:
+            db.execute("UPDATE reservations SET run_id=? WHERE run_id=?",
+                       ("a141runtwo",self.run))
+            db.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            a.reservation_state(self.run)
+        self.assertFalse(a.reserve("a141runnew",1))
+
+    def test_22_hardlink_added_after_initialization_is_denied(self):
+        a=self.ledger()
+        link=self.work/"post-init-link.sqlite3"
+        try:
+            os.link(self.lab/DB_FILENAME,link)
+        except OSError:
+            self.skipTest("Hardlinks unsupported by filesystem")
+        self.assertFalse(a.reserve(self.run,1))
+        with self.assertRaises(QuotaLabUnavailable):
+            _=a.reserved_units
 
 
 if __name__=="__main__":
