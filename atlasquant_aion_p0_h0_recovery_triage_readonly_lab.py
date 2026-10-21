@@ -32,6 +32,11 @@ MAY_DISPATCH_LOCALLY = frozenset(("PENDING", "RETRY", "CLAIMED"))
 KNOWN_AFTER_DISPATCH = frozenset((
     "UNCERTAIN", "SENT", "CONFIRMED", "BLOCKED_PRODUCER",
 ))
+# Terminal local states must never silently revert or change identity on the
+# same idempotency key. This is only a rollback *symptom*, not proof of effect.
+TERMINAL_LOCAL_STATES = frozenset((
+    "CONFIRMED", "REVOKED", "FAILED", "BLOCKED_REAPPROVAL",
+))
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 UTC = re.compile(
     r"(?:\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d"
@@ -170,8 +175,17 @@ def inspect_execution_outbox_recovery_readonly_lab(
                 or type(row.get("state")) is not str
                 or row["state"] not in STATES
                 or type(row.get("attempts")) is not int
-                or row["attempts"] < 0
-                or type(row.get("dispatch_started_at")) is not str):
+                or not 0 <= row["attempts"] <= 1_000_000
+                or any(type(row.get(k)) is not str for k in (
+                    "dispatch_started_at", "sent_at", "confirmed_at",
+                    "effect_ref",
+                ))
+                or any(
+                    row[k] != "" and (
+                        len(row[k]) > 40 or UTC.fullmatch(row[k]) is None
+                    )
+                    for k in ("dispatch_started_at", "sent_at", "confirmed_at")
+                )):
             observations.append({
                 "idempotency_key": handle,
                 "observed_local_state": "UNREADABLE",
@@ -180,19 +194,42 @@ def inspect_execution_outbox_recovery_readonly_lab(
             })
             continue
         state = row["state"]
+        # Even if both sides are local, a terminal intent becoming live or
+        # changing to another terminal state is a regression symptom. Also
+        # flag local dispatch/effect markers on supposedly reusable rows:
+        # a recovered row with those markers MUST NOT be mistaken for safe.
+        unexpected_terminal_change = (
+            case["last_known_state"] in TERMINAL_LOCAL_STATES
+            and state != case["last_known_state"]
+        )
+        local_effect_markers_on_reusable_state = (
+            (
+                state in ("PENDING", "RETRY")
+                and any(row[k] != "" for k in (
+                    "dispatch_started_at", "sent_at",
+                    "confirmed_at", "effect_ref",
+                ))
+            )
+            or (
+                state == "CLAIMED"
+                and any(row[k] != "" for k in (
+                    "sent_at", "confirmed_at", "effect_ref",
+                ))
+            )
+        )
+        prior_dispatch = case["last_known_dispatch_started_at"]
         regression = (
             row["attempts"] < case["last_known_attempts"]
+            or unexpected_terminal_change
+            or local_effect_markers_on_reusable_state
             or (
                 state in MAY_DISPATCH_LOCALLY
                 and (
                     case["last_known_state"] in KNOWN_AFTER_DISPATCH
-                    or case["last_known_dispatch_started_at"] != ""
+                    or prior_dispatch != ""
                 )
             )
-            or (
-                case["last_known_dispatch_started_at"] != ""
-                and row["dispatch_started_at"] == ""
-            )
+            or (prior_dispatch != "" and row["dispatch_started_at"] != prior_dispatch)
         )
         if regression:
             reason = "POSSIBLE_LOCAL_ROLLBACK_OR_STALE_RECLAIM"
