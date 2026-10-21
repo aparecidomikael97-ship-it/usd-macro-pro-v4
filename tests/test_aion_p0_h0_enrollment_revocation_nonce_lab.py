@@ -349,11 +349,11 @@ class EnrollmentRevocationNonceLabTest(unittest.TestCase):
         p=deepcopy(self.pins);p["registry_root_public_key_b64url"]+="="
         self.check(pins=p,defect="PINNED_SIGNER_ENCODING_INVALID",crypto=False)
 
-    def test_53_enrolled_role_bad_public_key_rejected(self):
-        self.a["roles"][0]["public_key_b64url"]="e"*43
-        # Still a 32-byte canonical encoding: does not prove the key is truly held.
-        # Binding of actual role keys to the signed witness transcript happens
-        # at a higher gate, not in this registry-only LAB.
+    def test_53_replaced_role_public_key_has_no_independent_proof(self):
+        self.a["roles"][0]["public_key_b64url"]=pub(Ed25519PrivateKey.generate())
+        # A new well-formed public key in a synthetic registry does not prove
+        # independent enrollment or possession by a genuine provider.
+        # Cross-check against dual-witness transcript is a separate future gate.
         result=self.check(crypto=True)
         self.assertIs(result["issuer_independently_enrolled"],False)
 
@@ -369,7 +369,7 @@ class EnrollmentRevocationNonceLabTest(unittest.TestCase):
 
     def test_56_missing_nonce_signed_receipt_never_promotes(self):
         a,b,_=self.packet()
-        self.check(aa=a,bb=b,cc=None if False else {},defect="CHALLENGE_ENVELOPE_SHAPE_INVALID",crypto=False)
+        self.check(aa=a,bb=b,cc={},defect="CHALLENGE_ENVELOPE_SHAPE_INVALID",crypto=False)
 
 
 if __name__ == "__main__":
