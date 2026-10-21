@@ -16,9 +16,7 @@ from atlasquant_aion_p0_h0_seven_signed_provider_receipt_lab import (
     PROVIDER_RECEIPT_SCHEMA, PROVIDER_HEAD_SCHEMA,
     inspect_seven_signed_provider_lab as inspect,
 )
-from test_aion_p0_h0_linked_five_envelopes_lab import (
-    H0FiveEnvelopeCrossBindingTests as FiveFixture,
-)
+import test_aion_p0_h0_linked_five_envelopes_lab as five_fixture_module
 
 
 def key_public(key):
@@ -38,7 +36,8 @@ def envelope(key, payload):
 
 class H0SevenSignedProviderCausalReceiptLab(unittest.TestCase):
     def setUp(self):
-        self.f = FiveFixture("test_01_five_valid_signatures_with_causal_links_never_authorize")
+        self.f = five_fixture_module.H0FiveEnvelopeCrossBindingTests(
+            "test_01_five_valid_signatures_with_causal_links_never_authorize")
         self.f.setUp()
         self.effect_key = Ed25519PrivateKey.generate()
         self.head_key = Ed25519PrivateKey.generate()
@@ -323,8 +322,11 @@ class H0SevenSignedProviderCausalReceiptLab(unittest.TestCase):
         self.check(finding="PROVIDER_RECEIPT_PAYLOAD_INVALID",linked=False)
 
     def test_44_nan_sequence_not_accepted(self):
-        self.receipt["provider_sequence"]=float("nan")
-        self.check(finding="PROVIDER_RECEIPT_PAYLOAD_INVALID",linked=False)
+        # Do not sign or JSON-encode hostile NaN in the test fixture: inject
+        # it into an already-signed envelope so admission must fail closed.
+        p=list(self.packet())
+        p[5]["payload"]["provider_sequence"]=float("nan")
+        self.check(packet=p,finding="PROVIDER_RECEIPT_PAYLOAD_INVALID",linked=False)
 
     def test_45_caller_provider_pins_claim_extra_verified_rejected(self):
         pins=deepcopy(self.pins);pins["provider_independently_verified"]=True
