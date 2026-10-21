@@ -36,9 +36,9 @@ jobs:
         shell: bash
         run: |
           python -B -m unittest -v \
-            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_green_local_gate_cannot_mint_activation_plan_without_external_source \
-            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_missing_fresh_gate_and_untrusted_ticket_never_write_flag \
-            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_execution_validation_rejects_reopened_gate_without_synthetic_approval
+            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_activation_plan_binds_green_post_incident_gate \
+            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_final_activation_execution_requires_fresh_gate \
+            test_atlasquant_aion_global_worker_reactivation_gate.PostIncidentReactivationGateTests.test_execution_validation_rejects_reopened_gate
       - name: Existing A74 activation authorization denial contract
         run: python -B -m unittest -q test_atlasquant_aion_activation_authority_a74.py
       - name: H0 causal denial after restored local snapshots
