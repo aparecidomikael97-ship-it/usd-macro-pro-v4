@@ -1,0 +1,44 @@
+name: AION P0 H0 LAB Vendor RFI Intake & Existing Safety Gates (NO-GO)
+
+on:
+  push:
+    branches: [lab/aion-p0-h0-vendor-rfi-evidence-intake-20261021]
+
+permissions:
+  contents: read
+
+jobs:
+  rfi_intake:
+    name: 34 unsent vendor questions and strict read-only safety checks - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      AION_WORKER_ENABLED: "0"
+      AION_EXTERNAL_EXECUTION_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install tracked project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify UNSENT 34-question evidence manifest (code 0 is not GO)
+        run: python -B tools/aion_p0_h0_vendor_rfi_readonly_intake_gate.py
+      - name: 26 adversarial vendor response intake/authority tests
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_vendor_rfi_readonly_intake_lab.py -v
+      - name: 28 existing producer-vs-custodian separation cases
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_vendor_custodian_two_role_documentary_lab.py -v
+      - name: 17 current H0 32 producer error case crosswalk
+        run: python -B -m unittest discover -s tests -p test_aion_p0_h0_provider_32_current_crosswalk_lab.py -v
+      - name: 14 original Quality 85 red ledger integrity cases
+        run: python -B -m unittest discover -s tests -p test_aion_p0_quality_red_ledger_audit_lab.py -v
+      - name: 64 H0 A79 causal denials from unchanged production code
+        run: python -B -m unittest -v test_atlasquant_aion_h0_causal_denial_a79
