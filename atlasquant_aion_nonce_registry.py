@@ -76,57 +76,136 @@ class PersistentNonceRegistry:
             conn.close()
 
     def _initialize(self):
+        """Fail closed on an incompatible or partially restored nonce schema.
+
+        Validate BEFORE PRAGMA WAL, CREATE TABLE, ALTER or metadata writes.
+        An existing v2 registry is not a blank database merely because one
+        of its tables disappeared. The one explicitly supported legacy path
+        is v1 (or pre-metadata v1), identified by its missing microsecond
+        expiry column. This LOCAL schema check cannot detect full DB rollback.
+        """
         with self._connect() as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS nonce_claims (
-                    scope TEXT NOT NULL,
-                    nonce TEXT NOT NULL,
-                    expires_at TEXT NOT NULL,
-                    expires_at_us INTEGER,
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY (scope, nonce)
+            # Serialize observation, validation and schema mutation across
+            # simultaneous first-start processes. SQLite DDL is transactional.
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                existing = {
+                    str(row[0])
+                    for row in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' "
+                        "AND name IN ('nonce_claims','nonce_registry_meta')"
+                    ).fetchall()
+                }
+                has_claims = "nonce_claims" in existing
+                has_meta = "nonce_registry_meta" in existing
+                fields = (
+                    {str(row[1]) for row in conn.execute(
+                        "PRAGMA table_info(nonce_claims)"
+                    ).fetchall()}
+                    if has_claims else set()
                 )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS nonce_registry_meta (
-                    singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
-                    schema_version INTEGER NOT NULL
-                )
-                """
-            )
+                old_version = None
+                if has_meta:
+                    rows = conn.execute(
+                        "SELECT singleton, schema_version FROM nonce_registry_meta"
+                    ).fetchall()
+                    if (
+                        not has_claims
+                        or len(rows) != 1
+                        or type(rows[0][0]) is not int
+                        or rows[0][0] != 1
+                        or type(rows[0][1]) is not int
+                        or rows[0][1] not in (1, SCHEMA_VERSION)
+                    ):
+                        raise ValueError("nonce registry unsupported or incomplete schema")
+                    old_version = rows[0][1]
+                elif has_claims:
+                    # A pre-v2 registry had no schema metadata AND no
+                    # expires_at_us. Existing v2 claims with metadata missing
+                    # mean partial restore: never recreate the marker silently.
+                    if "expires_at_us" in fields:
+                        raise ValueError("nonce registry metadata missing from v2")
+                    old_version = 1
+                if has_claims and not {
+                    "scope", "nonce", "expires_at", "created_at",
+                }.issubset(fields):
+                    raise ValueError("nonce registry claims columns missing")
+                if (old_version == SCHEMA_VERSION
+                        and "expires_at_us" not in fields):
+                    raise ValueError("nonce registry v2 expiry column missing")
 
-            columns = {
-                str(row[1])
-                for row in conn.execute("PRAGMA table_info(nonce_claims)").fetchall()
-            }
-            if "expires_at_us" not in columns:
-                conn.execute("ALTER TABLE nonce_claims ADD COLUMN expires_at_us INTEGER")
-
-            rows = conn.execute(
-                "SELECT scope, nonce, expires_at FROM nonce_claims WHERE expires_at_us IS NULL"
-            ).fetchall()
-            for scope, nonce, expires_at in rows:
-                expires_us = _epoch_us(_parse_ts(expires_at))
                 conn.execute(
-                    "UPDATE nonce_claims SET expires_at_us = ? WHERE scope = ? AND nonce = ?",
-                    (expires_us, scope, nonce),
+                    """
+                    CREATE TABLE IF NOT EXISTS nonce_claims (
+                        scope TEXT NOT NULL,
+                        nonce TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        expires_at_us INTEGER,
+                        created_at TEXT NOT NULL,
+                        PRIMARY KEY (scope, nonce)
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS nonce_registry_meta (
+                        singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                        schema_version INTEGER NOT NULL
+                    )
+                    """
                 )
 
-            conn.execute(
-                "INSERT OR IGNORE INTO nonce_registry_meta(singleton, schema_version) VALUES(1, ?)",
-                (SCHEMA_VERSION,),
-            )
-            conn.execute(
-                "UPDATE nonce_registry_meta SET schema_version = ? WHERE singleton = 1",
-                (SCHEMA_VERSION,),
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_nonce_claims_expiry ON nonce_claims(expires_at_us)"
-            )
+                if old_version == 1 and "expires_at_us" not in fields:
+                    conn.execute("ALTER TABLE nonce_claims ADD COLUMN expires_at_us INTEGER")
+                rows = conn.execute(
+                    "SELECT scope, nonce, expires_at FROM nonce_claims WHERE expires_at_us IS NULL"
+                ).fetchall()
+                for scope, nonce, expires_at in rows:
+                    expires_us = _epoch_us(_parse_ts(expires_at))
+                    conn.execute(
+                        "UPDATE nonce_claims SET expires_at_us = ? WHERE scope = ? AND nonce = ?",
+                        (expires_us, scope, nonce),
+                    )
+
+                if not has_meta:
+                    conn.execute(
+                        "INSERT INTO nonce_registry_meta(singleton,schema_version) VALUES(1,?)",
+                        (SCHEMA_VERSION,),
+                    )
+                elif old_version == 1:
+                    conn.execute(
+                        "UPDATE nonce_registry_meta SET schema_version=? WHERE singleton=1",
+                        (SCHEMA_VERSION,),
+                    )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_nonce_claims_expiry ON nonce_claims(expires_at_us)"
+                )
+
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+
+            # journal_mode cannot be changed inside the transaction. A
+            # different initializer may still hold a new BEGIN IMMEDIATE
+            # after our commit, so accept transient busy and retry a bounded
+            # number of times. Never silently leave expected WAL mode false.
+            if str(conn.execute("PRAGMA journal_mode").fetchone()[0]).lower() != "wal":
+                import time
+                for _attempt in range(50):
+                    try:
+                        mode = str(
+                            conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+                        ).lower()
+                        if mode == "wal":
+                            break
+                        raise RuntimeError("nonce registry WAL mode unavailable")
+                    except sqlite3.OperationalError as exc:
+                        if "locked" not in str(exc).lower():
+                            raise
+                        time.sleep(0.02)
+                else:
+                    raise RuntimeError("nonce registry WAL transition still busy")
 
     def claim(self, *, scope: str, nonce: str, expires_at: str, now_ts: str) -> bool:
         if not isinstance(scope, str) or not scope or len(scope) > 256:
