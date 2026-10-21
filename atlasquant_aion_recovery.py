@@ -318,7 +318,19 @@ def recovery_preflight(
         }
 
     candidate_digest=checkpoint_source_digest(checkpoint)
+    # A128 LAB: a syntactically valid Git blob SHA is not proof that a
+    # current checkpoint body was observed. Preserve the legacy candidate
+    # integrity diagnosis above, then deny absent/empty current evidence
+    # before computing digests or permitting a historical readback.
     current_checkpoint=current.get("checkpoint")
+    if not isinstance(current_checkpoint, Mapping) or not current_checkpoint:
+        return {
+            "schema": SCHEMA, "allowed": False,
+            "reason": "Current runtime checkpoint is missing or invalid.",
+            "candidate_integrity": integrity_state,
+            "candidate_digest": candidate_digest,
+            "executes_action": False,
+        }
     current_digest=(
         checkpoint_source_digest(current_checkpoint)
         if isinstance(current_checkpoint,Mapping)
