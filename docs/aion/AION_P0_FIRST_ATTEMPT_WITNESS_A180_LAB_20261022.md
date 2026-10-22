@@ -28,7 +28,12 @@ CI inicial [A180 RED #39871324744](https://github.com/aparecidomikael97-ship-it/
 - Resultados de CI em LAB provam somente os casos e ambientes testados; nenhum teste simulado é aceite de produção.
 
 ## Validação executada
-Aguardando registro final da CI Windows/Ubuntu nesta rodada. Documentar os links e contagens somente após logs inspecionados.
+Código da rodada testado no commit `bbfbe7b448a1eb7ba5be400a137d6cdaf70ab935` (as alterações posteriores são somente documentação).
+- [GitHub Actions A180 #39871528923](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528923): **95/95 Ubuntu + 95/95 Windows**, total 190 execuções; inclui A180/A179/A178/A177/A176, Outbox e Saga com rede negada.
+- [GitHub Actions SQLite #39871528959](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528959): **93/93 Ubuntu + 93/93 Windows**, total 186 execuções.
+- **376/376 execuções nas duas baterias principais**. Os fluxos adicionais A176, A177, A178 e A179 também foram repetidos e concluíram com sucesso no Ubuntu e Windows ([A176](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528746), [A177](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528735), [A178](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528957), [A179](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528887)).
+- Marcadores de logs verificados em **ambas** plataformas: `A180_DEFAULT_NO_FIRST_WITNESS=NO_SEND`, `A180_UNCERTAIN_RESERVATION_REPLY=NO_SEND`, `A180_PREFLIGHT_CRASH_REOPEN=UNKNOWN_NO_RETRY`, `A180_NEW_TECHNICAL_ID_SAME_SEMANTIC_DIGEST=DENIED`, `A180_RESTORED_WITNESS=REPEATED_SEMANTIC_EFFECT_NOT_ATTESTED`, `A180_CALLER_REPINS_FIRST_WITNESS=FALSE_AUTHORITY_ACCEPTED`, `A180_ALTERED_SEMANTIC_DESCRIPTOR=UNDETECTABLE_AS_SAME_EFFECT`.
+- **Não é homologação:** 95 testes por OS são cenários concretos de regressão; testes deliberadamente verdes de rollback e confiança falsa reproduzem falhas. Quality canônica completa, origem externa e recuperação sob host adversarial não verificadas.
 
 ## Política
 **Proibido** merge, deploy, Worker, provisionamento, pagamentos, provedores externos ou novas despesas. Sem prova externa de primeira reserva e custódia após rollback, **0/6 P0 homologados e HARD NO-GO.**
