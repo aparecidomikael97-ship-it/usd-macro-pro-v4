@@ -57,5 +57,17 @@ class CheckpointComparatorLab(unittest.TestCase):
         with self.assertRaises(CheckpointRejected):
             verify_checkpoint(ledger_id="ledger-A", events=self.events, witness=bad)
 
+    def test_extra_event_field_denied(self):
+        altered = [dict(e) for e in self.events]
+        altered[0]["untrusted"] = "payload"
+        with self.assertRaises(CheckpointRejected):
+            verify_checkpoint(ledger_id="ledger-A", events=altered, witness=self.witness)
+
+    def test_empty_intent_denied(self):
+        altered = [dict(e) for e in self.events]
+        altered[0]["intent"] = ""
+        with self.assertRaises(CheckpointRejected):
+            verify_checkpoint(ledger_id="ledger-A", events=altered, witness=self.witness)
+
 if __name__ == "__main__":
     unittest.main()
