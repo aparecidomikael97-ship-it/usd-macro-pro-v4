@@ -148,6 +148,10 @@ def _signature(value: Any, *, allow_empty: bool = False) -> bytes | None:
 
 
 def _verify(pub: bytes, payload: bytes, signature: Any, label: str) -> None:
+    # Missing critical consent/proof MUST be distinguishable from corrupt
+    # base64 while remaining an unconditional fail-closed denial.
+    if type(signature) is not str or not signature:
+        raise CustodyRejected(label+"_signature_missing")
     sig=_signature(signature)
     try:
         Ed25519PublicKey.from_public_bytes(pub).verify(sig,payload)
