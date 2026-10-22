@@ -345,5 +345,55 @@ class A156RealRecoveryDenyASTLAB(unittest.TestCase):
         self.assertFalse(r["automatic_resend_allowed"])
 
 
+    def save_call(self, tree):
+        w=self.fn(tree)
+        for st in w.body:
+            if (isinstance(st, ast.Assign) and isinstance(st.value, ast.Call)
+                    and isinstance(st.value.func, ast.Name)
+                    and st.value.func.id=="save_runtime_checkpoint"):
+                return st.value
+        self.fail("save function call not found")
+
+    def replace_save_keyword(self, tree, name, text):
+        call=self.save_call(tree)
+        kw=next(k for k in call.keywords if k.arg==name)
+        kw.value=ast.parse(text,mode="eval").body
+
+    def test_53_cas_sha_literal_instead_of_preflight_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"expected_sha","str('a'*40)"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
+    def test_54_cas_sha_from_candidate_revision_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"expected_sha","str(revision)"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
+    def test_55_cas_sha_wrong_preflight_field_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"expected_sha",
+                                  "str(preflight.get('candidate_digest') or '')"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
+    def test_56_cas_sha_without_explicit_string_fallback_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"expected_sha",
+                                  "str(preflight.get('expected_sha'))"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
+    def test_57_cas_sha_unreviewed_default_keyword_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"expected_sha",
+                                  "str(preflight.get('expected_sha', 'fake') or '')"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
+    def test_58_cas_sha_unsafe_nonempty_fallback_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"expected_sha",
+                                  "str(preflight.get('expected_sha') or 'f'*40)"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
+    def test_59_save_timeout_hardcoded_instead_of_forwarded_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"timeout","999"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
+    def test_60_save_approved_numeric_true_instead_of_boolean_rejected(self):
+        self.expect(lambda t:self.replace_save_keyword(t,"approved","1"),
+                    "SHARED_CHECKPOINT_SAVE_BINDING_DRIFT")
+
 if __name__ == "__main__":
     unittest.main()
