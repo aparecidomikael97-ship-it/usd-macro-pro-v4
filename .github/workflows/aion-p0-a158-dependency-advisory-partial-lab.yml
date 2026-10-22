@@ -40,7 +40,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "pip-audit==2.10.1"
           python -m pip check
-      - name: A158 44 exact dependency audit corruption and PDF image regressions
+      - name: A159 52 direct-pin coverage and PDF/image regressions
         run: python -B tests/run_aion_a158_dependency_counted_lab.py
       - name: Independently re-audit full requirements and prove pypdf patch only
         run: python -B tools/aion_p0_a158_dependency_audit_lab.py --verify-pypdf-only
