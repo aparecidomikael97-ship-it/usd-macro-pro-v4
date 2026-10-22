@@ -1,0 +1,51 @@
+name: AION P0 A152 External Evidence Decision NO-GO (offline)
+on:
+  pull_request:
+    paths:
+      - 'tools/aion_p0_a152_external_evidence_decision_gate.py'
+      - 'tests/test_aion_p0_a152_external_evidence_decision_gate_lab.py'
+      - 'tests/run_aion_a152_decision_counted_lab.py'
+      - 'docs/aion/AION_P0_H0_IAM_FINOPS_UNPRICED_PROPOSAL_TEMPLATE_20261019.json'
+      - 'docs/aion/evidence/aion_p0_h0_vendor_custodian_two_role_review_20261021.json'
+      - 'docs/aion/evidence/aion_p0_h0_vendor_rfi_34_open_questions_20261021.json'
+      - 'docs/aion/evidence/aion_p0_h0_32_provider_errors_current_6895_crosswalk_20261021.json'
+      - 'docs/aion/evidence/aion_p0_quality_85_red_baseline_20261021.json'
+      - 'docs/aion/A152_H0_CUSTODY_IAM_FINOPS_EVIDENCE_DECISION_20261022.md'
+      - '.github/workflows/aion-p0-a152-external-evidence-decision-no-go-lab.yml'
+  push:
+    branches:
+      - lab/aion-p0-a152-external-evidence-decision-fence-20261022
+permissions:
+  contents: read
+jobs:
+  non-authorizing-cross-document-gate:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic-only test dependency
+        run: python -m pip install "cryptography==44.0.3"
+      - name: A145-A150 259 LAB counted regression tests
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 16 static import-fence mutation tests and runtime scan
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 30 documentary decision adversaries plus 25 existing FinOps tests
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A152 current source-only NO-GO decision
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historical 32 provider errors exact crosswalk remains blocked
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
