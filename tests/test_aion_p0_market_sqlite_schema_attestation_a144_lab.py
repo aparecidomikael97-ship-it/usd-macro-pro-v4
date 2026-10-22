@@ -1,5 +1,7 @@
 """A144 LAB adversarial schema checks. Offline synthetic SQLite only."""
 import sqlite3
+import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -108,5 +110,25 @@ class A144SchemaAttestationLAB(unittest.TestCase):
         self.assertTrue(ledger.record_local_output("a144runone","b"*64))
         self.assertEqual(self.reopen().reservation_state("a144runone")["state"],
                          "LOCAL_OUTPUT_OBSERVED")
+
+    def test_13_negative_stale_valid_database_still_accepted_after_restart(self):
+        # NEGATIVE SECURITY EVIDENCE: exact schema cannot establish freshness.
+        ledger=self.reopen()
+        stale=self.lab.parent/"stale_valid_snapshot.sqlite3"
+        shutil.copyfile(self.path,stale)
+        self.assertTrue(ledger.reserve("a144runone",1))
+        os.replace(stale,self.path)
+        reopened=self.reopen()
+        self.assertEqual(reopened.reserved_units,0)
+        self.assertFalse(reopened.independent_witness_enrolled)
+
+    def test_14_negative_manual_rebootstrap_still_resets_local_history(self):
+        # NEGATIVE SECURITY EVIDENCE: no independent genesis custody.
+        ledger=self.reopen()
+        self.assertTrue(ledger.reserve("a144runone",1))
+        self.path.unlink()
+        fresh=SQLiteLabReservationLedger.bootstrap_synthetic_lab(**self.args)
+        self.assertEqual(fresh.reserved_units,0)
+        self.assertFalse(fresh.human_owner_verified)
 
 if __name__=="__main__": unittest.main()
