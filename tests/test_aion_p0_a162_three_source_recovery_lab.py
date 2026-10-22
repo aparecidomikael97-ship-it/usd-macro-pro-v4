@@ -113,7 +113,10 @@ class A162ThreeSourceCorrelationLAB(unittest.TestCase):
     def evaluate(self,*,journal=None,witness=None,checkpoint=None,pins=None,
                  d1=None,d2=None,floor_pins=None,ledger=None,epoch=None,
                  nonce=None,now=None):
-        a,b=self.floor_pair()
+        if d1 is None or d2 is None:
+            a,b=self.floor_pair()
+        else:
+            a,b=d1,d2
         return assess_three_source_restart(
             journal=self.journal if journal is None else journal,
             local_witness=self.witness if witness is None else witness,
@@ -226,23 +229,28 @@ class A162ThreeSourceCorrelationLAB(unittest.TestCase):
         self.denied(checkpoint=old)
 
     def test_12_journal_corrupted_state_blocks(self):
+        cp=self.checkpoint()
         with closing(sqlite3.connect(self.journal.path)) as db:
             db.execute("UPDATE ledger_meta SET ledger_id='attacker'")
             db.commit()
-        self.denied("ledger_identity_or_policy_changed")
+        self.denied("ledger_identity_or_policy_changed",checkpoint=cp)
 
     def test_13_journal_removed_blocks(self):
+        cp=self.checkpoint()
         self.journal.path.unlink()
-        self.denied("missing_or_linked_journal")
+        self.denied("missing_or_linked_journal",checkpoint=cp)
 
     def test_14_journal_extra_table_blocks(self):
+        cp=self.checkpoint()
         with closing(sqlite3.connect(self.journal.path)) as db:
             db.execute("CREATE TABLE injected(x TEXT)")
-        self.denied("unexpected_schema_objects")
+        self.denied("unexpected_schema_objects",checkpoint=cp)
 
     def test_15_a150_witness_removed_blocks(self):
+        a,b=self.floor_pair()
+        cp=self.checkpoint()
         self.witness.db_path.unlink()
-        self.denied()
+        self.denied(d1=a,d2=b,checkpoint=cp)
 
     def test_16_witness_epoch_policy_mutated_before_eval_blocks(self):
         self.denied(epoch="f"*32)
@@ -360,20 +368,23 @@ class A162ThreeSourceCorrelationLAB(unittest.TestCase):
             self.denied(expected="multiple_source_read_drift",checkpoint=cp)
 
     def test_43_double_read_witness_detects_torn_view(self):
+        a,b=self.floor_pair()
         original=self.witness.read_head()
         changed={**original,"sequence":1,"digest":"e"*64}
         with patch.object(self.witness,"read_head",side_effect=[original,changed]):
-            self.denied("multiple_source_read_drift")
+            self.denied("multiple_source_read_drift",d1=a,d2=b)
 
     def test_44_double_read_witness_connection_failure_blocks(self):
+        a,b=self.floor_pair()
         first=self.witness.read_head()
         with patch.object(self.witness,"read_head",side_effect=[first,ConnectionError("offline")]):
-            self.denied("a150_head_read_unavailable")
+            self.denied("a150_head_read_unavailable",d1=a,d2=b)
 
     def test_45_double_read_journal_io_error_blocks(self):
         first=self.journal.read_events()
+        cp=self.checkpoint()
         with patch.object(self.journal,"read_events",side_effect=[first,OSError("gone")]):
-            self.denied("unexpected_source_validation_failure")
+            self.denied("unexpected_source_validation_failure",checkpoint=cp)
 
     def test_46_journal_subclass_unapproved_introspection_blocked(self):
         class Evasive(SyntheticCrashJournalLAB):
