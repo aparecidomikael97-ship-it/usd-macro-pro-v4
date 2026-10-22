@@ -1,0 +1,65 @@
+name: AION P0 A160 No Base-Class Witness CAS Bypass (LAB NO-GO)
+on:
+  push:
+    branches:
+      - lab/aion-p0-a160-inherited-witness-cas-bypass-fence-20261022
+  pull_request:
+    paths:
+      - 'aion_p0_a149_authenticated_cas_lab.py'
+      - 'aion_p0_a150_pinned_policy_lease_lab.py'
+      - 'tests/test_aion_p0_a160_inherited_mutator_bypass_lab.py'
+      - 'tests/run_aion_a160_inherited_bypass_counted_lab.py'
+      - 'docs/aion/A160_LEGACY_INHERITED_CAS_BYPASS_HARDSTOP_LAB_20261022.md'
+      - '.github/workflows/aion-p0-a160-inherited-cas-guard-no-go.yml'
+permissions:
+  contents: read
+jobs:
+  verify-inherited-mutator-deny:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic CI dependencies only
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3" "PyYAML==6.0.2"
+      - name: A160 RED-first 30 inherited witness method bypass mutations
+        run: python -B tests/run_aion_a160_inherited_bypass_counted_lab.py
+      - name: A145-A150 original 259 authenticated witness and crash tests
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 16 LAB-runtime import boundary checks
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 55 external evidence and FinOps gates
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 48 IAM candidate policy cases
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 73 real checkpoint writer deny tests
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A155 78 GitHub destinations review
+        run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
+      - name: A156 90 historical recovery deny checks
+        run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
+      - name: A157 67 strict YAML credential workflow cases
+        run: python -B tests/run_aion_a157_workflow_policy_counted_lab.py
+      - name: A157 strict YAML six-workflow audit remains NO-GO
+        run: python -B tools/aion_p0_a157_workflow_yaml_policy_lab.py --enforce
+      - name: A156 recovery source guard remains NO-GO
+        run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
+      - name: A154 real checkpoint writer remains deny-only
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: A152 external proof decision remains NO-GO
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historical 32 external provider effect blockers remain unclosed
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
