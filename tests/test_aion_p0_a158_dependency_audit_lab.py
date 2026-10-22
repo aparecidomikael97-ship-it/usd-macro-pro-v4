@@ -230,7 +230,7 @@ class A158DependencyAdvisoryLAB(unittest.TestCase):
         self.fails(req=REQ.replace("cryptography==50.0.2","cryptography==49.0.0"))
 
     def test_38_extra_direct_package_rejected(self):
-        self.fails(req=REQ+"unreviewed-package==1.0.0\\n")
+        self.fails(req=REQ+"unreviewed_package==1.0.0")
 
     def test_39_required_psycopg_extra_removal_rejected(self):
         self.fails(req=REQ.replace("psycopg[binary]==3.3.6","psycopg==3.3.6"))
