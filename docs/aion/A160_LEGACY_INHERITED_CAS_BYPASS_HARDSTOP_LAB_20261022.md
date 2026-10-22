@@ -69,16 +69,23 @@ not a production service.
 - Historical regression expected: A145–A150 **259**, A151 **16**,
   A152 **55**, A153 **48**, A154 **73**, A155 **78**,
   A156 **90**, A157 **67** = **686 previous checks**.
-- Total requirement: **716 counted tests per OS**, **1,432 total**
-  test executions on Windows + Ubuntu, plus standalone documentary
-  and 32-provider-error NO-GO gates. **This is a target until
-  GitHub Actions independently concludes green.**
-- Initial RED-first commit `e656b31cf7468d82b1c6cb83f959fad51d2a0abe`
-  has tests but deliberately lacks the guard; it is submitted for
-  independently observable failure. Patch commit
+- **RED demonstrated BEFORE patch**: [Actions PR #39815265598](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39815265598) at
+  `e656b31cf7468d82b1c6cb83f959fad51d2a0abe`. Windows logs:
+  **21 FAIL, 0 ERROR, 0 SKIP out of 30 tests**. The first-phase
+  A160 gate FAILED; later regression steps were not counted as passing
+  under the RED source. Ubuntu's A160 step also returned FAIL.
+  This is a reproduced **LAB security regression**, not an external
+  provider effect or observed production incident.
+- **GREEN after guarded A149 change**: [Actions PR #39815588724](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39815588724),
+  at `c08ff0610cdc9b22740559a8445be37bb9fa6729`. Windows and Ubuntu
+  jobs each concluded SUCCESS in the inspected job logs:
+  **30/30** new A160 + **259+16+55+48+73+78+90+67=686** historical
+  cases = **716/716 per OS, 1,432 executions combined**.
+  The standalone workflow source audit, recovery/writer deny gates,
+  E0–E5 documentary decision and exact 32-provider-error crosswalk
+  also succeeded. The fact that they are GREEN does not close the
+  independent evidence or H0 P0 gates. The initial patch commit was
   `d3ab865f1cbeab5ffdf9589ee49daa4bc7a366c6`.
-  Never present expected red tests as proven until CI log evidence is
-  actually available.
 
 ## Important residual security risk
 
