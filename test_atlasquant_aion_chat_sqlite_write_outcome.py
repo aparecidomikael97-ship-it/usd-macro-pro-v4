@@ -54,6 +54,9 @@ class WriteOutcomeUnknownTests(unittest.TestCase):
                 handle.append_message(
                     self.scope, Message(cid, "user", "committed-once"))
         self.assertEqual(handle.storage_health()["state"], FAILED)
+        self.assertEqual(
+            handle.storage_health()["reason"],
+            "BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED")
         items = self.native_messages(handle, cid)
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].content, "committed-once")
