@@ -273,9 +273,13 @@ class SQLiteLabReservationLedger:
             "reservations": "CREATE TABLE reservations (run_id TEXT PRIMARY KEY NOT NULL,units INTEGER NOT NULL CHECK(units BETWEEN 1 AND 100),state TEXT NOT NULL CHECK(state IN ('RESERVED_UNCERTAIN','LOCAL_OUTPUT_OBSERVED')),payload_sha256 TEXT)",
         }
         rows=db.execute("SELECT type,name,tbl_name,sql FROM sqlite_master").fetchall()
-        if len(rows)!=2 or {row[1] for row in rows}!=set(expected):
+        if len(rows)!=3 or {row[1] for row in rows}!=set(expected)|{"sqlite_autoindex_reservations_1"}:
             raise QuotaLabUnavailable("Unexpected SQLite schema objects")
         for kind,name,table,sql in rows:
+            if name=="sqlite_autoindex_reservations_1":
+                if kind!="index" or table!="reservations" or sql is not None:
+                    raise QuotaLabUnavailable("SQLite implicit primary-key index changed")
+                continue
             if kind!="table" or table!=name or sql!=expected[name]:
                 raise QuotaLabUnavailable("SQLite schema definition changed")
         if db.execute("PRAGMA application_id").fetchone()!=(0,):
