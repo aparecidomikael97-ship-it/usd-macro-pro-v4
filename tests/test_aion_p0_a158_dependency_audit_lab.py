@@ -21,7 +21,7 @@ altair==6.3.0
 pyarrow==25.0.1
 pypdf==6.21.1
 cryptography==50.0.2
-psycopg==3.3.6
+psycopg[binary]==3.3.6
 """
 DIST = ["pillow>=7.1.0,<13", "numpy>=1.23,<3", "requests<3"]
 NAMES = ("streamlit","pandas","numpy","requests","altair",
