@@ -1,0 +1,42 @@
+name: AION P0 A160 Patched Dependencies Cross-OS LAB (NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - 'tests/test_aion_p0_a160_patched_dependencies_lab.py'
+      - '.github/workflows/aion-p0-a160-patched-dependencies-cross-os-lab.yml'
+  push:
+    branches:
+      - lab/aion-p0-a160-streamlit-1661-pillow-13-compatibility-20261022
+permissions:
+  contents: read
+jobs:
+  synthetic-compatibility-no-go:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 40
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+      AION_LAB_MODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependencies and public audit tooling
+        run: |
+          python -m pip install "pip==26.2.1"
+          python -m pip install -r requirements.txt
+          python -m pip install "pip-audit==2.10.1"
+          python -m pip check
+      - name: Run unmodified real pip-audit (zero advisory requirement)
+        run: python -m pip_audit -r requirements.txt
+      - name: Run exactly 12 in-memory UI, PDF and image checks
+        run: python -B tests/test_aion_p0_a160_patched_dependencies_lab.py
