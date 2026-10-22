@@ -51,13 +51,15 @@ def check_requirements(source: Any) -> dict[str, Any]:
         line=line.strip()
         if not line or line.startswith("#"):
             continue
-        match=re.fullmatch(r"([A-Za-z0-9][A-Za-z0-9_-]*)==([0-9][A-Za-z0-9.]+)",line)
+        match=re.fullmatch(r"([A-Za-z0-9][A-Za-z0-9_-]*)(?:\[([A-Za-z0-9_-]+)\])?==([0-9][A-Za-z0-9.]+)",line)
         if not match:
             raise AuditInputRejected("REQUIREMENT_NOT_EXACT_PIN")
         name=_pkg(match.group(1))
+        if match.group(2) and (name != "psycopg" or match.group(2) != "binary"):
+            raise AuditInputRejected("UNREVIEWED_DEPENDENCY_EXTRA")
         if name in found:
             raise AuditInputRejected("DUPLICATE_REQUIREMENT:"+name)
-        found[name]=match.group(2)
+        found[name]=match.group(3)
     if len(found) < 9 or not all(found.get(k)==v for k,v in EXPECTED.items()):
         raise AuditInputRejected("PINNED_STREAMLIT_OR_PYPDF_VERSION_DRIFT")
     if "pillow" in found:
