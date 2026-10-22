@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from contextlib import closing
 from pathlib import Path
+import os
 import re
 import stat
 import sqlite3
@@ -157,6 +158,7 @@ class SQLiteLabReservationLedger:
 
     def _initialize(self):
         existed=self.path.exists()
+        created_identity=None
         try:
             # A143 explicitly separates ordinary re-open/recovery from LAB
             # creation. A missing DB is ALWAYS denied for the regular path.
@@ -169,8 +171,17 @@ class SQLiteLabReservationLedger:
                         "Missing quota ledger cannot be interpreted as fresh install"
                     )
                 try:
-                    with self.path.open("xb"):
-                        pass
+                    # Record the identity of OUR OWN exclusive-creation
+                    # handle BEFORE close. The pathname can otherwise be
+                    # replaced by another fully valid SQLite between close
+                    # and the following identity capture.
+                    with self.path.open("xb") as newly_created:
+                        created_stat=os.fstat(newly_created.fileno())
+                        if not created_stat.st_ino:
+                            raise QuotaLabUnavailable(
+                                "New LAB file handle lacks stable identity"
+                            )
+                        created_identity=(created_stat.st_dev,created_stat.st_ino)
                 except FileExistsError as exc:
                     raise QuotaLabUnavailable(
                         "Quota bootstrap raced an existing file; no implicit open"
@@ -178,6 +189,10 @@ class SQLiteLabReservationLedger:
             if self.path.is_symlink() or self.path.is_junction():
                 raise ValueError("Symlink or junction quota file denied")
             self._db_identity=self._identity(self.path)
+            if not existed and self._db_identity!=created_identity:
+                raise QuotaLabUnavailable(
+                    "Exclusive LAB-created SQLite handle differs from destination"
+                )
             with closing(self._connect()) as db:
                 db.execute("BEGIN IMMEDIATE")
                 if existed:
