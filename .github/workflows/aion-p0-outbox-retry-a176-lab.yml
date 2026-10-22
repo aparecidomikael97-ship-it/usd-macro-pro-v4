@@ -1,0 +1,43 @@
+name: AION A176 P0-3 outbox deny-retry LAB
+
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'test_atlasquant_aion_outbox_uncertain_retry_a176_lab.py'
+      - 'test_atlasquant_aion_execution_outbox.py'
+      - 'test_atlasquant_aion_execution_saga.py'
+      - '.github/workflows/aion-p0-outbox-retry-a176-lab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  a176-lab:
+    name: P0-3 retry boundary (${{ matrix.os }})
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: A176 focused red/green and historical outbox/saga regressions (network forbidden)
+        run: >-
+          python -B -c "import socket,unittest; from unittest.mock import Mock;
+          socket.socket.connect=Mock(side_effect=AssertionError('network forbidden'));
+          socket.socket.connect_ex=Mock(side_effect=AssertionError('network forbidden'));
+          socket.create_connection=Mock(side_effect=AssertionError('network forbidden'));
+          suite=unittest.defaultTestLoader.loadTestsFromNames([
+          'test_atlasquant_aion_outbox_uncertain_retry_a176_lab',
+          'test_atlasquant_aion_execution_outbox',
+          'test_atlasquant_aion_execution_saga']);
+          result=unittest.TextTestRunner(verbosity=2).run(suite);
+          raise SystemExit(not result.wasSuccessful())"
