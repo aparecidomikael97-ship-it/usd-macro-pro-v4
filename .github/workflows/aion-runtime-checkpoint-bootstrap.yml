@@ -18,6 +18,10 @@ concurrency:
 
 jobs:
   bootstrap:
+    # A157 Draft safety proposal: the owner has not approved independent
+    # custodian enrollment or real restart/restore/first-effect execution.
+    # Review disruption of benign scheduled collection BEFORE any merge.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout canonical main
