@@ -60,7 +60,7 @@ jobs:
           module = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(module)
           suite = unittest.defaultTestLoader.loadTestsFromModule(module)
-          assert suite.countTestCases() == 10, f"Expected 10 tests, got {suite.countTestCases()}"
+          assert suite.countTestCases() == 12, f"Expected 12 tests, got {suite.countTestCases()}"
           result = unittest.TextTestRunner(verbosity=2).run(suite)
-          assert result.testsRun == 10 and result.wasSuccessful() and not result.skipped, "A145 comparator failed/incomplete"
+          assert result.testsRun == 12 and result.wasSuccessful() and not result.skipped, "A145 comparator failed/incomplete"
           PY
