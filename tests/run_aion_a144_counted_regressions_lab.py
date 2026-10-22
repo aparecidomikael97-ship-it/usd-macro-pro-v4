@@ -13,7 +13,7 @@ PATTERNS = (
     "test_aion_p0_market_sqlite_explicit_bootstrap_a143_lab.py",
     "test_aion_p0_market_sqlite_schema_attestation_a144_lab.py",
 )
-EXPECTED_COUNTS = (45, 22, 11, 20, 14)
+EXPECTED_COUNTS = (45, 22, 11, 20, 18)
 
 def main():
     loader = unittest.TestLoader()
