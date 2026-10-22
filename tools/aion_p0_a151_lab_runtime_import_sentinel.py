@@ -32,7 +32,7 @@ def _is_test_or_lab(path: Path, root: Path) -> bool:
         return True
     # Only explicit A145–A150 root-level experimental modules; the
     # new A151 sentinel is NOT part of this exclusion.
-    if len(relative.parts) == 1 and LAB_MODULE.fullmatch(path.stem):
+    if len(relative.parts) == 1 and LAB_MODULE.match(path.stem) is not None:
         return True
     return False
 
