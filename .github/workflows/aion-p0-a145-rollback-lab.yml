@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'tests/test_aion_p0_a145_rollback_threat_model_lab.py'
+      - 'tests/test_aion_p0_a145_checkpoint_verifier_lab.py'
+      - 'aion_p0_a145_checkpoint_verifier_lab.py'
       - '.github/workflows/aion-p0-a145-rollback-lab.yml'
   push:
     branches:
@@ -44,4 +46,21 @@ jobs:
           assert suite.countTestCases() == 4, f"Expected 4 tests, got {suite.countTestCases()}"
           result = unittest.TextTestRunner(verbosity=2).run(suite)
           assert result.testsRun == 4 and result.wasSuccessful() and not result.skipped, "A145 failed/incomplete"
+          PY
+
+      - name: A145 counted checkpoint comparator suite
+        shell: bash
+        run: |
+          python -B - <<'PY'
+          import importlib.util, unittest
+          from pathlib import Path
+          path = Path("tests/test_aion_p0_a145_checkpoint_verifier_lab.py")
+          assert path.is_file(), "A145 comparator tests missing"
+          spec = importlib.util.spec_from_file_location("a145_comparator_lab", path)
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+          assert suite.countTestCases() == 6, f"Expected 6 tests, got {suite.countTestCases()}"
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.testsRun == 6 and result.wasSuccessful() and not result.skipped, "A145 comparator failed/incomplete"
           PY
