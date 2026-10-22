@@ -146,11 +146,12 @@ class A147CrashReconciliationLAB(unittest.TestCase):
         self.assertFalse(self.reserve())
         self.assertEqual(len(self.reopen().read_events()), 1)
 
-    def test_09_two_distinct_intents_strict_order(self):
+    def test_09_second_intent_blocked_while_first_uncertain(self):
         self.assertTrue(self.reserve())
-        self.assertTrue(self.reserve("run_two"))
+        with self.assertRaisesRegex(JournalUnavailable, "unresolved_first_operation_blocks_new_intent"):
+            self.reserve("run_two")
         self.assertEqual(self.reopen().read_events(),
-                         [{"seq": 1, "intent": "run_one"}, {"seq": 2, "intent": "run_two"}])
+                         [{"seq": 1, "intent": "run_one"}])
 
     def test_10_duplicate_after_process_reopen_denied(self):
         self.reserve()
@@ -262,15 +263,20 @@ class A147CrashReconciliationLAB(unittest.TestCase):
         self.assertEqual(sorted(outcome), [False, True])
         self.assertEqual(len(self.reopen().read_events()), 1)
 
-    def test_27_concurrent_distinct_writer_sequence_contiguous(self):
+    def test_27_concurrent_distinct_writer_only_one_admitted(self):
         outcome = []
         def worker(intent):
-            outcome.append(self.reopen().reserve_local_uncertain(intent))
+            try:
+                outcome.append("accepted" if self.reopen().reserve_local_uncertain(intent) else "duplicate")
+            except JournalUnavailable as exc:
+                outcome.append(str(exc))
         tasks = [threading.Thread(target=worker, args=(s,)) for s in ("run_a", "run_b")]
         for task in tasks: task.start()
         for task in tasks: task.join()
-        self.assertEqual(outcome, [True, True])
-        self.assertEqual(sorted(x["seq"] for x in self.reopen().read_events()), [1,2])
+        self.assertEqual(sorted(outcome), ["accepted", "unresolved_first_operation_blocks_new_intent"])
+        events = self.reopen().read_events()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["seq"], 1)
 
     def test_28_real_child_process_crash_after_commit_survives(self):
         code = (
@@ -374,6 +380,91 @@ class A147CrashReconciliationLAB(unittest.TestCase):
         with self.assertRaisesRegex(JournalUnavailable, "ledger_identity_or_policy_changed"):
             SyntheticCrashJournalLAB(lab_dir=self.local, ledger_id="ledger-B")
 
+
+    def test_41_run_mode_disabled_after_open_denies_new_write(self):
+        with patch.dict(os.environ, {"AION_LAB_MODE": "0"}):
+            with self.assertRaisesRegex(JournalUnavailable, "lab_mode_required"):
+                self.reserve()
+        self.assertEqual(self.journal.read_events(), [])
+
+    def test_42_run_mode_disabled_after_open_denies_read(self):
+        with patch.dict(os.environ, {"AION_LAB_MODE": "0"}):
+            with self.assertRaisesRegex(JournalUnavailable, "lab_mode_required"):
+                self.journal.read_events()
+
+    def test_43_unresolved_first_operation_blocks_second_after_reopen(self):
+        self.assertTrue(self.reserve("first"))
+        with self.assertRaisesRegex(JournalUnavailable, "unresolved_first_operation_blocks_new_intent"):
+            self.reopen().reserve_local_uncertain("second")
+        self.assertEqual(len(self.journal.read_events()), 1)
+
+    def test_44_matching_signed_highwater_does_not_allow_new_intent(self):
+        self.assertTrue(self.reserve("first"))
+        self.witness_current()
+        self.assertEqual(self.assess().verdict, "LAB_QUARANTINE_MANUAL_REVIEW")
+        with self.assertRaisesRegex(JournalUnavailable, "unresolved_first_operation_blocks_new_intent"):
+            self.reserve("second")
+
+    def test_45_witness_offline_does_not_allow_new_intent(self):
+        self.assertTrue(self.reserve("first"))
+        self.floor_store.offline = True
+        self.assert_blocked(self.assess())
+        with self.assertRaisesRegex(JournalUnavailable, "unresolved_first_operation_blocks_new_intent"):
+            self.reserve("second")
+
+    def test_46_negative_deleted_database_explicit_rebootstrap_erases_local_history(self):
+        # NEGATIVE EVIDENCE: synthetic genesis is not protected by independent
+        # custody. A missing file can be manually re-created with the same ID.
+        self.assertTrue(self.reserve("before_reset"))
+        self.journal.path.unlink()
+        fresh = SyntheticCrashJournalLAB.bootstrap_synthetic_lab(
+            lab_dir=self.local, ledger_id="ledger-A"
+        )
+        self.assertEqual(fresh.read_events(), [])
+        self.assertFalse(self.floor_store.offline)
+        # The still-current high-water catches the loss; if the witness is also
+        # reset or rolled back, A146's negative proof remains relevant.
+        decision = fresh.assess_restart(
+            checkpoint_envelope=self.cp([]),
+            checkpoint_pinned_keys=self.cp_keys,
+            highwater_pinned_keys=self.floor_keys,
+            read_signed_highwater=self.floor_reader,
+        )
+        self.assertEqual(decision.verdict, "LAB_QUARANTINE_MANUAL_REVIEW")
+        self.assertFalse(decision.external_execution_allowed)
+
+    def test_47_precommit_crash_does_not_create_a_pending_reservation(self):
+        with self.assertRaises(SimulatedBeforeCommitCrash):
+            self.journal.reserve_local_uncertain("before_commit", fault_before_commit=True)
+        self.assertTrue(self.reserve("later_allowed_synthetic"))
+        self.assertEqual(self.reopen().read_events(), [{"seq":1,"intent":"later_allowed_synthetic"}])
+
+    def test_48_extra_index_rejected_without_repair(self):
+        with closing(sqlite3.connect(self.journal.path)) as db:
+            db.execute("CREATE INDEX extra_state_index ON events(state)")
+            db.commit()
+        with self.assertRaisesRegex(JournalUnavailable, "unexpected_schema_objects"):
+            self.reopen()
+
+    def test_49_external_effect_remains_unproven_after_valid_commit(self):
+        self.assertTrue(self.reserve("intent_no_provider"))
+        self.witness_current()
+        after_restart = self.reopen()
+        outcome = after_restart.assess_restart(
+            checkpoint_envelope=self.cp(after_restart.read_events()),
+            checkpoint_pinned_keys=self.cp_keys,
+            highwater_pinned_keys=self.floor_keys,
+            read_signed_highwater=self.floor_reader,
+        )
+        self.assertEqual(outcome.reason, "reserved_effect_unknown")
+        self.assertFalse(outcome.automatic_retry_allowed)
+
+    def test_50_second_write_denial_is_transactional(self):
+        self.assertTrue(self.reserve("first"))
+        for attempt in range(3):
+            with self.assertRaisesRegex(JournalUnavailable, "unresolved_first_operation_blocks_new_intent"):
+                self.reserve("another_"+str(attempt))
+        self.assertEqual(self.reopen().read_events(), [{"seq": 1, "intent": "first"}])
 
 if __name__ == "__main__":
     unittest.main()
