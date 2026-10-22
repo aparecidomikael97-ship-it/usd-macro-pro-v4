@@ -131,4 +131,40 @@ class A144SchemaAttestationLAB(unittest.TestCase):
         self.assertEqual(fresh.reserved_units,0)
         self.assertFalse(fresh.human_owner_verified)
 
+    def test_15_policy_row_deletion_must_not_rebootstrap(self):
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("DELETE FROM quota_policy")
+            db.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.reopen()
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM quota_policy").fetchone(),(0,))
+
+    def test_16_policy_limit_tamper_must_not_be_accepted(self):
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("UPDATE quota_policy SET configured_limit=4 WHERE singleton=1")
+            db.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.reopen()
+
+    def test_17_reserved_row_cannot_gain_unobserved_digest(self):
+        ledger=self.reopen()
+        self.assertTrue(ledger.reserve("a144runone",1))
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("UPDATE reservations SET payload_sha256=? WHERE run_id=?",
+                       ("a"*64,"a144runone"))
+            db.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.reopen()
+        self.assertFalse(ledger.reserve("a144runtwo",1))
+
+    def test_18_existing_database_missing_implicit_index_is_denied(self):
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("ALTER TABLE reservations RENAME TO old_reservations")
+            db.execute("CREATE TABLE reservations (run_id TEXT NOT NULL,units INTEGER NOT NULL,state TEXT NOT NULL,payload_sha256 TEXT)")
+            db.execute("DROP TABLE old_reservations")
+            db.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.reopen()
+
 if __name__=="__main__": unittest.main()
