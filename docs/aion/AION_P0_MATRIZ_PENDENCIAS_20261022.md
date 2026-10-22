@@ -66,3 +66,17 @@ A [PR Draft #1468](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4
 - [A179 contrato e provas](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-witness-admission-a179-20261022/docs/aion/AION_P0_WITNESSED_RECEIPT_A179_LAB_20261022.md).
 
 **Próximo gate obrigatório:** especificar e demonstrar autoridade independente de primeira reserva, high-water irreversível, continuidade H0 após host e testemunha restaurados, procedência de chaves e recibos emitidos por provedor real. Não substituir esse gate por mais hashes/assinaturas sintéticos. **P0 0/6, HARD NO-GO, ZERO_AUTO_RESEND.**
+
+## Adendo A180 — reserva antes de enviar (P0-3)
+[PR Draft #1470](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1470) · [CI A180 #39871528923](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528923): **95/95 Ubuntu + 95/95 Windows** · [SQLite #39871528959](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39871528959): **93/93 Ubuntu + 93/93 Windows**. Total 376 execuções específicas e herdadas; outros workflows A176–A179 repetidos com sucesso. Quality completa pendente.
+
+**Red → green verificável:** `ExecutionOutbox.dispatch_claimed` agora registra `UNCERTAIN` de forma durável antes de contactar qualquer testemunha de primeira tentativa e só chama `adapter.send` após um callback de reserva verificado. Sem testemunha, com resposta perdida ou assinatura inválida, nenhum envio acontece; reinício e expiração de lease não autorizam reenvio. Testes anteriores receberam callbacks de **LAB explicitamente sintéticos**, não certificados. Os 18 cenários A180 incluem ID técnico novo com mesmos dados semânticos e recuperação após reserva incerta.
+
+**Pendências P0-3/4 essenciais:**
+- `A180_RESTORED_WITNESS=REPEATED_SEMANTIC_EFFECT_NOT_ATTESTED`: rollback da própria testemunha admite novamente a mesma operação declarada.
+- `A180_CALLER_REPINS_FIRST_WITNESS=FALSE_AUTHORITY_ACCEPTED`: se o hospedeiro pode fixar outra chave, prova autoassinada é admitida. O callback ainda é injetável por qualquer chamador capaz de construir o Outbox.
+- `A180_ALTERED_SEMANTIC_DESCRIPTOR=UNDETECTABLE_AS_SAME_EFFECT`: o hash semântico de ação/escopo/alvo/payload não é prova externa de identidade do efeito e pode tanto falhar em reconhecer um efeito quanto bloquear dois eventos legítimos idênticos.
+- Não há guarda operacional obrigatória para todos os serviços, custódia independente resistente a rollback, atestado real de reserva antes de efeito, testemunha pós-falha H0, rastreio nativo do SQLite nem procedência de chaves.
+- Ver [evidências e contratos A180](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-preflight-witness-a180-20261022/docs/aion/AION_P0_FIRST_ATTEMPT_WITNESS_A180_LAB_20261022.md). **P0 0/6, HARD NO-GO, ZERO_AUTO_RESEND.**
+
+**Próximo gate recomendado:** definir requisitos de serviço externo que ofereça reserva durável *antes* da fronteira, idempotência de evento de negócio autêntico, identidade de chaves comprovada, consulta independente H0 e garantia explícita contra rollback do próprio custódio. Uma simulação local extra não fechará esse P0.
