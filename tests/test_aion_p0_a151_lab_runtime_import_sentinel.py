@@ -167,5 +167,25 @@ class A151StaticLabImportFence(unittest.TestCase):
                   "import importlib\np=importlib.import_module('aion_p0_a164_independent_revocation_floor_lab')\n")
         self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
 
+    def test_29_a165_import_from_runtime_denied(self):
+        self.file("runtime/aion_owner.py",
+                  "from aion_p0_a165_external_custody_evidence_lab import CustodyClaim\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
+    def test_30_a165_root_lab_can_import_a164(self):
+        self.file("aion_p0_a165_external_custody_evidence_lab.py",
+                  "from aion_p0_a164_independent_revocation_floor_lab import RevocationFloor\n")
+        self.assertTrue(audit_repository(self.root)["static_import_boundary_clean"])
+
+    def test_31_a165_nested_deploy_filename_is_never_exempt(self):
+        self.file("deploy/aion_p0_a165_external_custody_evidence_lab.py",
+                  "from aion_p0_a164_independent_revocation_floor_lab import RevocationFloor\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
+    def test_32_a165_dynamic_import_in_worker_denied(self):
+        self.file("services/worker.py",
+                  "import importlib\nmod=importlib.import_module('aion_p0_a165_external_custody_evidence_lab')\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
 if __name__ == "__main__":
     unittest.main()
