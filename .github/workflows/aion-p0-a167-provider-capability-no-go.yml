@@ -1,0 +1,94 @@
+name: AION P0 A167 Vendor Capability Counterexamples LAB (HARD NO-GO)
+on:
+  push:
+    branches:
+      - lab/aion-p0-a167-provider-capability-counterexamples-20261022
+  pull_request:
+    paths:
+      - 'tests/aion_p0_a167_provider_semantics_lab.py'
+      - 'tests/test_aion_p0_a167_provider_semantics_lab.py'
+      - 'tests/run_aion_a167_provider_counted_lab.py'
+      - 'docs/aion/evidence/aion_p0_a167_vendor_capability_no_go_20261022.json'
+      - 'docs/aion/A167_VENDOR_CAPABILITY_COUNTEREXAMPLES_NO_GO_20261022.md'
+      - '.github/workflows/aion-p0-a167-provider-capability-no-go.yml'
+      - 'tests/aion_p0_a166_review_contract.py'
+      - 'tests/test_aion_p0_a166_custodian_acceptance_contract.py'
+      - 'tests/run_aion_a166_custodian_counted_lab.py'
+      - 'docs/aion/evidence/aion_p0_a166_custodian_acceptance_open_20261022.json'
+      - 'docs/aion/A166_EXTERNAL_CUSTODIAN_ACCEPTANCE_NO_GO_20261022.md'
+      - '.github/workflows/aion-p0-a166-custodian-acceptance-no-go.yml'
+      - 'aion_p0_a165_external_custody_evidence_lab.py'
+      - 'aion_p0_a164_independent_revocation_floor_lab.py'
+      - 'tools/aion_p0_a151_lab_runtime_import_sentinel.py'
+      - 'tests/test_aion_p0_a165_external_custody_evidence_lab.py'
+      - 'tests/run_aion_a165_custody_evidence_counted_lab.py'
+      - 'tests/run_aion_a151_no_go_gate.py'
+      - 'tests/test_aion_p0_a151_lab_runtime_import_sentinel.py'
+      - '.github/workflows/aion-p0-a165-custody-evidence-independence-no-go.yml'
+      - 'docs/aion/A165_EXTERNAL_CUSTODY_EVIDENCE_INTAKE_NO_GO_20261022.md'
+permissions:
+  contents: read
+jobs:
+  enforce-custody-evidence-no-go:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 50
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic signing/AST dependencies only
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3" "PyYAML==6.0.2"
+      - name: A167 24 official-document capability counterexamples (synthetic NO-GO)
+        run: python -B tests/run_aion_a167_provider_counted_lab.py
+      - name: A166 40 synthetic custodian acceptance requirements (no external trust)
+        run: python -B tests/run_aion_a166_custodian_counted_lab.py
+      - name: A165 80 strict but self-attested external-custody evidence tests
+        run: python -B tests/run_aion_a165_custody_evidence_counted_lab.py
+      - name: A164 80 dual review-floor synthetic revocation tests
+        run: python -B tests/run_aion_a164_revocation_floor_counted_lab.py
+      - name: A163 80 explicit enrollment rotation terminal revocation tests
+        run: python -B tests/run_aion_a163_custody_counted_lab.py
+      - name: A162 70 real LAB three-source H0 reconciliation tests
+        run: python -B tests/run_aion_a162_three_source_counted_lab.py
+      - name: A161 70 dual-custodian signed history floor tests
+        run: python -B tests/run_aion_a161_dual_custodian_counted_lab.py
+      - name: A160 30 inherited CAS bypass deny tests
+        run: python -B tests/run_aion_a160_inherited_bypass_counted_lab.py
+      - name: A145-A150 259 LAB signed checkpoint and crash witness tests
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 32 explicit LAB-runtime import boundary tests
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 55 missing external evidence FinOps gate tests
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 48 IAM candidate evidence negative tests
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 73 real checkpoint writer deny cases
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A155 78 GitHub writer destination denial cases
+        run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
+      - name: A156 90 restore and recovery fail-closed tests
+        run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
+      - name: A157 67 GitHub workflow credential source attacks
+        run: python -B tests/run_aion_a157_workflow_policy_counted_lab.py
+      - name: A157 six workflow source-only IAM review still blocks external writes
+        run: python -B tools/aion_p0_a157_workflow_yaml_policy_lab.py --enforce
+      - name: A156 runtime checkpoint recovery source remains DENY
+        run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
+      - name: A154 real checkpoint source writer remains DENY
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: A152 documentary E0-E5 absence remains HARD NO-GO
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historical 32 provider proof errors remain open
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
