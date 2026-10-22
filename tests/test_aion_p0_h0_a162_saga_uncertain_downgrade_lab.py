@@ -8,9 +8,8 @@ from __future__ import annotations
 from datetime import timedelta
 import unittest
 
-from test_aion_p0_h0_saga_existing_first_intent_reentry_lab import (
-    SagaExistingFirstIntentFenceLab, NOW,
-)
+import test_aion_p0_h0_saga_existing_first_intent_reentry_lab as prior
+NOW = prior.NOW
 
 LOCKED = "SAGA_UNCERTAIN_RECONCILIATION_LOCKED"
 MARKERS = "SAGA_OUTBOX_PRIOR_DISPATCH_MARKERS_REQUIRES_RECONCILIATION"
@@ -18,7 +17,7 @@ MARKERS = "SAGA_OUTBOX_PRIOR_DISPATCH_MARKERS_REQUIRES_RECONCILIATION"
 
 class A162NoUncertainDowngradeLAB(unittest.TestCase):
     def setUp(self):
-        fixture = SagaExistingFirstIntentFenceLab(
+        fixture = prior.SagaExistingFirstIntentFenceLab(
             "test_01_healthy_first_time_stage_remains_allowed_locally"
         )
         fixture.setUp()
