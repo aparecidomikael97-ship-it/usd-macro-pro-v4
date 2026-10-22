@@ -99,8 +99,15 @@ class SeparateSQLiteCustodyLab:
         # The file may vanish after is_file(); a fresh SQLite db then lacks
         # the required schema, fails verification and must not bootstrap.
         db = sqlite3.connect(str(self.path), timeout=5, isolation_level=None)
-        db.execute("PRAGMA busy_timeout=5000")
-        db.execute("PRAGMA synchronous=FULL")
+        try:
+            db.execute("PRAGMA busy_timeout=5000")
+            db.execute("PRAGMA synchronous=FULL")
+        except BaseException:
+            # SQLite can reject a corrupt file during a PRAGMA, before a
+            # caller's closing() context is entered. On Windows the leaked
+            # handle prevents quarantine, cleanup and reliable recovery.
+            db.close()
+            raise
         return db
 
     def _verify_schema(self):
