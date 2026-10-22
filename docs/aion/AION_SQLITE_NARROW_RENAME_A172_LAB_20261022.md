@@ -23,4 +23,14 @@ Apenas um sensor temporal do diretório. Ele **não prova** vínculo atômico co
 **HARD NO-GO; 0/6 P0 homologados; main inalterada; no merge/deploy/Worker/providers/cost; ZERO_AUTO_RESEND.**
 
 ## CI / evidência
-Pendente — preencher estritamente após logs Windows e Ubuntu; não tratar job green como homologação operacional.
+[GitHub Actions #39853106563](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39853106563): **SUCESSO, Ubuntu 69/69 e Windows 69/69 (138 testes).** O verde comprova o resultado esperado dos ensaios; não é homologação.
+
+| Observação dos logs | Ubuntu | Windows |
+|---|---|---|
+| ABA real na leitura | `ABA_COMPLETED_OBSERVED_DENIED` | `OS_DENIED_OR_RESTORED_OS_NOT_EXERCISED` |
+| Concorrência legítima | `READ_ALLOWED_WITH_WAL_CHANGE` | `READ_ALLOWED_WITH_WAL_CHANGE` |
+| ABA real na escrita | `ABA_COMPLETED_NOT_ATTESTED` | `OS_DENIED_OR_RESTORED_OS_NOT_EXERCISED` |
+| Criação de arquivo não relacionado | `READ_DENIED_DIRECTORY_FALSE_POSITIVE` | `TIMESTAMP_DRIFT_NOT_OBSERVED` |
+| Alteração de conteúdo em arquivo não relacionado | `READ_ALLOWED` | `READ_ALLOWED` |
+
+**Interpretação:** A172 removeu o falso positivo específico de escrita concorrente ao WAL observado na A171 e conservou a detecção Ubuntu de ABA de leitura. **Restam:** falso positivo por alteração legítima de entrada no diretório Ubuntu; ausência de mudança observada nos timestamps do diretório Windows neste ensaio; ABA durante escrita Ubuntu não detectado. Não houve prova de prevenção de manipulação de host, recuperabilidade externa, nem custódia independente. A Quality canônica completa continua pendente.
