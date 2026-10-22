@@ -1,0 +1,51 @@
+name: AION P0 A159 Streamlit Pillow13 Dependency Fix Security LAB (NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - 'tools/aion_p0_a158_dependency_audit_lab.py'
+      - 'tools/aion_p0_a159_supported_pillow13_zero_cve_lab.py'
+      - 'tests/test_aion_p0_a158_dependency_audit_lab.py'
+      - 'tests/test_aion_p0_a158_pdf_image_dependency_smoke_lab.py'
+      - 'tests/test_aion_p0_a159_streamlit_pillow_security_lab.py'
+      - 'tests/test_aion_p0_a159_pillow13_streamlit_runtime_lab.py'
+      - 'tests/run_aion_a159_supported_pillow_counted_lab.py'
+      - '.github/workflows/aion-p0-a159-pillow13-upstream-supported-security-lab.yml'
+      - 'docs/aion/A159_STREAMLIT_1661_PILLOW_130_ZERO_CVE_LAB_20261022.md'
+  push:
+    branches:
+      - lab/aion-p0-a159-streamlit-pillow13-security-compat-20261022
+permissions:
+  contents: read
+jobs:
+  validate-security-fixed-upstream-pair:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned full runtime and independent audit dependencies
+        run: |
+          python -m pip install "pip==26.2.1"
+          python -m pip install -r requirements.txt
+          python -m pip install "pip-audit==2.10.1"
+          python -m pip check
+      - name: Run A158 and A159 96 exactly counted PDF Streamlit and security tests
+        run: python -B tests/run_aion_a159_supported_pillow_counted_lab.py
+      - name: A159 complete zero-advisory pip-audit with exact supported upstream package metadata
+        run: python -B tools/aion_p0_a159_supported_pillow13_zero_cve_lab.py
+      - name: A158 prior adversarial pypdf gate still passes without waivers
+        run: python -B tools/aion_p0_a158_dependency_audit_lab.py --verify-pypdf-only

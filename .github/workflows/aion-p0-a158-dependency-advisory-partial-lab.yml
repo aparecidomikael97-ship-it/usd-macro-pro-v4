@@ -1,0 +1,46 @@
+name: AION P0 A158 pypdf Advisory Remediation — Partial, Pillow NO-GO
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - 'tools/aion_p0_a158_dependency_audit_lab.py'
+      - 'tests/test_aion_p0_a158_dependency_audit_lab.py'
+      - 'tests/test_aion_p0_a158_pdf_image_dependency_smoke_lab.py'
+      - 'tests/run_aion_a158_dependency_counted_lab.py'
+      - 'docs/aion/A158_SUPPLY_CHAIN_PARTIAL_REMEDIATION_AND_PILLOW_NO_GO_20261022.md'
+      - '.github/workflows/aion-p0-a158-dependency-advisory-partial-lab.yml'
+  push:
+    branches:
+      - lab/aion-p0-a158-supply-chain-pypdf-remediation-20261022
+permissions:
+  contents: read
+jobs:
+  pypdf-partial-remediation-no-go:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 40
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+      AION_LAB_MODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install currently pinned project and audit dependencies
+        run: |
+          python -m pip install "pip==26.2.1"
+          python -m pip install -r requirements.txt
+          python -m pip install "pip-audit==2.10.1"
+          python -m pip check
+      - name: A158 44 exact dependency audit corruption and PDF image regressions
+        run: python -B tests/run_aion_a158_dependency_counted_lab.py
+      - name: Independently re-audit full requirements and prove pypdf patch only
+        run: python -B tools/aion_p0_a158_dependency_audit_lab.py --verify-pypdf-only
