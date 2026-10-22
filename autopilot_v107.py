@@ -109,6 +109,27 @@ HOME_SNAPSHOT_PATH = "dados/atlasquant_home_snapshot_v1.json"
 RESEARCH_TF_CACHE_PATH = "dados/atlasquant_research_timeframes_v1.json"
 AION_LIVE_EVENT_JOURNAL_PATH = "dados/aion_live_event_journal_v1.json"
 
+# A155 P0: this scheduled writer holds repository contents:write, so its
+# destination cannot be a generic caller-controlled "dados/" namespace.
+# These are the ONLY 12 output files currently emitted by gh_put_json/csv.
+# Keep the allowlist independent of imported path constants: if any source
+# constant drifts unexpectedly, writing must fail closed until reviewed.
+# This does not replace GitHub token scope or independent H0 witness custody.
+AUTOPILOT_ALLOWED_GITHUB_WRITE_PATHS = frozenset({
+    "dados/scanner_tecnico_v934.json",
+    "dados/autopilot_daily_cache_v107.json",
+    "dados/atlasquant_research_timeframes_v1.json",
+    "dados/twelve_series_v1108.json",
+    "dados/master_market_map_v102.json",
+    "dados/currency_news_current_v107.json",
+    "dados/aion_live_event_journal_v1.json",
+    "dados/currency_news_validation_v1061.csv",
+    "dados/atlasquant_signal_lifecycle_v1.json",
+    "dados/atlasquant_home_snapshot_v1.json",
+    "dados/atlasquant_quota_shadow_v1.json",
+    "dados/autopilot_status_v107.json",
+})
+
 M15_EVERY_MIN = 55
 H1_EVERY_MIN = 115
 H4_EVERY_MIN = 235
@@ -186,9 +207,10 @@ def gh_get_bytes(path: str) -> tuple[bytes | None, str]:
         return None, f"{type(exc).__name__}: {exc}"
 
 def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
-    # A136b LAB: do not allow raw GitHub Contents target selection to bypass
-    # Checkpoint Mestre A135. This is for ordinary flat/nested 'dados/' files.
-    # Reject encoded characters, query fragments and dot-segment traversal.
+    # A155: restrict writes to explicitly reviewed Autopilot output paths.
+    # A136b originally rejected checkpoint/traversal, but still admitted
+    # unrelated operational files under dados/. Reject them BEFORE token/GET/PUT.
+    # Keep encoded characters, fragments and dot-segment traversal rejected.
     import re
     if (
         type(path) is not str
@@ -196,6 +218,7 @@ def gh_put_bytes(path: str, raw: bytes, message: str) -> tuple[bool, str]:
         or re.fullmatch(r"[A-Za-z0-9_./-]+", path) is None
         or any(segment in ("", ".", "..") for segment in path.split("/"))
         or path == "dados/aion/checkpoint_master.json"
+        or path not in AUTOPILOT_ALLOWED_GITHUB_WRITE_PATHS
     ):
         return False, "Autopilot GitHub destination is not authorized."
     if not TOKEN or not REPO:
