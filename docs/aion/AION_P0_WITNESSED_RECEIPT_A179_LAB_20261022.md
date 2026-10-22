@@ -24,7 +24,21 @@ São **21 testes A179**: duas assinaturas válidas de LAB, reconciliação após
 - Não há Quality canônica completa nesta etapa.
 
 ## Evidências de CI
-Preencher após checagem dos logs da bateria Windows + Ubuntu, incluindo as regressões SQLite.
+Código e testes exercitados no commit `7074f40a5225937932082e6f6128ef22c431e75b`:
+- [CI A179 #39870396609](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39870396609) — **77/77 Ubuntu + 77/77 Windows**. Incluiu 21 casos novos A179, além das regressões A178/A177/A176, Outbox e Saga.
+- [CI SQLite #39870396346](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39870396346) — **93/93 Ubuntu + 93/93 Windows**. Regressões do ciclo de vida e reservas.
+- **340/340 execuções** somadas. Esses números não são 340 P0 homologados nem prova de produção. Full Quality não rodou. Arquivos de documentação posteriores não modificaram o código validado.
+
+Marcadores conferidos nos logs das duas plataformas:
+`A179_TWO_SIGNERS_SYNTHETIC=CONFIRMED_LAB_ONLY`,
+`A179_WITNESS_MISSING=NO_CONFIRMATION`,
+`A179_WITNESS_OFFLINE=NO_CONFIRMATION`,
+`A179_STALE_WITNESS_CHALLENGE=DENIED`,
+`A179_WITNESS_STATE_ROLLBACK=REPLAY_ACCEPTED_NOT_ATTESTED`,
+`A179_CALLER_REPINS_WITNESS_ROOT=FAKE_AUTHORITY_ACCEPTED`,
+`A179_TWO_SIGNATURE_EFFECT_ZERO=TERMINAL_NO_RETRY_LAB`.
+
+**Gate A179:** verificação sintética de contrato passou; fonte independente, durabilidade externa e raiz de confiança autenticada continuam não demonstradas.
 
 ## Segurança operacional
 Sem custo, novas chaves reais, provisionamento, chamadas reais ao provedor, Worker, merge ou deploy. Os seis P0 continuam **0/6 homologados, HARD NO-GO**. `ZERO_AUTO_RESEND` não pode ser relaxado por assinaturas sintéticas ou testemunha local.
