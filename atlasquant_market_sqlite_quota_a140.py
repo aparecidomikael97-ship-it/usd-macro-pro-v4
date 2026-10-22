@@ -114,7 +114,15 @@ class SQLiteLabReservationLedger:
         self._check_path()
         db=None
         try:
-            db=sqlite3.connect(str(self.path),timeout=0.25,isolation_level=None)
+            # A142: SQLite's default open mode can silently create a NEW
+            # database if the path disappears after our pre-open identity
+            # check. A quota ledger must NEVER be recreated by an ordinary
+            # connection. Initialization alone creates it explicitly (xb).
+            # Path.as_uri percent-encodes '#' / '?' / '%' for URI safety.
+            db=sqlite3.connect(
+                self.path.as_uri()+"?mode=rw",
+                uri=True,timeout=0.25,isolation_level=None,
+            )
             # Detect a replacement between our first pathname check and the
             # sqlite3.connect call BEFORE BEGIN IMMEDIATE or any write.
             # This is identity-based race reduction, NOT an atomic handle-
