@@ -486,5 +486,54 @@ class A150PinnedPolicyLeaseLAB(unittest.TestCase):
         self.assertEqual(self.publish(next_env).receipt.sequence, 2)
 
 
+    def test_51_lease_extension_within_global_limit_denied_by_operator_pin(self):
+        env = self.signed()
+        with closing(sqlite3.connect(self.engine.db_path)) as db:
+            db.execute("UPDATE challenge_lease SET expires_ns=issued_ns+? WHERE challenge_id=?",
+                       (60*NANOSECONDS_PER_SECOND, env.request.challenge_id))
+            db.commit()
+        with self.assertRaisesRegex(A149Denied, "lease_integrity_failure"):
+            self.reopen()
+
+    def test_52_lease_shrinking_denied_by_operator_pin(self):
+        env = self.signed()
+        with closing(sqlite3.connect(self.engine.db_path)) as db:
+            db.execute("UPDATE challenge_lease SET expires_ns=issued_ns+? WHERE challenge_id=?",
+                       (15*NANOSECONDS_PER_SECOND, env.request.challenge_id))
+            db.commit()
+        with self.assertRaisesRegex(A149Denied, "lease_integrity_failure"):
+            self.engine.read_head()
+
+    def test_53_runtime_lease_setting_must_match_enrolled_operator_policy(self):
+        with self.assertRaisesRegex(A149Denied, "operator_lease_policy_mismatch"):
+            self.reopen(lease_seconds=60)
+
+    def test_54_operator_pin_cannot_declare_boolean_lease(self):
+        altered = replace(self.pin, lease_seconds=True)
+        with self.assertRaisesRegex(A149Denied, "invalid_external_lease_policy"):
+            self.reopen(policy=altered)
+
+    def test_55_operator_lease_pin_mismatch_denied_on_reopen(self):
+        altered = replace(self.pin, lease_seconds=60)
+        with self.assertRaisesRegex(A149Denied, "operator_lease_policy_mismatch"):
+            self.reopen(policy=altered)
+
+    def test_56_negative_attacker_can_shift_both_lease_timestamps_in_mutable_db(self):
+        # NEGATIVE proof: exact duration pin cannot stop a DB owner from
+        # shifting BOTH issued and expires to a newer artificial interval.
+        env = self.signed()
+        initial = self.clock.value
+        self.clock.advance(40)  # Original 30s lease is expired.
+        with closing(sqlite3.connect(self.engine.db_path)) as db:
+            db.execute(
+                "UPDATE challenge_lease SET issued_ns=?,expires_ns=? WHERE challenge_id=?",
+                (initial+20*NANOSECONDS_PER_SECOND,
+                 initial+50*NANOSECONDS_PER_SECOND, env.request.challenge_id),
+            )
+            db.commit()
+        # Still accepted in LAB: illustrates need for independently
+        # authenticated issued timestamp / tamper-resistant lease register.
+        self.assertEqual(self.publish(env).receipt.sequence, 1)
+
 if __name__ == "__main__":
     unittest.main()
