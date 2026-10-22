@@ -479,17 +479,23 @@ class A163CustodyEnrollmentRotationRevocationLAB(unittest.TestCase):
         self.denied(d1=a,d2=b)
 
     def test_46_lost_local_journal_never_auto_rebootstraps(self):
+        # Cache VALID checkpoint and current dual-signed floor before loss:
+        # prove that actual journal absence (rather than a fake checkpoint)
+        # is what causes the fail-closed decision.
+        cp=self.checkpoint()
         one,two=self.floors()
         self.journal.path.unlink()
         result=assess_enrollment_and_recovery(
             signed_events=self.records,trusted_issuer_public_key=pub(self.issuer),
             required_anchor=self.anchor(),ledger_id=self.ledger,epoch=self.epoch,
             journal=self.journal,local_witness=self.witness,
-            checkpoint="invalid-no-go",checkpoint_pins={"checkpoint":pub(self.cp_signer)},
+            checkpoint=cp,checkpoint_pins={"checkpoint":pub(self.cp_signer)},
             floor_d1=one,floor_d2=two,request_nonce=self.nonce,now_ns=self.now,
         )
         self.invariant(result)
         self.assertEqual(result.verdict,"LAB_HARD_BLOCKED")
+        self.assertIn("missing_or_linked_journal",result.reason)
+        self.assertFalse(self.journal.path.exists())
 
     def test_47_snapshot_both_policy_and_anchor_to_old_generation_still_quarantine(self):
         old_policy=list(self.records)
