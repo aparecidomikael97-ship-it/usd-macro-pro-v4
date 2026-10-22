@@ -217,6 +217,10 @@ class SQLiteLabReservationLedger:
                             "LAB bootstrap encountered pre-existing SQLite schema"
                         )
                 if existed:
+                    # A144: inspect the existing schema BEFORE any DDL.
+                    # Even IF NOT EXISTS is a write-capable schema operation;
+                    # do not enter it on a foreign or altered ledger.
+                    self._verify_schema(db)
                     # A140 independent audit: an EXISTING database must
                     # never silently recreate lost quota history. sqlite
                     # quick_check verifies pages, not missing logical tables.
@@ -254,6 +258,7 @@ class SQLiteLabReservationLedger:
                     item=(SCHEMA,self.limit)
                 if item!=(SCHEMA,self.limit):
                     raise QuotaLabUnavailable("SQLite LAB quota policy missing or changed")
+                self._verify_schema(db)
                 db.execute("COMMIT")
             # Detect clearly corrupt pages, not a trusted anti-rollback proof.
             with closing(self._connect()) as db:
@@ -264,7 +269,28 @@ class SQLiteLabReservationLedger:
         except (sqlite3.Error,OSError) as exc:
             raise QuotaLabUnavailable("SQLite LAB initialization unavailable") from exc
 
+    @staticmethod
+    def _verify_schema(db):
+        """LAB-only exact SQLite schema attestation; not anti-rollback."""
+        expected={
+            "quota_policy": "CREATE TABLE quota_policy (singleton INTEGER PRIMARY KEY CHECK (singleton=1),schema TEXT NOT NULL,configured_limit INTEGER NOT NULL CHECK(configured_limit BETWEEN 1 AND 100))",
+            "reservations": "CREATE TABLE reservations (run_id TEXT PRIMARY KEY NOT NULL,units INTEGER NOT NULL CHECK(units BETWEEN 1 AND 100),state TEXT NOT NULL CHECK(state IN ('RESERVED_UNCERTAIN','LOCAL_OUTPUT_OBSERVED')),payload_sha256 TEXT)",
+        }
+        rows=db.execute("SELECT type,name,tbl_name,sql FROM sqlite_master").fetchall()
+        if len(rows)!=3 or {row[1] for row in rows}!=set(expected)|{"sqlite_autoindex_reservations_1"}:
+            raise QuotaLabUnavailable("Unexpected SQLite schema objects")
+        for kind,name,table,sql in rows:
+            if name=="sqlite_autoindex_reservations_1":
+                if kind!="index" or table!="reservations" or sql is not None:
+                    raise QuotaLabUnavailable("SQLite implicit primary-key index changed")
+                continue
+            if kind!="table" or table!=name or sql!=expected[name]:
+                raise QuotaLabUnavailable("SQLite schema definition changed")
+        if db.execute("PRAGMA application_id").fetchone()!=(0,):
+            raise QuotaLabUnavailable("SQLite application identity changed")
+
     def _verify_policy(self,db):
+        self._verify_schema(db)
         policy=db.execute(
             "SELECT schema,configured_limit FROM quota_policy WHERE singleton=1"
         ).fetchone()

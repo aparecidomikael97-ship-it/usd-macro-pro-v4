@@ -1,0 +1,35 @@
+name: AION P0 A144 SQLite Schema LAB (NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_market_sqlite_quota_a140.py'
+      - 'tests/test_aion_p0_*sqlite*lab.py'
+      - 'tests/run_aion_a144_counted_regressions_lab.py'
+      - '.github/workflows/aion-p0-market-sqlite-schema-a144-lab.yml'
+  push:
+    branches:
+      - lab/aion-p0-market-sqlite-schema-attestation-a144-20261022
+permissions:
+  contents: read
+jobs:
+  adversarial-schema:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 12
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: A140-A144 counted offline regression suite (zero tests is failure)
+        run: python -B tests/run_aion_a144_counted_regressions_lab.py
