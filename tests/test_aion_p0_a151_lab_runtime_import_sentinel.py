@@ -107,5 +107,25 @@ class A151StaticLabImportFence(unittest.TestCase):
         self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE", self.reasons())
 
 
+    def test_17_a161_dual_floor_import_inside_runtime_denied(self):
+        self.file("runtime/worker.py",
+                  "from aion_p0_a161_dual_custodian_floor_lab import FloorClaim\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE", self.reasons())
+
+    def test_18_a162_tripartite_import_inside_runtime_denied(self):
+        self.file("runtime/worker.py",
+                  "from aion_p0_a162_three_source_recovery_lab import assess_three_source_restart\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE", self.reasons())
+
+    def test_19_explicit_root_level_a162_experiment_is_excluded(self):
+        self.file("aion_p0_a162_three_source_recovery_lab.py",
+                  "from aion_p0_a161_dual_custodian_floor_lab import FloorReview\n")
+        self.assertTrue(audit_repository(self.root)["static_import_boundary_clean"])
+
+    def test_20_a162_filename_in_nested_deploy_directory_is_not_excluded(self):
+        self.file("deploy/aion_p0_a162_three_source_recovery_lab.py",
+                  "from aion_p0_a150_pinned_policy_lease_lab import LeasedPinnedWitnessLAB\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE", self.reasons())
+
 if __name__ == "__main__":
     unittest.main()
