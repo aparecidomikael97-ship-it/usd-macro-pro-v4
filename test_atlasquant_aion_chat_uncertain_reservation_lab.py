@@ -1,5 +1,6 @@
 """A174 LAB — local reservation persistence is not external custody proof."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 import os
 import sqlite3
 from pathlib import Path
@@ -200,13 +201,14 @@ class UncertainWriteJournalTests(unittest.TestCase):
         self.assertCountEqual(outcomes, ["RESERVED", "DENIED"])
 
     def test_15_legacy_journal_without_semantic_column_fails_closed(self):
-        with sqlite3.connect(self.path) as conn:
+        with closing(sqlite3.connect(self.path)) as conn:
             conn.execute(
                 "CREATE TABLE reservations (request_id TEXT PRIMARY KEY, "
                 "payload_sha256 TEXT NOT NULL, state TEXT NOT NULL)")
             conn.execute(
                 "INSERT INTO reservations VALUES (?,?,?)",
                 (RID, HASH_A, "UNKNOWN"))
+            conn.commit()
         with self.assertRaisesRegex(
                 ReservationJournalUnavailable, "JOURNAL_LEGACY_SCHEMA_UNBOUND"):
             self.journal()
