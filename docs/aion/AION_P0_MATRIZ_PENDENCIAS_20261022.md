@@ -23,3 +23,12 @@
 - Mesmo efeito declarado sob novo request_id: negado. **Novo business_id falso e deleção de diário: ainda aceitos no LAB**.
 - Não se verificaram a Quality canônica completa, provedores externos, hardware resistente a rollback ou identidade de proprietário real nesta rodada.
 - **Proibido:** declarar P0 fechado, reativar Worker, integração com cliente real, merge ou deploy sem homologação; ZERO_AUTO_RESEND.
+
+## Adendo A176 — auditoria do call site Outbox
+[PR Draft #1466](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1466), [CI GREEN #39867557973](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39867557973) — Ubuntu 33/33 e Windows 33/33.
+
+**P0-3 — avanço confirmado apenas no LAB:** o Outbox não confia mais em `retryable=True` após enviar, nem em `authoritative_absence=True` do próprio adaptador para liberar `RETRY`. Reproduções RED do comportamento anterior ficaram registradas no CI #39867407275.
+
+**P0-2/P0-3 — pendências explícitas:** declaração de rejeição definitiva (`accepted=False,retryable=False`) ainda permite `FAILED` e não é recibo independente de efeito zero; confirmação `found=True,confirmed=True` ainda é autoafirmada pelo adaptador. Falta proteger contra novo ID de negócio falso, restauração/exclusão do diário e autenticação de provedor. Não houve inspeção completa de todos os call sites. Ver [documento A176](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-outbox-uncertain-retry-gate-a176-20261022/docs/aion/AION_P0_OUTBOX_UNCERTAIN_RETRY_A176_LAB_20261022.md).
+
+**Prioridade seguinte:** teste RED do efeito que ocorre antes de uma falsa rejeição definitiva + recibo falso de confirmação; aplicar fail-closed em LAB sem enfraquecer os testes de saga, depois revisar dependências de testemunha externa. P0 homologados: **0/6**.
