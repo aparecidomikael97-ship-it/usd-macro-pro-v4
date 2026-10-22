@@ -30,6 +30,7 @@ class OperationScopedSQLiteChatStore:
         self._closed = False
         self._failure = ""
         self._file_identity = None
+        self._parent_identity = None
         self.require_healthy()
 
     def close(self):
@@ -58,6 +59,51 @@ class OperationScopedSQLiteChatStore:
         if not stat.S_ISREG(info.st_mode):
             raise StorageUnavailableError("BOUND_DATABASE_NOT_REGULAR_FILE")
         return (info.st_dev, info.st_ino)
+
+    def _ancestor_chain_identity(self, *, allow_missing):
+        """Inspect every parent, including platform-specific directory junctions.
+
+        lstat sees the path component itself (not its symlink target). The
+        snapshots are best effort: there is no atomic openat-based native
+        SQLite VFS binding or protection against a same-inode ABA swap.
+        """
+        chain = []
+        parent = self.path.parent
+        while True:
+            try:
+                info = parent.lstat()
+            except FileNotFoundError as exc:
+                if not allow_missing:
+                    raise StorageUnavailableError(
+                        "BOUND_DATABASE_ANCESTOR_UNAVAILABLE") from exc
+                chain.append(None)  # native first bootstrap can create dirs
+            except OSError as exc:
+                raise StorageUnavailableError(
+                    "BOUND_DATABASE_ANCESTOR_UNAVAILABLE") from exc
+            else:
+                try:
+                    is_junction = getattr(parent, "is_junction", None)
+                    junction = bool(is_junction()) if callable(is_junction) else False
+                except OSError as exc:
+                    raise StorageUnavailableError(
+                        "BOUND_DATABASE_ANCESTOR_UNAVAILABLE") from exc
+                if stat.S_ISLNK(info.st_mode) or junction:
+                    raise StorageUnavailableError(
+                        "BOUND_DATABASE_ANCESTOR_ALIAS_DENIED")
+                if not stat.S_ISDIR(info.st_mode):
+                    raise StorageUnavailableError(
+                        "BOUND_DATABASE_ANCESTOR_NOT_DIRECTORY")
+                chain.append((info.st_dev, info.st_ino))
+            if parent.parent == parent:
+                break
+            parent = parent.parent
+        return tuple(chain)
+
+    @staticmethod
+    def _compatible_parent_chains(before, after):
+        # Only the first initialization may create missing directories.
+        return (len(before) == len(after) and all(
+            old is None or old == new for old, new in zip(before, after)))
 
     def _verify_identity_anchor(self, fd, expected):
         """Compare a separately opened OS descriptor to the observed DB path.
@@ -110,6 +156,12 @@ class OperationScopedSQLiteChatStore:
                 store = None
                 anchor = None
                 try:
+                    parents_before = self._ancestor_chain_identity(
+                        allow_missing=self._parent_identity is None)
+                    if (self._parent_identity is not None
+                            and parents_before != self._parent_identity):
+                        raise StorageUnavailableError(
+                            "BOUND_DATABASE_ANCESTOR_REPLACED")
                     before = self._path_identity(
                         allow_missing=self._file_identity is None)
                     if (self._file_identity is not None
@@ -119,10 +171,22 @@ class OperationScopedSQLiteChatStore:
                         # Hold a separately verified file descriptor across
                         # native SQLite open, operation and native close.
                         anchor = self._open_identity_anchor(before)
+                        if (self._ancestor_chain_identity(allow_missing=False)
+                                != parents_before):
+                            raise StorageUnavailableError(
+                                "BOUND_DATABASE_ANCESTOR_CHANGED_BEFORE_OPEN")
                         if self._path_identity(allow_missing=False) != before:
                             raise StorageUnavailableError(
                                 "BOUND_DATABASE_CHANGED_BEFORE_OPEN")
                     store = SQLiteChatStore(self.path)
+                    parents_after_open = self._ancestor_chain_identity(
+                        allow_missing=False)
+                    if (not self._compatible_parent_chains(
+                            parents_before, parents_after_open)
+                            or (self._parent_identity is not None
+                                and parents_after_open != self._parent_identity)):
+                        raise StorageUnavailableError(
+                            "BOUND_DATABASE_ANCESTOR_CHANGED_DURING_OPEN")
                     after_open = self._path_identity(allow_missing=False)
                     if ((before is not None and after_open != before)
                             or (self._file_identity is not None
@@ -136,7 +200,15 @@ class OperationScopedSQLiteChatStore:
                         self._verify_identity_anchor(anchor, after_open)
                     if self._file_identity is None:
                         self._file_identity = after_open
+                    if self._parent_identity is None:
+                        self._parent_identity = parents_after_open
                     result = getattr(store, name)(*args, **kwargs)
+                    if (self._ancestor_chain_identity(allow_missing=False)
+                            != self._parent_identity):
+                        # A write may ALREADY have committed; no automatic
+                        # retry or rollback assumption is permissible.
+                        raise StorageUnavailableError(
+                            "BOUND_DATABASE_ANCESTOR_CHANGED_DURING_OPERATION")
                     after_operation = self._path_identity(allow_missing=False)
                     if after_operation != self._file_identity:
                         # A write may ALREADY have committed. Report UNKNOWN,
