@@ -23,8 +23,9 @@ class A177ReceiptAdmissionTests(unittest.TestCase):
         self.scope = Scope("ownerlab", "tenantlab", "workspacelab")
 
     def make_claim(self, *, evidence_verifier=None):
-        outbox = ExecutionOutbox(
-            self.store, self.scope, evidence_verifier=evidence_verifier)
+        options = {} if evidence_verifier is None else {
+            "evidence_verifier": evidence_verifier}
+        outbox = ExecutionOutbox(self.store, self.scope, **options)
         item = outbox.enqueue(
             intent_ref="event-one", action="send_email",
             payload={"to":"lab.invalid","body":"synthetic"},
