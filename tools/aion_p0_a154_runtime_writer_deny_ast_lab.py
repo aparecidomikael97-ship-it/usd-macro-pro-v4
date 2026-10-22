@@ -173,6 +173,20 @@ def inspect_runtime_writer_source(source: str) -> dict[str, Any]:
             findings.append("GUARD_CALL_NOT_UNIQUE")
         if len(puts) != 1:
             findings.append("RUNTIME_GITHUB_PUT_NOT_UNIQUE")
+        # Also flag unknown transport aliases: old A136 line-order matching
+        # alone cannot recognize a new session.put() before the witness gate.
+        potential_mutators = [
+            n for n in ast.walk(writer_fn) if isinstance(n, ast.Call)
+            and _name(n.func).rsplit(".", 1)[-1] in {
+                "put", "patch", "post", "delete", "request",
+                "create_file", "update_file",
+            }
+        ]
+        if len(potential_mutators) != 1 or (
+            potential_mutators and _name(potential_mutators[0].func) != "requests.put"
+        ):
+            findings.append("UNREVIEWED_MUTATOR_IN_RUNTIME_WRITER")
+
         indices = [i for i, stmt in enumerate(body) if _guard_assignment(stmt)]
         if len(indices) != 1:
             findings.append("GUARD_ASSIGNMENT_NOT_DIRECT_TOP_LEVEL")
