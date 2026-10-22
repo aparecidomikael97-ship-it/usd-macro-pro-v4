@@ -88,6 +88,8 @@ class SyntheticCrashJournalLAB:
         return cls(lab_dir=root, ledger_id=ledger_id)
 
     def _connect(self, *, writable=False):
+        if os.environ.get("AION_LAB_MODE") != "1":
+            raise JournalUnavailable("lab_mode_required")
         if self.path.is_symlink() or not self.path.is_file():
             raise JournalUnavailable("missing_or_linked_journal")
         uri = self.path.resolve().as_uri() + ("?mode=rw" if writable else "?mode=ro")
@@ -152,6 +154,12 @@ class SyntheticCrashJournalLAB:
                 if any(e["intent"] == intent for e in events):
                     db.execute("ROLLBACK")
                     return False
+                # First uncertain operation: no further critical local intents
+                # until an authoritative human-supervised reconciliation exists.
+                # The LAB has no such mechanism, so reject further reservations.
+                if events:
+                    db.execute("ROLLBACK")
+                    raise JournalUnavailable("unresolved_first_operation_blocks_new_intent")
                 db.execute(
                     "INSERT INTO events(seq,intent,state) VALUES (?,?,?)",
                     (len(events) + 1, intent, "RESERVED_UNCERTAIN"),
