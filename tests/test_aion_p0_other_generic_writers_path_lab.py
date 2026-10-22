@@ -45,12 +45,27 @@ class OtherGenericWritersDestinationLAB(unittest.TestCase):
                 getcfg,requests)
 
     def autopilot_writer(self):
+        # A155: the isolated AST function depends on a module-level frozen
+        # path allowlist. Load ONLY its literal value without importing the
+        # scheduled job, networking, or executing any other module code.
+        module=ast.parse((ROOT/"autopilot_v107.py").read_text(encoding="utf-8"))
+        assignments=[n for n in module.body if isinstance(n,ast.Assign)
+                     and any(isinstance(t,ast.Name)
+                             and t.id=="AUTOPILOT_ALLOWED_GITHUB_WRITE_PATHS"
+                             for t in n.targets)]
+        assert len(assignments)==1
+        value=assignments[0].value
+        assert isinstance(value,ast.Call) and isinstance(value.func,ast.Name)
+        assert value.func.id=="frozenset" and len(value.args)==1
+        allowed=frozenset(ast.literal_eval(value.args[0]))
+        assert len(allowed)==12
         requests=MagicMock()
         requests.get.return_value.status_code=404
         requests.put.return_value.status_code=200
         variables={
             "TOKEN":"synthetic-unused","REPO":"example/repo",
             "BRANCH":"atlasquant-runtime",
+            "AUTOPILOT_ALLOWED_GITHUB_WRITE_PATHS":allowed,
             "gh_headers":lambda : {"Authorization":"synthetic"},
             "requests":requests,"base64":base64,
         }
