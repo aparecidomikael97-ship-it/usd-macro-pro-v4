@@ -122,6 +122,48 @@ class A150PinnedPolicyLeaseLAB(unittest.TestCase):
             envelope=self.signed() if envelope is None else envelope,
         )
 
+    def run_synthetic_child(self, envelope, *, fault=None, action="publish"):
+        """Other Python process, same machine. No network or real provider."""
+        attrs = {
+            key: getattr(envelope.request, key)
+            for key in PublishRequest.__dataclass_fields__
+        }
+        lines = [
+            "from aion_p0_a150_pinned_policy_lease_lab import LeasedPinnedWitnessLAB, OperatorPinnedPolicyLAB",
+            "from aion_p0_a149_authenticated_cas_lab import PublishRequest, SignedPublishRequest",
+            "from aion_p0_a149_authenticated_cas_lab import verify_signed_receipt",
+            "from pathlib import Path",
+            "policy = OperatorPinnedPolicyLAB("
+            +repr(self.pin.ledger_id)+", "+repr(self.pin.epoch)+", "
+            +repr(self.pin.publisher_key_id)+", bytes.fromhex("
+            +repr(self.pin.publisher_public_key.hex())+"), bytes.fromhex("
+            +repr(self.pin.witness_public_key.hex())+"), "
+            +repr(self.pin.lease_seconds)+")",
+            "witness = LeasedPinnedWitnessLAB("
+            +"witness_dir="+repr(str(self.witness_dir))
+            +", ledger_id='ledger-A', pinned_policy=policy, "
+            +"clock_ns=lambda: "+repr(self.clock.value)+")",
+            "env = SignedPublishRequest(PublishRequest(**"+repr(attrs)+"), "
+            +repr(envelope.signature_b64)+")",
+        ]
+        if action == "publish":
+            lines.append("witness.publish(envelope=env, fault="+repr(fault)+")")
+        elif action == "receipt":
+            lines.append("r = witness.read_receipt(env.request.request_id)")
+            lines.append("assert r is not None")
+            lines.append("assert verify_signed_receipt(envelope=r, "
+                         "pinned_witness_key=policy.witness_public_key).request_id "
+                         "== env.request.request_id")
+        else:
+            raise ValueError("invalid test action")
+        process = subprocess.run(
+            [sys.executable, "-B", "-c", "\n".join(lines)],
+            cwd=ROOT,
+            env={**os.environ, "AION_A150_FAULT_LAB":"1"},
+            capture_output=True, text=True, timeout=25,
+        )
+        return process
+
     def assert_no_advance(self):
         self.assertEqual(self.engine.read_head()["sequence"], 0)
 
@@ -534,6 +576,50 @@ class A150PinnedPolicyLeaseLAB(unittest.TestCase):
         # Still accepted in LAB: illustrates need for independently
         # authenticated issued timestamp / tamper-resistant lease register.
         self.assertEqual(self.publish(env).receipt.sequence, 1)
+
+    def test_57_child_crash_before_commit_rolls_back_lease_cas_and_receipt(self):
+        envelope = self.signed()
+        process = self.run_synthetic_child(envelope, fault="before_commit")
+        self.assertEqual(process.returncode, 101, process.stderr)
+        self.assert_no_advance()
+        self.assertIsNone(self.reopen().read_receipt(envelope.request.request_id))
+        with closing(sqlite3.connect(self.engine.db_path)) as db:
+            used = db.execute("SELECT consumed FROM challenges WHERE challenge_id=?",
+                              (envelope.request.challenge_id,)).fetchone()[0]
+        self.assertEqual(used, 0)
+
+    def test_58_child_crash_after_commit_persists_signed_receipt_without_ack(self):
+        envelope = self.signed()
+        process = self.run_synthetic_child(envelope, fault="after_commit")
+        self.assertEqual(process.returncode, 102, process.stderr)
+        self.assertEqual(self.reopen().read_head()["sequence"], 1)
+        receipt = self.reopen().read_receipt(envelope.request.request_id)
+        self.assertEqual(
+            verify_signed_receipt(envelope=receipt,
+                                  pinned_witness_key=self.pin.witness_public_key).request_id,
+            envelope.request.request_id,
+        )
+        with self.assertRaisesRegex(A149Denied, "challenge_already_consumed"):
+            self.reopen().publish(envelope=envelope)
+
+    def test_59_readonly_receipt_in_different_process_after_lost_ack(self):
+        envelope = self.signed()
+        process = self.run_synthetic_child(envelope, fault="after_commit")
+        self.assertEqual(process.returncode, 102, process.stderr)
+        lookup = self.run_synthetic_child(envelope, action="receipt")
+        self.assertEqual(lookup.returncode, 0, lookup.stderr)
+        self.assertEqual(self.reopen().read_head()["sequence"], 1)
+
+    def test_60_signed_receipt_read_after_lease_expiration_never_reissues(self):
+        envelope = self.signed()
+        process = self.run_synthetic_child(envelope, fault="after_commit")
+        self.assertEqual(process.returncode, 102, process.stderr)
+        self.clock.advance(60)
+        receipt = self.reopen().read_receipt(envelope.request.request_id)
+        self.assertIsNotNone(receipt)
+        self.assertEqual(receipt.receipt.sequence, 1)
+        with self.assertRaisesRegex(A149Denied, "challenge_already_consumed"):
+            self.reopen().publish(envelope=envelope)
 
 if __name__ == "__main__":
     unittest.main()
