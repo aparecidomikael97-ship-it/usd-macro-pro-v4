@@ -13,6 +13,7 @@ on:
       - 'test_atlasquant_aion_chat_sqlite_ancestor_chain.py'
       - 'test_atlasquant_aion_chat_sqlite_read_snapshot.py'
       - 'test_atlasquant_aion_chat_sqlite_narrow_rename.py'
+      - 'test_atlasquant_aion_chat_sqlite_write_outcome.py'
       - 'test_atlasquant_aion_chat_host_staging.py'
       - 'test_atlasquant_aion_chat_staged_runtime_resilience.py'
       - '.github/workflows/aion-sqlite-staged-lifecycle.yml'
@@ -44,6 +45,6 @@ jobs:
           socket.socket.connect=Mock(side_effect=AssertionError('network forbidden'));
           socket.socket.connect_ex=Mock(side_effect=AssertionError('network forbidden'));
           socket.create_connection=Mock(side_effect=AssertionError('network forbidden'));
-          suite=unittest.defaultTestLoader.loadTestsFromNames(['test_atlasquant_aion_chat_sqlite_lifecycle','test_atlasquant_aion_chat_sqlite_path_identity','test_atlasquant_aion_chat_sqlite_inode_anchor','test_atlasquant_aion_chat_sqlite_live_mutations','test_atlasquant_aion_chat_sqlite_ancestor_chain','test_atlasquant_aion_chat_sqlite_read_snapshot','test_atlasquant_aion_chat_sqlite_narrow_rename','test_atlasquant_aion_chat_host_staging','test_atlasquant_aion_chat_staged_runtime_resilience']);
+          suite=unittest.defaultTestLoader.loadTestsFromNames(['test_atlasquant_aion_chat_sqlite_lifecycle','test_atlasquant_aion_chat_sqlite_path_identity','test_atlasquant_aion_chat_sqlite_inode_anchor','test_atlasquant_aion_chat_sqlite_live_mutations','test_atlasquant_aion_chat_sqlite_ancestor_chain','test_atlasquant_aion_chat_sqlite_read_snapshot','test_atlasquant_aion_chat_sqlite_narrow_rename','test_atlasquant_aion_chat_sqlite_write_outcome','test_atlasquant_aion_chat_host_staging','test_atlasquant_aion_chat_staged_runtime_resilience']);
           result=unittest.TextTestRunner(verbosity=2).run(suite);
           raise SystemExit(not result.wasSuccessful())"

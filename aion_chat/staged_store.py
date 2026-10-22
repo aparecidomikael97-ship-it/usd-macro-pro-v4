@@ -33,6 +33,15 @@ class OperationScopedSQLiteChatStore:
         "storage_health", "require_healthy",
     })
 
+    # Only operations which normally mutate SQLite without creating or
+    # renaming other files inside the parent folder. backup_to intentionally
+    # excluded: its output-file protocol needs a separate transaction gate.
+    _WRITE_SENSITIVE_METHODS = frozenset({
+        "create_conversation", "archive_conversation", "append_message",
+        "add_attachment_metadata", "save_checkpoint",
+        "save_context_summary", "wal_checkpoint",
+    })
+
     def __init__(self, path):
         self.path = Path(path)
         self._lock = RLock()
@@ -149,26 +158,32 @@ class OperationScopedSQLiteChatStore:
             os.close(fd)
             raise
 
-    def _read_snapshot(self, anchor):
-        """Observe directory renames, not WAL-content changes during reads.
+    def _rename_fingerprint(self, anchor):
+        """Temporal directory fingerprint; never a native SQLite VFS binding.
 
-        Comparing the DB descriptor's identity and the parent directory's
-        modification timestamps can detect ordinary same-inode rename ABA
-        without rejecting every concurrent WAL writer. This is *not* a
-        monotonic/atomic rename proof: timestamps can be coarse, restored or
-        forged, and unrelated directory activity can deny a valid read.
+        A rename-away-and-back ordinarily changes the parent directory's
+        metadata. A normal WAL write generally does not. This observation
+        can miss timestamp-level ABA and can flag unrelated directory edits.
         """
         try:
             db = os.fstat(anchor)
             parent = self.path.parent.lstat()
             return (
-                (db.st_dev, db.st_ino, db.st_nlink),
+                (db.st_dev, db.st_ino),
                 (parent.st_dev, parent.st_ino,
                  parent.st_ctime_ns, parent.st_mtime_ns),
             )
         except OSError as exc:
             raise StorageUnavailableError(
-                "BOUND_DATABASE_READ_SNAPSHOT_UNAVAILABLE") from exc
+                "BOUND_DATABASE_FINGERPRINT_UNAVAILABLE") from exc
+
+    def _read_snapshot(self, anchor):
+        return self._rename_fingerprint(anchor)
+
+    def _write_snapshot(self, anchor):
+        # A post-write alarm is always UNKNOWN outcome: native SQLite may
+        # already have committed; never authorize replay automatically.
+        return self._rename_fingerprint(anchor)
 
     def __getattr__(self, name):
         if name not in self._METHODS:
@@ -236,6 +251,10 @@ class OperationScopedSQLiteChatStore:
                         self._read_snapshot(anchor)
                         if name in self._READ_ONLY_METHODS else None
                     )
+                    write_before = (
+                        self._write_snapshot(anchor)
+                        if name in self._WRITE_SENSITIVE_METHODS else None
+                    )
                     result = getattr(store, name)(*args, **kwargs)
                     if (self._ancestor_chain_identity(allow_missing=False)
                             != self._parent_identity):
@@ -258,6 +277,12 @@ class OperationScopedSQLiteChatStore:
                         # to identify who changed the DB or prove rollback.
                         raise StorageUnavailableError(
                             "BOUND_DATABASE_READ_SNAPSHOT_CHANGED")
+                    if (write_before is not None
+                            and self._write_snapshot(anchor) != write_before):
+                        # Native SQLite may already have persisted this exact
+                        # write. The result is uncertain; no automatic retry.
+                        raise StorageUnavailableError(
+                            "BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED")
                     return result
                 except sqlite3.DatabaseError as exc:
                     # Constraint rejection/busy is not proof of corruption. Other
