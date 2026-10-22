@@ -12,11 +12,11 @@
   with A148/A147/A146/A145 below.
 - Cumulative counted runner: \`python -B tests/run_aion_a150_counted_lab.py\`.
 - Contract checks: A145 26 + A146 33 + A147 50 + A148 40 + A149 50
-  + **A150 56 = 255 tests per operating system**. Zero skips/failures
+  + **A150 60 = 259 tests per operating system**. Zero skips/failures
   permitted; count mismatch fails the job.
 - Candidate code commit: \`232a11e305ef2c1b27d712ec0e41b69ef61bef10\`.
-- GitHub Actions candidate: [run #39761387792](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39761387792)
-  (push) and [run #39761394187](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39761394187)
+- GitHub Actions candidate: [run #39761860951](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39761860951)
+  (push) and [run #39761866156](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39761866156)
   (PR). Consult the run's final job conclusions before treating
   test count as a PASS; a queued/running job is NOT evidence of approval.
 
@@ -85,6 +85,10 @@ receipt.
 | Unexpected trigger / schema deviation | Denied |
 | Competing same-sequence writers | At most one succeeds in test |
 | Signed receipt fetched after restart | Read-only, no CAS performed |
+| Child process killed before A150 SQLite COMMIT | No advance, no receipt, challenge unconsumed |
+| Child process killed after A150 SQLite COMMIT but before reply | Sequence and signed receipt persist; replay rejected |
+| Signed receipt re-read in another child process | Read-only; never reissues publication |
+| Signed receipt queried after lease expiration | Read allowed; replay still rejected |
 | Witness SQLite snapshot restored | **NEGATIVE:** prior state can reappear |
 | Operator policy AND SQLite replaced together | **NEGATIVE:** attacker-controlled key may become accepted |
 | Both issued_ns and expires_ns shifted together | **NEGATIVE:** even an exact-duration pin does not detect time shift |
