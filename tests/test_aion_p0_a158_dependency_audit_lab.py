@@ -26,12 +26,17 @@ psycopg[binary]==3.3.6
 DIST = ["pillow>=7.1.0,<13", "numpy>=1.23,<3", "requests<3"]
 NAMES = ("streamlit","pandas","numpy","requests","altair",
          "pyarrow","pypdf","cryptography","psycopg","pillow")
+BASELINE_PINS = {
+    "streamlit":"1.64.0","pandas":"3.0.6","numpy":"2.5.3",
+    "requests":"2.34.2","altair":"6.3.0","pyarrow":"25.0.1",
+    "pypdf":"6.21.1","cryptography":"50.0.2","psycopg":"3.3.6",
+}
 def sample():
     return {
         "dependencies": [
             {"name":n,"version":("6.21.1" if n=="pypdf"
                                 else "1.64.0" if n=="streamlit"
-                                else "12.3.0" if n=="pillow" else "1.2.3"),
+                                else "12.3.0" if n=="pillow" else BASELINE_PINS[n]),
              "vulns":([{"id":f"CVE-2026-TEST-{i}"} for i in range(24)]
                       if n=="pillow" else [])}
             for n in NAMES
@@ -220,6 +225,44 @@ class A158DependencyAdvisoryLAB(unittest.TestCase):
         self.assertFalse(v["canonical_supply_chain_security_gate_homologated"])
         self.assertEqual(v["remaining_pillow_advisory_count"],0)
         self.assertEqual(v["verdict"],"HARD_NO_GO_FULL_SECURITY_AUDIT_UNCLOSED")
+
+    def test_37_other_direct_pin_change_rejected(self):
+        self.fails(req=REQ.replace("cryptography==50.0.2","cryptography==49.0.0"))
+
+    def test_38_extra_direct_package_rejected(self):
+        self.fails(req=REQ+"unreviewed_package==1.0.0")
+
+    def test_39_required_psycopg_extra_removal_rejected(self):
+        self.fails(req=REQ.replace("psycopg[binary]==3.3.6","psycopg==3.3.6"))
+
+    def test_40_direct_pin_drift_in_altair_rejected(self):
+        self.fails(req=REQ.replace("altair==6.3.0","altair==6.2.0"))
+
+    def test_41_missing_cryptography_in_audit_denied(self):
+        value=sample()
+        value["dependencies"]=[d for d in value["dependencies"]
+                               if d["name"]!="cryptography"]
+        self.fails(obj=value)
+        self.assertIn("DIRECT_AUDIT_PACKAGE_MISSING:cryptography",
+                      self.verdict(value)["findings"])
+
+    def test_42_mismatched_cryptography_audit_version_denied(self):
+        value=sample()
+        next(d for d in value["dependencies"]
+             if d["name"]=="cryptography")["version"]="49.0.0"
+        self.fails(obj=value)
+
+    def test_43_missing_pyarrow_in_audit_denied(self):
+        value=sample()
+        value["dependencies"]=[d for d in value["dependencies"]
+                               if d["name"]!="pyarrow"]
+        self.fails(obj=value)
+        self.assertIn("DIRECT_AUDIT_PACKAGE_MISSING:pyarrow",
+                      self.verdict(value)["findings"])
+
+    def test_44_psycopg_pin_drift_rejected(self):
+        self.fails(req=REQ.replace("psycopg[binary]==3.3.6",
+                                   "psycopg[binary]==3.3.5"))
 
 
 if __name__ == "__main__":
