@@ -53,7 +53,7 @@ jobs:
         run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
       - name: A155 78 Autopilot and generic writer containment tests
         run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
-      - name: A156 82 real restore mutations, mocked restore and disabled jobs
+      - name: A156 90 real restore mutations, mocked restore and disabled jobs
         run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
       - name: A156 restore AST never authorizes a real recovery
         run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
