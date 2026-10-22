@@ -35,9 +35,10 @@ class A142SQLiteNoImplicitCreateLAB(unittest.TestCase):
         return self.lab/DB_FILENAME
 
     def ledger(self):
-        return SQLiteLabReservationLedger(
-            lab_dir=self.lab,checkout_root=self.checkout,limit=3,
-        )
+        args={"lab_dir":self.lab,"checkout_root":self.checkout,"limit":3}
+        if not self.db_path.exists():
+            return SQLiteLabReservationLedger.bootstrap_synthetic_lab(**args)
+        return SQLiteLabReservationLedger(**args)
 
     def test_01_existing_file_sqlite_connection_is_uri_mode_rw(self):
         ledger=self.ledger()
@@ -110,15 +111,16 @@ class A142SQLiteNoImplicitCreateLAB(unittest.TestCase):
         self.assertEqual(a.reserved_units,0)
         self.assertFalse(a.reserve("",1))
 
-    def test_09_recreate_with_new_object_still_not_trusted_history(self):
-        # Explicit negative characterization: a new object can create an empty
-        # DB if the old file disappears, so this is NOT production protection.
+    def test_09_new_object_missing_db_denies_without_bootstrap(self):
+        # A143 ordinary open must not silently reset a missing quota history.
         a=self.ledger()
         self.assertTrue(a.reserve(self.key,1))
         self.db_path.unlink()
-        b=self.ledger()
-        self.assertEqual(b.reserved_units,0)
-        self.assertTrue(b.reserve(self.key,1))
+        with self.assertRaises(QuotaLabUnavailable):
+            SQLiteLabReservationLedger(
+                lab_dir=self.lab,checkout_root=self.checkout,limit=3,
+            )
+        self.assertFalse(self.db_path.exists())
 
     def test_10_database_file_no_unexpected_creation_after_connection_error(self):
         ledger=self.ledger()
