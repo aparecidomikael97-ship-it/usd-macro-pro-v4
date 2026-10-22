@@ -15,7 +15,7 @@ TEST_COUNTS = (
     ("test_aion_p0_a147_sqlite_crash_reconcile_lab.py", 50),
     ("test_aion_p0_a148_split_process_witness_lab.py", 40),
     ("test_aion_p0_a149_authenticated_cas_lab.py", 50),
-    ("test_aion_p0_a150_pinned_policy_lease_lab.py", 56),
+    ("test_aion_p0_a150_pinned_policy_lease_lab.py", 60),
 )
 
 
