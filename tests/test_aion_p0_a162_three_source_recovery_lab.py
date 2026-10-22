@@ -446,6 +446,11 @@ def _inval_test(kwargs):
                           ("_lab","AION_LAB_MODE")):
             if alias in params:
                 env[key]=params.pop(alias)
+        # Compute synthetic evidence BEFORE deliberately disabling LAB:
+        # exercise A162's deny path, not the fixture's local key/journal reader.
+        if env:
+            first,second=self.floor_pair()
+            params.update(checkpoint=self.checkpoint(),d1=first,d2=second)
         with patch.dict(os.environ,env):
             self.denied(**params)
     return run
