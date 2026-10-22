@@ -29,4 +29,10 @@ Se qualquer observação muda ou não pode ser efetuada, falha fechada e latch d
 5. CI só comprova que os cenários simulados/locais tiveram os resultados registrados; não é homologação de servidor, plataforma ou proteção anti-rollback.
 
 ## Evidências
-Aguardar os dois jobs do workflow `AION SQLite staged lifecycle` em Ubuntu e Windows, com contagem e observações `A171_...` transcritas posteriormente. A Quality canônica completa, assinaturas reais e recibos externos continuam pendentes.
+CI [run #39852419347](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39852419347), workflow `AION SQLite staged lifecycle`: **SUCESSO, Ubuntu 65/65, Windows 65/65** (130 testes). Eventos concretos extraídos dos logs:
+- Ubuntu: `A171_READ_ABA=ABA_COMPLETED_OBSERVED_DENIED`; `A171_WRITE_ABA=ABA_COMPLETED_NOT_ATTESTED`.
+- Windows: `A171_READ_ABA=OS_DENIED_OR_RESTORED_OS_NOT_EXERCISED`; `A171_WRITE_ABA=OS_DENIED_OR_RESTORED_OS_NOT_EXERCISED`. **Não alegar detecção ABA no Windows**, porque o SO impediu a tentativa.
+- Ambos: `A171_CONCURRENT_WRITER=READ_DENIED_FALSE_POSITIVE`. Isso comprova o custo operacional de bloquear leituras válidas sob escrita concorrente.
+- A variante do teste legado A169 confirmou as mesmas observações: `A171_ABA_LEGACY_REPRO=ABA_COMPLETED_DENIED` no Ubuntu e não exercitado no Windows.
+
+**Resultado:** hipótese técnica de detecção parcial apoiada nos ambientes testados; desenho atual inadequado para homologação por falso positivo e cobertura incompleta de escrita. A Quality canônica completa, assinaturas reais e recibos externos continuam pendentes.
