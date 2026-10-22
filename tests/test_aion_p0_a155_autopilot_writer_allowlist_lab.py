@@ -242,5 +242,71 @@ class A155AutopilotDestinationAllowlistLAB(unittest.TestCase):
         self.deny(attack)
 
 
+    def test_49_declared_literal_allowlist_exactly_matches_12_verified_targets(self):
+        tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
+        matches = [node for node in tree.body
+                   if isinstance(node, ast.Assign)
+                   and any(isinstance(t, ast.Name)
+                           and t.id == "AUTOPILOT_ALLOWED_GITHUB_WRITE_PATHS"
+                           for t in node.targets)]
+        self.assertEqual(len(matches), 1)
+        expression = matches[0].value
+        self.assertIsInstance(expression, ast.Call)
+        self.assertIsInstance(expression.func, ast.Name)
+        self.assertEqual(expression.func.id, "frozenset")
+        self.assertEqual(len(expression.args), 1)
+        self.assertIsInstance(expression.args[0], (ast.Set, ast.List))
+        values = [ast.literal_eval(v) for v in expression.args[0].elts]
+        self.assertEqual(len(values), 12)
+        self.assertEqual(frozenset(values), EXPECTED)
+
+    def test_50_actual_writer_guard_is_direct_negative_membership(self):
+        tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
+        writer = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                      and n.name == "gh_put_bytes")
+        checks = [n for n in writer.body if isinstance(n, ast.If)]
+        membership_checks = []
+        for statement in checks:
+            for n in ast.walk(statement.test):
+                if (isinstance(n, ast.Compare) and len(n.ops) == 1
+                        and isinstance(n.ops[0], ast.NotIn)
+                        and isinstance(n.left, ast.Name) and n.left.id == "path"
+                        and len(n.comparators) == 1
+                        and isinstance(n.comparators[0], ast.Name)
+                        and n.comparators[0].id == "AUTOPILOT_ALLOWED_GITHUB_WRITE_PATHS"):
+                    membership_checks.append(statement)
+        self.assertEqual(len(membership_checks), 1)
+        guard = membership_checks[0]
+        self.assertEqual(len(guard.body), 1)
+        self.assertIsInstance(guard.body[0], ast.Return)
+        output = guard.body[0].value
+        self.assertIsInstance(output, ast.Tuple)
+        self.assertIsInstance(output.elts[0], ast.Constant)
+        self.assertIs(output.elts[0].value, False)
+        puts = [n for n in ast.walk(writer) if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Attribute) and n.func.attr == "put"]
+        self.assertEqual(len(puts), 1)
+        self.assertLess(guard.lineno, puts[0].lineno)
+
+    def test_51_no_alternate_http_put_post_patch_inside_generic_writer(self):
+        tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
+        writer = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                      and n.name == "gh_put_bytes")
+        names = [n.func.attr for n in ast.walk(writer)
+                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                 and n.func.attr in {"put", "post", "patch", "delete"}]
+        self.assertEqual(names, ["put"])
+
+    def test_52_json_and_csv_wrappers_retain_same_path_guard(self):
+        tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
+        for name in ("gh_put_json", "gh_put_csv"):
+            writer = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                          and n.name == name)
+            calls = [n for n in ast.walk(writer) if isinstance(n, ast.Call)
+                     and isinstance(n.func, ast.Name) and n.func.id == "gh_put_bytes"]
+            self.assertEqual(len(calls), 1)
+            self.assertIsInstance(calls[0].args[0], ast.Name)
+            self.assertEqual(calls[0].args[0].id, "path")
+
 if __name__ == "__main__":
     unittest.main()
