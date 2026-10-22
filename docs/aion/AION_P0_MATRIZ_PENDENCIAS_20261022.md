@@ -54,3 +54,15 @@ A [PR Draft #1468](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4
 - [Evidências, contrato e contraprovas A178](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-ed25519-receipt-a178-20261022/docs/aion/AION_P0_PINNED_ED25519_RECEIPT_A178_LAB_20261022.md).
 
 **Próxima prioridade:** pinagem de fonte de confiança fora do adapter + teste de falha/rollback de testemunha, sem passar para produção. P0 homologados: **0/6**.
+
+## Adendo A179 — testemunha assinada em desafio, sem custódia real
+[PR #1469](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1469), [CI A179 #39870396609](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39870396609) = **77/77 Ubuntu e 77/77 Windows**; [SQLite #39870396346](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39870396346) = **93/93 Ubuntu e 93/93 Windows**. **340 execuções em LAB**, Quality canônica ainda não reexecutada.
+
+- **P0-2 avanço somente LAB:** segunda assinatura Ed25519 verificada sob chave separada, challenge aleatório de 256 bits, digest da confiança do fornecedor, vínculo com recibo/decisão/efeito, recusa se testemunha indisponível, revogada, expirada ou assinatura inválida. Fonte da chave continua auto-configurável e não autenticada externamente.
+- **P0-3 avanço somente LAB:** A177 fail-closed não altera UNKNOWN/SENT sem dupla verificação sintética. Uma RESERVA DA PRIMEIRA INTENÇÃO ANTES DO SEND ainda NÃO foi comprovada. O witness A179 é de admissão de recibo, não de autorização durável pré-envio.
+- **P0-4 pendência fundamental:** `A179_WITNESS_STATE_ROLLBACK=REPLAY_ACCEPTED_NOT_ATTESTED`. Retomar uma testemunha restaurada e assinando corretamente reabre uma evidência já consumida. Quórum/custódia independente resistente a rollback não existe.
+- **P0-1/P0-2:** `A179_CALLER_REPINS_WITNESS_ROOT=FAKE_AUTHORITY_ACCEPTED`. Se chamador controla a chave que o verificador supõe confiável, pode simular uma autoridade de testemunha. Falta bootstrap independente de chaves, autenticação do titular, política de revogação e proveniência do fornecedor.
+- **P0-5/P0-6:** banco SQLite e VFS continuam sem prova atômica do arquivo nativo; os 93/93 de regressão não homologam compatibilidade hostil.
+- [A179 contrato e provas](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-witness-admission-a179-20261022/docs/aion/AION_P0_WITNESSED_RECEIPT_A179_LAB_20261022.md).
+
+**Próximo gate obrigatório:** especificar e demonstrar autoridade independente de primeira reserva, high-water irreversível, continuidade H0 após host e testemunha restaurados, procedência de chaves e recibos emitidos por provedor real. Não substituir esse gate por mais hashes/assinaturas sintéticos. **P0 0/6, HARD NO-GO, ZERO_AUTO_RESEND.**
