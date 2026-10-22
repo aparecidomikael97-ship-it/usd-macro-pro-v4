@@ -1,0 +1,61 @@
+{
+  "schema": "AION_P0_A167_VENDOR_CAPABILITY_COUNTEREXAMPLES_NO_GO_V1",
+  "reviewed_on": "2026-10-22",
+  "status": "DOCUMENTARY_ONLY_HARD_NO_GO",
+  "official_documentation_not_external_provider_receipt": true,
+  "examples": [
+    {
+      "scenario": "S3_WORM_VERSION",
+      "documented_negative_boundary": "PROTECTED_VERSION_IS_NOT_LATEST_MONOTONIC_HEAD",
+      "source_url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html"
+    },
+    {
+      "scenario": "S3_DELETE_MARKER_404",
+      "documented_negative_boundary": "CURRENT_404_CAN_HIDE_PROTECTED_VERSION",
+      "source_url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-managing.html"
+    },
+    {
+      "scenario": "CF_DO_PITR",
+      "documented_negative_boundary": "PITR_CAN_REWIND_LOCAL_STATE_WITHOUT_EXTERNAL_HEAD",
+      "source_url": "https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/"
+    },
+    {
+      "scenario": "CF_DO_DELETE_ALL",
+      "documented_negative_boundary": "DURABLE_STORAGE_IS_NOT_ADMIN_IMMUTABLE_WORM",
+      "source_url": "https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/"
+    },
+    {
+      "scenario": "DDB_RESTORE_NEW_TABLE",
+      "documented_negative_boundary": "STRONG_READ_OF_RESTORED_TABLE_NOT_EXTERNAL_HIGHWATER",
+      "source_url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/pointintimerecovery_restores.html"
+    },
+    {
+      "scenario": "ONESIGNAL_WITHIN_TTL",
+      "documented_negative_boundary": "CREATE_DEDUPE_NOT_EFFECT_RECEIPT_OR_TERMINAL_FENCE",
+      "source_url": "https://documentation.onesignal.com/reference/idempotent-notification-requests"
+    },
+    {
+      "scenario": "ONESIGNAL_AFTER_TTL",
+      "documented_negative_boundary": "REPEATED_CREATE_AFTER_30_DAYS_MAY_SEND_AGAIN",
+      "source_url": "https://documentation.onesignal.com/reference/idempotent-notification-requests"
+    }
+  ],
+  "open_gates": [
+    "EXTERNAL_MONOTONIC_WITNESS",
+    "INDEPENDENT_ADMIN_AND_KEY_CUSTODY",
+    "AUTHENTIC_PROVIDER_EFFECT_OR_NO_EFFECT",
+    "REAL_HUMAN_OWNER_APPROVAL",
+    "CANONICAL_QUALITY_AND_P0"
+  ],
+  "historical_provider_proofs_open": 32,
+  "actual_provider_receipt_verified": false,
+  "independent_custodian_verified": false,
+  "immutable_monotonic_external_head_verified": false,
+  "real_owner_authorization_verified": false,
+  "worker_allowed": false,
+  "automatic_resend_allowed": false,
+  "homologated_p0_count": 0,
+  "procurement_authorized": false,
+  "new_spend_authorized_brl": 0,
+  "note": "Official product documentation establishes limitations, not authenticated real operational evidence or independent third-party custody. No account or cost incurred."
+}
