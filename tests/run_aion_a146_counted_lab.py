@@ -11,6 +11,7 @@ TEST_COUNTS = (
     ("test_aion_p0_a145_checkpoint_verifier_lab.py", 12),
     ("test_aion_p0_a145_authenticated_checkpoint_lab.py", 10),
     ("test_aion_p0_a146_highwater_gate_lab.py", 20),
+    ("test_aion_p0_a146_signed_highwater_lab.py", 13),
 )
 
 
