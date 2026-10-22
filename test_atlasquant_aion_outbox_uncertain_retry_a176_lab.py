@@ -91,16 +91,17 @@ class A176OutboxRetryGateTests(unittest.TestCase):
             reopened.close()
         print("A176_UNCERTAIN_RESTART=NO_AUTO_RESEND")
 
-    def test_05_confirmed_reconciliation_can_confirm_without_new_send(self):
+    def test_05_unverified_reconciliation_is_not_terminal_confirmation(self):
         adapter = FakeIdempotentAdapter("lose-after-effect")
         self.assertEqual(self._dispatch(adapter)["state"], "UNCERTAIN")
         final = self.outbox.reconcile(self.key, adapter=adapter,
                                        authorize=policy(self.scope),
                                        now=NOW+timedelta(seconds=2))
-        self.assertEqual(final["state"], "CONFIRMED")
+        self.assertEqual(final["state"], "UNCERTAIN")
+        self.assertEqual(final["reconcile_state"], "STILL_UNCERTAIN")
         self.assertEqual(adapter.send_calls, 1)
-        # Test is only a synthetic confirmed receipt, not authentication.
-        print("A176_SIMULATED_FOUND_RECEIPT=CONFIRMED_LAB_ONLY")
+        self.assertEqual(self.outbox.effect_count(), 0)
+        print("A177_SIMULATED_FOUND_RECEIPT=DENIED_UNVERIFIED")
 
 
 if __name__ == "__main__":
