@@ -1,0 +1,47 @@
+name: AION P0 A145 Rollback Threat Model LAB (NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'tests/test_aion_p0_a145_rollback_threat_model_lab.py'
+      - '.github/workflows/aion-p0-a145-rollback-lab.yml'
+  push:
+    branches:
+      - lab/aion-p0-a145-rollback-redfirst-20261021
+permissions:
+  contents: read
+jobs:
+  rollback-threat-model:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: A145 counted offline threat-model suite
+        shell: bash
+        run: |
+          python -B - <<'PY'
+          import importlib.util, unittest
+          from pathlib import Path
+          path = Path("tests/test_aion_p0_a145_rollback_threat_model_lab.py")
+          assert path.is_file(), "A145 suite missing"
+          spec = importlib.util.spec_from_file_location("a145_lab", path)
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+          assert suite.countTestCases() == 4, f"Expected 4 tests, got {suite.countTestCases()}"
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.testsRun == 4 and result.wasSuccessful() and not result.skipped, "A145 failed/incomplete"
+          PY
