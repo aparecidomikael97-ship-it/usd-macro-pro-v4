@@ -1,4 +1,4 @@
-name: AION P0 A144 SQLite Schema RED LAB (NO-GO)
+name: AION P0 A144 SQLite Schema LAB (NO-GO)
 on:
   push:
     branches:
@@ -27,3 +27,9 @@ jobs:
           python-version: '3.12'
       - name: A144 RED-first schema tests
         run: python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_schema_attestation_a144_lab.py -v
+      - name: A140-A143 targeted SQLite regressions
+        run: |
+          python -B -m unittest discover -s tests -p test_aion_p0_sqlite_durable_market_quota_a140_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_identity_a141_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_mode_rw_a142_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_explicit_bootstrap_a143_lab.py -v
