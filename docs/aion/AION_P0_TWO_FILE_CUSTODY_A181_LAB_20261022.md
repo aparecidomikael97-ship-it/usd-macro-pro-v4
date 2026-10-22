@@ -30,7 +30,12 @@ A180 bloqueia o primeiro envio sem uma reserva assinada de testemunha, mas a tes
 - Um arquivo em diretório separado ainda pode ser apagado/restaurado pelo mesmo operador/host. Um índice UNIQUE não prova custódia externa, testemunha anti-rollback, procedência do emissor, entrega do provedor nem recuperação real H0.
 
 ## Evidências e limites de validação
-A execução inicial passou **110/110 testes Ubuntu**, incluindo 15 A181 e regressões A180–A176/Outbox/Saga. **Aguardando conclusão Windows e SQLite canônico antes de congelar números finais.** Ver links da PR.
+**Resultado final, código exercitado no commit `72fe8d7e033b1cc43d6ad144c9c554d12edbeb20`:**
+- [A181 CI #39872947467](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39872947467): **110/110 Ubuntu + 110/110 Windows**. Contém os 15 testes A181 e as baterias A180/A179/A178/A177/A176/Outbox/Saga com rede negada.
+- [SQLite lifecycle CI #39872947397](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39872947397): **93/93 Ubuntu + 93/93 Windows**.
+- **406 execuções aprovadas** (duas baterias repetidas nos dois SOs); não são 406 garantias homologadas. Quality canônica completa, custódia externa e testes de infraestrutura real continuam não executados.
+- Primeira execução A181 [#39872730587](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39872730587) passou 110/110 no Ubuntu; Windows teve 1 erro em 110 testes causado por vazamento de handle SQLite ao rejeitar PRAGMA num arquivo de custódia corrompido. A correção fechou a conexão imediatamente em caso de erro antes de retornar ao chamador; testes repetidos passaram nas duas plataformas.
+- Marcadores confirmados nos dois logs finais: `A181_HOST_DB_DELETED_WITNESS_SURVIVES=NO_REPLAY`, `A181_HOST_ROLLBACK_WITH_CUSTODY_INTACT=NO_REPLAY`, `A181_LOST_RESERVATION_REPLY_AND_HOST_LOSS=NO_SEND`, `A181_CONCURRENT_TWO_IDS_ONE_EFFECT=ONE_RESERVATION`, `A181_CUSTODY_REENROLL_AFTER_WIPE=REPLAY_ACCEPTED_NO_ROOT`, `A181_CUSTODY_SNAPSHOT_ROLLBACK=REPLAY_ACCEPTED_NOT_ATTESTED`, `A181_INJECTED_TRUE_GUARD=FAKE_AUTHORITY_ACCEPTED`, `A181_DISTINCT_IDENTICAL_LEGITIMATE_EVENT=DENIED_FALSE_POSITIVE`.
   
 Não houve teste de custodiantes físicos remotos, quórum real, falhas de rede entre domínios independentes, cerimônia HUMAN_OWNER, assinatura do provedor real, retomada H0 sobre infraestrutura final, Quality completa nem vinculação atômica ao arquivo nativo SQLite em uso pela VFS.
 
