@@ -21,7 +21,7 @@ def main():
         matches = list(TESTS.glob(pattern))
         if len(matches) != 1:
             raise SystemExit(f"FAIL-CLOSED: expected one file for {pattern}, found {len(matches)}")
-        suite = loader.discover(start_dir=str(TESTS), pattern=pattern, top_level_dir=str(ROOT))
+        suite = loader.discover(start_dir=str(TESTS), pattern=pattern, top_level_dir=str(TESTS))
         count = suite.countTestCases()
         print(f"DISCOVERED {pattern}: {count}", flush=True)
         if count == 0:
