@@ -7,6 +7,7 @@ import hashlib
 import os
 import shutil
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,7 +18,7 @@ def digest(rows):
 
 
 def read_state(path):
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db:
         rows = db.execute("SELECT seq, intent FROM events ORDER BY seq").fetchall()
         integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
     return rows, integrity
@@ -30,14 +31,16 @@ class RollbackThreatModelLab(unittest.TestCase):
         root = Path(self.temp.name)
         self.db = root / "ledger.sqlite"
         self.old = root / "snapshot.sqlite"
-        with sqlite3.connect(self.db) as db:
+        with closing(sqlite3.connect(self.db)) as db:
             db.execute("CREATE TABLE events (seq INTEGER PRIMARY KEY, intent TEXT NOT NULL UNIQUE)")
             db.execute("INSERT INTO events VALUES (1, 'intent-1')")
+            db.commit()
         shutil.copy2(self.db, self.old)
 
     def test_valid_old_snapshot_is_not_detected_by_sqlite_integrity(self):
-        with sqlite3.connect(self.db) as db:
+        with closing(sqlite3.connect(self.db)) as db:
             db.execute("INSERT INTO events VALUES (2, 'intent-2')")
+            db.commit()
         newer, _ = read_state(self.db)
         shutil.copy2(self.old, self.db)
         restored, integrity = read_state(self.db)
@@ -46,8 +49,9 @@ class RollbackThreatModelLab(unittest.TestCase):
         self.assertNotEqual(digest(restored), digest(newer))
 
     def test_trusted_outside_digest_would_reject_old_snapshot(self):
-        with sqlite3.connect(self.db) as db:
+        with closing(sqlite3.connect(self.db)) as db:
             db.execute("INSERT INTO events VALUES (2, 'intent-2')")
+            db.commit()
         current, _ = read_state(self.db)
         expected = digest(current)  # synthetic stand-in, NOT independent authority
         shutil.copy2(self.old, self.db)
@@ -63,8 +67,9 @@ class RollbackThreatModelLab(unittest.TestCase):
         initial, _ = read_state(self.db)
         witness.write_text(digest(initial), encoding="ascii")
         old_witness = witness.read_text(encoding="ascii")
-        with sqlite3.connect(self.db) as db:
+        with closing(sqlite3.connect(self.db)) as db:
             db.execute("INSERT INTO events VALUES (2, 'intent-2')")
+            db.commit()
         witness.write_text(digest(read_state(self.db)[0]), encoding="ascii")
         shutil.copy2(self.old, self.db)
         witness.write_text(old_witness, encoding="ascii")
