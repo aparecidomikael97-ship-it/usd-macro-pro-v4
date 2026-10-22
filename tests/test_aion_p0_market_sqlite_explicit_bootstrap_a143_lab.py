@@ -4,7 +4,7 @@ No provider, Worker, GitHub writer, production quota, owner identity or external
 antirollback witness. All files are temporary synthetic lab databases.
 """
 from __future__ import annotations
-from contextlib import closing
+from contextlib import closing, contextmanager
 from pathlib import Path
 import os
 import shutil
@@ -90,6 +90,14 @@ class A143ExplicitBootstrapLAB(unittest.TestCase):
         except QuotaLabUnavailable:
             ledger=None
         self.assertIsNone(ledger)
+        # Test the actual fail-closed acquisition boundary, not just the
+        # absence of a constructed ledger object.
+        result=collect_synthetic_market(
+            run_id=self.run,symbols=("EUR/USD",),feed=feed,quota=ledger,
+            output_dir=self.output,checkout_root=self.repo,
+            observed_at="2026-10-21T23:00:00Z",
+        )
+        self.assertEqual(result["status"],"BLOCKED_NO_PROVIDER_FETCH")
         self.assertEqual(feed.calls,[])
         self.assertEqual(list(self.output.iterdir()),[])
 
@@ -182,6 +190,46 @@ class A143ExplicitBootstrapLAB(unittest.TestCase):
         with self.assertRaises(QuotaLabUnavailable):
             self.bootstrap()
         self.assertEqual(self.open().reserved_units,2)
+
+
+    def test_19_bootstrap_created_file_replaced_after_exclusive_close_denied(self):
+        adversary_dir=self.base/"synthetic_adversary_lab"
+        adversary_dir.mkdir()
+        malicious_db=SQLiteLabReservationLedger.bootstrap_synthetic_lab(
+            lab_dir=adversary_dir,checkout_root=self.repo,limit=3,
+        )
+        self.assertTrue(malicious_db.reserve("a143otherone",1))
+        replacement=adversary_dir/DB_FILENAME
+        normal_path_open=Path.open
+        swapped=[False]
+
+        @contextmanager
+        def substituted_open(path,*args,**kwargs):
+            mode=args[0] if args else kwargs.get("mode","r")
+            with normal_path_open(path,*args,**kwargs) as handle:
+                yield handle
+            if path==self.path and mode=="xb":
+                # Simulated adversary swaps a fully initialized valid SQLite
+                # immediately after exclusive-creation FD closes.
+                os.replace(replacement,self.path)
+                swapped[0]=True
+
+        from unittest.mock import patch
+        with patch.object(Path,"open",substituted_open):
+            with self.assertRaises(QuotaLabUnavailable):
+                self.bootstrap()
+        self.assertTrue(swapped[0])
+        # The synthetic attacker had valid schema/policy; only identity of
+        # OUR freshly-created FD may reject this substituted source.
+        self.assertTrue(self.path.exists())
+
+    def test_20_partial_bootstrap_file_fails_closed_without_self_heal(self):
+        self.path.write_bytes(b"")
+        with self.assertRaises(QuotaLabUnavailable):
+            self.open()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.bootstrap()
+        self.assertEqual(self.path.read_bytes(),b"")
 
 
 if __name__=="__main__":
