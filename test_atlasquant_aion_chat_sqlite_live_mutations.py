@@ -153,19 +153,11 @@ class SQLiteLiveMutationBoundaryTests(unittest.TestCase):
                 return Page(items=[])
 
         before = handle._path_identity(allow_missing=False)
-        error = None
         with patch("aion_chat.staged_store.SQLiteChatStore", Intercept):
-            try:
-                result = handle.list_conversations(self.scope)
-                self.assertEqual(result.items, [])
-            except StorageUnavailableError as exc:
-                error = exc
+            result = handle.list_conversations(self.scope)
+            self.assertEqual(result.items, [])
         self.assertEqual(handle._path_identity(allow_missing=False), before)
-        if error:
-            self.assertIn("BOUND_DATABASE_READ_SNAPSHOT_CHANGED", str(error))
-            self.assertEqual(handle.storage_health()["state"], FAILED)
-        else:
-            self.assertEqual(handle.storage_health()["state"], HEALTHY)
+        self.assertEqual(handle.storage_health()["state"], HEALTHY)
         readback = Native(handle.path)
         try:
             items = readback.list_messages(self.scope, cid).items
@@ -173,9 +165,7 @@ class SQLiteLiveMutationBoundaryTests(unittest.TestCase):
             self.assertEqual(items[0].content, "other-writer")
         finally:
             readback.close()
-        print("A171_SAME_INODE_WRITE=" +
-              ("READ_DENIED_METADATA_DRIFT" if error
-               else "PERMITTED_NOT_ATTESTED"))
+        print("A172_SAME_INODE_WRITE=READ_ALLOWED_NO_ATTESTATION")
 
     def test_05_parent_directory_symlink_is_denied_by_a170(self):
         target = self.root / "real-parent"

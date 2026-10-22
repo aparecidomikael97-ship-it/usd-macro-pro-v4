@@ -83,7 +83,7 @@ class SQLiteReadSnapshotLabTests(unittest.TestCase):
         print("A171_READ_ABA=" + attempts[0] +
               ("_OBSERVED_DENIED" if error else "_OS_NOT_EXERCISED"))
 
-    def test_04_legitimate_concurrent_writer_can_invalidate_read(self):
+    def test_04_legitimate_concurrent_writer_is_allowed_by_narrow_guard(self):
         handle = self.facade()
         cid = handle.create_conversation(self.scope).id
         Native = SQLiteChatStore
@@ -99,13 +99,10 @@ class SQLiteReadSnapshotLabTests(unittest.TestCase):
                     writer.close()
                 return Page(items=[])
 
-        error = None
         with patch("aion_chat.staged_store.SQLiteChatStore", Intercept):
-            try:
-                result = handle.list_conversations(self.scope)
-                self.assertEqual(result.items, [])
-            except StorageUnavailableError as exc:
-                error = exc
+            result = handle.list_conversations(self.scope)
+            self.assertEqual(result.items, [])
+        self.assertEqual(handle.storage_health()["state"], HEALTHY)
         readback = Native(handle.path)
         try:
             messages = readback.list_messages(self.scope, cid).items
@@ -113,13 +110,7 @@ class SQLiteReadSnapshotLabTests(unittest.TestCase):
             self.assertEqual(messages[0].content, "legitimate-writer")
         finally:
             readback.close()
-        if error is not None:
-            self.assertIn("BOUND_DATABASE_READ_SNAPSHOT_CHANGED", str(error))
-            self.assertEqual(handle.storage_health()["state"], FAILED)
-            print("A171_CONCURRENT_WRITER=READ_DENIED_FALSE_POSITIVE")
-        else:
-            self.assertEqual(handle.storage_health()["state"], HEALTHY)
-            print("A171_CONCURRENT_WRITER=NOT_OBSERVED_LIMIT")
+        print("A172_CONCURRENT_WRITER=READ_ALLOWED_WITH_WAL_CHANGE")
 
     def test_05_real_aba_during_write_is_outside_read_guard(self):
         handle = self.facade()
