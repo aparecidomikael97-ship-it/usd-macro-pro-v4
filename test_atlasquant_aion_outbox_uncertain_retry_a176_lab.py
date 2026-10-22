@@ -11,7 +11,8 @@ import unittest
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
-from test_atlasquant_aion_execution_outbox import FakeIdempotentAdapter, NOW, policy
+from test_atlasquant_aion_execution_outbox import (FakeIdempotentAdapter, NOW, policy,
+    synthetic_lab_first_attempt_reservation)
 
 
 class A176OutboxRetryGateTests(unittest.TestCase):
@@ -22,7 +23,8 @@ class A176OutboxRetryGateTests(unittest.TestCase):
         self.dbpath = Path(self.tmp.name) / "outbox.sqlite3"
         self.store = SQLiteChatStore(self.dbpath)
         self.addCleanup(self.store.close)
-        self.outbox = ExecutionOutbox(self.store, self.scope)
+        self.outbox = ExecutionOutbox(self.store, self.scope,
+            first_attempt_guard=synthetic_lab_first_attempt_reservation)
         self.item = self.outbox.enqueue(
             intent_ref="event-once", action="send_email",
             payload={"to":"example.invalid","template":"lab"},

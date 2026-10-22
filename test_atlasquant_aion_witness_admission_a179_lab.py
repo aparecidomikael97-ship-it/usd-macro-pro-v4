@@ -19,7 +19,7 @@ from test_atlasquant_aion_signed_receipt_a178_lab import (
     NOW, LAB_PRIVATE, LAB_ISSUER, LAB_KEY_ID, LAB_EFFECT,
     public_bytes, receipt_for, SignedAdapter,
 )
-from test_atlasquant_aion_execution_outbox import policy
+from test_atlasquant_aion_execution_outbox import policy, synthetic_lab_first_attempt_reservation
 
 
 WITNESS_PRIVATE = Ed25519PrivateKey.from_private_bytes(b"\x09" * 32)
@@ -98,7 +98,8 @@ class A179WitnessGateTests(unittest.TestCase):
         )
 
     def claimed(self, gate, *, intent="once"):
-        out = ExecutionOutbox(self.store, self.scope, evidence_verifier=gate)
+        out = ExecutionOutbox(self.store, self.scope, evidence_verifier=gate,
+            first_attempt_guard=synthetic_lab_first_attempt_reservation)
         row = out.enqueue(intent_ref=intent, action="send_email",
             payload={"to": "example.invalid", "body": "lab"},
             aggregate_key=intent, policy_version="policy-v1",

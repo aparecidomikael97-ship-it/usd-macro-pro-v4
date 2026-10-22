@@ -107,11 +107,14 @@ class ExecutionOutbox:
     def __init__(
         self, store: SQLiteChatStore, scope: Scope, *,
         evidence_verifier: Callable[[str, Mapping[str, Any], Mapping[str, Any]], bool] | None = None,
+        first_attempt_guard: Callable[[Mapping[str, Any]], bool] | None = None,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
         if evidence_verifier is not None and not callable(evidence_verifier):
             raise TypeError("callable evidence_verifier required")
+        if first_attempt_guard is not None and not callable(first_attempt_guard):
+            raise TypeError("callable first_attempt_guard required")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -121,7 +124,21 @@ class ExecutionOutbox:
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
         self._evidence_verifier = evidence_verifier
+        # DENY by default: no witness/proof, no adapter send. Tests may inject
+        # synthetic callbacks ONLY in isolated LAB fixtures.
+        self._first_attempt_guard = first_attempt_guard
         self._ensure_schema()
+
+    def _reserved_first_attempt(self, intent: Mapping[str, Any]) -> bool:
+        # A180 candidate calls a separately pinned synthetic witness contract.
+        # An arbitrary injected true-returning callback is NOT trustworthy
+        # and must be prohibited by any future operational host.
+        if self._first_attempt_guard is None:
+            return False
+        try:
+            return self._first_attempt_guard(dict(intent)) is True
+        except Exception:
+            return False
 
     def _verified_evidence(
         self, kind: str, intent: Mapping[str, Any], result: Mapping[str, Any],
@@ -650,16 +667,36 @@ class ExecutionOutbox:
         if not callable(send):
             raise TypeError("adapter.send required")
 
-        # Persist ambiguity BEFORE crossing the external boundary. If the process
-        # dies after this commit, restart must reconcile and must not blind-retry.
+        # A180: persist UNCERTAIN BEFORE contacting the witness. The witness
+        # might reserve the first attempt and then time out: if the host dies
+        # there, the original claim must NOT become an automatic RETRY.
         with self.db:
-            self.db.execute(
+            reserved = self.db.execute(
                 """UPDATE action_outbox
-                   SET state='UNCERTAIN',dispatch_started_at=?,last_error='DISPATCH_IN_PROGRESS'
+                   SET state='UNCERTAIN',dispatch_started_at=?,
+                       last_error='FIRST_ATTEMPT_WITNESS_PENDING'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                      AND state='CLAIMED' AND lease_owner=?""",
                 (_iso(now_dt), key, *self._scope_args(), worker),
             )
+            if reserved.rowcount != 1:
+                raise RuntimeError("INFLIGHT_CLAIM_CHANGED_NO_SEND")
+
+        # A first-attempt witness is a mandatory precondition for this
+        # experimental Outbox. No callback, false, invalid signature, timeout
+        # or lost response => DENY SEND, retain UNCERTAIN after restart.
+        if not self._reserved_first_attempt(intent):
+            with self.db:
+                self.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error='FIRST_ATTEMPT_WITNESS_UNVERIFIED_NO_SEND'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN'""",
+                    (key, *self._scope_args()),
+                )
+            return {**self.get(key),
+                    "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"}
 
         try:
             result = _mapping(send(dict(intent["decision"]), key))

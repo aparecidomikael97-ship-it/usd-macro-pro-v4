@@ -10,7 +10,8 @@ from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_cumulative_authority_budget import CumulativeAuthorityBudget
 from atlasquant_aion_execution_outbox import ExecutionOutbox
 from atlasquant_aion_execution_saga import ExecutionSagaCoordinator
-from test_atlasquant_aion_execution_outbox import synthetic_lab_evidence_verifier
+from test_atlasquant_aion_execution_outbox import (synthetic_lab_evidence_verifier,
+    synthetic_lab_first_attempt_reservation)
 
 
 NOW = datetime(2026, 10, 5, 10, 0, tzinfo=timezone.utc)
@@ -101,7 +102,8 @@ class ExecutionSagaTests(unittest.TestCase):
     def _components(self, raw, **budget_limits):
         store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
         outbox = ExecutionOutbox(
-            store, self.scope, evidence_verifier=synthetic_lab_evidence_verifier)
+            store, self.scope, evidence_verifier=synthetic_lab_evidence_verifier,
+            first_attempt_guard=synthetic_lab_first_attempt_reservation)
         budget = CumulativeAuthorityBudget(
             store,
             self.scope,

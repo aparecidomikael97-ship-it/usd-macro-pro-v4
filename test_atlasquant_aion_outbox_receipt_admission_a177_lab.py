@@ -11,7 +11,8 @@ import unittest
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
-from test_atlasquant_aion_execution_outbox import FakeIdempotentAdapter, NOW, policy
+from test_atlasquant_aion_execution_outbox import (FakeIdempotentAdapter, NOW, policy,
+    synthetic_lab_first_attempt_reservation)
 
 
 class A177ReceiptAdmissionTests(unittest.TestCase):
@@ -23,8 +24,9 @@ class A177ReceiptAdmissionTests(unittest.TestCase):
         self.scope = Scope("ownerlab", "tenantlab", "workspacelab")
 
     def make_claim(self, *, evidence_verifier=None):
-        options = {} if evidence_verifier is None else {
-            "evidence_verifier": evidence_verifier}
+        options = {"first_attempt_guard": synthetic_lab_first_attempt_reservation}
+        options.update({} if evidence_verifier is None else {
+            "evidence_verifier": evidence_verifier})
         outbox = ExecutionOutbox(self.store, self.scope, **options)
         item = outbox.enqueue(
             intent_ref="event-one", action="send_email",
