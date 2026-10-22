@@ -25,11 +25,5 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
-      - name: A144 RED-first schema tests
-        run: python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_schema_attestation_a144_lab.py -v
-      - name: A140-A143 targeted SQLite regressions
-        run: |
-          python -B -m unittest discover -s tests -p test_aion_p0_sqlite_durable_market_quota_a140_lab.py -v
-          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_identity_a141_lab.py -v
-          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_mode_rw_a142_lab.py -v
-          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_explicit_bootstrap_a143_lab.py -v
+      - name: A140-A144 counted offline regression suite (zero tests is failure)
+        run: python -B tests/run_aion_a144_counted_regressions_lab.py
