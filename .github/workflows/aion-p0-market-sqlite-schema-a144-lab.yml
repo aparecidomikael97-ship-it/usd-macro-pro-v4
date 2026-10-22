@@ -1,5 +1,11 @@
 name: AION P0 A144 SQLite Schema LAB (NO-GO)
 on:
+  pull_request:
+    paths:
+      - 'atlasquant_market_sqlite_quota_a140.py'
+      - 'tests/test_aion_p0_*sqlite*lab.py'
+      - 'tests/run_aion_a144_counted_regressions_lab.py'
+      - '.github/workflows/aion-p0-market-sqlite-schema-a144-lab.yml'
   push:
     branches:
       - lab/aion-p0-market-sqlite-schema-attestation-a144-20261022
