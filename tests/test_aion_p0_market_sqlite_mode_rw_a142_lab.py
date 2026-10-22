@@ -25,8 +25,8 @@ class A142SQLiteNoImplicitCreateLAB(unittest.TestCase):
         self.root=Path(self.temp.name)
         self.checkout=self.root/"checkout"
         self.checkout.mkdir()
-        # Spaces, #, % and ? prove URL query cannot be injected by path.
-        self.lab=self.root/"quota folder#100%?case"
+        # Spaces, #, % and & exercise percent-encoding on Windows and Ubuntu.
+        self.lab=self.root/"quota folder#100%&case"
         self.lab.mkdir()
         self.key="a142runone"
 
