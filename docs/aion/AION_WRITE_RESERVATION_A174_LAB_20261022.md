@@ -27,4 +27,16 @@ O módulo não executa o efeito externo, não fornece API de reenvio e não decl
 - A174 não homologa os 6 P0: identidade independente, recibos externos e rollback físico continuam pendentes. ZERO_AUTO_RESEND em qualquer resultado incerto.
 
 ## Evidências do CI
-Aguardar Windows/Ubuntu; preencher números e observações extraídos dos logs antes de conclusão.
+CI [GitHub Actions #39858489340](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39858489340): **SUCESSO Ubuntu 85/85 e Windows 85/85 (170 execuções de testes)**.
+
+| Evidência emitida | Ubuntu | Windows |
+|---|---|---|
+| Mesmo ID reservado novamente | `A174_REPLAY_SAME_ID=DENIED` | `DENIED` |
+| Reinício em processo Python distinto | `A174_NEW_PROCESS_REPLAY=DENIED_LOCAL_JOURNAL_PRESENT` | `DENIED_LOCAL_JOURNAL_PRESENT` |
+| Saída abrupta após commit da reserva | `A174_ABRUPT_EXIT=PENDING_SURVIVED_LOCAL_RESTART` | `PENDING_SURVIVED_LOCAL_RESTART` |
+| `UNKNOWN` permanece em reinício | `A174_UNKNOWN_RESTART=DENIED` | `DENIED` |
+| Apagar diário local e reinicializar | `A174_LOCAL_JOURNAL_DELETION=REPLAY_ACCEPTED_NOT_ATTESTED` | `REPLAY_ACCEPTED_NOT_ATTESTED` |
+
+O teste `test_02_post_write_observation_denies_success_but_write_exists` também confirmou o código exato `BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED` no `storage_health.reason` da fachada experimental.
+
+**Veredito:** contrato local anti-reenvio após reinício confirmado nos cenários específicos. **Não homologado:** exclusão/rollback do diário local permite nova reserva, estado independente inexistente, vínculo com efeito real não implementado, proteção H0 não comprovada. Nenhuma alteração de produção autorizada.
