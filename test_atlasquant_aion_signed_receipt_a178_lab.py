@@ -109,7 +109,7 @@ class A178SignedReceiptLabTests(unittest.TestCase):
         item = outbox.enqueue(
             intent_ref=ref, action="send_email",
             payload={"to":"example.invalid", "template":"demo"},
-            aggregate_key="account-lab", policy_version="policy-v1",
+            aggregate_key="account-"+ref, policy_version="policy-v1",
             authorization_ref="approval-1", created_at=NOW,
             valid_until=NOW+timedelta(minutes=5),
         )
