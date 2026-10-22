@@ -402,17 +402,28 @@ class A164SignedPolicyRevocationFloorLAB(unittest.TestCase):
         old_floor=self.floor(old_anchor)
         old_d1,old_d2=self.fx.floors()
         self.fx.rotate()
-        a,b=self.signpair(old_floor)
+        # A *different* current requester challenge after the rotation
+        # still cannot prove that two compromised auditors preserved
+        # a newer policy generation.
+        fresh_nonce="e"*32
+        self.assertNotEqual(fresh_nonce,old_floor.request_nonce)
+        forged_old_floor=replace(old_floor,request_nonce=fresh_nonce)
+        a,b=self.signpair(forged_old_floor)
         self.quarantine(anchor=old_anchor,events=old_events,
-                        sign1=a,sign2=b,d1=old_d1,d2=old_d2)
+                        sign1=a,sign2=b,d1=old_d1,d2=old_d2,
+                        challenge=fresh_nonce)
 
     def test_58_compromised_both_auditors_can_hide_revocation(self):
         old_anchor=self.fx.anchor()
         old_events=list(self.fx.records)
         old_floor=self.floor(old_anchor)
         self.fx.revoke()
-        a,b=self.signpair(old_floor)
-        self.quarantine(anchor=old_anchor,events=old_events,sign1=a,sign2=b)
+        fresh_nonce="e"*32
+        self.assertNotEqual(fresh_nonce,old_floor.request_nonce)
+        forged_old_floor=replace(old_floor,request_nonce=fresh_nonce)
+        a,b=self.signpair(forged_old_floor)
+        self.quarantine(anchor=old_anchor,events=old_events,
+                        sign1=a,sign2=b,challenge=fresh_nonce)
 
     def test_59_no_automatic_grants_even_if_r1_r2_valid(self):
         r=self.quarantine()
