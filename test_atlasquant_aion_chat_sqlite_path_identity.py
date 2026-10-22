@@ -31,7 +31,16 @@ class SQLitePathIdentityHardeningTests(unittest.TestCase):
     def test_01_preexisting_symlink_is_denied_before_sqlite_open(self):
         alias = self.root / "alias.sqlite3"
         fake_link = SimpleNamespace(st_mode=stat.S_IFLNK, st_dev=1, st_ino=2)
-        with patch.object(Path, "lstat", return_value=fake_link):
+        real_lstat = Path.lstat
+
+        def observed(path, *args, **kwargs):
+            # Only the final DB entry is a synthetic symlink. Parent
+            # directories remain real to exercise the final-file gate.
+            if path == alias:
+                return fake_link
+            return real_lstat(path, *args, **kwargs)
+
+        with patch.object(Path, "lstat", autospec=True, side_effect=observed):
             with patch("aion_chat.staged_store.SQLiteChatStore") as native:
                 with self.assertRaisesRegex(
                         StorageUnavailableError, "BOUND_DATABASE_SYMLINK_DENIED"):
