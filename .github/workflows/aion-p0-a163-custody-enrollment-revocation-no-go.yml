@@ -1,0 +1,75 @@
+name: AION P0 A163 Custody Enrollment Rotation Revocation (LAB NO-GO)
+on:
+  push:
+    branches:
+      - lab/aion-p0-a163-custody-enrollment-revocation-20261022
+  pull_request:
+    paths:
+      - 'aion_p0_a163_custody_enrollment_revocation_lab.py'
+      - 'aion_p0_a162_three_source_recovery_lab.py'
+      - 'aion_p0_a161_dual_custodian_floor_lab.py'
+      - 'tools/aion_p0_a151_lab_runtime_import_sentinel.py'
+      - 'tests/test_aion_p0_a151_lab_runtime_import_sentinel.py'
+      - 'tests/run_aion_a151_no_go_gate.py'
+      - 'tests/test_aion_p0_a163_custody_enrollment_revocation_lab.py'
+      - 'tests/run_aion_a163_custody_counted_lab.py'
+      - '.github/workflows/aion-p0-a163-custody-enrollment-revocation-no-go.yml'
+      - 'docs/aion/A163_INDEPENDENT_CUSTODY_ENROLLMENT_ROTATION_REVOCATION_LAB_20261022.md'
+permissions:
+  contents: read
+jobs:
+  custody-policy-no-go:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 50
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned offline signing/source-test dependencies
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3" "PyYAML==6.0.2"
+      - name: A163 exact 80 offline key enrollment rotation and terminal revoke adversaries
+        run: python -B tests/run_aion_a163_custody_counted_lab.py
+      - name: A162 70 local journal checkpoint witness and floor comparison cases
+        run: python -B tests/run_aion_a162_three_source_counted_lab.py
+      - name: A161 70 dual custodian floor co-rollback cases
+        run: python -B tests/run_aion_a161_dual_custodian_counted_lab.py
+      - name: A160 30 legacy inherited method guard cases
+        run: python -B tests/run_aion_a160_inherited_bypass_counted_lab.py
+      - name: A145-A150 259 synthetic crash and witness cases
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 24 LAB-runtime import exclusion checks
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 55 independent external proof E0-E5 documentary cases
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 48 read-only IAM source review cases
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 73 checkpoint Mestre writer deny cases
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A155 78 GitHub writer destinations block cases
+        run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
+      - name: A156 90 recovery restore deny cases
+        run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
+      - name: A157 67 YAML permission and credential barrier cases
+        run: python -B tests/run_aion_a157_workflow_policy_counted_lab.py
+      - name: A157 source-only main workflow safety check remains HARD NO-GO
+        run: python -B tools/aion_p0_a157_workflow_yaml_policy_lab.py --enforce
+      - name: A156 checkpoint recovery source deny remains HARD NO-GO
+        run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
+      - name: A154 checkpoint writer source deny remains HARD NO-GO
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: A152 no-external-evidence authority decision remains NO-GO
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historical 32 provider proof blockers remain unclosed
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
