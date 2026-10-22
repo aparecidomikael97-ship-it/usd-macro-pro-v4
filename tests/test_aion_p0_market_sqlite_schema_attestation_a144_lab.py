@@ -58,4 +58,37 @@ class A144SchemaAttestationLAB(unittest.TestCase):
             db.commit()
         with self.assertRaises(QuotaLabUnavailable): self.reopen()
 
+    def test_07_extra_view_denies_reopen(self):
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("CREATE VIEW extra_view AS SELECT * FROM reservations")
+            db.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.reopen()
+
+    def test_08_trigger_denies_existing_instance_reservation(self):
+        ledger=self.reopen()
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("CREATE TRIGGER extra_trigger AFTER INSERT ON reservations BEGIN SELECT 1; END")
+            db.commit()
+        self.assertFalse(ledger.reserve("a144runtwo",1))
+        with self.assertRaises(QuotaLabUnavailable):
+            _=ledger.reserved_units
+
+    def test_09_index_denies_existing_instance_output(self):
+        ledger=self.reopen()
+        self.assertTrue(ledger.reserve("a144runone",1))
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("CREATE INDEX extra_index ON reservations(units)")
+            db.commit()
+        self.assertFalse(ledger.record_local_output("a144runone","a"*64))
+        with self.assertRaises(QuotaLabUnavailable):
+            ledger.reservation_state("a144runone")
+
+    def test_10_attestation_does_not_claim_external_witness(self):
+        ledger=self.reopen()
+        self.assertFalse(ledger.independent_witness_enrolled)
+        self.assertFalse(ledger.external_provider_effect_proven)
+        self.assertFalse(ledger.human_owner_verified)
+        self.assertFalse(ledger.automatic_retry_allowed)
+
 if __name__=="__main__": unittest.main()
