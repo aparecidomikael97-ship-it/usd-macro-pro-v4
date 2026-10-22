@@ -333,6 +333,12 @@ class AuthenticatedWitnessLAB:
 
     def issue_challenge(self):
         """Durable one-time challenge. No rights to publish are conferred."""
+        # A160: never let an upgraded A150 witness call this old A149 CAS
+        # endpoint directly (explicit parent/descriptor/super invocation).
+        # A149's challenge has NO lease, and would create an orphan row under
+        # the A150 schema, invalidating its lease integrity on next read.
+        if type(self) is not AuthenticatedWitnessLAB:
+            raise A149Denied("base_mutator_on_subclass_forbidden")
         try:
             with closing(self._connect(writable=True)) as db:
                 db.execute("BEGIN IMMEDIATE")
@@ -357,6 +363,12 @@ class AuthenticatedWitnessLAB:
         Crash after COMMIT loses reply but NOT consumed challenge or durable
         receipt. Retry is NOT authorized: read_receipt is the *only* follow-up.
         """
+        # A160: the A149 CAS lacks A150's lease/clock/pinned policy checks.
+        # Python permits AuthenticatedWitnessLAB.publish(a150_instance, ...),
+        # silently bypassing the subclass's override. Reject BEFORE parsing
+        # signed input, touching SQLite or any fault-injection stage.
+        if type(self) is not AuthenticatedWitnessLAB:
+            raise A149Denied("base_mutator_on_subclass_forbidden")
         if type(envelope) is not SignedPublishRequest:
             raise A149Denied("missing_signed_request")
         request = envelope.request
