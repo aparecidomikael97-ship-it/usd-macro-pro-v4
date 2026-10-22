@@ -340,8 +340,12 @@ class A164SignedPolicyRevocationFloorLAB(unittest.TestCase):
     def test_47_exact_valid_until_is_expired_denied(self):
         self.deny("signed_floor_expired",now=self.floor().valid_until_ns)
 
-    def test_48_one_nanosecond_before_expiry_quarantined(self):
-        self.quarantine(now=self.floor().valid_until_ns-1)
+    def test_48_a164_still_fresh_but_a161_already_expired_must_block(self):
+        # A164's 20s synthetic policy window does not override the
+        # STRICTER 30s max/A161 actual 5s challenge evidence expiry.
+        # At A164 expiry -1ns, the local A161 proof is already expired.
+        self.deny("floor_attestation_expired",
+                  now=self.floor().valid_until_ns-1)
 
     def test_49_time_before_observation_denied(self):
         self.deny("signed_floor_observation_in_future",now=self.floor().observed_ns-1)
@@ -389,14 +393,18 @@ class A164SignedPolicyRevocationFloorLAB(unittest.TestCase):
         self.assertFalse(self.quarantine().actual_nonrollbackable_revocation_floor_verified)
 
     def test_57_compromised_both_auditors_can_sign_old_floor_with_new_nonce(self):
-        # Explicit negative proof. Replaying old policy+anchor and getting
-        # both LOCAL auditors to re-sign old floor still yields quarantine.
+        # Explicit negative proof: shared attacker restores the OLD
+        # generation of policy, its local anchor AND prior A161 D1/D2
+        # signer proof, while R1/R2 sign an old revocation floor over a
+        # fresh nonce. Without custody, mathematics can only quarantine.
         old_anchor=self.fx.anchor()
         old_events=list(self.fx.records)
         old_floor=self.floor(old_anchor)
+        old_d1,old_d2=self.fx.floors()
         self.fx.rotate()
         a,b=self.signpair(old_floor)
-        self.quarantine(anchor=old_anchor,events=old_events,sign1=a,sign2=b)
+        self.quarantine(anchor=old_anchor,events=old_events,
+                        sign1=a,sign2=b,d1=old_d1,d2=old_d2)
 
     def test_58_compromised_both_auditors_can_hide_revocation(self):
         old_anchor=self.fx.anchor()
