@@ -8,6 +8,7 @@ on:
       - 'atlasquant_aion_chat_storage_resilience.py'
       - 'test_atlasquant_aion_chat_sqlite_lifecycle.py'
       - 'test_atlasquant_aion_chat_sqlite_path_identity.py'
+      - 'test_atlasquant_aion_chat_sqlite_inode_anchor.py'
       - 'test_atlasquant_aion_chat_host_staging.py'
       - 'test_atlasquant_aion_chat_staged_runtime_resilience.py'
       - '.github/workflows/aion-sqlite-staged-lifecycle.yml'
@@ -39,6 +40,6 @@ jobs:
           socket.socket.connect=Mock(side_effect=AssertionError('network forbidden'));
           socket.socket.connect_ex=Mock(side_effect=AssertionError('network forbidden'));
           socket.create_connection=Mock(side_effect=AssertionError('network forbidden'));
-          suite=unittest.defaultTestLoader.loadTestsFromNames(['test_atlasquant_aion_chat_sqlite_lifecycle','test_atlasquant_aion_chat_sqlite_path_identity','test_atlasquant_aion_chat_host_staging','test_atlasquant_aion_chat_staged_runtime_resilience']);
+          suite=unittest.defaultTestLoader.loadTestsFromNames(['test_atlasquant_aion_chat_sqlite_lifecycle','test_atlasquant_aion_chat_sqlite_path_identity','test_atlasquant_aion_chat_sqlite_inode_anchor','test_atlasquant_aion_chat_host_staging','test_atlasquant_aion_chat_staged_runtime_resilience']);
           result=unittest.TextTestRunner(verbosity=2).run(suite);
           raise SystemExit(not result.wasSuccessful())"
