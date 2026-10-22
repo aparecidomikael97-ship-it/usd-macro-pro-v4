@@ -104,15 +104,35 @@ def _mapping(value: Any) -> dict[str, Any]:
 class ExecutionOutbox:
     """Scoped outbox bound to the same SQLite database as staged chat state."""
 
-    def __init__(self, store: SQLiteChatStore, scope: Scope):
+    def __init__(
+        self, store: SQLiteChatStore, scope: Scope, *,
+        evidence_verifier: Callable[[str, Mapping[str, Any], Mapping[str, Any]], bool] | None = None,
+    ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
+        if evidence_verifier is not None and not callable(evidence_verifier):
+            raise TypeError("callable evidence_verifier required")
         store.require_healthy()
         _scope(scope)
         self.store = store
         self.scope = scope
         self.db = store.db
+        # Default fail-closed. This LAB callback boundary is NOT a verified
+        # identity/receipt trust root: callers can inject synthetic verifiers.
+        # Production admission requires separately pinned external trust.
+        self._evidence_verifier = evidence_verifier
         self._ensure_schema()
+
+    def _verified_evidence(
+        self, kind: str, intent: Mapping[str, Any], result: Mapping[str, Any],
+    ) -> bool:
+        """No evidence, exception or ambiguous result can authorize an effect."""
+        if self._evidence_verifier is None:
+            return False
+        try:
+            return self._evidence_verifier(kind, dict(intent), dict(result)) is True
+        except Exception:
+            return False
 
     def _ensure_schema(self) -> None:
         with self.db:
@@ -664,9 +684,14 @@ class ExecutionOutbox:
             # retryable=True cannot prove that no effect was committed.
             # Never convert a possibly executed send into an automatic retry.
             retry_claim = result.get("retryable") is True
-            state = "UNCERTAIN" if retry_claim else "FAILED"
-            reason = ("ADAPTER_RETRY_CLAIM_UNVERIFIED_NO_RESEND" if retry_claim
-                      else _clean(result.get("reason") or "ADAPTER_REJECTED", 240))
+            # A definitive rejection is also untrusted after send(): the
+            # adapter may have produced the effect before returning False.
+            # EFFECT_ZERO verification is never a permission to auto-retry.
+            proved_zero = (not retry_claim and
+                           self._verified_evidence("EFFECT_ZERO", intent, result))
+            state = "FAILED" if proved_zero else "UNCERTAIN"
+            reason = ("ADAPTER_EFFECT_ZERO_VERIFIED_LAB" if proved_zero
+                      else "ADAPTER_REJECTION_UNVERIFIED_OUTCOME_UNKNOWN")
             with self.db:
                 self.db.execute(
                     """UPDATE action_outbox
@@ -675,13 +700,13 @@ class ExecutionOutbox:
                     (state, reason, key, *self._scope_args()),
                 )
             dispatch_state = ("UNCERTAIN_RECONCILE_REQUIRED"
-                              if retry_claim else state)
+                              if state == "UNCERTAIN" else "FAILED")
             return {**self.get(key), "dispatch_state": dispatch_state}
 
         effect_ref = _clean(result.get("effect_ref"), 128)
-        if result.get("confirmed") is True:
-            if not effect_ref:
-                raise ValueError("confirmed adapter result requires effect_ref")
+        if result.get("confirmed") is True and effect_ref and self._verified_evidence(
+            "EFFECT_CONFIRMED", intent, result
+        ):
             out = self._confirm(
                 key,
                 effect_ref=effect_ref,
@@ -720,15 +745,19 @@ class ExecutionOutbox:
         result = _mapping(reconcile(key, dict(intent["decision"])))
         if result.get("found") is True and result.get("confirmed") is True:
             effect_ref = _clean(result.get("effect_ref"), 128)
-            if not effect_ref:
-                raise ValueError("confirmed reconciliation requires effect_ref")
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "reconcile_state": "CONFIRMED"}
+            if effect_ref and self._verified_evidence(
+                "EFFECT_CONFIRMED", intent, result
+            ):
+                out = self._confirm(
+                    key,
+                    effect_ref=effect_ref,
+                    confirmed_at=now_dt,
+                    result=result,
+                )
+                return {**out, "reconcile_state": "CONFIRMED"}
+            # A self-asserted receipt or a disabled verifier is not evidence
+            # of a trusted provider-side effect. Leave current state intact.
+            return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
         # A caller-controlled dictionary with found=False and
         # authoritative_absence=True is NOT an independently authenticated
