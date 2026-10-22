@@ -1,6 +1,6 @@
 # AION A170 — SQLite parent-chain alias and drift guard (2026-10-22 LAB)
 
-**Only LAB / Draft:** stacked on A169 #1459 -> A168 #1458 -> A167? No: the SQLite line continues via #1457 -> #1195. No merge, deploy, Worker, provider, paid dependency, or external side effects.
+**Only LAB / Draft:** stacked on A169 #1459 -> A168 #1458 -> SQLite path guard #1457 -> original SQLite Draft #1195. No merge, deploy, Worker, provider, paid dependency, or external side effects.
 
 ## Original finding
 
