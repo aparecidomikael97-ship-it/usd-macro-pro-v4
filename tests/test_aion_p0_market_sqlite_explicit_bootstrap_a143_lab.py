@@ -208,17 +208,22 @@ class A143ExplicitBootstrapLAB(unittest.TestCase):
             mode=args[0] if args else kwargs.get("mode","r")
             with normal_path_open(path,*args,**kwargs) as handle:
                 yield handle
-            if path==self.path and mode=="xb":
-                # Simulated adversary swaps a fully initialized valid SQLite
-                # immediately after exclusive-creation FD closes.
-                os.replace(replacement,self.path)
+            if path.name==DB_FILENAME and mode=="xb":
+                # Windows CI normalizes short/long temp path aliases during
+                # resolve(). Target the ACTUAL Path.open("xb") destination,
+                # not textual equality with the unnormalized test fixture.
+                os.replace(replacement,path)
                 swapped[0]=True
 
         from unittest.mock import patch
+        denied=False
         with patch.object(Path,"open",substituted_open):
-            with self.assertRaises(QuotaLabUnavailable):
+            try:
                 self.bootstrap()
-        self.assertTrue(swapped[0])
+            except QuotaLabUnavailable:
+                denied=True
+        self.assertTrue(swapped[0],"Adversarial DB substitution was not injected")
+        self.assertTrue(denied,"Bootstrap accepted a substituted valid SQLite")
         # The synthetic attacker had valid schema/policy; only identity of
         # OUR freshly-created FD may reject this substituted source.
         self.assertTrue(self.path.exists())
