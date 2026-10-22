@@ -660,20 +660,23 @@ class ExecutionOutbox:
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
         if result.get("accepted") is not True:
-            state = "RETRY" if result.get("retryable") is True else "FAILED"
+            # The external boundary was already crossed. A bare adapter flag
+            # retryable=True cannot prove that no effect was committed.
+            # Never convert a possibly executed send into an automatic retry.
+            retry_claim = result.get("retryable") is True
+            state = "UNCERTAIN" if retry_claim else "FAILED"
+            reason = ("ADAPTER_RETRY_CLAIM_UNVERIFIED_NO_RESEND" if retry_claim
+                      else _clean(result.get("reason") or "ADAPTER_REJECTED", 240))
             with self.db:
                 self.db.execute(
                     """UPDATE action_outbox
                        SET state=?,lease_owner='',lease_until='',last_error=?
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (
-                        state,
-                        _clean(result.get("reason") or "ADAPTER_REJECTED", 240),
-                        key,
-                        *self._scope_args(),
-                    ),
+                    (state, reason, key, *self._scope_args()),
                 )
-            return {**self.get(key), "dispatch_state": state}
+            dispatch_state = ("UNCERTAIN_RECONCILE_REQUIRED"
+                              if retry_claim else state)
+            return {**self.get(key), "dispatch_state": dispatch_state}
 
         effect_ref = _clean(result.get("effect_ref"), 128)
         if result.get("confirmed") is True:
@@ -727,25 +730,11 @@ class ExecutionOutbox:
             )
             return {**out, "reconcile_state": "CONFIRMED"}
 
-        if result.get("found") is False and result.get("authoritative_absence") is True:
-            allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
-            if not allowed:
-                out = self._set_blocked(
-                    key,
-                    blocked_state,
-                    auth.get("reason", blocked_state),
-                )
-                return {**out, "reconcile_state": blocked_state}
-            with self.db:
-                self.db.execute(
-                    """UPDATE action_outbox
-                       SET state='RETRY',lease_owner='',lease_until='',
-                           last_error='AUTHORITATIVE_ABSENCE_CONFIRMED'
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (key, *self._scope_args()),
-                )
-            return {**self.get(key), "reconcile_state": "RETRY"}
-
+        # A caller-controlled dictionary with found=False and
+        # authoritative_absence=True is NOT an independently authenticated
+        # guarantee that the provider produced no effect. Do not turn
+        # UNCERTAIN/SENT into RETRY here. A future witnessed absence protocol
+        # requires a separate reviewed contract before any retry authority.
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
     def effect_count(self) -> int:
