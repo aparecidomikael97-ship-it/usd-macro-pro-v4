@@ -135,7 +135,6 @@ class LeasedPinnedWitnessLAB(AuthenticatedWitnessLAB):
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw,
         )
-        original = base.read_head if False else None  # no re-use of legacy engine
         # Read the epoch from the already-committed genesis via read-only sqlite.
         with closing(sqlite3.connect(
             base.db_path.resolve().as_uri() + "?mode=ro", uri=True
@@ -242,6 +241,7 @@ class LeasedPinnedWitnessLAB(AuthenticatedWitnessLAB):
 
     def issue_challenge(self):
         """Atomic lease issuance and monotonic local-clock-floor update."""
+        self._signer()  # Reject private-key substitution before modifying SQLite.
         try:
             with closing(self._connect(writable=True)) as db:
                 db.execute("BEGIN IMMEDIATE")
@@ -283,6 +283,7 @@ class LeasedPinnedWitnessLAB(AuthenticatedWitnessLAB):
         req = envelope.request
         payload = canonical_publish_request(req)
         sig = _signature_bytes(envelope.signature_b64)
+        self._signer()  # Fail closed before any write if witness key is replaced.
         if fault is not None and (
             fault not in ("before_commit", "after_commit")
             or os.environ.get("AION_A150_FAULT_LAB") != "1"
