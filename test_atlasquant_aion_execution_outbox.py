@@ -100,13 +100,29 @@ class FakeIdempotentAdapter:
         }
 
 
+def synthetic_lab_evidence_verifier(kind, intent, result):
+    """Fake evidence ONLY for legacy synthetic Outbox/Saga coverage.
+
+    This tests state machines, not provenance, signatures or trust roots.
+    Never load this function in an operational host.
+    """
+    if kind == "EFFECT_CONFIRMED":
+        return (result.get("confirmed") is True and
+                bool(result.get("effect_ref")))
+    if kind == "EFFECT_ZERO":
+        return (result.get("accepted") is False and
+                result.get("retryable") is False)
+    return False
+
+
 class ExecutionOutboxTests(unittest.TestCase):
     def setUp(self):
         self.scope = Scope("mikael", "tenant-a", "workspace-a")
 
     def _outbox(self, root):
         store = SQLiteChatStore(Path(root) / "chat.sqlite3")
-        return store, ExecutionOutbox(store, self.scope)
+        return store, ExecutionOutbox(
+            store, self.scope, evidence_verifier=synthetic_lab_evidence_verifier)
 
     def _enqueue(self, outbox, *, ref="intent-1", payload=None, aggregate="client-1",
                  valid_until=None, requires_reauth=False, reauth_ref=""):
