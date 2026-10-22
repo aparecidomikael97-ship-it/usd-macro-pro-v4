@@ -1,0 +1,68 @@
+name: AION P0 A161 Dual Custodian Floor Co-Rollback LAB (NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'aion_p0_a161_dual_custodian_floor_lab.py'
+      - 'aion_p0_a150_pinned_policy_lease_lab.py'
+      - 'aion_p0_a149_authenticated_cas_lab.py'
+      - 'tests/test_aion_p0_a161_dual_custodian_floor_lab.py'
+      - 'tests/run_aion_a161_dual_custodian_counted_lab.py'
+      - 'docs/aion/A161_DUAL_CUSTODIAN_NONCE_FLOOR_CO_ROLLBACK_20261022.md'
+      - '.github/workflows/aion-p0-a161-dual-custodian-co-rollback-no-go.yml'
+  push:
+    branches:
+      - lab/aion-p0-a161-dual-custodian-freshness-co-rollback-20261022
+permissions:
+  contents: read
+jobs:
+  synthetic-independent-floor-proof:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned offline cryptographic test dependencies
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3" "PyYAML==6.0.2"
+      - name: A161 70 distinct signed floor freshness and co-rollback attacks
+        run: python -B tests/run_aion_a161_dual_custodian_counted_lab.py
+      - name: A160 30 inherited base mutator bypass defense regressions
+        run: python -B tests/run_aion_a160_inherited_bypass_counted_lab.py
+      - name: A145-A150 259 witness and crash recovery LAB regressions
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 16 runtime boundary regressions
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 55 evidence and FinOps documentary regressions
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 48 external IAM abusive claims regressions
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 73 checkpoint Mestre writer deny tests
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A155 78 automatic and generic writer destination tests
+        run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
+      - name: A156 90 historical checkpoint restore deny tests
+        run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
+      - name: A157 67 strict YAML workflow token checks
+        run: python -B tests/run_aion_a157_workflow_policy_counted_lab.py
+      - name: A157 six workflow source-only IAM audit
+        run: python -B tools/aion_p0_a157_workflow_yaml_policy_lab.py --enforce
+      - name: A156 real recovery must stay hard NO-GO
+        run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
+      - name: A154 checkpoint Mestre real writer source DENY
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: A152 independent external evidence decision remains NO-GO
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historic 32 provider proof errors remain OPEN
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
