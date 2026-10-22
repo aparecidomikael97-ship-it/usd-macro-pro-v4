@@ -40,7 +40,24 @@ class SQLiteLabReservationLedger:
     human_owner_verified=False
     automatic_retry_allowed=False
 
-    def __init__(self, *, lab_dir, checkout_root, limit:int):
+    @classmethod
+    def bootstrap_synthetic_lab(cls, *, lab_dir, checkout_root, limit:int):
+        """Explicit LAB-only creation of a BRAND-NEW quota file.
+
+        This is not authorization from HUMAN_OWNER and cannot detect that an
+        old quota ledger was deleted. A trustworthy production system needs
+        independently registered genesis/high-water and custodian approval.
+        """
+        return cls(
+            lab_dir=lab_dir, checkout_root=checkout_root, limit=limit,
+            _explicit_synthetic_bootstrap=True,
+        )
+
+    def __init__(self, *, lab_dir, checkout_root, limit:int,
+                 _explicit_synthetic_bootstrap:bool=False):
+        if type(_explicit_synthetic_bootstrap) is not bool:
+            raise ValueError("Bootstrap declaration must be boolean")
+        self._explicit_synthetic_bootstrap=_explicit_synthetic_bootstrap
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("Quota limit must be a literal integer between 1 and 100")
         lab=Path(lab_dir)
@@ -141,14 +158,23 @@ class SQLiteLabReservationLedger:
     def _initialize(self):
         existed=self.path.exists()
         try:
-            # Only a new DB may receive an initial policy. An existing DB
-            # without meta is corrupt/unsafe, never silently reinitialized.
+            # A143 explicitly separates ordinary re-open/recovery from LAB
+            # creation. A missing DB is ALWAYS denied for the regular path.
+            # A purported bootstrap cannot silently reset an existing DB.
+            if existed and self._explicit_synthetic_bootstrap:
+                raise QuotaLabUnavailable("Synthetic LAB bootstrap requires empty destination")
             if not existed:
+                if not self._explicit_synthetic_bootstrap:
+                    raise QuotaLabUnavailable(
+                        "Missing quota ledger cannot be interpreted as fresh install"
+                    )
                 try:
                     with self.path.open("xb"):
                         pass
-                except FileExistsError:
-                    existed=True
+                except FileExistsError as exc:
+                    raise QuotaLabUnavailable(
+                        "Quota bootstrap raced an existing file; no implicit open"
+                    ) from exc
             if self.path.is_symlink() or self.path.is_junction():
                 raise ValueError("Symlink or junction quota file denied")
             self._db_identity=self._identity(self.path)
