@@ -46,6 +46,8 @@ def verify_checkpoint(*, ledger_id, events, witness):
         raise CheckpointRejected("invalid_history")
     if any(not isinstance(e, dict) or type(e.get("seq")) is not int for e in events):
         raise CheckpointRejected("invalid_event")
+    if any(set(e) != {"seq", "intent"} or not isinstance(e["intent"], str) or not e["intent"] for e in events):
+        raise CheckpointRejected("invalid_event_shape")
     sequences = [e["seq"] for e in events]
     if sequences != list(range(1, len(events) + 1)):
         raise CheckpointRejected("non_contiguous_history")
