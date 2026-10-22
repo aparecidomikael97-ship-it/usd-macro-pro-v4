@@ -7,10 +7,14 @@ on:
       timezone: "America/Cuiaba"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   coletar:
+    # A157 Draft safety proposal: the owner has not approved independent
+    # custodian enrollment or real restart/restore/first-effect execution.
+    # Review disruption of benign scheduled collection BEFORE any merge.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
