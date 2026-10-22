@@ -1,0 +1,42 @@
+name: AION P0 A146 High-Water LAB (NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'aion_p0_a145_checkpoint_verifier_lab.py'
+      - 'aion_p0_a145_authenticated_checkpoint_lab.py'
+      - 'aion_p0_a146_highwater_gate_lab.py'
+      - 'tests/test_aion_p0_a145_rollback_threat_model_lab.py'
+      - 'tests/test_aion_p0_a145_checkpoint_verifier_lab.py'
+      - 'tests/test_aion_p0_a145_authenticated_checkpoint_lab.py'
+      - 'tests/test_aion_p0_a146_highwater_gate_lab.py'
+      - 'tests/run_aion_a146_counted_lab.py'
+      - '.github/workflows/aion-p0-a146-highwater-lab.yml'
+  push:
+    branches:
+      - lab/aion-p0-a146-highwater-gate-20261022
+permissions:
+  contents: read
+jobs:
+  counted-synthetic-highwater:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 12
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned test-only crypto library
+        run: python -m pip install "cryptography==44.0.3"
+      - name: A145-A146 46 counted offline LAB tests (zero/skips/fail is error)
+        run: python -B tests/run_aion_a146_counted_lab.py
