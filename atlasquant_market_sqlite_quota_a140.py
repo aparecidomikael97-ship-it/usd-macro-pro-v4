@@ -70,6 +70,8 @@ class SQLiteLabReservationLedger:
         # Observed high-water protects ONLY this process instance from
         # lower-balance in-place rollback. Restart loses the witness.
         self._highwater_units=0
+        # Same-instance monotonic row observations (NOT external history).
+        self._observed_rows={}
         self._initialize()
 
     @staticmethod
@@ -198,14 +200,41 @@ class SQLiteLabReservationLedger:
         ).fetchone()
         if policy!=(SCHEMA,self.limit):
             raise QuotaLabUnavailable("Untrusted or changed quota policy")
-        if self._highwater_units:
-            count=db.execute(
-                "SELECT COALESCE(SUM(units),0) FROM reservations"
-            ).fetchone()[0]
-            if type(count) is not int or count<self._highwater_units:
-                raise QuotaLabUnavailable(
-                    "Same-process observed quota high-water regressed"
-                )
+        rows=db.execute(
+            "SELECT run_id,units,state,payload_sha256 FROM reservations"
+        ).fetchall()
+        current={}
+        total=0
+        for run_id,units,state,digest in rows:
+            if (
+                type(run_id) is not str or RUN_ID_RE.fullmatch(run_id) is None
+                or type(units) is not int or not 1<=units<=100
+                or state not in ("RESERVED_UNCERTAIN","LOCAL_OUTPUT_OBSERVED")
+                or (state=="RESERVED_UNCERTAIN" and digest is not None)
+                or (state=="LOCAL_OUTPUT_OBSERVED"
+                    and (type(digest) is not str or DIGEST_RE.fullmatch(digest) is None))
+            ):
+                raise QuotaLabUnavailable("Quota reservation record is not canonical")
+            current[run_id]=(units,state,digest)
+            total+=units
+        if total<self._highwater_units or total>self.limit:
+            raise QuotaLabUnavailable("Same-instance quota high-water regressed")
+        for run_id,(prior_units,prior_state,prior_digest) in self._observed_rows.items():
+            row=current.get(run_id)
+            if row is None or row[0]!=prior_units:
+                raise QuotaLabUnavailable("Previously observed reservation lost or changed")
+            if prior_state=="LOCAL_OUTPUT_OBSERVED":
+                if row!=(prior_units,prior_state,prior_digest):
+                    raise QuotaLabUnavailable("Observed local output was rolled back or forged")
+            elif prior_state=="RESERVED_UNCERTAIN":
+                if row[1]=="RESERVED_UNCERTAIN" and row[2] is None:
+                    pass
+                elif row[1]=="LOCAL_OUTPUT_OBSERVED" and row[2] is not None:
+                    pass  # Locally observed monotonic advance; NO provider proof.
+                else:
+                    raise QuotaLabUnavailable("Quota state regressed")
+        self._highwater_units=max(self._highwater_units,total)
+        self._observed_rows.update(current)
 
     def reserve(self, run_id, units)->bool:
         if (
@@ -233,6 +262,7 @@ class SQLiteLabReservationLedger:
             )
             db.execute("COMMIT")
             self._highwater_units=max(self._highwater_units,used+units)
+            self._observed_rows[run_id]=(units,"RESERVED_UNCERTAIN",None)
             # A separate connection read confirms our own SQLite state.
             # If this fails, return denial, do NOT resend the source read.
             state=self.reservation_state(run_id)
@@ -270,6 +300,8 @@ class SQLiteLabReservationLedger:
                 db.execute("ROLLBACK")
                 return False
             db.execute("COMMIT")
+            units=self._observed_rows[run_id][0]
+            self._observed_rows[run_id]=(units,"LOCAL_OUTPUT_OBSERVED",payload_sha256)
             recorded=self.reservation_state(run_id)
             return bool(
                 recorded and recorded["state"]=="LOCAL_OUTPUT_OBSERVED"
