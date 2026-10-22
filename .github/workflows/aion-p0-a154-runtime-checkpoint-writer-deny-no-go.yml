@@ -1,0 +1,58 @@
+name: AION P0 A154 Runtime Checkpoint Writer Deny Boundary (LAB NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'tools/aion_p0_a154_runtime_writer_deny_ast_lab.py'
+      - 'tests/test_aion_p0_a154_runtime_writer_deny_ast_lab.py'
+      - 'tests/run_aion_a154_checkpoint_deny_counted_lab.py'
+      - 'atlasquant_aion_memory.py'
+      - 'tools/aion_p0_checkpoint_write_surface_audit.py'
+      - 'tests/test_aion_p0_checkpoint_write_surface_ast_lab.py'
+      - 'tests/test_aion_p0_runtime_direct_write_independent_witness_lab.py'
+      - 'docs/aion/A154_RUNTIME_CHECKPOINT_WRITER_DENY_BOUNDARY_NO_GO_20261022.md'
+      - '.github/workflows/aion-p0-a154-runtime-checkpoint-writer-deny-no-go.yml'
+  push:
+    branches:
+      - lab/aion-p0-a154-runtime-writer-deny-ast-20261022
+permissions:
+  contents: read
+jobs:
+  verify-real-writer-deny-and-previous-lab:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 35
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned test-only cryptography dependency
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3"
+      - name: A145-A150 counted regression 259
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 counted 16 import fence and repository scan
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 counted 55 documentary and FinOps evidence cases
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 counted 48 IAM policy abuse cases
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 counted 73 Checkpoint Mestre safety regressions
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A154 direct writer denial structure is still only static NO-GO
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: Legacy A136 broad write surface inventory must still pass
+        run: python -B tools/aion_p0_checkpoint_write_surface_audit.py --enforce
+      - name: A152 documentary decision always HARD NO-GO
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historical 32 producer errors cannot be waived
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
