@@ -63,6 +63,7 @@ class OperatorPinnedPolicyLAB:
     publisher_key_id: str
     publisher_public_key: bytes
     witness_public_key: bytes
+    lease_seconds: int = DEFAULT_LEASE_SECONDS
 
 
 def _validate_policy(policy):
@@ -77,6 +78,9 @@ def _validate_policy(policy):
             or type(policy.witness_public_key) is not bytes
             or len(policy.witness_public_key) != 32):
         raise A149Denied("invalid_external_public_keys")
+    if (type(policy.lease_seconds) is not int
+            or not 1 <= policy.lease_seconds <= MAX_LEASE_SECONDS):
+        raise A149Denied("invalid_external_lease_policy")
     if hmac.compare_digest(policy.publisher_public_key, policy.witness_public_key):
         raise A149Denied("publisher_witness_key_reused")
     return policy
@@ -92,6 +96,8 @@ class LeasedPinnedWitnessLAB(AuthenticatedWitnessLAB):
             raise A149Denied("policy_ledger_mismatch")
         if type(lease_seconds) is not int or not 1 <= lease_seconds <= MAX_LEASE_SECONDS:
             raise A149Denied("invalid_lease_seconds")
+        if lease_seconds != self.policy.lease_seconds:
+            raise A149Denied("operator_lease_policy_mismatch")
         self.lease_seconds = lease_seconds
         if clock_ns is not None and not callable(clock_ns):
             raise A149Denied("invalid_clock_source")
@@ -147,6 +153,7 @@ class LeasedPinnedWitnessLAB(AuthenticatedWitnessLAB):
             publisher_key_id=publisher_key_id,
             publisher_public_key=publisher_public_key,
             witness_public_key=witness_public,
+            lease_seconds=lease_seconds,
         )
         return cls(
             witness_dir=witness_dir, ledger_id=ledger_id,
@@ -209,8 +216,8 @@ class LeasedPinnedWitnessLAB(AuthenticatedWitnessLAB):
                 "SELECT COUNT(*) FROM challenge_lease"
                 " WHERE typeof(issued_ns)!='integer' OR typeof(expires_ns)!='integer'"
                 " OR issued_ns<=0 OR expires_ns<=issued_ns"
-                " OR expires_ns-issued_ns>?",
-                (MAX_LEASE_SECONDS * NANOSECONDS_PER_SECOND,)
+                " OR expires_ns-issued_ns!=?",
+                (self.policy.lease_seconds * NANOSECONDS_PER_SECOND,)
             ).fetchone()[0]
             if bad_leases or orphan_leases or corrupt_leases:
                 raise A149Denied("lease_integrity_failure")
