@@ -139,10 +139,26 @@ def _save_assignment(node: ast.stmt) -> bool:
     kw = {item.arg: item.value for item in call.keywords if item.arg is not None}
     if len(kw) != len(call.keywords) or set(kw) != {"approved", "expected_sha", "timeout"}:
         return False
-    return (_const(kw["approved"], True)
-            and isinstance(kw["timeout"], ast.Name) and kw["timeout"].id == "timeout"
-            and isinstance(kw["expected_sha"], ast.Call)
-            and _callee(kw["expected_sha"].func) == "str")
+    if (not _const(kw["approved"], True)
+            or not isinstance(kw["timeout"], ast.Name)
+            or kw["timeout"].id != "timeout"):
+        return False
+    # The expected SHA must derive from the preflight's exact CAS SHA,
+    # NEVER from a caller-supplied constant, stale branch head, or candidate.
+    encoded = kw["expected_sha"]
+    if (not isinstance(encoded, ast.Call)
+            or _callee(encoded.func) != "str"
+            or len(encoded.args) != 1 or encoded.keywords):
+        return False
+    default = encoded.args[0]
+    if (not isinstance(default, ast.BoolOp) or not isinstance(default.op, ast.Or)
+            or len(default.values) != 2 or not _const(default.values[1], "")):
+        return False
+    selected = default.values[0]
+    return (isinstance(selected, ast.Call)
+            and _callee(selected.func) == "preflight.get"
+            and len(selected.args) == 1 and not selected.keywords
+            and _const(selected.args[0], "expected_sha"))
 
 
 def inspect_recovery_source(source: str) -> dict[str, Any]:
