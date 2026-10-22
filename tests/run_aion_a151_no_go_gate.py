@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 from tools.aion_p0_a151_lab_runtime_import_sentinel import audit_repository
 
 TEST_FILE = "test_aion_p0_a151_lab_runtime_import_sentinel.py"
-EXPECTED = 20
+EXPECTED = 24
 
 
 def main():
@@ -40,7 +40,7 @@ def main():
         raise SystemExit("FAIL-CLOSED A151: no repository source was scanned")
     if report["H0_effect_authorization"] or report["automatic_resend_allowed"]:
         raise SystemExit("FAIL-CLOSED A151: authority was minted")
-    print("PASS A151 20 mutation tests and repo-wide static scan; HARD NO-GO ONLY")
+    print("PASS A151 24 mutation tests and repo-wide static scan; HARD NO-GO ONLY")
 
 
 if __name__ == "__main__":

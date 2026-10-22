@@ -1,4 +1,4 @@
-"""A151 offline import boundary auditor: experimental A145-A150 / A161-A162 != H0 authority.
+"""A151 offline import boundary auditor: experimental A145-A150 / A161-A163 != H0 authority.
 
 A passing return code means ONLY that listed static Python import patterns
 from LAB modules were not found in non-test Python source. NOT proof of
@@ -16,7 +16,7 @@ import sys
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-LAB_MODULE = re.compile(r"^aion_p0_a(?:145|146|147|148|149|150|161|162)(?:_|$)")
+LAB_MODULE = re.compile(r"^aion_p0_a(?:145|146|147|148|149|150|161|162|163)(?:_|$)")
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", ".tox",
              ".pytest_cache", "build", "dist"}
 STATIC_DYNAMIC_LOADERS = {"__import__", "import_module"}
@@ -30,7 +30,7 @@ def _is_test_or_lab(path: Path, root: Path) -> bool:
         return True
     if "tests" in relative.parts[:-1] or path.name.startswith("test_"):
         return True
-    # Only explicit A145–A150 and A161–A162 root-level LAB modules; the
+    # Only explicit A145–A150 and A161–A163 root-level LAB modules; the
     # new A151 sentinel is NOT part of this exclusion.
     if len(relative.parts) == 1 and LAB_MODULE.match(path.stem) is not None:
         return True
@@ -53,7 +53,7 @@ def _module_matches(module: str) -> bool:
 
 
 def inspect_source(code: str, relative_path: str) -> list[dict[str, Any]]:
-    """Find literal/direct uses of the isolated A145-A150/A161-A162 modules."""
+    """Find literal/direct uses of the isolated A145-A150/A161-A163 modules."""
     if not isinstance(code, str) or not isinstance(relative_path, str):
         raise TypeError("invalid_source")
     try:
