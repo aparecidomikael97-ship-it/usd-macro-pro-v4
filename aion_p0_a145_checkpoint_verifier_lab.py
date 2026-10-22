@@ -36,7 +36,7 @@ def verify_checkpoint(*, ledger_id, events, witness):
         raise CheckpointRejected("missing_or_untrusted_witness")
     if not isinstance(ledger_id, str) or not ledger_id:
         raise CheckpointRejected("invalid_ledger_identity")
-    if not hmac.compare_digest(ledger_id, witness.ledger_id):
+    if not isinstance(witness.ledger_id, str) or not witness.ledger_id:\n        raise CheckpointRejected("invalid_witness_identity")\n    if not hmac.compare_digest(ledger_id, witness.ledger_id):
         raise CheckpointRejected("ledger_identity_mismatch")
     if not isinstance(witness.sequence, int) or isinstance(witness.sequence, bool) or witness.sequence < 0:
         raise CheckpointRejected("invalid_witness_sequence")
@@ -49,8 +49,8 @@ def verify_checkpoint(*, ledger_id, events, witness):
         raise CheckpointRejected("non_contiguous_history")
     if len(events) != witness.sequence:
         raise CheckpointRejected("history_sequence_mismatch")
-    actual = canonical_history_digest(events)
-    if not isinstance(witness.history_digest, str) or len(witness.history_digest) != 64:
+    try:\n        actual = canonical_history_digest(events)\n    except (TypeError, ValueError, OverflowError, RecursionError) as exc:\n        raise CheckpointRejected("noncanonical_history") from exc
+    if (not isinstance(witness.history_digest, str) or len(witness.history_digest) != 64\n            or any(c not in "0123456789abcdef" for c in witness.history_digest)):
         raise CheckpointRejected("invalid_witness_digest")
     if not hmac.compare_digest(actual, witness.history_digest):
         raise CheckpointRejected("history_digest_mismatch")
