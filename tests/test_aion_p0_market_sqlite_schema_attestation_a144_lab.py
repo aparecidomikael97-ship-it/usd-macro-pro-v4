@@ -91,4 +91,22 @@ class A144SchemaAttestationLAB(unittest.TestCase):
         self.assertFalse(ledger.human_owner_verified)
         self.assertFalse(ledger.automatic_retry_allowed)
 
+    def test_11_reopen_rejects_foreign_view_without_schema_repair(self):
+        with closing(sqlite3.connect(self.path)) as db:
+            db.execute("CREATE VIEW extra_view AS SELECT units FROM reservations")
+            db.commit()
+        with self.assertRaises(QuotaLabUnavailable):
+            self.reopen()
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name='extra_view'"
+            ).fetchone(),(1,))
+
+    def test_12_valid_ledger_still_reserves_and_observes_output(self):
+        ledger=self.reopen()
+        self.assertTrue(ledger.reserve("a144runone",1))
+        self.assertTrue(ledger.record_local_output("a144runone","b"*64))
+        self.assertEqual(self.reopen().reservation_state("a144runone")["state"],
+                         "LOCAL_OUTPUT_OBSERVED")
+
 if __name__=="__main__": unittest.main()
