@@ -42,11 +42,17 @@ class A140SQLiteLedgerAdversarialLAB(unittest.TestCase):
         self.observed="2026-10-21T23:00:00Z"
 
     def ledger(self,*,limit=3,lab=None,root=None):
-        return SQLiteLabReservationLedger(
-            lab_dir=self.lab if lab is None else lab,
-            checkout_root=self.root if root is None else root,
-            limit=limit,
-        )
+        destination=self.lab if lab is None else lab
+        args={
+            "lab_dir":destination,
+            "checkout_root":self.root if root is None else root,
+            "limit":limit,
+        }
+        # Test fixture only: explicitly create the DB once in the synthetic
+        # sandbox, then use ordinary open-existing for all later calls.
+        if not (Path(destination)/DB_FILENAME).exists():
+            return SQLiteLabReservationLedger.bootstrap_synthetic_lab(**args)
+        return SQLiteLabReservationLedger(**args)
 
     def collect(self,ledger,*,feed=None,run_id=None):
         return collect_synthetic_market(
