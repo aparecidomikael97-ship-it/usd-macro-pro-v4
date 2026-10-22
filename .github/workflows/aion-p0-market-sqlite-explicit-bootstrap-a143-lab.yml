@@ -1,0 +1,49 @@
+name: AION P0 A143 LAB Explicit SQLite Bootstrap vs Recovery (NO-GO)
+on:
+  push:
+    branches:
+      - lab/aion-p0-market-sqlite-explicit-bootstrap-a143-20261021
+permissions:
+  contents: read
+jobs:
+  explicit-bootstrap-lab:
+    name: A143 fail-closed open - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: A143 strict bootstrap RED-first
+        run: python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_explicit_bootstrap_a143_lab.py -v
+      - name: Regression A142 A141 A140 A139 A138
+        shell: bash
+        run: |
+          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_mode_rw_a142_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_sqlite_identity_a141_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_sqlite_durable_market_quota_a140_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_acquisition_isolation_a139_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_only_a138_lab.py -v
+          python -B -m unittest discover -s tests -p test_aion_p0_market_artifact_workflow_contract_a138_lab.py -v
+      - name: Guard against provider or GitHub write authority
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('atlasquant_market_sqlite_quota_a140.py').read_text('utf-8')
+          for banned in ('requests.','httpx.','urllib.request','subprocess.','save_runtime_checkpoint','GITHUB_TOKEN_HISTORICO'):
+              assert banned not in s, banned
+          print('A143 LAB strict no-provider quota contract')
+          PY

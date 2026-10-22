@@ -30,11 +30,14 @@ class A141StorageIdentityLAB(unittest.TestCase):
         self.run="a141runone"
 
     def ledger(self,**extra):
-        return SQLiteLabReservationLedger(
-            lab_dir=extra.get("lab_dir",self.lab),
-            checkout_root=extra.get("checkout_root",self.checkout),
-            limit=extra.get("limit",3),
-        )
+        params={
+            "lab_dir":extra.get("lab_dir",self.lab),
+            "checkout_root":extra.get("checkout_root",self.checkout),
+            "limit":extra.get("limit",3),
+        }
+        if not (Path(params["lab_dir"])/DB_FILENAME).exists():
+            return SQLiteLabReservationLedger.bootstrap_synthetic_lab(**params)
+        return SQLiteLabReservationLedger(**params)
 
     def replace_db(self):
         db=self.lab/DB_FILENAME

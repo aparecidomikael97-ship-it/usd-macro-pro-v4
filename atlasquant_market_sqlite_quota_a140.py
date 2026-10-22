@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from contextlib import closing
 from pathlib import Path
+import os
 import re
 import stat
 import sqlite3
@@ -40,7 +41,24 @@ class SQLiteLabReservationLedger:
     human_owner_verified=False
     automatic_retry_allowed=False
 
-    def __init__(self, *, lab_dir, checkout_root, limit:int):
+    @classmethod
+    def bootstrap_synthetic_lab(cls, *, lab_dir, checkout_root, limit:int):
+        """Explicit LAB-only creation of a BRAND-NEW quota file.
+
+        This is not authorization from HUMAN_OWNER and cannot detect that an
+        old quota ledger was deleted. A trustworthy production system needs
+        independently registered genesis/high-water and custodian approval.
+        """
+        return cls(
+            lab_dir=lab_dir, checkout_root=checkout_root, limit=limit,
+            _explicit_synthetic_bootstrap=True,
+        )
+
+    def __init__(self, *, lab_dir, checkout_root, limit:int,
+                 _explicit_synthetic_bootstrap:bool=False):
+        if type(_explicit_synthetic_bootstrap) is not bool:
+            raise ValueError("Bootstrap declaration must be boolean")
+        self._explicit_synthetic_bootstrap=_explicit_synthetic_bootstrap
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("Quota limit must be a literal integer between 1 and 100")
         lab=Path(lab_dir)
@@ -140,20 +158,64 @@ class SQLiteLabReservationLedger:
 
     def _initialize(self):
         existed=self.path.exists()
+        created_identity=None
         try:
-            # Only a new DB may receive an initial policy. An existing DB
-            # without meta is corrupt/unsafe, never silently reinitialized.
+            # A143 explicitly separates ordinary re-open/recovery from LAB
+            # creation. A missing DB is ALWAYS denied for the regular path.
+            # A purported bootstrap cannot silently reset an existing DB.
+            if existed and self._explicit_synthetic_bootstrap:
+                raise QuotaLabUnavailable("Synthetic LAB bootstrap requires empty destination")
             if not existed:
+                if not self._explicit_synthetic_bootstrap:
+                    raise QuotaLabUnavailable(
+                        "Missing quota ledger cannot be interpreted as fresh install"
+                    )
                 try:
-                    with self.path.open("xb"):
-                        pass
-                except FileExistsError:
-                    existed=True
+                    # Record the identity of OUR OWN exclusive-creation
+                    # handle BEFORE close. The pathname can otherwise be
+                    # replaced by another fully valid SQLite between close
+                    # and the following identity capture.
+                    with self.path.open("xb") as newly_created:
+                        created_stat=os.fstat(newly_created.fileno())
+                        if not created_stat.st_ino:
+                            raise QuotaLabUnavailable(
+                                "New LAB file handle lacks stable identity"
+                            )
+                        created_identity=(created_stat.st_dev,created_stat.st_ino)
+                except FileExistsError as exc:
+                    raise QuotaLabUnavailable(
+                        "Quota bootstrap raced an existing file; no implicit open"
+                    ) from exc
             if self.path.is_symlink() or self.path.is_junction():
                 raise ValueError("Symlink or junction quota file denied")
             self._db_identity=self._identity(self.path)
+            if not existed:
+                if self._db_identity!=created_identity:
+                    raise QuotaLabUnavailable(
+                        "Exclusive LAB-created SQLite handle differs from destination"
+                    )
+                # An exclusive new file MUST still be blank before SQLite
+                # initialization. Windows file IDs can be unreliable/reused;
+                # reject a substituted pre-initialized database even when
+                # the two filesystem identity tuples appear to coincide.
+                # Not an atomic defense against an adversarial ABA swap.
+                if self.path.stat().st_size!=0:
+                    raise QuotaLabUnavailable(
+                        "LAB bootstrap destination was populated before initialization"
+                    )
             with closing(self._connect()) as db:
                 db.execute("BEGIN IMMEDIATE")
+                if not existed:
+                    # A pre-existing, initialized SQLite source can be swapped
+                    # in between pathname checks. An explicit fresh bootstrap
+                    # must never accept schema or application data at genesis.
+                    schema_count=db.execute(
+                        "SELECT COUNT(*) FROM sqlite_master"
+                    ).fetchone()[0]
+                    if schema_count!=0:
+                        raise QuotaLabUnavailable(
+                            "LAB bootstrap encountered pre-existing SQLite schema"
+                        )
                 if existed:
                     # A140 independent audit: an EXISTING database must
                     # never silently recreate lost quota history. sqlite
