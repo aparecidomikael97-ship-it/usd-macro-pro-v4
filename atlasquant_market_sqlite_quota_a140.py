@@ -217,6 +217,10 @@ class SQLiteLabReservationLedger:
                             "LAB bootstrap encountered pre-existing SQLite schema"
                         )
                 if existed:
+                    # A144: inspect the existing schema BEFORE any DDL.
+                    # Even IF NOT EXISTS is a write-capable schema operation;
+                    # do not enter it on a foreign or altered ledger.
+                    self._verify_schema(db)
                     # A140 independent audit: an EXISTING database must
                     # never silently recreate lost quota history. sqlite
                     # quick_check verifies pages, not missing logical tables.
