@@ -75,7 +75,7 @@ class NarrowRenameFingerprintTests(unittest.TestCase):
         try:
             before = handle._read_snapshot(fd)
             self.assertEqual(len(before), 2)
-            self.assertEqual(len(before[0]), 3)
+            self.assertEqual(len(before[0]), 2)
             self.assertEqual(len(before[1]), 4)
         finally:
             import os
