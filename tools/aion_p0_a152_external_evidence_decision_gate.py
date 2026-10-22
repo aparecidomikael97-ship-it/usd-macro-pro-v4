@@ -14,6 +14,12 @@ from pathlib import Path
 import sys
 from typing import Any
 
+# Direct invocation from tools/ must resolve the checked-out repository root.
+# This does not import any runtime worker, provider, or external service.
+CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
+if str(CHECKOUT_ROOT) not in sys.path:
+    sys.path.insert(0, str(CHECKOUT_ROOT))
+
 from atlasquant_aion_p0_h0_iam_finops_preflight_lab import (
     assess_h0_iam_finops_lab,
 )
