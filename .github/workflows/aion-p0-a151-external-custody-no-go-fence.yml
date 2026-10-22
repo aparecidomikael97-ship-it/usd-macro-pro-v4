@@ -1,0 +1,53 @@
+name: AION P0 A151 External Custody NO-GO and LAB Runtime Fence
+on:
+  pull_request:
+    paths:
+      - 'tools/aion_p0_a151_lab_runtime_import_sentinel.py'
+      - 'tests/test_aion_p0_a151_lab_runtime_import_sentinel.py'
+      - 'tests/run_aion_a151_no_go_gate.py'
+      - 'docs/aion/A151_H0_EXTERNAL_CUSTODY_ACCEPTANCE_AND_LAB_RUNTIME_FENCE_20261022.md'
+      - 'aion_p0_a145_checkpoint_verifier_lab.py'
+      - 'aion_p0_a145_authenticated_checkpoint_lab.py'
+      - 'aion_p0_a146_highwater_gate_lab.py'
+      - 'aion_p0_a146_signed_highwater_lab.py'
+      - 'aion_p0_a147_sqlite_crash_journal_lab.py'
+      - 'aion_p0_a148_split_process_witness_lab.py'
+      - 'aion_p0_a149_authenticated_cas_lab.py'
+      - 'aion_p0_a149_broker_cli_lab.py'
+      - 'aion_p0_a150_pinned_policy_lease_lab.py'
+      - '.github/workflows/aion-p0-a151-external-custody-no-go-fence.yml'
+  push:
+    branches:
+      - lab/aion-p0-a151-external-custody-no-go-fence-20261022
+permissions:
+  contents: read
+jobs:
+  documentary-gate-and-isolated-regression:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic Ed25519 test dependency
+        run: python -m pip install "cryptography==44.0.3"
+      - name: A145-A150 previous 259 counted LAB regression cases
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 16 adversarial mutation tests plus entire runtime import scan
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: Historical independent custodian/provider documentary gate
+        run: python -B tools/aion_p0_h0_vendor_custodian_documentary_gate.py
+      - name: Already drafted vendor RFI read-only intake gate
+        run: python -B tools/aion_p0_h0_vendor_rfi_readonly_intake_gate.py
