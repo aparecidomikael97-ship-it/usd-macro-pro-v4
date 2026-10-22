@@ -169,7 +169,7 @@ class OperationScopedSQLiteChatStore:
             db = os.fstat(anchor)
             parent = self.path.parent.lstat()
             return (
-                (db.st_dev, db.st_ino, db.st_nlink),
+                (db.st_dev, db.st_ino),
                 (parent.st_dev, parent.st_ino,
                  parent.st_ctime_ns, parent.st_mtime_ns),
             )
