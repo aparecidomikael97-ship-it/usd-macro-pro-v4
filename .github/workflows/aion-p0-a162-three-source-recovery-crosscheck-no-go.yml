@@ -45,7 +45,7 @@ jobs:
         run: python -B tests/run_aion_a160_inherited_bypass_counted_lab.py
       - name: A145-A150 259 journal and signed witness regressions
         run: python -B tests/run_aion_a150_counted_lab.py
-      - name: A151 16 runtime import boundary regressions
+      - name: A151 20 runtime import boundary regressions
         run: python -B tests/run_aion_a151_no_go_gate.py
       - name: A152 55 E0-E5 and FinOps documentary gates
         run: python -B tests/run_aion_a152_decision_counted_lab.py
