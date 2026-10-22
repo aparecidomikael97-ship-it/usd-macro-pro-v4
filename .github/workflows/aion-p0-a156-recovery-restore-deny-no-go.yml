@@ -1,0 +1,67 @@
+name: AION P0 A156 Real Restore Deny Boundary (LAB NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_recovery.py'
+      - 'atlasquant_aion_memory.py'
+      - 'tools/aion_p0_a156_recovery_restore_deny_ast_lab.py'
+      - 'tests/test_aion_p0_a156_recovery_restore_deny_ast_lab.py'
+      - 'tests/run_aion_a156_restore_deny_counted_lab.py'
+      - 'tests/test_aion_p0_recovery_independent_head_witness_admission_lab.py'
+      - 'tests/test_aion_p0_recovery_branch_head_toctou_lab.py'
+      - 'test_atlasquant_checkpoint_writers_hard_stop_a69.py'
+      - '.github/workflows/aion-runtime-checkpoint-bootstrap.yml'
+      - '.github/workflows/aion-runtime-checkpoint-migrate.yml'
+      - 'docs/aion/A156_REAL_RESTORE_DENY_AST_AND_DISABLED_WORKFLOWS_20261022.md'
+      - '.github/workflows/aion-p0-a156-recovery-restore-deny-no-go.yml'
+  push:
+    branches:
+      - lab/aion-p0-a156-recovery-restore-deny-boundary-20261022
+permissions:
+  contents: read
+jobs:
+  verify-actual-recovery-and-historical-denials:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 40
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic test dependencies only
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3"
+      - name: A145-A150 259 synthetic regressions
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 16 AST LAB-runtime boundary checks
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 55 evidence and FinOps NO-GO checks
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 48 IAM document abuse tests
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 73 Checkpoint Mestre real-writer deny checks
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A155 78 Autopilot and generic writer containment tests
+        run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
+      - name: A156 82 real restore mutations, mocked restore and disabled jobs
+        run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
+      - name: A156 restore AST never authorizes a real recovery
+        run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
+      - name: A154 runtime checkpoint writer remains deny-only
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: A136 repository write surface legacy inventory still applies
+        run: python -B tools/aion_p0_checkpoint_write_surface_audit.py --enforce
+      - name: A152 external witness IAM and costs remain HARD NO-GO
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historical 32 external producer-proof issues remain open
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
