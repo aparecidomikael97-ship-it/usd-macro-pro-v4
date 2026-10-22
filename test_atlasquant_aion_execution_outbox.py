@@ -100,6 +100,14 @@ class FakeIdempotentAdapter:
         }
 
 
+def synthetic_lab_first_attempt_reservation(intent):
+    """Synthetic bypass ONLY to retain historical Outbox state-machine tests.
+
+    This is NOT a trusted witness; never wire this into a real host.
+    """
+    return isinstance(intent, dict) and bool(intent.get("idempotency_key"))
+
+
 def synthetic_lab_evidence_verifier(kind, intent, result):
     """Fake evidence ONLY for legacy synthetic Outbox/Saga coverage.
 
@@ -122,7 +130,8 @@ class ExecutionOutboxTests(unittest.TestCase):
     def _outbox(self, root):
         store = SQLiteChatStore(Path(root) / "chat.sqlite3")
         return store, ExecutionOutbox(
-            store, self.scope, evidence_verifier=synthetic_lab_evidence_verifier)
+            store, self.scope, evidence_verifier=synthetic_lab_evidence_verifier,
+            first_attempt_guard=synthetic_lab_first_attempt_reservation)
 
     def _enqueue(self, outbox, *, ref="intent-1", payload=None, aggregate="client-1",
                  valid_until=None, requires_reauth=False, reauth_ref=""):
