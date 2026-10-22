@@ -14,6 +14,7 @@ from __future__ import annotations
 from contextlib import closing
 from pathlib import Path
 import re
+import stat
 import sqlite3
 
 DB_FILENAME="aion_a140_quota_ledger.sqlite3"
@@ -48,10 +49,11 @@ class SQLiteLabReservationLedger:
             raise ValueError("LAB directory and checkout must be absolute")
         if not lab.is_dir() or not checkout.is_dir():
             raise ValueError("Existing directories required")
-        # Reject lexical symlink components too; resolve() alone would hide it.
+        # Reject lexical symlink components and Windows reparse junctions:
+        # resolve() alone would hide a path that was redirected.
         for part in (lab, *lab.parents):
-            if part.is_symlink():
-                raise ValueError("LAB path includes symbolic link")
+            if part.is_symlink() or part.is_junction():
+                raise ValueError("LAB path contains symlink or junction")
         root=checkout.resolve(strict=True)
         resolved=lab.resolve(strict=True)
         if resolved==root or resolved.is_relative_to(root):
@@ -61,14 +63,51 @@ class SQLiteLabReservationLedger:
             raise ValueError("Quota database is not a normal regular file")
         self.path=path
         self.limit=limit
+        # LAB-only process-lifetime identity pins. They DO NOT survive a
+        # malicious local DB rollback or establish independent monotonicity.
+        self._dir_identity=self._identity(self.path.parent,expect_dir=True)
+        self._db_identity=None
+        # Observed high-water protects ONLY this process instance from
+        # lower-balance in-place rollback. Restart loses the witness.
+        self._highwater_units=0
+        # Same-instance monotonic row observations (NOT external history).
+        self._observed_rows={}
         self._initialize()
 
+    @staticmethod
+    def _identity(path, *, expect_dir=False):
+        try:
+            metadata=path.lstat()
+            if path.is_symlink() or path.is_junction():
+                raise ValueError("Symlink or Windows junction not allowed")
+            if expect_dir:
+                if not stat.S_ISDIR(metadata.st_mode):
+                    raise ValueError("LAB quota directory must remain a directory")
+            else:
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise ValueError("LAB quota database must be a regular file")
+                if metadata.st_nlink != 1:
+                    raise ValueError("Hardlinked SQLite quota DB not allowed")
+            # Fail closed on a filesystem that cannot report a stable file id.
+            if not metadata.st_ino:
+                raise ValueError("Stable filesystem object id unavailable")
+            return (metadata.st_dev,metadata.st_ino)
+        except OSError as exc:
+            raise QuotaLabUnavailable("LAB filesystem metadata unavailable") from exc
+
     def _check_path(self):
-        if self.path.is_symlink() or not self.path.is_file():
-            raise QuotaLabUnavailable("Quota database missing or is a symlink")
         for part in (self.path.parent,*self.path.parent.parents):
-            if part.is_symlink():
-                raise QuotaLabUnavailable("Untrusted LAB path")
+            if part.is_symlink() or part.is_junction():
+                raise QuotaLabUnavailable("LAB path contains link or junction")
+        try:
+            parent=self._identity(self.path.parent,expect_dir=True)
+            file=self._identity(self.path)
+        except (ValueError,QuotaLabUnavailable) as exc:
+            raise QuotaLabUnavailable("Quota filesystem object is unsafe") from exc
+        if parent!=self._dir_identity or (
+            self._db_identity is not None and file!=self._db_identity
+        ):
+            raise QuotaLabUnavailable("Quota file or directory identity changed")
         return self.path
 
     def _connect(self):
@@ -76,16 +115,20 @@ class SQLiteLabReservationLedger:
         db=None
         try:
             db=sqlite3.connect(str(self.path),timeout=0.25,isolation_level=None)
+            # Detect a replacement between our first pathname check and the
+            # sqlite3.connect call BEFORE BEGIN IMMEDIATE or any write.
+            # This is identity-based race reduction, NOT an atomic handle-
+            # bound open, nor protection against a malicious ABA swap.
+            self._check_path()
             db.execute("PRAGMA busy_timeout=250")
             db.execute("PRAGMA synchronous=FULL")
             db.execute("PRAGMA foreign_keys=ON")
+            self._check_path()
             return db
-        except sqlite3.Error as exc:
-            # A failed PRAGMA on a corrupt file still leaves an open SQLite
-            # handle unless closed explicitly, especially fatal on Windows.
+        except (sqlite3.Error,QuotaLabUnavailable) as exc:
             if db is not None:
                 db.close()
-            raise QuotaLabUnavailable("SQLite open or PRAGMA failed") from exc
+            raise QuotaLabUnavailable("SQLite handle or pinned identity unavailable") from exc
 
     def _initialize(self):
         existed=self.path.exists()
@@ -98,8 +141,9 @@ class SQLiteLabReservationLedger:
                         pass
                 except FileExistsError:
                     existed=True
-            if self.path.is_symlink():
-                raise ValueError("Symlink quota file denied")
+            if self.path.is_symlink() or self.path.is_junction():
+                raise ValueError("Symlink or junction quota file denied")
+            self._db_identity=self._identity(self.path)
             with closing(self._connect()) as db:
                 db.execute("BEGIN IMMEDIATE")
                 if existed:
@@ -156,6 +200,41 @@ class SQLiteLabReservationLedger:
         ).fetchone()
         if policy!=(SCHEMA,self.limit):
             raise QuotaLabUnavailable("Untrusted or changed quota policy")
+        rows=db.execute(
+            "SELECT run_id,units,state,payload_sha256 FROM reservations"
+        ).fetchall()
+        current={}
+        total=0
+        for run_id,units,state,digest in rows:
+            if (
+                type(run_id) is not str or RUN_ID_RE.fullmatch(run_id) is None
+                or type(units) is not int or not 1<=units<=100
+                or state not in ("RESERVED_UNCERTAIN","LOCAL_OUTPUT_OBSERVED")
+                or (state=="RESERVED_UNCERTAIN" and digest is not None)
+                or (state=="LOCAL_OUTPUT_OBSERVED"
+                    and (type(digest) is not str or DIGEST_RE.fullmatch(digest) is None))
+            ):
+                raise QuotaLabUnavailable("Quota reservation record is not canonical")
+            current[run_id]=(units,state,digest)
+            total+=units
+        if total<self._highwater_units or total>self.limit:
+            raise QuotaLabUnavailable("Same-instance quota high-water regressed")
+        for run_id,(prior_units,prior_state,prior_digest) in self._observed_rows.items():
+            row=current.get(run_id)
+            if row is None or row[0]!=prior_units:
+                raise QuotaLabUnavailable("Previously observed reservation lost or changed")
+            if prior_state=="LOCAL_OUTPUT_OBSERVED":
+                if row!=(prior_units,prior_state,prior_digest):
+                    raise QuotaLabUnavailable("Observed local output was rolled back or forged")
+            elif prior_state=="RESERVED_UNCERTAIN":
+                if row[1]=="RESERVED_UNCERTAIN" and row[2] is None:
+                    pass
+                elif row[1]=="LOCAL_OUTPUT_OBSERVED" and row[2] is not None:
+                    pass  # Locally observed monotonic advance; NO provider proof.
+                else:
+                    raise QuotaLabUnavailable("Quota state regressed")
+        self._highwater_units=max(self._highwater_units,total)
+        self._observed_rows.update(current)
 
     def reserve(self, run_id, units)->bool:
         if (
@@ -182,6 +261,8 @@ class SQLiteLabReservationLedger:
                 " VALUES(?,?,'RESERVED_UNCERTAIN',NULL)",(run_id,units),
             )
             db.execute("COMMIT")
+            self._highwater_units=max(self._highwater_units,used+units)
+            self._observed_rows[run_id]=(units,"RESERVED_UNCERTAIN",None)
             # A separate connection read confirms our own SQLite state.
             # If this fails, return denial, do NOT resend the source read.
             state=self.reservation_state(run_id)
@@ -219,6 +300,8 @@ class SQLiteLabReservationLedger:
                 db.execute("ROLLBACK")
                 return False
             db.execute("COMMIT")
+            units=self._observed_rows[run_id][0]
+            self._observed_rows[run_id]=(units,"LOCAL_OUTPUT_OBSERVED",payload_sha256)
             recorded=self.reservation_state(run_id)
             return bool(
                 recorded and recorded["state"]=="LOCAL_OUTPUT_OBSERVED"
@@ -265,6 +348,7 @@ class SQLiteLabReservationLedger:
                 ).fetchone()[0]
                 if type(result) is not int or not 0<=result<=self.limit:
                     raise QuotaLabUnavailable("Quota sum out of bounds")
+                self._highwater_units=max(self._highwater_units,result)
                 return result
         except (sqlite3.Error,OSError) as exc:
             raise QuotaLabUnavailable("Quota balance unreadable") from exc
