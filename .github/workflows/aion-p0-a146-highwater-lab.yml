@@ -5,10 +5,12 @@ on:
       - 'aion_p0_a145_checkpoint_verifier_lab.py'
       - 'aion_p0_a145_authenticated_checkpoint_lab.py'
       - 'aion_p0_a146_highwater_gate_lab.py'
+      - 'aion_p0_a146_signed_highwater_lab.py'
       - 'tests/test_aion_p0_a145_rollback_threat_model_lab.py'
       - 'tests/test_aion_p0_a145_checkpoint_verifier_lab.py'
       - 'tests/test_aion_p0_a145_authenticated_checkpoint_lab.py'
       - 'tests/test_aion_p0_a146_highwater_gate_lab.py'
+      - 'tests/test_aion_p0_a146_signed_highwater_lab.py'
       - 'tests/run_aion_a146_counted_lab.py'
       - '.github/workflows/aion-p0-a146-highwater-lab.yml'
   push:
@@ -38,5 +40,5 @@ jobs:
           python-version: '3.12'
       - name: Install pinned test-only crypto library
         run: python -m pip install "cryptography==44.0.3"
-      - name: A145-A146 46 counted offline LAB tests (zero/skips/fail is error)
+      - name: A145-A146 59 counted offline LAB tests (zero/skips/fail is error)
         run: python -B tests/run_aion_a146_counted_lab.py
