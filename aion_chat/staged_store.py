@@ -6,6 +6,7 @@ operations and close; other handles/processes rely on existing SQLite transactio
 and busy_timeout. This is not a production or distributed authorization gate.
 """
 import sqlite3
+import stat
 from pathlib import Path
 from threading import RLock
 
@@ -36,6 +37,27 @@ class OperationScopedSQLiteChatStore:
         with self._lock:
             self._closed = True
 
+    def _path_identity(self, *, allow_missing):
+        """Refuse reparse/symlink/non-file aliases; not physical host attestation.
+
+        lstat does not follow the final symlink. This is a best-effort path
+        guard with pre/open/post-operation comparisons, not an atomic OS
+        handle pin, external monotonic witness or hostile-host guarantee.
+        """
+        try:
+            info = self.path.lstat()
+        except FileNotFoundError as exc:
+            if allow_missing:
+                return None  # first initialization may create this DB
+            raise StorageUnavailableError("BOUND_DATABASE_UNAVAILABLE") from exc
+        except OSError as exc:
+            raise StorageUnavailableError("BOUND_DATABASE_UNAVAILABLE") from exc
+        if stat.S_ISLNK(info.st_mode):
+            raise StorageUnavailableError("BOUND_DATABASE_SYMLINK_DENIED")
+        if not stat.S_ISREG(info.st_mode):
+            raise StorageUnavailableError("BOUND_DATABASE_NOT_REGULAR_FILE")
+        return (info.st_dev, info.st_ino)
+
     def __getattr__(self, name):
         if name not in self._METHODS:
             raise AttributeError(name)
@@ -51,18 +73,28 @@ class OperationScopedSQLiteChatStore:
                     raise StorageUnavailableError("staged handle unavailable: " + reason)
                 store = None
                 try:
-                    if self._file_identity is not None:
-                        try:
-                            current = self.path.stat()
-                        except OSError as exc:
-                            raise StorageUnavailableError("BOUND_DATABASE_UNAVAILABLE") from exc
-                        if (current.st_dev, current.st_ino) != self._file_identity:
-                            raise StorageUnavailableError("BOUND_DATABASE_REPLACED")
+                    before = self._path_identity(
+                        allow_missing=self._file_identity is None)
+                    if (self._file_identity is not None
+                            and before != self._file_identity):
+                        raise StorageUnavailableError("BOUND_DATABASE_REPLACED")
                     store = SQLiteChatStore(self.path)
+                    after_open = self._path_identity(allow_missing=False)
+                    if ((before is not None and after_open != before)
+                            or (self._file_identity is not None
+                                and after_open != self._file_identity)):
+                        raise StorageUnavailableError(
+                            "BOUND_DATABASE_CHANGED_DURING_OPEN")
                     if self._file_identity is None:
-                        current = self.path.stat()
-                        self._file_identity = (current.st_dev, current.st_ino)
-                    return getattr(store, name)(*args, **kwargs)
+                        self._file_identity = after_open
+                    result = getattr(store, name)(*args, **kwargs)
+                    if self._path_identity(allow_missing=False) != self._file_identity:
+                        # A write may ALREADY have committed. Report UNKNOWN,
+                        # latch this facade, and require independent readback;
+                        # NEVER retry or treat this as rolled back.
+                        raise StorageUnavailableError(
+                            "BOUND_DATABASE_CHANGED_DURING_OPERATION")
+                    return result
                 except sqlite3.DatabaseError as exc:
                     # Constraint rejection/busy is not proof of corruption. Other
                     # database errors stay latched until this handle is revoked.
