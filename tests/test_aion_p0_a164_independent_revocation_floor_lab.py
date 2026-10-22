@@ -7,6 +7,7 @@ All signatures, nonce, time, DB/keys generated in one ephemeral test host.
 import base64
 from dataclasses import replace
 import unittest
+from unittest.mock import patch
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -366,11 +367,17 @@ class A164SignedPolicyRevocationFloorLAB(unittest.TestCase):
         self.deny(events=old)
 
     def test_54_local_witness_missing_after_signed_policy_still_denied(self):
+        # Capture VALID synthetic local attestation before removing witness:
+        # failure must arise from A162 real SQLite head read, not fixture.
+        cp=self.fx.checkpoint()
+        local_pair=self.fx.floors()
         a,b=self.signpair()
         self.fx.witness.db_path.unlink()
-        result=self.review(sign1=a,sign2=b,cp="bad")
+        with patch.object(self.fx,"floors",return_value=local_pair):
+            result=self.review(sign1=a,sign2=b,cp=cp)
         self.assert_no_effect(result)
         self.assertEqual(result.verdict,"LAB_HARD_BLOCKED")
+        self.assertIn("a163_issuer_or_h0_rejected",result.reason)
 
     def test_55_a162_hash_mismatch_cannot_be_cleared_by_policy_floor(self):
         # Present valid policy+auditors but corrupt D1 floor signature.
