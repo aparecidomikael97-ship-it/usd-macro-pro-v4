@@ -1,0 +1,76 @@
+name: AION P0 A164 Independent Revocation Floor (SYNTHETIC LAB NO-GO)
+on:
+  push:
+    branches:
+      - lab/aion-p0-a164-independent-revocation-floor-20261022
+  pull_request:
+    paths:
+      - 'aion_p0_a164_independent_revocation_floor_lab.py'
+      - 'aion_p0_a163_custody_enrollment_revocation_lab.py'
+      - 'tools/aion_p0_a151_lab_runtime_import_sentinel.py'
+      - 'tests/test_aion_p0_a164_independent_revocation_floor_lab.py'
+      - 'tests/run_aion_a164_revocation_floor_counted_lab.py'
+      - 'tests/run_aion_a151_no_go_gate.py'
+      - 'tests/test_aion_p0_a151_lab_runtime_import_sentinel.py'
+      - 'docs/aion/A164_SIGNED_POLICY_REVOCATION_EXTERNAL_FLOOR_NO_GO_20261022.md'
+      - '.github/workflows/aion-p0-a164-revocation-external-floor-no-go.yml'
+permissions:
+  contents: read
+jobs:
+  verify-policy-revocation-external-floor:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 50
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned temporary Ed25519/source analysis dependencies
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3" "PyYAML==6.0.2"
+      - name: A164 exact 80 externally signed policy floor and revocation adversaries
+        run: python -B tests/run_aion_a164_revocation_floor_counted_lab.py
+      - name: A163 prior 80 key rotation and terminal revocation cases
+        run: python -B tests/run_aion_a163_custody_counted_lab.py
+      - name: A162 prior 70 A147/A150/A161 read-only reconciliation cases
+        run: python -B tests/run_aion_a162_three_source_counted_lab.py
+      - name: A161 prior 70 dual witness signed floor cases
+        run: python -B tests/run_aion_a161_dual_custodian_counted_lab.py
+      - name: A160 30 inherited legacy CAS bypass regression checks
+        run: python -B tests/run_aion_a160_inherited_bypass_counted_lab.py
+      - name: A145-A150 259 local checkpoint and crash witness cases
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 28 strict runtime import boundary cases
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 55 external H0 proof documentary regressions
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 48 GitHub policy IAM regressions
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 73 real checkpoint writer deny tests
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A155 78 automatic writer destination deny tests
+        run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
+      - name: A156 90 real restore fail-closed tests
+        run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
+      - name: A157 67 GitHub workflow YAML credential denial cases
+        run: python -B tests/run_aion_a157_workflow_policy_counted_lab.py
+      - name: A157 read-only six-workflow source policy gate
+        run: python -B tools/aion_p0_a157_workflow_yaml_policy_lab.py --enforce
+      - name: A156 real recovery source remains DENY
+        run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
+      - name: A154 real checkpoint writer remains DENY
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: A152 external evidence trust decisions remain NO-GO
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Historic 32 real producer proof errors remain open
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
