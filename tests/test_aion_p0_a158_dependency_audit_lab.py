@@ -9,7 +9,7 @@ from pathlib import Path
 import unittest
 
 from tools.aion_p0_a158_dependency_audit_lab import (
-    ROOT, EXPECTED, AuditInputRejected, check_requirements, parse_audit_json,
+    ROOT, AuditInputRejected, check_requirements, parse_audit_json,
     streamlit_pillow_constraint, decision,
 )
 
@@ -26,12 +26,17 @@ psycopg[binary]==3.3.6
 DIST = ["pillow>=7.1.0,<13", "numpy>=1.23,<3", "requests<3"]
 NAMES = ("streamlit","pandas","numpy","requests","altair",
          "pyarrow","pypdf","cryptography","psycopg","pillow")
+BASELINE_PINS = {
+    "streamlit":"1.64.0","pandas":"3.0.6","numpy":"2.5.3",
+    "requests":"2.34.2","altair":"6.3.0","pyarrow":"25.0.1",
+    "pypdf":"6.21.1","cryptography":"50.0.2","psycopg":"3.3.6",
+}
 def sample():
     return {
         "dependencies": [
             {"name":n,"version":("6.21.1" if n=="pypdf"
                                 else "1.64.0" if n=="streamlit"
-                                else "12.3.0" if n=="pillow" else EXPECTED[n]),
+                                else "12.3.0" if n=="pillow" else BASELINE_PINS[n]),
              "vulns":([{"id":f"CVE-2026-TEST-{i}"} for i in range(24)]
                       if n=="pillow" else [])}
             for n in NAMES
