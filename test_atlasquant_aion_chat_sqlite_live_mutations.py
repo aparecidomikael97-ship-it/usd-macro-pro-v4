@@ -159,7 +159,7 @@ class SQLiteLiveMutationBoundaryTests(unittest.TestCase):
             readback.close()
         print("A169_SAME_INODE_WRITE=PERMITTED_NOT_ATTESTED")
 
-    def test_05_parent_directory_symlink_is_not_an_identity_proof(self):
+    def test_05_parent_directory_symlink_is_denied_by_a170(self):
         target = self.root / "real-parent"
         target.mkdir()
         alias = self.root / "aliased-parent"
@@ -168,11 +168,11 @@ class SQLiteLiveMutationBoundaryTests(unittest.TestCase):
         except (OSError, NotImplementedError) as exc:
             self.skipTest("OS does not permit a directory symlink here: " +
                           type(exc).__name__)
-        handle = OperationScopedSQLiteChatStore(alias / "nested.sqlite3")
-        self.addCleanup(handle.close)
-        self.assertEqual(handle.storage_health()["state"], HEALTHY)
-        self.assertTrue((target / "nested.sqlite3").is_file())
-        print("A169_PARENT_DIRECTORY_ALIAS=ALLOWED_NOT_ATTESTED")
+        with self.assertRaisesRegex(
+                StorageUnavailableError, "BOUND_DATABASE_ANCESTOR_ALIAS_DENIED"):
+            OperationScopedSQLiteChatStore(alias / "nested.sqlite3")
+        self.assertFalse((target / "nested.sqlite3").exists())
+        print("A170_PARENT_DIRECTORY_ALIAS=DENIED")
 
 
 if __name__ == "__main__":
