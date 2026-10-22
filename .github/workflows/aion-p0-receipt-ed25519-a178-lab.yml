@@ -1,0 +1,46 @@
+name: AION A178 signed receipt ED25519 LAB
+
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/signed_receipt_lab.py'
+      - 'test_atlasquant_aion_signed_receipt_a178_lab.py'
+      - 'atlasquant_aion_execution_outbox.py'
+      - '.github/workflows/aion-p0-receipt-ed25519-a178-lab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-receipt:
+    name: A178 pinned receipt (${{ matrix.os }})
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned existing project cryptography dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: A178 synthetic signed receipts + A177 A176 Outbox Saga regressions (network forbidden)
+        run: >-
+          python -B -c "import socket,unittest; from unittest.mock import Mock;
+          socket.socket.connect=Mock(side_effect=AssertionError('network forbidden'));
+          socket.socket.connect_ex=Mock(side_effect=AssertionError('network forbidden'));
+          socket.create_connection=Mock(side_effect=AssertionError('network forbidden'));
+          suite=unittest.defaultTestLoader.loadTestsFromNames([
+          'test_atlasquant_aion_signed_receipt_a178_lab',
+          'test_atlasquant_aion_outbox_receipt_admission_a177_lab',
+          'test_atlasquant_aion_outbox_uncertain_retry_a176_lab',
+          'test_atlasquant_aion_execution_outbox',
+          'test_atlasquant_aion_execution_saga']);
+          result=unittest.TextTestRunner(verbosity=2).run(suite);
+          raise SystemExit(not result.wasSuccessful())"

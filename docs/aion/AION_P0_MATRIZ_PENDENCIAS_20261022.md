@@ -42,3 +42,15 @@
 - **P0-3/4 pendentes:** diário local apagável/restaurável, negócio falso com ID novo, recuperação H0 sem testemunha monotônica, ausência de cobertura de toda a rota operacional.
 - **P0-5/6 pendentes:** identidade nativa de arquivo SQLite e restauração atômica não atestadas.
 - Documento auditável: [A177](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-outbox-proof-admission-a177-20261022/docs/aion/AION_P0_OUTBOX_RECEIPT_ADMISSION_A177_LAB_20261022.md). **P0 homologados 0/6, HARD NO-GO.**
+
+## Adendo A178 — prova de assinatura Ed25519, mas sem autenticidade externa
+A [PR Draft #1468](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1468) adiciona verificador Ed25519 **somente LAB** e 16 testes adversariais. [CI A178 #39869577629](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39869577629): 56/56 Ubuntu e 56/56 Windows; [SQLite #39869577563](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39869577563): 93/93 Ubuntu e 93/93 Windows. **298 execuções**, Quality completa não rodou.
+
+- **P0-2 progresso LAB:** assinatura, escopo, digest completo da intenção, issuer/key ID, effect_ref, nonce, seq, validade e revogação de teste verificados; chave desconhecida, conteúdo alterado e replay cruzado são negados nos testes.
+- **P0-2 bloqueio crítico:** quem define a lista de chaves pode fixar a própria chave e aprovar recibo inventado. `A178_CALLER_CONTROLS_TRUST_ROOT=FAKE_PROOF_ACCEPTED_NOT_EXTERNAL`. Requer proveniência independente das chaves, custódia e recibos emitidos por fonte confiável real.
+- **P0-3/4 bloqueio crítico:** restaurar instantâneo antigo do contador high-water permite aceitar recibo velho. `A178_ROLLBACK_OF_TRUST_SNAPSHOT=REPLAY_ACCEPTED_NOT_ATTESTED`. Requer prova externa monotônica, anti-rollback e recuperação física.
+- **P0-1 permanece:** identidade HUMAN_OWNER real não validada; testes de chave LAB não comprovam pessoa ou controle independente.
+- **P0-5/6 permanecem:** nenhuma vinculação atômica ao descritor VFS do SQLite nem homologação em host adversarial.
+- [Evidências, contrato e contraprovas A178](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-ed25519-receipt-a178-20261022/docs/aion/AION_P0_PINNED_ED25519_RECEIPT_A178_LAB_20261022.md).
+
+**Próxima prioridade:** pinagem de fonte de confiança fora do adapter + teste de falha/rollback de testemunha, sem passar para produção. P0 homologados: **0/6**.
