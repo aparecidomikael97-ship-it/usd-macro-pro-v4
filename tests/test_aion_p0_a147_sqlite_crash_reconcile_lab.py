@@ -416,21 +416,23 @@ class A147CrashReconciliationLAB(unittest.TestCase):
         # NEGATIVE EVIDENCE: synthetic genesis is not protected by independent
         # custody. A missing file can be manually re-created with the same ID.
         self.assertTrue(self.reserve("before_reset"))
+        self.witness_current()
         self.journal.path.unlink()
         fresh = SyntheticCrashJournalLAB.bootstrap_synthetic_lab(
             lab_dir=self.local, ledger_id="ledger-A"
         )
         self.assertEqual(fresh.read_events(), [])
         self.assertFalse(self.floor_store.offline)
-        # The still-current high-water catches the loss; if the witness is also
-        # reset or rolled back, A146's negative proof remains relevant.
+        # Non-rollbacked signed high-water must detect the deleted/rebuilt DB.
+        # Resetting both DB and witness is a separate negative proof (test 31).
         decision = fresh.assess_restart(
             checkpoint_envelope=self.cp([]),
             checkpoint_pinned_keys=self.cp_keys,
             highwater_pinned_keys=self.floor_keys,
             read_signed_highwater=self.floor_reader,
         )
-        self.assertEqual(decision.verdict, "LAB_QUARANTINE_MANUAL_REVIEW")
+        self.assertEqual(decision.verdict, "LAB_HARD_BLOCKED")
+        self.assertIn("signed_checkpoint_rollback", decision.reason)
         self.assertFalse(decision.external_execution_allowed)
 
     def test_47_precommit_crash_does_not_create_a_pending_reservation(self):
