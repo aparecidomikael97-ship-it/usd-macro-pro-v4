@@ -112,9 +112,19 @@ def _is_hex(value: Any) -> bool:
     return type(value) is str and HEX.fullmatch(value) is not None
 
 
+def _strict_plain_fields(value: Any, expected: frozenset[str]) -> bool:
+    """Inspect only plain built-in string keys before comparing field sets.
+
+    A hostile str subclass may override equality/hash. Constructing a set
+    before checking key types can execute attacker-supplied Python methods.
+    """
+    return (type(value) is dict and all(type(key) is str for key in value)
+            and frozenset(value) == expected)
+
+
 def _valid_payload(payload: Any, *, readback: bool) -> bool:
     keys = READ_FIELDS if readback else RES_FIELDS
-    if type(payload) is not dict or frozenset(payload) != keys:
+    if not _strict_plain_fields(payload, keys):
         return False
     # Never execute untrusted Python objects' __eq__/__ne__ on schema/kind.
     # Reject them before any canonical JSON serialization or comparisons.
@@ -145,7 +155,7 @@ def _valid_payload(payload: Any, *, readback: bool) -> bool:
 
 
 def _verify_envelope(obj: Any, pub: Any, *, readback: bool) -> tuple[dict | None, bytes | None, str | None]:
-    if type(obj) is not dict or frozenset(obj) != ENVELOPE_FIELDS:
+    if not _strict_plain_fields(obj, ENVELOPE_FIELDS):
         return None, None, "ENVELOPE_SHAPE_INVALID"
     payload = obj["payload"]
     if not _valid_payload(payload, readback=readback):
@@ -168,7 +178,7 @@ def inspect_dual_signed_witness_lab(
 ) -> dict[str, Any]:
     """Cryptographic and causal consistency ONLY, zero external authority."""
     defects: list[str] = []
-    if type(pinned_fixture) is not dict or frozenset(pinned_fixture) != PINS_FIELDS:
+    if not _strict_plain_fields(pinned_fixture, PINS_FIELDS):
         defects.append("CALLER_PINS_INVALID")
         pin: dict[str, Any] = {}
     else:
