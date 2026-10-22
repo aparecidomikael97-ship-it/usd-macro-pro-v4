@@ -24,6 +24,8 @@ class ReservationJournalUnavailable(RuntimeError):
 class LocalWriteReservationLab:
     _REQUEST_ID = re.compile(r"[A-Za-z0-9_-]{16,96}\Z")
     _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+    _EFFECT_PART = re.compile(r"[a-z0-9][a-z0-9._:-]{0,127}\Z")
+    _EFFECT_FIELDS = frozenset({"tenant", "provider", "action", "business_id"})
 
     def __init__(self, path):
         self.path = Path(path)
