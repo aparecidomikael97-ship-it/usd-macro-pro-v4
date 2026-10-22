@@ -189,12 +189,33 @@ class SQLiteLabReservationLedger:
             if self.path.is_symlink() or self.path.is_junction():
                 raise ValueError("Symlink or junction quota file denied")
             self._db_identity=self._identity(self.path)
-            if not existed and self._db_identity!=created_identity:
-                raise QuotaLabUnavailable(
-                    "Exclusive LAB-created SQLite handle differs from destination"
-                )
+            if not existed:
+                if self._db_identity!=created_identity:
+                    raise QuotaLabUnavailable(
+                        "Exclusive LAB-created SQLite handle differs from destination"
+                    )
+                # An exclusive new file MUST still be blank before SQLite
+                # initialization. Windows file IDs can be unreliable/reused;
+                # reject a substituted pre-initialized database even when
+                # the two filesystem identity tuples appear to coincide.
+                # Not an atomic defense against an adversarial ABA swap.
+                if self.path.stat().st_size!=0:
+                    raise QuotaLabUnavailable(
+                        "LAB bootstrap destination was populated before initialization"
+                    )
             with closing(self._connect()) as db:
                 db.execute("BEGIN IMMEDIATE")
+                if not existed:
+                    # A pre-existing, initialized SQLite source can be swapped
+                    # in between pathname checks. An explicit fresh bootstrap
+                    # must never accept schema or application data at genesis.
+                    schema_count=db.execute(
+                        "SELECT COUNT(*) FROM sqlite_master"
+                    ).fetchone()[0]
+                    if schema_count!=0:
+                        raise QuotaLabUnavailable(
+                            "LAB bootstrap encountered pre-existing SQLite schema"
+                        )
                 if existed:
                     # A140 independent audit: an EXISTING database must
                     # never silently recreate lost quota history. sqlite
