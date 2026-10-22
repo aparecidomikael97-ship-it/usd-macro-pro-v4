@@ -1,0 +1,57 @@
+{
+  "schema": "AION_P0_A166_EXTERNAL_CUSTODIAN_CANDIDATE_NO_GO_V1",
+  "as_of": "2026-10-22",
+  "status": "NOT_ENROLLED",
+  "read_only": true,
+  "source": "TEMPLATE_ONLY_NO_VENDOR_RESPONSE",
+  "required_evidence_kinds": [
+    "LEGAL_IDENTITY",
+    "ADMIN_CONTROL",
+    "KEY_PROVENANCE",
+    "ACCOUNT_SEGREGATION",
+    "WORM_READBACK",
+    "REVOCATION_PROPAGATION",
+    "ROLLBACK_RESTORE",
+    "NONCE_TIME"
+  ],
+  "missing_by_role": {
+    "r1": [
+      "LEGAL_IDENTITY",
+      "ADMIN_CONTROL",
+      "KEY_PROVENANCE",
+      "ACCOUNT_SEGREGATION",
+      "WORM_READBACK",
+      "REVOCATION_PROPAGATION",
+      "ROLLBACK_RESTORE",
+      "NONCE_TIME"
+    ],
+    "r2": [
+      "LEGAL_IDENTITY",
+      "ADMIN_CONTROL",
+      "KEY_PROVENANCE",
+      "ACCOUNT_SEGREGATION",
+      "WORM_READBACK",
+      "REVOCATION_PROPAGATION",
+      "ROLLBACK_RESTORE",
+      "NONCE_TIME"
+    ]
+  },
+  "open_gates": [
+    "E0_AUTHENTIC_FINANCE",
+    "E1_INDEPENDENT_IAM",
+    "E2_IMMUTABLE_CUSTODY",
+    "E3_EXTERNAL_MONOTONIC_HEAD",
+    "E4_RECOVERY_DRILLS",
+    "E5_OWNER_AND_CANONICAL_SIGNOFF",
+    "PROVIDER_32_EXTERNAL_PROOFS"
+  ],
+  "historical_external_provider_proofs_open": 32,
+  "external_issuer_authenticated": false,
+  "custodian_independence_verified": false,
+  "owner_approved": false,
+  "worker_allowed": false,
+  "actual_provider_receipt_verified": false,
+  "automatic_resend_allowed": false,
+  "homologated_p0_count": 0,
+  "notes": "All records missing by design; identifiers and signatures provided solely by a LAB test cannot satisfy any external evidence obligation. No provisioning or spending."
+}
