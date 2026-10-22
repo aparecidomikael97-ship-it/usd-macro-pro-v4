@@ -37,5 +37,25 @@ class CheckpointComparatorLab(unittest.TestCase):
             verify_checkpoint(ledger_id="ledger-A", events=altered, witness=self.witness)
 
 
+    def test_malformed_witness_identity_denied(self):
+        bad = Checkpoint(None, 2, self.witness.history_digest)
+        with self.assertRaises(CheckpointRejected):
+            verify_checkpoint(ledger_id="ledger-A", events=self.events, witness=bad)
+
+    def test_invalid_witness_digest_denied(self):
+        bad = Checkpoint("ledger-A", 2, "z" * 64)
+        with self.assertRaises(CheckpointRejected):
+            verify_checkpoint(ledger_id="ledger-A", events=self.events, witness=bad)
+
+    def test_unserializable_history_denied(self):
+        altered = [{"seq": 1, "intent": object()}, {"seq": 2, "intent": "b"}]
+        with self.assertRaises(CheckpointRejected):
+            verify_checkpoint(ledger_id="ledger-A", events=altered, witness=self.witness)
+
+    def test_boolean_sequence_denied(self):
+        bad = Checkpoint("ledger-A", True, self.witness.history_digest)
+        with self.assertRaises(CheckpointRejected):
+            verify_checkpoint(ledger_id="ledger-A", events=self.events, witness=bad)
+
 if __name__ == "__main__":
     unittest.main()
