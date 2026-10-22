@@ -147,5 +147,25 @@ class A151StaticLabImportFence(unittest.TestCase):
                   "import importlib\nx=importlib.import_module('aion_p0_a163_custody_enrollment_revocation_lab')\n")
         self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
 
+    def test_25_a164_policy_floor_import_from_runtime_denied(self):
+        self.file("runtime/aion_witness_service.py",
+                  "from aion_p0_a164_independent_revocation_floor_lab import RevocationFloor\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
+    def test_26_a164_root_experimental_module_is_excluded(self):
+        self.file("aion_p0_a164_independent_revocation_floor_lab.py",
+                  "from aion_p0_a163_custody_enrollment_revocation_lab import PolicyAnchor\n")
+        self.assertTrue(audit_repository(self.root)["static_import_boundary_clean"])
+
+    def test_27_a164_nested_worker_file_is_not_excluded(self):
+        self.file("deploy/aion_p0_a164_independent_revocation_floor_lab.py",
+                  "import aion_p0_a163_custody_enrollment_revocation_lab\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
+    def test_28_a164_dynamic_import_from_operational_service_denied(self):
+        self.file("services/recover.py",
+                  "import importlib\np=importlib.import_module('aion_p0_a164_independent_revocation_floor_lab')\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
 if __name__ == "__main__":
     unittest.main()
