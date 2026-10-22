@@ -1,0 +1,71 @@
+name: AION P0 A162 Three Source H0 Recovery Crosscheck (LAB NO-GO)
+on:
+  pull_request:
+    paths:
+      - 'aion_p0_a162_three_source_recovery_lab.py'
+      - 'aion_p0_a161_dual_custodian_floor_lab.py'
+      - 'aion_p0_a150_pinned_policy_lease_lab.py'
+      - 'aion_p0_a147_sqlite_crash_journal_lab.py'
+      - 'tests/test_aion_p0_a162_three_source_recovery_lab.py'
+      - 'tests/run_aion_a162_three_source_counted_lab.py'
+      - 'docs/aion/A162_THREE_SOURCE_CRASH_RECOVERY_RECONCILIATION_NO_GO_20261022.md'
+      - '.github/workflows/aion-p0-a162-three-source-recovery-crosscheck-no-go.yml'
+  push:
+    branches:
+      - lab/aion-p0-a162-triple-head-recovery-crosscheck-20261022
+permissions:
+  contents: read
+jobs:
+  verify-three-source-h0-read-only-fence:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      AION_LAB_MODE: '1'
+      AION_WORKER_ENABLED: '0'
+      AION_EXTERNAL_EXECUTION_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic test requirements only
+        run: python -m pip install "cryptography==44.0.3" "requests==2.32.3" "PyYAML==6.0.2"
+      - name: A162 new 70 three-source SQLite witness floor replay reconciliation attacks
+        run: python -B tests/run_aion_a162_three_source_counted_lab.py
+      - name: A161 70 independent witness claim and co-rollback attacks
+        run: python -B tests/run_aion_a161_dual_custodian_counted_lab.py
+      - name: A160 30 base-method bypass regressions
+        run: python -B tests/run_aion_a160_inherited_bypass_counted_lab.py
+      - name: A145-A150 259 journal and signed witness regressions
+        run: python -B tests/run_aion_a150_counted_lab.py
+      - name: A151 16 runtime import boundary regressions
+        run: python -B tests/run_aion_a151_no_go_gate.py
+      - name: A152 55 E0-E5 and FinOps documentary gates
+        run: python -B tests/run_aion_a152_decision_counted_lab.py
+      - name: A153 48 external IAM case regressions
+        run: python -B tests/run_aion_a153_counted_lab.py
+      - name: A154 73 checkpoint Mestre writer deny tests
+        run: python -B tests/run_aion_a154_checkpoint_deny_counted_lab.py
+      - name: A155 78 Autopilot writer destination regressions
+        run: python -B tests/run_aion_a155_autopilot_destinations_counted_lab.py
+      - name: A156 90 historic checkpoint restore deny tests
+        run: python -B tests/run_aion_a156_restore_deny_counted_lab.py
+      - name: A157 67 strict YAML GitHub permission source attacks
+        run: python -B tests/run_aion_a157_workflow_policy_counted_lab.py
+      - name: A157 enforce six workflow source-only constraints
+        run: python -B tools/aion_p0_a157_workflow_yaml_policy_lab.py --enforce
+      - name: A156 actual recovery source HARD NO-GO
+        run: python -B tools/aion_p0_a156_recovery_restore_deny_ast_lab.py
+      - name: A154 checkpoint writer still denies external activation
+        run: python -B tools/aion_p0_a154_runtime_writer_deny_ast_lab.py
+      - name: A152 external proof E0-E5 still cannot authorize operations
+        run: python -B tools/aion_p0_a152_external_evidence_decision_gate.py
+      - name: Exact 32 producer proof blockers remain open
+        run: python -B tools/aion_p0_h0_provider_32_crosswalk_audit.py --check-crosswalk
