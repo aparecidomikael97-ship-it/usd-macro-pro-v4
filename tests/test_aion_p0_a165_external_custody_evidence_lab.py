@@ -381,12 +381,16 @@ class A165SyntheticCustodyEvidenceLAB(unittest.TestCase):
         self.assertFalse(r.actual_nonrollbackable_storage_verified)
 
     def test_53_custody_claim_self_reports_no_immutability_denied(self):
-        claim=self.claim("r1",asserted_nonrollbackable_storage=False)
-        self.denied("nonrollbackable_storage_not_claimed",entry1="invalid")
+        valid,_=self.pair()
+        bad=replace(valid,claim=replace(
+            valid.claim,asserted_nonrollbackable_storage=False))
+        self.denied("nonrollbackable_storage_not_claimed",entry1=bad)
 
     def test_54_custody_claim_self_reports_no_independence_denied(self):
-        claim=self.claim("r1",asserted_separate_administration=False)
-        self.denied("separate_administration_not_claimed",entry1="invalid")
+        valid,_=self.pair()
+        bad=replace(valid,claim=replace(
+            valid.claim,asserted_separate_administration=False))
+        self.denied("separate_administration_not_claimed",entry1=bad)
 
     def test_55_both_colluding_issuers_can_sign_false_disjoint_claims(self):
         # NEGATIVE PROOF: every key and identity is manufactured by this
