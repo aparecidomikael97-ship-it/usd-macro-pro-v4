@@ -20,7 +20,10 @@ from packaging.requirements import Requirement
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS = ROOT / "requirements.txt"
 SCHEMA = "AION_P0_A158_DEPENDENCY_ADVISORY_PARTIAL_REMEDIATION_LAB_V1"
-EXPECTED = {"streamlit": "1.64.0", "pypdf": "6.21.1"}
+EXPECTED = {"pypdf": "6.21.1"}
+# A158 is the historic partial baseline; A159 is the supported security
+# remediation candidate. Never allow an arbitrary Streamlit/Pillow pairing.
+ALLOWED_PIN_PAIRS = {("1.64.0", None), ("1.66.1", "13.0.0")}
 NEVER_GO = "HARD_NO_GO_FULL_SECURITY_AUDIT_UNCLOSED"
 
 
@@ -61,9 +64,9 @@ def check_requirements(source: Any) -> dict[str, Any]:
             raise AuditInputRejected("DUPLICATE_REQUIREMENT:"+name)
         found[name]=match.group(3)
     if len(found) < 9 or not all(found.get(k)==v for k,v in EXPECTED.items()):
-        raise AuditInputRejected("PINNED_STREAMLIT_OR_PYPDF_VERSION_DRIFT")
-    if "pillow" in found:
-        raise AuditInputRejected("PILLOW_OVERRIDE_REQUIRES_INDEPENDENT_COMPATIBILITY_PROOF")
+        raise AuditInputRejected("PINNED_PYPDF_VERSION_DRIFT")
+    if (found.get("streamlit"),found.get("pillow")) not in ALLOWED_PIN_PAIRS:
+        raise AuditInputRejected("STREAMLIT_PILLOW_PAIR_UNVERIFIED")
     return found
 
 
@@ -151,9 +154,17 @@ def decision(reqs: Any, audit_payload: Any, auditor_exit: int,
         compat={}
         problems.append(str(exc))
     if observed and checked:
-        for name,version in EXPECTED.items():
-            if observed[name]["version"]!=version:
+        for name in ("pypdf", "streamlit", "pillow"):
+            expected_version = checked.get(name)
+            # Pillow is transitive in A158 and an explicit direct pin in A159;
+            # verify its exact resolved version only in the security-fix case.
+            if expected_version is not None and observed[name]["version"]!=expected_version:
                 problems.append("AUDIT_VERSION_MISMATCH:"+name)
+        if (checked.get("pillow")=="13.0.0"
+                and not compat.get("pillow_13_supported_by_current_streamlit_metadata")):
+            problems.append("UPSTREAM_STREAMLIT_PILLOW13_INCOMPATIBLE")
+        if checked.get("pillow")=="13.0.0" and observed["pillow"]["ids"]:
+            problems.append("PATCHED_PILLOW_HAS_UNRESOLVED_ADVISORIES")
         if observed["pypdf"]["ids"]:
             problems.append("PYPDF_STILL_HAS_ADVISORIES")
         unexpected=sorted(name for name,d in observed.items()
