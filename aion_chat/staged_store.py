@@ -24,7 +24,7 @@ class OperationScopedSQLiteChatStore:
         "storage_health", "require_healthy", "wal_checkpoint", "backup_to",
     })
 
-    # Metadata observation only for methods that do not intentionally write.
+    # A172 narrow directory-rename observation for read-only operations.
     # This is not a transaction snapshot or independent rollback attestation.
     _READ_ONLY_METHODS = frozenset({
         "get_conversation", "list_conversations", "search_conversations",
@@ -150,34 +150,21 @@ class OperationScopedSQLiteChatStore:
             raise
 
     def _read_snapshot(self, anchor):
-        """Detect *observed* read-window metadata drift, including some ABA.
+        """Observe directory renames, not WAL-content changes during reads.
 
-        The independent DB descriptor, parent directory timestamps and WAL/SHM
-        sidecar lstat values give a fail-closed heuristic. Timestamp granularity,
-        forged metadata, races outside this window and native VFS identity can
-        still evade it. Normal concurrent writes can trigger false positives.
+        Comparing the DB descriptor's identity and the parent directory's
+        modification timestamps can detect ordinary same-inode rename ABA
+        without rejecting every concurrent WAL writer. This is *not* a
+        monotonic/atomic rename proof: timestamps can be coarse, restored or
+        forged, and unrelated directory activity can deny a valid read.
         """
         try:
             db = os.fstat(anchor)
             parent = self.path.parent.lstat()
-            sidecars = []
-            for suffix in ("-wal", "-shm"):
-                candidate = Path(str(self.path) + suffix)
-                try:
-                    entry = candidate.lstat()
-                except FileNotFoundError:
-                    sidecars.append(None)
-                else:
-                    sidecars.append((
-                        entry.st_dev, entry.st_ino, entry.st_size,
-                        entry.st_ctime_ns, entry.st_mtime_ns,
-                    ))
             return (
-                (db.st_dev, db.st_ino, db.st_size, db.st_nlink,
-                 db.st_ctime_ns, db.st_mtime_ns),
+                (db.st_dev, db.st_ino, db.st_nlink),
                 (parent.st_dev, parent.st_ino,
                  parent.st_ctime_ns, parent.st_mtime_ns),
-                tuple(sidecars),
             )
         except OSError as exc:
             raise StorageUnavailableError(
