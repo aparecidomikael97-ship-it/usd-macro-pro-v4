@@ -24,6 +24,15 @@ class OperationScopedSQLiteChatStore:
         "storage_health", "require_healthy", "wal_checkpoint", "backup_to",
     })
 
+    # Metadata observation only for methods that do not intentionally write.
+    # This is not a transaction snapshot or independent rollback attestation.
+    _READ_ONLY_METHODS = frozenset({
+        "get_conversation", "list_conversations", "search_conversations",
+        "list_messages", "get_message", "get_attachment",
+        "get_latest_checkpoint", "get_latest_summary", "retrieve_messages",
+        "storage_health", "require_healthy",
+    })
+
     def __init__(self, path):
         self.path = Path(path)
         self._lock = RLock()
@@ -140,6 +149,40 @@ class OperationScopedSQLiteChatStore:
             os.close(fd)
             raise
 
+    def _read_snapshot(self, anchor):
+        """Detect *observed* read-window metadata drift, including some ABA.
+
+        The independent DB descriptor, parent directory timestamps and WAL/SHM
+        sidecar lstat values give a fail-closed heuristic. Timestamp granularity,
+        forged metadata, races outside this window and native VFS identity can
+        still evade it. Normal concurrent writes can trigger false positives.
+        """
+        try:
+            db = os.fstat(anchor)
+            parent = self.path.parent.lstat()
+            sidecars = []
+            for suffix in ("-wal", "-shm"):
+                candidate = Path(str(self.path) + suffix)
+                try:
+                    entry = candidate.lstat()
+                except FileNotFoundError:
+                    sidecars.append(None)
+                else:
+                    sidecars.append((
+                        entry.st_dev, entry.st_ino, entry.st_size,
+                        entry.st_ctime_ns, entry.st_mtime_ns,
+                    ))
+            return (
+                (db.st_dev, db.st_ino, db.st_size, db.st_nlink,
+                 db.st_ctime_ns, db.st_mtime_ns),
+                (parent.st_dev, parent.st_ino,
+                 parent.st_ctime_ns, parent.st_mtime_ns),
+                tuple(sidecars),
+            )
+        except OSError as exc:
+            raise StorageUnavailableError(
+                "BOUND_DATABASE_READ_SNAPSHOT_UNAVAILABLE") from exc
+
     def __getattr__(self, name):
         if name not in self._METHODS:
             raise AttributeError(name)
@@ -202,6 +245,10 @@ class OperationScopedSQLiteChatStore:
                         self._file_identity = after_open
                     if self._parent_identity is None:
                         self._parent_identity = parents_after_open
+                    read_before = (
+                        self._read_snapshot(anchor)
+                        if name in self._READ_ONLY_METHODS else None
+                    )
                     result = getattr(store, name)(*args, **kwargs)
                     if (self._ancestor_chain_identity(allow_missing=False)
                             != self._parent_identity):
@@ -217,6 +264,13 @@ class OperationScopedSQLiteChatStore:
                         raise StorageUnavailableError(
                             "BOUND_DATABASE_CHANGED_DURING_OPERATION")
                     self._verify_identity_anchor(anchor, after_operation)
+                    if (read_before is not None
+                            and self._read_snapshot(anchor) != read_before):
+                        # A read result may have seen mixed external state.
+                        # This failure revokes this facade; it does not claim
+                        # to identify who changed the DB or prove rollback.
+                        raise StorageUnavailableError(
+                            "BOUND_DATABASE_READ_SNAPSHOT_CHANGED")
                     return result
                 except sqlite3.DatabaseError as exc:
                     # Constraint rejection/busy is not proof of corruption. Other
