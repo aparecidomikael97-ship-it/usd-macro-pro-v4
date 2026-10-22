@@ -1,4 +1,4 @@
-"""A158: independently re-audit exact pinned dependency set, never waive CVEs.
+"""A159 extension of A158: verify every direct pin and audit coverage, never waive CVEs.
 
 Scope: pypdf patch verification; Pillow remains a separate blocked review.
 Report stdout from pip-audit, do not edit canonical security workflow.
@@ -20,7 +20,17 @@ from packaging.requirements import Requirement
 ROOT = Path(__file__).resolve().parents[1]
 REQUIREMENTS = ROOT / "requirements.txt"
 SCHEMA = "AION_P0_A158_DEPENDENCY_ADVISORY_PARTIAL_REMEDIATION_LAB_V1"
-EXPECTED = {"streamlit": "1.64.0", "pypdf": "6.21.1"}
+EXPECTED = {
+    "streamlit": "1.64.0",
+    "pandas": "3.0.6",
+    "numpy": "2.5.3",
+    "requests": "2.34.2",
+    "altair": "6.3.0",
+    "pyarrow": "25.0.1",
+    "pypdf": "6.21.1",
+    "cryptography": "50.0.2",
+    "psycopg": "3.3.6",
+}
 NEVER_GO = "HARD_NO_GO_FULL_SECURITY_AUDIT_UNCLOSED"
 
 
@@ -47,6 +57,7 @@ def check_requirements(source: Any) -> dict[str, Any]:
     if type(source) is not str or len(source) > 20_000:
         raise AuditInputRejected("REQUIREMENTS_SOURCE_INVALID")
     found={}
+    extras={}
     for line in source.splitlines():
         line=line.strip()
         if not line or line.startswith("#"):
@@ -60,10 +71,14 @@ def check_requirements(source: Any) -> dict[str, Any]:
         if name in found:
             raise AuditInputRejected("DUPLICATE_REQUIREMENT:"+name)
         found[name]=match.group(3)
-    if len(found) < 9 or not all(found.get(k)==v for k,v in EXPECTED.items()):
-        raise AuditInputRejected("PINNED_STREAMLIT_OR_PYPDF_VERSION_DRIFT")
+        if match.group(2):
+            extras[name]=match.group(2)
     if "pillow" in found:
         raise AuditInputRejected("PILLOW_OVERRIDE_REQUIRES_INDEPENDENT_COMPATIBILITY_PROOF")
+    if found != EXPECTED:
+        raise AuditInputRejected("PINNED_DIRECT_REQUIREMENTS_DRIFT")
+    if extras != {"psycopg":"binary"}:
+        raise AuditInputRejected("DIRECT_DEPENDENCY_EXTRAS_DRIFT")
     return found
 
 
@@ -152,7 +167,9 @@ def decision(reqs: Any, audit_payload: Any, auditor_exit: int,
         problems.append(str(exc))
     if observed and checked:
         for name,version in EXPECTED.items():
-            if observed[name]["version"]!=version:
+            if name not in observed:
+                problems.append("DIRECT_AUDIT_PACKAGE_MISSING:"+name)
+            elif observed[name]["version"]!=version:
                 problems.append("AUDIT_VERSION_MISMATCH:"+name)
         if observed["pypdf"]["ids"]:
             problems.append("PYPDF_STILL_HAS_ADVISORIES")
