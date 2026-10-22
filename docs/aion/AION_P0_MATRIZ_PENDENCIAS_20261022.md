@@ -32,3 +32,13 @@
 **P0-2/P0-3 — pendências explícitas:** declaração de rejeição definitiva (`accepted=False,retryable=False`) ainda permite `FAILED` e não é recibo independente de efeito zero; confirmação `found=True,confirmed=True` ainda é autoafirmada pelo adaptador. Falta proteger contra novo ID de negócio falso, restauração/exclusão do diário e autenticação de provedor. Não houve inspeção completa de todos os call sites. Ver [documento A176](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-outbox-uncertain-retry-gate-a176-20261022/docs/aion/AION_P0_OUTBOX_UNCERTAIN_RETRY_A176_LAB_20261022.md).
 
 **Prioridade seguinte:** teste RED do efeito que ocorre antes de uma falsa rejeição definitiva + recibo falso de confirmação; aplicar fail-closed em LAB sem enfraquecer os testes de saga, depois revisar dependências de testemunha externa. P0 homologados: **0/6**.
+
+## Adendo A177 — contratos de rejeição e confirmação não autenticados
+**PR #1467:** [RED #39868471657](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39868471657) com 3 divergências de estado e 4 erros de API por SO. [GREEN #39868617571](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39868617571) 40/40 Ubuntu + 40/40 Windows; regressão [A176 #39868617589](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39868617589) 33/33 Ubuntu + 33/33 Windows. **146 execuções**, Quality canônica não rodada.
+
+- **P0-3 parcial LAB:** rejeição supostamente definitiva depois de send não se torna `FAILED` sem confirmação de ausência de efeito. Indefinição continua `UNCERTAIN`; nenhuma liberação para `RETRY`.
+- **P0-2 parcial LAB:** confirmação declarada pelo próprio adaptador não vira ledger `CONFIRMED` sem um verificador. Sem verificador, ausente/falhando, bloqueia.
+- **P0-2 bloqueio externo:** o callback `evidence_verifier` é injetável e verificadores dos testes são sintéticos, não identificam fonte de recibos confiável. Requer pinagem de chaves públicas externas, política de raiz de confiança, assinatura verificável, revogação e proveniência independente.
+- **P0-3/4 pendentes:** diário local apagável/restaurável, negócio falso com ID novo, recuperação H0 sem testemunha monotônica, ausência de cobertura de toda a rota operacional.
+- **P0-5/6 pendentes:** identidade nativa de arquivo SQLite e restauração atômica não atestadas.
+- Documento auditável: [A177](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-outbox-proof-admission-a177-20261022/docs/aion/AION_P0_OUTBOX_RECEIPT_ADMISSION_A177_LAB_20261022.md). **P0 homologados 0/6, HARD NO-GO.**
