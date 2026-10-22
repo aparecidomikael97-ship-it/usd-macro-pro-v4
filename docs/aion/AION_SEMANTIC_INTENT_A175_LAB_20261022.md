@@ -27,5 +27,18 @@ A construção é isolada: módulo de LAB não conectado à fachada operacional,
 ## Referência de aceite do futuro P0
 Para considerar P0-3 e P0-4 aptos à homologação, exigir reserva semântica estável derivada de uma fonte confiável, testemunha monotônica independente cuja indisponibilidade bloqueie qualquer tentativa, recibo de operação do provedor com autenticação verificável e reconciliação efetiva depois de restart/rollback. CI verde sozinho **não** atende esses critérios.
 
-## Registro de CI
-Aguardando execução Ubuntu + Windows; registrar SHA, URL do run, contagens, contraexemplos e qualquer falha antes de concluir.
+## Evidência conferida em 22/10/2026
+CI final [GitHub Actions #39865960416](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39865960416) = **SUCCESS: Ubuntu 93/93, Windows 93/93** (186 execuções).
+
+Observações repetidas nos dois sistemas:
+- `A175_SAME_EFFECT_NEW_ID=DENIED`: segundo request_id para o mesmo descritor canônico negado.
+- `A175_UNKNOWN_RESTART_NEW_ID=DENIED`: trava persistiu após reinício simulado e mudança de ID.
+- `A175_DIFFERENT_BUSINESS_EVENT=ALLOWED`: duas intenções legítimas com business_id diferente não foram bloqueadas.
+- `A175_LEGACY_JOURNAL=QUARANTINED_NOT_MIGRATED`: schema A174 antigo não foi migrado silenciosamente.
+- `A175_FORGED_BUSINESS_ID=REPLAY_ACCEPTED_NOT_ATTESTED`: falsificação de business_id contorna o gate. É contraexemplo deliberado.
+- `A174_LOCAL_JOURNAL_DELETION=REPLAY_ACCEPTED_NOT_ATTESTED`: exclusão local segue permitindo reapresentar intenção.
+
+Histórico dos ensaios: [#39865650549](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39865650549) falhou por constantes ausentes no protótipo; [#39865755060](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39865755060) passou Ubuntu, mas falhou Windows por fixture SQLite que mantinha o arquivo aberto; teste corrigido com fechamento explícito e todos os 93/93 repetidos nas duas plataformas.
+
+**Veredito A175:** somente LAB. Bloqueio local de duplicação de descritor melhorou; sem verificação independente do evento real, anti-rollback externo ou controle operacional de reenvio. ZERO P0 homologados. CI específico não equivale à Quality canônica.
+
