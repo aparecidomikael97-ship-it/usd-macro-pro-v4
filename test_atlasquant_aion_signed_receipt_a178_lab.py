@@ -18,7 +18,7 @@ from aion_chat.signed_receipt_lab import (
     SCHEMA, DOMAIN, PinnedEd25519ReceiptLab, canonical_bytes, decision_sha256,
 )
 from atlasquant_aion_execution_outbox import ExecutionOutbox
-from test_atlasquant_aion_execution_outbox import NOW, policy
+from test_atlasquant_aion_execution_outbox import NOW, policy, synthetic_lab_first_attempt_reservation
 
 
 LAB_PRIVATE = Ed25519PrivateKey.from_private_bytes(b"\x07" * 32)
@@ -105,7 +105,8 @@ class A178SignedReceiptLabTests(unittest.TestCase):
 
     def create_outbox(self, verifier, *, scope=None, ref="only-intent"):
         sc = scope or self.scope
-        outbox = ExecutionOutbox(self.store, sc, evidence_verifier=verifier)
+        outbox = ExecutionOutbox(self.store, sc, evidence_verifier=verifier,
+            first_attempt_guard=synthetic_lab_first_attempt_reservation)
         item = outbox.enqueue(
             intent_ref=ref, action="send_email",
             payload={"to":"example.invalid", "template":"demo"},
