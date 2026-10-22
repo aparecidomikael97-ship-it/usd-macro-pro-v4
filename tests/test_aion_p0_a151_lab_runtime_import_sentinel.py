@@ -127,5 +127,25 @@ class A151StaticLabImportFence(unittest.TestCase):
                   "from aion_p0_a150_pinned_policy_lease_lab import LeasedPinnedWitnessLAB\n")
         self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE", self.reasons())
 
+    def test_21_a163_enrollment_import_in_runtime_denied(self):
+        self.file("runtime/worker.py",
+                  "from aion_p0_a163_custody_enrollment_revocation_lab import PolicyEvent\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
+    def test_22_root_level_a163_experiment_allowed(self):
+        self.file("aion_p0_a163_custody_enrollment_revocation_lab.py",
+                  "from aion_p0_a162_three_source_recovery_lab import ThreeSourceReview\n")
+        self.assertTrue(audit_repository(self.root)["static_import_boundary_clean"])
+
+    def test_23_nested_deploy_a163_name_never_bypasses_fence(self):
+        self.file("deploy/aion_p0_a163_custody_enrollment_revocation_lab.py",
+                  "from aion_p0_a161_dual_custodian_floor_lab import SignedFloor\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
+    def test_24_dynamic_import_a163_from_runtime_denied(self):
+        self.file("services/process.py",
+                  "import importlib\nx=importlib.import_module('aion_p0_a163_custody_enrollment_revocation_lab')\n")
+        self.assertIn("LAB_MODULE_IMPORTED_IN_NON_LAB_SOURCE",self.reasons())
+
 if __name__ == "__main__":
     unittest.main()
