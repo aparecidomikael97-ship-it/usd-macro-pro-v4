@@ -42,5 +42,5 @@ jobs:
           python-version: '3.12'
       - name: Install pinned crypto dependency for synthetic LAB
         run: python -m pip install "cryptography==44.0.3"
-      - name: A145-A147 99 counted offline LAB tests
+      - name: A145-A147 109 counted offline LAB tests
         run: python -B tests/run_aion_a147_counted_lab.py
