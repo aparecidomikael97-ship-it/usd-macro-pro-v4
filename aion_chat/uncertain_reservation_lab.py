@@ -6,6 +6,8 @@ duplicate blocking. A host can delete/rollback the entire journal: no
 independent receipt, monotonic custodian, or real-effect proof exists.
 """
 from pathlib import Path
+import hashlib
+import json
 import re
 import sqlite3
 import stat
@@ -22,6 +24,8 @@ class ReservationJournalUnavailable(RuntimeError):
 class LocalWriteReservationLab:
     _REQUEST_ID = re.compile(r"[A-Za-z0-9_-]{16,96}\Z")
     _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+    _EFFECT_PART = re.compile(r"[a-z0-9][a-z0-9._:-]{0,127}\Z")
+    _EFFECT_FIELDS = frozenset({"tenant", "provider", "action", "business_id"})
 
     def __init__(self, path):
         self.path = Path(path)
@@ -45,9 +49,14 @@ class LocalWriteReservationLab:
                 CREATE TABLE IF NOT EXISTS reservations(
                     request_id TEXT PRIMARY KEY,
                     payload_sha256 TEXT NOT NULL,
+                    effect_digest TEXT NOT NULL UNIQUE,
+                    effect_json TEXT NOT NULL,
                     state TEXT NOT NULL
                         CHECK(state IN ('PENDING','UNKNOWN'))
                 )""")
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(reservations)")}
+            if cols != {"request_id", "payload_sha256", "effect_digest", "effect_json", "state"}:
+                raise ReservationJournalUnavailable("JOURNAL_LEGACY_SCHEMA_UNBOUND")
             if str(conn.execute("PRAGMA quick_check").fetchone()[0]).lower() != "ok":
                 raise ReservationJournalUnavailable("JOURNAL_INTEGRITY_FAILED")
         except (sqlite3.DatabaseError, OSError) as exc:
@@ -100,6 +109,23 @@ class LocalWriteReservationLab:
             raise ReservationDenied("INVALID_PAYLOAD_SHA256")
         return value
 
+    @classmethod
+    def _effect(cls, descriptor):
+        """Canonical business-event identity, NOT proof the caller was honest.
+
+        Callers must provide an immutable business event ID. Reusing a different
+        ID for the same real effect remains an external trust problem.
+        """
+        if type(descriptor) is not dict or set(descriptor) != cls._EFFECT_FIELDS:
+            raise ReservationDenied("EFFECT_DESCRIPTOR_REQUIRED")
+        if any(type(v) is not str or not cls._EFFECT_PART.fullmatch(v)
+               for v in descriptor.values()):
+            raise ReservationDenied("INVALID_EFFECT_DESCRIPTOR")
+        canonical = json.dumps(
+            {"version": "A175:v1", **descriptor},
+            ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode("ascii")).hexdigest(), canonical
+
     def _transact(self, action):
         if self._fingerprint() != self._identity:
             raise ReservationJournalUnavailable("JOURNAL_REPLACED")
@@ -129,10 +155,15 @@ class LocalWriteReservationLab:
             if conn is not None:
                 conn.close()
 
-    def reserve(self, request_id, payload_sha256):
-        """Reserve once; same key is NEVER an implicit permission to resend."""
+    def reserve(self, request_id, payload_sha256, effect):
+        """Atomic request-ID AND semantic-effect reservation (LAB ONLY).
+
+        The effect descriptor must identify the actual immutable business
+        event. This is not an attestation of that event or external delivery.
+        """
         request_id = self._request(request_id)
         payload_sha256 = self._payload(payload_sha256)
+        effect_digest, effect_json = self._effect(effect)
 
         def action(conn):
             prior = conn.execute(
@@ -142,10 +173,18 @@ class LocalWriteReservationLab:
                 if prior[0] != payload_sha256:
                     raise ReservationDenied("PAYLOAD_MISMATCH_DENIED")
                 raise ReservationDenied("ALREADY_RESERVED_DENIED")
+            prior_effect = conn.execute(
+                "SELECT request_id FROM reservations WHERE effect_digest=?",
+                (effect_digest,)).fetchone()
+            if prior_effect is not None:
+                raise ReservationDenied("SEMANTIC_EFFECT_ALREADY_RESERVED")
             conn.execute(
-                "INSERT INTO reservations(request_id,payload_sha256,state) "
-                "VALUES(?,?,'PENDING')", (request_id, payload_sha256))
-            return {"request_id": request_id, "state": "PENDING"}
+                "INSERT INTO reservations("
+                "request_id,payload_sha256,effect_digest,effect_json,state) "
+                "VALUES(?,?,?,?,'PENDING')",
+                (request_id, payload_sha256, effect_digest, effect_json))
+            return {"request_id": request_id, "state": "PENDING",
+                    "effect_digest": effect_digest}
 
         return self._transact(action)
 
