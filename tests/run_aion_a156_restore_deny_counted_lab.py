@@ -11,7 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 SUITES = (
-    ("test_aion_p0_a156_recovery_restore_deny_ast_lab.py", 52, ROOT / "tests"),
+    ("test_aion_p0_a156_recovery_restore_deny_ast_lab.py", 60, ROOT / "tests"),
     ("test_aion_p0_recovery_independent_head_witness_admission_lab.py", 11, ROOT / "tests"),
     ("test_aion_p0_recovery_branch_head_toctou_lab.py", 13, ROOT / "tests"),
     ("test_atlasquant_checkpoint_writers_hard_stop_a69.py", 6, ROOT),
