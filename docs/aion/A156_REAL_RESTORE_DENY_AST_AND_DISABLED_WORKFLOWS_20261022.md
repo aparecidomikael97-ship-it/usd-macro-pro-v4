@@ -18,10 +18,10 @@ A156 adds a conservative AST audit of the **actual recovery source**. This is pr
 
 ## Delivered controls
 
-- `tools/aion_p0_a156_recovery_restore_deny_ast_lab.py`: read-only static verification of the helper's unconditional deny-only return, initial admin approval, direct witness invocation with expected metadata, immediate negative admission, no separate network mutation or shadowing, and a single well-bound downstream shared checkpoint save.
-- `tests/test_aion_p0_a156_recovery_restore_deny_ast_lab.py`: **52 adversarial AST mutation tests**, e.g. `is not True` → `is True`, `allowed=True`, forged witness authority, alternative save, early PUT, late/missing return, local helper rebinding, unreviewed HTTP mutation, and auto-retry/status changes.
-- `tests/run_aion_a156_restore_deny_counted_lab.py` also reuses **11 previous actual restore tests** with GitHub HTTP and save mocked, **13 branch HEAD TOCTOU tests**, and **six A69 hard-stop tests** proving bootstrap/migration jobs retain unconditional job-level `if: ${{ false }}`. Together this is **82 counted A156-specific/restore regression cases**.
-- CI Windows+Ubuntu also runs **529 previous A145–A155 cases**, target **611 exact cases per OS**, plus standalone static restore and checkpoint gates, static broad writer inventory, E0–E5 NO-GO decision and historical 32 producer proof errors. The count is a **target until Actions logs prove it**.
+- `tools/aion_p0_a156_recovery_restore_deny_ast_lab.py`: read-only static verification of the helper's unconditional deny-only return, initial admin approval, direct witness invocation with expected metadata, immediate negative admission, no separate network mutation or shadowing, and a single well-bound downstream shared checkpoint save whose CAS expected SHA is exactly derived from the reviewed preflight blob SHA, not a candidate or hardcoded SHA.
+- `tests/test_aion_p0_a156_recovery_restore_deny_ast_lab.py`: **60 adversarial AST mutation tests**, e.g. `is not True` → `is True`, `allowed=True`, forged witness authority, alternative save, early PUT, late/missing return, local helper rebinding, unreviewed HTTP mutation, and auto-retry/status changes.
+- `tests/run_aion_a156_restore_deny_counted_lab.py` also reuses **11 previous actual restore tests** with GitHub HTTP and save mocked, **13 branch HEAD TOCTOU tests**, and **six A69 hard-stop tests** proving bootstrap/migration jobs retain unconditional job-level `if: ${{ false }}`. Together this is **90 counted A156-specific/restore regression cases**.
+- CI Windows+Ubuntu also runs **529 previous A145–A155 cases**, target **619 exact cases per OS**, plus standalone static restore and checkpoint gates, static broad writer inventory, E0–E5 NO-GO decision and historical 32 producer proof errors. The count is a **target until Actions logs prove it**.
 
 ## Threats that remain unresolved
 
