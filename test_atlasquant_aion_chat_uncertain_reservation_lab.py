@@ -232,6 +232,15 @@ class UncertainWriteJournalTests(unittest.TestCase):
             journal.reserve(RID2, HASH_B, EFFECT)
         self.assertIsNone(journal.status(RID2))
 
+    def test_18_forged_business_id_bypasses_local_gate_known_limit(self):
+        journal = self.journal()
+        journal.reserve(RID, HASH_A, EFFECT)
+        # Same real-world effect fraudulently represented as a new event.
+        forged = {**EFFECT, "business_id": "evt-fake-new"}
+        self.assertEqual(
+            journal.reserve(RID2, HASH_A, forged)["state"], "PENDING")
+        print("A175_FORGED_BUSINESS_ID=REPLAY_ACCEPTED_NOT_ATTESTED")
+
 
 if __name__ == "__main__":
     unittest.main()
