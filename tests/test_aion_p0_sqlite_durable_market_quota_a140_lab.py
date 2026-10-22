@@ -290,6 +290,9 @@ class A140SQLiteLedgerAdversarialLAB(unittest.TestCase):
 
 
     def test_36_new_process_sees_committed_reservation_after_abrupt_exit(self):
+        # Explicitly bootstrap once in the test LAB, then the child must
+        # recover EXISTING state only (never auto-bootstrap missing history).
+        self.ledger()
         # The child exits without a Python finally/atexit; DB commit already
         # completed. This is not a sudden hardware power-loss simulation.
         script=(
