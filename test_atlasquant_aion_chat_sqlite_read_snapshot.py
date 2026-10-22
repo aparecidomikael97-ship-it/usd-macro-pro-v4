@@ -112,7 +112,7 @@ class SQLiteReadSnapshotLabTests(unittest.TestCase):
             readback.close()
         print("A172_CONCURRENT_WRITER=READ_ALLOWED_WITH_WAL_CHANGE")
 
-    def test_05_real_aba_during_write_is_outside_read_guard(self):
+    def test_05_real_aba_during_write_is_now_uncertain(self):
         handle = self.facade()
         cid = handle.create_conversation(self.scope).id
         away = self.root / "aba-write-away.sqlite3"
@@ -132,18 +132,29 @@ class SQLiteReadSnapshotLabTests(unittest.TestCase):
                     attempts.append("ABA_COMPLETED")
                 return super().append_message(*args, **kwargs)
 
+        error = None
         with patch("aion_chat.staged_store.SQLiteChatStore", Intercept):
-            handle.append_message(
-                self.scope, Message(cid, "user", "write-after-aba"))
+            try:
+                handle.append_message(
+                    self.scope, Message(cid, "user", "write-after-aba"))
+            except StorageUnavailableError as exc:
+                error = exc
         self.assertEqual(len(attempts), 1)
-        self.assertEqual(handle.storage_health()["state"], HEALTHY)
+        if attempts[0] == "ABA_COMPLETED":
+            self.assertIsNotNone(error)
+            self.assertIn("BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED",
+                          str(error))
+            self.assertEqual(handle.storage_health()["state"], FAILED)
+        else:
+            self.assertIsNone(error)
+            self.assertEqual(handle.storage_health()["state"], HEALTHY)
         readback = Native(handle.path)
         try:
             self.assertEqual(len(readback.list_messages(self.scope, cid).items), 1)
         finally:
             readback.close()
-        print("A171_WRITE_ABA=" + attempts[0] +
-              ("_NOT_ATTESTED" if attempts[0] == "ABA_COMPLETED"
+        print("A173_WRITE_ABA=" + attempts[0] +
+              ("_OUTCOME_UNKNOWN_POST_COMMIT" if error
                else "_OS_NOT_EXERCISED"))
 
     def test_06_snapshot_observation_failure_latches(self):
