@@ -140,7 +140,7 @@ class SQLiteIdentityAnchorTests(unittest.TestCase):
         def drift(fd):
             info = real_fstat(fd)
             calls[0] += 1
-            if calls[0] == 3:  # checked after native method may commit
+            if calls[0] == 4:  # A173 prewrite fingerprint adds a prior fstat
                 return SimpleNamespace(st_mode=info.st_mode,
                                        st_dev=info.st_dev + 1,
                                        st_ino=info.st_ino)
@@ -150,7 +150,7 @@ class SQLiteIdentityAnchorTests(unittest.TestCase):
             with self.assertRaisesRegex(
                     StorageUnavailableError, "BOUND_DATABASE_ANCHOR_MISMATCH"):
                 handle.append_message(self.scope, Message(cid, "user", "once"))
-        self.assertEqual(calls[0], 3)
+        self.assertEqual(calls[0], 4)
         self.assertEqual(handle.storage_health()["state"], FAILED)
         with self.assertRaises(StorageUnavailableError):
             handle.append_message(self.scope, Message(cid, "user", "not-again"))
