@@ -294,7 +294,13 @@ class OperationScopedSQLiteChatStore:
                         self._failure = "DATABASE_ERROR:" + type(exc).__name__
                     raise
                 except StorageUnavailableError as exc:
-                    self._failure = type(exc).__name__
+                    if str(exc) == (
+                            "BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED"):
+                        # Preserve the exact hazard for post-error health checks.
+                        # Do not convert a possibly committed write into retry.
+                        self._failure = str(exc)
+                    else:
+                        self._failure = type(exc).__name__
                     raise
                 finally:
                     try:
