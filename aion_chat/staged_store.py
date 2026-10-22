@@ -5,6 +5,7 @@ opens and closes its native connection on the calling thread. A handle serialize
 operations and close; other handles/processes rely on existing SQLite transactions
 and busy_timeout. This is not a production or distributed authorization gate.
 """
+import os
 import sqlite3
 import stat
 from pathlib import Path
@@ -41,8 +42,8 @@ class OperationScopedSQLiteChatStore:
         """Refuse reparse/symlink/non-file aliases; not physical host attestation.
 
         lstat does not follow the final symlink. This is a best-effort path
-        guard with pre/open/post-operation comparisons, not an atomic OS
-        handle pin, external monotonic witness or hostile-host guarantee.
+        guard with pre/open/post-operation comparisons, not atomic native
+        SQLite VFS handle pinning, monotonic witness or hostile-host proof.
         """
         try:
             info = self.path.lstat()
@@ -58,6 +59,41 @@ class OperationScopedSQLiteChatStore:
             raise StorageUnavailableError("BOUND_DATABASE_NOT_REGULAR_FILE")
         return (info.st_dev, info.st_ino)
 
+    def _verify_identity_anchor(self, fd, expected):
+        """Compare a separately opened OS descriptor to the observed DB path.
+
+        This descriptor pins its *own* inode for the duration of an operation.
+        Python sqlite3 does not expose SQLite's internal VFS handle, so this
+        does NOT prove the native SQLite connection opened the same inode.
+        """
+        try:
+            info = os.fstat(fd)
+        except OSError as exc:
+            raise StorageUnavailableError(
+                "BOUND_DATABASE_ANCHOR_UNAVAILABLE") from exc
+        if not stat.S_ISREG(info.st_mode):
+            raise StorageUnavailableError(
+                "BOUND_DATABASE_ANCHOR_NOT_REGULAR_FILE")
+        if (info.st_dev, info.st_ino) != expected:
+            raise StorageUnavailableError("BOUND_DATABASE_ANCHOR_MISMATCH")
+
+    def _open_identity_anchor(self, expected):
+        """Open no-follow, nonblocking descriptor when OS flags support it."""
+        flags = os.O_RDONLY
+        for flag in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK"):
+            flags |= getattr(os, flag, 0)
+        try:
+            fd = os.open(self.path, flags)
+        except OSError as exc:
+            raise StorageUnavailableError(
+                "BOUND_DATABASE_ANCHOR_UNAVAILABLE") from exc
+        try:
+            self._verify_identity_anchor(fd, expected)
+            return fd
+        except BaseException:
+            os.close(fd)
+            raise
+
     def __getattr__(self, name):
         if name not in self._METHODS:
             raise AttributeError(name)
@@ -72,12 +108,20 @@ class OperationScopedSQLiteChatStore:
                                 "quick_check": "", "foreign_key_violations": None}
                     raise StorageUnavailableError("staged handle unavailable: " + reason)
                 store = None
+                anchor = None
                 try:
                     before = self._path_identity(
                         allow_missing=self._file_identity is None)
                     if (self._file_identity is not None
                             and before != self._file_identity):
                         raise StorageUnavailableError("BOUND_DATABASE_REPLACED")
+                    if before is not None:
+                        # Hold a separately verified file descriptor across
+                        # native SQLite open, operation and native close.
+                        anchor = self._open_identity_anchor(before)
+                        if self._path_identity(allow_missing=False) != before:
+                            raise StorageUnavailableError(
+                                "BOUND_DATABASE_CHANGED_BEFORE_OPEN")
                     store = SQLiteChatStore(self.path)
                     after_open = self._path_identity(allow_missing=False)
                     if ((before is not None and after_open != before)
@@ -85,15 +129,22 @@ class OperationScopedSQLiteChatStore:
                                 and after_open != self._file_identity)):
                         raise StorageUnavailableError(
                             "BOUND_DATABASE_CHANGED_DURING_OPEN")
+                    if anchor is None:
+                        # First-ever bootstrap creates the DB during open.
+                        anchor = self._open_identity_anchor(after_open)
+                    else:
+                        self._verify_identity_anchor(anchor, after_open)
                     if self._file_identity is None:
                         self._file_identity = after_open
                     result = getattr(store, name)(*args, **kwargs)
-                    if self._path_identity(allow_missing=False) != self._file_identity:
+                    after_operation = self._path_identity(allow_missing=False)
+                    if after_operation != self._file_identity:
                         # A write may ALREADY have committed. Report UNKNOWN,
                         # latch this facade, and require independent readback;
                         # NEVER retry or treat this as rolled back.
                         raise StorageUnavailableError(
                             "BOUND_DATABASE_CHANGED_DURING_OPERATION")
+                    self._verify_identity_anchor(anchor, after_operation)
                     return result
                 except sqlite3.DatabaseError as exc:
                     # Constraint rejection/busy is not proof of corruption. Other
@@ -108,13 +159,23 @@ class OperationScopedSQLiteChatStore:
                     self._failure = type(exc).__name__
                     raise
                 finally:
-                    if store is not None:
-                        if store._health_state == FAILED:
-                            self._failure = "DATABASE_FAILED"
-                        try:
-                            store.close()
-                        except Exception as exc:
-                            self._failure = "CONNECTION_CLOSE_FAILED"
-                            raise StorageUnavailableError(self._failure) from exc
+                    try:
+                        if store is not None:
+                            if store._health_state == FAILED:
+                                self._failure = "DATABASE_FAILED"
+                            try:
+                                store.close()
+                            except Exception as exc:
+                                self._failure = "CONNECTION_CLOSE_FAILED"
+                                raise StorageUnavailableError(self._failure) from exc
+                    finally:
+                        if anchor is not None:
+                            try:
+                                os.close(anchor)
+                            except OSError as exc:
+                                # A prior write may have committed: do not
+                                # return ordinary success or attempt replay.
+                                self._failure = "BOUND_DATABASE_ANCHOR_CLOSE_FAILED"
+                                raise StorageUnavailableError(self._failure) from exc
 
         return operation

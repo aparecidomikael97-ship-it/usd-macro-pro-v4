@@ -57,7 +57,7 @@ class SQLitePathIdentityHardeningTests(unittest.TestCase):
         def observed(*, allow_missing):
             calls[0] += 1
             real = original(allow_missing=allow_missing)
-            if calls[0] == 2:
+            if calls[0] == 3:  # after native SQLite opens; anchor adds a pre-open check
                 return real[0] + 1, real[1] + 1
             return real
 
@@ -65,7 +65,7 @@ class SQLitePathIdentityHardeningTests(unittest.TestCase):
             with self.assertRaisesRegex(
                     StorageUnavailableError, "BOUND_DATABASE_CHANGED_DURING_OPEN"):
                 handle.list_conversations(self.scope)
-        self.assertEqual(calls[0], 2)
+        self.assertEqual(calls[0], 3)
         self.assertEqual(handle.storage_health()["state"], FAILED)
         with self.assertRaises(StorageUnavailableError):
             handle.list_conversations(self.scope)
@@ -79,7 +79,7 @@ class SQLitePathIdentityHardeningTests(unittest.TestCase):
         def observed(*, allow_missing):
             calls[0] += 1
             real = original(allow_missing=allow_missing)
-            if calls[0] == 3:  # after SQLite method may have committed
+            if calls[0] == 4:  # after SQLite method may have committed
                 return real[0] + 1, real[1] + 1
             return real
 
@@ -89,7 +89,7 @@ class SQLitePathIdentityHardeningTests(unittest.TestCase):
                     "BOUND_DATABASE_CHANGED_DURING_OPERATION"):
                 handle.append_message(
                     self.scope, Message(cid, "user", "once-only"))
-        self.assertEqual(calls[0], 3)
+        self.assertEqual(calls[0], 4)
         self.assertEqual(handle.storage_health()["state"], FAILED)
         with self.assertRaises(StorageUnavailableError):
             handle.append_message(self.scope, Message(cid, "user", "never-resend"))
