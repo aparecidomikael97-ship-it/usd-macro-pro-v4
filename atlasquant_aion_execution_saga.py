@@ -645,6 +645,26 @@ class ExecutionSagaCoordinator:
             raise LookupError("saga step/outbox binding unavailable")
         out = self.outbox.get(step["outbox_key"])
         state = out["state"]
+        # A162: UNKNOWN is sticky until independently authenticated producer
+        # reconciliation exists. A restored/relabelled local Outbox row cannot
+        # downgrade a Saga from RECONCILIATION_REQUIRED/UNCERTAIN to RUNNING.
+        # Pure local checks confer no effect authority or permission to retry.
+        if saga["state"] == "RECONCILIATION_REQUIRED" or step["state"] == "UNCERTAIN":
+            raise PermissionError("SAGA_UNCERTAIN_RECONCILIATION_LOCKED")
+        # Even before the Saga sees UNKNOWN, a PENDING label is not a fresh
+        # attempt if the same SQLite row still carries dispatch/attempt markers.
+        # The locked snapshot comparison below prevents a concurrent change
+        # between this check and the Saga projection write.
+        if state == "PENDING" and (
+            out.get("attempts") != 0
+            or out.get("dispatch_started_at")
+            or out.get("sent_at")
+            or out.get("confirmed_at")
+            or out.get("effect_ref")
+        ):
+            raise PermissionError(
+                "SAGA_OUTBOX_PRIOR_DISPATCH_MARKERS_REQUIRES_RECONCILIATION"
+            )
         # V16-A.39: a local SQLite state/effects row is not authenticated
         # producer testimony. In particular, this staging system cannot
         # presently enroll or verify a real causal COMMITTED_EFFECT receipt
