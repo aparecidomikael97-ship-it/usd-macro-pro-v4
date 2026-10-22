@@ -30,4 +30,12 @@ Capturar a impressão digital temporal do diretório-pai imediatamente **após a
 **Sem merge, deploy, Worker, integração externa, credenciais novas ou custo.**
 
 ## Evidência do CI
-Aguardando execução Windows e Ubuntu; transcrever contagens/logs reais aqui antes de qualquer conclusão.
+[Execução GitHub Actions #39857256120](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39857256120): **SUCESSO Ubuntu 75/75 + Windows 75/75, total 150**. O primeiro run #39856913156 falhou em um mock de `st_nlink`; o segundo #39857103187 expôs deslocamento da contagem `os.fstat` no teste legado A168; ambos foram corrigidos e toda a bateria repetida no terceiro run.
+
+- Ubuntu: `A173_WRITE_ABA=ABA_COMPLETED_OUTCOME_UNKNOWN_POST_COMMIT`. O rename ABA ocorreu e foi detectado no pós-commit; readback nativo independente confirmou **uma** mensagem persistida. **Falha pós-commit não é rollback.**
+- Windows: `A173_WRITE_ABA=OS_DENIED_OR_RESTORED_OS_NOT_EXERCISED`. O sistema operacional impediu o rename, portanto proteção A173 não foi exercitada nesse caso.
+- Ambos: `A173_NORMAL_WRITES=ALLOWED`, `A173_CONCURRENT_WRITER=WRITES_ALLOWED` e `A173_INJECTED_DRIFT=OUTCOME_UNKNOWN_BUT_COMMITTED_ONCE`.
+- Arquivo não relacionado no diretório durante write: Ubuntu `A173_UNRELATED_FILE=FALSE_POST_WRITE_UNKNOWN`; Windows `A173_UNRELATED_FILE=TIMESTAMP_DRIFT_NOT_OBSERVED`. **O sensor produz falsos positivos e pode não observar determinadas alterações de diretório no Windows.**
+- O teste herdado de âncora pós-commit (A168) voltou a passar, preservando o erro `BOUND_DATABASE_ANCHOR_MISMATCH` e a proibição de reenvio automático.
+
+**Veredito:** detecção heurística de ABA durante escrita no Ubuntu demonstrada, com custo de disponibilidade e limitações de metadados; **não está apta a homologação**. Zero prova de atomicidade do handle SQLite, custódia externa, recibo produtor independente ou proteção contra host hostil. P0 permanecem 0/6.
