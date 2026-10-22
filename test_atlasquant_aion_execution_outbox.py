@@ -307,7 +307,7 @@ class ExecutionOutboxTests(unittest.TestCase):
             self.assertEqual(outbox.effect_count(), 1)
             store.close()
 
-    def test_authoritative_absence_allows_retry_after_lost_pre_effect_attempt(self):
+    def test_adapter_declared_absence_never_authorizes_unwitnessed_retry(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox)
@@ -323,31 +323,21 @@ class ExecutionOutboxTests(unittest.TestCase):
             self.assertEqual(first["state"], "UNCERTAIN")
             self.assertEqual(len(adapter.effects), 0)
 
-            retry = outbox.reconcile(
+            # The fake adapter can only DECLARE absence. It cannot attest
+            # independent custody or prove that a real provider made no effect.
+            unresolved = outbox.reconcile(
                 item["idempotency_key"],
                 adapter=adapter,
                 authorize=policy(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(retry["state"], "RETRY")
-
-            claimed = outbox.claim_next(
-                "worker-2",
-                now=NOW + timedelta(seconds=3),
-                lease_seconds=60,
-            )
-            adapter.mode = "confirmed"
-            final = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-2",
-                authorize=policy(self.scope),
-                adapter=adapter,
-                now=NOW + timedelta(seconds=4),
-            )
-            self.assertEqual(final["state"], "CONFIRMED")
-            self.assertEqual(adapter.send_calls, 2)
-            self.assertEqual(len(adapter.effects), 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(unresolved["state"], "UNCERTAIN")
+            self.assertEqual(unresolved["reconcile_state"], "STILL_UNCERTAIN")
+            self.assertIsNone(outbox.claim_next(
+                "worker-2", now=NOW + timedelta(seconds=3),
+                lease_seconds=60))
+            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
     def test_same_aggregate_is_ordered_until_previous_intent_is_terminal(self):
