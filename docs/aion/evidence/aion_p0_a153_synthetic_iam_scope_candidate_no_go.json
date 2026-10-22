@@ -1,0 +1,79 @@
+{
+  "schema": "AION_P0_A153_IAM_DOCUMENT_FENCE_LAB_V1",
+  "d0_executor_aws_account_id": "111111111111",
+  "d2_anchor_aws_account_id": "222222222222",
+  "d0_administrator_label": "synthetic:executor-admin",
+  "d1_custodian_administrator_label": "synthetic:custodian-admin",
+  "d2_anchor_administrator_label": "synthetic:anchor-admin",
+  "d2_recovery_administrator_label": "synthetic:recovery-admin",
+  "bucket_name": "aion-h0-synthetic-no-go",
+  "object_prefix": "aion-h0/v1/",
+  "proposed_role_policies": {
+    "aion_executor": {
+      "Version": "2012-10-17",
+      "Statement": []
+    },
+    "cloudflare_cas_runtime": {
+      "Version": "2012-10-17",
+      "Statement": []
+    },
+    "aws_anchor_writer": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "A153AppendOnlyCandidate",
+          "Effect": "Allow",
+          "Action": [
+            "s3:PutObject"
+          ],
+          "Resource": [
+            "arn:aws:s3:::aion-h0-synthetic-no-go/aion-h0/v1/*"
+          ]
+        }
+      ]
+    },
+    "aws_anchor_reader": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "A153ListAnchorVersions",
+          "Effect": "Allow",
+          "Action": [
+            "s3:ListBucketVersions"
+          ],
+          "Resource": [
+            "arn:aws:s3:::aion-h0-synthetic-no-go"
+          ],
+          "Condition": {
+            "StringLike": {
+              "s3:prefix": [
+                "aion-h0/v1/*"
+              ]
+            }
+          }
+        },
+        {
+          "Sid": "A153ReadRetentionConfiguration",
+          "Effect": "Allow",
+          "Action": [
+            "s3:GetBucketObjectLockConfiguration"
+          ],
+          "Resource": [
+            "arn:aws:s3:::aion-h0-synthetic-no-go"
+          ]
+        },
+        {
+          "Sid": "A153ReadExactObjectVersions",
+          "Effect": "Allow",
+          "Action": [
+            "s3:GetObjectRetention",
+            "s3:GetObjectVersion"
+          ],
+          "Resource": [
+            "arn:aws:s3:::aion-h0-synthetic-no-go/aion-h0/v1/*"
+          ]
+        }
+      ]
+    }
+  }
+}
