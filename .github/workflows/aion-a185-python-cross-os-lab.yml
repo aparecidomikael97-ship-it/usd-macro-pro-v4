@@ -1,0 +1,38 @@
+name: A185 Python sqlite epoch negative controls (Ubuntu and Windows)
+on:
+  pull_request:
+    paths:
+      - 'labs/a185/sqlite_python_epoch_cross_os.py'
+      - '.github/workflows/aion-a185-python-cross-os-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stdlib-epoch-cached-and-connection-bypass:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Execute synthetic stdlib negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -c 'import pathlib,hashlib; b=pathlib.Path("labs/a185/sqlite_python_epoch_cross_os.py").read_bytes().replace(bytes((13,10)),bytes((10,))); h=hashlib.sha256(b).hexdigest(); print("Normalized source SHA256:",h); assert h=="8ba86716cc26f3186dc5783cb2902d557a134ad3a9d2e73ddf73843bd06780e4"'
+          python -V
+          python -B labs/a185/sqlite_python_epoch_cross_os.py 2>&1 | tee a185_python.log
+          grep -q 'PYTHON_CACHE_REVOKED=DENIED' a185_python.log
+          grep -q 'PYTHON_SECOND_CONNECTION_UNGUARDED_WRITE=SUCCEEDED' a185_python.log
+          grep -q 'RESULT=PASS_EXPECTED_NEGATIVE_CONTROLS SECURITY_STATUS=NOT_HOMOLOGATED' a185_python.log
+      - name: State evidence boundary
+        shell: bash
+        run: |
+          echo 'Passing means the controlled interruption AND unguarded bypass were reproduced.'
+          echo 'No live VFS file-pointer attestation on Windows; no AION production runtime, no P0 homologation.'
+          echo '0/6 P0 | HARD NO-GO | ZERO_AUTO_RESEND.'

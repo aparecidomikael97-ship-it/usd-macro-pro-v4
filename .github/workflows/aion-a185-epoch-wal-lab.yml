@@ -1,0 +1,41 @@
+name: A185 Native SQLite Epoch WAL LAB (negative controls only)
+on:
+  pull_request:
+    paths:
+      - 'labs/a185/sqlite_vfs_epoch_wal_lab.c'
+      - '.github/workflows/aion-a185-epoch-wal-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-synthetic-negative-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source and compile prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '097836f7f38fa4d41f690bd7ae8c37afa6b297cd4b104d928f4e234e23750f2d  labs/a185/sqlite_vfs_epoch_wal_lab.c' | sha256sum -c -
+          cc --version | head -1
+          pkg-config --modversion sqlite3
+      - name: Compile and run native LAB twice, O0 and O2
+        shell: bash
+        run: |
+          set -euo pipefail
+          for opt in 0 2; do
+            cc -std=c11 -Wall -Wextra -Werror -O"$opt" labs/a185/sqlite_vfs_epoch_wal_lab.c -lsqlite3 -o "/tmp/a185_epoch_wal_O$opt"
+            "/tmp/a185_epoch_wal_O$opt" 2>&1 | tee "/tmp/a185_epoch_wal_O$opt.log"
+            grep -q 'REVOKED_CACHED_RC=9' "/tmp/a185_epoch_wal_O$opt.log"
+            grep -q 'EXPLICIT_BASE_VFS_BYPASS_RC=0' "/tmp/a185_epoch_wal_O$opt.log"
+            grep -q 'WAL_MODE_MAIN_ONLY_DENY_INSERT_RC=0' "/tmp/a185_epoch_wal_O$opt.log"
+            grep -q 'WAL_XWRITE_DENY_INSERT_RC=10' "/tmp/a185_epoch_wal_O$opt.log"
+            grep -q 'A185_LAB_RESULT=PASS_NEGATIVE_CONTROLS SECURITY_STATUS=INCOMPLETE_STDLIB_BYPASS_AND_EXTERNAL_EPOCH_UNATTESTED' "/tmp/a185_epoch_wal_O$opt.log"
+          done
+      - name: Explicitly preserve qualification
+        shell: bash
+        run: |
+          echo 'CI GREEN means negative controls reproduced; not a fix.'
+          echo 'UNVERIFIED: Windows, real AION Python, host/epoch independence, native same-inode ABA, recovery and power-loss.'
+          echo 'P0 homologated 0/6 | HARD NO-GO | ZERO_AUTO_RESEND.'
