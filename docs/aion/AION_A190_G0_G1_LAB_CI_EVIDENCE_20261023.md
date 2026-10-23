@@ -4,7 +4,7 @@ Data 2026-10-23; missão #1486; PR Draft #1488 sobre preflight #1487.
 
 ## Estado da evidência
 
-- **SHA exato de código/testes/workflow verificado pelo CI:** cef d6f419af7c702fc39ecb27688dd2f02cdce43 (remover o espaço após "cef" ao consultar Git; SHA canônico: cefd6f419af7c702fc39ecb27688dd2f02cdce43).
+- **SHA exato de código/testes/workflow verificado pelo CI:** cefd6f419af7c702fc39ecb27688dd2f02cdce43.
 - **Run verificado:** https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40042023892
 - **Resultado:** quatro jobs **SUCCESS**: G0 Ubuntu, G0 Windows, G1 Ubuntu UID e G1 Windows SID. Inspecionados job summaries e logs de G1. Sem alteração em módulos operacionais ou arquivo de credenciais.
 - **Tentativa inicial mantida para rastreio:** https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40041894887 — G0 passou nos dois SOs e G1 Windows passou, mas G1 Linux falhou **antes do probe** por não conseguir importar o script dentro do checkout como UID restrito. Corrigido copiando script de teste para /tmp público com permissões de leitura, sem alterar ACL do banco, asserts ou critério de aceitação.
