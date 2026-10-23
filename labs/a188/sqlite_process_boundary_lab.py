@@ -1,142 +1,154 @@
-"""A188 LAB ONLY — broker-process SQLite boundary with untrusted local custody.
+"""A188 LAB ONLY — subprocess SQLite broker, JSON-only IPC, untrusted custody.
 
-No action adapter, external provider, live keys, credential bootstrap or production
-integration. This deliberately exhibits raw-file and rollback bypasses. A green
-negative-control suite is NOT a P0 security gate or a deploy approval.
+This intentionally demonstrates raw SQLite and rollback bypasses. It is NOT
+an authenticated root, production sandbox, transaction authority or API server.
 """
 from __future__ import annotations
 
 import hashlib
-import multiprocessing
+import json
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 SCHEMA = "A188_SYNTHETIC_SQLITE_BROKER_LAB_V1"
+MAX_MESSAGE = 4096
 
 
 def _hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _worker(conn: Any, path: str, local_token: str) -> None:
-    """Own one SQLite connection inside the child. Never send the handle."""
-    db = None
+def _send(obj: dict[str, Any]) -> None:
+    sys.stdout.write(json.dumps(obj, sort_keys=True) + "\n")
+    sys.stdout.flush()
+
+
+def _worker(path: str, local_token: str) -> None:
+    """Own the SQLite handle; accept JSON values, never arbitrary SQL."""
+    db = sqlite3.connect(path, timeout=5.0)
     try:
-        db = sqlite3.connect(path, timeout=5.0)
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("PRAGMA busy_timeout=5000")
         db.execute("""CREATE TABLE IF NOT EXISTS lab_reservations (
-            request_id TEXT PRIMARY KEY,
-            event_id TEXT NOT NULL,
-            payload_hash TEXT NOT NULL,
-            status TEXT NOT NULL CHECK (status='RESERVED')
+            request_id TEXT PRIMARY KEY, event_id TEXT NOT NULL,
+            payload_hash TEXT NOT NULL, status TEXT NOT NULL CHECK(status='RESERVED')
         )""")
         db.commit()
-        conn.send({"kind": "READY", "schema": SCHEMA})
+        _send({"kind": "READY", "schema": SCHEMA})
         while True:
-            try:
-                msg = conn.recv()
-            except EOFError:
+            line = sys.stdin.readline(MAX_MESSAGE + 1)
+            if not line:
                 break
+            if len(line) > MAX_MESSAGE or not line.endswith("\n"):
+                _send({"status": "DENIED_OVERSIZED_OR_UNTERMINATED_MESSAGE"})
+                break
+            try:
+                msg = json.loads(line)
+            except (ValueError, UnicodeError):
+                _send({"status": "DENIED_INVALID_JSON"})
+                continue
             if not isinstance(msg, dict):
-                conn.send({"status": "DENIED_INVALID_MESSAGE"})
+                _send({"status": "DENIED_INVALID_MESSAGE"})
                 continue
             if msg.get("token") != local_token:
-                conn.send({"status": "DENIED_UNAUTHENTICATED_LOCAL_TOKEN"})
+                _send({"status": "DENIED_UNAUTHENTICATED_LOCAL_TOKEN"})
                 continue
             op = msg.get("op")
             if op == "shutdown":
-                conn.send({"status": "SHUTDOWN"})
+                _send({"status": "SHUTDOWN"})
                 break
             if op == "reserve":
                 key, event, payload = msg.get("request_id"), msg.get("event_id"), msg.get("payload")
                 if not all(isinstance(v, str) and 0 < len(v) <= 128 for v in (key, event, payload)):
-                    conn.send({"status": "DENIED_INVALID_RESERVATION"})
+                    _send({"status": "DENIED_INVALID_RESERVATION"})
                     continue
                 checksum = _hash(payload)
                 with db:
-                    row = db.execute(
-                        "SELECT event_id,payload_hash FROM lab_reservations WHERE request_id=?",
-                        (key,),
-                    ).fetchone()
+                    row = db.execute("SELECT event_id,payload_hash FROM lab_reservations WHERE request_id=?", (key,)).fetchone()
                     if row:
                         result = {"status": "ALREADY_RESERVED" if row == (event, checksum) else "DENIED_REQUEST_CONFLICT"}
                     else:
                         db.execute("INSERT INTO lab_reservations VALUES(?,?,?,'RESERVED')", (key, event, checksum))
                         result = {"status": "RESERVED_LOCAL_ONLY"}
                 if msg.get("simulate_ack_loss") is True:
-                    # Deliberately lose post-commit ACK. No external action is sent.
-                    # Closing the pipe makes the parent retain UNCERTAIN.
+                    # No actual external effect; simulate missing ACK after commit.
                     break
-                conn.send(result)
+                _send(result)
             elif op == "lookup_local":
                 key = msg.get("request_id")
                 if not isinstance(key, str):
-                    conn.send({"status": "DENIED_INVALID_LOOKUP"})
+                    _send({"status": "DENIED_INVALID_LOOKUP"})
                     continue
-                row = db.execute(
-                    "SELECT event_id,status FROM lab_reservations WHERE request_id=?", (key,)
-                ).fetchone()
-                # Explicitly not a receipt of external effect or monotonic witness.
-                conn.send({"status": "OBSERVED_LOCAL_UNTRUSTED", "found": bool(row)})
+                row = db.execute("SELECT 1 FROM lab_reservations WHERE request_id=?", (key,)).fetchone()
+                _send({"status": "OBSERVED_LOCAL_UNTRUSTED", "found": bool(row)})
             elif op == "count_local":
                 count = db.execute("SELECT COUNT(*) FROM lab_reservations").fetchone()[0]
-                conn.send({"status": "LOCAL_COUNT_UNTRUSTED", "count": count})
+                _send({"status": "LOCAL_COUNT_UNTRUSTED", "count": count})
             else:
-                conn.send({"status": "DENIED_UNSUPPORTED_OPERATION"})
+                _send({"status": "DENIED_UNSUPPORTED_OPERATION"})
     finally:
-        if db is not None:
-            db.close()
-        conn.close()
+        db.close()
 
 
 class BrokerLab:
-    """Test controller; same-host parent token is NOT an independent authority."""
+    """Same-host parent retains DB path and synthetic token: NOT independent."""
 
     def __init__(self, path: Path, token: str = "synthetic-local-token"):
         self.path = Path(path)
         self.token = token
-        ctx = multiprocessing.get_context("spawn")
-        parent, child = ctx.Pipe(duplex=True)
-        self.conn = parent
-        self.process = ctx.Process(target=_worker, args=(child, str(self.path), token))
-        self.process.start()
-        child.close()
-        if not self.conn.poll(12):
+        self.process = subprocess.Popen(
+            [sys.executable, "-B", "-u", "-m", "labs.a188.sqlite_process_boundary_lab",
+             "--worker", str(self.path), token],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding="utf-8", bufsize=1,
+        )
+        assert self.process.stdin is not None and self.process.stdout is not None
+        line = self.process.stdout.readline()
+        if not line:
+            error = self.process.stderr.read(2500) if self.process.stderr is not None else ""
             self.close()
-            raise RuntimeError("A188_BROKER_BOOT_TIMEOUT")
-        ready = self.conn.recv()
-        if ready != {"kind": "READY", "schema": SCHEMA}:
+            raise RuntimeError("A188_BROKER_START_FAILED: " + error[:300])
+        if json.loads(line) != {"kind": "READY", "schema": SCHEMA}:
             self.close()
             raise RuntimeError("A188_BROKER_NOT_READY")
 
     def request(self, op: str, *, token: str | None = None, **kwargs: Any) -> dict[str, Any]:
-        msg = {"op": op, "token": self.token if token is None else token, **kwargs}
+        message = {"op": op, "token": self.token if token is None else token, **kwargs}
         try:
-            self.conn.send(msg)
-            if not self.conn.poll(8):
-                return {"status": "UNCERTAIN", "auto_resend": False}
-            return self.conn.recv()
-        except (EOFError, BrokenPipeError, OSError):
+            assert self.process.stdin is not None and self.process.stdout is not None
+            self.process.stdin.write(json.dumps(message) + "\n")
+            self.process.stdin.flush()
+            line = self.process.stdout.readline()
+            return json.loads(line) if line else {"status": "UNCERTAIN", "auto_resend": False}
+        except (BrokenPipeError, OSError, ValueError):
             return {"status": "UNCERTAIN", "auto_resend": False}
 
     def close(self) -> None:
-        if self.process.is_alive():
+        if self.process.poll() is None:
             try:
-                if not self.conn.closed:
-                    self.request("shutdown")
+                self.request("shutdown")
             except Exception:
                 pass
-            self.process.join(timeout=5)
-            if self.process.is_alive():
-                self.process.terminate()
-                self.process.join(timeout=5)
-        if not self.conn.closed:
-            self.conn.close()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=5)
+        for pipe in (self.process.stdin, self.process.stdout, self.process.stderr):
+            if pipe is not None and not pipe.closed:
+                pipe.close()
 
     def __enter__(self) -> "BrokerLab":
         return self
 
     def __exit__(self, _type: Any, _value: Any, _tb: Any) -> None:
         self.close()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4 or sys.argv[1] != "--worker":
+        raise SystemExit("LAB worker only; not a production entrypoint")
+    _worker(sys.argv[2], sys.argv[3])
