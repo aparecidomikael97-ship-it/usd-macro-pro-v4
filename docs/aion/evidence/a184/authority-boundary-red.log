@@ -1,0 +1,32 @@
+test_distinct_roles_must_sign_one_identical_message (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message) ... FAIL
+test_query_cannot_replace_original_binding_through_retained_input (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input) ... FAIL
+test_retained_response_mutation_cannot_invalidate_captured_signed_bytes (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes) ... FAIL
+
+======================================================================
+FAIL: test_distinct_roles_must_sign_one_identical_message (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_authority_boundary_a184_lab.py", line 54, in test_distinct_roles_must_sign_one_identical_message
+    self.assertIsNone(result, "two valid signatures over DIFFERENT bodies are not a quorum")
+AssertionError: {'lab_verified': True, 'kind': 'RESERVATION', 'permits_send': False, 'permits_retry': False, 'external_homologation': False} is not None : two valid signatures over DIFFERENT bodies are not a quorum
+
+======================================================================
+FAIL: test_query_cannot_replace_original_binding_through_retained_input (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_authority_boundary_a184_lab.py", line 24, in test_query_cannot_replace_original_binding_through_retained_input
+    self.assertIsNone(fixture.verifier().admit(
+AssertionError: {'lab_verified': True, 'kind': 'RESERVATION', 'permits_send': False, 'permits_retry': False, 'external_homologation': False} is not None
+
+======================================================================
+FAIL: test_retained_response_mutation_cannot_invalidate_captured_signed_bytes (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_authority_boundary_a184_lab.py", line 75, in test_retained_response_mutation_cannot_invalidate_captured_signed_bytes
+    self.assertIsNotNone(result)
+AssertionError: unexpectedly None
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.007s
+
+FAILED (failures=3)

@@ -5,7 +5,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
+import stat
 from typing import Protocol
 from uuid import uuid4
 
@@ -19,6 +21,25 @@ HEALTHY = "healthy"
 DEGRADED = "degraded"
 RECOVERING = "recovering"
 FAILED = "failed"
+# A LAB resource budget, not a backup size guarantee for an activated service.
+MAX_RECOVERY_BYTES = 16 * 1024 * 1024
+
+# A deliberately narrow recovery format matching this store's emitted DDL.
+# This is not a general SQLite schema equivalence/compatibility validator.
+_CHAT_RECOVERY_DDL = {
+    "conversations": """CREATE TABLE conversations(id TEXT PRIMARY KEY, owner TEXT NOT NULL,
+        tenant TEXT NOT NULL, workspace TEXT NOT NULL, updated TEXT NOT NULL,
+        archived INTEGER NOT NULL, title TEXT NOT NULL, data TEXT NOT NULL)""",
+    "messages": """CREATE TABLE messages(id TEXT PRIMARY KEY,cid TEXT NOT NULL REFERENCES conversations(id),
+        seq INTEGER NOT NULL,content TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(cid,seq))""",
+    "records": """CREATE TABLE records(id TEXT PRIMARY KEY,cid TEXT NOT NULL REFERENCES conversations(id),
+        kind TEXT NOT NULL,seq INTEGER NOT NULL,data TEXT NOT NULL)""",
+}
+_CHAT_RECOVERY_INDEX_DDL = {
+    "scope_recency": "CREATE INDEX scope_recency ON conversations(owner,tenant,workspace,archived,updated,id)",
+    "message_history": "CREATE INDEX message_history ON messages(cid,seq)",
+    "record_history": "CREATE INDEX record_history ON records(cid,kind,seq,id)",
+}
 
 
 class StorageUnavailableError(RuntimeError):
@@ -47,35 +68,273 @@ def dump(value):
     return json.dumps(redact(asdict(value)), ensure_ascii=False, separators=(",", ":"))
 
 
-def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+class _ValidatedDatabaseReport(dict):
+    """Public metadata plus the exact locally validated bytes, never provenance."""
+
+    def __init__(self, data, **metadata):
+        super().__init__(metadata)
+        self._data = data
 
 
-def _validate_database_file(path: Path) -> dict:
-    if not path.is_file():
-        raise StorageUnavailableError("database file unavailable")
+def _recovery_path_chain(path, *, missing=False):
+    """Reject observable aliases; this is not a native SQLite VFS attestation."""
+    result = []
+    for node in (path, *path.parents):
+        try:
+            info = node.lstat()
+        except FileNotFoundError:
+            if missing:
+                result.append(None)
+                continue
+            raise
+        if stat.S_ISLNK(info.st_mode) or getattr(node, "is_junction", lambda: False)():
+            raise StorageUnavailableError("RECOVERY_ALIAS_DENIED")
+        if not info.st_ino:
+            raise StorageUnavailableError("RECOVERY_FILE_IDENTITY_UNAVAILABLE")
+        result.append((info.st_dev, info.st_ino))
+    return tuple(result)
+
+
+def _deny_recovery_sidecars(path):
+    for suffix in ("-wal", "-shm", "-journal"):
+        try:
+            Path(str(path) + suffix).lstat()
+        except FileNotFoundError:
+            continue
+        raise StorageUnavailableError("RECOVERY_SIDECAR_AMBIGUITY")
+
+
+def _recovery_file_state(info):
+    return tuple(getattr(info, field) for field in (
+        "st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns"))
+
+
+def _recovery_ddl_tokens(sql):
+    """Allow ASCII keyword case/spacing only; deny unsupported SQL syntax.
+
+    No removal of comments, quoting, literals or token boundaries is attempted.
+    Equivalent alternative DDL can therefore be rejected intentionally.
+    """
+    if not isinstance(sql, str):
+        return None
+    tokens, end = [], 0
+    for match in re.finditer(r"[A-Za-z_][A-Za-z_0-9]*|[(),]", sql):
+        if sql[end:match.start()].strip(" \t\r\n\f\v"):
+            return None
+        tokens.append(match.group().upper())
+        end = match.end()
+    if sql[end:].strip(" \t\r\n\f\v"):
+        return None
+    return tuple(tokens)
+
+
+def _validate_database_bytes(data):
+    if not 100 <= len(data) <= MAX_RECOVERY_BYTES:
+        raise StorageUnavailableError("RECOVERY_SIZE_DENIED")
+    if data[:16] != b"SQLite format 3\0" or data[18:20] != b"\x01\x01":
+        raise StorageUnavailableError("RECOVERY_OFFLINE_ROLLBACK_FORMAT_REQUIRED")
     db = None
     try:
-        db = sqlite3.connect(str(path), timeout=5)
-        quick = str(db.execute("PRAGMA quick_check").fetchone()[0] or "")
-        foreign = db.execute("PRAGMA foreign_key_check").fetchall()
-        if quick.lower() != "ok" or foreign:
+        db = sqlite3.connect(":memory:")
+        if not hasattr(db, "deserialize"):
+            raise StorageUnavailableError("RECOVERY_NATIVE_DESERIALIZE_REQUIRED")
+        db.deserialize(data)
+        db.execute("PRAGMA trusted_schema=OFF")
+        db.execute("PRAGMA query_only=ON")
+        budget = 10_000
+
+        def progress():
+            nonlocal budget
+            budget -= 1
+            return int(budget <= 0)
+
+        db.set_progress_handler(progress, 1_000)
+        if db.execute("PRAGMA database_list").fetchall() != [(0, "main", "")]:
+            raise StorageUnavailableError("RECOVERY_NATIVE_MEMORY_REQUIRED")
+        quick = db.execute("PRAGMA quick_check").fetchmany(2)
+        foreign = db.execute("PRAGMA foreign_key_check").fetchmany(1)
+        if quick != [("ok",)] or foreign:
             raise StorageUnavailableError("database integrity validation failed")
-        return {
-            "quick_check": quick,
-            "foreign_key_violations": len(foreign),
-            "size_bytes": path.stat().st_size,
-            "sha256": _file_sha256(path),
+        # Reject arbitrary SQLite databases and executable schema constructs.
+        # Additional ordinary tables (e.g. Outbox/Saga) are permitted, without
+        # claiming general application-level compatibility of their contents.
+        schema = db.execute("SELECT type, name, sql FROM sqlite_schema").fetchmany(1_001)
+        if len(schema) > 1_000 or any(
+            kind in {"trigger", "view"} or "CREATE VIRTUAL TABLE" in (sql or "").upper()
+            for kind, _, sql in schema
+        ):
+            raise StorageUnavailableError("RECOVERY_SCHEMA_DENIED")
+        tables = {name: sql for kind, name, sql in schema if kind == "table"}
+        indexes = {name: sql for kind, name, sql in schema if kind == "index"}
+        for table, expected_ddl in _CHAT_RECOVERY_DDL.items():
+            if _recovery_ddl_tokens(tables.get(table)) != _recovery_ddl_tokens(expected_ddl):
+                raise StorageUnavailableError("RECOVERY_CHAT_DDL_DENIED")
+            # Explicit indexes can also add uniqueness or failing expressions
+            # without changing table_info/FKs. Permit only the emitted forms.
+            for row in db.execute(f"PRAGMA index_list({table})"):
+                if row[3] == "c":
+                    expected_index = _CHAT_RECOVERY_INDEX_DDL.get(row[1])
+                    if (expected_index is None or _recovery_ddl_tokens(indexes.get(row[1]))
+                            != _recovery_ddl_tokens(expected_index)):
+                        raise StorageUnavailableError("RECOVERY_CHAT_INDEX_DDL_DENIED")
+        required = {
+            "conversations": {
+                "id": ("TEXT", 0, 1), "owner": ("TEXT", 1, 0),
+                "tenant": ("TEXT", 1, 0), "workspace": ("TEXT", 1, 0),
+                "updated": ("TEXT", 1, 0), "archived": ("INTEGER", 1, 0),
+                "title": ("TEXT", 1, 0), "data": ("TEXT", 1, 0)},
+            "messages": {
+                "id": ("TEXT", 0, 1), "cid": ("TEXT", 1, 0),
+                "seq": ("INTEGER", 1, 0), "content": ("TEXT", 1, 0),
+                "data": ("TEXT", 1, 0)},
+            "records": {
+                "id": ("TEXT", 0, 1), "cid": ("TEXT", 1, 0),
+                "kind": ("TEXT", 1, 0), "seq": ("INTEGER", 1, 0),
+                "data": ("TEXT", 1, 0)},
         }
-    except (sqlite3.DatabaseError, OSError) as exc:
+        for table, expected in required.items():
+            actual = {row[1]: (row[2].upper(), row[3], row[5])
+                      for row in db.execute(f"PRAGMA table_info({table})")}
+            if any(actual.get(name) != spec for name, spec in expected.items()):
+                raise StorageUnavailableError("RECOVERY_CHAT_SCHEMA_REQUIRED")
+        for table in ("messages", "records"):
+            if not any(row[2:5] == ("conversations", "cid", "id")
+                       for row in db.execute(f"PRAGMA foreign_key_list({table})")):
+                raise StorageUnavailableError("RECOVERY_CHAT_FOREIGN_KEY_REQUIRED")
+        unique_message_sequence = False
+        for row in db.execute("PRAGMA index_list(messages)").fetchall():
+            if row[2] and not row[4]:
+                escaped = row[1].replace('"', '""')
+                columns = [item[2] for item in db.execute(f'PRAGMA index_info("{escaped}")')]
+                unique_message_sequence |= columns == ["cid", "seq"]
+        if not unique_message_sequence:
+            raise StorageUnavailableError("RECOVERY_MESSAGE_SEQUENCE_UNIQUENESS_REQUIRED")
+        return _ValidatedDatabaseReport(
+            data, quick_check="ok", foreign_key_violations=0,
+            size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+    except (sqlite3.Error, OSError) as exc:
         raise StorageUnavailableError("database integrity validation failed") from exc
     finally:
         if db is not None:
             db.close()
+
+
+def _validate_database_file(path: Path) -> dict:
+    """Capture once without SQLite filename reopening/creation, then validate.
+
+    Our fd supplies the bytes consumed by the in-memory SQLite connection. It
+    does not identify a live store's native VFS handle, prove freshness, exclude
+    same-host ABA, or supply independently monotonic custody.
+    """
+    path = Path(path).absolute()
+    fd = None
+    try:
+        before = _recovery_path_chain(path)
+        _deny_recovery_sidecars(path)
+        flags = os.O_RDONLY
+        for option in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW", "O_NONBLOCK"):
+            flags |= getattr(os, option, 0)
+        fd = os.open(path, flags)
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or (info.st_dev, info.st_ino) != before[0]):
+            raise StorageUnavailableError("RECOVERY_FD_IDENTITY_MISMATCH")
+        if not 100 <= info.st_size <= MAX_RECOVERY_BYTES:
+            raise StorageUnavailableError("RECOVERY_SIZE_DENIED")
+        parts, total = [], 0
+        while True:
+            block = os.read(fd, min(65_536, MAX_RECOVERY_BYTES + 1 - total))
+            if not block:
+                break
+            parts.append(block)
+            total += len(block)
+            if total > MAX_RECOVERY_BYTES:
+                raise StorageUnavailableError("RECOVERY_SIZE_DENIED")
+        if (_recovery_file_state(info) != _recovery_file_state(os.fstat(fd))
+                or _recovery_path_chain(path) != before or total != info.st_size):
+            raise StorageUnavailableError("RECOVERY_CHANGED_DURING_CAPTURE")
+        _deny_recovery_sidecars(path)
+        return _validate_database_bytes(b"".join(parts))
+    except (OSError, sqlite3.Error) as exc:
+        raise StorageUnavailableError("database file unavailable") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _publish_database_report(report, destination):
+    """Publish only captured bytes; late failure means uncertain local outcome.
+
+    Existing target must be quiescent/offline. Sidecar/path checks cannot prove
+    that another process holds no live DELETE-mode connection or prevent a
+    privileged host from replacing bytes after verification. File fsync is not
+    a portable power-loss/directory durability or independent custody claim.
+    """
+    if not isinstance(report, _ValidatedDatabaseReport):
+        raise StorageUnavailableError("RECOVERY_CAPTURE_REQUIRED")
+    data = report._data
+    if hashlib.sha256(data).hexdigest() != report.get("sha256"):
+        raise StorageUnavailableError("RECOVERY_CAPTURE_DIGEST_MISMATCH")
+    destination = Path(destination).absolute()
+    _recovery_path_chain(destination, missing=True)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    before = _recovery_path_chain(destination, missing=True)
+    _deny_recovery_sidecars(destination)
+    target_state = None
+    if before[0] is not None:
+        info = destination.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise StorageUnavailableError("RECOVERY_TARGET_FILE_REQUIRED")
+        target_state = _recovery_file_state(info)
+    temp = destination.with_name(destination.name + ".publish-" + uuid4().hex)
+    fd = None
+    publication_attempted = False
+    try:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        for option in ("O_BINARY", "O_CLOEXEC", "O_NOFOLLOW"):
+            flags |= getattr(os, option, 0)
+        fd = os.open(temp, flags, 0o600)
+        identity = os.fstat(fd)
+        pending = memoryview(data)
+        while pending:
+            written = os.write(fd, pending)
+            if written <= 0:
+                raise StorageUnavailableError("RECOVERY_WRITE_INCOMPLETE")
+            pending = pending[written:]
+        os.fsync(fd)
+        after = os.fstat(fd)
+        os.close(fd)
+        fd = None
+        captured = _validate_database_file(temp)
+        if ((identity.st_dev, identity.st_ino) != _recovery_path_chain(temp)[0]
+                or captured._data != data or after.st_size != len(data)):
+            raise StorageUnavailableError("RECOVERY_OUTPUT_CHANGED")
+        if _recovery_path_chain(destination, missing=True) != before:
+            raise StorageUnavailableError("RECOVERY_TARGET_CHANGED")
+        if target_state is not None and _recovery_file_state(destination.lstat()) != target_state:
+            raise StorageUnavailableError("RECOVERY_TARGET_CHANGED")
+        _deny_recovery_sidecars(destination)
+        # An exception/lost response from replace cannot prove no effect.
+        publication_attempted = True
+        os.replace(temp, destination)
+        final = _validate_database_file(destination)
+        if final._data != data:
+            raise StorageUnavailableError("RECOVERY_PUBLISHED_BYTES_CHANGED")
+        return final
+    except (OSError, sqlite3.Error, StorageUnavailableError) as exc:
+        if publication_attempted:
+            raise StorageUnavailableError(
+                "RECOVERY_PUBLICATION_UNCERTAIN_ZERO_AUTO_RESEND") from exc
+        if isinstance(exc, StorageUnavailableError):
+            raise
+        raise StorageUnavailableError("verified SQLite publication failed") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 class SQLiteChatStore:
@@ -240,10 +499,17 @@ class SQLiteChatStore:
             target = sqlite3.connect(str(temp), timeout=BUSY_TIMEOUT_MS / 1000)
             self.db.backup(target)
             target.commit()
+            # A backup artifact must be standalone, with no live WAL to replay.
+            if str(target.execute("PRAGMA journal_mode=DELETE").fetchone()[0]).lower() != "delete":
+                raise StorageUnavailableError("RECOVERY_OFFLINE_BACKUP_REQUIRED")
             target.close()
             target = None
             verified = _validate_database_file(temp)
-            os.replace(temp, destination)
+            _publish_database_report(verified, destination)
+            try:
+                temp.unlink(missing_ok=True)
+            except OSError:
+                pass
             return {
                 "state": "BACKUP_VERIFIED",
                 "source_path": str(self.path),
@@ -267,27 +533,18 @@ class SQLiteChatStore:
 
     @classmethod
     def restore_from_backup(cls, backup_path, target_path):
-        """Restore a verified backup atomically; never replace target on invalid input."""
+        """Restore captured offline bytes; post-publication failure is uncertain.
+
+        This validates local structure/content, not age, external provenance or
+        a monotonic antirollback history. The target must be offline/quiescent.
+        """
         source = Path(backup_path)
         target = Path(target_path)
         if source.resolve() == target.resolve():
             raise ValueError("restore target must differ from backup")
         source_report = _validate_database_file(source)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temp = target.with_name(target.name + ".restore-" + uuid4().hex)
-        source_db = None
-        target_db = None
         try:
-            source_db = sqlite3.connect(str(source), timeout=BUSY_TIMEOUT_MS / 1000)
-            target_db = sqlite3.connect(str(temp), timeout=BUSY_TIMEOUT_MS / 1000)
-            source_db.backup(target_db)
-            target_db.commit()
-            target_db.close()
-            target_db = None
-            source_db.close()
-            source_db = None
-            restored_report = _validate_database_file(temp)
-            os.replace(temp, target)
+            restored_report = _publish_database_report(source_report, target)
             return {
                 "state": "RESTORE_VERIFIED",
                 "backup_path": str(source),
@@ -297,16 +554,6 @@ class SQLiteChatStore:
                 "size_bytes": restored_report["size_bytes"],
             }
         except (sqlite3.DatabaseError, OSError, StorageUnavailableError) as exc:
-            for db in (target_db, source_db):
-                if db is not None:
-                    try:
-                        db.close()
-                    except Exception:
-                        pass
-            try:
-                temp.unlink(missing_ok=True)
-            except Exception:
-                pass
             if isinstance(exc, StorageUnavailableError):
                 raise
             raise StorageUnavailableError("verified SQLite restore failed") from exc

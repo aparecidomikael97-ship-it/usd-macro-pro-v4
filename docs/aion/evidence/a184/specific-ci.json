@@ -1,0 +1,987 @@
+{
+  "repository": "aparecidomikael97-ship-it/usd-macro-pro-v4",
+  "pr": 1476,
+  "run_id": 39902967998,
+  "run_url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998",
+  "base_sha": "172be01c5ae665fbbfddb2c4d5dc02f15b77e953",
+  "candidate_sha": "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+  "audit_utc": "2026-10-23T04:58:17.640134+00:00",
+  "scope": "Read-only audit of the two BASE RED and two specific jobs only; no rerun or repository edits.",
+  "jobs": [
+    {
+      "id": 120248447876,
+      "name": "A184 specific (windows-latest)",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248447876",
+      "status": "completed",
+      "conclusion": "success",
+      "expected_tested_sha": "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+      "observed_git_log_shas": [
+        "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c"
+      ],
+      "tested_sha_matches": true,
+      "tests_run": 76,
+      "elapsed_test_seconds": 19.436,
+      "verdicts": [
+        "OK"
+      ],
+      "failure_count_including_subtests": 0,
+      "error_count": 0,
+      "failure_headers": [],
+      "test_case_names": [
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_native_connection_redirected_read_must_be_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_native_connection_redirected_write_must_be_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_postcommit_connection_drift_is_unknown_and_latched",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_same_filename_native_aba_remains_unattested",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_same_filename_native_aba_write_can_commit_before_alarm",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_authorizer_denies_writes_attach_pragma_and_unsafe_functions",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_changed_during_fd_read_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_closed_handle_denies",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_missing_or_malformed_pin_denies",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_native_memory_reads_exact_pinned_bytes",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_new_process_retains_explicit_digest",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_persist_and_backup_fail_closed_no_file_created",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_renamed_or_deleted_source_cannot_change_captured_memory",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_restore_under_same_inode_is_denied_by_retained_digest",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_size_bound_and_invalid_sqlite_are_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_symlink_denied_or_os_capability_reported",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_threads_have_separate_native_connections",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_wal_header_and_sidecars_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_all_three_contracts_verify_but_never_grant_execution",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_local_rebootstrap_still_revalidates_same_evidence_risk",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_lost_response_and_boolean_authority_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_minimum_floor_and_missing_original_deny",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_missing_role_and_forged_signature_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_revoked_role_and_rotated_root_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_role_key_reuse_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_same_instance_replay_denied_and_original_input_is_copied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_signed_stale_and_expired_evidence_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_signed_wrong_binding_epoch_challenge_or_root_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_added_required_column_cannot_pass_recovery_gate",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_backup_cannot_publish_bytes_changed_after_validation",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_changed_published_file_reports_uncertain_without_claiming_rollback",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_chat_columns_without_message_uniqueness_are_rejected",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_ddl_comparison_allows_case_spacing_but_not_syntax_erasure",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_disappearing_input_is_not_recreated_by_native_sqlite",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_explicit_unique_index_cannot_add_constraints_to_chat_tables",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_lost_replace_response_reports_uncertain_and_never_retries",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_missing_input_is_never_created",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_missing_native_deserialize_fails_closed",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_mutation_during_single_fd_capture_is_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_ordinary_additional_tables_remain_permitted",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_alias_and_dangling_sidecar_alias_are_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_hardlink_is_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_target_sidecars_are_not_silently_reused_after_restore",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_trigger_bearing_backup_is_not_a_passive_chat_artifact",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_unexpected_check_constraint_cannot_pass_recovery_gate",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_valid_sqlite_without_chat_schema_cannot_erase_target",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_validated_source_replacement_cannot_change_restored_bytes",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_visible_concurrent_target_commit_is_not_overwritten",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_wal_header_without_sidecars_is_still_not_offline_backup",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_write_failure_before_publish_preserves_target",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_zero_byte_input_cannot_erase_valid_target",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_budgets_cannot_exceed_lab_safety_ceilings",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_connections_close_on_vm_row_size_and_authorization_errors",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_large_single_value_denied_by_sqlite_length_limit",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_result_byte_budget_accounts_for_aggregate_rows",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_row_budget_denies_instead_of_returning_partial_rows",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_sidecar_directory_denies_capture",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_unicode_budget_counts_utf8_bytes",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_vm_budget_denies_bounded_synthetic_cross_join",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes",
+          "result": "ok"
+        }
+      ],
+      "per_module_result_lines": {
+        "test_atlasquant_aion_native_path_a183_lab": 5,
+        "test_atlasquant_aion_snapshot_a183_lab": 13,
+        "test_atlasquant_aion_authority_a183_lab": 10,
+        "test_atlasquant_aion_sqlite_recovery_a184_lab": 24,
+        "test_atlasquant_aion_snapshot_limits_a184_lab": 11,
+        "test_atlasquant_aion_callback_boundary_a184_lab": 10,
+        "test_atlasquant_aion_authority_boundary_a184_lab": 3
+      },
+      "capability_and_risk_markers": [
+        "A184_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False",
+        "A183_NATIVE_SAME_NAME_ABA=OS_OR_FACADE_DENIED",
+        "A183_NATIVE_SAME_NAME_ABA_WRITE=OS_DENIED",
+        "A183_NATIVE_MEMORY_EXACT_PINNED_ARTIFACT=READ_OLD_PINNED_BYTES",
+        "A183_AUTHORITY_CONTRACT_RESET=LOCAL_ROOT_AND_FLOOR_NOT_EXTERNAL",
+        "A184_DANGLING_SIDECAR=CAPTURE_DENIED",
+        "A184_ROW_BUDGET=QUERY_DENIED_NO_TRUNCATION",
+        "A184_VM_STEP_BUDGET=QUERY_DENIED_NO_PARTIAL_RESULT"
+      ],
+      "log_file": "120248447876.log",
+      "log_sha256": "51fc14fd23827d332dfa244b55c4a0b0aa8ca30f83360182d36a4bea69ef5bdc"
+    },
+    {
+      "id": 120248447902,
+      "name": "A184 specific (ubuntu-latest)",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248447902",
+      "status": "completed",
+      "conclusion": "success",
+      "expected_tested_sha": "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+      "observed_git_log_shas": [
+        "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c"
+      ],
+      "tested_sha_matches": true,
+      "tests_run": 76,
+      "elapsed_test_seconds": 0.736,
+      "verdicts": [
+        "OK"
+      ],
+      "failure_count_including_subtests": 0,
+      "error_count": 0,
+      "failure_headers": [],
+      "test_case_names": [
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_native_connection_redirected_read_must_be_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_native_connection_redirected_write_must_be_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_postcommit_connection_drift_is_unknown_and_latched",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_same_filename_native_aba_remains_unattested",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_native_path_a183_lab.NativeDeclaredPathTests.test_same_filename_native_aba_write_can_commit_before_alarm",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_authorizer_denies_writes_attach_pragma_and_unsafe_functions",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_changed_during_fd_read_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_closed_handle_denies",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_missing_or_malformed_pin_denies",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_native_memory_reads_exact_pinned_bytes",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_new_process_retains_explicit_digest",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_persist_and_backup_fail_closed_no_file_created",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_renamed_or_deleted_source_cannot_change_captured_memory",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_restore_under_same_inode_is_denied_by_retained_digest",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_size_bound_and_invalid_sqlite_are_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_symlink_denied_or_os_capability_reported",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_threads_have_separate_native_connections",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_a183_lab.PinnedSnapshotTests.test_wal_header_and_sidecars_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_all_three_contracts_verify_but_never_grant_execution",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_local_rebootstrap_still_revalidates_same_evidence_risk",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_lost_response_and_boolean_authority_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_minimum_floor_and_missing_original_deny",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_missing_role_and_forged_signature_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_revoked_role_and_rotated_root_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_role_key_reuse_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_same_instance_replay_denied_and_original_input_is_copied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_signed_stale_and_expired_evidence_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_a183_lab.AuthorityContractTests.test_signed_wrong_binding_epoch_challenge_or_root_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_added_required_column_cannot_pass_recovery_gate",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_backup_cannot_publish_bytes_changed_after_validation",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_changed_published_file_reports_uncertain_without_claiming_rollback",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_chat_columns_without_message_uniqueness_are_rejected",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_ddl_comparison_allows_case_spacing_but_not_syntax_erasure",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_disappearing_input_is_not_recreated_by_native_sqlite",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_explicit_unique_index_cannot_add_constraints_to_chat_tables",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_lost_replace_response_reports_uncertain_and_never_retries",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_missing_input_is_never_created",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_missing_native_deserialize_fails_closed",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_mutation_during_single_fd_capture_is_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_ordinary_additional_tables_remain_permitted",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_alias_and_dangling_sidecar_alias_are_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_hardlink_is_denied",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_target_sidecars_are_not_silently_reused_after_restore",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_trigger_bearing_backup_is_not_a_passive_chat_artifact",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_unexpected_check_constraint_cannot_pass_recovery_gate",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_valid_sqlite_without_chat_schema_cannot_erase_target",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_validated_source_replacement_cannot_change_restored_bytes",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_visible_concurrent_target_commit_is_not_overwritten",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_wal_header_without_sidecars_is_still_not_offline_backup",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_write_failure_before_publish_preserves_target",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_zero_byte_input_cannot_erase_valid_target",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_budgets_cannot_exceed_lab_safety_ceilings",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_connections_close_on_vm_row_size_and_authorization_errors",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_large_single_value_denied_by_sqlite_length_limit",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_result_byte_budget_accounts_for_aggregate_rows",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_row_budget_denies_instead_of_returning_partial_rows",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_sidecar_directory_denies_capture",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_unicode_budget_counts_utf8_bytes",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_vm_budget_denies_bounded_synthetic_cross_join",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input",
+          "result": "ok"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes",
+          "result": "ok"
+        }
+      ],
+      "per_module_result_lines": {
+        "test_atlasquant_aion_native_path_a183_lab": 5,
+        "test_atlasquant_aion_snapshot_a183_lab": 13,
+        "test_atlasquant_aion_authority_a183_lab": 10,
+        "test_atlasquant_aion_sqlite_recovery_a184_lab": 24,
+        "test_atlasquant_aion_snapshot_limits_a184_lab": 11,
+        "test_atlasquant_aion_callback_boundary_a184_lab": 10,
+        "test_atlasquant_aion_authority_boundary_a184_lab": 3
+      },
+      "capability_and_risk_markers": [
+        "A184_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "A183_NATIVE_SAME_NAME_ABA=WRONG_FILE_READ_PATH_CHECK_PASSED",
+        "A183_NATIVE_SAME_NAME_ABA_WRITE=SQLITE_READONLY_DBMOVED",
+        "A183_NATIVE_MEMORY_EXACT_PINNED_ARTIFACT=READ_OLD_PINNED_BYTES",
+        "A183_AUTHORITY_CONTRACT_RESET=LOCAL_ROOT_AND_FLOOR_NOT_EXTERNAL",
+        "A184_DANGLING_SIDECAR=CAPTURE_DENIED",
+        "A184_ROW_BUDGET=QUERY_DENIED_NO_TRUNCATION",
+        "A184_VM_STEP_BUDGET=QUERY_DENIED_NO_PARTIAL_RESULT"
+      ],
+      "log_file": "120248447902.log",
+      "log_sha256": "3d55b48ca76cd7d7163095c52f537f177135614d6dffcb0c7a9b0ad6f9ddf4eb"
+    },
+    {
+      "id": 120248447955,
+      "name": "A184 adversarial BASE RED (ubuntu-latest)",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248447955",
+      "status": "completed",
+      "conclusion": "failure",
+      "expected_tested_sha": "172be01c5ae665fbbfddb2c4d5dc02f15b77e953",
+      "observed_git_log_shas": [
+        "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+        "172be01c5ae665fbbfddb2c4d5dc02f15b77e953"
+      ],
+      "tested_sha_matches": true,
+      "tests_run": 21,
+      "elapsed_test_seconds": 0.372,
+      "verdicts": [
+        "FAILED (failures=25)"
+      ],
+      "failure_count_including_subtests": 25,
+      "error_count": 0,
+      "failure_headers": [
+        "test_distinct_roles_must_sign_one_identical_message (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message)",
+        "test_query_cannot_replace_original_binding_through_retained_input (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input)",
+        "test_retained_response_mutation_cannot_invalidate_captured_signed_bytes (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes)",
+        "test_authorizer_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send)",
+        "test_budget_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send)",
+        "test_reconcile_changed_binding_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms)",
+        "test_retained_adapter_result_cannot_change_recorded_receipt (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt)",
+        "test_retained_authorizer_reference_cannot_change_later_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send)",
+        "test_retained_witness_reference_cannot_change_verifier_binding (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding)",
+        "test_send_changed_nested_binding_never_confirms_or_retries (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries)",
+        "test_verifier_changed_nested_intent_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms)",
+        "test_verifier_changed_nested_result_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms)",
+        "test_witness_changed_nested_binding_denies_and_stays_uncertain (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain)",
+        "test_zero_byte_input_cannot_erase_valid_target (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_zero_byte_input_cannot_erase_valid_target)",
+        "test_valid_sqlite_without_chat_schema_cannot_erase_target (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_valid_sqlite_without_chat_schema_cannot_erase_target)",
+        "test_validated_source_replacement_cannot_change_restored_bytes (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_validated_source_replacement_cannot_change_restored_bytes)",
+        "test_backup_cannot_publish_bytes_changed_after_validation (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_backup_cannot_publish_bytes_changed_after_validation)",
+        "test_source_sidecar_is_ambiguous_even_when_empty (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty) (suffix='-wal')",
+        "test_source_sidecar_is_ambiguous_even_when_empty (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty) (suffix='-shm')",
+        "test_source_sidecar_is_ambiguous_even_when_empty (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty) (suffix='-journal')",
+        "test_target_sidecars_are_not_silently_reused_after_restore (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_target_sidecars_are_not_silently_reused_after_restore)",
+        "test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-wal')",
+        "test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-shm')",
+        "test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-journal')",
+        "test_dangling_sidecar_created_during_read_denies_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture)"
+      ],
+      "test_case_names": [
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_zero_byte_input_cannot_erase_valid_target",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_valid_sqlite_without_chat_schema_cannot_erase_target",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_validated_source_replacement_cannot_change_restored_bytes",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_backup_cannot_publish_bytes_changed_after_validation",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_target_sidecars_are_not_silently_reused_after_restore",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture",
+          "result": "FAIL"
+        }
+      ],
+      "per_module_result_lines": {
+        "test_atlasquant_aion_authority_boundary_a184_lab": 3,
+        "test_atlasquant_aion_callback_boundary_a184_lab": 10,
+        "test_atlasquant_aion_sqlite_recovery_a184_lab": 5,
+        "test_atlasquant_aion_snapshot_limits_a184_lab": 1
+      },
+      "capability_and_risk_markers": [
+        "A184_DANGLING_SIDECAR=CAPTURE_DENIED"
+      ],
+      "log_file": "120248447955.log",
+      "log_sha256": "6ff2276421c0080fb78bab1845e062631a6d9d0fab20a31b2fa5380b90e40dc0"
+    },
+    {
+      "id": 120248447959,
+      "name": "A184 adversarial BASE RED (windows-latest)",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248447959",
+      "status": "completed",
+      "conclusion": "failure",
+      "expected_tested_sha": "172be01c5ae665fbbfddb2c4d5dc02f15b77e953",
+      "observed_git_log_shas": [
+        "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+        "172be01c5ae665fbbfddb2c4d5dc02f15b77e953"
+      ],
+      "tested_sha_matches": true,
+      "tests_run": 21,
+      "elapsed_test_seconds": 2.131,
+      "verdicts": [
+        "FAILED (failures=25)"
+      ],
+      "failure_count_including_subtests": 25,
+      "error_count": 0,
+      "failure_headers": [
+        "test_distinct_roles_must_sign_one_identical_message (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message)",
+        "test_query_cannot_replace_original_binding_through_retained_input (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input)",
+        "test_retained_response_mutation_cannot_invalidate_captured_signed_bytes (test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes)",
+        "test_authorizer_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send)",
+        "test_budget_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send)",
+        "test_reconcile_changed_binding_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms)",
+        "test_retained_adapter_result_cannot_change_recorded_receipt (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt)",
+        "test_retained_authorizer_reference_cannot_change_later_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send)",
+        "test_retained_witness_reference_cannot_change_verifier_binding (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding)",
+        "test_send_changed_nested_binding_never_confirms_or_retries (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries)",
+        "test_verifier_changed_nested_intent_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms)",
+        "test_verifier_changed_nested_result_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms)",
+        "test_witness_changed_nested_binding_denies_and_stays_uncertain (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain)",
+        "test_zero_byte_input_cannot_erase_valid_target (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_zero_byte_input_cannot_erase_valid_target)",
+        "test_valid_sqlite_without_chat_schema_cannot_erase_target (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_valid_sqlite_without_chat_schema_cannot_erase_target)",
+        "test_validated_source_replacement_cannot_change_restored_bytes (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_validated_source_replacement_cannot_change_restored_bytes)",
+        "test_backup_cannot_publish_bytes_changed_after_validation (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_backup_cannot_publish_bytes_changed_after_validation)",
+        "test_source_sidecar_is_ambiguous_even_when_empty (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty) (suffix='-wal')",
+        "test_source_sidecar_is_ambiguous_even_when_empty (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty) (suffix='-shm')",
+        "test_source_sidecar_is_ambiguous_even_when_empty (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty) (suffix='-journal')",
+        "test_target_sidecars_are_not_silently_reused_after_restore (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_target_sidecars_are_not_silently_reused_after_restore)",
+        "test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-wal')",
+        "test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-shm')",
+        "test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-journal')",
+        "test_dangling_sidecar_created_during_read_denies_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture)"
+      ],
+      "test_case_names": [
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_distinct_roles_must_sign_one_identical_message",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_query_cannot_replace_original_binding_through_retained_input",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_authority_boundary_a184_lab.AuthorityBoundaryTests.test_retained_response_mutation_cannot_invalidate_captured_signed_bytes",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_zero_byte_input_cannot_erase_valid_target",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_valid_sqlite_without_chat_schema_cannot_erase_target",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_validated_source_replacement_cannot_change_restored_bytes",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_backup_cannot_publish_bytes_changed_after_validation",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_target_sidecars_are_not_silently_reused_after_restore",
+          "result": "FAIL"
+        },
+        {
+          "name": "test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture",
+          "result": "FAIL"
+        }
+      ],
+      "per_module_result_lines": {
+        "test_atlasquant_aion_authority_boundary_a184_lab": 3,
+        "test_atlasquant_aion_callback_boundary_a184_lab": 10,
+        "test_atlasquant_aion_sqlite_recovery_a184_lab": 5,
+        "test_atlasquant_aion_snapshot_limits_a184_lab": 1
+      },
+      "capability_and_risk_markers": [
+        "A184_DANGLING_SIDECAR=CAPTURE_DENIED"
+      ],
+      "log_file": "120248447959.log",
+      "log_sha256": "fc8ba5cea14ee1edaa9593e626c61c761eeefa8520f8f335403a181d8e9d1a79"
+    }
+  ],
+  "findings": [
+    "Both baseline jobs ran 21 test methods and failed with 25 assertion failures including subtests, without test errors; step and job conclusions are actual failures.",
+    "Both candidate-specific jobs ran the same 76 named tests successfully, without skips or errors.",
+    "The stdout marker A184_DANGLING_SIDECAR=CAPTURE_DENIED is also emitted by the baseline despite failed subtests. It cannot serve as standalone protection evidence; assertions and job conclusions take precedence.",
+    "Candidate Linux retains the unresolved A183 same-filename ABA read counterexample: WRONG_FILE_READ_PATH_CHECK_PASSED. Windows reports OS_OR_FACADE_DENIED. These differ by platform and do not attest native VFS identity.",
+    "Native fileno is unavailable on both candidate runners. The observed VM/row/byte and sidecar controls do not establish external authority, freshness, monotonic custody, process RSS bounds or production homologation."
+  ],
+  "homologated_p0": 0,
+  "hard_no_go": true
+}

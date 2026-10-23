@@ -1,0 +1,125 @@
+test_authorizer_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send) ... FAIL
+test_budget_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send) ... FAIL
+test_reconcile_changed_binding_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms) ... FAIL
+test_retained_adapter_result_cannot_change_recorded_receipt (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt) ... FAIL
+test_retained_authorizer_reference_cannot_change_later_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send) ... FAIL
+test_retained_witness_reference_cannot_change_verifier_binding (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding) ... FAIL
+test_send_changed_nested_binding_never_confirms_or_retries (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries) ... FAIL
+test_verifier_changed_nested_intent_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms) ... FAIL
+test_verifier_changed_nested_result_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms) ... FAIL
+test_witness_changed_nested_binding_denies_and_stays_uncertain (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain) ... FAIL
+
+======================================================================
+FAIL: test_authorizer_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_authorizer_changed_nested_binding_denies_before_send)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 61, in test_authorizer_changed_nested_binding_denies_before_send
+    self.assertEqual(result["state"], "REVOKED")
+AssertionError: 'CONFIRMED' != 'REVOKED'
+- CONFIRMED
++ REVOKED
+
+
+======================================================================
+FAIL: test_budget_changed_nested_binding_denies_before_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_budget_changed_nested_binding_denies_before_send)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 72, in test_budget_changed_nested_binding_denies_before_send
+    self.assertEqual(result["state"], "BLOCKED_REAPPROVAL")
+AssertionError: 'CONFIRMED' != 'BLOCKED_REAPPROVAL'
+- CONFIRMED
++ BLOCKED_REAPPROVAL
+
+
+======================================================================
+FAIL: test_reconcile_changed_binding_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_reconcile_changed_binding_never_confirms)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 128, in test_reconcile_changed_binding_never_confirms
+    self.assertNotEqual(result["state"], "CONFIRMED")
+AssertionError: 'CONFIRMED' == 'CONFIRMED'
+
+======================================================================
+FAIL: test_retained_adapter_result_cannot_change_recorded_receipt (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_adapter_result_cannot_change_recorded_receipt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 172, in test_retained_adapter_result_cannot_change_recorded_receipt
+    self.assertEqual(json.loads(stored)["proof"]["binding"], "synthetic-original")
+AssertionError: 'synthetic-changed' != 'synthetic-original'
+- synthetic-changed
++ synthetic-original
+
+
+======================================================================
+FAIL: test_retained_authorizer_reference_cannot_change_later_send (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_authorizer_reference_cannot_change_later_send)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 142, in test_retained_authorizer_reference_cannot_change_later_send
+    self.assertEqual(self.sent[0]["payload"], self.original_payload)
+AssertionError: {'operation': {'target': 'synthetic-changed', 'units': [1, 2]}} != {'operation': {'target': 'synthetic-original', 'units': [1, 2]}}
+- {'operation': {'target': 'synthetic-changed', 'units': [1, 2]}}
+?                                     ^^ ^^^^
+
++ {'operation': {'target': 'synthetic-original', 'units': [1, 2]}}
+?                                     ^^^^^^ ^
+
+
+======================================================================
+FAIL: test_retained_witness_reference_cannot_change_verifier_binding (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_retained_witness_reference_cannot_change_verifier_binding)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 158, in test_retained_witness_reference_cannot_change_verifier_binding
+    self.assertEqual(verified, [self.original_payload])
+AssertionError: Lists differ: [{'operation': {'target': 'synthetic-original', 'units': [1, 2, 3]}}] != [{'operation': {'target': 'synthetic-original', 'units': [1, 2]}}]
+
+First differing element 0:
+{'operation': {'target': 'synthetic-original', 'units': [1, 2, 3]}}
+{'operation': {'target': 'synthetic-original', 'units': [1, 2]}}
+
+- [{'operation': {'target': 'synthetic-original', 'units': [1, 2, 3]}}]
+?                                                               ---
+
++ [{'operation': {'target': 'synthetic-original', 'units': [1, 2]}}]
+
+======================================================================
+FAIL: test_send_changed_nested_binding_never_confirms_or_retries (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_send_changed_nested_binding_never_confirms_or_retries)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 93, in test_send_changed_nested_binding_never_confirms_or_retries
+    self.assertEqual(result["state"], "UNCERTAIN")
+AssertionError: 'CONFIRMED' != 'UNCERTAIN'
+- CONFIRMED
++ UNCERTAIN
+
+
+======================================================================
+FAIL: test_verifier_changed_nested_intent_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_intent_never_confirms)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 105, in test_verifier_changed_nested_intent_never_confirms
+    self.assertNotEqual(result["state"], "CONFIRMED")
+AssertionError: 'CONFIRMED' == 'CONFIRMED'
+
+======================================================================
+FAIL: test_verifier_changed_nested_result_never_confirms (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_verifier_changed_nested_result_never_confirms)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 117, in test_verifier_changed_nested_result_never_confirms
+    self.assertNotEqual(result["state"], "CONFIRMED")
+AssertionError: 'CONFIRMED' == 'CONFIRMED'
+
+======================================================================
+FAIL: test_witness_changed_nested_binding_denies_and_stays_uncertain (test_atlasquant_aion_callback_boundary_a184_lab.CallbackBoundaryTests.test_witness_changed_nested_binding_denies_and_stays_uncertain)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_callback_boundary_a184_lab.py", line 82, in test_witness_changed_nested_binding_denies_and_stays_uncertain
+    self.assertEqual(result["state"], "UNCERTAIN")
+AssertionError: 'CONFIRMED' != 'UNCERTAIN'
+- CONFIRMED
++ UNCERTAIN
+
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.069s
+
+FAILED (failures=10)

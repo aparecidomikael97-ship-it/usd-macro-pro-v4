@@ -1,0 +1,88 @@
+{
+  "repo": "aparecidomikael97-ship-it/usd-macro-pro-v4",
+  "run_id": 39902967998,
+  "source_sha": "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+  "jobs": [
+    {
+      "id": 120248447886,
+      "name": "A184 regression (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248447886",
+      "full_log_read": true,
+      "checkout_confirmed": true,
+      "excerpt": [
+        "2026-10-23T04:56:06.0772406Z   ref: af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+        "2026-10-23T04:56:07.0596706Z HEAD is now at af5739c A184 LAB: bind callback snapshots and captured SQLite recovery; preserve six P0 NO-GO",
+        "2026-10-23T04:56:10.7619034Z A184_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T04:56:10.7630969Z A183_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T04:56:12.6967410Z Ran 132 tests in 1.843s",
+        "2026-10-23T04:56:12.6967743Z OK"
+      ],
+      "sha256": "32ef1aded144240a0fb72a7d40699061de6d58b47abfa24304589ce1ef1e7c39"
+    },
+    {
+      "id": 120248447947,
+      "name": "A184 regression (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248447947",
+      "full_log_read": true,
+      "checkout_confirmed": true,
+      "excerpt": [
+        "2026-10-23T04:56:29.9250323Z   ref: af5739c010ddf5cb28a64fad5b5c386b96ed2b3c\r",
+        "2026-10-23T04:56:34.9581598Z HEAD is now at af5739c A184 LAB: bind callback snapshots and captured SQLite recovery; preserve six P0 NO-GO\r",
+        "2026-10-23T04:56:45.4132999Z A184_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T04:56:45.4148483Z A183_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T04:57:11.2986283Z Ran 132 tests in 25.771s\r"
+      ],
+      "sha256": "f64735a3fcb1b6f412a5a5eb259deadd6c57599b874bfbb8442dbd4f309002df"
+    },
+    {
+      "id": 120248448038,
+      "name": "A184 external-red (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248448038",
+      "full_log_read": true,
+      "checkout_confirmed": true,
+      "excerpt": [
+        "2026-10-23T04:56:28.3015948Z   ref: af5739c010ddf5cb28a64fad5b5c386b96ed2b3c\r",
+        "2026-10-23T04:56:34.0496905Z HEAD is now at af5739c A184 LAB: bind callback snapshots and captured SQLite recovery; preserve six P0 NO-GO\r",
+        "2026-10-23T04:56:46.6763348Z A184_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T04:56:46.6778185Z A183_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T04:56:47.7229860Z FAIL: test_custody_plus_checkpoint_rollback_must_not_reauthorize (lab_a183_external_requirements_red.ExternalRequirementsRed.test_custody_plus_checkpoint_rollback_must_not_reauthorize)\r",
+        "2026-10-23T04:56:47.7243779Z FAIL: test_replacement_original_enrollment_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_original_enrollment_must_be_detected)\r",
+        "2026-10-23T04:56:47.7252521Z FAIL: test_replacement_trust_root_and_fingerprint_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_trust_root_and_fingerprint_must_be_detected)\r",
+        "2026-10-23T04:56:47.7259978Z FAIL: test_live_restore_same_inode_must_be_attested_before_read (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_be_attested_before_read)\r",
+        "2026-10-23T04:56:47.7268307Z FAIL: test_live_restore_same_inode_must_not_reopen_write_authority (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_not_reopen_write_authority)\r",
+        "2026-10-23T04:56:47.7275454Z Ran 5 tests in 0.946s\r",
+        "2026-10-23T04:56:47.7275790Z FAILED (failures=5)\r"
+      ],
+      "sha256": "c71369cacf27c050cdf731a3c23ef844db1dfcf937022d1f4ae5f8a706cc7983"
+    },
+    {
+      "id": 120248448053,
+      "name": "A184 external-red (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998/job/120248448053",
+      "full_log_read": true,
+      "checkout_confirmed": true,
+      "excerpt": [
+        "2026-10-23T04:56:17.1680524Z   ref: af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+        "2026-10-23T04:56:18.3498647Z HEAD is now at af5739c A184 LAB: bind callback snapshots and captured SQLite recovery; preserve six P0 NO-GO",
+        "2026-10-23T04:56:22.1273930Z A184_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T04:56:22.1284842Z A183_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T04:56:22.2868025Z FAIL: test_custody_plus_checkpoint_rollback_must_not_reauthorize (lab_a183_external_requirements_red.ExternalRequirementsRed.test_custody_plus_checkpoint_rollback_must_not_reauthorize)",
+        "2026-10-23T04:56:22.2880337Z FAIL: test_replacement_original_enrollment_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_original_enrollment_must_be_detected)",
+        "2026-10-23T04:56:22.2885156Z FAIL: test_replacement_trust_root_and_fingerprint_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_trust_root_and_fingerprint_must_be_detected)",
+        "2026-10-23T04:56:22.2890455Z FAIL: test_live_restore_same_inode_must_be_attested_before_read (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_be_attested_before_read)",
+        "2026-10-23T04:56:22.2895629Z FAIL: test_live_restore_same_inode_must_not_reopen_write_authority (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_not_reopen_write_authority)",
+        "2026-10-23T04:56:22.2900213Z Ran 5 tests in 0.077s",
+        "2026-10-23T04:56:22.2900436Z FAILED (failures=5)"
+      ],
+      "sha256": "5dad85648a5ab18143274d27fe22d41b89c10d1870ee313f82b870b607d8359d"
+    }
+  ]
+}

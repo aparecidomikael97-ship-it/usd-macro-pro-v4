@@ -1,0 +1,120 @@
+name: A184 six P0 LAB evidence (no homologation)
+
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/**'
+      - '*a184_lab.py'
+      - '*a183_lab.py'
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'test_atlasquant_aion_chaos_campaign.py'
+      - 'test_atlasquant_aion_convergence.py'
+      - '.github/workflows/quality-tests.yml'
+      - 'lab_a183_external_requirements_red.py'
+      - 'scripts/run_a184*'
+      - 'scripts/run_a183*'
+      - '.github/workflows/aion-six-p0-a184-lab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  adversarial-base-red:
+    name: A184 adversarial BASE RED (${{ matrix.os }})
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Retain new adversarial tests outside checkout
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/a184-red-tests"
+          cp test_atlasquant_aion_*a184_lab.py "$RUNNER_TEMP/a184-red-tests/"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: '172be01c5ae665fbbfddb2c4d5dc02f15b77e953'
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned LAB dependencies
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Restore retained test fixtures
+        shell: bash
+        run: cp "$RUNNER_TEMP/a184-red-tests/"*.py .
+      - name: Demonstrate baseline defects (genuine RED, no failure masking)
+        run: >-
+          python -B -m unittest -v
+          test_atlasquant_aion_authority_boundary_a184_lab
+          test_atlasquant_aion_callback_boundary_a184_lab
+          test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_zero_byte_input_cannot_erase_valid_target
+          test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_valid_sqlite_without_chat_schema_cannot_erase_target
+          test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_validated_source_replacement_cannot_change_restored_bytes
+          test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_backup_cannot_publish_bytes_changed_after_validation
+          test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_source_sidecar_is_ambiguous_even_when_empty
+          test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_target_sidecars_are_not_silently_reused_after_restore
+          test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture
+          test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture
+
+  lab:
+    name: A184 ${{ matrix.suite }} (${{ matrix.os }})
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        suite: [specific, regression, sqlite, external-red]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned LAB dependencies
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Run explicit suite (external-red has unmet requirements)
+        run: python -B scripts/run_a184_lab.py ${{ matrix.suite }}
+
+  canonical:
+    name: Canonical ${{ matrix.suite }} (${{ matrix.revision }})
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [base, candidate]
+        suite: [quality, security-unittest, security-pytest, security-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Retain identical harness for both revisions
+        run: cp scripts/run_a183_canonical_lab.py "$RUNNER_TEMP/run_a183_canonical_lab.py"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ matrix.revision == 'base' && '172be01c5ae665fbbfddb2c4d5dc02f15b77e953' || github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned canonical dependencies and audit tools
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0 pip-audit==2.10.1 bandit==1.9.4
+          python -m pip check
+      - name: Compile sources
+        run: python -m compileall -q .
+      - name: Run canonical selectors with LAB network guard
+        run: python -B "$RUNNER_TEMP/run_a183_canonical_lab.py" ${{ matrix.suite }}

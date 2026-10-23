@@ -1,0 +1,41 @@
+test_added_required_column_cannot_pass_recovery_gate (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_added_required_column_cannot_pass_recovery_gate) ... FAIL
+test_unexpected_check_constraint_cannot_pass_recovery_gate (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_unexpected_check_constraint_cannot_pass_recovery_gate) ... FAIL
+test_explicit_unique_index_cannot_add_constraints_to_chat_tables (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_explicit_unique_index_cannot_add_constraints_to_chat_tables) ... FAIL
+
+======================================================================
+FAIL: test_added_required_column_cannot_pass_recovery_gate (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_added_required_column_cannot_pass_recovery_gate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_sqlite_recovery_a184_lab.py", line 197, in test_added_required_column_cannot_pass_recovery_gate
+    self.assert_rejected_without_replacing(
+  File "/workspace/work/a184-lab/test_atlasquant_aion_sqlite_recovery_a184_lab.py", line 48, in assert_rejected_without_replacing
+    with self.assertRaises(StorageUnavailableError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised
+
+======================================================================
+FAIL: test_unexpected_check_constraint_cannot_pass_recovery_gate (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_unexpected_check_constraint_cannot_pass_recovery_gate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_sqlite_recovery_a184_lab.py", line 207, in test_unexpected_check_constraint_cannot_pass_recovery_gate
+    self.assert_rejected_without_replacing(
+  File "/workspace/work/a184-lab/test_atlasquant_aion_sqlite_recovery_a184_lab.py", line 48, in assert_rejected_without_replacing
+    with self.assertRaises(StorageUnavailableError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised
+
+======================================================================
+FAIL: test_explicit_unique_index_cannot_add_constraints_to_chat_tables (test_atlasquant_aion_sqlite_recovery_a184_lab.SQLiteRecoveryA184LabTests.test_explicit_unique_index_cannot_add_constraints_to_chat_tables)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_sqlite_recovery_a184_lab.py", line 215, in test_explicit_unique_index_cannot_add_constraints_to_chat_tables
+    self.assert_rejected_without_replacing(
+  File "/workspace/work/a184-lab/test_atlasquant_aion_sqlite_recovery_a184_lab.py", line 48, in assert_rejected_without_replacing
+    with self.assertRaises(StorageUnavailableError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.035s
+
+FAILED (failures=3)

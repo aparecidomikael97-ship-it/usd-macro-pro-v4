@@ -1,0 +1,42 @@
+Scope: AST-extracted resolver + resolver tests only; full module import blocked by missing streamlit.
+Synthetic git mocks; no remote or production calls.
+test_fetch_success_without_main_commit_still_fails_closed (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_fetch_success_without_main_commit_still_fails_closed) ... ok
+test_forbidden_paths_remain_denied_for_stacked_lab_work (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_forbidden_paths_remain_denied_for_stacked_lab_work) ... ok
+test_shallow_checkout_fetches_only_main_even_for_a_lab_pr (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_shallow_checkout_fetches_only_main_even_for_a_lab_pr) ... FAIL
+test_stacked_lab_target_is_never_the_production_reference (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_stacked_lab_target_is_never_the_production_reference) ... FAIL
+test_unavailable_main_fails_closed_without_using_local_or_lab_branch (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_unavailable_main_fails_closed_without_using_local_or_lab_branch) ... FAIL
+
+======================================================================
+FAIL: test_shallow_checkout_fetches_only_main_even_for_a_lab_pr (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_shallow_checkout_fetches_only_main_even_for_a_lab_pr)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "test_atlasquant_aion_convergence.py", line 148, in test_shallow_checkout_fetches_only_main_even_for_a_lab_pr
+    git.assert_called_once_with([
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 960, in assert_called_once_with
+    raise AssertionError(msg)
+AssertionError: Expected '_git' to be called once. Called 0 times.
+
+======================================================================
+FAIL: test_stacked_lab_target_is_never_the_production_reference (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_stacked_lab_target_is_never_the_production_reference)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "test_atlasquant_aion_convergence.py", line 139, in test_stacked_lab_target_is_never_the_production_reference
+    self.assertEqual(_production_base(), "origin/main")
+AssertionError: 'origin/lab/stacked-parent' != 'origin/main'
+- origin/lab/stacked-parent
++ origin/main
+
+
+======================================================================
+FAIL: test_unavailable_main_fails_closed_without_using_local_or_lab_branch (a184_convergence_resolver_oracle.ProductionBaseResolverTests.test_unavailable_main_fails_closed_without_using_local_or_lab_branch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "test_atlasquant_aion_convergence.py", line 159, in test_unavailable_main_fails_closed_without_using_local_or_lab_branch
+    with self.assertRaisesRegex(AssertionError, "base main"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.009s
+
+FAILED (failures=3)

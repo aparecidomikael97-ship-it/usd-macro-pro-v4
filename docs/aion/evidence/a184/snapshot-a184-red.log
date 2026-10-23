@@ -1,0 +1,346 @@
+test_connections_close_on_vm_row_size_and_authorization_errors (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_connections_close_on_vm_row_size_and_authorization_errors) ... ERROR
+test_dangling_sidecar_created_during_read_denies_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture) ... FAIL
+test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) ... 
+  test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-wal') ... FAIL
+  test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-shm') ... FAIL
+  test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-journal') ... FAIL
+test_large_single_value_denied_by_sqlite_length_limit (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_large_single_value_denied_by_sqlite_length_limit) ... ERROR
+test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) ... 
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=0) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=-1) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=True) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=1.5) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value='5') ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=None) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=0) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=-1) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=True) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=1.5) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value='5') ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=None) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=0) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=-1) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=True) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=1.5) ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value='5') ... ERROR
+  test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=None) ... ERROR
+test_result_byte_budget_accounts_for_aggregate_rows (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_result_byte_budget_accounts_for_aggregate_rows) ... ERROR
+test_row_budget_denies_instead_of_returning_partial_rows (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_row_budget_denies_instead_of_returning_partial_rows) ... ERROR
+test_sidecar_directory_denies_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_sidecar_directory_denies_capture) ... ok
+test_unicode_budget_counts_utf8_bytes (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_unicode_budget_counts_utf8_bytes) ... ERROR
+test_vm_budget_denies_bounded_synthetic_cross_join (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_vm_budget_denies_bounded_synthetic_cross_join) ... ERROR
+
+======================================================================
+ERROR: test_connections_close_on_vm_row_size_and_authorization_errors (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_connections_close_on_vm_row_size_and_authorization_errors)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 144, in test_connections_close_on_vm_row_size_and_authorization_errors
+    snapshot = self.snapshot(max_vm_steps=500, max_rows=1, max_result_bytes=200)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+ERROR: test_large_single_value_denied_by_sqlite_length_limit (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_large_single_value_denied_by_sqlite_length_limit)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 116, in test_large_single_value_denied_by_sqlite_length_limit
+    snapshot = self.snapshot(max_result_bytes=128)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=-1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value='5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_vm_steps', value=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_rows'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=-1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_rows'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_rows'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_rows'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value='5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_rows'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_rows', value=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_rows'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=-1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value='5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_nonpositive_and_noninteger_budgets_deny (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_nonpositive_and_noninteger_budgets_deny) (name='max_result_bytes', value=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 92, in test_nonpositive_and_noninteger_budgets_deny
+    self.snapshot(**{name: value})
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_result_byte_budget_accounts_for_aggregate_rows (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_result_byte_budget_accounts_for_aggregate_rows)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 110, in test_result_byte_budget_accounts_for_aggregate_rows
+    snapshot = self.snapshot(max_result_bytes=400)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_row_budget_denies_instead_of_returning_partial_rows (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_row_budget_denies_instead_of_returning_partial_rows)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 103, in test_row_budget_denies_instead_of_returning_partial_rows
+    snapshot = self.snapshot(max_rows=3)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_rows'
+
+======================================================================
+ERROR: test_unicode_budget_counts_utf8_bytes (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_unicode_budget_counts_utf8_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 123, in test_unicode_budget_counts_utf8_bytes
+    snapshot = self.snapshot(max_result_bytes=130)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_result_bytes'
+
+======================================================================
+ERROR: test_vm_budget_denies_bounded_synthetic_cross_join (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_vm_budget_denies_bounded_synthetic_cross_join)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 96, in test_vm_budget_denies_bounded_synthetic_cross_join
+    snapshot = self.snapshot(max_vm_steps=500)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 32, in snapshot
+    result = PinnedSQLiteSnapshotLab(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: PinnedSQLiteSnapshotLab.__init__() got an unexpected keyword argument 'max_vm_steps'
+
+======================================================================
+FAIL: test_dangling_sidecar_created_during_read_denies_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_created_during_read_denies_capture)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 79, in test_dangling_sidecar_created_during_read_denies_capture
+    with self.assertRaisesRegex(StorageUnavailableError, "SIDECAR"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised
+
+======================================================================
+FAIL: test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-wal')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 55, in test_dangling_sidecar_directory_entries_deny_capture
+    with self.assertRaisesRegex(StorageUnavailableError, "SIDECAR"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised
+
+======================================================================
+FAIL: test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-shm')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 55, in test_dangling_sidecar_directory_entries_deny_capture
+    with self.assertRaisesRegex(StorageUnavailableError, "SIDECAR"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised
+
+======================================================================
+FAIL: test_dangling_sidecar_directory_entries_deny_capture (test_atlasquant_aion_snapshot_limits_a184_lab.SnapshotLimitsA184Tests.test_dangling_sidecar_directory_entries_deny_capture) (suffix='-journal')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_snapshot_limits_a184_lab.py", line 55, in test_dangling_sidecar_directory_entries_deny_capture
+    with self.assertRaisesRegex(StorageUnavailableError, "SIDECAR"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.026s
+
+FAILED (failures=4, errors=24)
+A184_DANGLING_SIDECAR=CAPTURE_DENIED
+A184_PRE_FIX_BOUNDED_PROBE_CROSS_JOIN=[(262144,)]
+A184_PRE_FIX_BOUNDED_PROBE_RETURNED_ROWS=64
+A184_PRE_FIX_BOUNDED_PROBE_SINGLE_TEXT_BYTES=240

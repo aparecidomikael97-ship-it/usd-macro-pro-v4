@@ -1,4 +1,4 @@
-# AION — MATRIZ DOS SEIS P0 (22/10/2026, histórico A175–A183)
+# AION — MATRIZ DOS SEIS P0 (atualização 23/10/2026, histórico A175–A184)
 **Controle de pendências; não é certificado de prontidão. 0/6 homologados, HARD NO-GO.**
 
 | P0 | Bloqueio | Evidência LAB atual | Falta para aceite verificável | Próxima ação autorizada |
@@ -135,3 +135,24 @@ Local: **28/28 específicos**, **132/132 herdados**, SQLite **92 PASS + 1 ERROR 
 Quality Ubuntu: base **6.190 / 5 FAIL** → candidato **6.322 / 4 FAIL**; dez módulos A176–A183 adicionados, omissão de cobertura corrigida, nenhum teste removido. Quatro falhas restantes já ocorrem na base (três Chaos e uma expectativa GITHUB_BASE_REF=main incompatível com a PR LAB empilhada). Security unittest: **365 / mesmas 3 FAIL** nas duas revisões; pytest: **2.825 PASS** nas duas; audit: **mesmos 43 IDs/versões em pypdf/pillow**, não remediados aqui. Primeiro Windows specific teve 14 ERROR de fixture/cleanup; fechamento explícito corrigido, repetição final 28/28. Erros iniciais preservados.
 
 [18 jobs e excertos/SHAs verificados](evidence/a183/ci-verified.json) · [manifesto-base parcial, 141 blobs](evidence/a183/base-verified.json) · [relatório e gates por P0](AION_SIX_P0_EVIDENCE_A183_LAB_20261022.md). Nenhum código/teste/seletor mudou após o SHA testado nesta atualização documental. **CI global FAILURE; seis P0 ABERTOS; 0/6 homologados; HARD NO-GO; ZERO_AUTO_RESEND.** Nenhuma autoridade externa/serviço/decisão do proprietário foi implementada: revisão humana continua pendente.
+
+## A184 — correções locais de recuperação e vínculo, sem homologação
+
+Base A183 #1474: `172be01c5ae665fbbfddb2c4d5dc02f15b77e953`. Ramo separado `lab/aion-p0-boundary-hardening-a184-20261023`. [Relatório A184, reproduções e gates mínimos](AION_P0_BOUNDARY_HARDENING_A184_LAB_20261023.md).
+
+| P0 | Avanço A184 | Gate que permanece sem prova | Status |
+|---|---|---|---|
+| 1 | Evento/configuração capturados antes do callback; troca do original retido negada | identidade HUMAN_OWNER e cerimônia/bootstrap/recuperação de chave independentes | ABERTO |
+| 2 | Uma mensagem canônica capturada para todas as assinaturas; cópias independentes no verificador Outbox | recibo de efeito e procedência/revogação/rotação da raiz externa | ABERTO |
+| 3 | Dez regressões de callbacks; mudança de binding falha fechada e send incerto não gera retry | identidade autêntica do evento/reserva global e impossibilidade de reinscrição privilegiada | ABERTO |
+| 4 | Referências retidas não alteram próximas etapas; requisitos de rollback/reset mantidos RED | custódia monotônica independente e H0 após perda conjunta, sem bootstrap automático | ABERTO |
+| 5 | Captura única da origem, schema/integridade, negação de aliases/sidecars; snapshot com limites de leitura | VFS/handle live atômico, ABA de mesmo nome/restore e ambiente alvo | ABERTO |
+| 6 | Backup/restore publicam bytes validados; falha de publicação é UNCERTAIN_ZERO_AUTO_RESEND | exclusão de conexão ativa, commit/VFS/backup/power loss e custódia antirollback | ABERTO |
+
+Local integrado: **76 específicos + 132 herdados + 93 SQLite GREEN**, Security unittest **368/368**, Security pytest **2.825/2.825**. Requisitos externos/live: **5 FAIL reais**. Quality/CI remota e SHA final devem ser consultados no adendo de execução A184. Novos testes foram adicionados à Quality; os RED não foram suprimidos. **0/6 homologados; HARD NO-GO; ZERO_AUTO_RESEND.** Serviços/decisões externos parados para revisão humana; sem contratação ou ativação.
+
+### A184 — evidência final conferida
+
+[Draft #1476](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1476), código/testes/workflows **`af5739c010ddf5cb28a64fad5b5c386b96ed2b3c`**. [CI A184 #39902967998](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998) **FAILURE**; [SQLite #39902967941](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967941) SUCCESS. **20 logs completos conferidos**: [manifesto auditável](evidence/a184/ci-verified.json).
+
+Por SO: **76 específicos + 132 herdados + 93 SQLite PASS**; SQLite histórico também 93/93. Base exata: 21 contraexemplos/25 FAIL reais por SO; candidato mantém **5 requisitos externos/live FAIL** por SO. Quality: base6.322/4FAIL → candidato**6.378PASS**; Security unittest365/3FAIL → **368PASS**; pytest**2.825PASS** ambos; audit **mesmos43 achados** pypdf/Pillow. Quatro módulos adicionados à Quality, nenhum seletor Security relaxado. Windows ABA parcialmente `OS_DENIED/NOT_EXERCISED`; Linux ainda demonstra leitura do arquivo errado sob mesmo nome. GREEN não comprova VFS, autoridade ou custódia. Atualização posterior é documental. **Seis P0 ABERTOS; 0/6 homologados; HARD NO-GO.**
