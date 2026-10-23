@@ -62,3 +62,19 @@ Esta reconciliação foi escrita em ramo documental isolado criado a partir de *
 4. Preparar roteiro de aceite do painel macro mínimo e orçamento, sem contratação de API.
 
 **Estado final desta rodada:** reconciliação documental entregue; **nenhuma feature ou P0 homologado por este documento**. Sem merge, deploy, Worker nem despesa.
+
+
+## Segunda rodada do pente-fino (22/10) — Complemento T18–T57
+O inventário acima possui T01–T17 e **não era uma lista completa**. Após conferência adicional do backlog, documentos de produto, guias de backtest/TradingView, diretório `tradingview/`, contratos de pesquisa, módulos de runtime e issues #1080/#1160, a matriz foi ampliada com **40 requisitos/documentações complementares** em:
+
+**[TRADER_PENTE_FINO_AMPLIADO_2026-10-22.md](TRADER_PENTE_FINO_AMPLIADO_2026-10-22.md)**.
+
+Destaques antes omitidos:
+- **T18 — Quarterly Theory:** decisão reconfirmada pelo proprietário; o Checkpoint de 22/09 só menciona `Quarterly/Weekly Profiles` na Academia. **Não equiparar à teoria completa implementada sem especificação e testes.**
+- **T19 — Volume Profile:** aprovado como expansão condicional em `docs/product/PRODUCT_DECISIONS_2026-09-19.md`, com proibição de apresentar tick volume do Forex spot como volume global consolidado.
+- **T20–T26 — TradingView/Pine:** guia de importação CSV e **cinco estratégias Pine reais** (BOS/CHOCH+OB, FVG, OTE, CRT, AMD/PO3), além de verificador de paridade *estática*; nenhum desses arquivos prova webhook/live ou execução idêntica no broker emulator.
+- **T27–T31 — laboratório profundo:** comparador, walk-forward/OOS, parâmetros, spread/slippage, snapshots e replay.
+- **T32–T39 — perfis e institucional:** perfil semanal estatístico, filtros de sessão/killzones, liquidez/SMT, PPR ainda indefinido, Wyckoff, VWAP, COT/Open Interest.
+- **T40–T57 — cadeia funcional:** gráficos, briefing macro/voz, histórico/auditoria, eventos, Academy, corretoras e licenças, UX, mercados separados e segurança.
+
+**Total de itens de rastreio nesta rodada: T01–T57.** É uma matriz de preservação de decisões; não é prova de que 57 funcionalidades estejam concluídas. A promessa de ausência absoluta de lacunas exigiria vasculhar todos os commits/chats/issues e reexecutar os testes; isso ainda não ocorreu. O material permanece isolado em PR Draft, sem merge, sem afetar Cloud A183, sem contratação, com HARD NO-GO e P0 0/6.
