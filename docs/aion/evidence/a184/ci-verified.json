@@ -1,0 +1,151 @@
+{
+  "repository": "aparecidomikael97-ship-it/usd-macro-pro-v4",
+  "pr": 1476,
+  "source_tests_workflow_sha": "af5739c010ddf5cb28a64fad5b5c386b96ed2b3c",
+  "base_sha": "172be01c5ae665fbbfddb2c4d5dc02f15b77e953",
+  "checked_at_utc": "2026-10-23T04:59:42.286589+00:00",
+  "runs": [
+    {
+      "id": 39902967998,
+      "conclusion": "failure",
+      "jobs_read": 18
+    },
+    {
+      "id": 39902967941,
+      "conclusion": "success",
+      "jobs_read": 2
+    }
+  ],
+  "full_job_logs_read": 20,
+  "jobs": [
+    {
+      "id": 120248447209,
+      "name": "lifecycle (ubuntu-latest)",
+      "conclusion": "success",
+      "detail": "sqlite-ci.json"
+    },
+    {
+      "id": 120248447474,
+      "name": "lifecycle (windows-latest)",
+      "conclusion": "success",
+      "detail": "sqlite-ci.json"
+    },
+    {
+      "id": 120248447771,
+      "name": "Canonical security-audit (candidate)",
+      "conclusion": "failure",
+      "detail": "canonical-ci.json"
+    },
+    {
+      "id": 120248447876,
+      "name": "A184 specific (windows-latest)",
+      "conclusion": "success",
+      "detail": "specific-ci.json"
+    },
+    {
+      "id": 120248447886,
+      "name": "A184 regression (ubuntu-latest)",
+      "conclusion": "success",
+      "detail": "root-jobs-ci.json"
+    },
+    {
+      "id": 120248447902,
+      "name": "A184 specific (ubuntu-latest)",
+      "conclusion": "success",
+      "detail": "specific-ci.json"
+    },
+    {
+      "id": 120248447911,
+      "name": "Canonical security-pytest (candidate)",
+      "conclusion": "success",
+      "detail": "canonical-ci.json"
+    },
+    {
+      "id": 120248447912,
+      "name": "Canonical security-unittest (candidate)",
+      "conclusion": "success",
+      "detail": "canonical-ci.json"
+    },
+    {
+      "id": 120248447947,
+      "name": "A184 regression (windows-latest)",
+      "conclusion": "success",
+      "detail": "root-jobs-ci.json"
+    },
+    {
+      "id": 120248447955,
+      "name": "A184 adversarial BASE RED (ubuntu-latest)",
+      "conclusion": "failure",
+      "detail": "specific-ci.json"
+    },
+    {
+      "id": 120248447959,
+      "name": "A184 adversarial BASE RED (windows-latest)",
+      "conclusion": "failure",
+      "detail": "specific-ci.json"
+    },
+    {
+      "id": 120248447989,
+      "name": "Canonical quality (base)",
+      "conclusion": "failure",
+      "detail": "canonical-ci.json"
+    },
+    {
+      "id": 120248447994,
+      "name": "A184 sqlite (ubuntu-latest)",
+      "conclusion": "success",
+      "detail": "sqlite-ci.json"
+    },
+    {
+      "id": 120248447996,
+      "name": "A184 sqlite (windows-latest)",
+      "conclusion": "success",
+      "detail": "sqlite-ci.json"
+    },
+    {
+      "id": 120248448004,
+      "name": "Canonical security-pytest (base)",
+      "conclusion": "success",
+      "detail": "canonical-ci.json"
+    },
+    {
+      "id": 120248448014,
+      "name": "Canonical security-unittest (base)",
+      "conclusion": "failure",
+      "detail": "canonical-ci.json"
+    },
+    {
+      "id": 120248448018,
+      "name": "Canonical security-audit (base)",
+      "conclusion": "failure",
+      "detail": "canonical-ci.json"
+    },
+    {
+      "id": 120248448038,
+      "name": "A184 external-red (windows-latest)",
+      "conclusion": "failure",
+      "detail": "root-jobs-ci.json"
+    },
+    {
+      "id": 120248448053,
+      "name": "A184 external-red (ubuntu-latest)",
+      "conclusion": "failure",
+      "detail": "root-jobs-ci.json"
+    },
+    {
+      "id": 120248448189,
+      "name": "Canonical quality (candidate)",
+      "conclusion": "success",
+      "detail": "canonical-ci.json"
+    }
+  ],
+  "homologated_p0": 0,
+  "hard_no_go": true,
+  "zero_auto_resend": true,
+  "limits": [
+    "LAB tests and synthetic keys/callbacks do not attest external identity, custody or production.",
+    "Some Windows native ABA tests report OS_DENIED/NOT_EXERCISED despite unittest OK.",
+    "The CAPTURE_DENIED stdout marker appears even in BASE RED and is not standalone proof.",
+    "Canonical audit retains 43 identical vulnerabilities; SBOM/browser/deploy not executed."
+  ]
+}

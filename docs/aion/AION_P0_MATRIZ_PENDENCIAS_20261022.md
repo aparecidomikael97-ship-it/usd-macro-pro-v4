@@ -150,3 +150,9 @@ Base A183 #1474: `172be01c5ae665fbbfddb2c4d5dc02f15b77e953`. Ramo separado `lab/
 | 6 | Backup/restore publicam bytes validados; falha de publicação é UNCERTAIN_ZERO_AUTO_RESEND | exclusão de conexão ativa, commit/VFS/backup/power loss e custódia antirollback | ABERTO |
 
 Local integrado: **76 específicos + 132 herdados + 93 SQLite GREEN**, Security unittest **368/368**, Security pytest **2.825/2.825**. Requisitos externos/live: **5 FAIL reais**. Quality/CI remota e SHA final devem ser consultados no adendo de execução A184. Novos testes foram adicionados à Quality; os RED não foram suprimidos. **0/6 homologados; HARD NO-GO; ZERO_AUTO_RESEND.** Serviços/decisões externos parados para revisão humana; sem contratação ou ativação.
+
+### A184 — evidência final conferida
+
+[Draft #1476](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1476), código/testes/workflows **`af5739c010ddf5cb28a64fad5b5c386b96ed2b3c`**. [CI A184 #39902967998](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998) **FAILURE**; [SQLite #39902967941](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967941) SUCCESS. **20 logs completos conferidos**: [manifesto auditável](evidence/a184/ci-verified.json).
+
+Por SO: **76 específicos + 132 herdados + 93 SQLite PASS**; SQLite histórico também 93/93. Base exata: 21 contraexemplos/25 FAIL reais por SO; candidato mantém **5 requisitos externos/live FAIL** por SO. Quality: base6.322/4FAIL → candidato**6.378PASS**; Security unittest365/3FAIL → **368PASS**; pytest**2.825PASS** ambos; audit **mesmos43 achados** pypdf/Pillow. Quatro módulos adicionados à Quality, nenhum seletor Security relaxado. Windows ABA parcialmente `OS_DENIED/NOT_EXERCISED`; Linux ainda demonstra leitura do arquivo errado sob mesmo nome. GREEN não comprova VFS, autoridade ou custódia. Atualização posterior é documental. **Seis P0 ABERTOS; 0/6 homologados; HARD NO-GO.**

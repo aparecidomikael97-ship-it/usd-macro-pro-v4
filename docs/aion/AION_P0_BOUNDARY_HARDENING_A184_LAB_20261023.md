@@ -76,4 +76,33 @@ Remediações de dependências já existentes permanecem trabalhos separados: Dr
 
 ## Registro final de execução
 
-Este bloco será preenchido somente com SHA, runs/jobs e logs efetivamente conferidos. Até então, CI remota não é declarada validada. Todos os seis P0 continuam ABERTOS, **0/6 homologados**, HARD NO-GO.
+[PR Draft #1476](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1476), sobre A183 #1474. **Código, testes e workflows testados: `af5739c010ddf5cb28a64fad5b5c386b96ed2b3c`**. Base comparada: `172be01c5ae665fbbfddb2c4d5dc02f15b77e953`. A atualização posterior deste relatório/matriz/manifestos é documental; não muda fontes, testes, seletores ou workflows.
+
+[CI A184 #39902967998](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967998): **FAILURE**. [SQLite histórico #39902967941](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39902967941): **SUCCESS**. Foram lidos **20 logs completos**, com checkouts conferidos, IDs/URLs, hashes e excertos registrados em [ci-verified.json](evidence/a184/ci-verified.json) e nos quatro manifestos detalhados referenciados por ele. Não houve rerun para esconder resultados anteriores.
+
+| Suíte real | Base A183 | Candidato A184 |
+|---|---|---|
+| Contraexemplos BASE RED Ubuntu/Windows | 21 testes / **25 FAIL reais, 0 ERROR por SO**, sobre a base exata | os mesmos cenários estão na específica, protegidos |
+| Específica Ubuntu/Windows | novas falhas reproduzidas | **76/76 por SO**, mesmos nomes, sem skips/erros |
+| A176–A182 / Outbox / Saga Ubuntu/Windows | regressões herdadas | **132/132 por SO** |
+| SQLite Ubuntu/Windows | histórico preservado | **93/93 por SO**, mais 93/93 por SO no workflow histórico |
+| Requisitos externos / SQLite live Ubuntu/Windows | riscos herdados | **5 FAIL reais por SO**, sem ERROR |
+| Quality Ubuntu | 6.322 testes / **4 FAIL** | **6.378/6.378** |
+| Security unittest Ubuntu | 365 / **3 FAIL** | **368/368** |
+| Security pytest Ubuntu | **2.825 PASS** | **2.825 PASS** |
+| Security audit Ubuntu | **43 achados**, pypdf6.19.0/Pillow12.3.0 | **mesmos 43**, nenhuma tupla pacote/versão/ID/correção nova ou removida |
+
+As quatro falhas Quality da base são exatamente os três casos Chaos com fixture incompatível com a negação A180 e a expectativa de que `GITHUB_BASE_REF` LAB fosse main. A candidata adiciona quatro módulos A184 ao seletor Quality, **sem remover tokens**. Os seletores Security unittest/pytest são idênticos nas duas revisões. Corrigir o fixture não concedeu autoridade a callbacks operacionais: os novos testes negativos verificam ausência de testemunha/prova, perda de resposta, ausência autoafirmada, reinício e compensação de resultado incerto.
+
+Pip check e compilação passaram nos oito jobs canônicos. O audit conserva 8 achados pypdf e 35 Pillow. Bandit canônico executou sem emitir achados; o harness não registra seu código individual, portanto não há conclusão isolada desse código. Um scan **local adicional** dos quatro arquivos de produção alterados (`bandit -q -lll`) terminou com **exit0**, registrado em [bandit-changed-files-local.json](evidence/a184/bandit-changed-files-local.json); isso cobre só o seletor de severidade alta. Quality local final também executou **6.378/6.378**, com log publicado, após o ajuste de DDL.
+
+Ambientes A184 conferidos: Ubuntu Python3.12.15/SQLite3.45.1 e Windows Python3.12.10/SQLite3.49.1, ambos `deserialize=True`, **`native_fileno=False`**. O workflow SQLite histórico não imprime sua versão SQLite, que não foi inferida de outro job. Local: Python3.12.14/SQLite3.53.1.
+
+**Limites materiais dos logs:**
+
+- Windows informa `OS_DENIED` ou `NOT_EXERCISED` em substituição/ABA A169/A171/A173; não se comprovou que esses casos passaram pela proteção da aplicação. Linux continua reproduzindo `WRONG_FILE_READ_PATH_CHECK_PASSED` em A183. Store vivo não está homologado.
+- O marcador stdout `A184_DANGLING_SIDECAR=CAPTURE_DENIED` também aparece no BASE RED, porque `subTest` continua até o print. **Somente assertions, traceback, contagem e exit/job determinam a conclusão**, nunca esse marcador isolado.
+- Os cinco requisitos ainda RED são: rollback conjunto custódia+checkpoint; substituição da inscrição original; substituição conjunta de raiz+fingerprint; restore sob mesmo inode antes de leitura; restore sob mesmo inode reabrindo escrita. Não foram reclassificados como expectedFailure, skip ou sucesso.
+- Testes que passam ao demonstrar replay local/negócio forjado/raiz auto-configurada continuam identificados como **caracterização de risco**, não proteção comprovada. SBOM, browser, infraestrutura alvo, provedor/autoridade reais, energia e homologação externa não foram testados.
+
+O máximo avanço interno desta rodada está publicado e reproduzível. Os seis gates da seção externa permanecem sem prova, com execução externa interrompida para revisão humana. **Todos os seis P0 ABERTOS; 0/6 efetivamente homologados; HARD NO-GO; ZERO_AUTO_RESEND.**
