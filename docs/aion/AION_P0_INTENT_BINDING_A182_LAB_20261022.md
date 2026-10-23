@@ -76,3 +76,22 @@ Esses requisitos não autorizam contratação, provisão, cadastro, uso de chave
 
 **0/6 P0 homologados. HARD NO-GO. ZERO_AUTO_RESEND.**
 
+## Validação CI real — PR Draft #1472
+Commit de código exercitado: `169105f1c83896b61d6dd331c128b604de37de93`.
+Logs de checkout confirmam esse SHA, não a merge ref. Dependências fixadas instaladas com sucesso no GitHub.
+[Resumo com excertos verificados e heads A176–A181](evidence/a182/ci-verified.json).
+
+| Run / suite | Ubuntu | Windows | Interpretação |
+|---|---|---|---|
+| [A182 #39875508639](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639) — regressão | [132/132](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006972) | [132/132](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006950) | proteção + caracterização de riscos, LAB |
+| Mesmo run — SQLite | [93/93](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006844) | [93/93](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006836) | dependência local ausente disponível em CI |
+| Mesmo run — external-red | [3 FAIL, 0 ERROR](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160007024) | [3 FAIL, 0 ERROR](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006967) | três requisitos externos não atendidos; exit 1 real |
+| [SQLite histórico #39875508631](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508631) | [93/93](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508631/job/120160007602) | [93/93](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508631/job/120160007618) | repetição da suíte histórica, não cenários independentes |
+
+Os oito logs foram lidos: contagens, resultados, SHA e marcadores A182 conferidos. Nos dois SOs estão presentes tanto `A182_ORIGINAL_BINDING_ALTERED_AGGREGATE=NO_SEND` quanto `A182_RISK_REPIN_ROOT_AND_FINGERPRINT=FAKE_AUTHORITY` e `A182_RISK_ROLLBACK_CUSTODY_AND_CHECKPOINT=REPLAY`. A falha local por requests não foi apagada do histórico nem contada como aprovação local.
+
+**CI A182 global: FAILURE por desenho, devido aos dois jobs external-red.** Regressão verde não é homologação, e testes de caracterização verdes não fecham vulnerabilidades. Nenhuma mudança de fonte após o SHA testado: este adendo, matriz e resumo de CI são documentação/evidência. Execuções eventualmente disparadas pelo commit documental são distintas das runs auditadas acima.
+
+Revisão humana solicitada para o contrato externo e para quem pode atestar intenção original, gênese/recuperação da custódia e raiz/revogação. Esse trecho permanece bloqueado, sem provisionamento ou adoção de autoridade local como externa. **HARD NO-GO; 0/6 P0 homologados; ZERO_AUTO_RESEND.**
+
+

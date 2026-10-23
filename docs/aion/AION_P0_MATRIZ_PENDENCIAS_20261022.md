@@ -108,3 +108,7 @@ Ramo LAB `lab/aion-p0-intent-binding-a182-20261022`, baseado no head A181 `e58fd
 
 Local: 132/132 regressões (22 A182, incluindo sete caracterizações de risco); SQLite 92 PASS + 1 ERROR por dependência requests ausente/proxy indisponível. Requisitos externos em suíte separada: **3 FAIL reais**, sem supressão. CI Ubuntu/Windows configurado com jobs externos deliberadamente vermelhos; detalhes de runs/logs devem ser conferidos no relatório/adendo de validação. Quality canônica não executada. Nenhum P0 fechado, **0/6 homologados, HARD NO-GO**.
 
+### Evidência CI A182 conferida
+[PR Draft #1472](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1472), código `169105f1c83896b61d6dd331c128b604de37de93`. [A182 #39875508639](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639): regressão **132/132 por SO**, SQLite **93/93 por SO**, requisitos externos **3 FAIL reais por SO**; CI global **FAILURE** por esses requisitos. [SQLite histórico #39875508631](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508631): 93/93 Ubuntu e Windows. Oito logs lidos, checkout e marcadores conferidos; [resumo verificável](evidence/a182/ci-verified.json). Nenhuma fonte alterada após o SHA testado nesta atualização documental. **P0 0/6; HARD NO-GO; revisão humana do contrato externo pendente.**
+
+
