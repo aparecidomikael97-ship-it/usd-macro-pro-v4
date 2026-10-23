@@ -92,3 +92,19 @@ A [PR Draft #1468](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4
 - [Relatório e critérios A181](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/blob/lab/aion-p0-external-custody-recovery-a181-20261022/docs/aion/AION_P0_TWO_FILE_CUSTODY_A181_LAB_20261022.md).
 
 **Próximo gate não substituível por LAB:** fonte de confiança externa com chave registrada de modo independente, contador durável resistente a rollback/restauração, identidade imutável de evento de negócio, política de reconstrução de gênese, testemunha disponível fora do host e ensaio H0 real. Quality completa ainda pendente. **0/6 P0 homologados, HARD NO-GO, sem merge/deploy/Worker.**
+
+
+## Adendo A182 — vínculo original e checkpoints locais, sem independência externa
+Ramo LAB `lab/aion-p0-intent-binding-a182-20261022`, baseado no head A181 `e58fd2b073f4eddb46d406da9b62e85bbe350aca`. Ver [relatório A182](AION_P0_INTENT_BINDING_A182_LAB_20261022.md).
+
+| P0 | Evidência/limite A182 | Status |
+|---|---|---|
+| 1 | original local não autentica proprietário/identidade de negócio; substituição da inscrição continua aceitando | ABERTO |
+| 2 | assinatura e fingerprint fixo rejeitam alteração unilateral; substituir raiz junto ao fingerprint continua aceitando autoridade falsa | ABERTO |
+| 3 | guard LAB opt-in vincula candidato à intenção original canônica, rejeita alterações e preserva ZERO_AUTO_RESEND; não cobre chamador privilegiado/reinscrição | ABERTO |
+| 4 | checkpoint retido detecta custódia abaixo do ordinal; rollback conjunto/rebootstrap com checkpoint antigo continua replay | ABERTO |
+| 5 | regressão SQLite executada; vínculo nativo/VFS e identidade atômica continuam não provados | ABERTO |
+| 6 | sem alteração ao armazenamento operacional; rollback/backup e vínculo ao handle nativo continuam sem homologação | ABERTO |
+
+Local: 132/132 regressões (22 A182, incluindo sete caracterizações de risco); SQLite 92 PASS + 1 ERROR por dependência requests ausente/proxy indisponível. Requisitos externos em suíte separada: **3 FAIL reais**, sem supressão. CI Ubuntu/Windows configurado com jobs externos deliberadamente vermelhos; detalhes de runs/logs devem ser conferidos no relatório/adendo de validação. Quality canônica não executada. Nenhum P0 fechado, **0/6 homologados, HARD NO-GO**.
+
