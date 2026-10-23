@@ -1,0 +1,54 @@
+name: A189 Local Witness Dual Rollback LAB (Ubuntu Windows)
+on:
+  pull_request:
+    paths:
+      - 'labs/a189/local_witness_failclosed_lab.py'
+      - 'test_atlasquant_aion_local_witness_a189_lab.py'
+      - '.github/workflows/quality-tests.yml'
+      - '.github/workflows/aion-a189-local-witness-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-witness-mismatch-vs-dual-rollback:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: A189 ten local witness tests with deliberately unsafe negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest -v test_atlasquant_aion_local_witness_a189_lab 2>&1 | tee a189_local_witness.log
+          grep -q 'Ran 10 tests' a189_local_witness.log
+          grep -q 'A189_DB_ONLY_ROLLBACK_WITH_LOCAL_WITNESS=DENIED' a189_local_witness.log
+          grep -q 'A189_WITNESS_ONLY_ROLLBACK=DENIED' a189_local_witness.log
+          grep -q 'A189_JOINT_LOCAL_DB_PLUS_WITNESS_ROLLBACK=UNSAFE_READMISSION_REPRODUCED' a189_local_witness.log
+          grep -q 'A189_SAME_HOST_WITNESS_FORGERY=UNSAFE_READMISSION_REPRODUCED' a189_local_witness.log
+          grep -q 'A189_H0_WITNESS_MISSING=DENIED_WITHOUT_AUTO_BOOTSTRAP' a189_local_witness.log
+          grep -q 'A189_SPLIT_COMMIT=UNCERTAIN_AND_DENY_NO_RETRY' a189_local_witness.log
+          grep -q 'A189_POST_WITNESS_ACK_LOSS=UNCERTAIN_ZERO_AUTO_RESEND' a189_local_witness.log
+          grep -q 'A189_ORIGINAL_EVENT_NOT_AUTHENTICATED=DOUBLE_SEMANTIC_CLAIM_REPRODUCED' a189_local_witness.log
+      - name: Regress A188, A187 and A186 negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m unittest -v test_atlasquant_aion_process_boundary_a188_lab test_atlasquant_aion_strict_connection_a187_lab test_atlasquant_aion_connection_factory_a186_lab 2>&1 | tee a189_regressions.log
+          grep -q 'Ran 21 tests' a189_regressions.log
+      - name: State actual gate boundary
+        shell: bash
+        run: |
+          echo 'GREEN = negative controls and partial-rollback denials reproduced, not security homologation.'
+          echo 'Local witness + SQLite share host authority and can BOTH be restored or forged.'
+          echo 'No external/OS separate principal, original event authentication or VFS/SHM/WAL atomicity.'
+          echo '0 of 6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
