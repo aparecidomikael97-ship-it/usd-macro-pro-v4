@@ -1,0 +1,42 @@
+name: A185 Actual AION SQLite Shared Handle LAB
+on:
+  pull_request:
+    paths:
+      - 'test_atlasquant_aion_live_connection_boundary_a185_lab.py'
+      - '.github/workflows/aion-a185-actual-store-boundary-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  aion-real-modules-negative-controls:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run integration negative controls without external adapters
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -V
+          python -B -m unittest -v test_atlasquant_aion_live_connection_boundary_a185_lab 2>&1 | tee a185_actual_store.log
+          grep -q 'A185_AION_SHARED_DB_HANDLE=CHAT_OUTBOX_BUDGET_SAGA' a185_actual_store.log
+          grep -q 'A185_AION_SHARED_HANDLE_CACHE_REVOKED=DENIED' a185_actual_store.log
+          grep -q 'A185_AION_SEPARATE_SQLITE_CONNECT_BYPASS=WRITES_DURING_REVOKED_EPOCH' a185_actual_store.log
+          grep -q 'A185_AION_NEW_STORE_OPEN_BYPASS=UNGUARDED_CONNECTION' a185_actual_store.log
+          grep -q 'Ran 4 tests' a185_actual_store.log
+      - name: Explicit qualification
+        shell: bash
+        run: |
+          echo 'GREEN = bypasses REPRODUCED in actual AION modules.'
+          echo 'PROTECTION INCOMPLETE: new raw connections and reopened stores do not inherit progress handler.'
+          echo 'No H0 external epoch, no atomic VFS proof, no real external sends; 0/6 P0; HARD NO-GO.'
