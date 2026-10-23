@@ -1,0 +1,224 @@
+{
+  "base_sha": "e58fd2b073f4eddb46d406da9b62e85bbe350aca",
+  "tested_code_sha": "169105f1c83896b61d6dd331c128b604de37de93",
+  "pr": 1472,
+  "branch": "lab/aion-p0-intent-binding-a182-20261022",
+  "heads_observed": [
+    {
+      "branch": "lab/aion-p0-outbox-uncertain-retry-gate-a176-20261022",
+      "sha": "028eddd5e2545f0b8a5238da8704e530f43a8cf0"
+    },
+    {
+      "branch": "lab/aion-p0-outbox-proof-admission-a177-20261022",
+      "sha": "b3780fef123d937e480c1de48a03a84bad640683"
+    },
+    {
+      "branch": "lab/aion-p0-ed25519-receipt-a178-20261022",
+      "sha": "abf3a4c5754e5ad3f20094bafef0ae3df493b978"
+    },
+    {
+      "branch": "lab/aion-p0-witness-admission-a179-20261022",
+      "sha": "4224198b4d5eec15df3280f41ce2af71f6033197"
+    },
+    {
+      "branch": "lab/aion-p0-preflight-witness-a180-20261022",
+      "sha": "6f70b5b72a85f184b9be502f88696297dc30880d"
+    },
+    {
+      "branch": "lab/aion-p0-external-custody-recovery-a181-20261022",
+      "sha": "e58fd2b073f4eddb46d406da9b62e85bbe350aca"
+    }
+  ],
+  "jobs": [
+    {
+      "id": 120160006836,
+      "run_id": 39875508639,
+      "name": "A182 sqlite (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006836",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:20.7514186Z   ref: 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:24.3012548Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:26.0113583Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD\r",
+        "2026-10-23T00:01:26.0164416Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}\r",
+        "2026-10-23T00:01:26.0549948Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:26.1807842Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:26.7660470Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.\r",
+        "2026-10-23T00:01:26.7668183Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED\r",
+        "2026-10-23T00:01:26.8651080Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:49.7101373Z Ran 93 tests in 10.511s\r",
+        "2026-10-23T00:01:49.7101724Z OK\r"
+      ]
+    },
+    {
+      "id": 120160006844,
+      "run_id": 39875508639,
+      "name": "A182 sqlite (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006844",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:19.1715365Z   ref: 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:19.3841507Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.5529374Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD",
+        "2026-10-23T00:01:20.5535885Z [command]/usr/bin/git rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}",
+        "2026-10-23T00:01:20.5564805Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.5687668Z [command]/usr/bin/git checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.6722061Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.",
+        "2026-10-23T00:01:20.6738358Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED",
+        "2026-10-23T00:01:20.6803797Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:24.3778045Z Ran 93 tests in 1.126s",
+        "2026-10-23T00:01:24.3778275Z OK"
+      ]
+    },
+    {
+      "id": 120160006950,
+      "run_id": 39875508639,
+      "name": "A182 regression (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006950",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:19.8345839Z   ref: 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:25.6886799Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:30.0205416Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD\r",
+        "2026-10-23T00:01:30.0252720Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}\r",
+        "2026-10-23T00:01:30.1094530Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:30.2340365Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:30.6793661Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.\r",
+        "2026-10-23T00:01:30.6801583Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED\r",
+        "2026-10-23T00:01:30.7852431Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:02:19.0004874Z Ran 132 tests in 19.862s\r",
+        "2026-10-23T00:02:19.0005136Z OK\r",
+        "2026-10-23T00:02:19.0005475Z A182_ORIGINAL_BINDING_ALTERED_AGGREGATE=NO_SEND\r",
+        "2026-10-23T00:02:19.0006144Z A182_RETAINED_ORDINAL_EMPTY_REBOOTSTRAP=DENIED_LOCAL_ONLY\r",
+        "2026-10-23T00:02:19.0006556Z A182_BOUND_ORIGINAL_NEW_REQUEST_HOST_LOSS=NO_REPLAY\r",
+        "2026-10-23T00:02:19.0006920Z A182_RISK_REPLACE_ORIGINAL_ENROLLMENT=ACCEPTED\r",
+        "2026-10-23T00:02:19.0007254Z A182_RISK_REPIN_ROOT_AND_FINGERPRINT=FAKE_AUTHORITY\r",
+        "2026-10-23T00:02:19.0007591Z A182_RISK_ROLLBACK_CUSTODY_AND_CHECKPOINT=REPLAY\r",
+        "2026-10-23T00:02:19.0007948Z A182_RISK_A181_CHANGED_AGGREGATE_SAME_ADAPTER_EFFECT=REPLAY\r"
+      ]
+    },
+    {
+      "id": 120160006967,
+      "run_id": 39875508639,
+      "name": "A182 external-red (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006967",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:19.7030363Z   ref: 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:22.2955334Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:23.7209307Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD\r",
+        "2026-10-23T00:01:23.7252741Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}\r",
+        "2026-10-23T00:01:23.7541143Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:23.8270922Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:24.1423720Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.\r",
+        "2026-10-23T00:01:24.1430818Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED\r",
+        "2026-10-23T00:01:24.2266690Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:33.7676028Z AssertionError: True is not false : UNMET: independent monotonic custody and checkpoint\r",
+        "2026-10-23T00:01:33.7678357Z AssertionError: True is not false : UNMET: authenticated immutable original business identity\r",
+        "2026-10-23T00:01:33.7682422Z     with self.assertRaises(ValueError, msg=\"UNMET: externally pinned trust authority\"):\r",
+        "2026-10-23T00:01:33.7682988Z AssertionError: ValueError not raised : UNMET: externally pinned trust authority\r",
+        "2026-10-23T00:01:33.7683436Z Ran 3 tests in 0.530s\r",
+        "2026-10-23T00:01:33.7683563Z FAILED (failures=3)\r"
+      ]
+    },
+    {
+      "id": 120160006972,
+      "run_id": 39875508639,
+      "name": "A182 regression (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160006972",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:19.6702559Z   ref: 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:19.8612936Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:21.0064347Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD",
+        "2026-10-23T00:01:21.0070667Z [command]/usr/bin/git rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}",
+        "2026-10-23T00:01:21.0096147Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:21.0180974Z [command]/usr/bin/git checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:21.1238048Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.",
+        "2026-10-23T00:01:21.1253397Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED",
+        "2026-10-23T00:01:21.1317081Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:25.2761219Z Ran 132 tests in 1.490s",
+        "2026-10-23T00:01:25.2761420Z OK",
+        "2026-10-23T00:01:25.2761671Z A182_ORIGINAL_BINDING_ALTERED_AGGREGATE=NO_SEND",
+        "2026-10-23T00:01:25.2761998Z A182_RETAINED_ORDINAL_EMPTY_REBOOTSTRAP=DENIED_LOCAL_ONLY",
+        "2026-10-23T00:01:25.2762329Z A182_BOUND_ORIGINAL_NEW_REQUEST_HOST_LOSS=NO_REPLAY",
+        "2026-10-23T00:01:25.2762617Z A182_RISK_REPLACE_ORIGINAL_ENROLLMENT=ACCEPTED",
+        "2026-10-23T00:01:25.2762905Z A182_RISK_REPIN_ROOT_AND_FINGERPRINT=FAKE_AUTHORITY",
+        "2026-10-23T00:01:25.2763190Z A182_RISK_ROLLBACK_CUSTODY_AND_CHECKPOINT=REPLAY",
+        "2026-10-23T00:01:25.2763506Z A182_RISK_A181_CHANGED_AGGREGATE_SAME_ADAPTER_EFFECT=REPLAY"
+      ]
+    },
+    {
+      "id": 120160007024,
+      "run_id": 39875508639,
+      "name": "A182 external-red (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639/job/120160007024",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:20.6988376Z   ref: 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.9323472Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:22.4571483Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD",
+        "2026-10-23T00:01:22.4580631Z [command]/usr/bin/git rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}",
+        "2026-10-23T00:01:22.4606661Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:22.4689053Z [command]/usr/bin/git checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:22.5793876Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.",
+        "2026-10-23T00:01:22.5819936Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED",
+        "2026-10-23T00:01:22.5880647Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:28.7072672Z AssertionError: True is not false : UNMET: independent monotonic custody and checkpoint",
+        "2026-10-23T00:01:28.7077007Z AssertionError: True is not false : UNMET: authenticated immutable original business identity",
+        "2026-10-23T00:01:28.7081014Z     with self.assertRaises(ValueError, msg=\"UNMET: externally pinned trust authority\"):",
+        "2026-10-23T00:01:28.7081909Z AssertionError: ValueError not raised : UNMET: externally pinned trust authority",
+        "2026-10-23T00:01:28.7082667Z Ran 3 tests in 0.036s",
+        "2026-10-23T00:01:28.7082899Z FAILED (failures=3)"
+      ]
+    },
+    {
+      "id": 120160007602,
+      "run_id": 39875508631,
+      "name": "lifecycle (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508631/job/120160007602",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:19.7844878Z   ref: 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.0392744Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.8119257Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD",
+        "2026-10-23T00:01:20.8127628Z [command]/usr/bin/git rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}",
+        "2026-10-23T00:01:20.8157825Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.8276339Z [command]/usr/bin/git checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:20.9644535Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.",
+        "2026-10-23T00:01:20.9659183Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED",
+        "2026-10-23T00:01:20.9733190Z 169105f1c83896b61d6dd331c128b604de37de93",
+        "2026-10-23T00:01:26.7477363Z Ran 93 tests in 1.326s",
+        "2026-10-23T00:01:26.7477581Z OK"
+      ]
+    },
+    {
+      "id": 120160007618,
+      "run_id": 39875508631,
+      "name": "lifecycle (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508631/job/120160007618",
+      "verified_log_excerpts": [
+        "2026-10-23T00:01:21.2102366Z   ref: 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:24.9004967Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:26.4285211Z  * branch            169105f1c83896b61d6dd331c128b604de37de93 -> FETCH_HEAD\r",
+        "2026-10-23T00:01:26.4340053Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" rev-parse --verify --quiet 169105f1c83896b61d6dd331c128b604de37de93^{object}\r",
+        "2026-10-23T00:01:26.4802078Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:26.5863685Z [command]\"C:\\Program Files\\Git\\bin\\git.exe\" checkout --progress --force 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:27.1706319Z Note: switching to '169105f1c83896b61d6dd331c128b604de37de93'.\r",
+        "2026-10-23T00:01:27.1714751Z HEAD is now at 169105f A182 LAB: bind original intent and retained trust/checkpoint fixtures; expose external guarantees RED\r",
+        "2026-10-23T00:01:27.2672893Z 169105f1c83896b61d6dd331c128b604de37de93\r",
+        "2026-10-23T00:01:48.9066071Z Ran 93 tests in 10.908s\r",
+        "2026-10-23T00:01:48.9066402Z OK\r"
+      ]
+    }
+  ]
+}
