@@ -1,0 +1,47 @@
+COMMAND: ['/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python', '-m', 'unittest', '-v', 'test_atlasquant_aion_chaos_campaign']
+EXIT: 1
+test_agent_loop_isolates_without_automatic_kill (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_agent_loop_isolates_without_automatic_kill) ... ok
+test_campaign_contract_never_authorizes_faults_or_recovery (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_campaign_contract_never_authorizes_faults_or_recovery) ... ok
+test_complete_campaign_requires_all_domains_and_remains_non_authoritative (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_complete_campaign_requires_all_domains_and_remains_non_authoritative) ... ok
+test_missing_domain_cross_scope_or_false_safety_claim_blocks (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_missing_domain_cross_scope_or_false_safety_claim_blocks) ... ok
+test_network_timeout_never_blind_resends_without_authoritative_absence (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_network_timeout_never_blind_resends_without_authoritative_absence) ... FAIL
+test_provider_fault_opens_circuit_and_degrades_to_read_only (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_provider_fault_opens_circuit_and_degrades_to_read_only) ... ok
+test_queue_lost_response_reconciles_exactly_once_without_resend (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_queue_lost_response_reconciles_exactly_once_without_resend) ... FAIL
+test_state_corruption_breaks_checkpoint_and_ledger_integrity (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_state_corruption_breaks_checkpoint_and_ledger_integrity) ... ok
+test_store_crash_before_commit_rolls_back_and_reopens_cleanly (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_store_crash_before_commit_rolls_back_and_reopens_cleanly) ... ok
+test_tool_failure_after_prior_effect_requires_manual_compensation_approval (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_tool_failure_after_prior_effect_requires_manual_compensation_approval) ... FAIL
+
+======================================================================
+FAIL: test_network_timeout_never_blind_resends_without_authoritative_absence (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_network_timeout_never_blind_resends_without_authoritative_absence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_chaos_campaign.py", line 158, in test_network_timeout_never_blind_resends_without_authoritative_absence
+    self.assertEqual(adapter.send_calls, 1)
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_queue_lost_response_reconciles_exactly_once_without_resend (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_queue_lost_response_reconciles_exactly_once_without_resend)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_chaos_campaign.py", line 222, in test_queue_lost_response_reconciles_exactly_once_without_resend
+    self.assertEqual(reconciled["state"], "CONFIRMED")
+AssertionError: 'UNCERTAIN' != 'CONFIRMED'
+- UNCERTAIN
++ CONFIRMED
+
+
+======================================================================
+FAIL: test_tool_failure_after_prior_effect_requires_manual_compensation_approval (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_tool_failure_after_prior_effect_requires_manual_compensation_approval)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a184-lab/test_atlasquant_aion_chaos_campaign.py", line 286, in test_tool_failure_after_prior_effect_requires_manual_compensation_approval
+    self.assertEqual(confirmed["state"], "CONFIRMED")
+AssertionError: 'UNCERTAIN' != 'CONFIRMED'
+- UNCERTAIN
++ CONFIRMED
+
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.065s
+
+FAILED (failures=3)

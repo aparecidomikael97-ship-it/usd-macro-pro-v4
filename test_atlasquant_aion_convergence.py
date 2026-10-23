@@ -68,25 +68,19 @@ def _repository_is_shallow():
 def _production_base():
     """Resolve main without requiring a historical SHA in the local clone.
 
-    A full checkout already has origin/main. A shallow Actions checkout does
-    not, so fetch only that branch tip. The tree diff does not need the
-    commits in between.
+    A PR can target another LAB branch. GITHUB_BASE_REF names that target,
+    not the production reference, and must never substitute for main here.
+    A shallow Actions checkout may lack origin/main, so fetch only that
+    branch tip. A local main branch is not evidence of the remote main tip.
+    The tree diff does not need the commits in between.
     """
-    base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
-    candidates = []
-    if base_ref:
-        candidates.append(f"origin/{base_ref}")
-    candidates.extend(["origin/main", "main"])
-    for name in candidates:
-        if _commit_exists(name):
-            return name
-    ref = base_ref or "main"
-    destination = f"refs/remotes/origin/{ref}"
+    candidate = "origin/main"
+    if _commit_exists(candidate):
+        return candidate
     fetched = _git([
         "fetch", "--depth", "1", "origin",
-        f"refs/heads/{ref}:{destination}",
+        "refs/heads/main:refs/remotes/origin/main",
     ])
-    candidate = f"origin/{ref}"
     if fetched.returncode == 0 and _commit_exists(candidate):
         return candidate
     detail = (fetched.stderr or fetched.stdout or "git fetch falhou").strip()
@@ -126,6 +120,56 @@ def _task(**step_fields):
         checkpoint_digest="cp-a",
         created_at=NOW,
     )
+
+
+class ProductionBaseResolverTests(unittest.TestCase):
+    """Synthetic git results test the oracle, never production admission."""
+
+    def test_stacked_lab_target_is_never_the_production_reference(self):
+        with mock.patch.dict(os.environ, {"GITHUB_BASE_REF": "lab/stacked-parent"}), \
+                mock.patch(__name__ + "._commit_exists", side_effect=lambda ref: ref in {
+                    "origin/lab/stacked-parent", "origin/main", "main",
+                }), mock.patch(__name__ + "._git") as git:
+            self.assertEqual(_production_base(), "origin/main")
+        git.assert_not_called()
+
+    def test_shallow_checkout_fetches_only_main_even_for_a_lab_pr(self):
+        fetched = subprocess.CompletedProcess([], 0, "", "")
+        with mock.patch.dict(os.environ, {"GITHUB_BASE_REF": "lab/stacked-parent"}), \
+                mock.patch(__name__ + "._commit_exists", side_effect=[False, True]), \
+                mock.patch(__name__ + "._git", return_value=fetched) as git:
+            self.assertEqual(_production_base(), "origin/main")
+        git.assert_called_once_with([
+            "fetch", "--depth", "1", "origin",
+            "refs/heads/main:refs/remotes/origin/main",
+        ])
+
+    def test_unavailable_main_fails_closed_without_using_local_or_lab_branch(self):
+        failed = subprocess.CompletedProcess([], 1, "", "synthetic offline fetch")
+        with mock.patch.dict(os.environ, {"GITHUB_BASE_REF": "lab/stacked-parent"}), \
+                mock.patch(__name__ + "._commit_exists", side_effect=lambda ref: ref in {
+                    "main", "origin/lab/stacked-parent",
+                }), mock.patch(__name__ + "._git", return_value=failed) as git:
+            with self.assertRaisesRegex(AssertionError, "base main"):
+                _production_base()
+        git.assert_called_once_with([
+            "fetch", "--depth", "1", "origin",
+            "refs/heads/main:refs/remotes/origin/main",
+        ])
+
+    def test_fetch_success_without_main_commit_still_fails_closed(self):
+        fetched = subprocess.CompletedProcess([], 0, "", "")
+        with mock.patch.dict(os.environ, {"GITHUB_BASE_REF": "lab/stacked-parent"}), \
+                mock.patch(__name__ + "._commit_exists", return_value=False), \
+                mock.patch(__name__ + "._git", return_value=fetched):
+            with self.assertRaisesRegex(AssertionError, "base main"):
+                _production_base()
+
+    def test_forbidden_paths_remain_denied_for_stacked_lab_work(self):
+        self.assertEqual(_forbidden_production_paths([
+            "render.yaml", "deploy/worker.yaml", "config/Secret.txt",
+            "test_atlasquant_aion_convergence.py", "docs/LAB_REPORT.md",
+        ]), ["render.yaml", "deploy/worker.yaml", "config/Secret.txt"])
 
 
 class AionConvergenceTests(unittest.TestCase):
@@ -339,9 +383,6 @@ class AionConvergenceTests(unittest.TestCase):
         self.assertIn("durable_task_continuity", (ROOT / "atlasquant_aion_status_board.py").read_text(encoding="utf-8"))
 
     def test_main_and_production_surfaces_stay_untouched(self):
-        base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
-        if base_ref:
-            self.assertEqual(base_ref, "main")
         base = _production_base()
         # Ancestry of the pinned base is enforced only when this clone can
         # actually walk that history. Shallow CI does not have the object.

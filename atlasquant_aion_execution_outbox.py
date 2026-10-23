@@ -16,6 +16,7 @@ Adapters are injected by tests/future hosts. No adapter is enabled here.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
@@ -101,6 +102,22 @@ def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
 
+def _bound_callback(callback: Callable[..., Any], *arguments: Any) -> Any:
+    """Isolate a synthetic callback and reject changed argument bindings.
+
+    Each boundary gets private nested data. Neither a retained argument nor a
+    returned mutable object is shared with later callbacks or ledger writes.
+    This is local data integrity, not evidence that a callback is trustworthy;
+    a hostile in-process host can still replace code, state and trust roots.
+    """
+    private = tuple(deepcopy(value) for value in arguments)
+    bindings = tuple(_canonical(value) for value in private)
+    result = callback(*private)
+    if any(_canonical(value) != binding for value, binding in zip(private, bindings)):
+        raise ValueError("CALLBACK_ARGUMENT_BINDING_CHANGED")
+    return deepcopy(result)
+
+
 class ExecutionOutbox:
     """Scoped outbox bound to the same SQLite database as staged chat state."""
 
@@ -136,7 +153,7 @@ class ExecutionOutbox:
         if self._first_attempt_guard is None:
             return False
         try:
-            return self._first_attempt_guard(dict(intent)) is True
+            return _bound_callback(self._first_attempt_guard, dict(intent)) is True
         except Exception:
             return False
 
@@ -147,7 +164,7 @@ class ExecutionOutbox:
         if self._evidence_verifier is None:
             return False
         try:
-            return self._evidence_verifier(kind, dict(intent), dict(result)) is True
+            return _bound_callback(self._evidence_verifier, kind, dict(intent), dict(result)) is True
         except Exception:
             return False
 
@@ -519,7 +536,7 @@ class ExecutionOutbox:
         if now_dt >= _utc(decision.get("valid_until")):
             return False, "BLOCKED_REAPPROVAL", {"reason": "AUTHORITY_EXPIRED"}
         try:
-            current = _mapping(authorize(dict(decision)))
+            current = _mapping(_bound_callback(authorize, dict(decision)))
         except Exception:
             return False, "REVOKED", {"reason": "AUTHORITY_REVALIDATION_FAILED"}
         if current.get("allowed") is not True:
@@ -637,7 +654,7 @@ class ExecutionOutbox:
                     "CUMULATIVE_AUTHORITY_GUARD_REQUIRED",
                 )
             try:
-                budget = _mapping(cumulative_authority_guard(dict(decision)))
+                budget = _mapping(_bound_callback(cumulative_authority_guard, dict(decision)))
             except Exception:
                 return self._set_blocked(
                     key,
@@ -699,7 +716,7 @@ class ExecutionOutbox:
                     "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"}
 
         try:
-            result = _mapping(send(dict(intent["decision"]), key))
+            result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
             with self.db:
                 self.db.execute(
@@ -779,7 +796,12 @@ class ExecutionOutbox:
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
 
-        result = _mapping(reconcile(key, dict(intent["decision"])))
+        try:
+            result = _mapping(_bound_callback(reconcile, key, dict(intent["decision"])))
+        except Exception:
+            # A changed binding or a lost reconciliation response cannot
+            # confirm an effect, nor grant a resend or retry permission.
+            return {**self.get(key), "reconcile_state": "STILL_UNCERTAIN"}
         if result.get("found") is True and result.get("confirmed") is True:
             effect_ref = _clean(result.get("effect_ref"), 128)
             if effect_ref and self._verified_evidence(

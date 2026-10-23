@@ -4,7 +4,10 @@ The file descriptor supplies bytes; SQLite deserializes those exact bytes into
 :memory:. This avoids claiming stdlib exposes its native VFS handle. Expected
 SHA-256 is a retained fixture, not authenticated external provenance. Live WAL,
 journals, filesystem persistence and unpinned restore are deliberately denied.
+Read budgets bound SQLite VM progress and returned material, not wall-clock
+time, total native memory, hostile OS activity or independent custody.
 """
+from contextlib import contextmanager
 import hashlib
 import os
 from pathlib import Path
@@ -18,9 +21,23 @@ from aion_chat.store import StorageUnavailableError
 
 class PinnedSQLiteSnapshotLab:
     MAX_BYTES = 16 * 1024 * 1024
-    def __init__(self, path, *, expected_sha256):
+    MAX_VM_STEPS = 1_000_000
+    MAX_ROWS = 10_000
+    MAX_RESULT_BYTES = 4 * 1024 * 1024
+
+    def __init__(self, path, *, expected_sha256,
+                 max_vm_steps=MAX_VM_STEPS, max_rows=MAX_ROWS,
+                 max_result_bytes=MAX_RESULT_BYTES):
         if type(expected_sha256) is not str or not re.fullmatch("[0-9a-f]{64}",expected_sha256):
             raise StorageUnavailableError("PINNED_SNAPSHOT_DIGEST_REQUIRED")
+        for value, ceiling in ((max_vm_steps, self.MAX_VM_STEPS),
+                               (max_rows, self.MAX_ROWS),
+                               (max_result_bytes, self.MAX_RESULT_BYTES)):
+            if type(value) is not int or not 1 <= value <= ceiling:
+                raise StorageUnavailableError("SNAPSHOT_POSITIVE_BUDGET_REQUIRED")
+        self._max_vm_steps = max_vm_steps
+        self._max_rows = max_rows
+        self._max_result_bytes = max_result_bytes
         self._lock=RLock()
         self._data=None
         path=Path(path).absolute()
@@ -34,7 +51,13 @@ class PinnedSQLiteSnapshotLab:
                 result.append((info.st_dev,info.st_ino))
             return result
         def no_sidecars():
-            if any(Path(str(path)+suffix).exists() for suffix in ("-wal","-shm","-journal")):
+            for suffix in ("-wal", "-shm", "-journal"):
+                try:
+                    Path(str(path) + suffix).lstat()
+                except FileNotFoundError:
+                    continue
+                # A dangling alias is still an ambiguous directory entry.
+                # Other stat errors propagate to the fail-closed outer handler.
                 raise StorageUnavailableError("LIVE_SQLITE_SIDECAR_DENIED")
         fd=None
         try:
@@ -71,8 +94,13 @@ class PinnedSQLiteSnapshotLab:
             self.digest=expected_sha256
             # Validate using the actual in-memory SQLite database.
             with self._connection() as db:
-                if db.execute("PRAGMA quick_check").fetchall()!=[("ok",)]:
-                    raise StorageUnavailableError("SNAPSHOT_INTEGRITY_FAILED")
+                with self._vm_budget(db, self.MAX_VM_STEPS):
+                    cursor = db.execute("PRAGMA quick_check(1)")
+                    if cursor.fetchone() != ("ok",) or cursor.fetchone() is not None:
+                        raise StorageUnavailableError("SNAPSHOT_INTEGRITY_FAILED")
+        except StorageUnavailableError:
+            self._data = None
+            raise
         except (OSError,sqlite3.Error) as exc:
             self._data=None
             raise StorageUnavailableError("SNAPSHOT_UNAVAILABLE") from exc
@@ -80,7 +108,6 @@ class PinnedSQLiteSnapshotLab:
             if fd is not None: os.close(fd)
 
     def _connection(self):
-        from contextlib import contextmanager
         @contextmanager
         def opened():
             db=sqlite3.connect(":memory:")
@@ -88,13 +115,63 @@ class PinnedSQLiteSnapshotLab:
                 if not hasattr(db,"deserialize"):
                     raise StorageUnavailableError("NATIVE_DESERIALIZE_UNAVAILABLE")
                 db.deserialize(self._data)
-                files=db.execute("PRAGMA database_list").fetchall()
-                if files!=[(0,"main","")]:
+                files = db.execute("PRAGMA database_list")
+                if files.fetchone() != (0, "main", "") or files.fetchone() is not None:
                     raise StorageUnavailableError("NATIVE_MEMORY_DATABASE_REQUIRED")
+                # Avoid query scratch spilling to disk. This is not an RSS cap.
+                db.execute("PRAGMA temp_store=MEMORY")
+                self._length_limit(db, self.MAX_RESULT_BYTES)
                 yield db
             finally:
                 db.close()
         return opened()
+
+    @staticmethod
+    def _length_limit(db, budget):
+        if not hasattr(db, "setlimit"):
+            raise StorageUnavailableError("NATIVE_QUERY_LIMITS_UNAVAILABLE")
+        # SQLite checks the length of each value/encoded row before returning
+        # it to Python. Aggregate accounting below also includes row/cell costs.
+        db.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, budget)
+
+    @staticmethod
+    @contextmanager
+    def _vm_budget(db, limit):
+        steps = 0
+        exhausted = False
+
+        def progress():
+            nonlocal steps, exhausted
+            steps += 1
+            exhausted = steps > limit
+            return int(exhausted)
+
+        db.set_progress_handler(progress, 1)
+        try:
+            yield
+        except sqlite3.Error as exc:
+            if exhausted:
+                raise StorageUnavailableError("SNAPSHOT_VM_STEP_BUDGET_EXCEEDED") from exc
+            raise
+        finally:
+            db.set_progress_handler(None, 0)
+
+    @staticmethod
+    def _row_bytes(row):
+        # Deterministic conservative accounting, not platform-specific RSS.
+        total = 64 + 32 * len(row)
+        for value in row:
+            if value is None:
+                continue
+            if isinstance(value, (int, float)):
+                total += 8
+            elif isinstance(value, str):
+                total += len(value.encode("utf-8"))
+            elif isinstance(value, bytes):
+                total += len(value)
+            else:
+                raise StorageUnavailableError("SNAPSHOT_RESULT_TYPE_DENIED")
+        return total
 
     def rows(self, sql, parameters=()):
         with self._lock:
@@ -102,6 +179,7 @@ class PinnedSQLiteSnapshotLab:
                 raise StorageUnavailableError("SNAPSHOT_CLOSED")
             with self._connection() as db:
                 db.execute("PRAGMA query_only=ON")
+                self._length_limit(db, self._max_result_bytes)
                 def authorize(action,one,two,database,source):
                     if action in (sqlite3.SQLITE_SELECT,sqlite3.SQLITE_READ):
                         return sqlite3.SQLITE_OK
@@ -110,7 +188,25 @@ class PinnedSQLiteSnapshotLab:
                         return sqlite3.SQLITE_OK
                     return sqlite3.SQLITE_DENY
                 db.set_authorizer(authorize)
-                return db.execute(sql,parameters).fetchall()
+                result = []
+                total_bytes = 0
+                try:
+                    with self._vm_budget(db, self._max_vm_steps):
+                        cursor = db.execute(sql, parameters)
+                        while True:
+                            row = cursor.fetchone()
+                            if row is None:
+                                return result
+                            if len(result) >= self._max_rows:
+                                raise StorageUnavailableError("SNAPSHOT_ROW_BUDGET_EXCEEDED")
+                            total_bytes += self._row_bytes(row)
+                            if total_bytes > self._max_result_bytes:
+                                raise StorageUnavailableError("SNAPSHOT_RESULT_BYTE_BUDGET_EXCEEDED")
+                            result.append(row)
+                except sqlite3.Error as exc:
+                    if getattr(exc, "sqlite_errorcode", None) == sqlite3.SQLITE_TOOBIG:
+                        raise StorageUnavailableError("SNAPSHOT_RESULT_BYTE_BUDGET_EXCEEDED") from exc
+                    raise
 
     def persist(self, *args, **kwargs):
         raise StorageUnavailableError("NATIVE_PERSISTENCE_UNATTESTED_ZERO_AUTO_RESEND")

@@ -1,0 +1,18 @@
+Original test source: 172be01c5ae665fbbfddb2c4d5dc02f15b77e953; actual dependencies installed, unchanged worktree import paths.
+Synthetic PR context GITHUB_BASE_REF=lab/stacked-parent; original test run, no stubs.
+test_main_and_production_surfaces_stay_untouched (a183_original_convergence.AionConvergenceTests.test_main_and_production_surfaces_stay_untouched) ... FAIL
+
+======================================================================
+FAIL: test_main_and_production_surfaces_stay_untouched (a183_original_convergence.AionConvergenceTests.test_main_and_production_surfaces_stay_untouched)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "git:172be01c5ae665fbbfddb2c4d5dc02f15b77e953:test_atlasquant_aion_convergence.py", line 344, in test_main_and_production_surfaces_stay_untouched
+AssertionError: 'lab/stacked-parent' != 'main'
+- lab/stacked-parent
++ main
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

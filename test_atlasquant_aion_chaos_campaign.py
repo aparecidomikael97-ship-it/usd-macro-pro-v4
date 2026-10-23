@@ -76,18 +76,62 @@ def authorization(scope, *, allowed=True, authorization_ref="approval-1"):
     return check
 
 
+class SyntheticChaosEvidence:
+    """In-memory LAB fixture; no signature, external identity or custody proof.
+
+    Explicit injection lets these historical tests reach the state machine
+    after A177/A180 admission hardened. Exact decision/result bindings prevent
+    this fixture from silently accepting arbitrary adapter booleans. All data
+    remains under the test process's control and proves no production trust.
+    """
+
+    def __init__(self):
+        self.reservations = {}
+        self.receipts = {}
+
+    def reserve_first_attempt(self, intent):
+        key = intent.get("idempotency_key")
+        decision = intent.get("decision")
+        if not key or not isinstance(decision, dict) or key in self.reservations:
+            return False
+        self.reservations[key] = deepcopy(decision)
+        return True
+
+    def issue(self, kind, decision, key, result):
+        if key not in self.reservations or self.reservations[key] != decision:
+            raise AssertionError("synthetic receipt requires the exact LAB reservation")
+        receipt_id = f"SYNTHETIC-CHAOS-{len(self.receipts) + 1}"
+        wrapped = {**result, "synthetic_lab_receipt": receipt_id}
+        self.receipts[receipt_id] = deepcopy((kind, key, decision, wrapped))
+        return wrapped
+
+    def verify(self, kind, intent, result):
+        record = self.receipts.get(result.get("synthetic_lab_receipt"))
+        return record == (kind, intent.get("idempotency_key"), intent.get("decision"), result)
+
+
 class ChaosAdapter:
-    def __init__(self, mode):
+    """Synthetic effects only; optional evidence is an explicit test fixture."""
+
+    def __init__(self, mode, *, evidence=None):
         self.mode = mode
+        self.evidence = evidence
         self.effects = {}
         self.send_calls = 0
         self.reconcile_calls = 0
         self._lost_once = False
 
+    def _result(self, kind, decision, key, result):
+        if self.evidence is None:
+            return result
+        return self.evidence.issue(kind, decision, key, result)
+
     def send(self, decision, idempotency_key):
         self.send_calls += 1
         if self.mode == "reject":
-            return {"accepted": False, "retryable": False, "reason": "synthetic tool failure"}
+            return self._result("EFFECT_ZERO", decision, idempotency_key, {
+                "accepted": False, "retryable": False, "reason": "synthetic tool failure",
+            })
         if self.mode == "lose-before-effect" and not self._lost_once:
             self._lost_once = True
             raise TimeoutError("synthetic network timeout before effect")
@@ -95,16 +139,18 @@ class ChaosAdapter:
         if self.mode == "lose-after-effect" and not self._lost_once:
             self._lost_once = True
             raise TimeoutError("synthetic queue response loss after effect")
-        return {"accepted": True, "confirmed": True, "effect_ref": effect}
+        return self._result("EFFECT_CONFIRMED", decision, idempotency_key, {
+            "accepted": True, "confirmed": True, "effect_ref": effect,
+        })
 
     def reconcile(self, idempotency_key, decision):
         self.reconcile_calls += 1
         if idempotency_key in self.effects:
-            return {
+            return self._result("EFFECT_CONFIRMED", decision, idempotency_key, {
                 "found": True,
                 "confirmed": True,
                 "effect_ref": self.effects[idempotency_key],
-            }
+            })
         return {"found": False, "authoritative_absence": True}
 
 
@@ -112,9 +158,13 @@ class AionChaosCampaignTests(unittest.TestCase):
     def setUp(self):
         self.scope = Scope("mikael", "tenant-a", "workspace-a")
 
-    def _outbox(self, root):
+    def _outbox(self, root, *, evidence=None):
         store = SQLiteChatStore(Path(root) / "chat.sqlite3")
-        return store, ExecutionOutbox(store, self.scope)
+        return store, ExecutionOutbox(
+            store, self.scope,
+            first_attempt_guard=evidence.reserve_first_attempt if evidence else None,
+            evidence_verifier=evidence.verify if evidence else None,
+        )
 
     def _enqueue(self, outbox, ref):
         return outbox.enqueue(
@@ -141,9 +191,10 @@ class AionChaosCampaignTests(unittest.TestCase):
         self.assertEqual(safe["mode"], "DEGRADED_READ_ONLY")
         self.assertFalse(safe["external_side_effects_allowed"])
 
-    def test_network_timeout_never_blind_resends_without_authoritative_absence(self):
+    def test_network_timeout_and_unverified_absence_never_authorize_resend(self):
         with tempfile.TemporaryDirectory() as raw:
-            store, outbox = self._outbox(raw)
+            evidence = SyntheticChaosEvidence()
+            store, outbox = self._outbox(raw, evidence=evidence)
             item = self._enqueue(outbox, "network-1")
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
             adapter = ChaosAdapter("lose-before-effect")
@@ -162,9 +213,16 @@ class AionChaosCampaignTests(unittest.TestCase):
                 authorize=authorization(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(reconciled["state"], "RETRY")
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(reconciled["reconcile_state"], "STILL_UNCERTAIN")
             self.assertEqual(adapter.send_calls, 1)
             self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(outbox.claim_next("worker-2", now=NOW + timedelta(seconds=61)))
+            store.close()
+            store, reopened = self._outbox(raw, evidence=evidence)
+            self.assertEqual(reopened.get(item["idempotency_key"])["state"], "UNCERTAIN")
+            self.assertIsNone(reopened.claim_next("worker-2", now=NOW + timedelta(seconds=62)))
+            self.assertEqual(adapter.send_calls, 1)
             store.close()
 
     def test_store_crash_before_commit_rolls_back_and_reopens_cleanly(self):
@@ -201,10 +259,11 @@ class AionChaosCampaignTests(unittest.TestCase):
 
     def test_queue_lost_response_reconciles_exactly_once_without_resend(self):
         with tempfile.TemporaryDirectory() as raw:
-            store, outbox = self._outbox(raw)
+            evidence = SyntheticChaosEvidence()
+            store, outbox = self._outbox(raw, evidence=evidence)
             item = self._enqueue(outbox, "queue-1")
             claimed = outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
-            adapter = ChaosAdapter("lose-after-effect")
+            adapter = ChaosAdapter("lose-after-effect", evidence=evidence)
             result = outbox.dispatch_claimed(
                 claimed["idempotency_key"],
                 worker_id="worker-1",
@@ -224,10 +283,10 @@ class AionChaosCampaignTests(unittest.TestCase):
             self.assertEqual(outbox.effect_count(), 1)
             store.close()
 
-    def test_tool_failure_after_prior_effect_requires_manual_compensation_approval(self):
+    def _tool_failure_after_prior_effect(self, *, verified_rejection):
         with tempfile.TemporaryDirectory() as raw:
-            store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
-            outbox = ExecutionOutbox(store, self.scope)
+            evidence = SyntheticChaosEvidence()
+            store, outbox = self._outbox(raw, evidence=evidence)
             budget = CumulativeAuthorityBudget(
                 store,
                 self.scope,
@@ -279,7 +338,7 @@ class AionChaosCampaignTests(unittest.TestCase):
                 claimed["idempotency_key"],
                 worker_id="worker-1",
                 authorize=authorization(self.scope),
-                adapter=ChaosAdapter("confirmed"),
+                adapter=ChaosAdapter("confirmed", evidence=evidence),
                 cumulative_authority_guard=lambda d: budget.guard(d, now=NOW),
                 now=NOW + timedelta(seconds=1),
             )
@@ -297,16 +356,30 @@ class AionChaosCampaignTests(unittest.TestCase):
                 claimed["idempotency_key"],
                 worker_id="worker-1",
                 authorize=authorization(self.scope),
-                adapter=ChaosAdapter("reject"),
+                adapter=ChaosAdapter("reject", evidence=evidence if verified_rejection else None),
                 cumulative_authority_guard=lambda d: budget.guard(d, now=NOW + timedelta(seconds=2)),
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(failed["state"], "FAILED")
+            self.assertEqual(failed["state"], "FAILED" if verified_rejection else "UNCERTAIN")
             synced = saga.sync_forward_outcome(
                 "chaos-saga",
                 "two",
                 now=NOW + timedelta(seconds=3),
             )
+            if not verified_rejection:
+                self.assertEqual(synced["state"], "RECONCILIATION_REQUIRED")
+                self.assertIsNone(outbox.claim_next("worker-2", now=NOW + timedelta(seconds=4)))
+                with self.assertRaisesRegex(ValueError, "not eligible for compensation"):
+                    saga.prepare_compensation(
+                        "chaos-saga",
+                        explicit_human_approval=True,
+                        approval_ref="approval-comp",
+                        reauth_ref="reauth-comp",
+                        now=NOW + timedelta(seconds=4),
+                    )
+                self.assertEqual(outbox.effect_count(), 1)
+                store.close()
+                return
             self.assertEqual(synced["state"], "COMPENSATION_REQUIRED")
             with self.assertRaisesRegex(ValueError, "explicit human approval"):
                 saga.prepare_compensation(
@@ -316,6 +389,61 @@ class AionChaosCampaignTests(unittest.TestCase):
                     reauth_ref="reauth-comp",
                     now=NOW + timedelta(seconds=4),
                 )
+            store.close()
+
+    def test_tool_failure_after_prior_effect_requires_manual_compensation_approval(self):
+        self._tool_failure_after_prior_effect(verified_rejection=True)
+
+    def test_unverified_tool_rejection_requires_reconciliation_before_compensation(self):
+        self._tool_failure_after_prior_effect(verified_rejection=False)
+
+    def test_default_outbox_without_witness_cannot_send_or_auto_requeue(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store, outbox = self._outbox(raw)
+            item = self._enqueue(outbox, "no-witness")
+            outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+            adapter = ChaosAdapter("confirmed")
+            result = outbox.dispatch_claimed(
+                item["idempotency_key"], worker_id="worker-1",
+                authorize=authorization(self.scope), adapter=adapter,
+                now=NOW + timedelta(seconds=1),
+            )
+            self.assertEqual(result["state"], "UNCERTAIN")
+            self.assertEqual(adapter.send_calls, 0)
+            self.assertEqual(adapter.effects, {})
+            self.assertEqual(outbox.effect_count(), 0)
+            store.close()
+            store, reopened = self._outbox(raw)
+            self.assertEqual(reopened.get(item["idempotency_key"])["state"], "UNCERTAIN")
+            self.assertIsNone(reopened.claim_next("worker-2", now=NOW + timedelta(seconds=61)))
+            self.assertEqual(adapter.send_calls, 0)
+            store.close()
+
+    def test_lost_response_with_bare_confirmation_stays_uncertain_without_resend(self):
+        with tempfile.TemporaryDirectory() as raw:
+            evidence = SyntheticChaosEvidence()
+            store, outbox = self._outbox(raw, evidence=evidence)
+            item = self._enqueue(outbox, "unverified-confirmation")
+            outbox.claim_next("worker-1", now=NOW, lease_seconds=60)
+            # The reservation fixture is present, but this adapter issues no
+            # registered synthetic receipt. Bare confirmation cannot suffice.
+            adapter = ChaosAdapter("lose-after-effect")
+            result = outbox.dispatch_claimed(
+                item["idempotency_key"], worker_id="worker-1",
+                authorize=authorization(self.scope), adapter=adapter,
+                now=NOW + timedelta(seconds=1),
+            )
+            self.assertEqual(result["state"], "UNCERTAIN")
+            result = outbox.reconcile(
+                item["idempotency_key"], adapter=adapter,
+                authorize=authorization(self.scope), now=NOW + timedelta(seconds=2),
+            )
+            self.assertEqual(result["state"], "UNCERTAIN")
+            self.assertEqual(result["reconcile_state"], "STILL_UNCERTAIN")
+            self.assertEqual(adapter.send_calls, 1)
+            self.assertEqual(len(adapter.effects), 1)
+            self.assertEqual(outbox.effect_count(), 0)
+            self.assertIsNone(outbox.claim_next("worker-2", now=NOW + timedelta(seconds=61)))
             store.close()
 
     def test_agent_loop_isolates_without_automatic_kill(self):
@@ -345,7 +473,7 @@ class AionChaosCampaignTests(unittest.TestCase):
     def test_complete_campaign_requires_all_domains_and_remains_non_authoritative(self):
         observations = [
             observation("PROVIDER", failure_mode="provider outage", containment="circuit OPEN", recovery="safe mode read-only"),
-            observation("NETWORK", failure_mode="timeout before effect", containment="UNCERTAIN", recovery="authoritative absence -> RETRY"),
+            observation("NETWORK", failure_mode="timeout before effect", containment="UNCERTAIN", recovery="unverified absence -> UNCERTAIN; no automatic resend"),
             observation("STORE", failure_mode="crash before CAS commit", containment="transaction rollback", recovery="reopen revision unchanged"),
             observation("QUEUE", failure_mode="response lost after effect", containment="UNCERTAIN", recovery="reconcile -> CONFIRMED exactly once"),
             observation("TOOL", failure_mode="second tool rejected", containment="COMPENSATION_REQUIRED", recovery="manual approval required"),
