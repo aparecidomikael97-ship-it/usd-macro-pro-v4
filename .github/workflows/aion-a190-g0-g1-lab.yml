@@ -62,8 +62,11 @@ jobs:
           echo "A190_OWNER_UID=$(id -u a190custodian)"
           echo "A190_ATTACK_UID=$(id -u a190attacker)"
           test "$(id -u a190custodian)" != "$(id -u a190attacker)"
-          sudo -u a190custodian python -B -m labs.a190.os_principal_probe init "$database" 2>&1 | tee a190_owner.log
-          sudo -u a190attacker python -B -m labs.a190.os_principal_probe attack "$database" 2>&1 | tee a190_attack.log
+          probe_file="$(mktemp -p /tmp a190_probe_XXXXXX.py)"
+          cp labs/a190/os_principal_probe.py "$probe_file"
+          chmod 644 "$probe_file"
+          sudo -u a190custodian python -B "$probe_file" init "$database" 2>&1 | tee a190_owner.log
+          sudo -u a190attacker python -B "$probe_file" attack "$database" 2>&1 | tee a190_attack.log
           grep -q 'A190_G1_LEGITIMATE_OWNER_SQLITE_READ_WRITE=SUCCESS' a190_owner.log
           grep -q 'A190_G1_DISTINCT_PRINCIPAL_DENIALS=4_OF_4' a190_attack.log
           grep -q 'A190_G1_WAL_SHM_SAME_INODE_ADMIN_ROOT=NOT_EXERCISED_OR_NOT_ATTESTED' a190_attack.log
@@ -134,8 +137,12 @@ jobs:
           }
           $legit = Invoke-Probe $owner $passOwner 'init'
           $hostile = Invoke-Probe $attacker $passAttack 'attack'
-          if ($legit -notmatch 'A190_G1_LEGITIMATE_OWNER_SQLITE_READ_WRITE=SUCCESS') { throw 'A190_OWNER_NOT_EXERCISED' }
-          if ($hostile -notmatch 'A190_G1_DISTINCT_PRINCIPAL_DENIALS=4_OF_4') { throw 'A190_ATTACK_NOT_EXERCISED' }
+          Write-Output $legit
+          Write-Output $hostile
+          if (($legit -join ' ') -notmatch 'A190_G1_LEGITIMATE_OWNER_SQLITE_READ_WRITE=SUCCESS') { throw 'A190_OWNER_NOT_EXERCISED' }
+          if (($hostile -join ' ') -notmatch 'A190_G1_DISTINCT_PRINCIPAL_DENIALS=4_OF_4') { throw 'A190_ATTACK_NOT_EXERCISED' }
+          if (($legit -join ' ') -notmatch [regex]::Escape($ownerSid.Value)) { throw 'A190_OWNER_PROCESS_WRONG_SID' }
+          if (($hostile -join ' ') -notmatch [regex]::Escape($attackSid.Value)) { throw 'A190_ATTACKER_PROCESS_WRONG_SID' }
           Write-Output 'A190_G1_REAL_WINDOWS_ACL_PROBE=OWNER_SUCCESS_ATTACKER_DENIED'
       - name: Windows G1 limitation
         shell: pwsh
