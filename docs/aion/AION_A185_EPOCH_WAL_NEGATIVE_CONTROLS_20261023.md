@@ -58,3 +58,20 @@ A185_LAB_RESULT=PASS_NEGATIVE_CONTROLS SECURITY_STATUS=INCOMPLETE_STDLIB_BYPASS_
 **A)** Decidir como fazer \`sqlite3.connect\` no Python usar sempre a camada nativa, com instruções explícitas de fail-closed se for impossível sem trocar a arquitetura; inventariar todos os caminhos de conexão. **B)** Implementar e reproduzir negação de statement cacheado e de WAL com same-inode/ABA, restart e commit incerto nas plataformas alvo. **C)** Exigir CI Ubuntu/Windows e comparar com os cinco requisitos externos verdadeiramente RED, sem skip, xfail ou renomear testes. **D)** Formular gate de H0/custódia externa para decisão humana, sem contratação.
 
 **É um resultado de engenharia experimental, não aumento de porcentagem de P0 homologados.**
+
+
+## Adendo — CI real após o código e workflows publicados
+
+**SHA de código e workflows testado:** \`9790c96e2013f888b1fa80ccaff7d601f427850a\`. Os dois arquivos-fonte conferidos em CI usam hash exato esperado; Python normalizou CRLF/LF antes do hash sem alterar a lógica.
+
+| Workflow | Sistema e evidência | Resultado |
+|---|---|---|
+| [Native VFS Epoch/WAL #39944927477](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39944927477) | Linux, compilações \`-O0\` e \`-O2\`, cenários VM/cache, VFS explícita, escrita MAIN vs WAL | **PASS de contraprovas (1 job)** |
+| [Python SQLite Epoch #39944927564](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39944927564) | Ubuntu Python 3.12, SQLite 3.45.1: \`PYTHON_CACHE_REVOKED=DENIED\`; segunda conexão escreve | **PASS** |
+| Mesmo run #39944927564 | Windows Python 3.12, SQLite 3.49.1: \`PYTHON_CACHE_REVOKED=DENIED\`; segunda conexão escreve | **PASS** |
+
+**Primeira tentativa Windows preservada:** [#39944702887](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39944702887) falhou na verificação SHA do checkout por conversão CRLF, **antes de executar o Python**. O ajuste em \`9790c96\` passa a verificar bytes normalizados para LF e ambos os SOs passaram. Não interpretar aquele erro como falha SQLite nem apagar a evidência.
+
+**Interpretação:** os resultados verdes provam que os testes reproduziram revogação no VM e bypass de conexão **no escopo e SOs declarados**. No Windows **não foi instrumentado o VFS nativo**, nem foram exercidos ABA/same-inode, xSync/locks/SHM, quedas de energia ou fronteira do Python AION real. Um callback de epoch auto-controlado no processo **não é autoridade independente**, e uma VFS default admite bypass por outra explicitamente nomeada.
+
+**Status:** CI dos experimentos PASS com lacunas de segurança intencionalmente demonstradas. Os cinco requisitos \`external-red\` A184 e os 43 achados do seu stack não foram retestados nesta nova PR, e continuam bloqueios do baseline. **0/6 P0 homologados; HARD NO-GO; UNCERTAIN; ZERO_AUTO_RESEND.** Este adendo é documental, posterior ao SHA testado, sem código operacional alterado.
