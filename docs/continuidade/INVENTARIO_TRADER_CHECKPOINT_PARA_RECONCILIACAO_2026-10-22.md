@@ -64,8 +64,8 @@ Esta reconciliação foi escrita em ramo documental isolado criado a partir de *
 **Estado final desta rodada:** reconciliação documental entregue; **nenhuma feature ou P0 homologado por este documento**. Sem merge, deploy, Worker nem despesa.
 
 
-## Segunda rodada do pente-fino (22/10) — Complemento T18–T57
-O inventário acima possui T01–T17 e **não era uma lista completa**. Após conferência adicional do backlog, documentos de produto, guias de backtest/TradingView, diretório `tradingview/`, contratos de pesquisa, módulos de runtime e issues #1080/#1160, a matriz foi ampliada com **40 requisitos/documentações complementares** em:
+## Segunda rodada do pente-fino (22/10) — Complemento T18–T58
+O inventário acima possui T01–T17 e **não era uma lista completa**. Após conferência adicional do backlog, documentos de produto, guias de backtest/TradingView, diretório `tradingview/`, contratos de pesquisa, módulos de runtime e issues #1080/#1160, a matriz foi ampliada com **41 requisitos/documentações complementares** em:
 
 **[TRADER_PENTE_FINO_AMPLIADO_2026-10-22.md](TRADER_PENTE_FINO_AMPLIADO_2026-10-22.md)**.
 
@@ -75,6 +75,9 @@ Destaques antes omitidos:
 - **T20–T26 — TradingView/Pine:** guia de importação CSV e **cinco estratégias Pine reais** (BOS/CHOCH+OB, FVG, OTE, CRT, AMD/PO3), além de verificador de paridade *estática*; nenhum desses arquivos prova webhook/live ou execução idêntica no broker emulator.
 - **T27–T31 — laboratório profundo:** comparador, walk-forward/OOS, parâmetros, spread/slippage, snapshots e replay.
 - **T32–T39 — perfis e institucional:** perfil semanal estatístico, filtros de sessão/killzones, liquidez/SMT, PPR ainda indefinido, Wyckoff, VWAP, COT/Open Interest.
-- **T40–T57 — cadeia funcional:** gráficos, briefing macro/voz, histórico/auditoria, eventos, Academy, corretoras e licenças, UX, mercados separados e segurança.
+- **T40–T58 — cadeia funcional:** gráficos, briefing macro/voz, histórico/auditoria, eventos, Academy, corretoras e licenças, UX, mercados separados e segurança.
 
-**Total de itens de rastreio nesta rodada: T01–T57.** É uma matriz de preservação de decisões; não é prova de que 57 funcionalidades estejam concluídas. A promessa de ausência absoluta de lacunas exigiria vasculhar todos os commits/chats/issues e reexecutar os testes; isso ainda não ocorreu. O material permanece isolado em PR Draft, sem merge, sem afetar Cloud A183, sem contratação, com HARD NO-GO e P0 0/6.
+**Total de itens de rastreio nesta rodada: T01–T58.** É uma matriz de preservação de decisões; não é prova de que 58 funcionalidades estejam concluídas. A promessa de ausência absoluta de lacunas exigiria vasculhar todos os commits/chats/issues e reexecutar os testes; isso ainda não ocorreu. O material permanece isolado em PR Draft, sem merge, sem afetar Cloud A183, sem contratação, com HARD NO-GO e P0 0/6.
+
+### Requisito específico do proprietário: Gráfico TradingView-style dentro do Trader
+**T58** está documentado em [TRADER_GRAFICO_REALTIME_INDICADORES_MODALIDADE_2026-10-22.md](TRADER_GRAFICO_REALTIME_INDICADORES_MODALIDADE_2026-10-22.md): gráfico interno com dados ao vivo licenciados, indicadores individualmente selecionáveis e ocultáveis via olhinho, perfis persistentes, suporte a Order Block/Volume Profile/Fibonacci/Quarterly/CRT, revisão das restrições Pine/widget/Advanced Charts, feed de dados, testes e orçamento. Requisito preservado; **não implementado e não autorizado para deploy antes da homologação do núcleo.**
