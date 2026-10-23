@@ -1,0 +1,52 @@
+name: A187 Strict SQLite LAB Admission (not external authority)
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'aion_chat/staged_store.py'
+      - 'test_atlasquant_aion_strict_connection_a187_lab.py'
+      - '.github/workflows/quality-tests.yml'
+      - '.github/workflows/aion-a187-strict-connection-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  strict-mode-negative-controls:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Run 8 strict-admission controls and 6 A186 regression controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest -v test_atlasquant_aion_strict_connection_a187_lab test_atlasquant_aion_connection_factory_a186_lab 2>&1 | tee a187_lab.log
+          grep -q 'Ran 14 tests' a187_lab.log
+          grep -q 'A187_MISSING_FACTORY=DENIED_BEFORE_FS_EFFECT' a187_lab.log
+          grep -q 'A187_EXPLICIT_NATIVE_DEFAULT_FACTORY=DENIED' a187_lab.log
+          grep -q 'A187_STRICT_MANAGED_CACHED_READ_AND_REOPEN=DENIED' a187_lab.log
+          grep -q 'A187_STAGED_STRICT_FACTORY=PROPAGATED_AND_REVOKED' a187_lab.log
+          grep -q 'A187_BACKUP_TEMP_CONNECTION=STRICT_FACTORY' a187_lab.log
+          grep -q 'A187_PROGRESS_HANDLER_REMOVAL_BYPASS=REPRODUCED' a187_lab.log
+          grep -q 'A187_CALLER_FAKE_FACTORY_AND_RAW_SQLITE_BYPASS=REPRODUCED' a187_lab.log
+      - name: Verify legacy lifecycle and Outbox with original default paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m unittest -v test_atlasquant_aion_chat_sqlite_lifecycle test_atlasquant_aion_execution_outbox 2>&1 | tee a187_regression.log
+      - name: Explicit gate status
+        shell: bash
+        run: |
+          echo 'Pass of negative tests proves bypasses persist outside opted-in factory.'
+          echo 'No independently authenticated factory, monotonic epoch, VFS atomic fd, WAL identity or rollback-proof authority.'
+          echo '0 of 6 P0 homologated, HARD NO-GO, ZERO_AUTO_RESEND, UNCERTAIN.'
