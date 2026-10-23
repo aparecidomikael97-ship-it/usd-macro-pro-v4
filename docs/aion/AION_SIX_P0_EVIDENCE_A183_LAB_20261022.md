@@ -1,7 +1,7 @@
 # A183 — bloco de evidência dos seis P0, exclusivamente LAB
 
 **22/10/2026 (America/Cuiaba). 0/6 P0 homologados. HARD NO-GO. ZERO_AUTO_RESEND.**
-Nenhuma autoridade, chave, conta, cliente, serviço, Worker ou operação real utilizada. Sem merge/deploy/push na main, contratação, provisionamento, gasto autorizado ou mudança de política.
+Chaves e identidades somente sintéticas; nenhuma autoridade externa real adotada, conta/serviço de negócio criado, Worker ativado ou operação real executada. Sem merge/deploy/push na main, contratação, provisionamento, gasto autorizado ou mudança de política.
 
 ## Ponto de partida e preservação
 PR Draft A182 #1472 inspecionada: aberta, não merged, base A181 #1471; head `c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365`, código anteriormente testado `169105f1c83896b61d6dd331c128b604de37de93`. Relatório A182, matriz, oito logs resumidos em ci-verified.json e cadeia A176–A181 conferidos. A176 #1466 → A177 #1467 → A178 #1468 → A179 #1469 → A180 #1470 → A181 #1471 → A182 #1472 é uma cadeia LAB empilhada; presença em main não foi presumida.
@@ -67,14 +67,14 @@ python -B scripts/run_a183_lab.py external-red
 - external-red: **5 FAIL, 0 ERROR**, sem skip/expectedFailure/continue-on-error: três requisitos A182 + leitura e escrita após restore sob mesmo inode no store vivo. São requisitos de aceite não satisfeitos, não corrigidos por snapshot offline.
 - Mocks de socket valem para processo de teste, não são firewall e não se propagam automaticamente a subprocessos. Todos os efeitos dos testes específicos ficam em diretórios temporários; nenhum serviço externo foi provisionado.
 
-## CI e comparação canônica prevista
-Workflow A183 roda specific/regression/sqlite/external-red em Ubuntu e Windows. external-red deve falhar sem mascaramento. Jobs Ubuntu separados comparam **a mesma base A182 e o candidato**, usando os seletores extraídos dos workflows canônicos sem alterar módulos:
-- Quality: 525 módulos da etapa Run quality suite.
+## CI e comparação canônica — configuração e escopo
+Workflow A183 roda specific/regression/sqlite/external-red em Ubuntu e Windows. external-red deve falhar sem mascaramento. Jobs Ubuntu separados comparam **a mesma base A182 e o candidato**, usando comandos extraídos dos workflows de cada revisão, com extensão explícita de cobertura no candidato:
+- Quality: 525 módulos na base e 535 no candidato; dez módulos A176–A183 adicionados à etapa Run quality suite.
 - Security: 27 módulos unittest + 34 arquivos pytest.
 - Security audit: pip-audit -r requirements.txt e bandit -q -lll com a lista canônica.
 Instala dependências fixadas, compila fontes e executa com guard LAB de rede para unittest/pytest. pip-audit consulta fontes públicas de vulnerabilidades, sem conta/chave/API paga. Não se executam etapas de deploy, Worker, browser com produção ou SBOM/upload; portanto não chamar isso de execução integral de todos os passos dos workflows canônicos.
 
-Runs, SHAs, contagens e diferenças base/candidato serão registrados somente após leitura dos logs. Erros históricos iguais nos dois SHAs não serão atribuídos ao patch; erros novos não serão apagados. Quality/Security não foram executadas no checkout parcial local.
+Runs, SHAs, contagens e diferenças base/candidato estão registrados no adendo final, após leitura dos logs. Erros históricos iguais nos dois SHAs não serão atribuídos ao patch; erros novos foram mantidos no histórico e tratados sem apagar evidências. Quality/Security não foram executadas no checkout parcial local.
 
 ## Matriz de aceite por P0
 | P0 | Causa / controle / contraexemplo | Evidência atual | Status e bloqueio | Próximo gate mínimo |
@@ -91,3 +91,37 @@ Custo contratado/autorizado adicional: **ZERO**. Nenhuma contratação, conta, c
 
 Solicitada revisão humana do contrato externo, cerimônia de proprietário, autoridade de gênese/recovery e plano de VFS/backup. Isso não é solicitação de ativação ou deploy. **0/6 P0 homologados; HARD NO-GO; ZERO_AUTO_RESEND.**
 
+
+## Evidência CI final auditada — PR Draft #1474
+Base comparada: `c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365`.
+SHA final de fonte/testes/configuração: **`dccdd939fa54df641b1def5f9048b237c8d05cbc`**.
+[CI A183 #39878411676](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676) · [SQLite histórico #39878411684](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411684) · [18 jobs, SHAs e excertos conferidos](evidence/a183/ci-verified.json).
+
+| Suite / escopo | Base A182 | Candidato A183 | Conclusão verificável |
+|---|---|---|---|
+| Específicos Ubuntu / Windows | não existiam | **28/28 por SO** | controle e caracterizações explícitas, sem homologação |
+| A176–A182/Outbox/Saga Ubuntu / Windows | histórico A182 | **132/132 por SO** | ZERO_AUTO_RESEND não relaxado |
+| SQLite A183 Ubuntu / Windows | histórico A182 | **93/93 por SO** | dependência requests instalada em CI |
+| SQLite workflow histórico Ubuntu / Windows | — | **93/93 por SO** | repetição, não cenários independentes |
+| external-red Ubuntu / Windows | três limites A182 | **5 FAIL reais, 0 ERROR por SO** | custódia/inscrição/raiz e restore vivo leitura/escrita não resolvidos |
+| Quality Ubuntu | **6.190 testes, 5 FAIL** | **6.322 testes, 4 FAIL** | 132 execuções adicionais; cobertura omitida corrigida, sem teste removido |
+| Security unittest Ubuntu | **365 testes, 3 FAIL** | **365 testes, mesmas 3 FAIL** | falhas históricas de Chaos, sem erro novo observado |
+| Security pytest Ubuntu | **2.825 PASS** | **2.825 PASS** | mesmos seletores canônicos |
+| Security audit Ubuntu | **43 achados / 2 pacotes** | **mesmos 43 IDs / versões / correções** | pypdf 6.19.0 (8) e pillow 12.3.0 (35), não remediados nesta alteração |
+
+Quality base usava 525 módulos; candidato passou a 535. O teste de cobertura revelou sete módulos A176–A182 omitidos na base e três novos omitidos inicialmente no candidato; todos os dez foram **adicionados**, não excluídos nem exemptados. O teste de cobertura passou na execução final. As quatro falhas remanescentes de Quality são as mesmas três de `test_atlasquant_aion_chaos_campaign` e uma de `test_atlasquant_aion_convergence.test_main_and_production_surfaces_stay_untouched`. Esta última exige GITHUB_BASE_REF=main, enquanto a PR LAB está corretamente empilhada sobre A182; não demonstra escrita em main. Não se mudou a base para main nem se relaxou a asserção para maquiar a run.
+
+As três falhas de Chaos esperam envio/confirmação num cenário que a base já mantém sem reserva/recibo verificáveis; asserts mostram 0≠1 e UNCERTAIN≠CONFIRMED. Permaneceram idênticas nos dois SHAs sob o mesmo harness LAB. Diagnóstico histórico não é aceite nem supressão: Quality/Security continuam vermelhos. pip-audit verificou os mesmos 43 achados nas duas revisões; bandit foi executado com lista e limiar canônicos, sem finding High emitido. Dependências não foram atualizadas silenciosamente nem foram importados ramos de outros trabalhos de remediação.
+
+### Falha nova de fixture Windows e correção preservada
+Primeiro candidato `8873c441f99ce592ca0b158eb8dbedbd005b1ab0`, [run #39878083909 / Windows specific](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878083909/job/120168527810): **28 testes, 14 ERROR** de conexões de fixture/cleanup abertas. `with sqlite3.connect` só controla transação, não fecha conexão. Corrigido por `closing(connection)` **e** contexto transacional explícito, sem remover asserts/casos. Commit `4d4fad807c710cd43b079bc8121219997a0013b1`; Windows passou 28/28 na [run #39878306484](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878306484/job/120169278966). Repetição final em `dccdd939…` passou nas duas plataformas. [Erros iniciais retidos](evidence/a183/first-windows-fixture-errors.json).
+
+### Limites de SO/native comprovados
+- Ubuntu CI: Python 3.12.15 / SQLite **3.45.1**; Windows CI: Python 3.12.10 / SQLite **3.49.1**; local SQLite **3.53.1**. Em todos: deserialize disponível, Connection.fileno ausente.
+- Linux CI reproduziu leitura de arquivo destacado sob pathname original; escrita equivalente retornou SQLITE_READONLY_DBMOVED.
+- Windows negou rename do arquivo nativo aberto (OS_OR_FACADE_DENIED/OS_DENIED); isso não prova resistência a restore sob mesmo inode: os dois RED de restore vivo falharam também em Windows.
+- Arquivo em memória é input pinado e offline. Não autentica atualidade, origem ou independência; rollback conjunto do hash e bytes permanece possível. O envelope de autoridade A183 não substitui todos os campos de recibo A178 (`effect_ref`, receipt ID, prova de ausência/completude) nem constitui recibo real.
+
+Os 18 logs finais foram lidos, checkouts conferidos por job (base ou candidato), versões, contagens e marcadores registrados; os 43 achados foram comparados por IDs/versões, não apenas por contagem. Snapshot-base parcial também foi reconferido em **141 blobs** incluindo staged_store original; ver [manifesto](evidence/a183/base-verified.json). O adendo/matriz/manifestos posteriores são documentação/evidência: nenhum código, teste ou seletor mudou após `dccdd939…`. Runs que um commit documental dispare são distintas das runs auditadas.
+
+**CI global A183: FAILURE**, pelos cinco requisitos RED por SO e pelos bloqueios históricos canônicos. **Homologação efetiva: 0/6. HARD NO-GO. ZERO_AUTO_RESEND.** Revisão humana pendente para identidade/raiz/custódia/H0 e VFS/backup; sem contratação ou operação real.

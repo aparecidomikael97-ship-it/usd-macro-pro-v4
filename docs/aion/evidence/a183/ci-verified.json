@@ -1,0 +1,400 @@
+{
+  "pr": 1474,
+  "branch": "lab/aion-six-p0-evidence-a183-20261022",
+  "base_sha": "c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365",
+  "first_candidate_sha": "8873c441f99ce592ca0b158eb8dbedbd005b1ab0",
+  "fixture_fix_sha": "4d4fad807c710cd43b079bc8121219997a0013b1",
+  "final_tested_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+  "homologated_p0": 0,
+  "hard_no_go": true,
+  "jobs": [
+    {
+      "id": 120169623964,
+      "run_id": 39878411676,
+      "name": "A183 specific (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169623964",
+      "log_excerpts": [
+        "2026-10-23T00:29:58.4623786Z A183_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T00:30:00.5379452Z Ran 28 tests in 1.953s\r",
+        "2026-10-23T00:30:00.5379756Z OK\r",
+        "2026-10-23T00:30:00.5380063Z A183_NATIVE_SAME_NAME_ABA=OS_OR_FACADE_DENIED\r",
+        "2026-10-23T00:30:00.5380523Z A183_NATIVE_SAME_NAME_ABA_WRITE=OS_DENIED\r",
+        "2026-10-23T00:30:00.5381082Z A183_NATIVE_MEMORY_EXACT_PINNED_ARTIFACT=READ_OLD_PINNED_BYTES\r",
+        "2026-10-23T00:30:00.5381744Z A183_AUTHORITY_CONTRACT_RESET=LOCAL_ROOT_AND_FLOOR_NOT_EXTERNAL\r"
+      ]
+    },
+    {
+      "id": 120169624176,
+      "run_id": 39878411676,
+      "name": "Canonical security-unittest (candidate)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624176",
+      "log_excerpts": [
+        "2026-10-23T00:30:12.4066868Z CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml sha256 927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485",
+        "2026-10-23T00:30:14.9426989Z FAIL: test_network_timeout_never_blind_resends_without_authoritative_absence (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_network_timeout_never_blind_resends_without_authoritative_absence)",
+        "2026-10-23T00:30:14.9441941Z FAIL: test_queue_lost_response_reconciles_exactly_once_without_resend (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_queue_lost_response_reconciles_exactly_once_without_resend)",
+        "2026-10-23T00:30:14.9450796Z FAIL: test_tool_failure_after_prior_effect_requires_manual_compensation_approval (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_tool_failure_after_prior_effect_requires_manual_compensation_approval)",
+        "2026-10-23T00:30:14.9458136Z Ran 365 tests in 1.642s",
+        "2026-10-23T00:30:14.9458497Z FAILED (failures=3)"
+      ]
+    },
+    {
+      "id": 120169624228,
+      "run_id": 39878411676,
+      "name": "Canonical quality (base)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624228",
+      "log_excerpts": [
+        "2026-10-23T00:30:02.0349430Z CANONICAL_SOURCE .github/workflows/quality-tests.yml sha256 9a6d98e899053cd14045c23ee1d9ce28f1566710de11301033000f6c03c07256",
+        "2026-10-23T00:31:20.9809757Z FAIL: test_network_timeout_never_blind_resends_without_authoritative_absence (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_network_timeout_never_blind_resends_without_authoritative_absence)",
+        "2026-10-23T00:31:20.9828986Z FAIL: test_queue_lost_response_reconciles_exactly_once_without_resend (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_queue_lost_response_reconciles_exactly_once_without_resend)",
+        "2026-10-23T00:31:20.9836865Z FAIL: test_tool_failure_after_prior_effect_requires_manual_compensation_approval (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_tool_failure_after_prior_effect_requires_manual_compensation_approval)",
+        "2026-10-23T00:31:20.9842699Z FAIL: test_main_and_production_surfaces_stay_untouched (test_atlasquant_aion_convergence.AionConvergenceTests.test_main_and_production_surfaces_stay_untouched)",
+        "2026-10-23T00:31:20.9848508Z FAIL: test_every_root_test_file_is_executed_by_quality_workflow (test_quality_workflow_coverage.QualityWorkflowCoverageTests.test_every_root_test_file_is_executed_by_quality_workflow)",
+        "2026-10-23T00:31:20.9861331Z Ran 6190 tests in 76.973s",
+        "2026-10-23T00:31:20.9861560Z FAILED (failures=5)"
+      ]
+    },
+    {
+      "id": 120169624248,
+      "run_id": 39878411676,
+      "name": "Canonical security-unittest (base)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624248",
+      "log_excerpts": [
+        "2026-10-23T00:30:03.8704410Z CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml sha256 927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485",
+        "2026-10-23T00:30:06.3549439Z FAIL: test_network_timeout_never_blind_resends_without_authoritative_absence (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_network_timeout_never_blind_resends_without_authoritative_absence)",
+        "2026-10-23T00:30:06.3564467Z FAIL: test_queue_lost_response_reconciles_exactly_once_without_resend (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_queue_lost_response_reconciles_exactly_once_without_resend)",
+        "2026-10-23T00:30:06.3573354Z FAIL: test_tool_failure_after_prior_effect_requires_manual_compensation_approval (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_tool_failure_after_prior_effect_requires_manual_compensation_approval)",
+        "2026-10-23T00:30:06.3580316Z Ran 365 tests in 1.670s",
+        "2026-10-23T00:30:06.3580659Z FAILED (failures=3)"
+      ]
+    },
+    {
+      "id": 120169624255,
+      "run_id": 39878411676,
+      "name": "Canonical security-audit (base)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624255",
+      "log_excerpts": [
+        "2026-10-23T00:30:08.9329097Z CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml sha256 927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485",
+        "2026-10-23T00:30:16.2936229Z Found 43 known vulnerabilities in 2 packages"
+      ]
+    },
+    {
+      "id": 120169624278,
+      "run_id": 39878411676,
+      "name": "A183 regression (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624278",
+      "log_excerpts": [
+        "2026-10-23T00:29:36.2993550Z A183_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T00:29:38.4563773Z Ran 132 tests in 2.050s",
+        "2026-10-23T00:29:38.4564146Z OK"
+      ]
+    },
+    {
+      "id": 120169624282,
+      "run_id": 39878411676,
+      "name": "Canonical security-pytest (base)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624282",
+      "log_excerpts": [
+        "2026-10-23T00:30:04.2445452Z CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml sha256 927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485",
+        "2026-10-23T00:30:27.6993044Z 2825 passed in 23.05s"
+      ]
+    },
+    {
+      "id": 120169624364,
+      "run_id": 39878411676,
+      "name": "A183 sqlite (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624364",
+      "log_excerpts": [
+        "2026-10-23T00:29:50.7964934Z A183_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T00:30:01.3267842Z Ran 93 tests in 10.396s\r",
+        "2026-10-23T00:30:01.3268160Z OK\r"
+      ]
+    },
+    {
+      "id": 120169624376,
+      "run_id": 39878411676,
+      "name": "A183 sqlite (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624376",
+      "log_excerpts": [
+        "2026-10-23T00:29:36.8455084Z A183_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T00:29:39.2446556Z Ran 93 tests in 2.292s",
+        "2026-10-23T00:29:39.2446807Z OK"
+      ]
+    },
+    {
+      "id": 120169624411,
+      "run_id": 39878411676,
+      "name": "A183 regression (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624411",
+      "log_excerpts": [
+        "2026-10-23T00:29:59.3852256Z A183_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T00:30:18.2893758Z Ran 132 tests in 18.705s\r",
+        "2026-10-23T00:30:18.2894023Z OK\r"
+      ]
+    },
+    {
+      "id": 120169624430,
+      "run_id": 39878411676,
+      "name": "A183 external-red (windows-latest)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624430",
+      "log_excerpts": [
+        "2026-10-23T00:29:51.7795763Z A183_CAPABILITIES Windows 3.12.10 SQLite 3.49.1 deserialize True native_fileno False\r",
+        "2026-10-23T00:29:53.0138476Z FAIL: test_custody_plus_checkpoint_rollback_must_not_reauthorize (lab_a183_external_requirements_red.ExternalRequirementsRed.test_custody_plus_checkpoint_rollback_must_not_reauthorize)\r",
+        "2026-10-23T00:29:53.0150766Z AssertionError: True is not false : UNMET: independent monotonic custody and checkpoint\r",
+        "2026-10-23T00:29:53.0152693Z FAIL: test_replacement_original_enrollment_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_original_enrollment_must_be_detected)\r",
+        "2026-10-23T00:29:53.0157303Z AssertionError: True is not false : UNMET: authenticated immutable original business identity\r",
+        "2026-10-23T00:29:53.0161441Z FAIL: test_replacement_trust_root_and_fingerprint_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_trust_root_and_fingerprint_must_be_detected)\r",
+        "2026-10-23T00:29:53.0165644Z     with self.assertRaises(ValueError, msg=\"UNMET: externally pinned trust authority\"):\r",
+        "2026-10-23T00:29:53.0167318Z AssertionError: ValueError not raised : UNMET: externally pinned trust authority\r",
+        "2026-10-23T00:29:53.0169262Z FAIL: test_live_restore_same_inode_must_be_attested_before_read (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_be_attested_before_read)\r",
+        "2026-10-23T00:29:53.0174445Z AssertionError: StorageUnavailableError not raised : UNMET: authenticated live snapshot/version and native VFS identity\r",
+        "2026-10-23T00:29:53.0176914Z FAIL: test_live_restore_same_inode_must_not_reopen_write_authority (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_not_reopen_write_authority)\r",
+        "2026-10-23T00:29:53.0182100Z AssertionError: StorageUnavailableError not raised : UNMET: rollback-proof native write boundary\r",
+        "2026-10-23T00:29:53.0183372Z Ran 5 tests in 1.129s\r",
+        "2026-10-23T00:29:53.0183673Z FAILED (failures=5)\r"
+      ]
+    },
+    {
+      "id": 120169624438,
+      "run_id": 39878411676,
+      "name": "A183 external-red (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624438",
+      "log_excerpts": [
+        "2026-10-23T00:29:36.9978506Z A183_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T00:29:37.1151789Z FAIL: test_custody_plus_checkpoint_rollback_must_not_reauthorize (lab_a183_external_requirements_red.ExternalRequirementsRed.test_custody_plus_checkpoint_rollback_must_not_reauthorize)",
+        "2026-10-23T00:29:37.1158611Z AssertionError: True is not false : UNMET: independent monotonic custody and checkpoint",
+        "2026-10-23T00:29:37.1159292Z FAIL: test_replacement_original_enrollment_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_original_enrollment_must_be_detected)",
+        "2026-10-23T00:29:37.1161017Z AssertionError: True is not false : UNMET: authenticated immutable original business identity",
+        "2026-10-23T00:29:37.1161898Z FAIL: test_replacement_trust_root_and_fingerprint_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_trust_root_and_fingerprint_must_be_detected)",
+        "2026-10-23T00:29:37.1163373Z     with self.assertRaises(ValueError, msg=\"UNMET: externally pinned trust authority\"):",
+        "2026-10-23T00:29:37.1163884Z AssertionError: ValueError not raised : UNMET: externally pinned trust authority",
+        "2026-10-23T00:29:37.1164561Z FAIL: test_live_restore_same_inode_must_be_attested_before_read (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_be_attested_before_read)",
+        "2026-10-23T00:29:37.1166555Z AssertionError: StorageUnavailableError not raised : UNMET: authenticated live snapshot/version and native VFS identity",
+        "2026-10-23T00:29:37.1167520Z FAIL: test_live_restore_same_inode_must_not_reopen_write_authority (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_not_reopen_write_authority)",
+        "2026-10-23T00:29:37.1169364Z AssertionError: StorageUnavailableError not raised : UNMET: rollback-proof native write boundary",
+        "2026-10-23T00:29:37.1169844Z Ran 5 tests in 0.061s",
+        "2026-10-23T00:29:37.1169969Z FAILED (failures=5)"
+      ]
+    },
+    {
+      "id": 120169624459,
+      "run_id": 39878411676,
+      "name": "Canonical quality (candidate)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624459",
+      "log_excerpts": [
+        "2026-10-23T00:30:05.1852884Z CANONICAL_SOURCE .github/workflows/quality-tests.yml sha256 edf14c993eba9249fea819680e414df136965eb2d25dcec914b12b9a596d4580",
+        "2026-10-23T00:31:17.9374848Z FAIL: test_network_timeout_never_blind_resends_without_authoritative_absence (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_network_timeout_never_blind_resends_without_authoritative_absence)",
+        "2026-10-23T00:31:17.9389637Z FAIL: test_queue_lost_response_reconciles_exactly_once_without_resend (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_queue_lost_response_reconciles_exactly_once_without_resend)",
+        "2026-10-23T00:31:17.9396979Z FAIL: test_tool_failure_after_prior_effect_requires_manual_compensation_approval (test_atlasquant_aion_chaos_campaign.AionChaosCampaignTests.test_tool_failure_after_prior_effect_requires_manual_compensation_approval)",
+        "2026-10-23T00:31:17.9403862Z FAIL: test_main_and_production_surfaces_stay_untouched (test_atlasquant_aion_convergence.AionConvergenceTests.test_main_and_production_surfaces_stay_untouched)",
+        "2026-10-23T00:31:17.9410054Z Ran 6322 tests in 70.649s",
+        "2026-10-23T00:31:17.9410387Z FAILED (failures=4)",
+        "2026-10-23T00:31:17.9451126Z A183_NATIVE_SAME_NAME_ABA=WRONG_FILE_READ_PATH_CHECK_PASSED",
+        "2026-10-23T00:31:17.9451664Z A183_NATIVE_SAME_NAME_ABA_WRITE=SQLITE_READONLY_DBMOVED",
+        "2026-10-23T00:31:17.9452329Z A183_NATIVE_MEMORY_EXACT_PINNED_ARTIFACT=READ_OLD_PINNED_BYTES",
+        "2026-10-23T00:31:17.9452943Z A183_AUTHORITY_CONTRACT_RESET=LOCAL_ROOT_AND_FLOOR_NOT_EXTERNAL"
+      ]
+    },
+    {
+      "id": 120169624479,
+      "run_id": 39878411676,
+      "name": "Canonical security-pytest (candidate)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624479",
+      "log_excerpts": [
+        "2026-10-23T00:30:03.0423461Z CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml sha256 927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485",
+        "2026-10-23T00:30:33.4448220Z 2825 passed in 29.84s"
+      ]
+    },
+    {
+      "id": 120169624959,
+      "run_id": 39878411676,
+      "name": "A183 specific (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169624959",
+      "log_excerpts": [
+        "2026-10-23T00:29:47.0210759Z A183_CAPABILITIES Linux 3.12.15 SQLite 3.45.1 deserialize True native_fileno False",
+        "2026-10-23T00:29:47.2537413Z Ran 28 tests in 0.180s",
+        "2026-10-23T00:29:47.2538023Z OK",
+        "2026-10-23T00:29:47.2538718Z A183_NATIVE_SAME_NAME_ABA=WRONG_FILE_READ_PATH_CHECK_PASSED",
+        "2026-10-23T00:29:47.2539816Z A183_NATIVE_SAME_NAME_ABA_WRITE=SQLITE_READONLY_DBMOVED",
+        "2026-10-23T00:29:47.2540859Z A183_NATIVE_MEMORY_EXACT_PINNED_ARTIFACT=READ_OLD_PINNED_BYTES",
+        "2026-10-23T00:29:47.2541687Z A183_AUTHORITY_CONTRACT_RESET=LOCAL_ROOT_AND_FLOOR_NOT_EXTERNAL"
+      ]
+    },
+    {
+      "id": 120169625277,
+      "run_id": 39878411676,
+      "name": "Canonical security-audit (candidate)",
+      "status": "completed",
+      "conclusion": "failure",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676/job/120169625277",
+      "log_excerpts": [
+        "2026-10-23T00:30:15.5876992Z CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml sha256 927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485",
+        "2026-10-23T00:30:24.5493255Z Found 43 known vulnerabilities in 2 packages"
+      ]
+    },
+    {
+      "id": 120169623693,
+      "run_id": 39878411684,
+      "name": "lifecycle (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411684/job/120169623693",
+      "log_excerpts": [
+        "2026-10-23T00:30:07.6283373Z Ran 93 tests in 22.530s\r",
+        "2026-10-23T00:30:07.6283572Z OK\r"
+      ]
+    },
+    {
+      "id": 120169624012,
+      "run_id": 39878411684,
+      "name": "lifecycle (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "verified_checkout_sha": "dccdd939fa54df641b1def5f9048b237c8d05cbc",
+      "url": "https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411684/job/120169624012",
+      "log_excerpts": [
+        "2026-10-23T00:29:48.0242093Z Ran 93 tests in 1.314s",
+        "2026-10-23T00:29:48.0242369Z OK"
+      ]
+    }
+  ],
+  "audit": {
+    "base": [
+      "pillow 12.3.0  CVE-2026-112390     13.0.0",
+      "pillow 12.3.0  CVE-2026-112391     13.0.0",
+      "pillow 12.3.0  CVE-2026-112392     13.0.0",
+      "pillow 12.3.0  CVE-2026-112393     13.0.0",
+      "pillow 12.3.0  CVE-2026-112395     13.0.0",
+      "pillow 12.3.0  CVE-2026-112396     13.0.0",
+      "pillow 12.3.0  CVE-2026-112397     13.0.0",
+      "pillow 12.3.0  CVE-2026-112399     13.0.0",
+      "pillow 12.3.0  CVE-2026-112400     13.0.0",
+      "pillow 12.3.0  CVE-2026-112401     13.0.0",
+      "pillow 12.3.0  CVE-2026-112402     13.0.0",
+      "pillow 12.3.0  CVE-2026-112404     13.0.0",
+      "pillow 12.3.0  CVE-2026-112405     13.0.0",
+      "pillow 12.3.0  CVE-2026-112406     13.0.0",
+      "pillow 12.3.0  CVE-2026-112891     13.0.0",
+      "pillow 12.3.0  CVE-2026-112892     13.0.0",
+      "pillow 12.3.0  CVE-2026-112893     13.0.0",
+      "pillow 12.3.0  CVE-2026-112894     13.0.0",
+      "pillow 12.3.0  CVE-2026-112895     13.0.0",
+      "pillow 12.3.0  CVE-2026-112896     13.0.0",
+      "pillow 12.3.0  CVE-2026-112897     13.0.0",
+      "pillow 12.3.0  CVE-2026-112899     13.0.0",
+      "pillow 12.3.0  CVE-2026-112900     13.0.0",
+      "pillow 12.3.0  CVE-2026-112901     13.0.0",
+      "pillow 12.3.0  CVE-2026-96636      13.0.0",
+      "pillow 12.3.0  CVE-2026-96637      13.0.0",
+      "pillow 12.3.0  CVE-2026-96638      13.0.0",
+      "pillow 12.3.0  CVE-2026-96639      13.0.0",
+      "pillow 12.3.0  CVE-2026-96640      13.0.0",
+      "pillow 12.3.0  CVE-2026-96641      13.0.0",
+      "pillow 12.3.0  CVE-2026-96642      13.0.0",
+      "pillow 12.3.0  CVE-2026-96643      13.0.0",
+      "pillow 12.3.0  CVE-2026-96644      13.0.0",
+      "pillow 12.3.0  CVE-2026-96778      13.0.0",
+      "pillow 12.3.0  GHSA-78g4-xqwv-q3g8 13.0.0",
+      "pypdf  6.19.0  CVE-2026-113786     6.21.1",
+      "pypdf  6.19.0  CVE-2026-113789     6.21.0",
+      "pypdf  6.19.0  CVE-2026-113790     6.21.0",
+      "pypdf  6.19.0  CVE-2026-113791     6.21.0",
+      "pypdf  6.19.0  CVE-2026-113792     6.20.1",
+      "pypdf  6.19.0  CVE-2026-113793     6.20.1",
+      "pypdf  6.19.0  CVE-2026-113794     6.20.0",
+      "pypdf  6.19.0  CVE-2026-113795     6.20.0"
+    ],
+    "candidate": [
+      "pillow 12.3.0  CVE-2026-112390     13.0.0",
+      "pillow 12.3.0  CVE-2026-112391     13.0.0",
+      "pillow 12.3.0  CVE-2026-112392     13.0.0",
+      "pillow 12.3.0  CVE-2026-112393     13.0.0",
+      "pillow 12.3.0  CVE-2026-112395     13.0.0",
+      "pillow 12.3.0  CVE-2026-112396     13.0.0",
+      "pillow 12.3.0  CVE-2026-112397     13.0.0",
+      "pillow 12.3.0  CVE-2026-112399     13.0.0",
+      "pillow 12.3.0  CVE-2026-112400     13.0.0",
+      "pillow 12.3.0  CVE-2026-112401     13.0.0",
+      "pillow 12.3.0  CVE-2026-112402     13.0.0",
+      "pillow 12.3.0  CVE-2026-112404     13.0.0",
+      "pillow 12.3.0  CVE-2026-112405     13.0.0",
+      "pillow 12.3.0  CVE-2026-112406     13.0.0",
+      "pillow 12.3.0  CVE-2026-112891     13.0.0",
+      "pillow 12.3.0  CVE-2026-112892     13.0.0",
+      "pillow 12.3.0  CVE-2026-112893     13.0.0",
+      "pillow 12.3.0  CVE-2026-112894     13.0.0",
+      "pillow 12.3.0  CVE-2026-112895     13.0.0",
+      "pillow 12.3.0  CVE-2026-112896     13.0.0",
+      "pillow 12.3.0  CVE-2026-112897     13.0.0",
+      "pillow 12.3.0  CVE-2026-112899     13.0.0",
+      "pillow 12.3.0  CVE-2026-112900     13.0.0",
+      "pillow 12.3.0  CVE-2026-112901     13.0.0",
+      "pillow 12.3.0  CVE-2026-96636      13.0.0",
+      "pillow 12.3.0  CVE-2026-96637      13.0.0",
+      "pillow 12.3.0  CVE-2026-96638      13.0.0",
+      "pillow 12.3.0  CVE-2026-96639      13.0.0",
+      "pillow 12.3.0  CVE-2026-96640      13.0.0",
+      "pillow 12.3.0  CVE-2026-96641      13.0.0",
+      "pillow 12.3.0  CVE-2026-96642      13.0.0",
+      "pillow 12.3.0  CVE-2026-96643      13.0.0",
+      "pillow 12.3.0  CVE-2026-96644      13.0.0",
+      "pillow 12.3.0  CVE-2026-96778      13.0.0",
+      "pillow 12.3.0  GHSA-78g4-xqwv-q3g8 13.0.0",
+      "pypdf  6.19.0  CVE-2026-113786     6.21.1",
+      "pypdf  6.19.0  CVE-2026-113789     6.21.0",
+      "pypdf  6.19.0  CVE-2026-113790     6.21.0",
+      "pypdf  6.19.0  CVE-2026-113791     6.21.0",
+      "pypdf  6.19.0  CVE-2026-113792     6.20.1",
+      "pypdf  6.19.0  CVE-2026-113793     6.20.1",
+      "pypdf  6.19.0  CVE-2026-113794     6.20.0",
+      "pypdf  6.19.0  CVE-2026-113795     6.20.0"
+    ],
+    "identical": true
+  }
+}
