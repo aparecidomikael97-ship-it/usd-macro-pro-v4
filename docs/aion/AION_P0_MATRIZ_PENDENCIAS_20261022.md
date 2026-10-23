@@ -1,4 +1,4 @@
-# AION — MATRIZ DOS SEIS P0 (22/10/2026, após A175)
+# AION — MATRIZ DOS SEIS P0 (22/10/2026, histórico A175–A183)
 **Controle de pendências; não é certificado de prontidão. 0/6 homologados, HARD NO-GO.**
 
 | P0 | Bloqueio | Evidência LAB atual | Falta para aceite verificável | Próxima ação autorizada |
@@ -111,4 +111,27 @@ Local: 132/132 regressões (22 A182, incluindo sete caracterizações de risco);
 ### Evidência CI A182 conferida
 [PR Draft #1472](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1472), código `169105f1c83896b61d6dd331c128b604de37de93`. [A182 #39875508639](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508639): regressão **132/132 por SO**, SQLite **93/93 por SO**, requisitos externos **3 FAIL reais por SO**; CI global **FAILURE** por esses requisitos. [SQLite histórico #39875508631](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39875508631): 93/93 Ubuntu e Windows. Oito logs lidos, checkout e marcadores conferidos; [resumo verificável](evidence/a182/ci-verified.json). Nenhuma fonte alterada após o SHA testado nesta atualização documental. **P0 0/6; HARD NO-GO; revisão humana do contrato externo pendente.**
 
+## A183 — avanço por evidência dos seis P0, exclusivamente LAB
+Base A182 #1472: `c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365`; ramo novo `lab/aion-six-p0-evidence-a183-20261022`. [Relatório A183](AION_SIX_P0_EVIDENCE_A183_LAB_20261022.md) detalha causas, controles, contraexemplos, escopo, custos não cotados e gates mínimos.
 
+| P0 | Controle/evidência A183 | Contraexemplo/bloqueio e próximo gate | Status |
+|---|---|---|---|
+| 1 | Contrato IDENTITY owner + identity_authority, pins/nonce/epoch/assinaturas; inspeção cerimônia V2.24 e persistência V2.26 | chaves sintéticas não autenticam HUMAN_OWNER; exigir cerimônia, raiz e recuperação independentes | ABERTO |
+| 2 | Contrato RECEIPT provider + witness, desafio/escopo/original/raiz, revogação e prazo | signatários locais não provam efeito real; exigir recibos de fonte externa autenticada | ABERTO |
+| 3 | Contrato RESERVATION vinculado ao original/epoch/piso, sem autorização de send/retry; regressões 132/132 locais | inscrição original e rebootstrap ainda substituíveis; autoridade de evento e reserva global antes do efeito | ABERTO |
+| 4 | Piso/epoch retidos e negação por padrão | rollback conjunto custódia/checkpoint continua RED; exigir quórum/custódia monotônica e ensaio H0 independentes | ABERTO |
+| 5 | Dois RED de conexão desviada → bloqueio pelo database_list; snapshot offline pinado deserializado em :memory:, sem WAL/persistência | ABA do mesmo nome ainda lê outro arquivo em Linux; pathname não é fd/VFS; exigir vínculo nativo ou homologação de artefato imutável | ABERTO |
+| 6 | pós-commit desviado vira UNKNOWN latched; escrita ABA observada como SQLITE_READONLY_DBMOVED; persist/backup de snapshot negados | restore sob mesmo inode reabre escrita no store vivo (RED); exigir VFS/sidecars/commit/backup/readback e falhas reais | ABERTO |
+
+Local: **28/28 específicos**, **132/132 herdados**, SQLite **92 PASS + 1 ERROR em 93** por requests ausente/proxy; requisitos externos/nativos **5 FAIL reais, 0 ERROR** em suíte separada. Nenhum skip/expectedFailure/continue-on-error para mascarar os RED. Os testes que demonstram riscos e indisponibilidade de capacidade do SO são identificados no relatório/logs. Quality/Security foram comparadas em CI base/candidato; resultados e limitações constam no adendo final. **0/6 homologados, HARD NO-GO, ZERO_AUTO_RESEND.**
+
+
+
+
+### A183 — CI final auditada, sem homologação
+[PR Draft #1474](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/pull/1474). SHA testado **`dccdd939fa54df641b1def5f9048b237c8d05cbc`**; base comparada `c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365`.
+[Run A183 #39878411676](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411676): por SO, **28/28 específicos + 132/132 herdados + 93/93 SQLite**; requisitos de aceite **5 FAIL reais por SO**. [SQLite histórico #39878411684](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/39878411684): 93/93 por SO.
+
+Quality Ubuntu: base **6.190 / 5 FAIL** → candidato **6.322 / 4 FAIL**; dez módulos A176–A183 adicionados, omissão de cobertura corrigida, nenhum teste removido. Quatro falhas restantes já ocorrem na base (três Chaos e uma expectativa GITHUB_BASE_REF=main incompatível com a PR LAB empilhada). Security unittest: **365 / mesmas 3 FAIL** nas duas revisões; pytest: **2.825 PASS** nas duas; audit: **mesmos 43 IDs/versões em pypdf/pillow**, não remediados aqui. Primeiro Windows specific teve 14 ERROR de fixture/cleanup; fechamento explícito corrigido, repetição final 28/28. Erros iniciais preservados.
+
+[18 jobs e excertos/SHAs verificados](evidence/a183/ci-verified.json) · [manifesto-base parcial, 141 blobs](evidence/a183/base-verified.json) · [relatório e gates por P0](AION_SIX_P0_EVIDENCE_A183_LAB_20261022.md). Nenhum código/teste/seletor mudou após o SHA testado nesta atualização documental. **CI global FAILURE; seis P0 ABERTOS; 0/6 homologados; HARD NO-GO; ZERO_AUTO_RESEND.** Nenhuma autoridade externa/serviço/decisão do proprietário foi implementada: revisão humana continua pendente.

@@ -180,6 +180,21 @@ class OperationScopedSQLiteChatStore:
     def _read_snapshot(self, anchor):
         return self._rename_fingerprint(anchor)
 
+    def _verify_native_declared_path(self, store):
+        """Check SQLite's own main filename, NOT its native fd/inode.
+
+        Reject a misdirected connection before invoking a store method.
+        database_list is a pathname diagnostic; same-name ABA and VFS/sidecar
+        identity remain unproved. Store initialization may already have run.
+        """
+        rows = store.db.execute("PRAGMA database_list").fetchall()
+        main = [row for row in rows if row[1] == "main"]
+        expected = os.path.normcase(os.path.abspath(self.path))
+        if (len(main) != 1 or not main[0][2]
+                or os.path.normcase(os.path.abspath(main[0][2])) != expected
+                or any(row[1] not in {"main", "temp"} for row in rows)):
+            raise StorageUnavailableError("NATIVE_DATABASE_PATH_MISMATCH")
+
     def _write_snapshot(self, anchor):
         # A post-write alarm is always UNKNOWN outcome: native SQLite may
         # already have committed; never authorize replay automatically.
@@ -224,6 +239,7 @@ class OperationScopedSQLiteChatStore:
                             raise StorageUnavailableError(
                                 "BOUND_DATABASE_CHANGED_BEFORE_OPEN")
                     store = SQLiteChatStore(self.path)
+                    self._verify_native_declared_path(store)
                     parents_after_open = self._ancestor_chain_identity(
                         allow_missing=False)
                     if (not self._compatible_parent_chains(
@@ -256,6 +272,11 @@ class OperationScopedSQLiteChatStore:
                         if name in self._WRITE_SENSITIVE_METHODS else None
                     )
                     result = getattr(store, name)(*args, **kwargs)
+                    try:
+                        self._verify_native_declared_path(store)
+                    except StorageUnavailableError as exc:
+                        raise StorageUnavailableError(
+                            "NATIVE_DATABASE_PATH_POST_OPERATION_OUTCOME_UNKNOWN") from exc
                     if (self._ancestor_chain_identity(allow_missing=False)
                             != self._parent_identity):
                         # A write may ALREADY have committed; no automatic
@@ -294,8 +315,9 @@ class OperationScopedSQLiteChatStore:
                         self._failure = "DATABASE_ERROR:" + type(exc).__name__
                     raise
                 except StorageUnavailableError as exc:
-                    if str(exc) == (
-                            "BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED"):
+                    if str(exc) in {
+                            "BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED",
+                            "NATIVE_DATABASE_PATH_POST_OPERATION_OUTCOME_UNKNOWN"}:
                         # Preserve the exact hazard for post-error health checks.
                         # Do not convert a possibly committed write into retry.
                         self._failure = str(exc)
