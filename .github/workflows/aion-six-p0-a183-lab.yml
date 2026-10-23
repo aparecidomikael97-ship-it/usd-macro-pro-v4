@@ -1,0 +1,71 @@
+name: A183 six P0 LAB evidence (no homologation)
+
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/**'
+      - '*a183_lab.py'
+      - 'lab_a183_external_requirements_red.py'
+      - 'scripts/run_a183*'
+      - '.github/workflows/aion-six-p0-a183-lab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    name: A183 ${{ matrix.suite }} (${{ matrix.os }})
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        suite: [specific, regression, sqlite, external-red]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned LAB dependencies
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Run explicit suite (external-red has unmet requirements)
+        run: python -B scripts/run_a183_lab.py ${{ matrix.suite }}
+
+  canonical:
+    name: Canonical ${{ matrix.suite }} (${{ matrix.revision }})
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [base, candidate]
+        suite: [quality, security-unittest, security-pytest, security-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Retain identical harness for both revisions
+        run: cp scripts/run_a183_canonical_lab.py "$RUNNER_TEMP/run_a183_canonical_lab.py"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ matrix.revision == 'base' && 'c9cd24c92d6b92a8c25dc7af636b73b6a5aa6365' || github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned canonical dependencies and audit tools
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0 pip-audit==2.10.1 bandit==1.9.4
+          python -m pip check
+      - name: Compile sources
+        run: python -m compileall -q .
+      - name: Run canonical selectors with LAB network guard
+        run: python -B "$RUNNER_TEMP/run_a183_canonical_lab.py" ${{ matrix.suite }}
+

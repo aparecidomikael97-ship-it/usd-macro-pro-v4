@@ -1,0 +1,53 @@
+test_custody_plus_checkpoint_rollback_must_not_reauthorize (lab_a183_external_requirements_red.ExternalRequirementsRed.test_custody_plus_checkpoint_rollback_must_not_reauthorize) ... FAIL
+test_replacement_original_enrollment_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_original_enrollment_must_be_detected) ... FAIL
+test_replacement_trust_root_and_fingerprint_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_trust_root_and_fingerprint_must_be_detected) ... FAIL
+test_live_restore_same_inode_must_be_attested_before_read (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_be_attested_before_read) ... FAIL
+test_live_restore_same_inode_must_not_reopen_write_authority (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_not_reopen_write_authority) ... FAIL
+
+======================================================================
+FAIL: test_custody_plus_checkpoint_rollback_must_not_reauthorize (lab_a183_external_requirements_red.ExternalRequirementsRed.test_custody_plus_checkpoint_rollback_must_not_reauthorize)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a183-source/lab_a182_external_requirements_red.py", line 18, in test_custody_plus_checkpoint_rollback_must_not_reauthorize
+    self.assertFalse(self.binding_guard(original,minimum_sequence=0)(original),
+AssertionError: True is not false : UNMET: independent monotonic custody and checkpoint
+
+======================================================================
+FAIL: test_replacement_original_enrollment_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_original_enrollment_must_be_detected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a183-source/lab_a182_external_requirements_red.py", line 25, in test_replacement_original_enrollment_must_be_detected
+    self.assertFalse(self.binding_guard(changed)(changed),
+AssertionError: True is not false : UNMET: authenticated immutable original business identity
+
+======================================================================
+FAIL: test_replacement_trust_root_and_fingerprint_must_be_detected (lab_a183_external_requirements_red.ExternalRequirementsRed.test_replacement_trust_root_and_fingerprint_must_be_detected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a183-source/lab_a182_external_requirements_red.py", line 36, in test_replacement_trust_root_and_fingerprint_must_be_detected
+    with self.assertRaises(ValueError, msg="UNMET: externally pinned trust authority"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ValueError not raised : UNMET: externally pinned trust authority
+
+======================================================================
+FAIL: test_live_restore_same_inode_must_be_attested_before_read (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_be_attested_before_read)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a183-source/lab_a183_external_requirements_red.py", line 31, in test_live_restore_same_inode_must_be_attested_before_read
+    with self.assertRaises(StorageUnavailableError,
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised : UNMET: authenticated live snapshot/version and native VFS identity
+
+======================================================================
+FAIL: test_live_restore_same_inode_must_not_reopen_write_authority (lab_a183_external_requirements_red.LiveNativeRollbackRequirementsRed.test_live_restore_same_inode_must_not_reopen_write_authority)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/work/a183-source/lab_a183_external_requirements_red.py", line 36, in test_live_restore_same_inode_must_not_reopen_write_authority
+    with self.assertRaises(StorageUnavailableError,
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: StorageUnavailableError not raised : UNMET: rollback-proof native write boundary
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.061s
+
+FAILED (failures=5)
