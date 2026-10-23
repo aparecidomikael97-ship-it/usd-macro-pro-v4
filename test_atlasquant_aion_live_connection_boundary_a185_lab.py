@@ -81,9 +81,15 @@ class A185ActualLiveConnectionBoundaryLab(unittest.TestCase):
         self.epoch["authority"] = 2
         with self.assertRaisesRegex(sqlite3.OperationalError, "(?i)interrupt"):
             self.store.db.execute("SELECT 1").fetchone()
-        with sqlite3.connect(self.path) as parallel:
-            parallel.execute("CREATE TABLE IF NOT EXISTS a185_bypass(n INTEGER NOT NULL)")
-            parallel.execute("INSERT INTO a185_bypass VALUES (7)")
+        parallel = sqlite3.connect(self.path)
+        try:
+            with parallel:
+                parallel.execute("CREATE TABLE IF NOT EXISTS a185_bypass(n INTEGER NOT NULL)")
+                parallel.execute("INSERT INTO a185_bypass VALUES (7)")
+        finally:
+            # sqlite3.Connection.__exit__ commits/rolls back; it DOES NOT close.
+            # On Windows a leaked handle prevents physical cleanup/restore.
+            parallel.close()
         self.epoch["authority"] = 1
         self.assertEqual(self.store.db.execute(
             "SELECT n FROM a185_bypass").fetchone()[0], 7)
