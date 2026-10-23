@@ -139,7 +139,13 @@ class BrokerLab:
                 self.process.wait(timeout=5)
         for pipe in (self.process.stdin, self.process.stdout, self.process.stderr):
             if pipe is not None and not pipe.closed:
-                pipe.close()
+                try:
+                    pipe.close()
+                except OSError:
+                    # After a simulated lost ACK the child has already exited.
+                    # Windows can reject closing an already-broken pipe; never
+                    # reinterpret the earlier result as a confirmed operation.
+                    pass
 
     def __enter__(self) -> "BrokerLab":
         return self
