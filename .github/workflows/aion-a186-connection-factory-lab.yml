@@ -1,0 +1,50 @@
+name: A186 LAB opt-in SQLite factory coverage (Ubuntu Windows)
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'aion_chat/staged_store.py'
+      - 'test_atlasquant_aion_connection_factory_a186_lab.py'
+      - '.github/workflows/aion-a186-connection-factory-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  a186-actual-aion-opt-in-factory:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A186 six opt-in positive and bypass negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest -v test_atlasquant_aion_connection_factory_a186_lab 2>&1 | tee a186_factory.log
+          grep -q 'Ran 6 tests' a186_factory.log
+          grep -q 'A186_INITIAL_CONNECTION_AFTER_REVOCATION=DENIED' a186_factory.log
+          grep -q 'A186_OUTBOX_SHARED_FACTORY_CONNECTION=DENIED_AFTER_REVOCATION' a186_factory.log
+          grep -q 'A186_MANAGED_REOPEN_REVOKED=DENIED_BEFORE_NATIVE_OPEN' a186_factory.log
+          grep -q 'A186_STAGED_REOPEN_MANAGED=DENIED_AFTER_REVOCATION' a186_factory.log
+          grep -q 'A186_BACKUP_TEMP_CONNECTION=FACTORY_CALLED' a186_factory.log
+          grep -q 'A186_UNMANAGED_CONNECTION_BYPASS=REPRODUCED' a186_factory.log
+      - name: Historic Chat and SQLite regressions (subset)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m unittest -v test_atlasquant_aion_chat_sqlite_lifecycle test_atlasquant_aion_execution_outbox 2>&1 | tee a186_regression.log
+      - name: Admit only LAB qualification
+        shell: bash
+        run: |
+          echo 'Factory is optional/caller-controlled. Plain sqlite3.connect and default SQLiteChatStore still bypass it.'
+          echo 'Epoch and witness synthetic, no VFS handle proof, no root/receipts/H0, no real send.'
+          echo '0/6 P0 homologated | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND'

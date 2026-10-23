@@ -338,14 +338,18 @@ def _publish_database_report(report, destination):
 
 
 class SQLiteChatStore:
-    def __init__(self, path):
+    def __init__(self, path, *, connection_factory=None):
+        # A186 LAB seam: opt-in connection constructor for falsifiable boundary
+        # tests. The default is unchanged and NOT production-attested.
+        # A passed factory is local/caller-controlled, never an authority.
+        self._connection_factory = connection_factory or sqlite3.connect
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._health_state = HEALTHY
         self._health_reason = "OK"
         self.db = None
         try:
-            self.db = sqlite3.connect(str(self.path), timeout=BUSY_TIMEOUT_MS / 1000)
+            self.db = self._connection_factory(str(self.path), timeout=BUSY_TIMEOUT_MS / 1000)
             self.db.row_factory = sqlite3.Row
             self.db.executescript(f"""
             PRAGMA foreign_keys=ON;
@@ -496,7 +500,7 @@ class SQLiteChatStore:
         temp = destination.with_name(destination.name + ".tmp-" + uuid4().hex)
         target = None
         try:
-            target = sqlite3.connect(str(temp), timeout=BUSY_TIMEOUT_MS / 1000)
+            target = self._connection_factory(str(temp), timeout=BUSY_TIMEOUT_MS / 1000)
             self.db.backup(target)
             target.commit()
             # A backup artifact must be standalone, with no live WAL to replay.

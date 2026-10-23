@@ -42,7 +42,10 @@ class OperationScopedSQLiteChatStore:
         "save_context_summary", "wal_checkpoint",
     })
 
-    def __init__(self, path):
+    def __init__(self, path, *, connection_factory=None):
+        # A186 LAB opt-in. Each per-operation SQLiteChatStore must receive
+        # the same factory; default behavior remains unchanged and untrusted.
+        self._connection_factory = connection_factory
         self.path = Path(path)
         self._lock = RLock()
         self._closed = False
@@ -238,7 +241,16 @@ class OperationScopedSQLiteChatStore:
                         if self._path_identity(allow_missing=False) != before:
                             raise StorageUnavailableError(
                                 "BOUND_DATABASE_CHANGED_BEFORE_OPEN")
-                    store = SQLiteChatStore(self.path)
+                    # Preserve the original single-argument constructor
+                    # when the LAB factory seam is not being exercised.
+                    # Legacy test doubles and existing hosts remain compatible.
+                    store = (
+                        SQLiteChatStore(self.path)
+                        if self._connection_factory is None
+                        else SQLiteChatStore(
+                            self.path, connection_factory=self._connection_factory
+                        )
+                    )
                     self._verify_native_declared_path(store)
                     parents_after_open = self._ancestor_chain_identity(
                         allow_missing=False)
