@@ -7,7 +7,7 @@
 - **T19 — Volume Profile:** consta expressamente em [Decisões de Produto 19/09, §Volume Profile](../product/PRODUCT_DECISIONS_2026-09-19.md). Só deve operar quando houver **fonte identificada e metodologia documentada**. Em Forex spot, o volume de ticks/descentralizado **não é volume consolidado do mercado inteiro**. Iniciante: interpretação resumida; Avançado: perfil completo com transparência. **Status: EXPANSÃO DE PRODUTO APROVADA; FONTE/VALIDAÇÃO E IMPLEMENTAÇÃO NÃO AUDITADAS.**
 - **T20 — TradingView:** consta no [Checkpoint 22/09, §11](../continuidade/CHECKPOINT_MESTRE_ATLASQUANT_2026-09-22.md), no [Backlog 18/09, §9](../continuidade/VISAO_MESTRE_BACKLOG_2026-09-18.md) e no [Guia TradingView](../backtest/GUIA_TRADINGVIEW_BACKTEST.md). Há **fluxo histórico offline CSV + replay/backtest próprio** e arquivos Pine reais; isto **não** demonstra ligação live/alertas bidirecionais/webhook/autorização de dados, nem equivalência com o executor da TradingView. **Status: BASE DE PESQUISA DOCUMENTADA E ARQUIVOS ENCONTRADOS; INTEGRAÇÃO LIVE NÃO COMPROVADA.**
 
-## Matriz complementar — T18–T57
+## Matriz complementar — T18–T58
 Todos os estados abaixo descrevem o grau de evidência **do inventário**, não aprovação para negociação real.
 
 | ID | Recurso/documento/aceite que não pode se perder | Estado e prova localizada |
@@ -51,6 +51,7 @@ Todos os estados abaixo descrevem o grau de evidência **do inventário**, não 
 | T54 | **Corretoras/plataformas**: comparação de MetaTrader, cTrader e TradingView, cadastro/KYC, spreads, custos, riscos e licença; não confundir conteúdo didático com integração com corretora. | Backlog 18/09 §8; Checkpoint §19. **Futuro, nenhuma conexão broker autorizada.** |
 | T55 | **Mercados além de Forex**: WIN/WDO, Dow/Nasdaq/S&P/Ibovespa, cripto, DXY separados por motor, dados e validação; sem copiar pesos Forex. | Checkpoint §§15–16. **Backlog histórico, prioridade secundária.** |
 | T56 | **FinOps e qualidade**: dados oficiais, transparência/frescor, atualização alinhada ao indicador, cache, licenças, limite de infraestrutura, sem chamar API por abrir tela. | Backlog §§7 e Produto; decisão 22/10: teto R$200, Plus fora. **Obrigação transversal, nenhum gasto novo autorizado.** |
+| T58 | **Gráfico profissional integrado e em tempo real, com pacotes de indicadores e olhinhos individuais**; Trader → Gráfico interno, ativo/timeframe, configurações persistidas, indicadores SMC/ICT/Quarterly/Volume Profile/Fibo/CRT, sem exigir abrir o site externo. | [Contrato do gráfico com requisitos do proprietário](TRADER_GRAFICO_REALTIME_INDICADORES_MODALIDADE_2026-10-22.md). **Novo requisito explícito de 22/10, não implementado; verificar licença TradingView, feed e Pine JS.** |
 | T57 | **Segurança da operação**: escala Backtest→OOS→Shadow→Paper→aprovação humana; execução com broker só em fase posterior e sem P0 aberto. | Backlog §10; Checkpoint §§3/13; ADR-0008. **HARD NO-GO, real_orders=false, sem autopromoção ou ordens.** |
 
 ## Evidência técnica adicional encontrada (não equivalente a produção)
@@ -71,5 +72,7 @@ Todos os estados abaixo descrevem o grau de evidência **do inventário**, não 
 4. **Dados e licenças:** não contratar fonte de volume/TV/API nem assumir redistribuição antes de avaliar licença, utilidade, custo e consentimento.
 5. **Aceite real:** testes de cálculo e versão de estratégia, anti-look-ahead, timezone DST, NO-DATA, integridade do histórico, paridade Pine quando aplicável, desktop/mobile e segurança do núcleo após fechamento dos seis P0.
 6. **Checkpoint canônico:** este suplemento fica na PR Draft, **não** se declara automaticamente integrado à persistência oficial em produção. Reconciliar mediante processo de checkpoint e revisão humana quando for seguro.
+
+**Complemento visual T58:** o pedido do proprietário de gráfico embutido em tempo real com olhinhos próprios por indicador está especificado em [TRADER_GRAFICO_REALTIME_INDICADORES_MODALIDADE_2026-10-22.md](TRADER_GRAFICO_REALTIME_INDICADORES_MODALIDADE_2026-10-22.md), inclusive as limitações oficiais de Pine em widgets e bibliotecas Advanced Charts, fonte live/licenças e custos.
 
 **Escopo deste segundo pente-fino:** quatro documentos canônicos + backlog, decisões de produto, guias, arquivos Pine e módulos de pesquisa foram inspecionados. Não foi executada uma varredura literal de todos os commits, chats, diretórios e linhas de código do repositório; por isso o inventário está **ampliado, não certificado como absolutamente exaustivo**.
