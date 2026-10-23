@@ -1,4 +1,5 @@
 """A183 RED before correction: real native connection, injected factory misrouting."""
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -38,7 +39,7 @@ class NativeDeclaredPathTests(unittest.TestCase):
         with self.redirected():
             with self.assertRaisesRegex(StorageUnavailableError,"NATIVE_DATABASE_PATH"):
                 self.handle.create_conversation(self.scope)
-        with sqlite3.connect(self.other) as db:
+        with closing(sqlite3.connect(self.other)) as db, db:
             self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],0)
 
     def test_postcommit_connection_drift_is_unknown_and_latched(self):
@@ -52,7 +53,7 @@ class NativeDeclaredPathTests(unittest.TestCase):
         with patch("aion_chat.staged_store.SQLiteChatStore",AfterCommit):
             with self.assertRaisesRegex(StorageUnavailableError,"OUTCOME_UNKNOWN"):
                 self.handle.create_conversation(self.scope)
-        with sqlite3.connect(self.bound) as db:
+        with closing(sqlite3.connect(self.bound)) as db, db:
             self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],1)
         with self.assertRaises(StorageUnavailableError):
             self.handle.create_conversation(self.scope)
@@ -93,7 +94,7 @@ class NativeDeclaredPathTests(unittest.TestCase):
             with patch("aion_chat.staged_store.SQLiteChatStore",SameNameABA):
                 result=self.handle.list_conversations(self.scope)
         self.assertEqual([c.title for c in result.items],["different-native-file"])
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],0)
         print("A183_NATIVE_SAME_NAME_ABA=WRONG_FILE_READ_PATH_CHECK_PASSED")
 
@@ -122,15 +123,15 @@ class NativeDeclaredPathTests(unittest.TestCase):
             return
         except sqlite3.OperationalError as exc:
             self.assertEqual(getattr(exc,"sqlite_errorname",""),"SQLITE_READONLY_DBMOVED")
-            with sqlite3.connect(detached) as db:
+            with closing(sqlite3.connect(detached)) as db, db:
                 self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],0)
             print("A183_NATIVE_SAME_NAME_ABA_WRITE=SQLITE_READONLY_DBMOVED")
             return
         except StorageUnavailableError:
             pass  # UNKNOWN after commit is not proof that write was prevented.
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],0)
-        with sqlite3.connect(detached) as db:
+        with closing(sqlite3.connect(detached)) as db, db:
             self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],1)
         print("A183_NATIVE_SAME_NAME_ABA_WRITE=DETACHED_FILE_COMMITTED_NOT_PREVENTED")
 

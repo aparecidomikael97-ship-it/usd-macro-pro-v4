@@ -1,4 +1,5 @@
 """A183 artifact snapshots: native :memory: input, real temp files, synthetic faults."""
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
 import os
@@ -19,7 +20,7 @@ class PinnedSnapshotTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.path=Path(self.tmp.name)/"artifact.db"
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("create table events(value integer)")
             db.execute("insert into events values(1)")
         self.digest=sha256(self.path.read_bytes()).hexdigest()
@@ -31,7 +32,7 @@ class PinnedSnapshotTests(unittest.TestCase):
     def test_native_memory_reads_exact_pinned_bytes(self):
         s=self.snapshot()
         self.assertEqual(s.rows("select value from events"),[(1,)])
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("update events set value=2")
         self.assertEqual(s.rows("select value from events"),[(1,)])
         with self.assertRaisesRegex(StorageUnavailableError,"DIGEST"):
@@ -40,7 +41,7 @@ class PinnedSnapshotTests(unittest.TestCase):
 
     def test_restore_under_same_inode_is_denied_by_retained_digest(self):
         old=self.path.read_bytes()
-        with sqlite3.connect(self.path) as db:db.execute("update events set value=2")
+        with closing(sqlite3.connect(self.path)) as db, db:db.execute("update events set value=2")
         current=sha256(self.path.read_bytes()).hexdigest()
         inode=self.path.stat().st_ino
         self.path.write_bytes(old)
@@ -58,7 +59,7 @@ class PinnedSnapshotTests(unittest.TestCase):
             p=Path(str(self.path)+suffix);p.write_bytes(b"x")
             with self.assertRaisesRegex(StorageUnavailableError,"SIDECAR"):self.snapshot()
             p.unlink()
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("pragma journal_mode=wal")
         digest=sha256(self.path.read_bytes()).hexdigest()
         with self.assertRaisesRegex(StorageUnavailableError,"OFFLINE"):
