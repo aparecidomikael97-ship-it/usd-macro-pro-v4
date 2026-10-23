@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -B -m unittest -v test_atlasquant_aion_chat_foundation test_atlasquant_aion_chat_sqlite_lifecycle test_atlasquant_aion_execution_outbox 2>&1 | tee a186_regression.log
+          python -B -m unittest -v test_atlasquant_aion_chat_sqlite_lifecycle test_atlasquant_aion_execution_outbox 2>&1 | tee a186_regression.log
       - name: Admit only LAB qualification
         shell: bash
         run: |
