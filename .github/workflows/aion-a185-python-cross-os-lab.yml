@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo '8ba86716cc26f3186dc5783cb2902d557a134ad3a9d2e73ddf73843bd06780e4  labs/a185/sqlite_python_epoch_cross_os.py' | sha256sum -c -
+          python -c 'import pathlib,hashlib; b=pathlib.Path("labs/a185/sqlite_python_epoch_cross_os.py").read_bytes().replace(bytes((13,10)),bytes((10,))); h=hashlib.sha256(b).hexdigest(); print("Normalized source SHA256:",h); assert h=="8ba86716cc26f3186dc5783cb2902d557a134ad3a9d2e73ddf73843bd06780e4"'
           python -V
           python -B labs/a185/sqlite_python_epoch_cross_os.py 2>&1 | tee a185_python.log
           grep -q 'PYTHON_CACHE_REVOKED=DENIED' a185_python.log
