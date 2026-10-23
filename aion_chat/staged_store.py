@@ -42,10 +42,20 @@ class OperationScopedSQLiteChatStore:
         "save_context_summary", "wal_checkpoint",
     })
 
-    def __init__(self, path, *, connection_factory=None):
-        # A186 LAB opt-in. Each per-operation SQLiteChatStore must receive
-        # the same factory; default behavior remains unchanged and untrusted.
+    def __init__(self, path, *, connection_factory=None,
+                 require_managed_connection=False):
+        # A187 LAB: enforce opt-in admission before require_healthy reopens
+        # SQLite. The factory itself remains caller-controlled, not trusted.
+        if not isinstance(require_managed_connection, bool):
+            raise TypeError("require_managed_connection must be bool")
+        if connection_factory is not None and not callable(connection_factory):
+            raise TypeError("connection_factory must be callable")
+        if require_managed_connection and connection_factory is None:
+            raise StorageUnavailableError("A187_MANAGED_CONNECTION_REQUIRED")
+        if require_managed_connection and connection_factory is sqlite3.connect:
+            raise StorageUnavailableError("A187_NATIVE_DEFAULT_FACTORY_DENIED")
         self._connection_factory = connection_factory
+        self._require_managed_connection = require_managed_connection
         self.path = Path(path)
         self._lock = RLock()
         self._closed = False
@@ -248,7 +258,9 @@ class OperationScopedSQLiteChatStore:
                         SQLiteChatStore(self.path)
                         if self._connection_factory is None
                         else SQLiteChatStore(
-                            self.path, connection_factory=self._connection_factory
+                            self.path,
+                            connection_factory=self._connection_factory,
+                            require_managed_connection=self._require_managed_connection,
                         )
                     )
                     self._verify_native_declared_path(store)
