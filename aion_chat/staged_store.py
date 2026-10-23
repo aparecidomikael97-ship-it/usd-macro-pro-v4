@@ -241,8 +241,15 @@ class OperationScopedSQLiteChatStore:
                         if self._path_identity(allow_missing=False) != before:
                             raise StorageUnavailableError(
                                 "BOUND_DATABASE_CHANGED_BEFORE_OPEN")
-                    store = SQLiteChatStore(
-                        self.path, connection_factory=self._connection_factory
+                    # Preserve the original single-argument constructor
+                    # when the LAB factory seam is not being exercised.
+                    # Legacy test doubles and existing hosts remain compatible.
+                    store = (
+                        SQLiteChatStore(self.path)
+                        if self._connection_factory is None
+                        else SQLiteChatStore(
+                            self.path, connection_factory=self._connection_factory
+                        )
                     )
                     self._verify_native_declared_path(store)
                     parents_after_open = self._ancestor_chain_identity(
