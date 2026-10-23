@@ -17,7 +17,7 @@ from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_cumulative_authority_budget import CumulativeAuthorityBudget
 from atlasquant_aion_execution_outbox import ExecutionOutbox
-from atlasquant_aion_execution_saga import ExecutionSaga
+from atlasquant_aion_execution_saga import ExecutionSagaCoordinator
 
 
 class A185ActualLiveConnectionBoundaryLab(unittest.TestCase):
@@ -31,7 +31,7 @@ class A185ActualLiveConnectionBoundaryLab(unittest.TestCase):
         self.budget = CumulativeAuthorityBudget(
             self.store, self.scope, authority_budget_ref="synthetic-budget",
             policy_version="LAB-A185")
-        self.saga = ExecutionSaga(
+        self.saga = ExecutionSagaCoordinator(
             self.store, self.scope, outbox=self.outbox,
             authority_budget=self.budget)
         self.epoch = {"captured": 1, "authority": 1, "calls": 0}
