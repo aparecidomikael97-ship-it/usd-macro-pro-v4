@@ -338,11 +338,23 @@ def _publish_database_report(report, destination):
 
 
 class SQLiteChatStore:
-    def __init__(self, path, *, connection_factory=None):
-        # A186 LAB seam: opt-in connection constructor for falsifiable boundary
-        # tests. The default is unchanged and NOT production-attested.
-        # A passed factory is local/caller-controlled, never an authority.
-        self._connection_factory = connection_factory or sqlite3.connect
+    def __init__(self, path, *, connection_factory=None,
+                 require_managed_connection=False):
+        # A187 LAB: fail closed before creating a file/parent if a HOST opts in
+        # to mandatory factory admission. This does NOT authenticate a factory
+        # or constrain raw sqlite3.connect elsewhere in the same host.
+        if not isinstance(require_managed_connection, bool):
+            raise TypeError("require_managed_connection must be bool")
+        if connection_factory is not None and not callable(connection_factory):
+            raise TypeError("connection_factory must be callable")
+        if require_managed_connection and connection_factory is None:
+            raise StorageUnavailableError("A187_MANAGED_CONNECTION_REQUIRED")
+        if require_managed_connection and connection_factory is sqlite3.connect:
+            raise StorageUnavailableError("A187_NATIVE_DEFAULT_FACTORY_DENIED")
+        self._connection_factory = (
+            sqlite3.connect if connection_factory is None else connection_factory
+        )
+        self._require_managed_connection = require_managed_connection
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._health_state = HEALTHY
