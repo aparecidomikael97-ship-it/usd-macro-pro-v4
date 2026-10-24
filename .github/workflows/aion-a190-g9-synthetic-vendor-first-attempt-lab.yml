@@ -1,0 +1,71 @@
+name: A190 G9 Synthetic Provider First Attempt LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g9_synthetic_vendor_first_attempt_lab.py'
+      - 'labs/a190/test_g9_synthetic_vendor_first_attempt_lab.py'
+      - '.github/workflows/aion-a190-g9-synthetic-vendor-first-attempt-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g9-ubuntu-two-signed-reservations-and-provider-simulation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned Ed25519 dependency for synthetic runner
+        run: python -m pip install cryptography==50.0.2
+      - name: Real TCP provider simulator, first attempt and adverse rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g9_synthetic_vendor_first_attempt_lab.py' -v 2>&1 | tee g9_ubuntu.log
+          grep -q 'Ran 12 tests' g9_ubuntu.log
+          grep -q '^OK$' g9_ubuntu.log
+          grep -q 'A190_G9_VENDOR_ACK_LOSS_AFTER_COMMIT=UNCERTAIN_NO_AUTO_RESEND' g9_ubuntu.log
+          grep -q 'A190_G9_H0_AFTER_JOURNAL_BEFORE_SEND=UNCERTAIN_NO_AUTO_RESEND' g9_ubuntu.log
+          grep -q 'A190_G9_SYNTHETIC_VENDOR_CONCURRENT_SUBMISSIONS=ONE_ONLY' g9_ubuntu.log
+          grep -q 'A190_G9_HOST_ADMIN_VENDOR_LEDGER_RESTORE=SECOND_SIGNED_SIMULATED_RECORD_RED' g9_ubuntu.log
+          echo 'A190_G9_CI_TESTS=12_SYNTHETIC_ONLY_ZERO_REAL_EFFECT'
+          echo 'A190_G9_HARD_NO_GO=TRUE_ZERO_AUTO_RESEND=TRUE'
+  g9-windows-two-signed-reservations-and-provider-simulation:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned Ed25519 dependency for synthetic runner
+        run: python -m pip install cryptography==50.0.2
+      - name: Real TCP provider simulator, first attempt and adverse rollback
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g9_synthetic_vendor_first_attempt_lab.py' -v 2>&1 | Tee-Object -FilePath g9_windows.log
+          if ($LASTEXITCODE -ne 0) { throw 'A190_G9_TESTS_FAILED' }
+          $out = Get-Content g9_windows.log -Raw
+          foreach ($marker in @(
+            'Ran 12 tests',
+            'OK',
+            'A190_G9_VENDOR_ACK_LOSS_AFTER_COMMIT=UNCERTAIN_NO_AUTO_RESEND',
+            'A190_G9_H0_AFTER_JOURNAL_BEFORE_SEND=UNCERTAIN_NO_AUTO_RESEND',
+            'A190_G9_SYNTHETIC_VENDOR_CONCURRENT_SUBMISSIONS=ONE_ONLY',
+            'A190_G9_HOST_ADMIN_VENDOR_LEDGER_RESTORE=SECOND_SIGNED_SIMULATED_RECORD_RED'
+          )) {
+            if (-not $out.Contains($marker)) { throw "A190_G9_MISSING_MARKER=$marker" }
+          }
+          Write-Output 'A190_G9_CI_TESTS=12_SYNTHETIC_ONLY_ZERO_REAL_EFFECT'
+          Write-Output 'A190_G9_HARD_NO_GO=TRUE_ZERO_AUTO_RESEND=TRUE'
