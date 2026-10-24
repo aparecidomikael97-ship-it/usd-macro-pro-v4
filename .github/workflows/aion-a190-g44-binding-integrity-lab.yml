@@ -33,7 +33,7 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v 2>&1 | tee g44.log
-          grep -F 'Ran 37 tests' g44.log
+          grep -F 'Ran 39 tests' g44.log
           grep -F 'G44_DECISION_BINDING_GREEN=SCOPED_HASH_AND_JSON_MATCH' g44.log
           grep -F 'G44_FOREIGN_SCOPE_GREEN=CROSS_OWNER_DECISION_NOT_EXPOSED' g44.log
           grep -F 'G44_PAYLOAD_DIGEST_GREEN=MODIFIED_BUSINESS_VALUE_REFUSED' g44.log
@@ -51,6 +51,8 @@ jobs:
           grep -F 'G44_RECONCILE_GETTER_GREEN=REENTRY_DENIED_ZERO_CALLBACK' g44.log
           grep -F 'G44_ORPHAN_PREDECESSOR_GREEN=NO_SUCCESSOR_CLAIM' g44.log
           grep -F 'G44_RECONFIRM_GREEN=IMMUTABLE_LOCAL_LEDGER_TIME' g44.log
+          grep -F 'G44_TERMINAL_PREDECESSOR_GREEN=MISSING_LEDGER_BLOCKS_SUCCESSOR' g44.log
+          grep -F 'G44_VALID_PREDECESSOR_GREEN=CONSISTENT_TERMINAL_PERMITS_CLAIM' g44.log
       - name: Historical G43-G30 regression RED+GREEN
         shell: bash
         run: |
