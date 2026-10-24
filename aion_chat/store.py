@@ -419,6 +419,25 @@ class SQLiteChatStore:
             self.db.close()
             self.db = None
 
+    def quarantine_failed_transaction(self):
+        """Detach an uncertain connection permanently until explicit recovery.
+
+        A failed rollback makes the active SQLite connection unsafe to reuse.
+        This is a local safety gate, not external custody, rollback protection
+        or evidence that a partially completed external action did not happen.
+        """
+        connection = self.db
+        self.db = None
+        self._health_state = FAILED
+        self._health_reason = "TRANSACTION_ROLLBACK_UNCERTAIN"
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception:
+                # A driver may also fail while closing. The store remains
+                # detached and unusable, regardless of that secondary error.
+                pass
+
     def _require_open(self):
         if self.db is None:
             raise StorageUnavailableError("staging store is closed")
