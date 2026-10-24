@@ -8,6 +8,11 @@ on:
       - 'test_atlasquant_aion_outbox_uncertain_retry_a176_lab.py'
       - 'test_atlasquant_aion_outbox_receipt_admission_a177_lab.py'
       - 'test_atlasquant_aion_a190_g6_outbox_callback_trust_boundary_lab.py'
+      - 'test_atlasquant_aion_signed_receipt_a178_lab.py'
+      - 'test_atlasquant_aion_witness_admission_a179_lab.py'
+      - 'test_atlasquant_aion_first_attempt_witness_a180_lab.py'
+      - 'test_atlasquant_aion_separate_custody_a181_lab.py'
+      - 'test_atlasquant_aion_callback_boundary_a184_lab.py'
       - 'test_atlasquant_aion_a190_g12_default_callback_quarantine_lab.py'
       - '.github/workflows/aion-a190-g12-outbox-default-callback-quarantine-lab.yml'
   workflow_dispatch:
@@ -44,6 +49,11 @@ jobs:
             test_atlasquant_aion_outbox_uncertain_retry_a176_lab \
             test_atlasquant_aion_outbox_receipt_admission_a177_lab \
             test_atlasquant_aion_a190_g6_outbox_callback_trust_boundary_lab \
+            test_atlasquant_aion_signed_receipt_a178_lab \
+            test_atlasquant_aion_witness_admission_a179_lab \
+            test_atlasquant_aion_first_attempt_witness_a180_lab \
+            test_atlasquant_aion_separate_custody_a181_lab \
+            test_atlasquant_aion_callback_boundary_a184_lab \
             test_atlasquant_aion_a190_g5_real_process_crash_h0_lab \
             test_atlasquant_aion_a190_g4_sqlite_native_files_lab \
             test_atlasquant_aion_a190_g3_first_intent_contract_lab \
