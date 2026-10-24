@@ -13,6 +13,9 @@ on:
       - 'test_atlasquant_aion_first_attempt_witness_a180_lab.py'
       - 'test_atlasquant_aion_separate_custody_a181_lab.py'
       - 'test_atlasquant_aion_callback_boundary_a184_lab.py'
+      - 'test_atlasquant_aion_chaos_campaign.py'
+      - 'test_quality_workflow_coverage.py'
+      - '.github/workflows/quality-tests.yml'
       - 'test_atlasquant_aion_a190_g12_default_callback_quarantine_lab.py'
       - '.github/workflows/aion-a190-g12-outbox-default-callback-quarantine-lab.yml'
   workflow_dispatch:
@@ -54,6 +57,8 @@ jobs:
             test_atlasquant_aion_first_attempt_witness_a180_lab \
             test_atlasquant_aion_separate_custody_a181_lab \
             test_atlasquant_aion_callback_boundary_a184_lab \
+            test_atlasquant_aion_chaos_campaign \
+            test_quality_workflow_coverage \
             test_atlasquant_aion_a190_g5_real_process_crash_h0_lab \
             test_atlasquant_aion_a190_g4_sqlite_native_files_lab \
             test_atlasquant_aion_a190_g3_first_intent_contract_lab \
