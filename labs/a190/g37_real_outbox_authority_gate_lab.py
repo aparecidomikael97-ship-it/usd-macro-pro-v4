@@ -37,7 +37,7 @@ def inspect_semantic_recovery(
             bytes.fromhex(certified["issuer_signature"]), signing_bytes(permit))
     except (ValueError, TypeError, KeyError, InvalidSignature) as exc:
         raise RecoveryDenied("G37_ISSUER_SIGNATURE_INVALID") from exc
-    if not isinstance(proof, dict):
+    if not isinstance(proof, dict) or not proof:
         raise RecoveryDenied("G37_CUSTODY_PROOF_MISSING")
     if (not isinstance(verifier_challenge, bytes) or
             len(verifier_challenge) != 32 or
