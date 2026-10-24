@@ -9,6 +9,7 @@ from contextlib import closing
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import sqlite3
 import sys
@@ -28,7 +29,7 @@ def canonical(value):
 def app_state(path):
     if not path.is_file():
         raise GateClosed("APP_DB_MISSING")
-    with closing(sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)) as db:
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
         rows = db.execute("SELECT seq,event FROM intents ORDER BY seq").fetchall()
     return {"schema": SCHEMA, "seq": rows[-1][0] if rows else 0,
             "digest": hashlib.sha256(canonical(rows)).hexdigest()}
@@ -148,6 +149,9 @@ def main():
         expect_current(Path(raw[0]), Path(raw[1]), raw[2])
     elif op == "forge" and len(raw) == 1:
         attempt_floor_forge(Path(raw[0]))
+    elif op == "copy-db" and len(raw) == 2:
+        shutil.copyfile(Path(raw[0]), Path(raw[1]))
+        print("A190_G2_APP_DB_COPY_COMPLETED")
     else:
         raise SystemExit("A190 G2 invalid command")
 
