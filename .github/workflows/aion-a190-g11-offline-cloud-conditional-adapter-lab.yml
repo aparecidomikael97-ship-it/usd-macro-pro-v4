@@ -1,0 +1,69 @@
+name: A190 G11 Offline Cloud Conditional Adapter Contract LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g11_offline_conditional_cloud_adapter_contract_lab.py'
+      - 'labs/a190/test_g11_offline_conditional_cloud_adapter_contract_lab.py'
+      - '.github/workflows/aion-a190-g11-offline-cloud-conditional-adapter-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g11-ubuntu-no-credentials-cloud-shape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Reuse pinned synthetic issuer-signature dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Native key and provider conditional shape under adversarial inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g11_offline_conditional_cloud_adapter_contract_lab.py' -v 2>&1 | tee g11_ubuntu.log
+          grep -q 'Ran 20 tests' g11_ubuntu.log
+          grep -q '^OK$' g11_ubuntu.log
+          grep -q 'A190_G11_DDB_ATOMIC_CONDITIONAL_PUT_SHAPE=DOCUMENTARY' g11_ubuntu.log
+          grep -q 'A190_G11_FIRESTORE_EXISTS_FALSE_PATCH_SHAPE=DOCUMENTARY' g11_ubuntu.log
+          grep -q 'A190_G11_UNKNOWN_STORAGE_ACK=UNCERTAIN_ZERO_AUTO_RESEND' g11_ubuntu.log
+          grep -q 'A190_G11_CLOUD_DB_COMMIT_IS_NOT_VENDOR_EFFECT=ENFORCED' g11_ubuntu.log
+          echo 'A190_G11_ALL_PROVIDER_SHAPES=OFFLINE_NO_CREDENTIALS_HARD_NO_GO'
+  g11-windows-no-credentials-cloud-shape:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Reuse pinned synthetic issuer-signature dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Native key and provider conditional shape under adversarial inputs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g11_offline_conditional_cloud_adapter_contract_lab.py' -v 2>&1 | Tee-Object -FilePath g11_windows.log
+          if ($LASTEXITCODE -ne 0) { throw 'A190_G11_TESTS_FAILED' }
+          $out = Get-Content g11_windows.log -Raw
+          foreach ($marker in @(
+            'Ran 20 tests',
+            'OK',
+            'A190_G11_DDB_ATOMIC_CONDITIONAL_PUT_SHAPE=DOCUMENTARY',
+            'A190_G11_FIRESTORE_EXISTS_FALSE_PATCH_SHAPE=DOCUMENTARY',
+            'A190_G11_UNKNOWN_STORAGE_ACK=UNCERTAIN_ZERO_AUTO_RESEND',
+            'A190_G11_CLOUD_DB_COMMIT_IS_NOT_VENDOR_EFFECT=ENFORCED'
+          )) {
+            if (-not $out.Contains($marker)) { throw "A190_G11_MISSING_MARKER=$marker" }
+          }
+          Write-Output 'A190_G11_ALL_PROVIDER_SHAPES=OFFLINE_NO_CREDENTIALS_HARD_NO_GO'
