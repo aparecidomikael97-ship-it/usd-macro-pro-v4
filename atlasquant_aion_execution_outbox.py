@@ -1007,6 +1007,8 @@ class ExecutionOutbox:
                 )
             return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        if self._strict_claim_fencing_lab:
+            self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         # No adapter attribute lookup (and therefore no user-defined property
         # getter) until the first-attempt witness passes. With G12 defaults
         # this line is unreachable regardless of caller-supplied callbacks.
@@ -1041,6 +1043,8 @@ class ExecutionOutbox:
                 )
             return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        if self._strict_claim_fencing_lab:
+            self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         try:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
@@ -1059,6 +1063,8 @@ class ExecutionOutbox:
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        if self._strict_claim_fencing_lab:
+            self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         if result.get("accepted") is not True:
             # The external boundary was already crossed. A bare adapter flag
             # retryable=True cannot prove that no effect was committed.
@@ -1096,13 +1102,18 @@ class ExecutionOutbox:
             return {**out, "dispatch_state": "CONFIRMED"}
 
         with self._managed_write_transaction():
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(now_dt), effect_ref, key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                (_iso(now_dt), effect_ref, key, *self._scope_args(),
+                 int(not self._strict_claim_fencing_lab), worker,
+                 claim_generation_lab or 0),
             )
-        return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
+            if self._strict_claim_fencing_lab and cursor.rowcount != 1:
+                raise RuntimeError("FENCE_STALE_SEND_RESULT_NO_WRITE")
+        return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"
 
     def reconcile(
         self,
