@@ -43,9 +43,6 @@ def reservation_hash(envelope):
 
 def verify_vendor_receipt(envelope, pinned_vendor_pub, expected_reservation,
                           *, now=None, epoch=1):
-    if not verify_receipt(expected_reservation, pinned_vendor_pub):
-        # Note: authority vs vendor keys differ; validated separately below.
-        pass
     payload = check_seal(
         envelope, pinned_vendor_pub, VENDOR_DOMAIN, VENDOR_FIELDS,
     )
