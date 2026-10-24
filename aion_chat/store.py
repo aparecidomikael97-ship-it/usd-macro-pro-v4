@@ -378,7 +378,24 @@ class SQLiteChatStore:
             CREATE TABLE IF NOT EXISTS records(id TEXT PRIMARY KEY,cid TEXT NOT NULL REFERENCES conversations(id),
                 kind TEXT NOT NULL,seq INTEGER NOT NULL,data TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS record_history ON records(cid,kind,seq,id);
+            -- A190 G14: local database clone/alias discriminator, NOT native
+            -- VFS file identity, independent custody or rollback resistance.
+            CREATE TABLE IF NOT EXISTS aion_native_marker_v1(
+                singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                marker TEXT NOT NULL);
             """)
+            self.db.execute(
+                "INSERT OR IGNORE INTO aion_native_marker_v1(singleton,marker) VALUES(1,?)",
+                (uuid4().hex,),
+            )
+            self.db.commit()
+            marker_rows = self.db.execute(
+                "SELECT marker FROM aion_native_marker_v1 WHERE singleton=1"
+            ).fetchall()
+            if (len(marker_rows) != 1
+                    or not isinstance(marker_rows[0][0], str)
+                    or re.fullmatch(r"[0-9a-f]{32}", marker_rows[0][0]) is None):
+                raise StorageUnavailableError("G14_LOCAL_NATIVE_MARKER_INVALID")
             report = self.storage_health(deep=True)
             if report["state"] != HEALTHY:
                 raise StorageUnavailableError(
