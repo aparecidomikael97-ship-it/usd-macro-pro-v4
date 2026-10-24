@@ -189,7 +189,7 @@ def classify_wire_response(provider, *, stage, status_code=None,
         state = "UNCERTAIN_ZERO_AUTO_RESEND"
     elif duplicate:
         state = "DUPLICATE_STORAGE_RESERVATION_READ_ONLY_ONLY"
-    elif 200 <= status_code < 300:
+    elif type(status_code) is int and 200 <= status_code < 300:
         # A database ACK is NOT an effect provider ACK, regardless of body.
         state = ("STORAGE_RESERVATION_ACK_NOT_EFFECT_PROOF"
                  if stage == "RESERVE"
