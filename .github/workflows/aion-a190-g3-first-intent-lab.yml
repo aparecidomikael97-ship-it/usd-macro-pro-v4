@@ -1,0 +1,48 @@
+name: A190 G3 Original Event and First Attempt Negative Controls LAB
+on:
+  pull_request:
+    paths:
+      - 'test_atlasquant_aion_a190_g3_first_intent_contract_lab.py'
+      - '.github/workflows/aion-a190-g3-first-intent-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g3-existing-a183-a189-cross-boundary:
+    name: G3 synthetic trust root RED and UNKNOWN (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pre-existing pinned A183 LAB cryptography dependencies
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Execute existing A183 and A189 plus adversarial joined G3 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest -v test_atlasquant_aion_authority_a183_lab test_atlasquant_aion_local_witness_a189_lab test_atlasquant_aion_a190_g3_first_intent_contract_lab 2>&1 | tee a190_g3.log
+          grep -q 'A190_G3_SAME_CLAIMED_EVENT=DENIED_LOCAL_AND_VERIFIER_INSTANCE' a190_g3.log
+          grep -q 'A190_G3_SIGNED_DIFFERENT_IDS_SAME_ORIGINAL=DOUBLE_LOCAL_RESERVATION_RED' a190_g3.log
+          grep -q 'A190_G3_SELF_PINNED_FAKE_RECEIPT=LAB_VERIFIED_BUT_EXTERNAL_AUTHORITY_RED' a190_g3.log
+          grep -q 'A190_G3_ACK_LOSS=UNCERTAIN_ZERO_AUTO_RESEND' a190_g3.log
+          grep -q 'A190_G3_POST_ACK_LOSS_NEW_UNAUTHENTICATED_ID=DOUBLE_RESERVATION_RED' a190_g3.log
+          grep -q 'A190_G3_MISSING_PROVIDER_RECEIPT=DENIED_NOT_SUCCESS' a190_g3.log
+          grep -q 'A190_G3_UNTRUSTED_EVIDENCE_CALLBACK=SIDE_EFFECT_PRECEDES_DENIAL_RED' a190_g3.log
+          echo 'A190_G3_LAB_CROSS_BOUNDARY_MATRIX=NEGATIVE_CONTROLS_REPRODUCED'
+      - name: Honest safety qualification
+        run: |
+          echo 'Job success = RED safety counterexamples reproduced, NOT a closed P0 gate.'
+          echo 'Synthetic keys all in one process. No original issuer, remote root or provider.'
+          echo 'No external effects, no send/retry, no proof of provider idempotency or ACK.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
