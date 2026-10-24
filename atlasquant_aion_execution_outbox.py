@@ -131,6 +131,7 @@ class ExecutionOutbox:
         strict_reconciliation_auth_lab: bool = False,
         fresh_dispatch_clock_lab: Callable[[], Any] | None = None,
         strict_claim_fencing_lab: bool = False,
+        strict_reconcile_snapshot_cas_lab: bool = False,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -148,6 +149,8 @@ class ExecutionOutbox:
             raise TypeError("fresh_dispatch_clock_lab must be callable")
         if type(strict_claim_fencing_lab) is not bool:
             raise TypeError("strict_claim_fencing_lab must be bool")
+        if type(strict_reconcile_snapshot_cas_lab) is not bool:
+            raise TypeError("strict_reconcile_snapshot_cas_lab must be bool")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -162,6 +165,9 @@ class ExecutionOutbox:
         # Persisted attempts rises atomically in claim_next: G41 uses it
         # as a LOCAL fencing epoch, not independent rollback protection.
         self._strict_claim_fencing_lab = strict_claim_fencing_lab
+        # This optional LAB gate detects reconcile replies against stale local
+        # state. No source/receipt is independently authenticated by it.
+        self._strict_reconcile_snapshot_cas_lab = strict_reconcile_snapshot_cas_lab
         # Default fail-closed. This LAB callback boundary is NOT a verified
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
@@ -776,11 +782,24 @@ class ExecutionOutbox:
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
         fence_lab: tuple[str, int] | None = None,
+        reconcile_snapshot_lab: tuple[str, int, str, str, str] | None = None,
     ) -> dict[str, Any]:
         effect = _token(effect_ref, "effect_ref", 128)
         encoded = _canonical(redact(dict(result or {})))
         self._begin_or_quarantine()
         try:
+            if reconcile_snapshot_lab is not None:
+                # Read under BEGIN IMMEDIATE: no other SQLite writer can
+                # change the row between this preflight and the ledger insert.
+                phase, epoch, owner, until, original_ref = reconcile_snapshot_lab
+                current = self._outbox_row(key)
+                if (current is None or phase not in {"SENT", "UNCERTAIN"}
+                        or current["state"] != phase
+                        or int(current["attempts"]) != epoch
+                        or current["lease_owner"] != owner
+                        or current["lease_until"] != until
+                        or current["effect_ref"] != original_ref):
+                    raise RuntimeError("G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER")
             existing = self.db.execute(
                 """SELECT effect_ref FROM action_effects
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
@@ -802,17 +821,28 @@ class ExecutionOutbox:
                     ),
                 )
             owner, epoch = fence_lab if fence_lab else ("", 0)
+            if reconcile_snapshot_lab is None:
+                reconcile_snapshot_lab = ("", 0, "", "", "")
+            phase, observed_epoch, observed_owner, observed_until, original_ref = (
+                reconcile_snapshot_lab
+            )
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
                        lease_owner='',lease_until='',last_error=''
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))
+                     AND (?=1 OR (state=? AND attempts=? AND lease_owner=?
+                                  AND lease_until=? AND effect_ref=?))""",
                 (_iso(confirmed_at), effect, key, *self._scope_args(),
-                 int(fence_lab is None), owner, epoch),
+                 int(fence_lab is None), owner, epoch,
+                 int(not phase), phase, observed_epoch, observed_owner,
+                 observed_until, original_ref),
             )
             if fence_lab and cursor.rowcount != 1:
                 raise RuntimeError("FENCE_STALE_CONFIRM_NO_LEDGER_WRITE")
+            if phase and cursor.rowcount != 1:
+                raise RuntimeError("G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER")
             self._commit_or_quarantine()
         except Exception as original_error:
             if self.db is not None:
