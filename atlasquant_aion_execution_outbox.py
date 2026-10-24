@@ -315,7 +315,7 @@ class ExecutionOutbox:
             CREATE INDEX IF NOT EXISTS action_effect_scope
                 ON action_effects(owner,tenant,workspace,confirmed_at,idempotency_key);
 
-            CREATE TABLE IF NOT EXISTS action_semantic_locks_lab(
+            CREATE TABLE IF NOT EXISTS semantic_reservations_lab(
                 owner TEXT NOT NULL,
                 tenant TEXT NOT NULL,
                 business_event_id TEXT NOT NULL,
@@ -477,7 +477,7 @@ class ExecutionOutbox:
             if semantic_event:
                 semantic_lock = self.db.execute(
                     """SELECT idempotency_key, payload_digest
-                       FROM action_semantic_locks_lab
+                       FROM semantic_reservations_lab
                        WHERE owner=? AND tenant=? AND business_event_id=?""",
                     (owner, tenant, semantic_event),
                 ).fetchone()
@@ -506,7 +506,7 @@ class ExecutionOutbox:
                 # The unique reservation and Outbox rows are written inside
                 # ONE SQLite transaction, never as separate auto-commits.
                 self.db.execute(
-                    """INSERT INTO action_semantic_locks_lab(
+                    """INSERT INTO semantic_reservations_lab(
                         owner,tenant,business_event_id,workspace,intent_ref,
                         idempotency_key,payload_digest
                     ) VALUES (?,?,?,?,?,?,?)""",
