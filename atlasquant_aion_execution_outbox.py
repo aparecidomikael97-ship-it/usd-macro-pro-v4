@@ -128,6 +128,8 @@ class ExecutionOutbox:
         first_attempt_guard: Callable[[Mapping[str, Any]], bool] | None = None,
         unsafe_allow_synthetic_lab_callbacks: bool = False,
         strict_authority_scope_lab: bool = False,
+        strict_reconciliation_auth_lab: bool = False,
+        fresh_dispatch_clock_lab: Callable[[], Any] | None = None,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -139,6 +141,10 @@ class ExecutionOutbox:
             raise TypeError("unsafe_allow_synthetic_lab_callbacks must be bool")
         if type(strict_authority_scope_lab) is not bool:
             raise TypeError("strict_authority_scope_lab must be bool")
+        if type(strict_reconciliation_auth_lab) is not bool:
+            raise TypeError("strict_reconciliation_auth_lab must be bool")
+        if fresh_dispatch_clock_lab is not None and not callable(fresh_dispatch_clock_lab):
+            raise TypeError("fresh_dispatch_clock_lab must be callable")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -146,6 +152,10 @@ class ExecutionOutbox:
         self.db = store.db
         # Opt-in LAB candidate. Legacy callers remain unchanged for comparison.
         self._strict_authority_scope_lab = strict_authority_scope_lab
+        self._strict_reconciliation_auth_lab = strict_reconciliation_auth_lab
+        # A synthetic clock is NOT independently trusted and requires test
+        # configuration. Legacy dispatch keeps its prior behavior for regressions.
+        self._fresh_dispatch_clock_lab = fresh_dispatch_clock_lab
         # Default fail-closed. This LAB callback boundary is NOT a verified
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
@@ -783,6 +793,57 @@ class ExecutionOutbox:
             raise
         return self.get(key)
 
+    def _reconciliation_authority_lab(
+        self, intent: Mapping[str, Any],
+        authorize: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    ) -> bool:
+        """Separate LOOKUP permission; never grants SEND or changes state.
+
+        Historical SEND validity is deliberately NOT required to reconcile
+        an already ambiguous effect. Returns False on missing authority.
+        """
+        if not callable(authorize):
+            return False
+        try:
+            current = _mapping(_bound_callback(authorize, dict(intent["decision"])))
+        except Exception:
+            return False
+        required = {
+            "actor_id": self.scope.owner_id,
+            "tenant_id": self.scope.tenant_id,
+            "workspace_id": self.scope.workspace_id,
+            "purpose": "RECONCILE_LOOKUP",
+        }
+        return current.get("allowed") is True and all(
+            type(current.get(field)) is str and current.get(field) == wanted
+            for field, wanted in required.items()
+        )
+
+    def _post_witness_freshness_lab(
+        self, *, key: str, worker: str, recorded: datetime,
+    ) -> str | None:
+        """Fail closed after uncertain reservation on expired/rewound clock.
+
+        This is a synthetic test-only clock; not a credible independent clock.
+        No adapter access if any condition cannot be established.
+        """
+        if self._fresh_dispatch_clock_lab is None:
+            return None
+        try:
+            fresh = _utc(_bound_callback(self._fresh_dispatch_clock_lab))
+            record = self.get(key)
+            if fresh < recorded:
+                return "CLOCK_REWOUND_NO_SEND"
+            if record["state"] != "UNCERTAIN" or record["lease_owner"] != worker:
+                return "CLAIM_CHANGED_NO_SEND"
+            if not record["lease_until"] or fresh >= _utc(record["lease_until"]):
+                return "LEASE_EXPIRED_NO_SEND"
+            if fresh >= _utc(record["decision"]["valid_until"]):
+                return "AUTHORITY_EXPIRED_AFTER_WITNESS_NO_SEND"
+        except Exception:
+            return "FRESH_CLOCK_UNAVAILABLE_NO_SEND"
+        return None
+
     def dispatch_claimed(
         self,
         idempotency_key: Any,
@@ -876,6 +937,22 @@ class ExecutionOutbox:
             return {**self.get(key),
                     "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"}
 
+        # A possibly reserved first attempt can never be returned to RETRY
+        # after a failed freshness check: preserve the UNCERTAIN reservation.
+        freshness_failure = self._post_witness_freshness_lab(
+            key=key, worker=worker, recorded=now_dt,
+        )
+        if freshness_failure:
+            with self._managed_write_transaction():
+                self.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN'""",
+                    (freshness_failure, key, *self._scope_args()),
+                )
+            return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
+
         # No adapter attribute lookup (and therefore no user-defined property
         # getter) until the first-attempt witness passes. With G12 defaults
         # this line is unreachable regardless of caller-supplied callbacks.
@@ -890,6 +967,23 @@ class ExecutionOutbox:
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                          AND state='UNCERTAIN'""",
                     (key, *self._scope_args()),
+                )
+            return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
+
+        # Adapter properties are caller-controlled code too; they can block,
+        # advance time, or even alter the local claim between our first fresh
+        # check and the actual send() call. Recheck AFTER getter, BEFORE call.
+        getter_freshness_failure = self._post_witness_freshness_lab(
+            key=key, worker=worker, recorded=now_dt,
+        )
+        if getter_freshness_failure:
+            with self._managed_write_transaction():
+                self.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN'""",
+                    (getter_freshness_failure, key, *self._scope_args()),
                 )
             return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
@@ -975,6 +1069,10 @@ class ExecutionOutbox:
         # property lookup may execute arbitrary host code. No confirmation.
         if not self._synthetic_lab_callbacks_enabled:
             return {**intent, "reconcile_state": "EXTERNAL_TRUST_NOT_CONFIGURED"}
+        if self._strict_reconciliation_auth_lab and not self._reconciliation_authority_lab(
+            intent, authorize,
+        ):
+            return {**intent, "reconcile_state": "RECONCILE_AUTH_DENIED_NO_LOOKUP"}
         reconcile = getattr(adapter, "reconcile", None)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
