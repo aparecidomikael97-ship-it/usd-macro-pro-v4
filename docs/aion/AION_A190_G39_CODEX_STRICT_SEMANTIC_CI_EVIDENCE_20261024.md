@@ -36,7 +36,7 @@ New suites:
 
 First validation [#40129675083](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40129675083) **not fully green**: Windows test 13 left reopened SQLite handle open and failed temp directory removal (`WinError 32`); Ubuntu G39 28/28 passed but inherited G34 schema-count regression failed `4 != 3` due newly added `action_*` table. **Both were corrected** in follow-on commits (explicit `store.close()`; rename LAB table to `semantic_reservations_lab`), along with cross-owner tenant uniqueness enforcement. No acceptance from first CI.
 
-**Final current-code workflow [#40129939905](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40129939905)**, tested SHA `45ccfd2f8d9147145e8de2d1091c73022b3f58ad`. Check jobs Ubuntu and Windows before claiming completion; this report may be committed before final CI status.
+**FINAL VERIFIED focused workflow [#40129939905](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40129939905): SUCCESS on both systems**, exact tested code/workflow SHA `45ccfd2f8d9147145e8de2d1091c73022b3f58ad`. Ubuntu job `120979306956`: **28 G39 + 197 G30–G38 = 225/225**. Windows job `120979306836`: **225/225**. **450 total test executions of 225 distinct tests**, with the GREEN and intentionally RED markers verified in the job logs. This report is a follow-up documentation commit; its later HEAD is not the tested code SHA. At evidence update, 12 other triggered workflows succeeded, while A184 was still queued and must not be reported as PASS.
 
 ## Nonnegotiable NO-GO
 
