@@ -27,6 +27,7 @@ jobs:
           set -euo pipefail
           {
             git rev-parse HEAD
+            python_bin="$(command -v python)"
             sudo useradd --system --no-create-home --shell /usr/sbin/nologin a190g7cust
             sudo useradd --system --no-create-home --shell /usr/sbin/nologin a190g7app
             echo "A190_G7_CUSTODIAN_UID=$(id -u a190g7cust)"
@@ -45,23 +46,23 @@ jobs:
             sudo chmod 700 "$appdir"
             privdb="$secret/issuer-reservations.sqlite"
             pin="$public/issuer-public.hex"
-            sudo -u a190g7cust python -B "$probe" init "$secret" "$public"
-            sudo -u a190g7cust python -B "$probe" issue "$secret" "$public" event-original-e1 req1
-            sudo -u a190g7app python -B "$probe" verify "$pin" "$public/req1.json" valid
-            sudo -u a190g7app python -B "$probe" try-read "$secret"
-            sudo -u a190g7app python -B "$probe" forge "$appdir" "$public/req1.json"
-            sudo -u a190g7app python -B "$probe" verify "$pin" "$appdir/forged-receipt.json" invalid
-            sudo -u a190g7app python -B "$probe" verify "$appdir/forged-pub.hex" "$appdir/forged-receipt.json" valid
+            sudo -u a190g7cust "$python_bin" -B "$probe" init "$secret" "$public"
+            sudo -u a190g7cust "$python_bin" -B "$probe" issue "$secret" "$public" event-original-e1 req1
+            sudo -u a190g7app "$python_bin" -B "$probe" verify "$pin" "$public/req1.json" valid
+            sudo -u a190g7app "$python_bin" -B "$probe" try-read "$secret"
+            sudo -u a190g7app "$python_bin" -B "$probe" forge "$appdir" "$public/req1.json"
+            sudo -u a190g7app "$python_bin" -B "$probe" verify "$pin" "$appdir/forged-receipt.json" invalid
+            sudo -u a190g7app "$python_bin" -B "$probe" verify "$appdir/forged-pub.hex" "$appdir/forged-receipt.json" valid
             echo 'A190_G7_SELF_PINNED_FAKE_KEY=MATHEMATICALLY_VALID_NOT_EXTERNAL_RED'
             snapshot="$(mktemp -p /tmp a190g7_oldstate_XXXXXX.sqlite)"
             sudo cp "$privdb" "$snapshot"
-            sudo -u a190g7cust python -B "$probe" issue "$secret" "$public" event-original-e2 req2
-            sudo -u a190g7app python -B "$probe" compare "$public" req1 req2
-            sudo -u a190g7cust python -B "$probe" expect-duplicate "$secret" "$public" event-original-e2 req3
+            sudo -u a190g7cust "$python_bin" -B "$probe" issue "$secret" "$public" event-original-e2 req2
+            sudo -u a190g7app "$python_bin" -B "$probe" compare "$public" req1 req2
+            sudo -u a190g7cust "$python_bin" -B "$probe" expect-duplicate "$secret" "$public" event-original-e2 req3
             # Same-host ROOT rolls back the signer reservation DB, not its key.
             sudo cp "$snapshot" "$privdb"
-            sudo -u a190g7cust python -B "$probe" issue "$secret" "$public" event-original-e2 req4
-            sudo -u a190g7app python -B "$probe" verify "$pin" "$public/req4.json" valid
+            sudo -u a190g7cust "$python_bin" -B "$probe" issue "$secret" "$public" event-original-e2 req4
+            sudo -u a190g7app "$python_bin" -B "$probe" verify "$pin" "$public/req4.json" valid
             echo 'A190_G7_HOST_ROOT_ROLLBACK_REISSUED_ORIGINAL=UNSAFE_SIGNED_RESERVATION_RED'
             echo 'A190_G7_REAL_OS_SIGNER=LOCAL_PRINCIPAL_ONLY_NOT_REMOTE_PROVIDER'
           } 2>&1 | tee a190_g7_ubuntu.log
