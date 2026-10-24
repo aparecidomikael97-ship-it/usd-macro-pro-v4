@@ -775,6 +775,7 @@ class ExecutionOutbox:
         effect_ref: Any,
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
+        fence_lab: tuple[str, int] | None = None,
     ) -> dict[str, Any]:
         effect = _token(effect_ref, "effect_ref", 128)
         encoded = _canonical(redact(dict(result or {})))
@@ -800,13 +801,18 @@ class ExecutionOutbox:
                         encoded,
                     ),
                 )
-            self.db.execute(
+            owner, epoch = fence_lab if fence_lab else ("", 0)
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
                        lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(confirmed_at), effect, key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                (_iso(confirmed_at), effect, key, *self._scope_args(),
+                 int(fence_lab is None), owner, epoch),
             )
+            if fence_lab and cursor.rowcount != 1:
+                raise RuntimeError("FENCE_STALE_CONFIRM_NO_LEDGER_WRITE")
             self._commit_or_quarantine()
         except Exception as original_error:
             if self.db is not None:
@@ -997,6 +1003,8 @@ class ExecutionOutbox:
             key=key, worker=worker, recorded=now_dt,
         )
         if freshness_failure:
+            if self._strict_claim_fencing_lab:
+                self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
             with self._managed_write_transaction():
                 self.db.execute(
                     """UPDATE action_outbox
@@ -1014,6 +1022,8 @@ class ExecutionOutbox:
         # this line is unreachable regardless of caller-supplied callbacks.
         send = getattr(adapter, "send", None)
         if not callable(send):
+            if self._strict_claim_fencing_lab:
+                self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
             # After UNCERTAIN reservation, any missing adapter must stay
             # uncertain; never make a fresh claim or silently retry.
             with self._managed_write_transaction():
@@ -1033,6 +1043,8 @@ class ExecutionOutbox:
             key=key, worker=worker, recorded=now_dt,
         )
         if getter_freshness_failure:
+            if self._strict_claim_fencing_lab:
+                self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
             with self._managed_write_transaction():
                 self.db.execute(
                     """UPDATE action_outbox
@@ -1098,8 +1110,10 @@ class ExecutionOutbox:
                 effect_ref=effect_ref,
                 confirmed_at=now_dt,
                 result=result,
+                fence_lab=(worker, claim_generation_lab) if
+                    self._strict_claim_fencing_lab else None,
             )
-            return {**out, "dispatch_state": "CONFIRMED"}
+            return {**out, "dispatch_state": "CONFIRMED"
 
         with self._managed_write_transaction():
             cursor = self.db.execute(
