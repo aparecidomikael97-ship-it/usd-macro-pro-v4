@@ -244,8 +244,12 @@ class G36SubprocessWitnessRecovery(unittest.TestCase):
     def test_17_latest_row_direct_tamper_denied_by_chain_self_check(self):
         self.stage()
         self.observe()
-        with sqlite3.connect(self.witness_dir / "custody.sqlite3") as db:
+        db = sqlite3.connect(self.witness_dir / "custody.sqlite3")
+        try:
             db.execute("UPDATE witness_log SET snapshot_digest=?", ("f" * 64,))
+            db.commit()
+        finally:
+            db.close()
         with self.assertRaisesRegex(RecoveryDenied, "G36_WITNESS_PROCESS_DENIED"):
             self.check()
 
