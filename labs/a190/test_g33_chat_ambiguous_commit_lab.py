@@ -5,6 +5,7 @@ successfully. Both outcomes must quarantine the same connection, never
 pretend that a successful rollback proves zero effects.
 """
 from pathlib import Path
+from contextlib import contextmanager
 import tempfile
 import unittest
 
@@ -74,8 +75,13 @@ class G33ChatCommitAmbiguity(unittest.TestCase):
                             getattr(captured.exception, "__notes__", [])))
         return captured.exception
 
+    @contextmanager
     def reopen(self):
-        return SQLiteChatStore(self.path)
+        db = SQLiteChatStore(self.path)
+        try:
+            yield db
+        finally:
+            db.close()
 
     def test_01_create_precommit_error_quarantines(self):
         self.fail_commit(lambda: self.store.create_conversation(SCOPE, "before"), after=False)
