@@ -1,0 +1,63 @@
+name: A190 G10 No-Procurement External Authority Decision Gates LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g10_external_custody_decision_gate_lab.py'
+      - 'labs/a190/test_g10_external_custody_decision_gate_lab.py'
+      - '.github/workflows/aion-a190-g10-external-custody-decision-gates-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g10-ubuntu-documentary-evidence-never-effects:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Validate all vendor documentary claims remain NO-GO
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g10_external_custody_decision_gate_lab.py' -v 2>&1 | tee g10_ubuntu.log
+          grep -q 'Ran 12 tests' g10_ubuntu.log
+          grep -q '^OK$' g10_ubuntu.log
+          grep -q 'A190_G10_FORGED_SELF_ATTESTED_ALL_EXTERNAL_GATES=NO_GO' g10_ubuntu.log
+          grep -q 'A190_G10_CLOUDFLARE_PITR_AND_ADMIN_BOUNDARY=RED_EXTERNAL_FLOOR_NOT_PROVEN' g10_ubuntu.log
+          grep -q 'A190_G10_R200_CAP_AND_R250_EXCEPTION=OWNER_APPROVAL_REQUIRED' g10_ubuntu.log
+          echo 'A190_G10_ALL_VENDORS=HARD_NO_GO_NO_SIGNUP_NO_EFFECT'
+  g10-windows-documentary-evidence-never-effects:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Validate all vendor documentary claims remain NO-GO
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g10_external_custody_decision_gate_lab.py' -v 2>&1 | Tee-Object -FilePath g10_windows.log
+          if ($LASTEXITCODE -ne 0) { throw 'A190_G10_TESTS_FAILED' }
+          $out = Get-Content g10_windows.log -Raw
+          foreach ($marker in @(
+            'Ran 12 tests',
+            'OK',
+            'A190_G10_FORGED_SELF_ATTESTED_ALL_EXTERNAL_GATES=NO_GO',
+            'A190_G10_CLOUDFLARE_PITR_AND_ADMIN_BOUNDARY=RED_EXTERNAL_FLOOR_NOT_PROVEN',
+            'A190_G10_R200_CAP_AND_R250_EXCEPTION=OWNER_APPROVAL_REQUIRED'
+          )) {
+            if (-not $out.Contains($marker)) { throw "A190_G10_MISSING_EVIDENCE=$marker" }
+          }
+          Write-Output 'A190_G10_ALL_VENDORS=HARD_NO_GO_NO_SIGNUP_NO_EFFECT'
