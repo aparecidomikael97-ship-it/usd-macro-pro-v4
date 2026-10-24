@@ -118,6 +118,11 @@ def assess(candidate, supplied_evidence=None, *, cost=None):
     # Offline reviewer cannot authenticate the asserted signers/host or logs.
     # Even forged documents claiming every gate pass remain UNVERIFIED.
     claims_present = sorted(set(REQUIRED_EXTERNAL_PROOFS) & set(supplied))
+    # Unknown cost fields cannot crash or bypass the no-provisioning gate.
+    allowed_cost = {"existing_brl", "new_usd", "effective_fx",
+                    "tax_brl", "cap_brl"}
+    sanitized_cost = ({k: v for k, v in cost.items()
+                       if k in allowed_cost} if isinstance(cost, dict) else {})
     return {
         "candidate": candidate,
         "decision": "HARD_NO_GO",
@@ -128,7 +133,7 @@ def assess(candidate, supplied_evidence=None, *, cost=None):
         "required_external_gate_count": len(REQUIRED_EXTERNAL_PROOFS),
         "unverifiable_self_claims_present": claims_present,
         "remaining_gates": list(REQUIRED_EXTERNAL_PROOFS),
-        "budget": budget_preflight(**(cost or {})),
+        "budget": budget_preflight(**sanitized_cost),
         "owner_approval": False,
         "effect_allowed": False,
         "auto_resend": False,
