@@ -1,0 +1,58 @@
+name: A190 G34 implicit COMMIT and atomic schema LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g34_outbox_implicit_commit_schema_lab.py'
+      - '.github/workflows/aion-a190-g34-implicit-commit-schema-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g34-implicit-commit:
+    name: G34 Outbox implicit transactions / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Real SQLite implicit commit, schema atomicity and no-send
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g34_*.py' -v 2>&1 | tee g34.log
+          grep -F 'Ran 16 tests' g34.log
+          grep -F 'G34_BLOCK_PRECOMMIT_GREEN=DENIAL_NOT_PERSISTED_STORE_QUARANTINED' g34.log
+          grep -F 'G34_BLOCK_POSTCOMMIT_RED=REVOKED_PERSISTED_DESPITE_EXCEPTION' g34.log
+          grep -F 'G34_PRE_WITNESS_POSTCOMMIT_RED=UNCERTAIN_PERSISTED_ACK_UNKNOWN' g34.log
+          grep -F 'G34_NO_SEND_POSTCOMMIT_RED=FINAL_UNCERTAIN_PERSISTED_ACK_UNKNOWN' g34.log
+          grep -F 'G34_POSTCOMMIT_REOPEN_GREEN=UNCERTAIN_NOT_RECLAIMED' g34.log
+          grep -F 'G34_ATOMIC_DDL_GREEN=NO_PARTIAL_ACTION_SCHEMA_AFTER_ERROR' g34.log
+          grep -F 'G34_SCHEMA_POSTCOMMIT_RED=TABLES_EXIST_ACK_UNKNOWN' g34.log
+      - name: Inherited G33 ambiguous commit and G32 G31 G30 regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g33_*.py' -v 2>&1 | tee g33.log
+          grep -F 'Ran 24 tests' g33.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g32_*.py' -v 2>&1 | tee g32.log
+          grep -F 'Ran 20 tests' g32.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g31_*.py' -v 2>&1 | tee g31.log
+          grep -F 'Ran 18 tests' g31.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g30_*.py' -v 2>&1 | tee g30.log
+          grep -F 'Ran 23 tests' g30.log
+      - name: Mandatory no-go
+        shell: bash
+        run: |
+          echo 'G34 isolated LAB only; schema DDL remains local, not external custody.'
+          echo 'Simulated pre/post COMMIT exceptions do not prove real power-failure behavior.'
+          echo 'No real provider/Worker/send or P0 closure. No main/merge/deploy.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
