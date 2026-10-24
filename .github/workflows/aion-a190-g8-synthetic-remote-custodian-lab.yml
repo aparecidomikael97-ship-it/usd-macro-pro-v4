@@ -1,0 +1,69 @@
+name: A190 G8 SYNTHETIC Remote Custodian Protocol LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g8_independent_authority_protocol_lab.py'
+      - 'labs/a190/test_g8_remote_authority_protocol_lab.py'
+      - '.github/workflows/aion-a190-g8-synthetic-remote-custodian-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g8-ubuntu-real-tcp-simulated-remote-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic cryptography fixture
+        run: python -m pip install cryptography==50.0.2
+      - name: Test distinct process RPC and attest RED limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g8_remote_authority_protocol_lab.py' -v 2>&1 | tee g8_ubuntu.log
+          grep -q 'Ran 10 tests' g8_ubuntu.log
+          grep -q '^OK$' g8_ubuntu.log
+          grep -q 'A190_G8_TCP_REPLY_DROPPED_AFTER_COMMIT=UNCERTAIN_ZERO_AUTO_RESEND' g8_ubuntu.log
+          grep -q 'A190_G8_REAL_TCP_SQLITE_CONCURRENT_SAME_SEMANTIC=ONE_ONLY' g8_ubuntu.log
+          grep -q 'A190_G8_SAME_HOST_ADMIN_REMOTE_STATE_RESTORE=UNSAFE_RESIGN_RED' g8_ubuntu.log
+          echo 'A190_G8_LAB_TESTS_PASSED=10_NO_EXTERNAL_ROOT_NO_EFFECT'
+          echo 'A190_G8_HARD_NO_GO=TRUE_ZERO_AUTO_RESEND=TRUE'
+  g8-windows-real-tcp-simulated-remote-authority:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic cryptography fixture
+        run: python -m pip install cryptography==50.0.2
+      - name: Test distinct process RPC and attest RED limits
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g8_remote_authority_protocol_lab.py' -v 2>&1 | Tee-Object -FilePath g8_windows.log
+          if ($LASTEXITCODE -ne 0) { throw 'A190_G8_UNITTEST_NONZERO' }
+          $out = Get-Content g8_windows.log -Raw
+          foreach ($required in @(
+            'Ran 10 tests',
+            'OK',
+            'A190_G8_TCP_REPLY_DROPPED_AFTER_COMMIT=UNCERTAIN_ZERO_AUTO_RESEND',
+            'A190_G8_REAL_TCP_SQLITE_CONCURRENT_SAME_SEMANTIC=ONE_ONLY',
+            'A190_G8_SAME_HOST_ADMIN_REMOTE_STATE_RESTORE=UNSAFE_RESIGN_RED'
+          )) {
+            if (-not $out.Contains($required)) { throw "A190_G8_MISSING_EVIDENCE=$required" }
+          }
+          Write-Output 'A190_G8_LAB_TESTS_PASSED=10_NO_EXTERNAL_ROOT_NO_EFFECT'
+          Write-Output 'A190_G8_HARD_NO_GO=TRUE_ZERO_AUTO_RESEND=TRUE'
