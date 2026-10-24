@@ -1,0 +1,54 @@
+name: A190 G45 G43 read-only effect scope integrity LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g43_projection_readonly_auditor_lab.py'
+      - 'labs/a190/test_g45_effect_scope_readonly_lab.py'
+      - '.github/workflows/aion-a190-g45-effect-scope-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g45-effect-scope:
+    name: G45 scoped effect audit / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install minimal isolated LAB dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G45 new scoped-effect adversarial cases
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g45_*.py' -v 2>&1 | tee g45.log
+          grep -F 'Ran 7 tests' g45.log
+          grep -F 'G45_FOREIGN_OWNER_GREEN=NO_FALSE_OK' g45.log
+          grep -F 'G45_FOREIGN_TENANT_GREEN=NO_FALSE_OK' g45.log
+          grep -F 'G45_FOREIGN_WORKSPACE_GREEN=NO_FALSE_OK' g45.log
+          grep -F 'G45_READONLY_GREEN=NO_REPAIR_NO_PAYLOAD' g45.log
+      - name: G43 and G44 inherited regression
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g43_*.py' -v 2>&1 | tee g43.log
+          grep -F 'Ran 32 tests' g43.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v 2>&1 | tee g44.log
+          grep -F 'Ran 39 tests' g44.log
+      - name: Mandatory hard no-go
+        shell: bash
+        run: |
+          echo 'G45 repairs G43 foreign-scope JOIN classification only.'
+          echo 'No external receipt authentication, anti-rollback custodian or P0 homologation.'
+          echo 'No Worker, provider, send, main/merge/deploy, customer, keys, spending.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
