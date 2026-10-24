@@ -211,6 +211,52 @@ class G40FreshClockAfterWitness(unittest.TestCase):
         with self.assertRaises(TypeError):
             ExecutionOutbox(self.store,SCOPE,fresh_dispatch_clock_lab=True)
 
+    def test_17_adapter_getter_clock_advance_denies_send(self):
+        claimed=self.build(ttl=5)
+        parent=self
+        class DelayedGetter:
+            calls=0
+            @property
+            def send(self):
+                parent.clock=NOW+timedelta(seconds=5)
+                return self._send
+            def _send(self, decision, key):
+                self.calls+=1
+                raise AssertionError("G40_DELAYED_GETTER_MUST_NOT_SEND")
+        delayed=DelayedGetter()
+        self.adapter=delayed
+        result=self.dispatch(claimed)
+        self.assertEqual(result["state"],"UNCERTAIN")
+        self.assertEqual(result["last_error"],
+                         "AUTHORITY_EXPIRED_AFTER_WITNESS_NO_SEND")
+        self.assertEqual(delayed.calls,0)
+        self.assertEqual(self.outbox.effect_count(),0)
+        print("G40_GETTER_DELAY_GREEN=EXPIRED_AFTER_PROPERTY_NO_SEND")
+
+    def test_18_adapter_getter_claim_change_denies_send(self):
+        claimed=self.build()
+        parent=self
+        class LeaseHijackGetter:
+            calls=0
+            @property
+            def send(self):
+                parent.outbox.db.execute(
+                    "UPDATE action_outbox SET lease_owner='g40-foreign' "
+                    "WHERE idempotency_key=?", (claimed["idempotency_key"],))
+                parent.outbox.db.commit()
+                return self._send
+            def _send(self, decision, key):
+                self.calls+=1
+                raise AssertionError("G40_LEASE_HIJACK_MUST_NOT_SEND")
+        hijack=LeaseHijackGetter()
+        self.adapter=hijack
+        result=self.dispatch(claimed)
+        self.assertEqual(result["state"],"UNCERTAIN")
+        self.assertEqual(result["last_error"],"CLAIM_CHANGED_NO_SEND")
+        self.assertEqual(hijack.calls,0)
+        self.assertEqual(self.outbox.effect_count(),0)
+        print("G40_GETTER_REENTRY_GREEN=CLAIM_CHANGED_AFTER_PROPERTY_NO_SEND")
+
     def test_16_post_witness_hold_never_auto_retry(self):
         claimed=self.build(ttl=6)
         self.clock=NOW+timedelta(seconds=7)
