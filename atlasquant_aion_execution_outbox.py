@@ -376,6 +376,30 @@ class ExecutionOutbox:
         if reason != "OK":
             raise RuntimeError("G44_BINDING_INTEGRITY_DENIED:" + reason)
 
+    def _g44_assert_predecessors_lab(self, row) -> None:
+        """Check ALL earlier scoped decisions under claim's BEGIN IMMEDIATE.
+
+        A terminal predecessor with missing/mismatched effect ledger must not
+        authorize the next claim. No provider proof is implied by local checks.
+        """
+        if not self._strict_binding_integrity_lab:
+            return
+        earlier = self.db.execute(
+            """SELECT eo.idempotency_key
+               FROM action_decisions d
+               LEFT JOIN action_outbox eo ON eo.decision_id=d.decision_id
+                 AND eo.owner=d.owner AND eo.tenant=d.tenant
+                 AND eo.workspace=d.workspace
+               WHERE d.owner=? AND d.tenant=? AND d.workspace=?
+                 AND d.aggregate_key=? AND d.aggregate_seq<?
+               ORDER BY d.aggregate_seq""",
+            (*self._scope_args(), row["aggregate_key"], row["aggregate_seq"]),
+        ).fetchall()
+        for predecessor in earlier:
+            if not predecessor["idempotency_key"]:
+                raise RuntimeError("G44_PREDECESSOR_MISSING_DENY")
+            self._g44_assert_binding_lab(predecessor["idempotency_key"])
+
     def _decision_row(self, decision_id: str):
         return self.db.execute(
             """SELECT * FROM action_decisions
@@ -683,7 +707,7 @@ class ExecutionOutbox:
         self._begin_or_quarantine()
         try:
             row = self.db.execute(
-                """SELECT o.idempotency_key
+                """SELECT o.idempotency_key, d.aggregate_key, d.aggregate_seq
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
                      AND d.owner=o.owner AND d.tenant=o.tenant
@@ -713,6 +737,7 @@ class ExecutionOutbox:
                 return None
             key = row["idempotency_key"]
             self._g44_assert_binding_lab(key)
+            self._g44_assert_predecessors_lab(row)
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CLAIMED',lease_owner=?,lease_until=?,attempts=attempts+1,last_error=''
