@@ -5,6 +5,7 @@ on:
       - 'labs/a190/g16_sqlite_native_file_control_lab.py'
       - 'labs/a190/test_g16_sqlite_native_file_control_lab.py'
       - '.github/workflows/aion-a190-g16-native-file-control-lab.yml'
+      - 'docs/aion/AION_A190_G16_NATIVE_FILE_CONTROL_APSW_LAB_20261024.md'
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +28,8 @@ jobs:
           python-version: '3.12'
       - name: Install pinned APSW wheel in LAB runner only
         run: python -m pip install --disable-pip-version-check --only-binary=:all: apsw==3.54.1.0
+      - name: Report effective SQLite and APSW wheel versions
+        run: python -c "import apsw; print('G16_APSW_VERSION=' + apsw.apswversion()); print('G16_SQLITE_VERSION=' + apsw.sqlitelibversion())"
       - name: Test exact-connection official SQLite VFS probes
         shell: bash
         run: |
