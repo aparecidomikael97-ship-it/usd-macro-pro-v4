@@ -103,7 +103,8 @@ class ExecutionSagaTests(unittest.TestCase):
         store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
         outbox = ExecutionOutbox(
             store, self.scope, evidence_verifier=synthetic_lab_evidence_verifier,
-            first_attempt_guard=synthetic_lab_first_attempt_reservation)
+            first_attempt_guard=synthetic_lab_first_attempt_reservation,
+            unsafe_allow_synthetic_lab_callbacks=True)
         budget = CumulativeAuthorityBudget(
             store,
             self.scope,

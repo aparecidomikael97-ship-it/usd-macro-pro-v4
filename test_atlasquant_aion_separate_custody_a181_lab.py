@@ -81,6 +81,7 @@ class A181SeparateCustodyRecoveryTests(unittest.TestCase):
         options = {
             "first_attempt_guard": self.guard() if guard is None else guard,
             "evidence_verifier": fake_confirmed,
+            "unsafe_allow_synthetic_lab_callbacks": True,
         }
         outbox = ExecutionOutbox(store, scope, **options)
         row = outbox.enqueue(
@@ -147,7 +148,8 @@ class A181SeparateCustodyRecoveryTests(unittest.TestCase):
         try:
             candidate=ExecutionOutbox(
                 reopened,self.scope,first_attempt_guard=self.guard(),
-                evidence_verifier=fake_confirmed)
+                evidence_verifier=fake_confirmed,
+                unsafe_allow_synthetic_lab_callbacks=True)
             self.assertEqual(candidate.get(row["idempotency_key"])["state"],"CLAIMED")
             resumed=LabAdapter()
             result=candidate.dispatch_claimed(

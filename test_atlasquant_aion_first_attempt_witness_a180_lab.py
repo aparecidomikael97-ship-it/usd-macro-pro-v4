@@ -101,7 +101,8 @@ class A180FirstAttemptWitnessTests(unittest.TestCase):
 
     def claim(self, *, guard="DEFAULT", intent_ref="event-a", payload=None,
               evidence_verifier=fake_confirmed):
-        opts={"evidence_verifier":evidence_verifier}
+        opts={"evidence_verifier":evidence_verifier,
+              "unsafe_allow_synthetic_lab_callbacks": True}
         if guard != "DEFAULT":
             opts["first_attempt_guard"]=guard
         outbox=ExecutionOutbox(self.store,self.scope,**opts)
@@ -249,7 +250,8 @@ class A180FirstAttemptWitnessTests(unittest.TestCase):
             authorization_ref="approval-1",created_at=NOW,
             valid_until=NOW+timedelta(minutes=5))
         out_after=ExecutionOutbox(self.store,self.scope,
-            evidence_verifier=fake_confirmed,first_attempt_guard=self.guard())
+            evidence_verifier=fake_confirmed,first_attempt_guard=self.guard(),
+            unsafe_allow_synthetic_lab_callbacks=True)
         self.assertIsNotNone(out_after.claim_next("worker1",now=NOW+timedelta(seconds=2)))
         sent=LabAdapter()
         r=out_after.dispatch_claimed(second["idempotency_key"],worker_id="worker1",

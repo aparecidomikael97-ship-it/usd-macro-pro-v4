@@ -30,7 +30,8 @@ class CallbackBoundaryTests(unittest.TestCase):
 
     def claim(self, *, guard=lambda intent: True, verifier=lambda *args: True, budget=False):
         self.outbox = ExecutionOutbox(self.store, self.scope,
-            first_attempt_guard=guard, evidence_verifier=verifier)
+            first_attempt_guard=guard, evidence_verifier=verifier,
+            unsafe_allow_synthetic_lab_callbacks=True)
         extra = ({"transaction_id": "synthetic-tx", "authority_budget_ref": "synthetic-budget",
                   "risk_points": 1, "capability_class": "LAB"} if budget else {})
         row = self.outbox.enqueue(intent_ref="synthetic-intent", action="synthetic_action",

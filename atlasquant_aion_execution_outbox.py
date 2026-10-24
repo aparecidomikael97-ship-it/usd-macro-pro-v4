@@ -125,6 +125,7 @@ class ExecutionOutbox:
         self, store: SQLiteChatStore, scope: Scope, *,
         evidence_verifier: Callable[[str, Mapping[str, Any], Mapping[str, Any]], bool] | None = None,
         first_attempt_guard: Callable[[Mapping[str, Any]], bool] | None = None,
+        unsafe_allow_synthetic_lab_callbacks: bool = False,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -132,6 +133,8 @@ class ExecutionOutbox:
             raise TypeError("callable evidence_verifier required")
         if first_attempt_guard is not None and not callable(first_attempt_guard):
             raise TypeError("callable first_attempt_guard required")
+        if type(unsafe_allow_synthetic_lab_callbacks) is not bool:
+            raise TypeError("unsafe_allow_synthetic_lab_callbacks must be bool")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -144,13 +147,18 @@ class ExecutionOutbox:
         # DENY by default: no witness/proof, no adapter send. Tests may inject
         # synthetic callbacks ONLY in isolated LAB fixtures.
         self._first_attempt_guard = first_attempt_guard
+        # A190 G12: even supplied true-returning callbacks are quarantined by
+        # default. The explicit unsafe opt-in exists ONLY to retain isolated
+        # state-machine LAB tests and is NOT a production trust boundary: an
+        # in-process caller could deliberately enable it. HARD NO-GO remains.
+        self._synthetic_lab_callbacks_enabled = unsafe_allow_synthetic_lab_callbacks
         self._ensure_schema()
 
     def _reserved_first_attempt(self, intent: Mapping[str, Any]) -> bool:
         # A180 candidate calls a separately pinned synthetic witness contract.
         # An arbitrary injected true-returning callback is NOT trustworthy
         # and must be prohibited by any future operational host.
-        if self._first_attempt_guard is None:
+        if not self._synthetic_lab_callbacks_enabled or self._first_attempt_guard is None:
             return False
         try:
             return _bound_callback(self._first_attempt_guard, dict(intent)) is True
@@ -161,7 +169,7 @@ class ExecutionOutbox:
         self, kind: str, intent: Mapping[str, Any], result: Mapping[str, Any],
     ) -> bool:
         """No evidence, exception or ambiguous result can authorize an effect."""
-        if self._evidence_verifier is None:
+        if not self._synthetic_lab_callbacks_enabled or self._evidence_verifier is None:
             return False
         try:
             return _bound_callback(self._evidence_verifier, kind, dict(intent), dict(result)) is True
@@ -680,10 +688,6 @@ class ExecutionOutbox:
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
                 )
 
-        send = getattr(adapter, "send", None)
-        if not callable(send):
-            raise TypeError("adapter.send required")
-
         # A180: persist UNCERTAIN BEFORE contacting the witness. The witness
         # might reserve the first attempt and then time out: if the host dies
         # there, the original claim must NOT become an automatic RETRY.
@@ -714,6 +718,23 @@ class ExecutionOutbox:
                 )
             return {**self.get(key),
                     "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"}
+
+        # No adapter attribute lookup (and therefore no user-defined property
+        # getter) until the first-attempt witness passes. With G12 defaults
+        # this line is unreachable regardless of caller-supplied callbacks.
+        send = getattr(adapter, "send", None)
+        if not callable(send):
+            # After UNCERTAIN reservation, any missing adapter must stay
+            # uncertain; never make a fresh claim or silently retry.
+            with self.db:
+                self.db.execute(
+                    """UPDATE action_outbox SET state='UNCERTAIN',lease_owner='',
+                       lease_until='',last_error='ADAPTER_SEND_MISSING_NO_SEND'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN'""",
+                    (key, *self._scope_args()),
+                )
+            return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
         try:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
@@ -792,6 +813,11 @@ class ExecutionOutbox:
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
             raise ValueError("only SENT or UNCERTAIN intents require reconciliation")
+        # Reconciliation adapters are caller-controlled Python objects too.
+        # In default quarantine do not even inspect adapter.reconcile: its
+        # property lookup may execute arbitrary host code. No confirmation.
+        if not self._synthetic_lab_callbacks_enabled:
+            return {**intent, "reconcile_state": "EXTERNAL_TRUST_NOT_CONFIGURED"}
         reconcile = getattr(adapter, "reconcile", None)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
