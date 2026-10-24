@@ -51,6 +51,8 @@ def audit_projection_snapshot_readonly_lab(
                       d.owner AS decision_owner,d.tenant AS decision_tenant,
                       d.workspace AS decision_workspace,
                       e.effect_ref AS ledger_effect,e.confirmed_at AS ledger_at,
+                      e.owner AS effect_owner,e.tenant AS effect_tenant,
+                      e.workspace AS effect_workspace,
                       e.idempotency_key AS matched_effect
                FROM action_outbox o
                LEFT JOIN action_decisions d ON d.decision_id=o.decision_id
@@ -67,6 +69,10 @@ def audit_projection_snapshot_readonly_lab(
                     (row["decision_owner"],row["decision_tenant"],
                      row["decision_workspace"]) != (owner,tenant,workspace)):
                 code = "DECISION_MISSING_OR_FOREIGN_SCOPE"
+            elif (row["matched_effect"] is not None and
+                  (row["effect_owner"],row["effect_tenant"],
+                   row["effect_workspace"]) != (owner,tenant,workspace)):
+                code = "EFFECT_SCOPE_MISMATCH"
             elif row["state"] == "CONFIRMED":
                 if (row["matched_effect"] is None or
                         row["effect_ref"] != row["ledger_effect"] or
