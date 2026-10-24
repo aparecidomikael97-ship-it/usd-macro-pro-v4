@@ -171,5 +171,21 @@ class G18WindowsExactStdlibConnectionTests(unittest.TestCase):
         print("G18_WIN32_TWO_REAL_CONNECTIONS=SAME_NATIVE_FILE_LOCAL_ONLY")
 
 
+    def test_10_closed_file_replacement_matches_native_but_wrong_content_red(self):
+        """Adversary controls both the local DB and the expected path: native match is NOT integrity."""
+        with closing(sqlite3.connect(self.live)) as before:
+            original_marker = before.execute("SELECT marker FROM aion_native_marker_v1").fetchone()
+            self.assertEqual(before.execute("SELECT count(*) FROM synthetic_events").fetchone()[0], 1)
+        self.live.unlink()
+        shutil.copyfile(self.clone, self.live)
+        with closing(sqlite3.connect(self.live)) as after:
+            _load_explicit_lab_extension(after)
+            self.assertEqual(after.execute("SELECT marker FROM aion_native_marker_v1").fetchone(),
+                             original_marker)
+            self.assertEqual(after.execute("SELECT count(*) FROM synthetic_events").fetchone()[0], 2)
+            self.assertEqual(_native_identity(after), _path_identity(self.live))
+        print("G18_WIN32_CLOSED_FILE_REPLACEMENT=WRONG_CONTENT_NATIVE_MATCH_RED")
+
+
 if __name__ == "__main__":
     unittest.main()
