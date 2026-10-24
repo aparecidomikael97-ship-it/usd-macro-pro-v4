@@ -24,7 +24,8 @@ class A177ReceiptAdmissionTests(unittest.TestCase):
         self.scope = Scope("ownerlab", "tenantlab", "workspacelab")
 
     def make_claim(self, *, evidence_verifier=None):
-        options = {"first_attempt_guard": synthetic_lab_first_attempt_reservation}
+        options = {"first_attempt_guard": synthetic_lab_first_attempt_reservation,
+                   "unsafe_allow_synthetic_lab_callbacks": True}
         options.update({} if evidence_verifier is None else {
             "evidence_verifier": evidence_verifier})
         outbox = ExecutionOutbox(self.store, self.scope, **options)
