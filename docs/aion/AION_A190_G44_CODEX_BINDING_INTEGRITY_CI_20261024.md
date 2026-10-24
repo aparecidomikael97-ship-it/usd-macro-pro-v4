@@ -53,6 +53,16 @@ Additional safety contracts applied: version-bound decision `schema` and `grants
 
 Local `python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v` on Windows **actual latest checkout SHA `2b8b24440e4b858981e05f49a2e31a2e055ca15d`** finished **37/37 PASS**, with required GREEN markers. **GitHub CI at same code SHA** [#40135893785](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40135893785) runs **37 G44 + 339 inherited G30–G43 = 376 distinct/OS, 752 if both systems pass**. It was queued when this evidence was first added; check both OS jobs before claiming CI SUCCESS. The previous #40135351231 found one test-fixture error under Windows; patched in #40135472795, but only the final code SHA counts.
 
+## Third Codex review: predecessor terminal integrity, and final LAB repair
+
+A **third actual read-only Codex** ran on the **updated G44 checkout SHA `2b8b24440e4b858981e05f49a2e31a2e055ca15d`** (not old G18), at the isolated detached Windows worktree, session `01a16fe6-030a-7023-bb60-f272abca75d2`. It **completed exit 0 in 46.50 seconds**, without modifications, tests, Worker/provider, credentials, merge or deploy. The review confirmed the four prior fixes by static inspection but found another concrete blocker:
+
+- A predecessor in terminal state `CONFIRMED` could lack its `action_effects` row, yet `claim_next` permitted the successor because its anti-overtake predicate only inspected the predecessor's state.
+- The opt-in G44 claim now verifies **every earlier decision's Outbox/Decision/Effect binding inside the same BEGIN IMMEDIATE transaction** before reserving the selected successor. Invalid or missing receipt/ledger refuses advancement; a truly consistent confirmed predecessor still permits claiming.
+- Added `test_38_terminal_predecessor_missing_effect_denies_successor` and `test_39_consistent_confirmed_predecessor_allows_successor_claim` with explicit proof markers. Both **passed on local Windows**.
+
+**Final source/workflow SHA `9e5d380d96ca26ef6bea10e048dd6e52aee3d222`**, verified locally on Windows: **39/39 new G44 tests PASS**. The latest [G44 focused GitHub run #40136260759](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40136260759) must separately prove **39 new G44 + 339 G30–G43 = 378 tests/OS, 756 executions if both succeed**. It was QUEUED at evidence edit, so do not claim a passing GitHub result before both OS jobs finish. The evidence-only commit after the tested SHA must not be confused with a tested source change.
+
 ## Outstanding RED
 
 - Opt-in local integrity gate is not a trusted provider receipt, authenticated origin/HUMAN_OWNER identity, durable independent monotonic antirollback custodian, host-proof crash recovery, or distributed exactly-once first SEND guarantee.
