@@ -152,10 +152,13 @@ class G39AtomicSemanticReservation(unittest.TestCase):
         path=self.store.path
         self.store.close()
         self.store=SQLiteChatStore(path)
-        self.outbox=ExecutionOutbox(self.store,SCOPE)
-        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
-            self.stage(intent="request-B")
-        self.assertEqual(len(self.locks()),1)
+        try:
+            self.outbox=ExecutionOutbox(self.store,SCOPE)
+            with self.assertRaisesRegex(ValueError,"semantic business event collision"):
+                self.stage(intent="request-B")
+            self.assertEqual(len(self.locks()),1)
+        finally:
+            self.store.close()
 
     def test_14_existing_same_request_without_event_replays_legacy(self):
         a=self.stage(strict=False)
