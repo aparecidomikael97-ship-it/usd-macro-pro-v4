@@ -1,0 +1,48 @@
+name: A190 G29 real Outbox semantic authorization RED LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/test_g29_real_outbox_semantic_authorization_red_lab.py'
+      - '.github/workflows/aion-a190-g29-real-outbox-semantic-auth-red-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g29-outbox-red:
+    name: G29 real Outbox semantic auth RED / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install isolated G13 bridge test dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Real Outbox staging replays, idempotency alias and redact RED
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g29_real_outbox_semantic_authorization_red_lab.py' -v 2>&1 | tee g29.log
+          grep -F 'Ran 20 tests' g29.log
+          grep -F 'G29_POLICY_REPLAY_RED=CHANGED_POLICY_RETURNS_OLD_DECISION' g29.log
+          grep -F 'G29_AUTH_REPLAY_RED=CHANGED_AUTH_REF_RETURNS_OLD_DECISION' g29.log
+          grep -F 'G29_EXPIRY_REPLAY_RED=SHORTER_VALIDITY_RETURNS_OLD_EXPIRY' g29.log
+          grep -F 'G29_REAUTH_REPLAY_RED=NEW_REAUTH_REQUIREMENT_RETURNS_OLD_DECISION' g29.log
+          grep -F 'G29_CALLER_ALIAS_RED=SAME_OPERATION_NEW_REF_TWO_RESERVATIONS' g29.log
+          grep -F 'G29_REDACTION_ALIAS_RED=DIFFERENT_CREDENTIAL_VALUES_SAME_IDEMPOTENCY_KEY' g29.log
+          grep -F 'G29_G13_DIGEST_REDACTION_RED=SAME_SIGNABLE_DIGEST_DIFFERENT_ORIGINAL_PAYLOAD' g29.log
+      - name: Mandatory fail-closed risk statement
+        shell: bash
+        run: |
+          echo 'G29 is STAGING ONLY, and cannot prove authorization bypass at dispatch.'
+          echo 'Redacted token differences may or may not change business semantics.'
+          echo 'No provider send, Worker, external receipt or first-send trust closure.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
