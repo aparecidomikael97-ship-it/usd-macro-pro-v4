@@ -1,6 +1,6 @@
 # AtlasQuant AION A190 G44 — Scoped Outbox/Decision/Effect local integrity admission LAB
 
-**Date:** 2026-10-24. **Draft PR #1531**, stacked on G43 Draft #1530. G44 candidate exact code/workflow SHA `41765b107abbf954cd6173fbe20e330b5fc4d1af`; code remains **LAB-only, opt-in**. No merge to main, deploy, Worker, customer/provider data, external send, credentials or spend.
+**Date:** 2026-10-24. **Draft PR #1531**, stacked on G43 Draft #1530. G44 **final tested code/workflow SHA `9e5d380d96ca26ef6bea10e048dd6e52aee3d222`**; code remains **LAB-only, opt-in**. No merge to main, deploy, Worker, customer/provider data, external send, credentials or spend.
 
 ## Independent Codex actually executed
 
@@ -37,7 +37,7 @@ These are **static recommendations against G18**, not proof that G44 was tested 
 - authorization callback reentry and invalid data preventing claim or adapter property lookup;
 - standalone mode=ro report privacy/zero writes and explicit **RED**: a valid local hash does not prove a commercial event.
 
-`.github/workflows/aion-a190-g44-binding-integrity-lab.yml` runs **31 new G44 + 339 inherited G30–G43 = 370 distinct tests per OS, 740 cross-platform executions if both pass**. Candidate [G44 CI #40135351231](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40135351231), code/workflow SHA `41765b107abbf954cd6173fbe20e330b5fc4d1af`: Ubuntu and Windows jobs were still queued at this document creation. Do **not** claim successful tests until checking both jobs and original tested SHA; this is a separate evidence-doc commit.
+**Historical superseded candidate**: workflow [G44 #40135351231](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40135351231) at old SHA `41765b107abbf954cd6173fbe20e330b5fc4d1af` had 31 new cases, with one fixture error under Windows after intentionally corrupting decision JSON. The harness was fixed. **This old run is NOT final validation.** Latest G44 workflow uses 39 new G44 tests plus 339 inherited, as verified below.
 
 ## Second Codex review of the ACTUAL G44 branch and verified fixes
 
@@ -51,7 +51,7 @@ It found **ten** candidate gaps. Four high-priority findings have been corrected
 
 Additional safety contracts applied: version-bound decision `schema` and `grants_authority=False` admission, and correctly scope-qualified local orphan-detection joins. Remaining independent Codex observations stay OPEN: versioned physical SQLite schema/constraints admission, G43 auditor scope/duplicate-key hardening, authorization-critical reauth field tampering without independent sealed binding, WAL sidecar write guarantees, and tests for eligible reconciliation after further reentrancy. These are not cleared by the passing targeted suite.
 
-Local `python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v` on Windows **actual latest checkout SHA `2b8b24440e4b858981e05f49a2e31a2e055ca15d`** finished **37/37 PASS**, with required GREEN markers. **GitHub CI at same code SHA** [#40135893785](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40135893785) runs **37 G44 + 339 inherited G30–G43 = 376 distinct/OS, 752 if both systems pass**. It was queued when this evidence was first added; check both OS jobs before claiming CI SUCCESS. The previous #40135351231 found one test-fixture error under Windows; patched in #40135472795, but only the final code SHA counts.
+**Intermediate Codex refinement SHA** `2b8b24440e4b858981e05f49a2e31a2e055ca15d` passed 37/37 new tests and 339/339 regressions on local Windows. Its GitHub run [#40135893785](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40135893785) was superseded by the final predecessor-integrity fix. Do not merge evidence from different SHAs.
 
 ## Third Codex review: predecessor terminal integrity, and final LAB repair
 
@@ -61,7 +61,7 @@ A **third actual read-only Codex** ran on the **updated G44 checkout SHA `2b8b24
 - The opt-in G44 claim now verifies **every earlier decision's Outbox/Decision/Effect binding inside the same BEGIN IMMEDIATE transaction** before reserving the selected successor. Invalid or missing receipt/ledger refuses advancement; a truly consistent confirmed predecessor still permits claiming.
 - Added `test_38_terminal_predecessor_missing_effect_denies_successor` and `test_39_consistent_confirmed_predecessor_allows_successor_claim` with explicit proof markers. Both **passed on local Windows**.
 
-**Final source/workflow SHA `9e5d380d96ca26ef6bea10e048dd6e52aee3d222`**, verified locally on Windows: **39/39 new G44 tests PASS**. The latest [G44 focused GitHub run #40136260759](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40136260759) must separately prove **39 new G44 + 339 G30–G43 = 378 tests/OS, 756 executions if both succeed**. It was QUEUED at evidence edit, so do not claim a passing GitHub result before both OS jobs finish. The evidence-only commit after the tested SHA must not be confused with a tested source change.
+**FINAL VERIFIED:** exact code/workflow SHA `9e5d380d96ca26ef6bea10e048dd6e52aee3d222`. Local Windows isolated checkout: **39/39 new G44 + 339/339 inherited G30–G43 PASS = 378/378**. [G44 GitHub Actions #40136260759](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40136260759) **SUCCESS**: Ubuntu job `120998306465` **378/378**, Windows job `120998306653` **378/378**, **756 executions of 378 distinct tests**, both mandated terminal-predecessor GREEN markers checked in log. This report was committed later and is NOT part of that tested source SHA. Separate [A184 #40136260770](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40136260770) was still **queued** at final G44 focused-CI validation; do not assert global Security/Quality/P0 homologation.
 
 ## Outstanding RED
 
