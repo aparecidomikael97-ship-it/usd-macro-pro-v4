@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: $\{{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -37,7 +37,7 @@ jobs:
       - name: Execute Windows real stdlib SQLite synthetic tests
         shell: pwsh
         env:
-          AION_G18_LAB_EXTENSION: $\{{ runner.temp }}\aion_g18_probe.dll
+          AION_G18_LAB_EXTENSION: ${{ runner.temp }}\aion_g18_probe.dll
         run: |
           git rev-parse HEAD
           python -B -m unittest discover -s labs/a190 -p 'test_g18_win32_native_identity_lab.py' -v 2>&1 | Tee-Object -FilePath g18_win32.log
