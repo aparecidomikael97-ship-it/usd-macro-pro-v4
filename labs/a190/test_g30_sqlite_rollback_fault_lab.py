@@ -29,7 +29,7 @@ class G30FaultInjection(unittest.TestCase):
         self.addCleanup(self.store.close)
         self.outbox=ExecutionOutbox(self.store,SCOPE)
         self.db=self.outbox.db
-        self.addCleanup(lambda:setattr(self.outbox,"db",self.db))
+        self.addCleanup(lambda:setattr(self.outbox,"db",self.db) if self.store.db is self.db else None)
     def stage(self):
         return self.outbox.enqueue(intent_ref="g30-sql-fault",
           action="synthetic",payload={"amount_minor":1000},
@@ -43,16 +43,15 @@ class G30FaultInjection(unittest.TestCase):
         self.assertEqual(proxy.rollbacks,1)
         self.assertFalse(self.db.in_transaction)
         self.assertEqual(len(self.outbox.list()),0)
-    def test_02_failed_rollback_masks_original_and_leaves_transaction_open_red(self):
+    def test_02_failed_rollback_preserves_original_and_detaches_connection_green(self):
         proxy=FaultingConnection(self.db,True)
         self.outbox.db=proxy
-        try:
-            with self.assertRaisesRegex(OSError,"G30_SYNTHETIC_ROLLBACK_ERROR") as caught:
-                self.stage()
-            self.assertIsInstance(caught.exception.__context__,RuntimeError)
-            self.assertTrue(self.db.in_transaction)
-            print("G30_SQLITE_ROLLBACK_MASK_RED=ORIGINAL_FAILURE_OBSCURED_TRANSACTION_OPEN")
-        finally:
-            self.db.rollback()
-        self.assertFalse(self.db.in_transaction)
+        with self.assertRaisesRegex(RuntimeError,"G30_ORIGINAL_WRITE_ERROR") as caught:
+            self.stage()
+        self.assertIsInstance(caught.exception.__cause__,OSError)
+        self.assertEqual(proxy.rollbacks,1)
+        self.assertIsNone(self.store.db)
+        self.assertIsNone(self.outbox.db)
+        self.assertEqual(self.store.storage_health()["state"],"failed")
+        print("G31_G30_REGRESSION_GREEN=ORIGINAL_ERROR_RETAINED_STORE_DETACHED")
 if __name__=="__main__":unittest.main()
