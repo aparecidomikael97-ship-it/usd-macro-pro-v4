@@ -995,7 +995,7 @@ class ExecutionOutbox:
                 if self._strict_claim_fencing_lab and cursor.rowcount != 1:
                     raise RuntimeError("FENCE_STALE_WITNESS_RESULT_NO_WRITE")
             return {**self.get(key),
-                    "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"
+                    "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"}
 
         # A possibly reserved first attempt can never be returned to RETRY
         # after a failed freshness check: preserve the UNCERTAIN reservation.
