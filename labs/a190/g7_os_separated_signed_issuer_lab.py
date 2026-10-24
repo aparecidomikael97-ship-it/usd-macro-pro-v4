@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import subprocess
 import sys
 
 from cryptography.exceptions import InvalidSignature
@@ -210,7 +211,7 @@ def read_hostile(secret_dir):
     attempts = (
         ("PRIVATE_KEY", lambda: key_path(secret_dir).read_bytes()),
         ("RESERVATION_DB", lambda: sqlite3.connect(
-            f"file:{database_path(secret_dir).as_posix()}?mode=rw", uri=True, timeout=0.2,
+            database_path(secret_dir).as_uri() + "?mode=rw", uri=True, timeout=0.2,
         )),
     )
     for name, operation in attempts:
@@ -246,6 +247,16 @@ def compare(public_dir, req1, req2):
 
 
 def main(argv):
+    if os.name == "nt":
+        identity = subprocess.run(
+            ["whoami", "/user"], capture_output=True, text=True, check=True,
+        ).stdout
+        match = re.search(r"S-1-\\d+(?:-\\d+)+", identity)
+        if match is None:
+            raise AssertionError("G7_REAL_WINDOWS_SID_NOT_FOUND")
+        print("A190_G7_REAL_PROCESS_PRINCIPAL=" + match.group(0))
+    else:
+        print("A190_G7_REAL_PROCESS_PRINCIPAL=" + str(os.geteuid()))
     if len(argv) < 2:
         raise SystemExit("G7 LAB usage")
     op = argv[1]
