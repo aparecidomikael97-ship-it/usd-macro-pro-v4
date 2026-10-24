@@ -132,6 +132,7 @@ class ExecutionOutbox:
         fresh_dispatch_clock_lab: Callable[[], Any] | None = None,
         strict_claim_fencing_lab: bool = False,
         strict_reconcile_snapshot_cas_lab: bool = False,
+        strict_projection_lab: bool = False,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -151,6 +152,8 @@ class ExecutionOutbox:
             raise TypeError("strict_claim_fencing_lab must be bool")
         if type(strict_reconcile_snapshot_cas_lab) is not bool:
             raise TypeError("strict_reconcile_snapshot_cas_lab must be bool")
+        if type(strict_projection_lab) is not bool:
+            raise TypeError("strict_projection_lab must be bool")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -168,6 +171,9 @@ class ExecutionOutbox:
         # This optional LAB gate detects reconcile replies against stale local
         # state. No source/receipt is independently authenticated by it.
         self._strict_reconcile_snapshot_cas_lab = strict_reconcile_snapshot_cas_lab
+        # Opt-in LAB: fresh confirmation updates its JSON projection in the
+        # same SQLite transaction. Historical rows require explicit dry-run.
+        self._strict_projection_lab = strict_projection_lab
         # Default fail-closed. This LAB callback boundary is NOT a verified
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
@@ -868,12 +874,139 @@ class ExecutionOutbox:
                 raise RuntimeError("FENCE_STALE_CONFIRM_NO_LEDGER_WRITE")
             if phase and cursor.rowcount != 1:
                 raise RuntimeError("G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER")
+            if self._strict_projection_lab:
+                self._g43_sync_projection_in_tx_lab(key)
             self._commit_or_quarantine()
         except Exception as original_error:
             if self.db is not None:
                 self._rollback_preserving_original(original_error)
             raise
         return self.get(key)
+
+    # A190 G43 — opt-in LAB projection coherence. This only synchronizes
+    # copies of columns in an existing JSON field; NOT a provider receipt,
+    # trusted migration, remote CAS, or authorization to dispatch.
+    _G43_PROJECTED_FIELDS = (
+        "state", "attempts", "lease_owner", "lease_until",
+        "dispatch_started_at", "sent_at", "confirmed_at",
+        "last_error", "effect_ref",
+    )
+
+    def _g43_projection_candidate_lab(self, row):
+        try:
+            document = json.loads(row["data"])
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("G43_PROJECTION_INVALID_JSON_DENY") from exc
+        if not isinstance(document, dict):
+            raise RuntimeError("G43_PROJECTION_NOT_OBJECT_DENY")
+        if (document.get("idempotency_key") != row["idempotency_key"] or
+                document.get("decision_id") != row["decision_id"]):
+            raise RuntimeError("G43_PROJECTION_IDENTITY_MISMATCH_DENY")
+        if document.get("state") not in STATES:
+            raise RuntimeError("G43_PROJECTION_STATE_INVALID_DENY")
+        ledger = self.db.execute(
+            """SELECT effect_ref,confirmed_at FROM action_effects
+               WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+            (row["idempotency_key"], *self._scope_args()),
+        ).fetchall()
+        if len(ledger) > 1:
+            raise RuntimeError("G43_DUPLICATE_LEDGER_DENY")
+        if row["state"] == "CONFIRMED":
+            if (len(ledger) != 1 or
+                    ledger[0]["effect_ref"] != row["effect_ref"] or
+                    ledger[0]["confirmed_at"] != row["confirmed_at"]):
+                raise RuntimeError("G43_CONFIRMED_LEDGER_INCONSISTENT_DENY")
+        elif ledger:
+            raise RuntimeError("G43_NONCONFIRMED_HAS_EFFECT_DENY")
+        for field in self._G43_PROJECTED_FIELDS:
+            document[field] = int(row[field]) if field == "attempts" else row[field]
+        return _canonical(document)
+
+    def _g43_sync_projection_in_tx_lab(self, key: str) -> bool:
+        # Caller owns BEGIN IMMEDIATE; compare current raw document and phase.
+        row = self._outbox_row(key)
+        if row is None:
+            raise RuntimeError("G43_PROJECTION_OUTBOX_ABSENT")
+        expected = self._g43_projection_candidate_lab(row)
+        if expected == row["data"]:
+            return False
+        cursor = self.db.execute(
+            """UPDATE action_outbox SET data=?
+               WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                 AND data=? AND state=? AND attempts=? AND effect_ref=?""",
+            (expected, key, *self._scope_args(), row["data"], row["state"],
+             row["attempts"], row["effect_ref"]),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("G43_PROJECTION_CAS_LOST_DENY")
+        return True
+
+    def projection_plan_lab(self, idempotency_key: str) -> dict[str, Any]:
+        """READ ONLY. Reports a one-row dry run, no implicit historical repair."""
+        if not self._strict_projection_lab:
+            raise RuntimeError("G43_PROJECTION_OPT_IN_REQUIRED")
+        key = _clean(idempotency_key, 64)
+        self.store.require_healthy()
+        row = self._outbox_row(key)
+        if row is None:
+            raise LookupError("G43_PROJECTION_ROW_UNAVAILABLE")
+        replacement = self._g43_projection_candidate_lab(row)
+        return {
+            "schema": "AION-A190-G43-PROJECTION-DRYRUN-V1",
+            "idempotency_key": key,
+            "owner": self.scope.owner_id,
+            "tenant": self.scope.tenant_id,
+            "workspace": self.scope.workspace_id,
+            "original_data_sha256": sha256(row["data"].encode("utf-8")).hexdigest(),
+            "state": row["state"],
+            "attempts": int(row["attempts"]),
+            "lease_owner": row["lease_owner"],
+            "lease_until": row["lease_until"],
+            "effect_ref": row["effect_ref"],
+            "confirmed_at": row["confirmed_at"],
+            "changed": replacement != row["data"],
+        }
+
+    def apply_projection_plan_lab(
+        self, plan: Mapping[str, Any], *, explicit_approval: bool = False,
+    ) -> dict[str, Any]:
+        """LAB only: one approved row, one conditional update, zero ledger writes.
+
+        Approval is an explicit argument, NOT inferred from the dry-run.
+        Production migration/recovery remains unapproved and HARD NO-GO.
+        """
+        if not self._strict_projection_lab:
+            raise RuntimeError("G43_PROJECTION_OPT_IN_REQUIRED")
+        if explicit_approval is not True:
+            raise RuntimeError("G43_EXPLICIT_APPROVAL_REQUIRED")
+        if not isinstance(plan, Mapping):
+            raise RuntimeError("G43_INVALID_PLAN")
+        if (plan.get("schema") != "AION-A190-G43-PROJECTION-DRYRUN-V1" or
+                tuple(plan.get(k) for k in ("owner", "tenant", "workspace"))
+                != self._scope_args()):
+            raise RuntimeError("G43_PLAN_SCOPE_OR_VERSION_DENIED")
+        key = _clean(plan.get("idempotency_key"), 64)
+        with self._managed_write_transaction():
+            row = self._outbox_row(key)
+            if row is None:
+                raise RuntimeError("G43_PLAN_OUTBOX_ABSENT")
+            snapshot = (
+                sha256(row["data"].encode("utf-8")).hexdigest(),
+                row["state"], int(row["attempts"]), row["lease_owner"],
+                row["lease_until"], row["effect_ref"], row["confirmed_at"],
+            )
+            expected = (
+                plan.get("original_data_sha256"),
+                plan.get("state"), plan.get("attempts"), plan.get("lease_owner"),
+                plan.get("lease_until"), plan.get("effect_ref"),
+                plan.get("confirmed_at"),
+            )
+            if snapshot != expected:
+                raise RuntimeError("G43_STALE_DRYRUN_REFUSED")
+            changed = self._g43_sync_projection_in_tx_lab(key)
+        return {"idempotency_key": key, "updated": changed,
+                "state": self.get(key)["state"],
+                "schema": "AION-A190-G43-PROJECTION-DRYRUN-V1"}
 
     def _reconciliation_authority_lab(
         self, intent: Mapping[str, Any],
