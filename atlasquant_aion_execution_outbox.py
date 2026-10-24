@@ -133,6 +133,7 @@ class ExecutionOutbox:
         strict_claim_fencing_lab: bool = False,
         strict_reconcile_snapshot_cas_lab: bool = False,
         strict_projection_lab: bool = False,
+        strict_binding_integrity_lab: bool = False,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -154,6 +155,8 @@ class ExecutionOutbox:
             raise TypeError("strict_reconcile_snapshot_cas_lab must be bool")
         if type(strict_projection_lab) is not bool:
             raise TypeError("strict_projection_lab must be bool")
+        if type(strict_binding_integrity_lab) is not bool:
+            raise TypeError("strict_binding_integrity_lab must be bool")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -174,6 +177,7 @@ class ExecutionOutbox:
         # Opt-in LAB: fresh confirmation updates its JSON projection in the
         # same SQLite transaction. Historical rows require explicit dry-run.
         self._strict_projection_lab = strict_projection_lab
+        self._strict_binding_integrity_lab = strict_binding_integrity_lab
         # Default fail-closed. This LAB callback boundary is NOT a verified
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
@@ -363,6 +367,39 @@ class ExecutionOutbox:
     def _scope_args(self) -> tuple[str, str, str]:
         return _scope(self.scope)
 
+    def _g44_assert_binding_lab(self, key: str) -> None:
+        if not self._strict_binding_integrity_lab:
+            return
+        # Local structural integrity is NOT authentic commercial evidence.
+        from atlasquant_aion_outbox_binding_lab import binding_issue_lab
+        reason = binding_issue_lab(self.db, key, self._scope_args())
+        if reason != "OK":
+            raise RuntimeError("G44_BINDING_INTEGRITY_DENIED:" + reason)
+
+    def _g44_assert_predecessors_lab(self, row) -> None:
+        """Check ALL earlier scoped decisions under claim's BEGIN IMMEDIATE.
+
+        A terminal predecessor with missing/mismatched effect ledger must not
+        authorize the next claim. No provider proof is implied by local checks.
+        """
+        if not self._strict_binding_integrity_lab:
+            return
+        earlier = self.db.execute(
+            """SELECT eo.idempotency_key
+               FROM action_decisions d
+               LEFT JOIN action_outbox eo ON eo.decision_id=d.decision_id
+                 AND eo.owner=d.owner AND eo.tenant=d.tenant
+                 AND eo.workspace=d.workspace
+               WHERE d.owner=? AND d.tenant=? AND d.workspace=?
+                 AND d.aggregate_key=? AND d.aggregate_seq<?
+               ORDER BY d.aggregate_seq""",
+            (*self._scope_args(), row["aggregate_key"], row["aggregate_seq"]),
+        ).fetchall()
+        for predecessor in earlier:
+            if not predecessor["idempotency_key"]:
+                raise RuntimeError("G44_PREDECESSOR_MISSING_DENY")
+            self._g44_assert_binding_lab(predecessor["idempotency_key"])
+
     def _decision_row(self, decision_id: str):
         return self.db.execute(
             """SELECT * FROM action_decisions
@@ -375,6 +412,8 @@ class ExecutionOutbox:
             """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
                FROM action_outbox o
                JOIN action_decisions d ON d.decision_id=o.decision_id
+                 AND d.owner=o.owner AND d.tenant=o.tenant
+                 AND d.workspace=o.workspace
                WHERE o.idempotency_key=? AND
                      o.owner=? AND o.tenant=? AND o.workspace=?""",
             (key, *self._scope_args()),
@@ -412,6 +451,8 @@ class ExecutionOutbox:
         sql = """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
                  FROM action_outbox o
                  JOIN action_decisions d ON d.decision_id=o.decision_id
+                   AND d.owner=o.owner AND d.tenant=o.tenant
+                   AND d.workspace=o.workspace
                  WHERE o.owner=? AND o.tenant=? AND o.workspace=?"""
         normalized = _clean(state, 40).upper()
         if normalized:
@@ -666,21 +707,26 @@ class ExecutionOutbox:
         self._begin_or_quarantine()
         try:
             row = self.db.execute(
-                """SELECT o.idempotency_key
+                """SELECT o.idempotency_key, d.aggregate_key, d.aggregate_seq
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
+                     AND d.owner=o.owner AND d.tenant=o.tenant
+                     AND d.workspace=o.workspace
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
                      AND o.state IN ('PENDING','RETRY')
                      AND NOT EXISTS (
                          SELECT 1
                          FROM action_decisions earlier
-                         JOIN action_outbox eo ON eo.decision_id=earlier.decision_id
+                         LEFT JOIN action_outbox eo ON eo.decision_id=earlier.decision_id
+                            AND eo.owner=earlier.owner AND eo.tenant=earlier.tenant
+                            AND eo.workspace=earlier.workspace
                          WHERE earlier.owner=d.owner
                            AND earlier.tenant=d.tenant
                            AND earlier.workspace=d.workspace
                            AND earlier.aggregate_key=d.aggregate_key
                            AND earlier.aggregate_seq<d.aggregate_seq
-                           AND eo.state NOT IN ('CONFIRMED','REVOKED','BLOCKED_REAPPROVAL','FAILED')
+                           AND (eo.idempotency_key IS NULL OR
+                                 eo.state NOT IN ('CONFIRMED','REVOKED','BLOCKED_REAPPROVAL','FAILED'))
                      )
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
@@ -690,6 +736,8 @@ class ExecutionOutbox:
                 self._commit_or_quarantine()
                 return None
             key = row["idempotency_key"]
+            self._g44_assert_binding_lab(key)
+            self._g44_assert_predecessors_lab(row)
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CLAIMED',lease_owner=?,lease_until=?,attempts=attempts+1,last_error=''
@@ -794,7 +842,9 @@ class ExecutionOutbox:
         encoded = _canonical(redact(dict(result or {})))
         self._begin_or_quarantine()
         try:
-            if (self._strict_reconcile_snapshot_cas_lab and
+            self._g44_assert_binding_lab(key)
+            if ((self._strict_reconcile_snapshot_cas_lab or
+                  self._strict_binding_integrity_lab) and
                     reconcile_snapshot_lab is None and fence_lab is None):
                 # G42 LAB contract: a second compatible confirmation is
                 # strictly read-only. A stale callback cannot overwrite the
@@ -1085,6 +1135,7 @@ class ExecutionOutbox:
         key = _clean(idempotency_key, 64)
         worker = _token(worker_id, "worker_id")
         now_dt = _utc(now)
+        self._g44_assert_binding_lab(key)
         intent = self.get(key)
         if self._strict_claim_fencing_lab:
             if type(claim_generation_lab) is not int or claim_generation_lab < 1:
@@ -1099,6 +1150,7 @@ class ExecutionOutbox:
             raise TimeoutError("claim lease expired before dispatch")
 
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
+        self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "CLAIMED")
         if not allowed:
@@ -1208,7 +1260,9 @@ class ExecutionOutbox:
         # No adapter attribute lookup (and therefore no user-defined property
         # getter) until the first-attempt witness passes. With G12 defaults
         # this line is unreachable regardless of caller-supplied callbacks.
+        self._g44_assert_binding_lab(key)
         send = getattr(adapter, "send", None)
+        self._g44_assert_binding_lab(key)
         if not callable(send):
             if self._strict_claim_fencing_lab:
                 self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
@@ -1243,6 +1297,7 @@ class ExecutionOutbox:
                 )
             return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         try:
@@ -1268,6 +1323,7 @@ class ExecutionOutbox:
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         if result.get("accepted") is not True:
@@ -1346,6 +1402,7 @@ class ExecutionOutbox:
         """Resolve SENT/UNCERTAIN without ever blind-resending an ambiguous effect."""
         key = _clean(idempotency_key, 64)
         now_dt = _utc(now)
+        self._g44_assert_binding_lab(key)
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
             raise ValueError("only SENT or UNCERTAIN intents require reconciliation")
@@ -1372,7 +1429,9 @@ class ExecutionOutbox:
             return {**intent, "reconcile_state": "RECONCILE_AUTH_DENIED_NO_LOOKUP"}
         if not no_stale_reply_lab():
             return stale_reply_lab()
+        self._g44_assert_binding_lab(key)
         reconcile = getattr(adapter, "reconcile", None)
+        self._g44_assert_binding_lab(key)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
         if not no_stale_reply_lab():
@@ -1387,6 +1446,7 @@ class ExecutionOutbox:
             return {**self.get(key), "reconcile_state": "STILL_UNCERTAIN"}
         if not no_stale_reply_lab():
             return stale_reply_lab()
+        self._g44_assert_binding_lab(key)
         if result.get("found") is True and result.get("confirmed") is True:
             effect_ref = _clean(result.get("effect_ref"), 128)
             if effect_ref and self._verified_evidence(
