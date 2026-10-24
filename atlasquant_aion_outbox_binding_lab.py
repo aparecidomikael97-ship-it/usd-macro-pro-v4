@@ -23,8 +23,18 @@ def _digest(value: Any) -> str:
 
 
 def _object(value: Any) -> dict[str, Any] | None:
+    # Default json.loads silently keeps the LAST of duplicate object keys.
+    # A safety-critical decision must not carry ambiguous JSON identities.
+    def unique_keys(pairs):
+        obj = {}
+        for name, item in pairs:
+            if name in obj:
+                raise ValueError("G44_DUPLICATE_JSON_KEY")
+            obj[name] = item
+        return obj
+
     try:
-        parsed = json.loads(value)
+        parsed = json.loads(value, object_pairs_hook=unique_keys)
     except (ValueError, TypeError):
         return None
     return parsed if isinstance(parsed, dict) else None
@@ -53,6 +63,13 @@ def binding_issue_lab(
     if (outbox_json.get("idempotency_key") != key or
             outbox_json.get("decision_id") != o["decision_id"]):
         return "OUTBOX_JSON_IDENTITY_MISMATCH"
+
+    references = db.execute(
+        "SELECT COUNT(*) FROM action_outbox WHERE decision_id=?",
+        (o["decision_id"],),
+    ).fetchone()[0]
+    if references != 1:
+        return "DECISION_SHARED_BY_MULTIPLE_OUTBOXES"
 
     d = db.execute(
         "SELECT * FROM action_decisions WHERE decision_id=?",
@@ -177,6 +194,14 @@ def audit_binding_readonly_lab(
         ).fetchone()[0]
         if orphans:
             counts["ORPHAN_EFFECT"] = int(orphans)
+        abandoned_decisions = db.execute(
+            """SELECT COUNT(*) FROM action_decisions d
+               LEFT JOIN action_outbox o ON o.decision_id=d.decision_id
+               WHERE d.owner=? AND d.tenant=? AND d.workspace=?
+                 AND o.idempotency_key IS NULL""",scope,
+        ).fetchone()[0]
+        if abandoned_decisions:
+            counts["ORPHAN_DECISION"] = int(abandoned_decisions)
         db.execute("ROLLBACK")
         return {"schema":"AION-A190-G44-BINDING-AUDIT-V1",
                 "scope":{"owner":owner,"tenant":tenant,"workspace":workspace},
