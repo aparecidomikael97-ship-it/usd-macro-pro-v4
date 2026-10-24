@@ -156,8 +156,11 @@ class G35BeginAndProcessCrash(unittest.TestCase):
             self.store.create_conversation(SCOPE, "synthetic")
         self.assertIsNone(self.store.db)
         self.assertEqual(proxy.rollbacks, 0)
-        with SQLiteChatStore(self.path) as unused:
-            pass
+        reopened = SQLiteChatStore(self.path)
+        try:
+            self.assertEqual(len(reopened.list_conversations(SCOPE).items), 0)
+        finally:
+            reopened.close()
         print("G35_CHAT_BEGIN_AFTER_RED=TRANSACTION_STARTED_ACK_LOST")
 
     def test_03_chat_append_begin_before(self):
