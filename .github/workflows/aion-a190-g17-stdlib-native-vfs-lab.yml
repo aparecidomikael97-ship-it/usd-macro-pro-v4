@@ -1,0 +1,51 @@
+name: A190 G17 stdlib sqlite3 Exact Native VFS LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/aion_g17_native_handle_extension.c'
+      - 'labs/a190/g17_prepare_official_headers_lab.py'
+      - 'labs/a190/test_g17_stdlib_sqlite_native_extension_lab.py'
+      - '.github/workflows/aion-a190-g17-stdlib-native-vfs-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-g17-stdlib-linux:
+    name: G17 official sqlite3.Connection native VFS Linux LAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Download only hash-pinned official SQLite SDK headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B labs/a190/g17_prepare_official_headers_lab.py --dest "$RUNNER_TEMP/aion_g17_sdk"
+      - name: Compile the single diagnostic extension in the LAB runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcc -std=c11 -O2 -Wall -Wextra -fPIC -shared -I "$RUNNER_TEMP/aion_g17_sdk" -o "$RUNNER_TEMP/aion_g17_probe.so" labs/a190/aion_g17_native_handle_extension.c
+      - name: Real Python stdlib SQLite native file control adversarial cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          export AION_G17_LAB_EXTENSION="$RUNNER_TEMP/aion_g17_probe.so"
+          python -B -m unittest discover -s labs/a190 -p 'test_g17_stdlib_sqlite_native_extension_lab.py' -v 2>&1 | tee g17_stdlib.log
+          grep -q 'Ran 8 tests' g17_stdlib.log
+          grep -q 'G17_STDLIB_NATIVE_SAME_MARKER_ABA=MOVED_DETECTED' g17_stdlib.log
+          grep -q 'G17_STDLIB_ROGUE_PREOPENED_PLUS_DECOY=CONNECTIONS_DIFFERENTIATED' g17_stdlib.log
+          grep -q 'G17_NO_NATIVE_MAIN_FILE=FAIL_CLOSED' g17_stdlib.log
+          grep -q 'G17_DIRECTONLY=UNTRUSTED_VIEW_CANNOT_CALL_NATIVE_PROBE' g17_stdlib.log
+      - name: Reiterate the NO-GO boundary
+        run: |
+          echo 'SQLite native extension is loaded only for synthetic temp connections, never AION runtime.'
+          echo 'No Windows test, no real owner, no provider receipts, no rollback or WAL sidecar proof.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
