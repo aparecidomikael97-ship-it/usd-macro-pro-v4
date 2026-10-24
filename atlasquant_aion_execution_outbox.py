@@ -970,6 +970,23 @@ class ExecutionOutbox:
                 )
             return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        # Adapter properties are caller-controlled code too; they can block,
+        # advance time, or even alter the local claim between our first fresh
+        # check and the actual send() call. Recheck AFTER getter, BEFORE call.
+        getter_freshness_failure = self._post_witness_freshness_lab(
+            key=key, worker=worker, recorded=now_dt,
+        )
+        if getter_freshness_failure:
+            with self._managed_write_transaction():
+                self.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN'""",
+                    (getter_freshness_failure, key, *self._scope_args()),
+                )
+            return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
+
         try:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
