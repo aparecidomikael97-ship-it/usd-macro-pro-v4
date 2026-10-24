@@ -1,0 +1,54 @@
+name: A190 G13 Signed Semantic Real Outbox Bridge LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g13_signed_semantic_outbox_bridge_lab.py'
+      - 'labs/a190/test_g13_signed_semantic_outbox_bridge_lab.py'
+      - '.github/workflows/aion-a190-g13-signed-semantic-real-outbox-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g13-offline-signed-semantic-outbox:
+    name: G13 real SQLite staging and external root counterexamples (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install isolated synthetic signing dependencies
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Run G13 bridge, G11 source native key and G12 callback gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g13_signed_semantic_outbox_bridge_lab.py' -v 2>&1 | tee g13_lab.log
+          grep -q 'Ran 15 tests' g13_lab.log
+          grep -q 'G13_G11_SIGNED_SEMANTIC_ALIASES=ONE_REAL_SQLITE_OUTBOX_INTENT' g13_lab.log
+          grep -q 'G13_SIGNED_LOCAL_STAGING=NO_SEND_NO_CONFIRM_UNCERTAIN' g13_lab.log
+          grep -q 'G13_LOCAL_SQLITE_ERASE=REOPEN_SAME_EVENT_RED_EXTERNAL_CUSTODY_MISSING' g13_lab.log
+          grep -q 'G13_CALLER_CONTROLS_PIN_AND_BUSINESS_EVENT=DOUBLE_STAGE_RED' g13_lab.log
+          grep -q 'G13_CROSS_WORKSPACE_SAME_EVENT=LOCAL_DOUBLE_STAGE_RED_EXTERNAL_ROOT_NEEDED' g13_lab.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g11_offline_conditional_cloud_adapter_contract_lab.py' -v 2>&1 | tee g11_lab.log
+          grep -q 'Ran 20 tests' g11_lab.log
+          python -B -m unittest -v test_atlasquant_aion_a190_g12_default_callback_quarantine_lab 2>&1 | tee g12_lab.log
+          grep -q 'Ran 9 tests' g12_lab.log
+          grep -q 'G12_DEFAULT_TRUE_CALLBACKS=NO_SEND_NO_ADAPTER_LOOKUP' g12_lab.log
+          echo 'A190_G13_REAL_OUTBOX_SIGNED_SEMANTIC_BRIDGE=LAB_PASS_WITH_EXTERNAL_ROOT_RED'
+      - name: Explicit absence of operational effects and P0 approval
+        run: |
+          echo 'No network to AWS/Google, no provider writes, no actual effect or external durable witness.'
+          echo 'The signer and trust pin live in the test process and can be forged or rolled back.'
+          echo 'Bridge cannot be used with G12 explicitly unsafe LAB callback mode.'
+          echo 'Local delete/rebootstrap and cross-workspace duplicates remain RED counterexamples.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
