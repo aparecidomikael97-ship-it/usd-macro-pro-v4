@@ -131,6 +131,7 @@ class ExecutionOutbox:
         strict_reconciliation_auth_lab: bool = False,
         fresh_dispatch_clock_lab: Callable[[], Any] | None = None,
         strict_claim_fencing_lab: bool = False,
+        strict_reconcile_snapshot_cas_lab: bool = False,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -148,6 +149,8 @@ class ExecutionOutbox:
             raise TypeError("fresh_dispatch_clock_lab must be callable")
         if type(strict_claim_fencing_lab) is not bool:
             raise TypeError("strict_claim_fencing_lab must be bool")
+        if type(strict_reconcile_snapshot_cas_lab) is not bool:
+            raise TypeError("strict_reconcile_snapshot_cas_lab must be bool")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -162,6 +165,9 @@ class ExecutionOutbox:
         # Persisted attempts rises atomically in claim_next: G41 uses it
         # as a LOCAL fencing epoch, not independent rollback protection.
         self._strict_claim_fencing_lab = strict_claim_fencing_lab
+        # This optional LAB gate detects reconcile replies against stale local
+        # state. No source/receipt is independently authenticated by it.
+        self._strict_reconcile_snapshot_cas_lab = strict_reconcile_snapshot_cas_lab
         # Default fail-closed. This LAB callback boundary is NOT a verified
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
@@ -776,11 +782,49 @@ class ExecutionOutbox:
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
         fence_lab: tuple[str, int] | None = None,
+        reconcile_snapshot_lab: tuple[str, int, str, str, str] | None = None,
     ) -> dict[str, Any]:
         effect = _token(effect_ref, "effect_ref", 128)
         encoded = _canonical(redact(dict(result or {})))
         self._begin_or_quarantine()
         try:
+            if (self._strict_reconcile_snapshot_cas_lab and
+                    reconcile_snapshot_lab is None and fence_lab is None):
+                # G42 LAB contract: a second compatible confirmation is
+                # strictly read-only. A stale callback cannot overwrite the
+                # original confirmed timestamp, receipt reference or ledger.
+                existing_state = self._outbox_row(key)
+                if existing_state is None:
+                    raise RuntimeError("G42_CONFIRM_OUTBOX_ABSENT")
+                if existing_state["state"] == "CONFIRMED":
+                    original_effect = self.db.execute(
+                        """SELECT effect_ref, confirmed_at FROM action_effects
+                           WHERE idempotency_key=? AND owner=? AND tenant=?
+                             AND workspace=?""",
+                        (key, *self._scope_args()),
+                    ).fetchone()
+                    if (original_effect is None or
+                            original_effect["effect_ref"] != effect or
+                            existing_state["effect_ref"] != effect or
+                            original_effect["confirmed_at"] !=
+                            existing_state["confirmed_at"]):
+                        raise RuntimeError("G42_CONFIRMED_LEDGER_INVARIANT_DENY")
+                    self._commit_or_quarantine()
+                    return self.get(key)
+                if existing_state["state"] not in {"UNCERTAIN", "SENT"}:
+                    raise RuntimeError("G42_UNSAFE_PRECONFIRM_PHASE_DENY")
+            if reconcile_snapshot_lab is not None:
+                # Read under BEGIN IMMEDIATE: no other SQLite writer can
+                # change the row between this preflight and the ledger insert.
+                phase, epoch, owner, until, original_ref = reconcile_snapshot_lab
+                current = self._outbox_row(key)
+                if (current is None or phase not in {"SENT", "UNCERTAIN"}
+                        or current["state"] != phase
+                        or int(current["attempts"]) != epoch
+                        or current["lease_owner"] != owner
+                        or current["lease_until"] != until
+                        or current["effect_ref"] != original_ref):
+                    raise RuntimeError("G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER")
             existing = self.db.execute(
                 """SELECT effect_ref FROM action_effects
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
@@ -802,17 +846,28 @@ class ExecutionOutbox:
                     ),
                 )
             owner, epoch = fence_lab if fence_lab else ("", 0)
+            if reconcile_snapshot_lab is None:
+                reconcile_snapshot_lab = ("", 0, "", "", "")
+            phase, observed_epoch, observed_owner, observed_until, original_ref = (
+                reconcile_snapshot_lab
+            )
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
                        lease_owner='',lease_until='',last_error=''
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))
+                     AND (?=1 OR (state=? AND attempts=? AND lease_owner=?
+                                  AND lease_until=? AND effect_ref=?))""",
                 (_iso(confirmed_at), effect, key, *self._scope_args(),
-                 int(fence_lab is None), owner, epoch),
+                 int(fence_lab is None), owner, epoch,
+                 int(not phase), phase, observed_epoch, observed_owner,
+                 observed_until, original_ref),
             )
             if fence_lab and cursor.rowcount != 1:
                 raise RuntimeError("FENCE_STALE_CONFIRM_NO_LEDGER_WRITE")
+            if phase and cursor.rowcount != 1:
+                raise RuntimeError("G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER")
             self._commit_or_quarantine()
         except Exception as original_error:
             if self.db is not None:
@@ -1139,6 +1194,14 @@ class ExecutionOutbox:
                 raise RuntimeError("FENCE_STALE_SEND_RESULT_NO_WRITE")
         return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
 
+    @staticmethod
+    def _g42_reconcile_snapshot_lab(intent: Mapping[str, Any]) -> tuple[str, int, str, str, str]:
+        return (
+            str(intent["state"]), int(intent["attempts"]),
+            str(intent["lease_owner"]), str(intent["lease_until"]),
+            str(intent["effect_ref"]),
+        )
+
     def reconcile(
         self,
         idempotency_key: Any,
@@ -1153,6 +1216,18 @@ class ExecutionOutbox:
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
             raise ValueError("only SENT or UNCERTAIN intents require reconciliation")
+        snapshot_lab = (
+            self._g42_reconcile_snapshot_lab(intent)
+            if self._strict_reconcile_snapshot_cas_lab else None
+        )
+
+        def no_stale_reply_lab() -> bool:
+            return (snapshot_lab is None or
+                    self._g42_reconcile_snapshot_lab(self.get(key)) == snapshot_lab)
+
+        def stale_reply_lab() -> dict[str, Any]:
+            return {**self.get(key), "reconcile_state": "G42_STALE_REPLY_NO_WRITE"}
+
         # Reconciliation adapters are caller-controlled Python objects too.
         # In default quarantine do not even inspect adapter.reconcile: its
         # property lookup may execute arbitrary host code. No confirmation.
@@ -1162,30 +1237,45 @@ class ExecutionOutbox:
             intent, authorize,
         ):
             return {**intent, "reconcile_state": "RECONCILE_AUTH_DENIED_NO_LOOKUP"}
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
         reconcile = getattr(adapter, "reconcile", None)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
 
         try:
             result = _mapping(_bound_callback(reconcile, key, dict(intent["decision"])))
         except Exception:
-            # A changed binding or a lost reconciliation response cannot
-            # confirm an effect, nor grant a resend or retry permission.
+            # A changed binding or lost response has no retry authority.
+            if not no_stale_reply_lab():
+                return stale_reply_lab()
             return {**self.get(key), "reconcile_state": "STILL_UNCERTAIN"}
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
         if result.get("found") is True and result.get("confirmed") is True:
             effect_ref = _clean(result.get("effect_ref"), 128)
             if effect_ref and self._verified_evidence(
                 "EFFECT_CONFIRMED", intent, result
             ):
-                out = self._confirm(
-                    key,
-                    effect_ref=effect_ref,
-                    confirmed_at=now_dt,
-                    result=result,
-                )
+                try:
+                    out = self._confirm(
+                        key,
+                        effect_ref=effect_ref,
+                        confirmed_at=now_dt,
+                        result=result,
+                        reconcile_snapshot_lab=snapshot_lab,
+                    )
+                except RuntimeError as exc:
+                    if str(exc) == "G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER":
+                        return stale_reply_lab()
+                    raise
                 return {**out, "reconcile_state": "CONFIRMED"}
             # A self-asserted receipt or a disabled verifier is not evidence
             # of a trusted provider-side effect. Leave current state intact.
+            if not no_stale_reply_lab():
+                return stale_reply_lab()
             return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
         # A caller-controlled dictionary with found=False and
@@ -1193,6 +1283,8 @@ class ExecutionOutbox:
         # guarantee that the provider produced no effect. Do not turn
         # UNCERTAIN/SENT into RETRY here. A future witnessed absence protocol
         # requires a separate reviewed contract before any retry authority.
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
     def effect_count(self) -> int:
