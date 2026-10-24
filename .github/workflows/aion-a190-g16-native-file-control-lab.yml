@@ -1,0 +1,51 @@
+name: A190 G16 SQLite Exact Connection File Control LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g16_sqlite_native_file_control_lab.py'
+      - 'labs/a190/test_g16_sqlite_native_file_control_lab.py'
+      - '.github/workflows/aion-a190-g16-native-file-control-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  aion-sqlite-g16:
+    name: G16 SQLite xFileControl same connection (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned APSW wheel in LAB runner only
+        run: python -m pip install --disable-pip-version-check --only-binary=:all: apsw==3.54.1.0
+      - name: Test exact-connection official SQLite VFS probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g16_sqlite_native_file_control_lab.py' -v 2>&1 | tee g16_native.log
+          grep -q 'Ran 8 tests' g16_native.log
+          grep -q 'G16_SAME_MARKER_DIFFERENT_BYTES=ADVERSARIAL_SETUP_CONFIRMED' g16_native.log
+          grep -q 'G16_CALLER_CONTROLLED_FAKE_MAY_REPORT_SAFE=NOT_EXTERNAL_TRUST_RED' g16_native.log
+          grep -q 'G16_WAL_NATIVE_MAIN_OBSERVATION=SIDE_CAR_AND_ROLLBACK_UNPROVEN' g16_native.log
+          if [ "${{ runner.os }}" = Linux ]; then
+            grep -q 'G16_NATIVE_VFS_SAME_MARKER_ABA=MOVED_DENIED_ON_LINUX' g16_native.log
+            grep -q 'G16_PREOPENED_ROGUE_VS_DECOY=NATIVE_CONNECTIONS_DIFFERENTIATED' g16_native.log
+          else
+            grep -q 'G16_WIN32_NATIVE_SQLITE_OS_HANDLE=MATCH_LOCAL_ONLY' g16_native.log
+            grep -q 'G16_WINDOWS_WRONG_ANCHOR_PATH=MISMATCH_OR_NON_WINDOWS_DENY' g16_native.log
+          fi
+      - name: Preserve HARD NO-GO
+        run: |
+          echo 'The G16 APSW lab is not part of AION stdlib sqlite3 runtime.'
+          echo 'Native handle matching is local; sidecars, owner, receipts and rollback lack external trust.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
