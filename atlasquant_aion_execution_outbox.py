@@ -807,7 +807,7 @@ class ExecutionOutbox:
                    SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
                        lease_owner='',lease_until='',last_error=''
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
                 (_iso(confirmed_at), effect, key, *self._scope_args(),
                  int(fence_lab is None), owner, epoch),
             )
@@ -967,7 +967,7 @@ class ExecutionOutbox:
                        last_error='FIRST_ATTEMPT_WITNESS_PENDING'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                      AND state='CLAIMED' AND lease_owner=?
-                     AND (?=0 OR attempts=?)""",
+                     AND (?=1 OR attempts=?)""",
                 (_iso(now_dt), key, *self._scope_args(), worker,
                  int(not self._strict_claim_fencing_lab),
                  claim_generation_lab or 0),
@@ -988,7 +988,7 @@ class ExecutionOutbox:
                            last_error='FIRST_ATTEMPT_WITNESS_UNVERIFIED_NO_SEND'
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                          AND state='UNCERTAIN'
-                         AND (?=0 OR (lease_owner=? AND attempts=?))""",
+                         AND (?=1 OR (lease_owner=? AND attempts=?))""",
                     (key, *self._scope_args(), int(not self._strict_claim_fencing_lab),
                      worker, claim_generation_lab or 0),
                 )
@@ -1065,7 +1065,7 @@ class ExecutionOutbox:
                     """UPDATE action_outbox
                        SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                         AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                         AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
                     (
                         "",
                         "SEND_RESULT_UNKNOWN:" + type(exc).__name__,
@@ -1100,7 +1100,7 @@ class ExecutionOutbox:
                     """UPDATE action_outbox
                        SET state=?,lease_owner='',lease_until='',last_error=?
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                         AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                         AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
                     (state, reason, key, *self._scope_args(),
                      int(not self._strict_claim_fencing_lab), worker,
                      claim_generation_lab or 0),
@@ -1130,7 +1130,7 @@ class ExecutionOutbox:
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
                 (_iso(now_dt), effect_ref, key, *self._scope_args(),
                  int(not self._strict_claim_fencing_lab), worker,
                  claim_generation_lab or 0),
