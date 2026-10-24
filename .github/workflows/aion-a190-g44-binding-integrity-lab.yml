@@ -33,7 +33,7 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v 2>&1 | tee g44.log
-          grep -F 'Ran 27 tests' g44.log
+          grep -F 'Ran 31 tests' g44.log
           grep -F 'G44_DECISION_BINDING_GREEN=SCOPED_HASH_AND_JSON_MATCH' g44.log
           grep -F 'G44_FOREIGN_SCOPE_GREEN=CROSS_OWNER_DECISION_NOT_EXPOSED' g44.log
           grep -F 'G44_PAYLOAD_DIGEST_GREEN=MODIFIED_BUSINESS_VALUE_REFUSED' g44.log
@@ -44,6 +44,9 @@ jobs:
           grep -F 'G44_RECONCILE_PREGETTER_GREEN=BAD_RECEIPT_ZERO_LOOKUP' g44.log
           grep -F 'G44_READONLY_AUDIT_GREEN=NO_SCHEMA_CREATION_OR_DATA_WRITE' g44.log
           grep -F 'G44_AUTHENTICITY_RED=CORRECT_LOCAL_HASH_NOT_VERIFIED_EXTERNAL_EVENT' g44.log
+          grep -F 'G44_DUPLICATE_JSON_GREEN=AMBIGUOUS_DECISION_KEYS_DENIED' g44.log
+          grep -F 'G44_SHARED_DECISION_GREEN=SECOND_OUTBOX_REFUSED' g44.log
+          grep -F 'G44_ORPHAN_DECISION_GREEN=READONLY_CLASSIFICATION_NO_REPAIR' g44.log
       - name: Historical G43-G30 regression RED+GREEN
         shell: bash
         run: |
