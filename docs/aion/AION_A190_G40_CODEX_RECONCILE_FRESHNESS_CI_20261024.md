@@ -33,7 +33,7 @@ Codex feedback prompted second adapter-property freshness check and two new adve
 - `G40_GETTER_DELAY_GREEN=EXPIRED_AFTER_PROPERTY_NO_SEND`
 - `G40_GETTER_REENTRY_GREEN=CLAIM_CHANGED_AFTER_PROPERTY_NO_SEND`
 
-Second/latest focused CI [#40131245219](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40131245219) at exact code/workflow SHA `afb2d51d68efb18e4a12d0c470cd7f5a69babce3`: **36 G40 + 225 inherited = 261 distinct tests per OS (522 executions)**. Its final status must be checked before claiming second version passes. This document is a follow-up commit and is not included in that tested SHA.
+Second/latest focused CI [#40131245219](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40131245219) **SUCCESS**, at exact tested code/workflow SHA `afb2d51d68efb18e4a12d0c470cd7f5a69babce3`: Windows job `120983215674` **36 G40 + 225 inherited G30–G39 = 261/261**, Ubuntu job `120983215891` **261/261**, **522 executions of 261 distinct tests**. Both jobs included mandatory getter-delay and getter-reentry GREEN markers, and intentionally untrusted-clock RED. This document follows as an evidence-only commit and was not included in that tested SHA. Other 12 triggered focused/regression workflows succeeded at same code SHA. Separate A184 [#40131245172](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40131245172) was **still running/queued** at evidence check, not counted as a success; prior audits showed 48 vulnerabilities and missing external trust.
 
 ## Remaining independent hard gates
 
