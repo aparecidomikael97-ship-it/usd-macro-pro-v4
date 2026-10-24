@@ -693,13 +693,16 @@ class ExecutionOutbox:
                      AND NOT EXISTS (
                          SELECT 1
                          FROM action_decisions earlier
-                         JOIN action_outbox eo ON eo.decision_id=earlier.decision_id
+                         LEFT JOIN action_outbox eo ON eo.decision_id=earlier.decision_id
+                            AND eo.owner=earlier.owner AND eo.tenant=earlier.tenant
+                            AND eo.workspace=earlier.workspace
                          WHERE earlier.owner=d.owner
                            AND earlier.tenant=d.tenant
                            AND earlier.workspace=d.workspace
                            AND earlier.aggregate_key=d.aggregate_key
                            AND earlier.aggregate_seq<d.aggregate_seq
-                           AND eo.state NOT IN ('CONFIRMED','REVOKED','BLOCKED_REAPPROVAL','FAILED')
+                           AND (eo.idempotency_key IS NULL OR
+                                 eo.state NOT IN ('CONFIRMED','REVOKED','BLOCKED_REAPPROVAL','FAILED'))
                      )
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
@@ -815,7 +818,8 @@ class ExecutionOutbox:
         self._begin_or_quarantine()
         try:
             self._g44_assert_binding_lab(key)
-            if (self._strict_reconcile_snapshot_cas_lab and
+            if ((self._strict_reconcile_snapshot_cas_lab or
+                  self._strict_binding_integrity_lab) and
                     reconcile_snapshot_lab is None and fence_lab is None):
                 # G42 LAB contract: a second compatible confirmation is
                 # strictly read-only. A stale callback cannot overwrite the
@@ -1402,6 +1406,7 @@ class ExecutionOutbox:
             return stale_reply_lab()
         self._g44_assert_binding_lab(key)
         reconcile = getattr(adapter, "reconcile", None)
+        self._g44_assert_binding_lab(key)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
         if not no_stale_reply_lab():
