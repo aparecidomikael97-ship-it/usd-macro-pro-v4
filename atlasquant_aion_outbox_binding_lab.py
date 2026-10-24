@@ -15,7 +15,8 @@ STATES = {"PENDING", "RETRY", "CLAIMED", "UNCERTAIN", "SENT",
 
 
 def _canonical(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, default=str)
 
 
 def _digest(value: Any) -> str:
@@ -98,6 +99,9 @@ def binding_issue_lab(
         return "DECISION_COLUMN_JSON_MISMATCH"
     if type(d["aggregate_seq"]) is not int or d["aggregate_seq"] < 1:
         return "DECISION_AGGREGATE_INVALID"
+    if (decision.get("schema") != "ATLASQUANT_AION_EXECUTION_OUTBOX_V1"
+            or decision.get("grants_authority") is not False):
+        return "DECISION_SCHEMA_OR_AUTHORITY_INVALID"
     if not isinstance(decision.get("payload"), dict):
         return "DECISION_PAYLOAD_INVALID"
     if _digest(decision["payload"]) != d["payload_digest"]:
@@ -189,6 +193,8 @@ def audit_binding_readonly_lab(
         orphans = db.execute(
             """SELECT COUNT(*) FROM action_effects e
                LEFT JOIN action_outbox o ON o.idempotency_key=e.idempotency_key
+                 AND o.owner=e.owner AND o.tenant=e.tenant
+                 AND o.workspace=e.workspace
                WHERE e.owner=? AND e.tenant=? AND e.workspace=?
                  AND o.idempotency_key IS NULL""",scope,
         ).fetchone()[0]
@@ -197,6 +203,8 @@ def audit_binding_readonly_lab(
         abandoned_decisions = db.execute(
             """SELECT COUNT(*) FROM action_decisions d
                LEFT JOIN action_outbox o ON o.decision_id=d.decision_id
+                 AND o.owner=d.owner AND o.tenant=d.tenant
+                 AND o.workspace=d.workspace
                WHERE d.owner=? AND d.tenant=? AND d.workspace=?
                  AND o.idempotency_key IS NULL""",scope,
         ).fetchone()[0]
