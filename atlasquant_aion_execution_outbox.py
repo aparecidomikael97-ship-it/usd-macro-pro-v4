@@ -788,6 +788,31 @@ class ExecutionOutbox:
         encoded = _canonical(redact(dict(result or {})))
         self._begin_or_quarantine()
         try:
+            if (self._strict_reconcile_snapshot_cas_lab and
+                    reconcile_snapshot_lab is None and fence_lab is None):
+                # G42 LAB contract: a second compatible confirmation is
+                # strictly read-only. A stale callback cannot overwrite the
+                # original confirmed timestamp, receipt reference or ledger.
+                existing_state = self._outbox_row(key)
+                if existing_state is None:
+                    raise RuntimeError("G42_CONFIRM_OUTBOX_ABSENT")
+                if existing_state["state"] == "CONFIRMED":
+                    original_effect = self.db.execute(
+                        """SELECT effect_ref, confirmed_at FROM action_effects
+                           WHERE idempotency_key=? AND owner=? AND tenant=?
+                             AND workspace=?""",
+                        (key, *self._scope_args()),
+                    ).fetchone()
+                    if (original_effect is None or
+                            original_effect["effect_ref"] != effect or
+                            existing_state["effect_ref"] != effect or
+                            original_effect["confirmed_at"] !=
+                            existing_state["confirmed_at"]):
+                        raise RuntimeError("G42_CONFIRMED_LEDGER_INVARIANT_DENY")
+                    self._commit_or_quarantine()
+                    return self.get(key)
+                if existing_state["state"] not in {"UNCERTAIN", "SENT"}:
+                    raise RuntimeError("G42_UNSAFE_PRECONFIRM_PHASE_DENY")
             if reconcile_snapshot_lab is not None:
                 # Read under BEGIN IMMEDIATE: no other SQLite writer can
                 # change the row between this preflight and the ledger insert.
