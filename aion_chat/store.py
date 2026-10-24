@@ -452,6 +452,25 @@ class SQLiteChatStore:
                 )
             raise primary_error from rollback_error
 
+    def _commit_or_quarantine(self):
+        """An exception from COMMIT gives no reliable durability verdict.
+
+        Whether failure occurred before or after the physical commit cannot
+        be inferred from the Python exception or a subsequent rollback.
+        Always detach the connection and require explicit recovery. This
+        NEVER constitutes an external freshness or first-send guarantee.
+        """
+        self._require_open()
+        try:
+            self.db.commit()
+        except Exception as commit_error:
+            self.quarantine_failed_transaction()
+            if hasattr(commit_error, "add_note"):
+                commit_error.add_note(
+                    "AION_CHAT_COMMIT_OUTCOME_UNCERTAIN_STORE_QUARANTINED_NO_RETRY"
+                )
+            raise
+
     @contextmanager
     def _managed_write_transaction(self):
         """Explicit transaction for chat writes, fail-closed on rollback uncertainty.
@@ -464,10 +483,11 @@ class SQLiteChatStore:
         connection.execute("BEGIN IMMEDIATE")
         try:
             yield
-            connection.commit()
         except Exception as primary_error:
             self._rollback_or_quarantine(primary_error)
             raise
+        else:
+            self._commit_or_quarantine()
 
     def _require_open(self):
         if self.db is None:
@@ -759,12 +779,13 @@ class SQLiteChatStore:
             )
             c.message_count, c.updated_at = message.sequence, now()
             self._update(c)
-            self.db.commit()
         except Exception as exc:
             self._rollback_or_quarantine(exc)
             if isinstance(exc, sqlite3.DatabaseError) and not isinstance(exc, sqlite3.IntegrityError):
                 self._record_database_error(exc)
             raise
+        else:
+            self._commit_or_quarantine()
         return message
 
     def list_messages(self, scope, conversation_id, cursor=None, page_size=50, *, newest_first=False):

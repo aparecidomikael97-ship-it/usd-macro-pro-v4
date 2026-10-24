@@ -1,0 +1,59 @@
+name: A190 G33 ambiguous SQLite COMMIT quarantine LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g33_chat_ambiguous_commit_lab.py'
+      - 'labs/a190/test_g33_outbox_ambiguous_commit_lab.py'
+      - '.github/workflows/aion-a190-g33-ambiguous-commit-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g33-ambiguous-commit:
+    name: G33 ambiguous commit / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: 24 real SQLite and Outbox precommit/postcommit acknowledgement tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g33_*.py' -v 2>&1 | tee g33.log
+          grep -F 'Ran 24 tests' g33.log
+          grep -F 'G33_CHAT_PRECOMMIT_GREEN=UNKNOWN_ACK_QUARANTINE_NO_ROLLBACK' g33.log
+          grep -F 'G33_CHAT_POSTCOMMIT_RED=PERSISTED_BUT_CALLER_GOT_ERROR' g33.log
+          grep -F 'G33_OUTBOX_POSTCOMMIT_RED=RESERVATION_PERSISTED_ERROR_RETURNED' g33.log
+          grep -F 'G33_CLAIM_POSTCOMMIT_RED=CLAIMED_ROW_PERSISTED_ACK_UNKNOWN' g33.log
+          grep -F 'G33_CONFIRM_POSTCOMMIT_RED=LOCAL_EFFECT_ROW_PERSISTED_ERROR_RETURNED' g33.log
+          grep -F 'G33_POSTCOMMIT_REOPEN_GREEN=DEFAULT_WITNESS_DENIES_SEND' g33.log
+      - name: 61 inherited G32 + G31 + G30 regression tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g32_*.py' -v 2>&1 | tee g32.log
+          grep -F 'Ran 20 tests' g32.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g31_*.py' -v 2>&1 | tee g31.log
+          grep -F 'Ran 18 tests' g31.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g30_*.py' -v 2>&1 | tee g30.log
+          grep -F 'Ran 23 tests' g30.log
+          grep -F 'G31_G30_REGRESSION_GREEN=ORIGINAL_ERROR_RETAINED_STORE_DETACHED' g30.log
+      - name: Mandatory no-go
+        shell: bash
+        run: |
+          echo 'Postcommit error may mean durable intent/effect exists.'
+          echo 'No automatic resend; externally trusted recovery is not built.'
+          echo 'Synthetic local SQLite wrapper, not a real disk/power fault.'
+          echo 'No merge/main/deploy/Worker/provider, no P0 homologation.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'

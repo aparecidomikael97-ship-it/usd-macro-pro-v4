@@ -194,6 +194,24 @@ class ExecutionOutbox:
                 )
             raise original_error from rollback_error
 
+    def _commit_or_quarantine(self) -> None:
+        """Any COMMIT exception has UNKNOWN durability: never infer absence.
+
+        The database may have committed before an acknowledgement was lost.
+        Detach shared store and Outbox handles, never rollback after a failed
+        commit or automatically requeue the effect.
+        """
+        try:
+            self.db.commit()
+        except Exception as commit_error:
+            self.store.quarantine_failed_transaction()
+            self.db = None
+            if hasattr(commit_error, "add_note"):
+                commit_error.add_note(
+                    "AION_OUTBOX_COMMIT_OUTCOME_UNCERTAIN_NO_AUTO_RESEND"
+                )
+            raise
+
     def _ensure_schema(self) -> None:
         with self.db:
             self.db.executescript("""
@@ -387,7 +405,7 @@ class ExecutionOutbox:
             if existing is not None:
                 if existing["idempotency_key"] != idempotency_key:
                     raise ValueError("intent_ref idempotency collision")
-                self.db.commit()
+                self._commit_or_quarantine()
                 out = self.get(idempotency_key)
                 return {**out, "enqueue_state": "IDEMPOTENT"}
 
@@ -465,9 +483,10 @@ class ExecutionOutbox:
                     }),
                 ),
             )
-            self.db.commit()
+            self._commit_or_quarantine()
         except Exception as original_error:
-            self._rollback_preserving_original(original_error)
+            if self.db is not None:
+                self._rollback_preserving_original(original_error)
             raise
         out = self.get(idempotency_key)
         return {**out, "enqueue_state": "ENQUEUED"}
@@ -485,10 +504,11 @@ class ExecutionOutbox:
                 (*self._scope_args(), current),
             )
             count = int(cursor.rowcount)
-            self.db.commit()
+            self._commit_or_quarantine()
             return count
         except Exception as original_error:
-            self._rollback_preserving_original(original_error)
+            if self.db is not None:
+                self._rollback_preserving_original(original_error)
             raise
 
     def claim_next(
@@ -531,7 +551,7 @@ class ExecutionOutbox:
                 (owner, tenant, workspace),
             ).fetchone()
             if row is None:
-                self.db.commit()
+                self._commit_or_quarantine()
                 return None
             key = row["idempotency_key"]
             cursor = self.db.execute(
@@ -551,10 +571,11 @@ class ExecutionOutbox:
                         "OUTBOX_CLAIM_ROLLBACK_UNCERTAIN_NO_RETRY"
                     ) from rollback_error
                 return None
-            self.db.commit()
+            self._commit_or_quarantine()
             return self.get(key)
         except Exception as original_error:
-            self._rollback_preserving_original(original_error)
+            if self.db is not None:
+                self._rollback_preserving_original(original_error)
             raise
 
     def _authorization_gate(
@@ -645,9 +666,10 @@ class ExecutionOutbox:
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
                 (_iso(confirmed_at), effect, key, *self._scope_args()),
             )
-            self.db.commit()
+            self._commit_or_quarantine()
         except Exception as original_error:
-            self._rollback_preserving_original(original_error)
+            if self.db is not None:
+                self._rollback_preserving_original(original_error)
             raise
         return self.get(key)
 
