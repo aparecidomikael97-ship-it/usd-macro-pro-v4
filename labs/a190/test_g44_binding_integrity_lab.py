@@ -205,7 +205,9 @@ class G44BindingIntegrity(unittest.TestCase):
                 authorize=self.authorize,adapter=self.trap,
                 now=NOW+timedelta(seconds=1))
         self.assertEqual(self.trap.reads,0)
-        self.assertEqual(self.base.get(self.key)["state"],"CLAIMED")
+        self.assertEqual(self.store.db.execute(
+            "SELECT state FROM action_outbox WHERE idempotency_key=?",
+            (self.key,)).fetchone()["state"],"CLAIMED")
         print("G44_PRE_SEND_GREEN=BAD_BINDING_ZERO_ADAPTER_ACCESS")
 
     def test_21_authorization_callback_reentry_poisons_decision(self):
@@ -218,7 +220,9 @@ class G44BindingIntegrity(unittest.TestCase):
                 authorize=authorize_then_tamper,adapter=self.trap,
                 now=NOW+timedelta(seconds=1))
         self.assertEqual(self.trap.reads,0)
-        self.assertEqual(self.base.get(self.key)["state"],"CLAIMED")
+        self.assertEqual(self.store.db.execute(
+            "SELECT state FROM action_outbox WHERE idempotency_key=?",
+            (self.key,)).fetchone()["state"],"CLAIMED")
         print("G44_CALLBACK_REENTRY_GREEN=BAD_DECISION_NO_SEND")
 
     def test_22_strict_reconcile_denies_bad_ledger_before_getter(self):
