@@ -1,0 +1,41 @@
+name: A190 G22 coordinated host rollback real Outbox RED LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/test_g22_coordinated_rollback_real_outbox_red_lab.py'
+      - '.github/workflows/aion-a190-g22-coordinated-rollback-red-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g22-real-outbox-host-red:
+    name: G22 real Outbox host rollback RED / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Host-controlled witness RED only, no provider
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g22_coordinated_rollback_real_outbox_red_lab.py' -v 2>&1 | tee g22.log
+          grep -F 'Ran 5 tests' g22.log
+          grep -F 'G22_COORDINATED_HOST_ROLLBACK_RED=OLD_HISTORY_FAKE_WITNESS_MATCHES' g22.log
+          grep -F 'G22_HOST_FORGED_SIGNATURE_RED=FAKE_VERIFY_TRUE_IS_ACCEPTED' g22.log
+          grep -F 'G22_SEMANTIC_ALIAS_RED=REAL_OUTBOX_DISTINCT_REQUEST_REFS' g22.log
+      - name: Mandatory no-go
+        shell: bash
+        run: |
+          echo 'Passing RED reproduces remaining vulnerability, NOT a fix.'
+          echo 'Host-controlled witness is NOT an independent trust root.'
+          echo 'No provider dispatch, no external effects, no P0 closure.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
