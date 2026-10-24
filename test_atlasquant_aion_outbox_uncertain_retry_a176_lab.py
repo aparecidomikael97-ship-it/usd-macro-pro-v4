@@ -24,7 +24,8 @@ class A176OutboxRetryGateTests(unittest.TestCase):
         self.store = SQLiteChatStore(self.dbpath)
         self.addCleanup(self.store.close)
         self.outbox = ExecutionOutbox(self.store, self.scope,
-            first_attempt_guard=synthetic_lab_first_attempt_reservation)
+            first_attempt_guard=synthetic_lab_first_attempt_reservation,
+            unsafe_allow_synthetic_lab_callbacks=True)
         self.item = self.outbox.enqueue(
             intent_ref="event-once", action="send_email",
             payload={"to":"example.invalid","template":"lab"},
