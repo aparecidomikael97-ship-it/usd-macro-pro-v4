@@ -58,19 +58,19 @@ class NativeDeclaredPathTests(unittest.TestCase):
         with self.assertRaises(StorageUnavailableError):
             self.handle.create_conversation(self.scope)
 
-    def test_same_filename_native_aba_remains_unattested(self):
-        import os,shutil
-        source=SQLiteChatStore(self.other)
-        source.create_conversation(self.scope,title="different-native-file")
+    def test_same_filename_native_aba_different_marker_denied_on_read(self):
+        import os, shutil
+        source = SQLiteChatStore(self.other)
+        source.create_conversation(self.scope, title="different-native-file")
         source.close()
-        saved=self.bound.with_suffix(".saved")
-        detached=self.bound.with_suffix(".detached")
-        path=self.bound
-        other=self.other
+        saved = self.bound.with_suffix(".saved")
+        detached = self.bound.with_suffix(".detached")
+        path, other = self.bound, self.other
+
         class SameNameABA(SQLiteChatStore):
-            def __init__(self,requested):
+            def __init__(self, requested):
                 path.rename(saved)
-                shutil.copyfile(other,path)
+                shutil.copyfile(other, path)
                 try:
                     super().__init__(requested)
                     self.db.execute("PRAGMA journal_mode=DELETE")
@@ -78,62 +78,73 @@ class NativeDeclaredPathTests(unittest.TestCase):
                     saved.rename(path)
                 except BaseException:
                     self.close()
-                    if path.exists():path.unlink()
-                    if saved.exists():saved.rename(path)
+                    if path.exists():
+                        path.unlink()
+                    if saved.exists():
+                        saved.rename(path)
                     raise
-        if os.name=="nt":
-            # Windows may deny rename of SQLite's open native file. This is
-            # an OS denial, not a portable guarantee or a skipped assertion.
-            try:
-                with patch("aion_chat.staged_store.SQLiteChatStore",SameNameABA):
-                    result=self.handle.list_conversations(self.scope)
-            except (OSError,StorageUnavailableError):
-                print("A183_NATIVE_SAME_NAME_ABA=OS_OR_FACADE_DENIED")
-                return
-        else:
-            with patch("aion_chat.staged_store.SQLiteChatStore",SameNameABA):
-                result=self.handle.list_conversations(self.scope)
-        self.assertEqual([c.title for c in result.items],["different-native-file"])
-        with closing(sqlite3.connect(path)) as db, db:
-            self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],0)
-        print("A183_NATIVE_SAME_NAME_ABA=WRONG_FILE_READ_PATH_CHECK_PASSED")
 
-    def test_same_filename_native_aba_write_can_commit_before_alarm(self):
-        import os,shutil
-        path=self.bound;other=self.other
-        saved=path.with_suffix(".saved");detached=path.with_suffix(".detached")
+        try:
+            with patch("aion_chat.staged_store.SQLiteChatStore", SameNameABA):
+                with self.assertRaisesRegex(
+                    StorageUnavailableError, "G14_NATIVE_MARKER_DRIFT"
+                ):
+                    self.handle.list_conversations(self.scope)
+        except OSError:
+            if os.name != "nt":
+                raise
+            print("A183_G14_NATIVE_ABA_READ=WINDOWS_OS_DENIED")
+            return
+        with closing(sqlite3.connect(path)) as db, db:
+            self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0], 0)
+        print("A183_G14_NATIVE_ABA_DIFFERENT_MARKER=READ_DENIED_BEFORE_WRONG_RESULT")
+
+    def test_same_filename_native_aba_different_marker_denies_write(self):
+        import os, shutil
+        path, other = self.bound, self.other
+        saved = path.with_suffix(".saved")
+        detached = path.with_suffix(".detached")
+
         class SameNameABA(SQLiteChatStore):
-            def __init__(self,requested):
-                path.rename(saved);shutil.copyfile(other,path)
+            def __init__(self, requested):
+                path.rename(saved)
+                shutil.copyfile(other, path)
                 try:
                     super().__init__(requested)
                     self.db.execute("PRAGMA journal_mode=DELETE")
-                    path.rename(detached);saved.rename(path)
+                    path.rename(detached)
+                    saved.rename(path)
                 except BaseException:
                     self.close()
-                    if path.exists():path.unlink()
-                    if saved.exists():saved.rename(path)
+                    if path.exists():
+                        path.unlink()
+                    if saved.exists():
+                        saved.rename(path)
                     raise
+
         try:
-            with patch("aion_chat.staged_store.SQLiteChatStore",SameNameABA):
-                self.handle.create_conversation(self.scope)
+            with patch("aion_chat.staged_store.SQLiteChatStore", SameNameABA):
+                with self.assertRaisesRegex(
+                    StorageUnavailableError, "G14_NATIVE_MARKER_DRIFT"
+                ):
+                    self.handle.create_conversation(self.scope)
         except OSError:
-            if os.name!="nt":raise
-            print("A183_NATIVE_SAME_NAME_ABA_WRITE=OS_DENIED")
+            if os.name != "nt":
+                raise
+            print("A183_G14_NATIVE_ABA_WRITE=WINDOWS_OS_DENIED")
             return
         except sqlite3.OperationalError as exc:
-            self.assertEqual(getattr(exc,"sqlite_errorname",""),"SQLITE_READONLY_DBMOVED")
-            with closing(sqlite3.connect(detached)) as db, db:
-                self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],0)
-            print("A183_NATIVE_SAME_NAME_ABA_WRITE=SQLITE_READONLY_DBMOVED")
+            self.assertEqual(
+                getattr(exc, "sqlite_errorname", ""), "SQLITE_READONLY_DBMOVED"
+            )
+            print("A183_G14_NATIVE_ABA_WRITE=SQLITE_DENIED")
             return
-        except StorageUnavailableError:
-            pass  # UNKNOWN after commit is not proof that write was prevented.
+
         with closing(sqlite3.connect(path)) as db, db:
-            self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],0)
+            self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0], 0)
         with closing(sqlite3.connect(detached)) as db, db:
-            self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0],1)
-        print("A183_NATIVE_SAME_NAME_ABA_WRITE=DETACHED_FILE_COMMITTED_NOT_PREVENTED")
+            self.assertEqual(db.execute("select count(*) from conversations").fetchone()[0], 0)
+        print("A183_G14_NATIVE_ABA_DIFFERENT_MARKER=WRITE_DENIED_BEFORE_EFFECT")
 
 
 if __name__=="__main__":
