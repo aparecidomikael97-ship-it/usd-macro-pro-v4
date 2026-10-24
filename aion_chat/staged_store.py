@@ -62,6 +62,7 @@ class OperationScopedSQLiteChatStore:
         self._failure = ""
         self._file_identity = None
         self._parent_identity = None
+        self._native_marker = None  # G14 local DB discriminator, NOT VFS inode
         self.require_healthy()
 
     def close(self):
@@ -208,6 +209,28 @@ class OperationScopedSQLiteChatStore:
                 or any(row[1] not in {"main", "temp"} for row in rows)):
             raise StorageUnavailableError("NATIVE_DATABASE_PATH_MISMATCH")
 
+    def _verify_native_marker(self, store):
+        """Detect a different locally initialized SQLite DB behind same filename.
+
+        The per-DB UUID is copied by backups/clones and is writable by the
+        host. This comparison cannot prove SQLite VFS descriptor identity,
+        hostile-root resistance, freshness, or antirollback. The first
+        healthy open defines this facade's reference marker.
+        """
+        rows = store.db.execute(
+            "SELECT marker FROM aion_native_marker_v1 WHERE singleton=1"
+        ).fetchall()
+        if (len(rows) != 1 or not isinstance(rows[0][0], str)
+                or len(rows[0][0]) != 32
+                or any(char not in "0123456789abcdef" for char in rows[0][0])):
+            raise StorageUnavailableError("G14_NATIVE_MARKER_INVALID")
+        marker = rows[0][0]
+        if self._native_marker is None:
+            self._native_marker = marker
+        elif self._native_marker != marker:
+            raise StorageUnavailableError("G14_NATIVE_MARKER_DRIFT")
+        return marker
+
     def _write_snapshot(self, anchor):
         # A post-write alarm is always UNKNOWN outcome: native SQLite may
         # already have committed; never authorize replay automatically.
@@ -287,6 +310,11 @@ class OperationScopedSQLiteChatStore:
                         self._file_identity = after_open
                     if self._parent_identity is None:
                         self._parent_identity = parents_after_open
+                    # A183 same-filename native ABA can open a different DB
+                    # while pathname and independently held inode look stable.
+                    # G14 catches independently initialized DBs by their local
+                    # marker, without claiming physical/VFS atomic identity.
+                    self._verify_native_marker(store)
                     read_before = (
                         self._read_snapshot(anchor)
                         if name in self._READ_ONLY_METHODS else None
@@ -301,6 +329,11 @@ class OperationScopedSQLiteChatStore:
                     except StorageUnavailableError as exc:
                         raise StorageUnavailableError(
                             "NATIVE_DATABASE_PATH_POST_OPERATION_OUTCOME_UNKNOWN") from exc
+                    try:
+                        self._verify_native_marker(store)
+                    except (StorageUnavailableError, sqlite3.DatabaseError) as exc:
+                        raise StorageUnavailableError(
+                            "G14_NATIVE_MARKER_POST_OPERATION_OUTCOME_UNKNOWN") from exc
                     if (self._ancestor_chain_identity(allow_missing=False)
                             != self._parent_identity):
                         # A write may ALREADY have committed; no automatic
@@ -341,7 +374,8 @@ class OperationScopedSQLiteChatStore:
                 except StorageUnavailableError as exc:
                     if str(exc) in {
                             "BOUND_DATABASE_WRITE_OUTCOME_UNKNOWN_DIRECTORY_CHANGED",
-                            "NATIVE_DATABASE_PATH_POST_OPERATION_OUTCOME_UNKNOWN"}:
+                            "NATIVE_DATABASE_PATH_POST_OPERATION_OUTCOME_UNKNOWN",
+                            "G14_NATIVE_MARKER_POST_OPERATION_OUTCOME_UNKNOWN"}:
                         # Preserve the exact hazard for post-error health checks.
                         # Do not convert a possibly committed write into retry.
                         self._failure = str(exc)
