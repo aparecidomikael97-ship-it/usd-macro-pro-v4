@@ -25,7 +25,7 @@ from typing import Any, Callable, Mapping
 
 from aion_chat.models import Scope
 from aion_chat.privacy import redact
-from aion_chat.store import SQLiteChatStore
+from aion_chat.store import SQLiteChatStore, StorageUnavailableError
 
 SCHEMA = "ATLASQUANT_AION_EXECUTION_OUTBOX_V1"
 MAX_AUTHORITY_TTL_SECONDS = 900
@@ -175,6 +175,24 @@ class ExecutionOutbox:
             return _bound_callback(self._evidence_verifier, kind, dict(intent), dict(result)) is True
         except Exception:
             return False
+
+    def _rollback_preserving_original(self, original_error: Exception) -> None:
+        """Keep the first transaction failure as the primary exception.
+
+        If rollback itself fails, quarantine and detach the SQLite store
+        before propagating the original error. No retry, repair or new
+        connection is attempted. Any later work requires explicit recovery.
+        """
+        try:
+            self.db.rollback()
+        except Exception as rollback_error:
+            self.store.quarantine_failed_transaction()
+            self.db = None
+            if hasattr(original_error, "add_note"):
+                original_error.add_note(
+                    "AION_OUTBOX_ROLLBACK_FAILED_STORE_QUARANTINED_NO_RETRY"
+                )
+            raise original_error from rollback_error
 
     def _ensure_schema(self) -> None:
         with self.db:
@@ -448,8 +466,8 @@ class ExecutionOutbox:
                 ),
             )
             self.db.commit()
-        except Exception:
-            self.db.rollback()
+        except Exception as original_error:
+            self._rollback_preserving_original(original_error)
             raise
         out = self.get(idempotency_key)
         return {**out, "enqueue_state": "ENQUEUED"}
@@ -469,8 +487,8 @@ class ExecutionOutbox:
             count = int(cursor.rowcount)
             self.db.commit()
             return count
-        except Exception:
-            self.db.rollback()
+        except Exception as original_error:
+            self._rollback_preserving_original(original_error)
             raise
 
     def claim_next(
@@ -524,12 +542,19 @@ class ExecutionOutbox:
                 (worker, lease_until, key, owner, tenant, workspace),
             )
             if cursor.rowcount != 1:
-                self.db.rollback()
+                try:
+                    self.db.rollback()
+                except Exception as rollback_error:
+                    self.store.quarantine_failed_transaction()
+                    self.db = None
+                    raise StorageUnavailableError(
+                        "OUTBOX_CLAIM_ROLLBACK_UNCERTAIN_NO_RETRY"
+                    ) from rollback_error
                 return None
             self.db.commit()
             return self.get(key)
-        except Exception:
-            self.db.rollback()
+        except Exception as original_error:
+            self._rollback_preserving_original(original_error)
             raise
 
     def _authorization_gate(
@@ -621,8 +646,8 @@ class ExecutionOutbox:
                 (_iso(confirmed_at), effect, key, *self._scope_args()),
             )
             self.db.commit()
-        except Exception:
-            self.db.rollback()
+        except Exception as original_error:
+            self._rollback_preserving_original(original_error)
             raise
         return self.get(key)
 
