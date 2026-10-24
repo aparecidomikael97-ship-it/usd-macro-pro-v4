@@ -39,6 +39,20 @@ These are **static recommendations against G18**, not proof that G44 was tested 
 
 `.github/workflows/aion-a190-g44-binding-integrity-lab.yml` runs **31 new G44 + 339 inherited G30–G43 = 370 distinct tests per OS, 740 cross-platform executions if both pass**. Candidate [G44 CI #40135351231](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40135351231), code/workflow SHA `41765b107abbf954cd6173fbe20e330b5fc4d1af`: Ubuntu and Windows jobs were still queued at this document creation. Do **not** claim successful tests until checking both jobs and original tested SHA; this is a separate evidence-doc commit.
 
+## Second Codex review of the ACTUAL G44 branch and verified fixes
+
+Unlike the first G18 static audit, the **second read-only Codex CLI** actually reviewed the clean detached HEAD `3e7e8a440536a9b7340dff57a5dc337151ef6848` on the user's Windows computer at `C:\\Users\\apare\\AtlasQuant-G44-Audit-LAB-20261024`. Codex model `gpt-6.1-sol`, session `01a16fe0-450c-7120-9b98-2a342d802ca4`, **exit 0 in 77.55 seconds**; no edits, tests, Worker/provider, merge or deployment were done by Codex. Later code changes were informed by its static findings, but Codex did **not** re-review the final patched HEAD.
+
+It found **ten** candidate gaps. Four high-priority findings have been corrected and tested on the local Windows checkout:
+- Original producer JSON has `ensure_ascii=False`, while G44 auditor omitted this; align canonicalization for Unicode payload. `G44_UNICODE_GREEN` passed.
+- G44 must revalidate after the potentially executable `adapter.reconcile` property getter before invoking callback. `G44_RECONCILE_GETTER_GREEN` passed.
+- The claim predecessor query used INNER JOIN; an earlier decision with no Outbox row could disappear and incorrectly release later work. Use scoped LEFT JOIN and block when predecessor is missing. `G44_ORPHAN_PREDECESSOR_GREEN` passed.
+- Even without G42 strict opt-in, G44 strict mode must preserve first confirmation timestamp/effect ledger upon identical replay. `G44_RECONFIRM_GREEN` passed.
+
+Additional safety contracts applied: version-bound decision `schema` and `grants_authority=False` admission, and correctly scope-qualified local orphan-detection joins. Remaining independent Codex observations stay OPEN: versioned physical SQLite schema/constraints admission, G43 auditor scope/duplicate-key hardening, authorization-critical reauth field tampering without independent sealed binding, WAL sidecar write guarantees, and tests for eligible reconciliation after further reentrancy. These are not cleared by the passing targeted suite.
+
+Local `python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v` on Windows **actual latest checkout SHA `2b8b24440e4b858981e05f49a2e31a2e055ca15d`** finished **37/37 PASS**, with required GREEN markers. **GitHub CI at same code SHA** [#40135893785](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40135893785) runs **37 G44 + 339 inherited G30–G43 = 376 distinct/OS, 752 if both systems pass**. It was queued when this evidence was first added; check both OS jobs before claiming CI SUCCESS. The previous #40135351231 found one test-fixture error under Windows; patched in #40135472795, but only the final code SHA counts.
+
 ## Outstanding RED
 
 - Opt-in local integrity gate is not a trusted provider receipt, authenticated origin/HUMAN_OWNER identity, durable independent monotonic antirollback custodian, host-proof crash recovery, or distributed exactly-once first SEND guarantee.
