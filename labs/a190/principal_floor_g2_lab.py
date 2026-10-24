@@ -132,23 +132,22 @@ def main():
     if len(sys.argv) < 3:
         raise SystemExit("A190 G2 LAB CLI")
     op = sys.argv[1]
-    args = [Path(x) if op not in {"publish", "expect-current"} or i < 2 else x
-            for i, x in enumerate(sys.argv[2:])]
-    if op == "app-init" and len(args) == 1:
-        app_init(args[0])
-    elif op == "app-advance" and len(args) == 1:
-        app_advance(args[0])
-    elif op == "state" and len(args) == 1:
-        state = app_state(args[0])
+    raw = sys.argv[2:]
+    if op == "app-init" and len(raw) == 1:
+        app_init(Path(raw[0]))
+    elif op == "app-advance" and len(raw) == 1:
+        app_advance(Path(raw[0]))
+    elif op == "state" and len(raw) == 1:
+        state = app_state(Path(raw[0]))
         print(str(state["seq"]) + " " + state["digest"])
-    elif op == "publish" and len(args) == 3:
-        floor_publish(args[0], args[1], args[2])
-    elif op == "expect-stale" and len(args) == 2:
-        expect_stale(*args)
-    elif op == "expect-current" and len(args) == 3:
-        expect_current(args[0], args[1], args[2])
-    elif op == "forge" and len(args) == 1:
-        attempt_floor_forge(args[0])
+    elif op == "publish" and len(raw) == 3:
+        floor_publish(Path(raw[0]), raw[1], raw[2])
+    elif op == "expect-stale" and len(raw) == 2:
+        expect_stale(Path(raw[0]), Path(raw[1]))
+    elif op == "expect-current" and len(raw) == 3:
+        expect_current(Path(raw[0]), Path(raw[1]), raw[2])
+    elif op == "forge" and len(raw) == 1:
+        attempt_floor_forge(Path(raw[0]))
     else:
         raise SystemExit("A190 G2 invalid command")
 
