@@ -1,0 +1,53 @@
+name: A190 G5 Real Child Kill and Reopen LAB
+on:
+  pull_request:
+    paths:
+      - 'test_atlasquant_aion_a190_g5_real_process_crash_h0_lab.py'
+      - '.github/workflows/aion-a190-g5-real-process-crash-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g5-real-process-os-restart-limits:
+    name: G5 real-process kill before/after commit (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned minimal AION LAB dependencies
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Kill REAL child processes at explicit SQLite COMMIT barriers and reopen
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest -v test_atlasquant_aion_a190_g5_real_process_crash_h0_lab test_atlasquant_aion_a190_g4_sqlite_native_files_lab test_atlasquant_aion_a190_g3_first_intent_contract_lab test_atlasquant_aion_local_witness_a189_lab test_atlasquant_aion_live_connection_boundary_a185_lab 2>&1 | tee a190_g5.log
+          grep -q 'A190_G5_REAL_PROCESS_KILL_BEFORE_COMMIT=ROLLED_BACK_AFTER_REOPEN' a190_g5.log
+          grep -q 'A190_G5_PRECOMMIT_NO_ACK=UNCERTAIN_NO_AUTO_RESEND' a190_g5.log
+          grep -q 'A190_G5_REAL_PROCESS_KILL_AFTER_COMMIT=ROW_SURVIVES_REOPEN' a190_g5.log
+          grep -q 'A190_G5_POSTCOMMIT_MISSING_ACK=UNCERTAIN_NO_AUTO_RESEND' a190_g5.log
+          grep -q 'A190_G5_HOST_ROLLBACK_AFTER_REAL_PROCESS_CRASH=UNSAFE_READMISSION_RED' a190_g5.log
+          grep -q 'A190_G5_REAL_CRASH_THEN_RELABELED_ID=DOUBLE_LOCAL_RESERVATION_RED' a190_g5.log
+          grep -q 'A190_G5_AION_STORE_REAL_CHILD_KILL_AFTER_COMMIT=REOPEN_SEES_CONVERSATION' a190_g5.log
+          grep -q 'A190_G5_AION_STORE_NO_ACK=NO_PROVIDER_CONFIRMATION' a190_g5.log
+          grep -q 'A190_G4_REAL_AION_SQLITE_CHAT_STORE_MAIN_ONLY_COPY=STALE_RED' a190_g5.log
+          grep -q 'A190_G3_SIGNED_DIFFERENT_IDS_SAME_ORIGINAL=DOUBLE_LOCAL_RESERVATION_RED' a190_g5.log
+          grep -q 'A189_JOINT_LOCAL_DB_PLUS_WITNESS_ROLLBACK=UNSAFE_READMISSION_REPRODUCED' a190_g5.log
+          echo 'A190_G5_REAL_PROCESS_INTERRUPTION=EXERCISED_BEFORE_AND_AFTER_COMMIT'
+      - name: Absolute boundaries of G5 evidence
+        run: |
+          echo 'Real killed child process and reopened SQLite != hard power failure, kernel crash or host reboot.'
+          echo 'No independent monotonic floor, provider idempotency, original issuer, owner identity, protected WAL/VFS.'
+          echo 'Host rollback reauthorizes old intention, even though other process read committed row after kill.'
+          echo 'Success = RED controls reproduced, NOT P0/H0 operational certification.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
