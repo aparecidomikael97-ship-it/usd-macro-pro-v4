@@ -1,0 +1,57 @@
+name: A190 G32 Chat Store rollback quarantine LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'labs/a190/test_g32_chat_store_rollback_quarantine_lab.py'
+      - '.github/workflows/aion-a190-g32-chat-store-rollback-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g32-chat-store-quarantine:
+    name: G32 Chat transaction guard / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: G32 real Chat Store write path faults
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g32_chat_store_rollback_quarantine_lab.py' -v 2>&1 | tee g32.log
+          grep -F 'Ran 20 tests' g32.log
+          grep -F 'G32_CHAT_QUARANTINE_GREEN=PRIMARY_PRESERVED_CONNECTION_DETACHED' g32.log
+          grep -F 'G32_APPEND_MESSAGE_GREEN=NO_SILENT_ROLLBACK_FAILURE' g32.log
+          grep -F 'G32_NO_RETRY_GREEN=STICKY_FAIL_CLOSED_AFTER_ROLLBACK_ERROR' g32.log
+          grep -F 'G32_REOPEN_LIMIT=LOCAL_SQLITE_IS_NOT_EXTERNAL_FRESHNESS' g32.log
+      - name: Inherited G31 rollback quarantine regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g31_*.py' -v 2>&1 | tee g31-regression.log
+          grep -F 'Ran 18 tests' g31-regression.log
+          grep -F 'G31_PRIMARY_EXCEPTION_GREEN=ORIGINAL_RETAINED_ROLLBACK_AS_CAUSE' g31-regression.log
+      - name: Inherited G30 dispatch fail-closed regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g30_*.py' -v 2>&1 | tee g30-regression.log
+          grep -F 'Ran 23 tests' g30-regression.log
+          grep -F 'G31_G30_REGRESSION_GREEN=ORIGINAL_ERROR_RETAINED_STORE_DETACHED' g30-regression.log
+      - name: Mandatory NO-GO
+        shell: bash
+        run: |
+          echo 'Synthetic SQLite wrapper failure injection, not real disk failure.'
+          echo 'No external witness, no provider, no Worker, no actual recovery proof.'
+          echo 'No merge/main/deploy/P0 homologation.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
