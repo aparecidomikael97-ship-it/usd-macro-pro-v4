@@ -1,4 +1,4 @@
-# A190 G17 — local Linux evidence; GitHub CI remains independent/pending
+# A190 G17 — local Linux evidence plus independent GitHub Linux CI
 
 **Date (client timezone America/Manaus): 2026-10-24. LAB-only Draft; no production or customer DB.**
 
@@ -38,6 +38,17 @@ G17_STDLIB_WAL_NATIVE_MAIN=UNMOVED_NOT_SIDE_CAR_PROOF
 
 **Interpretation:** The exact native Python `sqlite3.Connection` VFS in Linux detected the known same-marker clone misbinding and distinguished preopened rogue versus decoy. This is more direct than G16 APSW. This does **not** bind native code to the currently running AION store or prove that files/sidecars cannot be swapped before or after a check.
 
-No Windows results. New GitHub CI workflow created; **no run is claimed until independently observed and checked**. Canonical Quality/Security were not rerun.
+## Independent GitHub Actions confirmation
+
+Exact tested code + workflow SHA: **`b19b8a074c1a9bfa465429e1fe18fb9891d5b73d`** (later docs-only commits are not re-tested).
+
+- [Workflow G17 run #40090452224](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40090452224): **completed / SUCCESS**.
+- Ubuntu job **120861864007**: official pinned header download SHA3 step **SUCCESS**, GCC native extension compile step **SUCCESS**, stdlib `sqlite3` adversarial `unittest` step **SUCCESS**.
+- Observed native test log: **`Ran 8 tests in 0.070s` / `OK`**, all 8 individually `... ok`.
+- Logs show `G17_STDLIB_NATIVE_SAME_MARKER_ABA=MOVED_DETECTED`; `G17_STDLIB_ROGUE_PREOPENED_PLUS_DECOY=CONNECTIONS_DIFFERENTIATED`; `G17_DIRECTONLY=UNTRUSTED_VIEW_CANNOT_CALL_NATIVE_PROBE`; `G17_NO_NATIVE_MAIN_FILE=FAIL_CLOSED`.
+- Separate agent local Linux 8/8 is corroboration but not a second independent host CI. Do not count 16 unique tests; 8 unique scenarios were run on two Linux environments.
+- **Windows has not been run.** This workflow deliberately targets Linux. Canonical Quality/Security not rerun for G17. Native extension not integrated into AION runtime; no production GO.
+
+**0/6 P0 homologados · HARD NO-GO · UNCERTAIN · ZERO_AUTO_RESEND.**
 
 **0/6 P0 homologados · HARD NO-GO · UNCERTAIN · ZERO_AUTO_RESEND.**
