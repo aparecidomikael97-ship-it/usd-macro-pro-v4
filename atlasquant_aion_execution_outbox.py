@@ -323,7 +323,7 @@ class ExecutionOutbox:
                 intent_ref TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL UNIQUE,
                 payload_digest TEXT NOT NULL,
-                PRIMARY KEY(owner,tenant,business_event_id)
+                PRIMARY KEY(tenant,business_event_id)
             );
             """
         with self._managed_write_transaction():
@@ -478,8 +478,8 @@ class ExecutionOutbox:
                 semantic_lock = self.db.execute(
                     """SELECT idempotency_key, payload_digest
                        FROM semantic_reservations_lab
-                       WHERE owner=? AND tenant=? AND business_event_id=?""",
-                    (owner, tenant, semantic_event),
+                       WHERE tenant=? AND business_event_id=?""",
+                    (tenant, semantic_event),
                 ).fetchone()
                 if semantic_lock is not None and (
                     semantic_lock["idempotency_key"] != idempotency_key
@@ -503,6 +503,9 @@ class ExecutionOutbox:
                 return {**out, "enqueue_state": "IDEMPOTENT"}
 
             if semantic_event:
+                # Unique per TENANT+event across owners and workspaces.
+                # No trusted source namespace exists yet: legitimate source
+                # collisions must fail closed rather than silently duplicate.
                 # The unique reservation and Outbox rows are written inside
                 # ONE SQLite transaction, never as separate auto-commits.
                 self.db.execute(
