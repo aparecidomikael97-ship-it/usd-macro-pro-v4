@@ -1,0 +1,65 @@
+name: A190 G36 subprocess witness Outbox recovery LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g36_subprocess_witness_custody_lab.py'
+      - 'labs/a190/test_g36_subprocess_witness_recovery_lab.py'
+      - '.github/workflows/aion-a190-g36-subprocess-witness-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g36-subprocess-recovery:
+    name: G36 subprocess witness recovery / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install test-only crypto
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G36 real Outbox plus separate process synthetic witness
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g36_*.py' -v 2>&1 | tee g36.log
+          grep -F 'Ran 20 tests' g36.log
+          grep -F 'G36_SUBPROCESS_MATCH_GREEN=SIGNED_TIP_ONLY_UNCERTAIN' g36.log
+          grep -F 'G36_RESTART_GREEN=HOST_REOPEN_TIP_MATCH_ZERO_AUTO_RESEND' g36.log
+          grep -F 'G36_HOST_ROLLBACK_GREEN=RETAINED_TIP_DETECTS_OLD_OUTBOX' g36.log
+          grep -F 'G36_SAME_HOST_COROLLBACK_RED=DB_AND_WITNESS_OLD_STATE_ACCEPTED' g36.log
+          grep -F 'G36_UNTRUSTED_OBSERVATION_RED=WITNESS_SIGNED_HOST_SUPPLIED_FALSE_TIP' g36.log
+          grep -F 'G36_SEMANTIC_ALIAS_RED=TWO_CALLER_REFS_ONE_BUSINESS_OPERATION' g36.log
+          grep -F 'G36_PIN_RESET_GREEN=NEW_WITNESS_KEY_NOT_PINNED' g36.log
+      - name: Inherited G35-G30 quarantine regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g35_*.py' -v 2>&1 | tee g35.log
+          grep -F 'Ran 18 tests' g35.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g34_*.py' -v 2>&1 | tee g34.log
+          grep -F 'Ran 16 tests' g34.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g33_*.py' -v 2>&1 | tee g33.log
+          grep -F 'Ran 24 tests' g33.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g32_*.py' -v 2>&1 | tee g32.log
+          grep -F 'Ran 20 tests' g32.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g31_*.py' -v 2>&1 | tee g31.log
+          grep -F 'Ran 18 tests' g31.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g30_*.py' -v 2>&1 | tee g30.log
+          grep -F 'Ran 23 tests' g30.log
+      - name: Hard no-go
+        shell: bash
+        run: |
+          echo 'Witness is a separate subprocess only, all files on same host.'
+          echo 'Private key and DB can be copied/rolled back; caller feeds signed snapshots.'
+          echo 'Not independent external custody, no provider, Worker, main/merge/deploy or P0 closure.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
