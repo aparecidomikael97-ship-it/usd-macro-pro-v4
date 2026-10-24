@@ -130,6 +130,7 @@ class ExecutionOutbox:
         strict_authority_scope_lab: bool = False,
         strict_reconciliation_auth_lab: bool = False,
         fresh_dispatch_clock_lab: Callable[[], Any] | None = None,
+        strict_claim_fencing_lab: bool = False,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -145,6 +146,8 @@ class ExecutionOutbox:
             raise TypeError("strict_reconciliation_auth_lab must be bool")
         if fresh_dispatch_clock_lab is not None and not callable(fresh_dispatch_clock_lab):
             raise TypeError("fresh_dispatch_clock_lab must be callable")
+        if type(strict_claim_fencing_lab) is not bool:
+            raise TypeError("strict_claim_fencing_lab must be bool")
         store.require_healthy()
         _scope(scope)
         self.store = store
@@ -156,6 +159,9 @@ class ExecutionOutbox:
         # A synthetic clock is NOT independently trusted and requires test
         # configuration. Legacy dispatch keeps its prior behavior for regressions.
         self._fresh_dispatch_clock_lab = fresh_dispatch_clock_lab
+        # Persisted attempts rises atomically in claim_next: G41 uses it
+        # as a LOCAL fencing epoch, not independent rollback protection.
+        self._strict_claim_fencing_lab = strict_claim_fencing_lab
         # Default fail-closed. This LAB callback boundary is NOT a verified
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
@@ -735,16 +741,31 @@ class ExecutionOutbox:
                 return False, "BLOCKED_REAPPROVAL", {"reason": "REAUTH_TRANSACTION_MISMATCH"}
         return True, "ALLOW", current
 
-    def _set_blocked(self, key: str, state: str, reason: str) -> dict[str, Any]:
+    def _set_blocked(
+        self, key: str, state: str, reason: str, *,
+        worker_lab: str = "", generation_lab: int = 0,
+    ) -> dict[str, Any]:
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
         with self._managed_write_transaction():
-            self.db.execute(
-                """UPDATE action_outbox
-                   SET state=?,lease_owner='',lease_until='',last_error=?
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (state, _clean(reason, 240), key, *self._scope_args()),
-            )
+            if self._strict_claim_fencing_lab:
+                cursor = self.db.execute(
+                    """UPDATE action_outbox
+                       SET state=?,lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='CLAIMED' AND lease_owner=? AND attempts=?""",
+                    (state, _clean(reason, 240), key, *self._scope_args(),
+                     worker_lab, generation_lab),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("FENCE_STALE_AUTHORITY_TRANSITION_NO_WRITE")
+            else:
+                self.db.execute(
+                    """UPDATE action_outbox
+                       SET state=?,lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                    (state, _clean(reason, 240), key, *self._scope_args()),
+                )
         return self.get(key)
 
     def _confirm(
