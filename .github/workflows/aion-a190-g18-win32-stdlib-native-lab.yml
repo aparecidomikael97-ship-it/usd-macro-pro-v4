@@ -56,7 +56,7 @@ jobs:
           python -B -m unittest discover -s labs/a190 -p 'test_g18_win32_native_identity_lab.py' -v 2>&1 | Tee-Object -FilePath g18_win32.log
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $log = Get-Content g18_win32.log -Raw
-          foreach ($marker in @('Ran 9 tests', 'G18_WIN32_EXACT_STDLIB_NATIVE_MATCH=LOCAL_OBSERVATION_ONLY', 'G18_WIN32_SAME_MARKER_CLONE=WRONG_NATIVE_FILE_DENIED_BY_COMPARISON', 'G18_WIN32_PREOPENED_ROGUE_PLUS_DECOY=CONNECTIONS_DISTINGUISHED', 'G18_WIN32_WAL_MAIN_MATCH=NOT_WAL_SHM_OR_ROLLBACK_ATTESTATION')) {
+          foreach ($marker in @('Ran 10 tests', 'G18_WIN32_EXACT_STDLIB_NATIVE_MATCH=LOCAL_OBSERVATION_ONLY', 'G18_WIN32_SAME_MARKER_CLONE=WRONG_NATIVE_FILE_DENIED_BY_COMPARISON', 'G18_WIN32_PREOPENED_ROGUE_PLUS_DECOY=CONNECTIONS_DISTINGUISHED', 'G18_WIN32_WAL_MAIN_MATCH=NOT_WAL_SHM_OR_ROLLBACK_ATTESTATION', 'G18_WIN32_CLOSED_FILE_REPLACEMENT=WRONG_CONTENT_NATIVE_MATCH_RED')) {
             if (-not $log.Contains($marker)) { throw "Missing evidence marker: $marker" }
           }
       - name: No-go statement
