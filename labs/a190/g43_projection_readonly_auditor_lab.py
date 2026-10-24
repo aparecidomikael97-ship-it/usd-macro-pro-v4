@@ -15,6 +15,18 @@ FIELDS = ("state", "attempts", "lease_owner", "lease_until",
           "dispatch_started_at", "sent_at", "confirmed_at",
           "last_error", "effect_ref")
 
+class _DuplicateJSONKey(ValueError):
+    """Repeated JSON key makes an audit snapshot ambiguous."""
+
+
+def _unique_json_pairs(pairs):
+    document = {}
+    for key, value in pairs:
+        if key in document:
+            raise _DuplicateJSONKey("DUPLICATE_JSON_KEY")
+        document[key] = value
+    return document
+
 
 def audit_projection_snapshot_readonly_lab(
     sqlite_file: Path, *, owner: str, tenant: str, workspace: str,
@@ -80,9 +92,17 @@ def audit_projection_snapshot_readonly_lab(
                     code = "CONFIRMED_LEDGER_INCONSISTENT"
             elif row["matched_effect"] is not None:
                 code = "NONCONFIRMED_HAS_EFFECT"
+            if code == "OK" and (
+                type(row["attempts"]) is not int or row["attempts"] < 0
+            ):
+                code = "OUTBOX_ATTEMPTS_INVALID"
             if code == "OK":
                 try:
-                    document = json.loads(row["data"])
+                    document = json.loads(
+                        row["data"], object_pairs_hook=_unique_json_pairs
+                    )
+                except _DuplicateJSONKey:
+                    code = "JSON_DUPLICATE_KEY"
                 except (ValueError, TypeError):
                     code = "INVALID_JSON"
                 else:
@@ -97,6 +117,9 @@ def audit_projection_snapshot_readonly_lab(
                         "BLOCKED_REAPPROVAL",
                     }:
                         code = "JSON_STATE_INVALID"
+                    elif ("attempts" in document and
+                          type(document["attempts"]) is not int):
+                        code = "JSON_ATTEMPTS_INVALID"
                     elif any(
                         field in document and (
                             document[field] != (int(row[field]) if field == "attempts"
@@ -112,6 +135,8 @@ def audit_projection_snapshot_readonly_lab(
         orphan_count = db.execute(
             """SELECT count(*) FROM action_effects e
                LEFT JOIN action_outbox o ON o.idempotency_key=e.idempotency_key
+                 AND o.owner=e.owner AND o.tenant=e.tenant
+                 AND o.workspace=e.workspace
                WHERE e.owner=? AND e.tenant=? AND e.workspace=?
                  AND o.idempotency_key IS NULL""",
             (owner,tenant,workspace),
