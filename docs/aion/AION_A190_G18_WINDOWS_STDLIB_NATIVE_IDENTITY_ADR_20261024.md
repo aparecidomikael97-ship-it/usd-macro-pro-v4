@@ -8,7 +8,7 @@ G17's `SQLITE_FCNTL_HAS_MOVED` was validated on Linux only. Windows requires its
 
 This is a **local snapshot observation**. It is not a host-independent signed claim, rollback-resistant custody, atomic WAL/SHM attestation, external owner authentication, first-attempt receipt, or proof of recovery after restart. Windows may prevent same-path rename while SQLite has open handles: a clone on a different path tests native identity, **not** a successful Windows same-path ABA exploit. The anchor path is itself host-controlled.
 
-## Nine synthetic Windows tests
+## Ten synthetic Windows tests
 
 1. Actual stdlib connection matches independent Win32 anchor.
 2. Same-marker cloned DB differs in payload and native file identity.
@@ -19,6 +19,7 @@ This is a **local snapshot observation**. It is not a host-independent signed cl
 7. `SQLITE_DIRECTONLY` rejects untrusted SQL view.
 8. WAL main identity matches, explicitly **does not attest WAL/SHM**.
 9. Two real connections to one file share local identity.
+10. **RED by design:** after all connections close, a hostile host replaces the database with a same-marker clone; a newly opened stdlib connection and the independent path anchor both point to the wrong file and **native identity matches despite wrong content**. This explicitly defeats any claim that Win32 file identity alone proves content integrity or antirollback.
 
 ## Supply-chain and execution restrictions
 
