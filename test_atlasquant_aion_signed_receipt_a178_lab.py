@@ -106,7 +106,8 @@ class A178SignedReceiptLabTests(unittest.TestCase):
     def create_outbox(self, verifier, *, scope=None, ref="only-intent"):
         sc = scope or self.scope
         outbox = ExecutionOutbox(self.store, sc, evidence_verifier=verifier,
-            first_attempt_guard=synthetic_lab_first_attempt_reservation)
+            first_attempt_guard=synthetic_lab_first_attempt_reservation,
+            unsafe_allow_synthetic_lab_callbacks=True)
         item = outbox.enqueue(
             intent_ref=ref, action="send_email",
             payload={"to":"example.invalid", "template":"demo"},
