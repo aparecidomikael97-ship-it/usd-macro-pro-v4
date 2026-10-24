@@ -1123,7 +1123,7 @@ class ExecutionOutbox:
                 fence_lab=(worker, claim_generation_lab) if
                     self._strict_claim_fencing_lab else None,
             )
-            return {**out, "dispatch_state": "CONFIRMED"
+            return {**out, "dispatch_state": "CONFIRMED"}
 
         with self._managed_write_transaction():
             cursor = self.db.execute(
@@ -1137,7 +1137,7 @@ class ExecutionOutbox:
             )
             if self._strict_claim_fencing_lab and cursor.rowcount != 1:
                 raise RuntimeError("FENCE_STALE_SEND_RESULT_NO_WRITE")
-        return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"
+        return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
 
     def reconcile(
         self,
