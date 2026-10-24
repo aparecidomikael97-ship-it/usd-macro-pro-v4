@@ -1,5 +1,6 @@
 """Local SQLite staging with scoped identity and explicit resilience controls."""
 import base64
+from contextlib import contextmanager
 from dataclasses import asdict
 import hashlib
 import json
@@ -438,6 +439,36 @@ class SQLiteChatStore:
                 # detached and unusable, regardless of that secondary error.
                 pass
 
+    def _rollback_or_quarantine(self, primary_error):
+        """Preserve the primary write error; permanently detach on rollback fault."""
+        self._require_open()
+        try:
+            self.db.rollback()
+        except Exception as rollback_error:
+            self.quarantine_failed_transaction()
+            if hasattr(primary_error, "add_note"):
+                primary_error.add_note(
+                    "AION_CHAT_ROLLBACK_FAILED_STORE_QUARANTINED_NO_RETRY"
+                )
+            raise primary_error from rollback_error
+
+    @contextmanager
+    def _managed_write_transaction(self):
+        """Explicit transaction for chat writes, fail-closed on rollback uncertainty.
+
+        Unlike a bare 'with sqlite3.Connection', this preserves the original
+        write exception if the rollback also fails. This is local safety only.
+        """
+        self._require_open()
+        connection = self.db
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+            connection.commit()
+        except Exception as primary_error:
+            self._rollback_or_quarantine(primary_error)
+            raise
+
     def _require_open(self):
         if self.db is None:
             raise StorageUnavailableError("staging store is closed")
@@ -646,7 +677,7 @@ class SQLiteChatStore:
         self._scope(scope)
         c = Conversation(**asdict(scope), title=redact(title), metadata=redact(metadata or {}))
         try:
-            with self.db:
+            with self._managed_write_transaction():
                 self.db.execute(
                     "INSERT INTO conversations VALUES (?,?,?,?,?,?,?,?)",
                     (c.id, *self._scope(scope), c.updated_at, c.archived, c.title, dump(c)),
@@ -705,7 +736,7 @@ class SQLiteChatStore:
         return self.list_conversations(scope, query=query, **filters)
 
     def archive_conversation(self, scope, conversation_id):
-        with self.db:
+        with self._managed_write_transaction():
             c = self.get_conversation(scope, conversation_id)
             c.archived, c.updated_at = True, now()
             self._update(c)
@@ -730,10 +761,7 @@ class SQLiteChatStore:
             self._update(c)
             self.db.commit()
         except Exception as exc:
-            try:
-                self.db.rollback()
-            except Exception:
-                pass
+            self._rollback_or_quarantine(exc)
             if isinstance(exc, sqlite3.DatabaseError) and not isinstance(exc, sqlite3.IntegrityError):
                 self._record_database_error(exc)
             raise
@@ -774,7 +802,7 @@ class SQLiteChatStore:
     def add_attachment_metadata(self, scope, attachment):
         from .attachments import validate_metadata
         validate_metadata(attachment)
-        with self.db:
+        with self._managed_write_transaction():
             self._save_record(scope, "attachment", attachment)
         return attachment
 
@@ -800,7 +828,7 @@ class SQLiteChatStore:
         return self._latest(scope, conversation_id, "checkpoint", ConversationCheckpoint)
 
     def save_checkpoint(self, scope, checkpoint):
-        with self.db:
+        with self._managed_write_transaction():
             prior = self.get_latest_checkpoint(scope, checkpoint.conversation_id)
             if prior and checkpoint.through_sequence <= prior.through_sequence:
                 raise ValueError("coverage must advance")
@@ -810,7 +838,7 @@ class SQLiteChatStore:
             self._update(c)
 
     def save_context_summary(self, scope, summary):
-        with self.db:
+        with self._managed_write_transaction():
             for mid in summary.source_message_ids:
                 if self.get_message(scope, summary.conversation_id, mid).sequence > summary.through_sequence:
                     raise ValueError("source beyond coverage")
