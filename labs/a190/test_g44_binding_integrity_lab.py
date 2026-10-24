@@ -195,7 +195,9 @@ class G44BindingIntegrity(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,
                                     "G44_BINDING_INTEGRITY_DENIED:DECISION_JSON_INVALID"):
             self.strict.claim_next(WORKER,now=NOW)
-        self.assertEqual(self.base.get(self.key)["state"],before)
+        self.assertEqual(self.store.db.execute(
+            "SELECT state FROM action_outbox WHERE idempotency_key=?",
+            (self.key,)).fetchone()["state"],before)
         self.assertEqual(self.trap.reads,0)
         print("G44_CLAIM_BLOCK_GREEN=NO_CLAIM_ON_INVALID_DECISION")
 
