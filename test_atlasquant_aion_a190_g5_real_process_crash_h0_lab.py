@@ -225,7 +225,7 @@ class A190G5RealProcessCrashH0LabTests(unittest.TestCase):
         print("A190_G5_AION_STORE_NO_ACK=NO_PROVIDER_CONFIRMATION")
 
 if __name__ == "__main__":
-    if len(sys.argv) == 6 and sys.argv[1] == "--worker":
+    if len(sys.argv) == 5 and sys.argv[1] == "--worker":
         raise SystemExit(_child_entry(
             sys.argv[2], Path(sys.argv[3]), Path(sys.argv[4]),
         ))
