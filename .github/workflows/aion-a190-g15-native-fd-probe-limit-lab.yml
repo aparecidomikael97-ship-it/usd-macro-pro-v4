@@ -1,0 +1,48 @@
+name: A190 G15 SQLite Native FD Probe Limit LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g15_sqlite_procfd_probe_lab.py'
+      - 'labs/a190/test_g15_sqlite_native_fd_probe_limit_lab.py'
+      - 'docs/aion/AION_A190_G15_NATIVE_FD_PROBE_LIMITS_20261023.md'
+      - '.github/workflows/aion-a190-g15-native-fd-probe-limit-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sqlite-g15-probe-limit:
+    name: G15 native FD observation cannot attest VFS (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Run G15 isolated stdlib-only synthetic probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g15_sqlite_native_fd_probe_limit_lab.py' -v 2>&1 | tee g15_probe.log
+          grep -q 'Ran 8 tests' g15_probe.log
+          grep -q 'G15_SAME_LOCAL_MARKER_DIFFERENT_NATIVE_INODE=RED' g15_probe.log
+          grep -q 'G15_PUBLIC_PYTHON_SQLITE3_NATIVE_FILE_BINDING=ABSENT' g15_probe.log
+          grep -q 'G15_OBSERVATION_ONLY=NO_OWNER_NO_ROLLBACK_NO_P0_HOMOLOGATION' g15_probe.log
+          if [ "${{ runner.os }}" = Linux ]; then
+            grep -q 'G15_CLONE_NATIVE_FD=OBSERVED_MISMATCH_BUT_NO_VFS_PROOF' g15_probe.log
+            grep -q 'G15_PREOPENED_WRONG_NATIVE_PLUS_DECOY=FALSE_MATCH_RED' g15_probe.log
+            grep -q 'G15_TWO_NEW_FDS=AMBIGUOUS_NOT_AUTHORIZED' g15_probe.log
+          fi
+      - name: Explicit no-go after successful experiments
+        run: |
+          echo 'A procfs descriptor delta cannot associate a file handle with the specific sqlite3.Connection.'
+          echo 'RED decoy counterexample is expected and tested; matching candidates grant no authorization.'
+          echo 'No production runtime touched. 0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
