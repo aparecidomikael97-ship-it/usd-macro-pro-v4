@@ -388,6 +388,8 @@ class ExecutionOutbox:
             """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
                FROM action_outbox o
                JOIN action_decisions d ON d.decision_id=o.decision_id
+                 AND d.owner=o.owner AND d.tenant=o.tenant
+                 AND d.workspace=o.workspace
                WHERE o.idempotency_key=? AND
                      o.owner=? AND o.tenant=? AND o.workspace=?""",
             (key, *self._scope_args()),
@@ -425,6 +427,8 @@ class ExecutionOutbox:
         sql = """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
                  FROM action_outbox o
                  JOIN action_decisions d ON d.decision_id=o.decision_id
+                   AND d.owner=o.owner AND d.tenant=o.tenant
+                   AND d.workspace=o.workspace
                  WHERE o.owner=? AND o.tenant=? AND o.workspace=?"""
         normalized = _clean(state, 40).upper()
         if normalized:
