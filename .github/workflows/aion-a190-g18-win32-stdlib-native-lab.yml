@@ -27,13 +27,26 @@ jobs:
         run: |
           python -B labs/a190/g17_prepare_official_headers_lab.py --dest "$env:RUNNER_TEMP\aion_g18_sdk"
           if ($LASTEXITCODE -ne 0) { exit 1 }
-      - name: Compile diagnostic C extension with GitHub runner MSVC (synthetic only)
-        shell: cmd
+      - name: Compile diagnostic C extension with discovered runner MSVC (synthetic only)
+        shell: pwsh
         run: |
-          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          if errorlevel 1 exit /b 1
-          cl /nologo /LD /O2 /W4 /I "%RUNNER_TEMP%\aion_g18_sdk" /Fe:"%RUNNER_TEMP%\aion_g18_probe.dll" labs\a190\aion_g18_win32_native_identity_extension.c kernel32.lib
-          if errorlevel 1 exit /b 1
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw 'VSWHERE_NOT_FOUND' }
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'MSVC_TOOLCHAIN_NOT_FOUND' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw 'MSVC_VCVARS_NOT_FOUND' }
+          $batch = Join-Path $env:RUNNER_TEMP 'build_g18.cmd'
+          $lines = @(
+            '@echo off',
+            ('call "' + $vcvars + '"'),
+            'if errorlevel 1 exit /b 1',
+            'cl /nologo /LD /O2 /W4 /I "%RUNNER_TEMP%\aion_g18_sdk" /Fe:"%RUNNER_TEMP%\aion_g18_probe.dll" labs\a190\aion_g18_win32_native_identity_extension.c kernel32.lib',
+            'if errorlevel 1 exit /b 1'
+          )
+          Set-Content -Path $batch -Value $lines -Encoding ascii
+          & cmd.exe /d /c $batch
+          if ($LASTEXITCODE -ne 0) { throw 'G18_MSVC_COMPILE_FAILED' }
       - name: Execute Windows real stdlib SQLite synthetic tests
         shell: pwsh
         env:
