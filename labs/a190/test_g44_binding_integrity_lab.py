@@ -412,5 +412,42 @@ class G44BindingIntegrity(unittest.TestCase):
         doc["grants_authority"]=True
         self.mutate("action_decisions","data=?",(json.dumps(doc),))
         self.assertEqual(self.binding(),"DECISION_SCHEMA_OR_AUTHORITY_INVALID")
+
+    def test_38_terminal_predecessor_missing_effect_denies_successor(self):
+        successor=self.base.enqueue(
+            intent_ref="synthetic-order-43",action="synthetic_no_provider",
+            payload={"amount_minor":2000},aggregate_key="synthetic-group",
+            policy_version="p1",authorization_ref="auth1",
+            created_at=NOW+timedelta(seconds=1),
+            valid_until=NOW+timedelta(minutes=5))
+        prior=self.base.claim_next(WORKER,now=NOW)
+        self.assertEqual(prior["idempotency_key"],self.key)
+        self.confirm_synthetic()
+        self.store.db.execute(
+            "DELETE FROM action_effects WHERE idempotency_key=?", (self.key,))
+        self.store.db.commit()
+        self.assertEqual(self.binding(),"CONFIRMED_EFFECT_ABSENT")
+        with self.assertRaisesRegex(RuntimeError,
+                                    "G44_BINDING_INTEGRITY_DENIED:CONFIRMED_EFFECT_ABSENT"):
+            self.strict.claim_next(WORKER,now=NOW+timedelta(seconds=3))
+        self.assertEqual(self.base.get(successor["idempotency_key"])["state"],"PENDING")
+        print("G44_TERMINAL_PREDECESSOR_GREEN=MISSING_LEDGER_BLOCKS_SUCCESSOR")
+
+    def test_39_consistent_confirmed_predecessor_allows_successor_claim(self):
+        successor=self.base.enqueue(
+            intent_ref="synthetic-order-43",action="synthetic_no_provider",
+            payload={"amount_minor":2000},aggregate_key="synthetic-group",
+            policy_version="p1",authorization_ref="auth1",
+            created_at=NOW+timedelta(seconds=1),
+            valid_until=NOW+timedelta(minutes=5))
+        prior=self.base.claim_next(WORKER,now=NOW)
+        self.assertEqual(prior["idempotency_key"],self.key)
+        self.confirm_synthetic()
+        self.assertEqual(self.binding(),"OK")
+        accepted=self.strict.claim_next(WORKER,now=NOW+timedelta(seconds=3))
+        self.assertEqual(accepted["idempotency_key"],successor["idempotency_key"])
+        self.assertEqual(accepted["state"],"CLAIMED")
+        self.assertEqual(self.base.effect_count(),1)
+        print("G44_VALID_PREDECESSOR_GREEN=CONSISTENT_TERMINAL_PERMITS_CLAIM")
 if __name__=="__main__":
     unittest.main()
