@@ -1,0 +1,50 @@
+name: A190 G4 Native SQLite WAL SHM FD Path LAB
+on:
+  pull_request:
+    paths:
+      - 'test_atlasquant_aion_a190_g4_sqlite_native_files_lab.py'
+      - '.github/workflows/aion-a190-g4-native-sqlite-files-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g4-real-filesystem-and-aion-native-sqlite:
+    name: G4 WAL SHM FD path negative controls (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pre-existing minimal AION LAB requirements
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Exercise real SQLite WAL SHM file and live path operations
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest -v test_atlasquant_aion_a190_g4_sqlite_native_files_lab test_atlasquant_aion_live_connection_boundary_a185_lab 2>&1 | tee a190_g4.log
+          grep -q 'A190_G4_MAIN_FILE_ONLY_COPY=LOST_COMMITTED_WAL_ROW_RED' a190_g4.log
+          grep -q 'A190_G4_SQLITE_BACKUP_API=INCLUDES_COMMITTED_WAL_ROW' a190_g4.log
+          grep -q 'A190_G4_REAL_WAL_AND_SHM=CREATED_AND_EXERCISED' a190_g4.log
+          grep -q 'A190_G4_PINNED_SQLITE_READER=STALE_SNAPSHOT_WITH_NEWER_COMMITTED_WAL' a190_g4.log
+          grep -q 'A190_G4_LIVE_READER_PREVENTS_WAL_TRUNCATE=BUSY_THEN_SUCCESS' a190_g4.log
+          grep -q 'A190_G4_LIVE_PATH_REPLACEMENT_RESULT=' a190_g4.log
+          grep -q 'A190_G4_SAME_NATIVE_FILE_ID_DIFFERENT_COMMITTED_CONTENT=RED' a190_g4.log
+          grep -q 'A190_G4_REAL_AION_SQLITE_CHAT_STORE_MAIN_ONLY_COPY=STALE_RED' a190_g4.log
+          grep -q 'A185_AION_NEW_STORE_OPEN_BYPASS=UNGUARDED_CONNECTION' a190_g4.log
+          echo 'A190_G4_REAL_NATIVE_FILE_BYPASSES_AND_OS_DIFFERENCES=OBSERVED'
+      - name: Do not mistake a green negative-control suite for homologation
+        run: |
+          echo 'No custom VFS, authoritative FS hook, independent epoch, full WAL/SHM atomic restore or power loss test.'
+          echo 'Linux/Windows observed OS differences do not establish cross-host protections.'
+          echo 'No effect, client, provider, retry, deploy or runtime changes.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
