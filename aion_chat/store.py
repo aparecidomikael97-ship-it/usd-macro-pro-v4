@@ -452,6 +452,23 @@ class SQLiteChatStore:
                 )
             raise primary_error from rollback_error
 
+    def _begin_or_quarantine(self):
+        """A BEGIN exception may occur after SQLite has acquired a write lock.
+
+        No retry or rollback can attest whether BEGIN acquired the lock.
+        Detach the uncertain connection even if the driver reports a timeout.
+        """
+        self._require_open()
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+        except Exception as begin_error:
+            self.quarantine_failed_transaction()
+            if hasattr(begin_error, "add_note"):
+                begin_error.add_note(
+                    "AION_CHAT_BEGIN_OUTCOME_UNCERTAIN_STORE_QUARANTINED"
+                )
+            raise
+
     def _commit_or_quarantine(self):
         """An exception from COMMIT gives no reliable durability verdict.
 
@@ -479,8 +496,7 @@ class SQLiteChatStore:
         write exception if the rollback also fails. This is local safety only.
         """
         self._require_open()
-        connection = self.db
-        connection.execute("BEGIN IMMEDIATE")
+        self._begin_or_quarantine()
         try:
             yield
         except Exception as primary_error:
@@ -766,8 +782,8 @@ class SQLiteChatStore:
         if message.role not in {"user", "assistant", "system", "task"}:
             raise ValueError("invalid role")
         self._require_open()
+        self._begin_or_quarantine()
         try:
-            self.db.execute("BEGIN IMMEDIATE")
             c = self.get_conversation(scope, message.conversation_id)
             for aid in message.attachments:
                 self.get_attachment(scope, c.id, aid)

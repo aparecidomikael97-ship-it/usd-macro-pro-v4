@@ -195,6 +195,26 @@ class ExecutionOutbox:
                 )
             raise original_error from rollback_error
 
+    def _begin_or_quarantine(self) -> None:
+        """BEGIN error can follow a successful SQLite lock/transaction start.
+
+        Fail closed even on an apparent busy/error response; never infer
+        that no transaction began, and never resend an external operation.
+        """
+        if self.db is None:
+            raise StorageUnavailableError("OUTBOX_BEGIN_STORE_QUARANTINED")
+        self.store.require_healthy()
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+        except Exception as begin_error:
+            self.store.quarantine_failed_transaction()
+            self.db = None
+            if hasattr(begin_error, "add_note"):
+                begin_error.add_note(
+                    "AION_OUTBOX_BEGIN_OUTCOME_UNCERTAIN_NO_AUTO_RETRY"
+                )
+            raise
+
     def _commit_or_quarantine(self) -> None:
         """Any COMMIT exception has UNKNOWN durability: never infer absence.
 
@@ -223,7 +243,7 @@ class ExecutionOutbox:
         if self.db is None:
             raise StorageUnavailableError("OUTBOX_TRANSACTION_QUARANTINED")
         self.store.require_healthy()
-        self.db.execute("BEGIN IMMEDIATE")
+        self._begin_or_quarantine()
         try:
             yield
         except Exception as primary_error:
@@ -420,7 +440,7 @@ class ExecutionOutbox:
         idempotency_key = _digest(key_material)
         decision_id = "DEC-" + idempotency_key[:24].upper()
 
-        self.db.execute("BEGIN IMMEDIATE")
+        self._begin_or_quarantine()
         try:
             existing = self.db.execute(
                 """SELECT o.idempotency_key, d.data AS decision_data
@@ -520,7 +540,7 @@ class ExecutionOutbox:
 
     def release_expired_claims(self, *, now: Any | None = None) -> int:
         current = _iso(_utc(now))
-        self.db.execute("BEGIN IMMEDIATE")
+        self._begin_or_quarantine()
         try:
             cursor = self.db.execute(
                 """UPDATE action_outbox
@@ -554,7 +574,7 @@ class ExecutionOutbox:
         owner, tenant, workspace = self._scope_args()
 
         self.release_expired_claims(now=now_dt)
-        self.db.execute("BEGIN IMMEDIATE")
+        self._begin_or_quarantine()
         try:
             row = self.db.execute(
                 """SELECT o.idempotency_key
@@ -664,7 +684,7 @@ class ExecutionOutbox:
     ) -> dict[str, Any]:
         effect = _token(effect_ref, "effect_ref", 128)
         encoded = _canonical(redact(dict(result or {})))
-        self.db.execute("BEGIN IMMEDIATE")
+        self._begin_or_quarantine()
         try:
             existing = self.db.execute(
                 """SELECT effect_ref FROM action_effects
