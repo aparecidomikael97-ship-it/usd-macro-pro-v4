@@ -84,12 +84,14 @@ class G39AtomicSemanticReservation(unittest.TestCase):
         self.assertEqual(len(self.locks()),2)
         self.assertEqual(len(foreign.list()),1)
 
-    def test_06_different_owner_same_event_allowed(self):
+    def test_06_different_owner_same_tenant_event_denied(self):
         self.stage()
         foreign=ExecutionOutbox(self.store,Scope("other-owner",SCOPE.tenant_id,"separate-workspace"))
-        other=self.stage(outbox=foreign,intent="other-intent")
-        self.assertEqual(other["enqueue_state"],"ENQUEUED")
-        self.assertEqual(len(self.locks()),2)
+        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
+            self.stage(outbox=foreign,intent="other-intent")
+        self.assertEqual(foreign.list(),[])
+        self.assertEqual(len(self.locks()),1)
+        print("G39_CROSS_OWNER_GREEN=TENANT_EVENT_UNIQUE_ACROSS_OWNERS")
 
     def test_07_distinct_signed_event_ids_still_cannot_prove_business_truth_red(self):
         self.stage()
