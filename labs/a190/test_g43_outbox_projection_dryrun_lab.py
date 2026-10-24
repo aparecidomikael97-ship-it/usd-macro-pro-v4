@@ -143,7 +143,8 @@ class G43ProjectionContract(unittest.TestCase):
         self.make_uncertain()
         plan = self.lab.projection_plan_lab(self.key)
         once = self.lab.apply_projection_plan_lab(plan, explicit_approval=True)
-        twice = self.lab.apply_projection_plan_lab(plan, explicit_approval=True)
+        refreshed = self.lab.projection_plan_lab(self.key)
+        twice = self.lab.apply_projection_plan_lab(refreshed, explicit_approval=True)
         self.assertTrue(once["updated"])
         self.assertFalse(twice["updated"])
 
