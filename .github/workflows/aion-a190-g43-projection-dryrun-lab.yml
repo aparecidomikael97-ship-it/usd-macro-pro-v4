@@ -5,6 +5,8 @@ on:
       - 'atlasquant_aion_execution_outbox.py'
       - 'labs/a190/test_g43_outbox_projection_dryrun_lab.py'
       - '.github/workflows/aion-a190-g43-projection-dryrun-lab.yml'
+      - 'labs/a190/g43_projection_readonly_auditor_lab.py'
+      - 'labs/a190/test_g43_projection_readonly_auditor_lab.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,8 +34,10 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g43_*.py' -v 2>&1 | tee g43.log
-          grep -F 'Ran 22 tests' g43.log
+          grep -F 'Ran 32 tests' g43.log
           grep -F 'G43_READONLY_PLAN_GREEN=NO_HISTORICAL_WRITE' g43.log
+          grep -F 'G43_STANDALONE_RO_GREEN=READONLY_OPEN_NO_STORE_BOOTSTRAP' g43.log
+          grep -F 'G43_STANDALONE_DRIFT_GREEN=ANOMALY_CLASSIFIED_NO_MUTATION' g43.log
           grep -F 'G43_EXPLICIT_ONE_ROW_GREEN=ATOMIC_JSON_COLUMN_CAS' g43.log
           grep -F 'G43_NEW_CONFIRM_GREEN=PROJECTION_AND_LEDGER_SAME_COMMIT' g43.log
           grep -F 'G43_LEDGER_IMMUTABLE_GREEN=NO_RECEIPT_OR_TIMESTAMP_REWRITE' g43.log
