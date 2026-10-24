@@ -251,7 +251,7 @@ def main(argv):
         identity = subprocess.run(
             ["whoami", "/user"], capture_output=True, text=True, check=True,
         ).stdout
-        match = re.search(r"S-1-\\d+(?:-\\d+)+", identity)
+        match = re.search(r"S-1-\d+(?:-\d+)+", identity)
         if match is None:
             raise AssertionError("G7_REAL_WINDOWS_SID_NOT_FOUND")
         print("A190_G7_REAL_PROCESS_PRINCIPAL=" + match.group(0))
