@@ -682,6 +682,8 @@ class ExecutionOutbox:
                 """SELECT o.idempotency_key
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
+                     AND d.owner=o.owner AND d.tenant=o.tenant
+                     AND d.workspace=o.workspace
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
                      AND o.state IN ('PENDING','RETRY')
                      AND NOT EXISTS (
@@ -1227,6 +1229,7 @@ class ExecutionOutbox:
         # this line is unreachable regardless of caller-supplied callbacks.
         self._g44_assert_binding_lab(key)
         send = getattr(adapter, "send", None)
+        self._g44_assert_binding_lab(key)
         if not callable(send):
             if self._strict_claim_fencing_lab:
                 self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
@@ -1287,6 +1290,7 @@ class ExecutionOutbox:
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         if result.get("accepted") is not True:
