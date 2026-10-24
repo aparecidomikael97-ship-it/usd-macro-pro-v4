@@ -1,0 +1,70 @@
+name: A190 G41 persisted generation fencing LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g41_persisted_claim_epoch_lab.py'
+      - '.github/workflows/aion-a190-g41-persisted-fencing-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g41-fencing:
+    name: G41 persisted epoch and CAS / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install synthetic LAB cryptography
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Persistent SQLite epoch, fencing CAS, reentrant callback RED
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g41_*.py' -v 2>&1 | tee g41.log
+          grep -F 'Ran 18 tests' g41.log
+          grep -F 'G41_PERSISTED_EPOCH_GREEN=CLAIM_GENERATION_IN_REAL_SQLITE' g41.log
+          grep -F 'G41_SAME_WORKER_GREEN=STALE_EPOCH_DENIED_AFTER_RECLAIM' g41.log
+          grep -F 'G41_REOPEN_GREEN=PERSISTENT_NEW_EPOCH_OLD_HANDLE_REFUSED' g41.log
+          grep -F 'G41_AUTH_REENTRY_GREEN=CONFIRMED_NOT_REVOKED' g41.log
+          grep -F 'G41_WITNESS_REENTRY_GREEN=CONFIRMED_NOT_REPLACED' g41.log
+          grep -F 'G41_GETTER_EPOCH_GREEN=REENTRY_DENIED_BEFORE_SEND' g41.log
+          grep -F 'G41_SEND_REENTRY_GREEN=CONFIRMED_NOT_SENT' g41.log
+          grep -F 'G41_SAME_HOST_ROLLBACK_RED=OLD_GENERATION_RESTORED_WITH_SQLITE' g41.log
+          grep -F 'G41_LAB_STUB_LIMIT=SENT_ROW_NOT_REAL_PROVIDER_EFFECT' g41.log
+      - name: Inherited G40 to G30 regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          for n in 40 39 38 37 36 35 34 33 32 31 30; do
+            python -B -m unittest discover -s labs/a190 -p "test_g${n}_*.py" -v 2>&1 | tee "g${n}.log"
+          done
+          grep -F 'Ran 36 tests' g40.log
+          grep -F 'Ran 28 tests' g39.log
+          grep -F 'Ran 24 tests' g38.log
+          grep -F 'Ran 34 tests' g37.log
+          grep -F 'Ran 20 tests' g36.log
+          grep -F 'Ran 18 tests' g35.log
+          grep -F 'Ran 16 tests' g34.log
+          grep -F 'Ran 24 tests' g33.log
+          grep -F 'Ran 20 tests' g32.log
+          grep -F 'Ran 18 tests' g31.log
+          grep -F 'Ran 23 tests' g30.log
+      - name: Explicit no-go
+        shell: bash
+        run: |
+          echo 'G41 local SQLite attempts is only an intra-host fencing epoch.'
+          echo 'Host rollback can rewind epoch; same-host trust not external.'
+          echo 'Opt-in LAB only, no operational provider, Worker, main/merge/deploy.'
+          echo 'No real customer data, keys, money or P0 homologation.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
