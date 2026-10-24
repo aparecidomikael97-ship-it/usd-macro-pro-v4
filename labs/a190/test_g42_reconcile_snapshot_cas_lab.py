@@ -341,5 +341,90 @@ class G42ReconciliationCAS(unittest.TestCase):
         self.assertEqual(denied.effect_count(), 0)
 
 
+    def test_23_reconfirm_same_effect_keeps_original_timestamp(self):
+        first = self.check(ReconcileStub())
+        self.assertEqual(first["state"], "CONFIRMED")
+        original = self.current()
+        count_before = self.lab.effect_count()
+        repeated = self.lab._confirm(
+            self.key, effect_ref="g42-result",
+            confirmed_at=NOW + timedelta(hours=1),
+            result={"synthetic": "replay-with-different-metadata"},
+        )
+        self.assertEqual(repeated["confirmed_at"], original["confirmed_at"])
+        self.assertEqual(repeated["effect_ref"], original["effect_ref"])
+        self.assertEqual(self.lab.effect_count(), count_before)
+        ledger = self.store.db.execute(
+            "SELECT confirmed_at FROM action_effects WHERE idempotency_key=?",
+            (self.key,),
+        ).fetchone()
+        self.assertEqual(ledger["confirmed_at"], original["confirmed_at"])
+        print("G42_RECONFIRM_IDEMPOTENT_GREEN=ORIGINAL_TIMESTAMP_AND_LEDGER_FROZEN")
+
+    def test_24_reconfirm_conflicting_ref_denied_without_mutation(self):
+        self.check(ReconcileStub())
+        original = self.current()
+        with self.assertRaisesRegex(RuntimeError, "G42_CONFIRMED_LEDGER_INVARIANT_DENY"):
+            self.lab._confirm(
+                self.key, effect_ref="conflicting-ref",
+                confirmed_at=NOW + timedelta(hours=1),
+                result={"synthetic": True},
+            )
+        self.assertEqual(self.current(), original)
+        self.assertEqual(self.lab.effect_count(), 1)
+
+    def test_25_revoked_row_cannot_be_synthetically_confirmed(self):
+        self.mutate("state='REVOKED', last_error='synthetic-revocation'")
+        original = self.current()
+        with self.assertRaisesRegex(RuntimeError, "G42_UNSAFE_PRECONFIRM_PHASE_DENY"):
+            self.lab._confirm(
+                self.key, effect_ref="synthetic-invalid",
+                confirmed_at=NOW + timedelta(minutes=10),
+                result={"synthetic": True},
+            )
+        self.assertEqual(self.current(), original)
+        self.assertEqual(self.lab.effect_count(), 0)
+        self.assertFalse(self.lab.db.in_transaction)
+
+    def test_26_failed_row_cannot_be_synthetically_confirmed(self):
+        self.mutate("state='FAILED', last_error='synthetic-failed'")
+        with self.assertRaisesRegex(RuntimeError, "G42_UNSAFE_PRECONFIRM_PHASE_DENY"):
+            self.lab._confirm(
+                self.key, effect_ref="synthetic-invalid",
+                confirmed_at=NOW + timedelta(minutes=10),
+            )
+        self.assertEqual(self.current()["state"], "FAILED")
+        self.assertEqual(self.lab.effect_count(), 0)
+
+    def test_27_existing_confirmed_row_with_inconsistent_ledger_denied(self):
+        self.check(ReconcileStub())
+        self.store.db.execute(
+            "UPDATE action_effects SET confirmed_at='1999-01-01T00:00:00+00:00' "
+            "WHERE idempotency_key=?", (self.key,)
+        )
+        self.store.db.commit()
+        old = self.current()
+        with self.assertRaisesRegex(RuntimeError, "G42_CONFIRMED_LEDGER_INVARIANT_DENY"):
+            self.lab._confirm(
+                self.key, effect_ref="g42-result",
+                confirmed_at=NOW + timedelta(hours=1),
+            )
+        self.assertEqual(self.current(), old)
+        self.assertFalse(self.lab.db.in_transaction)
+        print("G42_LEDGER_INCONSISTENCY_GREEN=REFUSE_TO_REWRITE_CONTRADICTORY_HISTORY")
+
+    def test_28_legacy_outbox_json_projection_stale_red(self):
+        self.check(ReconcileStub())
+        raw = self.store.db.execute(
+            "SELECT data FROM action_outbox WHERE idempotency_key=?",
+            (self.key,),
+        ).fetchone()["data"]
+        import json
+        projected = json.loads(raw)
+        self.assertEqual(self.current()["state"], "CONFIRMED")
+        self.assertEqual(projected["state"], "PENDING")
+        print("G42_SNAPSHOT_JSON_RED=LEGACY_EMBEDDED_STATE_NOT_TRANSITIONED")
+
+
 if __name__ == "__main__":
     unittest.main()
