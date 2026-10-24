@@ -164,6 +164,7 @@ class AionChaosCampaignTests(unittest.TestCase):
             store, self.scope,
             first_attempt_guard=evidence.reserve_first_attempt if evidence else None,
             evidence_verifier=evidence.verify if evidence else None,
+            unsafe_allow_synthetic_lab_callbacks=evidence is not None,
         )
 
     def _enqueue(self, outbox, ref):
