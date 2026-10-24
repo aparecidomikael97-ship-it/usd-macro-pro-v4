@@ -332,5 +332,85 @@ class G44BindingIntegrity(unittest.TestCase):
         self.assertEqual(report["rows"],1)
         print("G44_ORPHAN_DECISION_GREEN=READONLY_CLASSIFICATION_NO_REPAIR")
 
+
+    def test_32_unicode_payload_canonicalization_matches_real_producer(self):
+        item=self.base.enqueue(
+            intent_ref="unicode42",action="synthetic_no_provider",
+            payload={"descrição":"ação e inflação","amount_minor":1000},
+            aggregate_key="synthetic-group",policy_version="p1",
+            authorization_ref="auth1",created_at=NOW,
+            valid_until=NOW+timedelta(minutes=5))
+        key=item["idempotency_key"]
+        self.assertEqual(self.binding(key),"OK")
+        print("G44_UNICODE_GREEN=PRODUCER_AUDITOR_CANONICAL_DIGEST_MATCH")
+
+    def test_33_reconcile_getter_reentry_denies_before_callback(self):
+        self.with_claim()
+        state=self.base.dispatch_claimed(self.key,worker_id=WORKER,
+            authorize=self.authorize,adapter=self.trap,
+            now=NOW+timedelta(seconds=1))
+        self.assertEqual(state["state"],"UNCERTAIN")
+        reviewer=ExecutionOutbox(self.store,SCOPE,
+            unsafe_allow_synthetic_lab_callbacks=True,
+            strict_binding_integrity_lab=True,evidence_verifier=lambda *_:True)
+        parent=self
+        class GetterPoison:
+            calls=0
+            @property
+            def reconcile(self):
+                parent.mutate("action_decisions","data='g44-malformed'")
+                return self._call
+            def _call(self,key,decision):
+                self.calls+=1
+                raise AssertionError("G44_GETTER_MUST_BLOCK_BEFORE_CALLBACK")
+        trap=GetterPoison()
+        with self.assertRaisesRegex(RuntimeError,"G44_BINDING_INTEGRITY_DENIED"):
+            reviewer.reconcile(self.key,adapter=trap,
+                authorize=self.authorize,now=NOW+timedelta(minutes=2))
+        self.assertEqual(trap.calls,0)
+        self.assertEqual(self.store.db.execute(
+            "SELECT state FROM action_outbox WHERE idempotency_key=?",
+            (self.key,)).fetchone()["state"],"UNCERTAIN")
+        print("G44_RECONCILE_GETTER_GREEN=REENTRY_DENIED_ZERO_CALLBACK")
+
+    def test_34_orphaned_predecessor_prevents_successor_claim(self):
+        successor=self.base.enqueue(
+            intent_ref="synthetic-order-43",action="synthetic_no_provider",
+            payload={"amount_minor":2000},
+            aggregate_key="synthetic-group",policy_version="p1",
+            authorization_ref="auth1",created_at=NOW+timedelta(seconds=1),
+            valid_until=NOW+timedelta(minutes=5))
+        self.store.db.execute("DELETE FROM action_outbox WHERE idempotency_key=?",
+                              (self.key,))
+        self.store.db.commit()
+        self.assertIsNone(self.strict.claim_next(WORKER,now=NOW))
+        self.assertEqual(self.base.get(successor["idempotency_key"])["state"],"PENDING")
+        self.assertEqual(self.audit()["counts"].get("ORPHAN_DECISION"),1)
+        print("G44_ORPHAN_PREDECESSOR_GREEN=NO_SUCCESSOR_CLAIM")
+
+    def test_35_repeated_confirmation_keeps_original_timestamp(self):
+        first=self.confirm_synthetic()
+        original_at=first["confirmed_at"]
+        repeated=self.strict._confirm(self.key,effect_ref="synthetic-local-effect",
+            confirmed_at=NOW+timedelta(hours=1),result={"synthetic":"repeated"})
+        self.assertEqual(repeated["confirmed_at"],original_at)
+        ledger=self.store.db.execute(
+            "SELECT confirmed_at FROM action_effects WHERE idempotency_key=?",
+            (self.key,)).fetchone()
+        self.assertEqual(ledger["confirmed_at"],original_at)
+        self.assertEqual(self.binding(),"OK")
+        print("G44_RECONFIRM_GREEN=IMMUTABLE_LOCAL_LEDGER_TIME")
+
+    def test_36_unsupported_decision_schema_denied(self):
+        doc=json.loads(self.decision())
+        doc["schema"]="ATLASQUANT_AION_UNREVIEWED_V2"
+        self.mutate("action_decisions","data=?",(json.dumps(doc),))
+        self.assertEqual(self.binding(),"DECISION_SCHEMA_OR_AUTHORITY_INVALID")
+
+    def test_37_deceptive_authority_grant_in_json_denied(self):
+        doc=json.loads(self.decision())
+        doc["grants_authority"]=True
+        self.mutate("action_decisions","data=?",(json.dumps(doc),))
+        self.assertEqual(self.binding(),"DECISION_SCHEMA_OR_AUTHORITY_INVALID")
 if __name__=="__main__":
     unittest.main()
