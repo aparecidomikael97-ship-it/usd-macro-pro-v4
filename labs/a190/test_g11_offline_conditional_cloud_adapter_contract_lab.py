@@ -26,9 +26,10 @@ class G11OfflineConditionalRequestContracts(unittest.TestCase):
             event if event is not None else self.event, self.pin, request,
         )
 
-    def fs(self, request="req-1", event=None):
+    def fs(self, request="req-1", event=None, **options):
         return firestore_envelopes(
             event if event is not None else self.event, self.pin, request,
+            **options,
         )
 
     def test_01_both_providers_share_signed_semantic_native_key(self):
