@@ -1169,6 +1169,14 @@ class ExecutionOutbox:
                 raise RuntimeError("FENCE_STALE_SEND_RESULT_NO_WRITE")
         return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
 
+    @staticmethod
+    def _g42_reconcile_snapshot_lab(intent: Mapping[str, Any]) -> tuple[str, int, str, str, str]:
+        return (
+            str(intent["state"]), int(intent["attempts"]),
+            str(intent["lease_owner"]), str(intent["lease_until"]),
+            str(intent["effect_ref"]),
+        )
+
     def reconcile(
         self,
         idempotency_key: Any,
@@ -1183,6 +1191,18 @@ class ExecutionOutbox:
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
             raise ValueError("only SENT or UNCERTAIN intents require reconciliation")
+        snapshot_lab = (
+            self._g42_reconcile_snapshot_lab(intent)
+            if self._strict_reconcile_snapshot_cas_lab else None
+        )
+
+        def no_stale_reply_lab() -> bool:
+            return (snapshot_lab is None or
+                    self._g42_reconcile_snapshot_lab(self.get(key)) == snapshot_lab)
+
+        def stale_reply_lab() -> dict[str, Any]:
+            return {**self.get(key), "reconcile_state": "G42_STALE_REPLY_NO_WRITE"}
+
         # Reconciliation adapters are caller-controlled Python objects too.
         # In default quarantine do not even inspect adapter.reconcile: its
         # property lookup may execute arbitrary host code. No confirmation.
@@ -1192,30 +1212,45 @@ class ExecutionOutbox:
             intent, authorize,
         ):
             return {**intent, "reconcile_state": "RECONCILE_AUTH_DENIED_NO_LOOKUP"}
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
         reconcile = getattr(adapter, "reconcile", None)
         if not callable(reconcile):
             raise TypeError("adapter.reconcile required")
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
 
         try:
             result = _mapping(_bound_callback(reconcile, key, dict(intent["decision"])))
         except Exception:
-            # A changed binding or a lost reconciliation response cannot
-            # confirm an effect, nor grant a resend or retry permission.
+            # A changed binding or lost response has no retry authority.
+            if not no_stale_reply_lab():
+                return stale_reply_lab()
             return {**self.get(key), "reconcile_state": "STILL_UNCERTAIN"}
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
         if result.get("found") is True and result.get("confirmed") is True:
             effect_ref = _clean(result.get("effect_ref"), 128)
             if effect_ref and self._verified_evidence(
                 "EFFECT_CONFIRMED", intent, result
             ):
-                out = self._confirm(
-                    key,
-                    effect_ref=effect_ref,
-                    confirmed_at=now_dt,
-                    result=result,
-                )
+                try:
+                    out = self._confirm(
+                        key,
+                        effect_ref=effect_ref,
+                        confirmed_at=now_dt,
+                        result=result,
+                        reconcile_snapshot_lab=snapshot_lab,
+                    )
+                except RuntimeError as exc:
+                    if str(exc) == "G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER":
+                        return stale_reply_lab()
+                    raise
                 return {**out, "reconcile_state": "CONFIRMED"}
             # A self-asserted receipt or a disabled verifier is not evidence
             # of a trusted provider-side effect. Leave current state intact.
+            if not no_stale_reply_lab():
+                return stale_reply_lab()
             return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
         # A caller-controlled dictionary with found=False and
@@ -1223,6 +1258,8 @@ class ExecutionOutbox:
         # guarantee that the provider produced no effect. Do not turn
         # UNCERTAIN/SENT into RETRY here. A future witnessed absence protocol
         # requires a separate reviewed contract before any retry authority.
+        if not no_stale_reply_lab():
+            return stale_reply_lab()
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
     def effect_count(self) -> int:
