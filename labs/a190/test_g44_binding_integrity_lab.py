@@ -189,7 +189,9 @@ class G44BindingIntegrity(unittest.TestCase):
 
     def test_19_strict_claim_refuses_tampered_pending(self):
         self.mutate("action_decisions","data='malformed'")
-        before=self.base.get(self.key)["state"]
+        before=self.store.db.execute(
+            "SELECT state FROM action_outbox WHERE idempotency_key=?",
+            (self.key,)).fetchone()["state"]
         with self.assertRaisesRegex(RuntimeError,
                                     "G44_BINDING_INTEGRITY_DENIED:DECISION_JSON_INVALID"):
             self.strict.claim_next(WORKER,now=NOW)
@@ -274,6 +276,59 @@ class G44BindingIntegrity(unittest.TestCase):
             " WHERE idempotency_key=?", (key,))
         self.store.db.commit()
         self.assertEqual(self.binding(key),"SEMANTIC_RESERVATION_MISMATCH")
+
+
+    def test_28_duplicate_decision_json_key_denied(self):
+        original = self.decision()
+        ambiguous = original.replace('"decision_id":', '"decision_id":"fake",'
+                                     '"decision_id":', 1)
+        self.mutate("action_decisions","data=?",(ambiguous,))
+        self.assertEqual(self.binding(),"DECISION_JSON_INVALID")
+        print("G44_DUPLICATE_JSON_GREEN=AMBIGUOUS_DECISION_KEYS_DENIED")
+
+    def test_29_duplicate_outbox_json_key_denied(self):
+        old=self.store.db.execute(
+            "SELECT data FROM action_outbox WHERE idempotency_key=?",
+            (self.key,)).fetchone()["data"]
+        ambiguous=old.replace('"state":','"state":"CONFIRMED","state":',1)
+        self.mutate("action_outbox","data=?",(ambiguous,))
+        self.assertEqual(self.binding(),"OUTBOX_JSON_INVALID")
+
+    def test_30_reused_decision_across_two_outbox_rows_denied(self):
+        ref=self.base.get(self.key)["decision_id"]
+        fake_key="g44-duplicate-binding-row"
+        fake_doc=json.dumps({"idempotency_key":fake_key,
+                             "decision_id":ref,"state":"PENDING"})
+        self.store.db.execute(
+            """INSERT INTO action_outbox
+               (idempotency_key,decision_id,owner,tenant,workspace,state,data)
+               VALUES(?,?,?,?,?,'PENDING',?)""",
+            (fake_key,ref,SCOPE.owner_id,SCOPE.tenant_id,
+             SCOPE.workspace_id,fake_doc))
+        self.store.db.commit()
+        self.assertEqual(self.binding(),"DECISION_SHARED_BY_MULTIPLE_OUTBOXES")
+        self.assertEqual(self.binding(fake_key),"DECISION_SHARED_BY_MULTIPLE_OUTBOXES")
+        print("G44_SHARED_DECISION_GREEN=SECOND_OUTBOX_REFUSED")
+
+    def test_31_orphan_decision_is_classified_without_auto_repair(self):
+        ref=self.base.get(self.key)["decision_id"]
+        self.store.db.execute(
+            """INSERT INTO action_decisions(
+               decision_id,owner,tenant,workspace,intent_ref,action,
+               aggregate_key,aggregate_seq,payload_digest,policy_version,
+               authorization_ref,valid_until,created_at,data)
+               SELECT 'DEC-G44-ORPHAN',owner,tenant,workspace,
+                      'g44-orphan-intent',action,aggregate_key,
+                      aggregate_seq+100,payload_digest,policy_version,
+                      authorization_ref,valid_until,created_at,data
+               FROM action_decisions WHERE decision_id=?""",
+            (ref,))
+        self.store.db.commit()
+        self.assertEqual(self.binding(),"OK")
+        report=self.audit()
+        self.assertEqual(report["counts"]["ORPHAN_DECISION"],1)
+        self.assertEqual(report["rows"],1)
+        print("G44_ORPHAN_DECISION_GREEN=READONLY_CLASSIFICATION_NO_REPAIR")
 
 if __name__=="__main__":
     unittest.main()
