@@ -195,6 +195,7 @@ class G40FreshClockAfterWitness(unittest.TestCase):
     def test_14_default_outbox_still_blocks_synthetic_send(self):
         outbox=ExecutionOutbox(self.store,SCOPE,
             fresh_dispatch_clock_lab=lambda:NOW+timedelta(seconds=2))
+        self.outbox=outbox
         row=outbox.enqueue(intent_ref="g40-other",action="synthetic_no_provider",
             payload={"amount_minor":1000},aggregate_key="g40-other",
             policy_version="p1",authorization_ref="a1",
