@@ -1,0 +1,46 @@
+name: A190 G27 durable SQLite custody LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g27_durable_sqlite_custody_lab.py'
+      - 'labs/a190/test_g27_durable_sqlite_custody_lab.py'
+      - '.github/workflows/aion-a190-g27-durable-custody-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g27-durable-custody:
+    name: G27 SQLite custody / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install test-only cryptography
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Durable local custody restart GREEN and host rollback RED
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g27_durable_sqlite_custody_lab.py' -v 2>&1 | tee g27.log
+          grep -F 'Ran 18 tests' g27.log
+          grep -F 'G27_RESTART_GREEN=RESERVATION_SURVIVES_REOPEN' g27.log
+          grep -F 'G27_HOST_DELETE_RED=LOCAL_CUSTODY_RECORD_LOST' g27.log
+          grep -F 'G27_HOST_ROLLBACK_RED=OLD_SQLITE_CUSTODY_ACCEPTED' g27.log
+          grep -F 'G27_HOST_COUNTER_ROLLBACK_RED=SEQUENCE_REUSED_AFTER_RESTORE' g27.log
+      - name: Mandatory no-go
+        shell: bash
+        run: |
+          echo 'SQLite persistence is NOT independent external antirollback custody.'
+          echo 'Passing RED reproduces host rollback and counter reuse vulnerability.'
+          echo 'No provider dispatch, no first-send external reservation, no P0 closure.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
