@@ -1,0 +1,75 @@
+name: A190 G44 decision outbox ledger binding LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'atlasquant_aion_outbox_binding_lab.py'
+      - 'labs/a190/test_g44_binding_integrity_lab.py'
+      - '.github/workflows/aion-a190-g44-binding-integrity-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g44-binding:
+    name: G44 binding integrity / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 27
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install LAB crypto for inherited witness tests
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Scoped local decision and ledger binding + fail-closed gates
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v 2>&1 | tee g44.log
+          grep -F 'Ran 27 tests' g44.log
+          grep -F 'G44_DECISION_BINDING_GREEN=SCOPED_HASH_AND_JSON_MATCH' g44.log
+          grep -F 'G44_FOREIGN_SCOPE_GREEN=CROSS_OWNER_DECISION_NOT_EXPOSED' g44.log
+          grep -F 'G44_PAYLOAD_DIGEST_GREEN=MODIFIED_BUSINESS_VALUE_REFUSED' g44.log
+          grep -F 'G44_MISSING_LEDGER_GREEN=CONFIRMED_WITHOUT_EFFECT_DENIED' g44.log
+          grep -F 'G44_CLAIM_BLOCK_GREEN=NO_CLAIM_ON_INVALID_DECISION' g44.log
+          grep -F 'G44_PRE_SEND_GREEN=BAD_BINDING_ZERO_ADAPTER_ACCESS' g44.log
+          grep -F 'G44_CALLBACK_REENTRY_GREEN=BAD_DECISION_NO_SEND' g44.log
+          grep -F 'G44_RECONCILE_PREGETTER_GREEN=BAD_RECEIPT_ZERO_LOOKUP' g44.log
+          grep -F 'G44_READONLY_AUDIT_GREEN=NO_SCHEMA_CREATION_OR_DATA_WRITE' g44.log
+          grep -F 'G44_AUTHENTICITY_RED=CORRECT_LOCAL_HASH_NOT_VERIFIED_EXTERNAL_EVENT' g44.log
+      - name: Historical G43-G30 regression RED+GREEN
+        shell: bash
+        run: |
+          set -o pipefail
+          for n in 43 42 41 40 39 38 37 36 35 34 33 32 31 30; do
+            python -B -m unittest discover -s labs/a190 -p "test_g${n}_*.py" -v 2>&1 | tee "g${n}.log"
+          done
+          grep -F 'Ran 32 tests' g43.log
+          grep -F 'Ran 28 tests' g42.log
+          grep -F 'Ran 18 tests' g41.log
+          grep -F 'Ran 36 tests' g40.log
+          grep -F 'Ran 28 tests' g39.log
+          grep -F 'Ran 24 tests' g38.log
+          grep -F 'Ran 34 tests' g37.log
+          grep -F 'Ran 20 tests' g36.log
+          grep -F 'Ran 18 tests' g35.log
+          grep -F 'Ran 16 tests' g34.log
+          grep -F 'Ran 24 tests' g33.log
+          grep -F 'Ran 20 tests' g32.log
+          grep -F 'Ran 18 tests' g31.log
+          grep -F 'Ran 23 tests' g30.log
+      - name: HARD NO-GO
+        shell: bash
+        run: |
+          echo 'Scoped local hashes/ledger are NOT provider-receipt authenticity.'
+          echo 'G44 opt-in: legacy readers/writers cannot be called fully secured.'
+          echo 'No schema migration, trigger/view, remote root, real Worker/provider.'
+          echo 'No main/merge/deploy, customer data/credentials or spending.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
