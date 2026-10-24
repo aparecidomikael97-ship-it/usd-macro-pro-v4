@@ -128,7 +128,7 @@ jobs:
           $probe = Join-Path $env:PUBLIC ('a190g7_probe_' + $suffix + '.py')
           Copy-Item (Join-Path $env:GITHUB_WORKSPACE 'labs\a190\g7_os_separated_signed_issuer_lab.py') $probe
           $python = (Get-Command python).Source
-          function Invoke-Role([string]$username, [securestring]$password, [string[]]$args) {
+          function Invoke-Role([string]$username, [securestring]$password, [string[]]$commandArgs) {
             $psi = [System.Diagnostics.ProcessStartInfo]::new()
             $psi.FileName = $python
             $psi.WorkingDirectory = $env:PUBLIC
@@ -140,7 +140,7 @@ jobs:
             $psi.RedirectStandardError = $true
             $psi.ArgumentList.Add('-B')
             $psi.ArgumentList.Add($probe)
-            foreach ($arg in $args) { $psi.ArgumentList.Add($arg) }
+            foreach ($arg in $commandArgs) { $psi.ArgumentList.Add($arg) }
             $proc = [System.Diagnostics.Process]::Start($psi)
             $out = $proc.StandardOutput.ReadToEnd()
             $err = $proc.StandardError.ReadToEnd()
