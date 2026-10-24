@@ -1,0 +1,182 @@
+name: A190 G2 Separate OS Principal Floor LAB (Ubuntu Windows)
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/principal_floor_g2_lab.py'
+      - '.github/workflows/aion-a190-g2-principal-floor-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g2-unprivileged-app-vs-custodian-then-root-counterexample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Real UIDs and two local files under different owners
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            git rev-parse HEAD
+            sudo useradd --system --no-create-home --shell /usr/sbin/nologin a190g2custodian
+            sudo useradd --system --no-create-home --shell /usr/sbin/nologin a190g2app
+            echo "A190_G2_CUSTODIAN_UID=$(id -u a190g2custodian)"
+            echo "A190_G2_APP_UID=$(id -u a190g2app)"
+            test "$(id -u a190g2custodian)" != "$(id -u a190g2app)"
+            probe_file="$(mktemp -p /tmp a190g2_probe_XXXXXX.py)"
+            cp labs/a190/principal_floor_g2_lab.py "$probe_file"
+            chmod 644 "$probe_file"
+            app_dir="$(mktemp -d -p /tmp a190g2_app_XXXXXX)"
+            floor_dir="$(mktemp -d -p /tmp a190g2_floor_XXXXXX)"
+            sudo chown a190g2app:a190g2app "$app_dir"
+            sudo chmod 700 "$app_dir"
+            sudo chown a190g2custodian:a190g2custodian "$floor_dir"
+            sudo chmod 755 "$floor_dir"
+            database="$app_dir/state.sqlite"
+            snapshot_db="$app_dir/old.sqlite"
+            floor="$floor_dir/floor.json"
+            snapshot_floor="$(mktemp -p /tmp a190g2_floor_backup_XXXXXX)"
+            sudo -u a190g2app python -B "$probe_file" app-init "$database"
+            first="$(sudo -u a190g2app python -B "$probe_file" state "$database")"
+            read -r first_seq first_digest <<< "$first"
+            test "$first_seq" = "1"
+            sudo -u a190g2custodian python -B "$probe_file" publish "$floor" "$first_seq" "$first_digest"
+            sudo -u a190g2app python -B "$probe_file" expect-current "$database" "$floor" 1
+            sudo -u a190g2app cp "$database" "$snapshot_db"
+            cp "$floor" "$snapshot_floor"
+            sudo -u a190g2app python -B "$probe_file" app-advance "$database"
+            second="$(sudo -u a190g2app python -B "$probe_file" state "$database")"
+            read -r second_seq second_digest <<< "$second"
+            test "$second_seq" = "2"
+            sudo -u a190g2custodian python -B "$probe_file" publish "$floor" "$second_seq" "$second_digest"
+            sudo -u a190g2app python -B "$probe_file" expect-current "$database" "$floor" 2
+            sudo -u a190g2app cp "$snapshot_db" "$database"
+            sudo -u a190g2app python -B "$probe_file" forge "$floor"
+            sudo -u a190g2app python -B "$probe_file" expect-stale "$database" "$floor"
+            echo 'A190_G2_DIFFERENT_UNPRIVILEGED_UID_CANNOT_ROLLBACK_PROTECTED_FLOOR=OBSERVED'
+            # Privileged host attacker can rewrite BOTH files. Deliberate RED.
+            sudo cp "$snapshot_floor" "$floor"
+            sudo -u a190g2app python -B "$probe_file" expect-current "$database" "$floor" 1
+            echo 'A190_G2_HOST_ROOT_JOINT_LOCAL_RESTORE=UNSAFE_READMISSION_REPRODUCED'
+            echo 'A190_G2_ORIGINAL_EVENT_AND_REMOTE_MONOTONIC_CUSTODY=NOT_ATTESTED'
+          } 2>&1 | tee a190g2_lab.log
+          grep -q 'A190_G2_ATTACKER_INPLACE_WRITE=OS_DENIED' a190g2_lab.log
+          grep -q 'A190_G2_ATTACKER_SIBLING_REPLACEMENT=OS_DENIED' a190g2_lab.log
+          grep -q 'A190_G2_APP_DB_ROLLBACK_VS_SEPARATE_UID_FLOOR=DENIED' a190g2_lab.log
+          grep -q 'A190_G2_HOST_ROOT_JOINT_LOCAL_RESTORE=UNSAFE_READMISSION_REPRODUCED' a190g2_lab.log
+      - name: State honest G2 boundary
+        run: |
+          echo 'GREEN = real UID separation plus root bypass reproduced. NOT external custody.'
+          echo 'Ubuntu only. Windows G2, WAL/SHM, H0, remote monotonic floor, effects/receipts not tested.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
+
+  g2-windows-real-sids-vs-admin-restore:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Separate local SIDs; app rollback denied, administrator restores both
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git rev-parse HEAD
+          $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+          $appName = 'a190g2a' + $suffix
+          $custName = 'a190g2c' + $suffix
+          $appPass = ConvertTo-SecureString ([Guid]::NewGuid().ToString('N') + 'aA!7') -AsPlainText -Force
+          $custPass = ConvertTo-SecureString ([Guid]::NewGuid().ToString('N') + 'aA!7') -AsPlainText -Force
+          New-LocalUser -Name $appName -Password $appPass -AccountNeverExpires -PasswordNeverExpires | Out-Null
+          New-LocalUser -Name $custName -Password $custPass -AccountNeverExpires -PasswordNeverExpires | Out-Null
+          $appSid = (Get-LocalUser -Name $appName).SID
+          $custSid = (Get-LocalUser -Name $custName).SID
+          if ($appSid -eq $custSid) { throw 'A190_G2_NOT_DISTINCT_SIDS' }
+          Write-Output "A190_G2_APP_SID=$appSid"
+          Write-Output "A190_G2_CUSTODIAN_SID=$custSid"
+          function Set-IsolatedAcl([string]$path, $ownerSid, $optionalReadSid) {
+            New-Item -Path $path -ItemType Directory -Force | Out-Null
+            $acl = Get-Acl $path
+            $acl.SetAccessRuleProtection($true, $false)
+            $acl.SetOwner($ownerSid)
+            $flags = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+            foreach ($principal in @($ownerSid, (New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-18'), (New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-544'))) {
+              $rule = [System.Security.AccessControl.FileSystemAccessRule]::new($principal, [System.Security.AccessControl.FileSystemRights]::FullControl, $flags, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+              $acl.AddAccessRule($rule)
+            }
+            if ($null -ne $optionalReadSid) {
+              $r = [System.Security.AccessControl.FileSystemAccessRule]::new($optionalReadSid, [System.Security.AccessControl.FileSystemRights]::ReadAndExecute, $flags, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+              $acl.AddAccessRule($r)
+            }
+            Set-Acl -Path $path -AclObject $acl
+          }
+          $appDir = Join-Path $env:RUNNER_TEMP ('a190g2-app-' + $suffix)
+          $floorDir = Join-Path $env:RUNNER_TEMP ('a190g2-floor-' + $suffix)
+          Set-IsolatedAcl $appDir $appSid $null
+          Set-IsolatedAcl $floorDir $custSid $appSid
+          $db = Join-Path $appDir 'state.sqlite'
+          $oldDb = Join-Path $appDir 'old.sqlite'
+          $floor = Join-Path $floorDir 'floor.json'
+          $oldFloor = Join-Path $env:RUNNER_TEMP ('a190g2-oldfloor-' + $suffix + '.json')
+          $probe = Join-Path $env:PUBLIC ('a190g2_probe_' + $suffix + '.py')
+          Copy-Item (Join-Path $env:GITHUB_WORKSPACE 'labs\a190\principal_floor_g2_lab.py') $probe
+          $python = (Get-Command python).Source
+          function Invoke-Role($name, [securestring]$password, [string[]]$commandArgs) {
+            $psi = [System.Diagnostics.ProcessStartInfo]::new()
+            $psi.FileName = $python
+            $psi.WorkingDirectory = $env:PUBLIC
+            $psi.UseShellExecute = $false
+            $psi.UserName = $name
+            $psi.Domain = $env:COMPUTERNAME
+            $psi.Password = $password
+            $psi.RedirectStandardOutput = $true
+            $psi.RedirectStandardError = $true
+            $psi.ArgumentList.Add('-B')
+            $psi.ArgumentList.Add($probe)
+            foreach ($arg in $commandArgs) { $psi.ArgumentList.Add($arg) }
+            $proc = [System.Diagnostics.Process]::Start($psi)
+            $out = $proc.StandardOutput.ReadToEnd()
+            $err = $proc.StandardError.ReadToEnd()
+            if (-not $proc.WaitForExit(30000)) { $proc.Kill(); throw 'A190_G2_PROCESS_TIMEOUT' }
+            if ($proc.ExitCode -ne 0) { throw "A190_G2_PROCESS_FAIL code=$($proc.ExitCode) err=$err" }
+            if ($out -notmatch '^\d+ [0-9a-f]{64}\s*$') { Write-Host $out }
+            return $out
+          }
+          Invoke-Role $appName $appPass @('app-init', $db) | Out-Null
+          $first = (Invoke-Role $appName $appPass @('state', $db)).Trim().Split(' ')
+          if ($first.Count -ne 2 -or $first[0] -ne '1') { throw 'A190_G2_BAD_INITIAL_STATE' }
+          Invoke-Role $custName $custPass @('publish', $floor, $first[0], $first[1]) | Out-Null
+          Invoke-Role $appName $appPass @('expect-current', $db, $floor, '1') | Out-Null
+          Invoke-Role $appName $appPass @('copy-db', $db, $oldDb) | Out-Null
+          Copy-Item $floor $oldFloor
+          Invoke-Role $appName $appPass @('app-advance', $db) | Out-Null
+          $second = (Invoke-Role $appName $appPass @('state', $db)).Trim().Split(' ')
+          if ($second.Count -ne 2 -or $second[0] -ne '2') { throw 'A190_G2_BAD_SECOND_STATE' }
+          Invoke-Role $custName $custPass @('publish', $floor, $second[0], $second[1]) | Out-Null
+          Invoke-Role $appName $appPass @('expect-current', $db, $floor, '2') | Out-Null
+          Invoke-Role $appName $appPass @('copy-db', $oldDb, $db) | Out-Null
+          $forgery = Invoke-Role $appName $appPass @('forge', $floor)
+          $stale = Invoke-Role $appName $appPass @('expect-stale', $db, $floor)
+          if ($forgery -notmatch 'A190_G2_ATTACKER_INPLACE_WRITE=OS_DENIED' -or $forgery -notmatch 'A190_G2_ATTACKER_SIBLING_REPLACEMENT=OS_DENIED') { throw 'A190_G2_OS_ACL_NOT_PROVED' }
+          if ($stale -notmatch 'A190_G2_APP_DB_ROLLBACK_VS_SEPARATE_UID_FLOOR=DENIED') { throw 'A190_G2_STALE_NOT_DENIED' }
+          Write-Output 'A190_G2_WINDOWS_SEPARATE_SID_APP_ROLLBACK=DENIED'
+          # Runneradmin/Administrators have full ACL access: deliberately RED.
+          Copy-Item $oldFloor $floor -Force
+          Invoke-Role $appName $appPass @('expect-current', $db, $floor, '1') | Out-Null
+          Write-Output 'A190_G2_WINDOWS_ADMIN_JOINT_RESTORE=UNSAFE_READMISSION_REPRODUCED'
+          Write-Output 'A190_G2_REMOTE_MONOTONIC_FLOOR=NOT_ATTESTED'
+      - name: Windows G2 qualification
+        shell: pwsh
+        run: |
+          Write-Output 'Only same-host OS principal separation. Administrator bypass was reproduced.'
+          Write-Output 'No remote witness, WAL/SHM, H0, provider receipt or semantic event authority.'
+          Write-Output '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
