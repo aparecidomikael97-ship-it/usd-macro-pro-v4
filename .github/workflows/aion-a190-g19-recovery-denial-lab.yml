@@ -1,0 +1,38 @@
+name: A190 G19 synthetic recovery denial oracle LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/test_g19_recovery_denial_oracle_lab.py'
+      - '.github/workflows/aion-a190-g19-recovery-denial-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g19-synthetic-denial:
+    name: G19 synthetic recovery deny / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Synthetic oracle tests only — no real AION/provider
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g19_recovery_denial_oracle_lab.py' -v 2>&1 | tee g19_synthetic.log
+          grep -F 'Ran 14 tests' g19_synthetic.log
+          grep -E '^OK$' g19_synthetic.log
+      - name: Mandatory no-go
+        shell: bash
+        run: |
+          echo 'Synthetic witness is in-process and is NOT an independent external trust root.'
+          echo 'Reference oracle only. No AION integration, no provider send, no P0 closure.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
