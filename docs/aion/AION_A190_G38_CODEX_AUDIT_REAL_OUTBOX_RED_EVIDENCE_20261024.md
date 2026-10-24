@@ -31,6 +31,6 @@ Created `labs/a190/test_g38_codex_semantic_scope_red_lab.py` (12 cases) and `lab
 
 ## CI and disposition
 
-[**G38 run #40128960373**](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40128960373), new 24 tests plus inherited G37–G30 173 tests = **197 distinct cases per OS**. Evidence to be updated after both jobs complete. At document creation, Ubuntu success and Windows run may still be processing. Exact tested SHA remains `78cd59c68ee478b376a13593502adb63e54da0d1`; this evidence doc is a later commit and is not itself code tested.
+[**G38 run #40128960373**](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40128960373): **completed SUCCESS on Ubuntu and Windows**. New 24 tests + inherited G37–G30 173 tests = **197/197 each OS; 394 executions of 197 distinct tests**. Ubuntu job `120976361104`; Windows job `120976360963`. Exact tested SHA remains `78cd59c68ee478b376a13593502adb63e54da0d1`; documentation was committed afterward and is not part of the tested code SHA.
 
 This is diagnostic RED coverage, NOT a remediation. **0/6 P0 homologados · HARD NO-GO · UNCERTAIN · ZERO_AUTO_RESEND.** Keep G37 same-host issuer/custody rollback, A184 and independent receipt/identity gaps open. No main/merge/deploy/Worker/provider/customer secrets/spend.
