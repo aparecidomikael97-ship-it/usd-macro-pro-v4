@@ -1,0 +1,70 @@
+name: A190 G39 strict semantic reserve and scope LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g39_atomic_semantic_lock_lab.py'
+      - 'labs/a190/test_g39_strict_authority_scope_lab.py'
+      - '.github/workflows/aion-a190-g39-semantic-auth-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g39-strict-candidate:
+    name: G39 semantic lock and exact authority scope / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install test-only crypto
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G39 strict semantic lock and authority scope matrix
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g39_*.py' -v 2>&1 | tee g39.log
+          grep -F 'Ran 28 tests' g39.log
+          grep -F 'G39_ALIAS_GUARD_GREEN=SAME_EVENT_NEW_REQUEST_DENIED_ONE_ROW' g39.log
+          grep -F 'G39_TENANT_GLOBAL_GREEN=CROSS_WORKSPACE_SAME_EVENT_DENIED' g39.log
+          grep -F 'G39_CROSS_OWNER_GREEN=TENANT_EVENT_UNIQUE_ACROSS_OWNERS' g39.log
+          grep -F 'G39_ATOMIC_ROLLBACK_GREEN=NO_ORPHAN_SEMANTIC_LOCK' g39.log
+          grep -F 'G39_AUTH_SCOPE_GREEN=MISSING_TENANT_DENIED_NO_ADAPTER' g39.log
+          grep -F 'G39_AUTH_WORKSPACE_GREEN=MISSING_WORKSPACE_DENIED_NO_ADAPTER' g39.log
+          grep -F 'G39_CORRECT_SCOPE_GREEN=UNCERTAIN_NOT_SEND' g39.log
+          grep -F 'G39_EVENT_ALIAS_RED=CALLER_INVENTED_DIFFERENT_EVENT_BYPASSES_SEMANTIC_LOCK' g39.log
+          grep -F 'G39_LEGACY_PATH_RED=OPTIONAL_STRICT_MODE_NOT_GLOBAL_ENFORCEMENT' g39.log
+      - name: Inherited adversarial G38 to G30
+        shell: bash
+        run: |
+          set -o pipefail
+          for n in 38 37 36 35 34 33 32 31 30; do
+            python -B -m unittest discover -s labs/a190 -p "test_g${n}_*.py" -v 2>&1 | tee "g${n}.log"
+          done
+          grep -F 'Ran 24 tests' g38.log
+          grep -F 'Ran 34 tests' g37.log
+          grep -F 'Ran 20 tests' g36.log
+          grep -F 'Ran 18 tests' g35.log
+          grep -F 'Ran 16 tests' g34.log
+          grep -F 'Ran 24 tests' g33.log
+          grep -F 'Ran 20 tests' g32.log
+          grep -F 'Ran 18 tests' g31.log
+          grep -F 'Ran 23 tests' g30.log
+      - name: Fail-closed declaration
+        shell: bash
+        run: |
+          echo 'G39 strict semantic event lock and full scope authorization are LAB opt-ins.'
+          echo 'Caller event IDs are NOT independently authenticated business truth.'
+          echo 'Legacy staging remains able to bypass strict lock; no migration/backfill.'
+          echo 'No worker, provider, signed receipt, real custody or automatic resend.'
+          echo 'No main/merge/deploy, customers, secrets, new cost, or P0 homologation.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'

@@ -127,6 +127,7 @@ class ExecutionOutbox:
         evidence_verifier: Callable[[str, Mapping[str, Any], Mapping[str, Any]], bool] | None = None,
         first_attempt_guard: Callable[[Mapping[str, Any]], bool] | None = None,
         unsafe_allow_synthetic_lab_callbacks: bool = False,
+        strict_authority_scope_lab: bool = False,
     ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
@@ -136,11 +137,15 @@ class ExecutionOutbox:
             raise TypeError("callable first_attempt_guard required")
         if type(unsafe_allow_synthetic_lab_callbacks) is not bool:
             raise TypeError("unsafe_allow_synthetic_lab_callbacks must be bool")
+        if type(strict_authority_scope_lab) is not bool:
+            raise TypeError("strict_authority_scope_lab must be bool")
         store.require_healthy()
         _scope(scope)
         self.store = store
         self.scope = scope
         self.db = store.db
+        # Opt-in LAB candidate. Legacy callers remain unchanged for comparison.
+        self._strict_authority_scope_lab = strict_authority_scope_lab
         # Default fail-closed. This LAB callback boundary is NOT a verified
         # identity/receipt trust root: callers can inject synthetic verifiers.
         # Production admission requires separately pinned external trust.
@@ -309,6 +314,17 @@ class ExecutionOutbox:
             );
             CREATE INDEX IF NOT EXISTS action_effect_scope
                 ON action_effects(owner,tenant,workspace,confirmed_at,idempotency_key);
+
+            CREATE TABLE IF NOT EXISTS semantic_reservations_lab(
+                owner TEXT NOT NULL,
+                tenant TEXT NOT NULL,
+                business_event_id TEXT NOT NULL,
+                workspace TEXT NOT NULL,
+                intent_ref TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                payload_digest TEXT NOT NULL,
+                PRIMARY KEY(tenant,business_event_id)
+            );
             """
         with self._managed_write_transaction():
             for statement in schema_sql.split(";"):
@@ -395,6 +411,7 @@ class ExecutionOutbox:
         authority_budget_ref: Any = "",
         risk_points: Any = 0,
         capability_class: Any = "",
+        semantic_event_id_lab: Any = "",
     ) -> dict[str, Any]:
         self.store.require_healthy()
         owner, tenant, workspace = self._scope_args()
@@ -424,7 +441,19 @@ class ExecutionOutbox:
             _token(budget_ref, "authority_budget_ref")
             _token(capability, "capability_class")
 
-        safe_payload = redact(dict(payload or {}))
+        # LAB-only strict semantic identity, never proof of event truth.
+        # Identity must be an explicitly asserted, non-redacted event token.
+        raw_payload = dict(payload or {})
+        semantic_event = (
+            _token(semantic_event_id_lab, "semantic_event_id_lab")
+            if semantic_event_id_lab else ""
+        )
+        if semantic_event:
+            if raw_payload.get("business_event_id") != semantic_event:
+                raise ValueError("semantic event binding mismatch")
+            if "business_event_id" not in redact(raw_payload):
+                raise ValueError("semantic event must survive redaction")
+        safe_payload = redact(raw_payload)
         payload_digest = _digest(safe_payload)
         key_material = {
             "scope": [owner, tenant, workspace],
@@ -437,11 +466,26 @@ class ExecutionOutbox:
             "risk_points": risk_points,
             "capability_class": capability,
         }
+        if semantic_event:
+            key_material["semantic_event_id_lab"] = semantic_event
         idempotency_key = _digest(key_material)
         decision_id = "DEC-" + idempotency_key[:24].upper()
 
         self._begin_or_quarantine()
         try:
+            semantic_lock = None
+            if semantic_event:
+                semantic_lock = self.db.execute(
+                    """SELECT idempotency_key, payload_digest
+                       FROM semantic_reservations_lab
+                       WHERE tenant=? AND business_event_id=?""",
+                    (tenant, semantic_event),
+                ).fetchone()
+                if semantic_lock is not None and (
+                    semantic_lock["idempotency_key"] != idempotency_key
+                    or semantic_lock["payload_digest"] != payload_digest
+                ):
+                    raise ValueError("semantic business event collision")
             existing = self.db.execute(
                 """SELECT o.idempotency_key, d.data AS decision_data
                    FROM action_decisions d
@@ -452,10 +496,26 @@ class ExecutionOutbox:
             if existing is not None:
                 if existing["idempotency_key"] != idempotency_key:
                     raise ValueError("intent_ref idempotency collision")
+                if semantic_event and semantic_lock is None:
+                    raise ValueError("semantic lock missing for existing intent")
                 self._commit_or_quarantine()
                 out = self.get(idempotency_key)
                 return {**out, "enqueue_state": "IDEMPOTENT"}
 
+            if semantic_event:
+                # Unique per TENANT+event across owners and workspaces.
+                # No trusted source namespace exists yet: legitimate source
+                # collisions must fail closed rather than silently duplicate.
+                # The unique reservation and Outbox rows are written inside
+                # ONE SQLite transaction, never as separate auto-commits.
+                self.db.execute(
+                    """INSERT INTO semantic_reservations_lab(
+                        owner,tenant,business_event_id,workspace,intent_ref,
+                        idempotency_key,payload_digest
+                    ) VALUES (?,?,?,?,?,?,?)""",
+                    (owner, tenant, semantic_event, workspace, intent,
+                     idempotency_key, payload_digest),
+                )
             seq = int(
                 self.db.execute(
                     """SELECT COALESCE(MAX(aggregate_seq),0)+1
@@ -476,6 +536,7 @@ class ExecutionOutbox:
                 "aggregate_seq": seq,
                 "payload": safe_payload,
                 "payload_digest": payload_digest,
+                "semantic_event_id_lab": semantic_event,
                 "policy_version": policy,
                 "authorization_ref": authorization,
                 "valid_until": _iso(valid_dt),
@@ -649,6 +710,8 @@ class ExecutionOutbox:
             ("workspace_id", self.scope.workspace_id),
         ):
             supplied = _clean(current.get(field), 128)
+            if self._strict_authority_scope_lab and not supplied:
+                return False, "REVOKED", {"reason": field.upper() + "_REQUIRED"}
             if supplied and supplied != wanted:
                 return False, "REVOKED", {"reason": field.upper() + "_MISMATCH"}
         if _clean(current.get("policy_version"), 128) != _clean(decision.get("policy_version"), 128):
