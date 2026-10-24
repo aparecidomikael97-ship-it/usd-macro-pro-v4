@@ -865,6 +865,17 @@ class ExecutionOutbox:
             return "FRESH_CLOCK_UNAVAILABLE_NO_SEND"
         return None
 
+    def _fence_assert_lab(
+        self, key: str, worker: str, epoch: int, expected_state: str,
+    ) -> dict[str, Any]:
+        """Read-only local persisted fencing preflight, NOT provider custody."""
+        record = self.get(key)
+        if (record["state"] != expected_state or
+                record["lease_owner"] != worker or
+                record["attempts"] != epoch):
+            raise RuntimeError("FENCE_STALE_GENERATION_OR_STATE_NO_SEND")
+        return record
+
     def dispatch_claimed(
         self,
         idempotency_key: Any,
@@ -874,12 +885,18 @@ class ExecutionOutbox:
         adapter: Any,
         cumulative_authority_guard: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
         now: Any | None = None,
+        claim_generation_lab: int | None = None,
     ) -> dict[str, Any]:
         """Dispatch one claimed intent; uncertain outcomes require reconciliation."""
         key = _clean(idempotency_key, 64)
         worker = _token(worker_id, "worker_id")
         now_dt = _utc(now)
         intent = self.get(key)
+        if self._strict_claim_fencing_lab:
+            if type(claim_generation_lab) is not int or claim_generation_lab < 1:
+                raise ValueError("FENCE_GENERATION_REQUIRED")
+            if claim_generation_lab != intent["attempts"]:
+                raise RuntimeError("FENCE_STALE_GENERATION_OR_STATE_NO_SEND")
         if intent["state"] != "CLAIMED":
             raise ValueError("intent must be CLAIMED before dispatch")
         if intent["lease_owner"] != worker:
@@ -888,8 +905,13 @@ class ExecutionOutbox:
             raise TimeoutError("claim lease expired before dispatch")
 
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
+        if self._strict_claim_fencing_lab:
+            self._fence_assert_lab(key, worker, claim_generation_lab, "CLAIMED")
         if not allowed:
-            return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+            return self._set_blocked(
+                key, blocked_state, auth.get("reason", blocked_state),
+                worker_lab=worker, generation_lab=claim_generation_lab or 0,
+            )
 
         decision = _mapping(intent.get("decision"))
         budget_ref = _clean(decision.get("authority_budget_ref"), 128)
@@ -927,6 +949,8 @@ class ExecutionOutbox:
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
                 )
 
+        if self._strict_claim_fencing_lab:
+            self._fence_assert_lab(key, worker, claim_generation_lab, "CLAIMED")
         # A180: persist UNCERTAIN BEFORE contacting the witness. The witness
         # might reserve the first attempt and then time out: if the host dies
         # there, the original claim must NOT become an automatic RETRY.
@@ -936,8 +960,11 @@ class ExecutionOutbox:
                    SET state='UNCERTAIN',dispatch_started_at=?,
                        last_error='FIRST_ATTEMPT_WITNESS_PENDING'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_owner=?""",
-                (_iso(now_dt), key, *self._scope_args(), worker),
+                     AND state='CLAIMED' AND lease_owner=?
+                     AND (?=0 OR attempts=?)""",
+                (_iso(now_dt), key, *self._scope_args(), worker,
+                 int(not self._strict_claim_fencing_lab),
+                 claim_generation_lab or 0),
             )
             if reserved.rowcount != 1:
                 raise RuntimeError("INFLIGHT_CLAIM_CHANGED_NO_SEND")
@@ -946,17 +973,23 @@ class ExecutionOutbox:
         # experimental Outbox. No callback, false, invalid signature, timeout
         # or lost response => DENY SEND, retain UNCERTAIN after restart.
         if not self._reserved_first_attempt(intent):
+            if self._strict_claim_fencing_lab:
+                self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
             with self._managed_write_transaction():
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
                        SET state='UNCERTAIN',lease_owner='',lease_until='',
                            last_error='FIRST_ATTEMPT_WITNESS_UNVERIFIED_NO_SEND'
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                         AND state='UNCERTAIN'""",
-                    (key, *self._scope_args()),
+                         AND state='UNCERTAIN'
+                         AND (?=0 OR (lease_owner=? AND attempts=?))""",
+                    (key, *self._scope_args(), int(not self._strict_claim_fencing_lab),
+                     worker, claim_generation_lab or 0),
                 )
+                if self._strict_claim_fencing_lab and cursor.rowcount != 1:
+                    raise RuntimeError("FENCE_STALE_WITNESS_RESULT_NO_WRITE")
             return {**self.get(key),
-                    "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"}
+                    "dispatch_state": "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED"
 
         # A possibly reserved first attempt can never be returned to RETRY
         # after a failed freshness check: preserve the UNCERTAIN reservation.
