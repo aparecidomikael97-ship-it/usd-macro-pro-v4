@@ -32,7 +32,7 @@ class G27DurableSQLiteCustody(unittest.TestCase):
             format=serialization.PublicFormat.Raw,
         )
         self.db = self.open()
-        self.addCleanup(self.db.close)
+        self.addCleanup(lambda: self.db.close())  # close CURRENT reopened handle before Windows temp cleanup
         self.first = self.db.reserve(KEY, "UNCERTAIN", canonical_hash(journal(1)))
 
     def open(self):
