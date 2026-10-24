@@ -131,7 +131,8 @@ class ExecutionOutboxTests(unittest.TestCase):
         store = SQLiteChatStore(Path(root) / "chat.sqlite3")
         return store, ExecutionOutbox(
             store, self.scope, evidence_verifier=synthetic_lab_evidence_verifier,
-            first_attempt_guard=synthetic_lab_first_attempt_reservation)
+            first_attempt_guard=synthetic_lab_first_attempt_reservation,
+            unsafe_allow_synthetic_lab_callbacks=True)
 
     def _enqueue(self, outbox, *, ref="intent-1", payload=None, aggregate="client-1",
                  valid_until=None, requires_reauth=False, reauth_ref=""):
