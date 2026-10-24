@@ -23,6 +23,8 @@ def inspect_outbox_recovery(*, outbox: Any, idempotency_key: str,
         raise RecoveryDenied("G21_INVALID_IDEMPOTENCY_KEY")
     try:
         row = outbox.get(idempotency_key)
+    except LookupError as exc:
+        raise RecoveryDenied("G21_REAL_OUTBOX_ROW_MISSING") from exc
     except Exception as exc:
         raise RecoveryDenied("G21_REAL_OUTBOX_READ_FAILED") from exc
     if not row:
