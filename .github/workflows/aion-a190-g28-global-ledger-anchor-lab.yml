@@ -1,0 +1,45 @@
+name: A190 G28 global ledger anchor LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g28_global_ledger_tip_anchor_lab.py'
+      - 'labs/a190/test_g28_global_ledger_tip_anchor_lab.py'
+      - '.github/workflows/aion-a190-g28-global-ledger-anchor-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g28-global-anchor:
+    name: G28 global ledger tip / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install test-only cryptography
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Cross-intent signed global tip and double-rollback RED
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g28_global_ledger_tip_anchor_lab.py' -v 2>&1 | tee g28.log
+          grep -F 'Ran 18 tests' g28.log
+          grep -F 'G28_CROSS_KEY_ROLLBACK_GREEN=GLOBAL_ANCHOR_DETECTS_MISSING_OTHER_INTENT' g28.log
+          grep -F 'G28_NONATOMIC_GAP_RED=LOCAL_COMMIT_AHEAD_OF_ANCHOR_DENIED' g28.log
+          grep -F 'G28_CO_ROLLBACK_RED=HOST_CAN_RESTORE_DB_AND_ANCHOR' g28.log
+      - name: Mandatory no-go
+        shell: bash
+        run: |
+          echo 'Anchor is separate in-memory object, NOT independently durable or external.'
+          echo 'Coupled host rollback and lost anchor update remain unresolved.'
+          echo 'No actual first-send atomic reservation, provider dispatch, or P0 closure.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
