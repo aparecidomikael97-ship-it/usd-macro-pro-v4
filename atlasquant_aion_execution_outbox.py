@@ -17,6 +17,7 @@ Adapters are injected by tests/future hosts. No adapter is enabled here.
 from __future__ import annotations
 
 from copy import deepcopy
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
@@ -212,9 +213,30 @@ class ExecutionOutbox:
                 )
             raise
 
+    @contextmanager
+    def _managed_write_transaction(self):
+        """Explicit Outbox write transaction; fail closed after ambiguous COMMIT.
+
+        sqlite3.Connection context manager hides COMMIT acknowledgements.
+        Each state transition must be atomic and propagate uncertainty.
+        """
+        if self.db is None:
+            raise StorageUnavailableError("OUTBOX_TRANSACTION_QUARANTINED")
+        self.store.require_healthy()
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        except Exception as primary_error:
+            if self.db is not None:
+                self._rollback_preserving_original(primary_error)
+            raise
+        else:
+            self._commit_or_quarantine()
+
     def _ensure_schema(self) -> None:
-        with self.db:
-            self.db.executescript("""
+        # executescript() commits before running DDL and can leave a partial
+        # schema. Execute static statements under one explicit transaction.
+        schema_sql = """
             CREATE TABLE IF NOT EXISTS action_decisions(
                 decision_id TEXT PRIMARY KEY,
                 owner TEXT NOT NULL,
@@ -267,7 +289,12 @@ class ExecutionOutbox:
             );
             CREATE INDEX IF NOT EXISTS action_effect_scope
                 ON action_effects(owner,tenant,workspace,confirmed_at,idempotency_key);
-            """)
+            """
+        with self._managed_write_transaction():
+            for statement in schema_sql.split(";"):
+                statement = statement.strip()
+                if statement:
+                    self.db.execute(statement)
 
     def _scope_args(self) -> tuple[str, str, str]:
         return _scope(self.scope)
@@ -618,7 +645,7 @@ class ExecutionOutbox:
     def _set_blocked(self, key: str, state: str, reason: str) -> dict[str, Any]:
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
-        with self.db:
+        with self._managed_write_transaction():
             self.db.execute(
                 """UPDATE action_outbox
                    SET state=?,lease_owner='',lease_until='',last_error=?
@@ -738,7 +765,7 @@ class ExecutionOutbox:
         # A180: persist UNCERTAIN BEFORE contacting the witness. The witness
         # might reserve the first attempt and then time out: if the host dies
         # there, the original claim must NOT become an automatic RETRY.
-        with self.db:
+        with self._managed_write_transaction():
             reserved = self.db.execute(
                 """UPDATE action_outbox
                    SET state='UNCERTAIN',dispatch_started_at=?,
@@ -754,7 +781,7 @@ class ExecutionOutbox:
         # experimental Outbox. No callback, false, invalid signature, timeout
         # or lost response => DENY SEND, retain UNCERTAIN after restart.
         if not self._reserved_first_attempt(intent):
-            with self.db:
+            with self._managed_write_transaction():
                 self.db.execute(
                     """UPDATE action_outbox
                        SET state='UNCERTAIN',lease_owner='',lease_until='',
@@ -773,7 +800,7 @@ class ExecutionOutbox:
         if not callable(send):
             # After UNCERTAIN reservation, any missing adapter must stay
             # uncertain; never make a fresh claim or silently retry.
-            with self.db:
+            with self._managed_write_transaction():
                 self.db.execute(
                     """UPDATE action_outbox SET state='UNCERTAIN',lease_owner='',
                        lease_until='',last_error='ADAPTER_SEND_MISSING_NO_SEND'
@@ -786,7 +813,7 @@ class ExecutionOutbox:
         try:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
-            with self.db:
+            with self._managed_write_transaction():
                 self.db.execute(
                     """UPDATE action_outbox
                        SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
@@ -814,7 +841,7 @@ class ExecutionOutbox:
             state = "FAILED" if proved_zero else "UNCERTAIN"
             reason = ("ADAPTER_EFFECT_ZERO_VERIFIED_LAB" if proved_zero
                       else "ADAPTER_REJECTION_UNVERIFIED_OUTCOME_UNKNOWN")
-            with self.db:
+            with self._managed_write_transaction():
                 self.db.execute(
                     """UPDATE action_outbox
                        SET state=?,lease_owner='',lease_until='',last_error=?
@@ -837,7 +864,7 @@ class ExecutionOutbox:
             )
             return {**out, "dispatch_state": "CONFIRMED"}
 
-        with self.db:
+        with self._managed_write_transaction():
             self.db.execute(
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
