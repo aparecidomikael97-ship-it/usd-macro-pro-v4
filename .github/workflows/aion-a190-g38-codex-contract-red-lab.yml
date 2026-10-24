@@ -1,0 +1,66 @@
+name: A190 G38 Codex audit real Outbox RED LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/test_g38_codex_semantic_scope_red_lab.py'
+      - 'labs/a190/test_g38_codex_auth_reconcile_red_lab.py'
+      - '.github/workflows/aion-a190-g38-codex-contract-red-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g38-codex-matrix:
+    name: G38 Codex contract RED / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 22
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install crypto for inherited A190 synthetic LAB
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G38 Codex independent audit reproduced on current real Outbox
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g38_*.py' -v 2>&1 | tee g38.log
+          grep -F 'Ran 24 tests' g38.log
+          grep -F 'G38_REQUEST_ALIAS_RED=SAME_BUSINESS_EVENT_TWO_LOCAL_ROWS' g38.log
+          grep -F 'G38_WORKSPACE_ALIAS_RED=TWO_SCOPED_RESERVATIONS_ONE_EVENT' g38.log
+          grep -F 'G38_SCOPE_MISMATCH_RED=BRIDGE_DIGEST_SHARED_OUTBOX_KEYS_DIFFER' g38.log
+          grep -F 'G38_REDACTED_DIGEST_RED=DIFFERENT_RAW_PAYLOADS_SAME_PROJECTED_ID' g38.log
+          grep -F 'G38_AUTH_SCOPE_OMISSION_RED=MISSING_TENANT_WORKSPACE_GATE_PASSED_NO_SEND' g38.log
+          grep -F 'G38_RECONCILE_AUTH_UNUSED_RED=LAB_RECONCILE_READ_WITHOUT_AUTH_CALLBACK' g38.log
+          grep -F 'G38_SYNTHETIC_RECONCILE_RED=LAB_CALLBACK_CONFIRM_WITHOUT_AUTH_RECHECK' g38.log
+          grep -F 'G38_STALE_CLOCK_RED=EXPLICIT_UNSAFE_LAB_CALL_USES_SUPPLIED_OLD_TIME' g38.log
+      - name: Preserve G37-G30 witness and sqlite regression gates
+        shell: bash
+        run: |
+          set -o pipefail
+          for n in 37 36 35 34 33 32 31 30; do
+            python -B -m unittest discover -s labs/a190 -p "test_g${n}_*.py" -v 2>&1 | tee "g${n}.log"
+          done
+          grep -F 'Ran 34 tests' g37.log
+          grep -F 'Ran 20 tests' g36.log
+          grep -F 'Ran 18 tests' g35.log
+          grep -F 'Ran 16 tests' g34.log
+          grep -F 'Ran 24 tests' g33.log
+          grep -F 'Ran 20 tests' g32.log
+          grep -F 'Ran 18 tests' g31.log
+          grep -F 'Ran 23 tests' g30.log
+      - name: Mandatory non-production guardrails
+        shell: bash
+        run: |
+          echo 'G38 intentional RED observations are not fixed security boundaries.'
+          echo 'Unsafe LAB callbacks and stale supplied clock never go to a real provider.'
+          echo 'Codex static audit done on older isolated G18 checkout; G38 executed on G37 stack.'
+          echo 'No real provider, Worker, main/merge/deploy, customer credentials or spending.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
