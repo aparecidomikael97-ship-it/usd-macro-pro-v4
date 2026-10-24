@@ -1061,17 +1061,22 @@ class ExecutionOutbox:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
             with self._managed_write_transaction():
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
                        SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
                     (
                         "",
                         "SEND_RESULT_UNKNOWN:" + type(exc).__name__,
                         key,
                         *self._scope_args(),
+                        int(not self._strict_claim_fencing_lab), worker,
+                        claim_generation_lab or 0,
                     ),
                 )
+                if self._strict_claim_fencing_lab and cursor.rowcount != 1:
+                    raise RuntimeError("FENCE_STALE_SEND_EXCEPTION_NO_WRITE")
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
@@ -1091,12 +1096,17 @@ class ExecutionOutbox:
             reason = ("ADAPTER_EFFECT_ZERO_VERIFIED_LAB" if proved_zero
                       else "ADAPTER_REJECTION_UNVERIFIED_OUTCOME_UNKNOWN")
             with self._managed_write_transaction():
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
                        SET state=?,lease_owner='',lease_until='',last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (state, reason, key, *self._scope_args()),
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND (?=0 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                    (state, reason, key, *self._scope_args(),
+                     int(not self._strict_claim_fencing_lab), worker,
+                     claim_generation_lab or 0),
                 )
+                if self._strict_claim_fencing_lab and cursor.rowcount != 1:
+                    raise RuntimeError("FENCE_STALE_SEND_REJECTION_NO_WRITE")
             dispatch_state = ("UNCERTAIN_RECONCILE_REQUIRED"
                               if state == "UNCERTAIN" else "FAILED")
             return {**self.get(key), "dispatch_state": dispatch_state}
