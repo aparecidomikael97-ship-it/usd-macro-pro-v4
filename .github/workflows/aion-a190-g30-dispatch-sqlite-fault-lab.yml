@@ -36,10 +36,10 @@ jobs:
           grep -F 'G30_NO_WITNESS_GREEN=UNCERTAIN_ZERO_SEND' g30.log
           grep -F 'G30_REPLAY_DISPATCH_GREEN=STALE_POLICY_BLOCKED' g30.log
           grep -F 'G30_BUDGET_WITNESS_GREEN=NO_SEND' g30.log
-          grep -F 'G30_SQLITE_ROLLBACK_MASK_RED=ORIGINAL_FAILURE_OBSCURED_TRANSACTION_OPEN' g30.log
+          grep -F 'G31_G30_REGRESSION_GREEN=ORIGINAL_ERROR_RETAINED_STORE_DETACHED' g30.log
       - name: Mandatory P0 hard stop
         shell: bash
         run: |
           echo 'Adapters are traps; no real provider dispatch/effect occurred.'
-          echo 'Rollback fault injection RED is diagnostic, not repaired.'
+          echo 'G31 candidate closes the G30 injected rollback masking RED; no independent custody.'
           echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
