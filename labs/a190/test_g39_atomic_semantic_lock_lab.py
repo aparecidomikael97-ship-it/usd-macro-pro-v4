@@ -39,7 +39,7 @@ class G39AtomicSemanticReservation(unittest.TestCase):
     def locks(self):
         return self.store.db.execute(
             "SELECT owner,tenant,business_event_id,workspace,intent_ref,"
-            "idempotency_key,payload_digest FROM action_semantic_locks_lab"
+            "idempotency_key,payload_digest FROM semantic_reservations_lab"
         ).fetchall()
 
     def test_01_strict_first_reservation_atomic(self):
