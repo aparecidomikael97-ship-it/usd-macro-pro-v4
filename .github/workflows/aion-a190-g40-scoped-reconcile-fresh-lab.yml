@@ -33,13 +33,15 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g40_*.py' -v 2>&1 | tee g40.log
-          grep -F 'Ran 34 tests' g40.log
+          grep -F 'Ran 36 tests' g40.log
           grep -F 'G40_LOOKUP_AUTH_GREEN=SCOPED_RECONCILIATION_ONLY' g40.log
           grep -F 'G40_RECONCILE_DENY_GREEN=NO_ADAPTER_PROPERTY_ACCESS' g40.log
           grep -F 'G40_EXPIRED_SEND_GREEN=RECONCILE_LOOKUP_SEPARATE_AUTHORITY' g40.log
           grep -F 'G40_TTL_AFTER_CALLBACK_GREEN=UNCERTAIN_ZERO_SEND' g40.log
           grep -F 'G40_LEASE_AFTER_CALLBACK_GREEN=UNCERTAIN_ZERO_SEND' g40.log
           grep -F 'G40_CLOCK_ROLLBACK_GREEN=UNCERTAIN_ZERO_SEND' g40.log
+          grep -F 'G40_GETTER_DELAY_GREEN=EXPIRED_AFTER_PROPERTY_NO_SEND' g40.log
+          grep -F 'G40_GETTER_REENTRY_GREEN=CLAIM_CHANGED_AFTER_PROPERTY_NO_SEND' g40.log
           grep -F 'G40_LOCAL_CLOCK_RED=UNTRUSTED_HOST_CAN_SUPPLY_FALSE_FRESH_TIME' g40.log
           grep -F 'G40_SYNTHETIC_CONFIRM_LIMIT=LOCAL_VERIFIER_NOT_PROVIDER_RECEIPT' g40.log
       - name: Inherited G39–G30 regression and RED gates
