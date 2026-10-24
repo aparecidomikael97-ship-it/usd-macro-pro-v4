@@ -1,0 +1,186 @@
+name: A190 G7 REAL OS Custodian Signed Evidence LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g7_os_separated_signed_issuer_lab.py'
+      - '.github/workflows/aion-a190-g7-os-signed-issuer-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g7-linux-distinct-real-uid-signed-receipts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned synthetic signing dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: REAL Ubuntu UIDs signer privacy, crypto forgery and privileged rollback RED
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            git rev-parse HEAD
+            sudo useradd --system --no-create-home --shell /usr/sbin/nologin a190g7cust
+            sudo useradd --system --no-create-home --shell /usr/sbin/nologin a190g7app
+            echo "A190_G7_CUSTODIAN_UID=$(id -u a190g7cust)"
+            echo "A190_G7_APP_UID=$(id -u a190g7app)"
+            test "$(id -u a190g7cust)" != "$(id -u a190g7app)"
+            probe="$(mktemp -p /tmp a190_g7_XXXXXX.py)"
+            cp labs/a190/g7_os_separated_signed_issuer_lab.py "$probe"
+            chmod 644 "$probe"
+            secret="$(mktemp -d -p /tmp a190g7_secret_XXXXXX)"
+            public="$(mktemp -d -p /tmp a190g7_public_XXXXXX)"
+            appdir="$(mktemp -d -p /tmp a190g7_app_XXXXXX)"
+            sudo chown a190g7cust:a190g7cust "$secret" "$public"
+            sudo chmod 700 "$secret"
+            sudo chmod 755 "$public"
+            sudo chown a190g7app:a190g7app "$appdir"
+            sudo chmod 700 "$appdir"
+            privdb="$secret/issuer-reservations.sqlite"
+            pin="$public/issuer-public.hex"
+            sudo -u a190g7cust python -B "$probe" init "$secret" "$public"
+            sudo -u a190g7cust python -B "$probe" issue "$secret" "$public" event-original-e1 req1
+            sudo -u a190g7app python -B "$probe" verify "$pin" "$public/req1.json" valid
+            sudo -u a190g7app python -B "$probe" try-read "$secret"
+            sudo -u a190g7app python -B "$probe" forge "$appdir" "$public/req1.json"
+            sudo -u a190g7app python -B "$probe" verify "$pin" "$appdir/forged-receipt.json" invalid
+            sudo -u a190g7app python -B "$probe" verify "$appdir/forged-pub.hex" "$appdir/forged-receipt.json" valid
+            echo 'A190_G7_SELF_PINNED_FAKE_KEY=MATHEMATICALLY_VALID_NOT_EXTERNAL_RED'
+            snapshot="$(mktemp -p /tmp a190g7_oldstate_XXXXXX.sqlite)"
+            sudo cp "$privdb" "$snapshot"
+            sudo -u a190g7cust python -B "$probe" issue "$secret" "$public" event-original-e2 req2
+            sudo -u a190g7app python -B "$probe" compare "$public" req1 req2
+            sudo -u a190g7cust python -B "$probe" expect-duplicate "$secret" "$public" event-original-e2 req3
+            # Same-host ROOT rolls back the signer reservation DB, not its key.
+            sudo cp "$snapshot" "$privdb"
+            sudo -u a190g7cust python -B "$probe" issue "$secret" "$public" event-original-e2 req4
+            sudo -u a190g7app python -B "$probe" verify "$pin" "$public/req4.json" valid
+            echo 'A190_G7_HOST_ROOT_ROLLBACK_REISSUED_ORIGINAL=UNSAFE_SIGNED_RESERVATION_RED'
+            echo 'A190_G7_REAL_OS_SIGNER=LOCAL_PRINCIPAL_ONLY_NOT_REMOTE_PROVIDER'
+          } 2>&1 | tee a190_g7_ubuntu.log
+          grep -q 'A190_G7_LOWER_PRIV_APP_PRIVATE_KEY=OS_DENIED' a190_g7_ubuntu.log
+          grep -q 'A190_G7_LOWER_PRIV_APP_RESERVATION_DB=OS_DENIED' a190_g7_ubuntu.log
+          grep -q 'A190_G7_ATTEMPTED_FORGERY_REJECTED_BY_RETAINED_PIN' a190_g7_ubuntu.log
+          grep -q 'A190_G7_CUSTODIAN_SAME_EVENT_NEW_REQUEST=DENIED' a190_g7_ubuntu.log
+          grep -q 'A190_G7_DIFFERENT_SELF_CLAIMED_ORIGINAL_IDS_SAME_SEMANTIC_SHA=ADMITTED_RED' a190_g7_ubuntu.log
+          grep -q 'A190_G7_HOST_ROOT_ROLLBACK_REISSUED_ORIGINAL=UNSAFE_SIGNED_RESERVATION_RED' a190_g7_ubuntu.log
+
+  g7-windows-distinct-real-sid-signed-receipts:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned synthetic signing dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: REAL Windows SIDs signer privacy, crypto forgery and administrator rollback RED
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git rev-parse HEAD
+          $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+          $appName = 'a190g7a' + $suffix
+          $custName = 'a190g7c' + $suffix
+          $appPass = ConvertTo-SecureString ([Guid]::NewGuid().ToString('N') + 'aA!7') -AsPlainText -Force
+          $custPass = ConvertTo-SecureString ([Guid]::NewGuid().ToString('N') + 'aA!7') -AsPlainText -Force
+          New-LocalUser -Name $appName -Password $appPass -AccountNeverExpires -PasswordNeverExpires | Out-Null
+          New-LocalUser -Name $custName -Password $custPass -AccountNeverExpires -PasswordNeverExpires | Out-Null
+          $appSid = (Get-LocalUser -Name $appName).SID
+          $custSid = (Get-LocalUser -Name $custName).SID
+          if ($appSid -eq $custSid) { throw 'A190_G7_NOT_DISTINCT_SIDS' }
+          Write-Output "A190_G7_APP_SID=$appSid"
+          Write-Output "A190_G7_CUSTODIAN_SID=$custSid"
+          function Set-IsolatedAcl([string]$path, $ownerSid, $optionalReadSid) {
+            New-Item -Path $path -ItemType Directory -Force | Out-Null
+            $acl = Get-Acl $path
+            $acl.SetAccessRuleProtection($true, $false)
+            $acl.SetOwner($ownerSid)
+            $flags = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+            foreach ($principal in @($ownerSid, (New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-18'), (New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-544'))) {
+              $rule = [System.Security.AccessControl.FileSystemAccessRule]::new($principal, [System.Security.AccessControl.FileSystemRights]::FullControl, $flags, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+              $acl.AddAccessRule($rule)
+            }
+            if ($null -ne $optionalReadSid) {
+              $readRule = [System.Security.AccessControl.FileSystemAccessRule]::new($optionalReadSid, [System.Security.AccessControl.FileSystemRights]::ReadAndExecute, $flags, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+              $acl.AddAccessRule($readRule)
+            }
+            Set-Acl -Path $path -AclObject $acl
+          }
+          $secret = Join-Path $env:RUNNER_TEMP ('a190g7-secret-' + $suffix)
+          $public = Join-Path $env:RUNNER_TEMP ('a190g7-public-' + $suffix)
+          $appDir = Join-Path $env:RUNNER_TEMP ('a190g7-app-' + $suffix)
+          Set-IsolatedAcl $secret $custSid $null
+          Set-IsolatedAcl $public $custSid $appSid
+          Set-IsolatedAcl $appDir $appSid $null
+          $probe = Join-Path $env:PUBLIC ('a190g7_probe_' + $suffix + '.py')
+          Copy-Item (Join-Path $env:GITHUB_WORKSPACE 'labs\a190\g7_os_separated_signed_issuer_lab.py') $probe
+          $python = (Get-Command python).Source
+          function Invoke-Role([string]$username, [securestring]$password, [string[]]$args) {
+            $psi = [System.Diagnostics.ProcessStartInfo]::new()
+            $psi.FileName = $python
+            $psi.WorkingDirectory = $env:PUBLIC
+            $psi.UseShellExecute = $false
+            $psi.UserName = $username
+            $psi.Domain = $env:COMPUTERNAME
+            $psi.Password = $password
+            $psi.RedirectStandardOutput = $true
+            $psi.RedirectStandardError = $true
+            $psi.ArgumentList.Add('-B')
+            $psi.ArgumentList.Add($probe)
+            foreach ($arg in $args) { $psi.ArgumentList.Add($arg) }
+            $proc = [System.Diagnostics.Process]::Start($psi)
+            $out = $proc.StandardOutput.ReadToEnd()
+            $err = $proc.StandardError.ReadToEnd()
+            if (-not $proc.WaitForExit(45000)) { $proc.Kill(); throw 'A190_G7_PROCESS_TIMEOUT' }
+            Write-Host $out
+            if ($proc.ExitCode -ne 0) { throw "A190_G7_PROCESS_FAIL code=$($proc.ExitCode) stdout=$out stderr=$err" }
+            $matchedSid = [regex]::Match($out, 'A190_G7_REAL_PROCESS_PRINCIPAL=(S-1-\d+(?:-\d+)+)')
+            if (-not $matchedSid.Success) { throw 'A190_G7_PROCESS_IDENTITY_MISSING' }
+            $expectedSid = if ($username -eq $custName) { $custSid.Value } else { $appSid.Value }
+            if ($matchedSid.Groups[1].Value -ne $expectedSid) { throw 'A190_G7_PROCESS_WRONG_SID' }
+            return $out
+          }
+          $pin = Join-Path $public 'issuer-public.hex'
+          $db = Join-Path $secret 'issuer-reservations.sqlite'
+          Invoke-Role $custName $custPass @('init',$secret,$public) | Out-Null
+          Invoke-Role $custName $custPass @('issue',$secret,$public,'event-original-e1','req1') | Out-Null
+          Invoke-Role $appName $appPass @('verify',$pin,(Join-Path $public 'req1.json'),'valid') | Out-Null
+          $hostile = Invoke-Role $appName $appPass @('try-read',$secret)
+          if ($hostile -notmatch 'PRIVATE_KEY=OS_DENIED' -or $hostile -notmatch 'RESERVATION_DB=OS_DENIED') { throw 'A190_G7_APP_PRIVATE_ACCESS_NOT_DENIED' }
+          Invoke-Role $appName $appPass @('forge',$appDir,(Join-Path $public 'req1.json')) | Out-Null
+          $forgery = Invoke-Role $appName $appPass @('verify',$pin,(Join-Path $appDir 'forged-receipt.json'),'invalid')
+          if ($forgery -notmatch 'FORGERY_REJECTED_BY_RETAINED_PIN') { throw 'A190_G7_FRAUD_NOT_REJECTED' }
+          Invoke-Role $appName $appPass @('verify',(Join-Path $appDir 'forged-pub.hex'),(Join-Path $appDir 'forged-receipt.json'),'valid') | Out-Null
+          Write-Output 'A190_G7_SELF_PINNED_FAKE_KEY=MATHEMATICALLY_VALID_NOT_EXTERNAL_RED'
+          $snapshot = Join-Path $env:RUNNER_TEMP ('a190g7-snapshot-' + $suffix + '.sqlite')
+          Copy-Item $db $snapshot
+          Invoke-Role $custName $custPass @('issue',$secret,$public,'event-original-e2','req2') | Out-Null
+          $semantic = Invoke-Role $appName $appPass @('compare',$public,'req1','req2')
+          if ($semantic -notmatch 'SAME_SEMANTIC_SHA=ADMITTED_RED') { throw 'A190_G7_SEMANTIC_BYPASS_NOT_REPRODUCED' }
+          $duplicate = Invoke-Role $custName $custPass @('expect-duplicate',$secret,$public,'event-original-e2','req3')
+          if ($duplicate -notmatch 'CUSTODIAN_SAME_EVENT_NEW_REQUEST=DENIED') { throw 'A190_G7_ORIGINAL_DUPLICATION_NOT_DENIED' }
+          # The runner administrator, not the lower-privileged app, restores local signer DB.
+          Copy-Item $snapshot $db -Force
+          Invoke-Role $custName $custPass @('issue',$secret,$public,'event-original-e2','req4') | Out-Null
+          Invoke-Role $appName $appPass @('verify',$pin,(Join-Path $public 'req4.json'),'valid') | Out-Null
+          Write-Output 'A190_G7_HOST_ADMIN_ROLLBACK_REISSUED_ORIGINAL=UNSAFE_SIGNED_RESERVATION_RED'
+          Write-Output 'A190_G7_REAL_OS_SIGNER=LOCAL_SID_ONLY_NOT_REMOTE_PROVIDER'
+      - name: Qualify results explicitly
+        shell: pwsh
+        run: |
+          Write-Output 'Two REAL Windows SIDs and Ed25519 fixture: lower privilege cannot read private key.'
+          Write-Output 'Runner administrator can undo SQLite state and issue a duplicate signed receipt.'
+          Write-Output 'No provider, remote monotonic floor, signed original issuer, H0, or real send.'
+          Write-Output '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
