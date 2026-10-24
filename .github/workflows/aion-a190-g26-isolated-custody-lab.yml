@@ -1,0 +1,45 @@
+name: A190 G26 isolated custody protocol LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g26_isolated_custody_service_lab.py'
+      - 'labs/a190/test_g26_isolated_custody_service_lab.py'
+      - '.github/workflows/aion-a190-g26-isolated-custody-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g26-isolated-custody:
+    name: G26 custody protocol / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install test-only cryptography
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: In-memory custody protocol and restart RED, no provider
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g26_isolated_custody_service_lab.py' -v 2>&1 | tee g26.log
+          grep -F 'Ran 18 tests' g26.log
+          grep -F 'G26_CUSTODY_RESTART_RED=IN_MEMORY_RESERVATION_LOST' g26.log
+          grep -F 'G26_MONOTONIC_RESTART_RED=COUNTER_RESET_AFTER_RESTART' g26.log
+          grep -F 'G26_CUSTODY_ROLLBACK_RED=OLD_SERVICE_ACCEPTS_OLD_HISTORY' g26.log
+      - name: Mandatory no-go
+        shell: bash
+        run: |
+          echo 'Custody is in-memory object, NOT an independent host or hardware.'
+          echo 'Restart/rollback RED proves lack of durable independent custody.'
+          echo 'No provider dispatch, no first-send external guarantee or P0 closure.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
