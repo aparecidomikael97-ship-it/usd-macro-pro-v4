@@ -99,7 +99,8 @@ class A179WitnessGateTests(unittest.TestCase):
 
     def claimed(self, gate, *, intent="once"):
         out = ExecutionOutbox(self.store, self.scope, evidence_verifier=gate,
-            first_attempt_guard=synthetic_lab_first_attempt_reservation)
+            first_attempt_guard=synthetic_lab_first_attempt_reservation,
+            unsafe_allow_synthetic_lab_callbacks=True)
         row = out.enqueue(intent_ref=intent, action="send_email",
             payload={"to": "example.invalid", "body": "lab"},
             aggregate_key=intent, policy_version="policy-v1",
