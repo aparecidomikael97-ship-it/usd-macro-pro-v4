@@ -1,0 +1,65 @@
+name: A190 G14 SQLite Local Marker Native ABA LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'aion_chat/staged_store.py'
+      - 'test_atlasquant_aion_native_path_a183_lab.py'
+      - 'labs/a190/test_g14_sqlite_native_marker_aba_lab.py'
+      - '.github/workflows/aion-a190-g14-sqlite-local-marker-aba-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sqlite-g14-native-marker:
+    name: G14 local marker versus real native same-path ABA (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned offline AION dependencies
+        run: python -m pip install cryptography==50.0.2 requests==2.34.2
+      - name: Real SQLite G14 / A183 / lifecycle and resilience regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          python -B -m unittest discover -s labs/a190 -p 'test_g14_sqlite_native_marker_aba_lab.py' -v 2>&1 | tee g14_native.log
+          grep -q 'Ran 8 tests' g14_native.log
+          grep -q 'G14_DIFFERENT_NATIVE_DB_BOOTSTRAPS=DIFFERENT_LOCAL_MARKERS' g14_native.log
+          grep -q 'G14_LEGIT_WAL_MUTATION=MARKER_STABLE' g14_native.log
+          grep -q 'G14_LOCAL_MARKER_DRIFT=READ_WRITE_FACADE_LATCHED' g14_native.log
+          grep -q 'G14_AFTER_COMMIT_MARKER_DRIFT=UNCERTAIN_NO_AUTOMATIC_REPLAY' g14_native.log
+          grep -q 'G14_BACKUP_CLONE_PRESERVES_MARKER=NOT_EXTERNAL_ANTIROLLBACK_RED' g14_native.log
+          python -B -m unittest -v \
+            test_atlasquant_aion_native_path_a183_lab \
+            test_atlasquant_aion_chat_sqlite_path_identity \
+            test_atlasquant_aion_chat_sqlite_inode_anchor \
+            test_atlasquant_aion_chat_sqlite_read_snapshot \
+            test_atlasquant_aion_chat_sqlite_write_outcome \
+            test_atlasquant_aion_chat_sqlite_live_mutations \
+            test_atlasquant_aion_chat_sqlite_narrow_rename \
+            test_atlasquant_aion_chat_sqlite_lifecycle \
+            test_atlasquant_aion_sqlite_recovery_a184_lab \
+            test_atlasquant_aion_execution_outbox \
+            test_atlasquant_aion_execution_saga \
+            2>&1 | tee g14_regression.log
+          grep -q 'A183_G14_NATIVE_ABA_DIFFERENT_MARKER=READ_DENIED_BEFORE_WRONG_RESULT' g14_regression.log || grep -q 'A183_G14_NATIVE_ABA_READ=WINDOWS_OS_DENIED' g14_regression.log
+          grep -q 'A183_G14_NATIVE_ABA_DIFFERENT_MARKER=WRITE_DENIED_BEFORE_EFFECT' g14_regression.log || grep -q 'A183_G14_NATIVE_ABA_WRITE=WINDOWS_OS_DENIED' g14_regression.log || grep -q 'A183_G14_NATIVE_ABA_WRITE=SQLITE_DENIED' g14_regression.log
+          echo 'G14_REAL_SQLITE_LOCAL_MARKER=TESTED_CLONE_RED_NOT_P0_GO'
+      - name: The native-file and external trust limitation remains
+        run: |
+          echo 'The marker is writable, local and copied by backups. Same-marker clones can still fool native VFS binding.'
+          echo 'A hostile host can replace marker or SQLite bytes: no independent file identity or antirollback.'
+          echo 'A postcommit alarm is UNKNOWN, never permission to blindly retry.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
