@@ -60,6 +60,7 @@ class A190G6RealOutboxCallbackBoundaryLabTests(unittest.TestCase):
         return ExecutionOutbox(
             self.store, self.scope, first_attempt_guard=guard,
             evidence_verifier=evidence,
+            unsafe_allow_synthetic_lab_callbacks=True,  # G6 reproduces deliberate LAB opt-in
         )
 
     def _enqueue(self, outbox, *, ref="claimed-original-e1", aggregate="same-operation"):
