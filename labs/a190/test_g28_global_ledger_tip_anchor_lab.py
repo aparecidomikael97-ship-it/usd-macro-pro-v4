@@ -102,7 +102,7 @@ class G28GlobalTip(unittest.TestCase):
         old_path = self.dir / "old.sqlite3"
         shutil.copyfile(self.path, old_path)
         old_anchor = SimulatedExternalAnchor(self.private, ROOT)
-        old_anchor.advance(read_local_tip(self.db_open_old()))
+        old_anchor.advance(self.db_open_old().tip)
         self.db = DurableCustodyLab(self.path, self.private, ROOT)
         self.anchor.advance(self.second())
         self.db.close()
