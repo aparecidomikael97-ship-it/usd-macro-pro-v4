@@ -1,0 +1,55 @@
+name: A190 G31 SQLite rollback quarantine candidate LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g30_sqlite_rollback_fault_lab.py'
+      - 'labs/a190/test_g31_transaction_quarantine_lab.py'
+      - 'labs/a190/test_g31_other_transaction_faults_lab.py'
+      - '.github/workflows/aion-a190-g31-rollback-quarantine-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g31-rollback-quarantine:
+    name: G31 transaction quarantine / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Run G31 correction regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g31_*.py' -v 2>&1 | tee g31.log
+          grep -F 'Ran 18 tests' g31.log
+          grep -F 'G31_PRIMARY_EXCEPTION_GREEN=ORIGINAL_RETAINED_ROLLBACK_AS_CAUSE' g31.log
+          grep -F 'G31_QUARANTINE_GREEN=NO_NEW_STAGING_AFTER_FAILED_ROLLBACK' g31.log
+          grep -F 'G31_CONFIRM_PATH_GREEN=PRIMARY_ERROR_QUARANTINED' g31.log
+          grep -F 'G31_STALE_CLAIM_GREEN=FAILED_ROLLBACK_NO_RETRY' g31.log
+      - name: Run inherited G30 dispatch and updated fault regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g30_*.py' -v 2>&1 | tee g30-regression.log
+          grep -F 'Ran 23 tests' g30-regression.log
+          grep -F 'G30_POLICY_GATE_GREEN=NO_ADAPTER' g30-regression.log
+          grep -F 'G30_NO_WITNESS_GREEN=UNCERTAIN_ZERO_SEND' g30-regression.log
+          grep -F 'G31_G30_REGRESSION_GREEN=ORIGINAL_ERROR_RETAINED_STORE_DETACHED' g30-regression.log
+      - name: Strict operating restrictions
+        shell: bash
+        run: |
+          echo 'Draft candidate code only, no integration into deployed AION.'
+          echo 'Closed local handle does not prove external monotonic custody or H0.'
+          echo 'No provider, Worker, main/merge/deploy, or P0 homologation.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
