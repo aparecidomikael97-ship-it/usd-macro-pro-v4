@@ -1,0 +1,45 @@
+name: A190 G30 real dispatch and SQLite fault LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/test_g30_real_dispatch_gates_lab.py'
+      - 'labs/a190/test_g30_budget_gates_lab.py'
+      - 'labs/a190/test_g30_sqlite_rollback_fault_lab.py'
+      - '.github/workflows/aion-a190-g30-dispatch-sqlite-fault-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g30-dispatch-faults:
+    name: G30 dispatch gates / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Execute 23 tests across 3 isolated suites
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g30_*.py' -v 2>&1 | tee g30.log
+          grep -F 'Ran 23 tests' g30.log
+          grep -F 'G30_POLICY_GATE_GREEN=NO_ADAPTER' g30.log
+          grep -F 'G30_AUTH_GATE_GREEN=NO_ADAPTER' g30.log
+          grep -F 'G30_NO_WITNESS_GREEN=UNCERTAIN_ZERO_SEND' g30.log
+          grep -F 'G30_REPLAY_DISPATCH_GREEN=STALE_POLICY_BLOCKED' g30.log
+          grep -F 'G30_BUDGET_WITNESS_GREEN=NO_SEND' g30.log
+          grep -F 'G30_SQLITE_ROLLBACK_MASK_RED=ORIGINAL_FAILURE_OBSCURED_TRANSACTION_OPEN' g30.log
+      - name: Mandatory P0 hard stop
+        shell: bash
+        run: |
+          echo 'Adapters are traps; no real provider dispatch/effect occurred.'
+          echo 'Rollback fault injection RED is diagnostic, not repaired.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
