@@ -104,7 +104,11 @@ def _assert_acyclic_payload_lab(
     try:
         if isinstance(value, Mapping):
             for key, child in value.items():
-                if isinstance(key, str) and redact(key) != key:
+                # G66: JSON objects have string keys. Non-string Mapping
+                # keys have no stable canonical/redaction interpretation.
+                if not isinstance(key, str):
+                    raise ValueError("G66_NONSTRING_JSON_KEY_DENY")
+                if redact(key) != key:
                     raise ValueError("G65_SENSITIVE_JSON_KEY_DENY")
                 _assert_acyclic_payload_lab(key, active, depth + 1, budget)
                 _assert_acyclic_payload_lab(child, active, depth + 1, budget)
