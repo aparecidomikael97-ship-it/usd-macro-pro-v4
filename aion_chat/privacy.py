@@ -166,6 +166,8 @@ def redact(value):
 def _g70_redact(value, active, budget, depth):
     _g70_charge(budget)
     is_container = isinstance(value, (Mapping, list, tuple))
+    # Save ORIGINAL identity: value is replaced by normalized dict/list.
+    container_id = id(value) if is_container else None
     if is_container:
         _g70_enter(value, active, depth)
     try:
@@ -232,4 +234,4 @@ def _g70_redact(value, active, budget, depth):
 
     finally:
         if is_container:
-            active.remove(id(value))
+            active.remove(container_id)
