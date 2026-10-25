@@ -31,7 +31,7 @@ Codex CLI Windows v0.164.0-alpha.11.1, read-only/ephemeral session `01a17451-7d0
 ## Windows complete regression and cross-OS CI provenance
 
 - Code+workflow SHA **`79f22e586c3b044361420890eb8dc689c501019e`**, isolated Windows checkout `C:\Users\apare\AtlasQuant-G62-Privacy-LAB-20261025`: **G30–G62 559/559 PASS**, exit 0, clean checkout (G51 cases consolidated in G50).
-- GitHub Actions [G62 run #40221864032](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40221864032) was started at this SHA; Ubuntu job `121254959201` **SUCCESS** when the report was created; Windows job `121254959443` was queued. **Do not claim full cross-OS success without a completed Windows job and actual log markers.** This report is a subsequent documentation-only commit, not the source-tested SHA.
+- **Cross-OS CI VERIFIED:** [GitHub Actions G62 run #40221864032](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40221864032), exact code+workflow SHA **`79f22e586c3b044361420890eb8dc689c501019e`**: Ubuntu job `121254959201` **SUCCESS 559/559**; Windows job `121254959443` **SUCCESS 559/559**. Read both job logs, summed the 32 test-group totals and checked all seven G62 markers in both systems. **1,118 test executions of the same 559 distinct synthetic cases**. Subsequent evidence-doc commits are not retested code.
 - No claim of canonical full Quality/Security clearance.
 
 ## Independent post-patch Codex review — explicit remaining risks
