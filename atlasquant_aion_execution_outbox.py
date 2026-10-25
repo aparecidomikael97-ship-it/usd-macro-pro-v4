@@ -64,6 +64,31 @@ def _token(value: Any, name: str, limit: int = 128) -> str:
     return text
 
 
+def _assert_acyclic_payload_lab(value: Any, active: set[int] | None = None) -> None:
+    """Reject container cycles before privacy redaction can recurse.
+
+    Track only active traversal ancestors, not all seen nodes: multiple
+    references to a shared acyclic object remain valid JSON payloads.
+    """
+    if not isinstance(value, (Mapping, list, tuple)):
+        return
+    if active is None:
+        active = set()
+    object_id = id(value)
+    if object_id in active:
+        raise ValueError("G62_CYCLIC_PAYLOAD_DENY")
+    active.add(object_id)
+    try:
+        children = (
+            (item for pair in value.items() for item in pair)
+            if isinstance(value, Mapping) else iter(value)
+        )
+        for child in children:
+            _assert_acyclic_payload_lab(child, active)
+    finally:
+        active.remove(object_id)
+
+
 def _assert_finite_payload_lab(value: Any) -> None:
     """Distinguish nonfinite JSON numbers from unrelated serializer errors.
 
@@ -555,6 +580,9 @@ class ExecutionOutbox:
                 raise ValueError("semantic event binding mismatch")
             if "business_event_id" not in redact(raw_payload):
                 raise ValueError("semantic event must survive redaction")
+        # G62: block dict/list/tuple cycles BEFORE redact recurses. The
+        # check runs before BEGIN and never writes a semantic reservation.
+        _assert_acyclic_payload_lab(raw_payload)
         safe_payload = redact(raw_payload)
         # G61: check numeric finiteness explicitly BEFORE BEGIN; a ValueError
         # raised by custom default=str conversion is not a nonfinite float.
