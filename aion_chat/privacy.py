@@ -20,7 +20,7 @@ _G69_JSON_MEMBER = re.compile(
 # credential visible merely because its terminating quote never arrived.
 _G69_JSON_MEMBER_UNFINISHED = re.compile(
     r'(?P<prefix>(?P<key>"(?:\\.|[^"\\])*")\s*:\s*")'
-    r'(?:\\.|[^"\\])*\Z'
+    r'(?:\\.|[^"\\])*\\?\Z'
 )
 _G69_SENSITIVE_KEY = re.compile(
     r"(?i)(?:password|senha|secret|token|credential|authorization|"
@@ -50,6 +50,9 @@ def _g69_preparse_chat_json(value):
     quoted = False
     escaped = False
     excess = False
+    # Malformed bracket-like public text uses fallback for modest depth;
+    # huge mismatched streams must still be denied before json.loads.
+    extremely_deep = False
     unbalanced = False
     for char in value:
         if quoted:
@@ -65,6 +68,8 @@ def _g69_preparse_chat_json(value):
             stack.append(char)
             if len(stack) > _G69_MAX_JSON_DEPTH:
                 excess = True
+            if len(stack) > 128:
+                extremely_deep = True
         elif char in "]}":
             if not stack:
                 unbalanced = True
@@ -77,7 +82,7 @@ def _g69_preparse_chat_json(value):
     # G69 second RED: an unterminated but otherwise consistent 2000-[ JSON
     # candidate must be rejected BEFORE json.loads, not allowed to recurse.
     # Genuine unmatched/mismatched plain bracket text retains text fallback.
-    if excess and not unbalanced:
+    if excess and (not unbalanced or extremely_deep):
         raise ValueError("G69_CHAT_JSON_NESTING_DENY")
 
 
