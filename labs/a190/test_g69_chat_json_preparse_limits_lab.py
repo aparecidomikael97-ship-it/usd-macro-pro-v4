@@ -183,6 +183,24 @@ class G69JSONPreparseGuards(unittest.TestCase):
         self.assertFalse(self.db.in_transaction)
         print("G69_UNFINISHED_CHAT_GREEN=MASKED_LOCAL_STORE")
 
+    def test_20_mismatched_malformed_deep_json_denied_before_parser(self):
+        source="["*2000 + "0}"
+        with self.assertRaisesRegex(ValueError,"G69_CHAT_JSON_NESTING_DENY"):
+            redact(source)
+        print("G69_MISMATCHED_DEEP_GREEN=NO_RECURSION")
+
+    def test_21_unfinished_secret_ending_backslash_masked(self):
+        source='Nota {"refresh\\u005ftoken":"G69_FAKE_TRAILING' + "\\"
+        result=redact(source)
+        self.assertNotIn("G69_FAKE_TRAILING",result)
+        self.assertIn("[REDACTED]",result)
+        print("G69_TRAILING_BACKSLASH_GREEN=MASKED")
+
+    def test_22_mismatched_plain_bracket_text_still_passes_fallback(self):
+        public="["*75 + "}"*75
+        self.assertEqual(redact(public),public)
+        print("G69_BRACKET_PROSE_GREEN=FALLBACK_PRESERVED")
+
     def test_16_nonjson_large_prose_unmodified_by_json_only_limit(self):
         # Deliberately documents scope: not a universal string memory cap.
         data="Just public prose "+"x"*(LIMIT+2)
