@@ -144,15 +144,16 @@ class G37RealOutboxReadOnlyRecovery(G37Fixture):
         self.assertEqual(self.admit(row,forged),Admission.UNCERTAIN)
         print("G37_FABRICATED_AUTHORITY_RED=SIGNED_FAKE_MATCHES_LOCAL_OUTBOX")
 
-    def test_15_certifying_two_aliases_does_not_merge_local_outbox(self):
+    def test_15_declared_same_event_cannot_stage_second_request_alias_g57(self):
         cert=self.certificate()
         self.reserve(cert)
         a=self.stage(request_ref="different-req-A")
-        b=self.stage(request_ref="different-req-B")
+        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
+            self.stage(request_ref="different-req-B")
         self.assertEqual(self.admit(a,cert),Admission.UNCERTAIN)
-        self.assertEqual(self.admit(b,cert),Admission.UNCERTAIN)
-        self.assertEqual(len(self.outbox.list()),2)
+        self.assertEqual(len(self.outbox.list()),1)
         self.assertEqual(self.adapter.reads,0)
+        print("G57_G37_REQUEST_ALIAS_GREEN=ONE_LOCAL_RESERVATION")
 
     def test_16_unavailable_witness_denies_no_send(self):
         row=self.stage()
