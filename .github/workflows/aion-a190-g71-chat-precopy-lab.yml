@@ -1,0 +1,43 @@
+name: A190 G71 chat precopy bounded-guard LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'labs/a190/test_g71_chat_precopy_guard_lab.py'
+      - '.github/workflows/aion-a190-g71-chat-precopy-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g71-synthetic:
+    name: G71 chat precopy / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install local LAB cryptography fixture dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Full G30 to G71 synthetic regression with stable denial markers
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g[3-7]*.py' -v 2>&1 | tee g71.log
+          grep -F 'Ran 699 tests' g71.log
+          grep -F 'G71_DICT_CYCLE_GREEN=DENY_AND_ROLLBACK' g71.log
+          grep -F 'G71_TUPLE_CYCLE_GREEN=DENY_AND_ROLLBACK' g71.log
+          grep -F 'G71_MASKED_CYCLE_GREEN=DENY_AND_ROLLBACK' g71.log
+          grep -F 'G71_PRECOPY_GREEN=GUARD_BEFORE_ASDICT' g71.log
+          grep -F 'G71_DAG_GREEN=BOUNDED_EXPANSION' g71.log
+          grep -F 'G71_NORMAL_GREEN=REDACTED_PERSISTED' g71.log
+          grep -F 'G70_CHAT_DEPTH_GREEN=ROLLED_BACK' g71.log
+          grep -F 'G69_CHAT_ROLLBACK_GREEN=NO_PARTIAL_MESSAGE' g71.log
