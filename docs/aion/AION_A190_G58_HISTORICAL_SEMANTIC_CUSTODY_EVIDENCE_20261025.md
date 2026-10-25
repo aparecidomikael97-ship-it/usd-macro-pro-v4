@@ -36,7 +36,7 @@ A G58 passa a auditar decisões existentes do **mesmo tenant** dentro do BEGIN I
 
 - GitHub Actions [G58 primeiro run #40217069228](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40217069228) terminou **FAILURE em Ubuntu e Windows** numa verificação desatualizada: o workflow ainda procurava o antigo marcador RED da G57, que foi convertido em GREEN. Os jobs falharam no passo G57 de greps, não no teste G58.
 - Corrigido o marcador e eliminada a execução duplicada de G56 no workflow no SHA `7036eab28836905c46cde0735d3e63804fde0a79`; o CI passou a exigir **517 casos não duplicados por OS**.
-- CI da G58 em SHA posterior ao reparo deve ser consultado em job logs antes de declarar matriz aprovada. O relatório é um commit documental posterior, não se deve trocar SHA de prova sem rerun.
+- **CI final verificado:** [GitHub Actions #40217331608](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40217331608) executou o SHA exato **`6ddbdf2fc35eefe02314cdc9d3288ad44a98d5c0`**. Ubuntu job `121241209572` **SUCCESS, 517/517**; Windows job `121241209824` **SUCCESS, 517/517**. Conferi os logs de ambos e os marcadores de reserva ausente, chave duplicada escapada, decisão órfã, G57 atualizada e limite da identidade externa. Total **1.034 execuções de 517 casos distintos**, não 1.034 cenários independentes. O relatório é um commit documental posterior, não se deve trocar SHA de prova sem rerun.
 
 ## Limites permanentes / gate
 
