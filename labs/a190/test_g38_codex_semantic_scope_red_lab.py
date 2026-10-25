@@ -93,7 +93,8 @@ class G38SemanticRED(unittest.TestCase):
 
     def test_07_nonredacted_business_amount_change_is_blocked(self):
         self.stage()
-        with self.assertRaisesRegex(ValueError,"idempotency collision"):
+        # Tenant-wide event collision is checked before intent-ref collision.
+        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
             self.stage(payload={"business_event_id":"synthetic-event-42","amount_minor":2000})
 
     def test_08_nonredacted_business_event_change_same_request_denies(self):
