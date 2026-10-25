@@ -215,6 +215,29 @@ class G68QuotedJSONAndMapping(unittest.TestCase):
         self.assertEqual(watch.begins,0)
         self.assertEqual(self.counts(),(0,0,0,0))
 
+    def test_17_unicode_escaped_sensitive_json_member_masked(self):
+        raw='{"refresh\\u005ftoken":"G68_FAKE_UNICODE_ESCAPE","public":"safe"}'
+        # JSON escape syntax in the source has a literal backslash-u sequence.
+        parsed=json.loads(redact(raw))
+        self.assertEqual(parsed["refresh_token"],"[REDACTED]")
+        self.assertEqual(parsed["public"],"safe")
+        self.assertNotIn("G68_FAKE_UNICODE_ESCAPE",json.dumps(parsed))
+        print("G68_ESCAPED_KEY_GREEN=NORMALIZED_AND_REDACTED")
+
+    def test_18_public_json_string_assignment_does_not_break_json(self):
+        raw='{"public":"password=G68_FAKE_ASSIGNMENT","other":"hello"}'
+        parsed=json.loads(redact(raw))
+        self.assertEqual(parsed["public"],"[REDACTED]")
+        self.assertEqual(parsed["other"],"hello")
+        print("G68_PUBLIC_JSON_GREEN=VALID_STRUCTURE")
+
+    def test_19_json_array_sensitive_nested_fields_redacted(self):
+        raw='[{"refresh_token":"G68_FAKE_ARRAY"},{"normal":"hello"}]'
+        parsed=json.loads(redact(raw))
+        self.assertEqual(parsed[0]["refresh_token"],"[REDACTED]")
+        self.assertEqual(parsed[1]["normal"],"hello")
+        print("G68_ARRAY_JSON_GREEN=VALID_REDACTED_ELEMENTS")
+
     def test_16_nonmapping_confirm_result_explicit_denial(self):
         key=self.uncertain()
         watch=BeginWatch(self.real)
