@@ -1339,6 +1339,9 @@ class ExecutionOutbox:
         # immediately after the getter, even without optional G41 fencing or
         # a synthetic clock. Never invoke send for a superseded attempt.
         current_before_send = self.get(key)
+        if self._strict_claim_fencing_lab:
+            # Preserve G41's specific generation denial precedence.
+            self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         if (current_before_send["state"] != "UNCERTAIN" or
                 current_before_send["lease_owner"] != worker or
                 current_before_send["lease_until"] != intent["lease_until"] or
@@ -1363,6 +1366,8 @@ class ExecutionOutbox:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
             if g50_reply_is_stale():
+                if self._strict_claim_fencing_lab:
+                    raise RuntimeError("FENCE_STALE_SEND_EXCEPTION_NO_WRITE")
                 return g50_stale_result()
             with self._managed_write_transaction():
                 cursor = self.db.execute(
@@ -1426,7 +1431,7 @@ class ExecutionOutbox:
         if result.get("confirmed") is True and effect_ref and self._verified_evidence(
             "EFFECT_CONFIRMED", intent, result
         ):
-            if g50_reply_is_stale():
+            if g50_reply_is_stale() and not self._strict_claim_fencing_lab:
                 return g50_stale_result()
             try:
                 out = self._confirm(
@@ -1436,7 +1441,10 @@ class ExecutionOutbox:
                     result=result,
                     fence_lab=(worker, claim_generation_lab) if
                         self._strict_claim_fencing_lab else None,
-                    reconcile_snapshot_lab=g50_send_snapshot,
+                    reconcile_snapshot_lab=(
+                        None if self._strict_claim_fencing_lab
+                        else g50_send_snapshot
+                    ),
                 )
             except RuntimeError as exc:
                 if str(exc) == "G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER":
