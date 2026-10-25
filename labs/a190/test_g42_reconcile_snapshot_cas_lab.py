@@ -291,15 +291,19 @@ class G42ReconciliationCAS(unittest.TestCase):
         self.assertEqual(self.current()["effect_ref"], "g42-result")
         print("G42_REOPEN_GREEN=PERSISTENT_CONFIRM_AND_EFFECT_LEDGER")
 
-    def test_18_legacy_reconcile_stale_response_is_not_strictly_fenced_red(self):
+    def test_18_legacy_reconcile_stale_response_is_always_fenced_g52(self):
+        # G52 upgrades the historical intentional RED to an actual no-write gate
+        # for unsafe synthetic callback mode, even with strict flag disabled.
         legacy = self.make_lab(strict=False)
         fake = ReconcileStub(
             on_call=lambda: self.fake_confirm("winner"),
             response={"found": False})
         result = self.check(fake, lab=legacy)
-        self.assertEqual(result["state"], "UNCERTAIN")
+        self.assertEqual(result["reconcile_state"], "G42_STALE_REPLY_NO_WRITE")
+        self.assertEqual(result["state"], "CONFIRMED")
         self.assertEqual(legacy.get(self.key)["state"], "CONFIRMED")
-        print("G42_LEGACY_STALE_RED=OPT_IN_STRICT_GATE_NOT_GLOBAL")
+        self.assertEqual(legacy.effect_count(), 1)
+        print("G52_G42_LEGACY_STALE_GREEN=NO_OLD_SNAPSHOT")
 
     def test_19_fake_verifier_true_still_not_real_provider_receipt_red(self):
         result = self.check(ReconcileStub(response={
