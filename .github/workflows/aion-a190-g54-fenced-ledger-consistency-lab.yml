@@ -1,0 +1,55 @@
+name: A190 G54 fenced and snapshot ledger consistency LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g54_fenced_ledger_consistency_lab.py'
+      - '.github/workflows/aion-a190-g54-fenced-ledger-consistency-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ledger-integrity-lab:
+    name: G54 local state integrity / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Minimal LAB-only dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G54 fenced/snapshot contradictory local effect tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g54_*.py' -v 2>&1 | tee g54.log
+          grep -F 'Ran 9 tests' g54.log
+          grep -F 'G54_FENCE_NORMAL_GREEN=ONE_LOCAL_EFFECT' g54.log
+          grep -F 'G54_SNAPSHOT_NORMAL_GREEN=ONE_LOCAL_EFFECT' g54.log
+          grep -F 'G54_FENCED_ORPHAN_GREEN=NO_ADOPTED_LEDGER' g54.log
+          grep -F 'G54_SNAPSHOT_ORPHAN_GREEN=NO_ADOPTED_LEDGER' g54.log
+      - name: Inherited G53-G30 synthetic regression
+        shell: bash
+        run: |
+          set -o pipefail
+          for entry in 'g53 11' 'g52 10' 'g50 11' 'g49 7' 'g48 11' 'g47 18' 'g46 10' 'g45 7' 'g44 39' 'g43 32' 'g42 28' 'g41 18' 'g40 36' 'g39 28' 'g38 24' 'g37 34' 'g36 20' 'g35 18' 'g34 16' 'g33 24' 'g32 20' 'g31 18' 'g30 23'; do
+            set -- $entry
+            python -B -m unittest discover -s labs/a190 -p "test_$1_*.py" -v 2>&1 | tee "$1.log"
+            grep -F "Ran $2 tests" "$1.log"
+          done
+      - name: Explicit hard stop and no external authority
+        shell: bash
+        run: |
+          echo 'G54 is local synthetic SQLite consistency only.'
+          echo 'No trustworthy provider receipt, no independent owner, no rollback-resistant witness.'
+          echo 'No main, merge, deploy, Global Worker, customer data, secrets, real SEND or spend.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND'
