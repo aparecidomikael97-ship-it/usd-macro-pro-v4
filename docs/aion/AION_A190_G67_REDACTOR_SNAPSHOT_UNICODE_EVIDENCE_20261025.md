@@ -46,6 +46,8 @@ Code/workflow SHA **`5882d35fd78e55ed64c98036afe657da54c4c96e`**:
 To investigate shared redactor regression beyond A190, executed three existing root-level suites on isolated Windows G67 source:
 `test_atlasquant_aion_chat_foundation`, `test_atlasquant_aion_chat_golden_path`, `test_atlasquant_aion_chat_sqlite_write_outcome`: **22 tests, 5 ERROR, 0 FAIL**. The five errors occur in the Golden Path import chain `atlasquant_aion_chat_golden_path → atlasquant_aion_command_orchestrator → atlasquant_aion_local_executor → atlasquant_lab_matrix → atlasquant_setup_validation`, because the local interpreter lacks **`pandas`**: `ModuleNotFoundError: No module named 'pandas'`.
 
+For the subset that does not need the missing optional dependency, **`test_atlasquant_aion_chat_foundation` plus `test_atlasquant_aion_chat_sqlite_write_outcome` completed separately on G67 with 6/6 PASS**, exit code 0. This is additional narrow chat verification, not a claim for the complete Golden Path.
+
 A representative exact test `ReadonlyGoldenPathExecutionTests.test_status_read_completes_verified_golden_path` was re-executed on the **unmodified G66 Windows worktree**, same Python environment and **same `ModuleNotFoundError: No module named 'pandas'`**. Thus these additional five errors are **not evidence of a regression caused by G67**; nevertheless the chat Golden Path was **NOT validated** in this session, and this out-of-scope result cannot be called all-green. No dependency installation/new spending was performed. The focused synthetic G30–G67 suite passing 633/633 remains a separate fact and does NOT replace end-to-end chat testing.
 
 ## Critical remaining HARD NO-GO
