@@ -605,7 +605,14 @@ class ExecutionOutbox:
 
         # LAB-only strict semantic identity, never proof of event truth.
         # Identity must be an explicitly asserted, non-redacted event token.
-        raw_payload = dict(payload or {})
+        # G68: do not let implicit dict(custom Mapping) execute unbounded
+        # __getitem__/keys/__bool__ before the G67 budgeted walk. The single
+        # returned built-in snapshot owns all later semantic checks/redaction.
+        if payload is not None and not isinstance(payload, Mapping):
+            raise TypeError("payload must be a Mapping")
+        raw_payload = _assert_acyclic_payload_lab(
+            {} if payload is None else payload
+        )
         semantic_event = (
             _token(semantic_event_id_lab, "semantic_event_id_lab")
             if semantic_event_id_lab else ""
@@ -619,10 +626,9 @@ class ExecutionOutbox:
         if semantic_event:
             if raw_payload.get("business_event_id") != semantic_event:
                 raise ValueError("semantic event binding mismatch")
-        # G62: guard EVERY redaction call (including semantic validation)
-        # against cyclic dict/list/tuple structures. Redact only once.
-        payload_snapshot = _assert_acyclic_payload_lab(raw_payload)
-        safe_payload = redact(payload_snapshot)
+        # G68: raw_payload is already an inspected/budgeted snapshot;
+        # redact it without invoking the caller's Mapping a second time.
+        safe_payload = redact(raw_payload)
         if semantic_event and "business_event_id" not in safe_payload:
             raise ValueError("semantic event must survive redaction")
         # G61: check numeric finiteness explicitly BEFORE BEGIN; a ValueError
@@ -1141,9 +1147,14 @@ class ExecutionOutbox:
         # G63: confirmation results can contain the same cycles as an
         # enqueue payload. Reject before redact and BEFORE BEGIN, so the
         # synthetic effect ledger cannot change on invalid input.
-        raw_result = dict(result or {})
+        if result is not None and not isinstance(result, Mapping):
+            raise TypeError("confirmation result must be a Mapping")
         try:
-            raw_result = _assert_acyclic_payload_lab(raw_result)
+            # G68: validate before any implicit dict(), including top-level
+            # custom Mapping. Consume its items only once before BEGIN.
+            raw_result = _assert_acyclic_payload_lab(
+                {} if result is None else result
+            )
         except ValueError as cycle_error:
             if str(cycle_error) == "G62_CYCLIC_PAYLOAD_DENY":
                 raise ValueError("G63_CYCLIC_RESULT_DENY") from None

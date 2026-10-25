@@ -1,4 +1,5 @@
 """Credential redaction: defense in depth, not universal DLP."""
+import json
 import re
 from collections.abc import Mapping
 
@@ -8,8 +9,54 @@ PATTERNS = [re.compile(r"(?i)\b(password|senha|api[_ -]?key|access[_ -]?token|re
             re.compile(r"-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----")]
 
 
+# G68: quoted JSON member names in chat text have a closing '"' between
+# the field name and ':'. Preserve JSON punctuation and replace only the
+# string value (including escaped quote sequences), not the whole member.
+_QUOTED_JSON_SECRET = re.compile(
+    r'(?i)(?P<prefix>"(?:password|senha|secret|token|credential|'
+    r'authorization|access[_-]?token|accessToken|refresh[_-]?token|'
+    r'refreshToken|private[_-]?key|privateKey|client[_-]?secret|'
+    r'clientSecret|api[_-]?key|apiKey)"\s*:\s*")'
+    r'(?:\\.|[^"\\])*"'
+)
+
+
+def _g68_unique_chat_json_pairs(pairs):
+    """Reject duplicate logical JSON keys, including Unicode-escaped aliases."""
+    result = {}
+    for key, item in pairs:
+        if key in result:
+            raise ValueError("G68_DUPLICATE_CHAT_JSON_KEY_DENY")
+        result[key] = item
+    return result
+
+
 def redact(value):
     if isinstance(value, str):
+        # G68: use decoded member names when the ENTIRE text is JSON, so
+        # Unicode-escaped aliases cannot bypass a literal-name regex.
+        # Preserve original formatting when nothing needs masking.
+        # Re-encode structurally if changed: legacy assignment regex alone
+        # could consume JSON delimiters and corrupt an otherwise valid blob.
+        if value.lstrip().startswith(("{", "[")):
+            try:
+                decoded = json.loads(
+                    value, object_pairs_hook=_g68_unique_chat_json_pairs
+                )
+            except json.JSONDecodeError:
+                pass  # Not valid full JSON: retain legacy text-pattern redaction.
+            else:
+                if isinstance(decoded, (dict, list)):
+                    masked = redact(decoded)
+                    if masked != decoded:
+                        return json.dumps(
+                            masked, ensure_ascii=False,
+                            separators=(",", ":"), allow_nan=False
+                        )
+                    return value
+        value = _QUOTED_JSON_SECRET.sub(
+            lambda match: match.group("prefix") + '[REDACTED]"', value
+        )
         for p in PATTERNS:
             value = p.sub("[REDACTED]", value)
     elif isinstance(value, Mapping):
