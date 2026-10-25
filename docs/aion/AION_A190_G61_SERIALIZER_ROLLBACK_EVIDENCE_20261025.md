@@ -31,8 +31,20 @@ At SHA `757f90bf704bf66dfd8c92107cc68b37ecfd63ee`:
 
 New `.github/workflows/aion-a190-g61-serializer-rollback-lab.yml` committed at exact code+CI SHA **`5fe5ee537df41cb073607e5414b5a3cc092522b5`**, two OS matrix.
 - Isolated Windows worktree `C:\Users\apare\AtlasQuant-G61-Fault-LAB-20261025`: **G30–G61 549/549 PASS**, exit 0, git worktree clean on SHA `5fe5ee537df41cb073607e5414b5a3cc092522b5` (G51 combined inside G50).
-- [GitHub Actions #40220903209](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40220903209): Ubuntu job `121252053802` SUCCESS at initial evidence entry; Windows job `121252053553` IN PROGRESS. Final Windows status and actual log marker counts should be verified before CI cross-OS claims.
+- **GitHub Actions MULTI-OS VERIFIED:** [#40220903209](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40220903209) at exact source+workflow SHA **`5fe5ee537df41cb073607e5414b5a3cc092522b5`**: Ubuntu job `121252053802` **SUCCESS 549/549**, Windows job `121252053553` **SUCCESS 549/549**. Both raw logs inspected; five G61 markers confirmed each, totals **1,098 executions of 549 distinct synthetic tests**. The report commits followed this code-tested SHA.
 - Documentation-only commits after tested SHA are NOT substituted for runtime test provenance.
+
+## Independent Codex postpatch audit — confirmed versus unproven
+
+A SECOND real Codex CLI session `01a1744c-f4c6-76a1-babc-2e6c022696c8`, read-only/ephemeral, inspected diff `589a137` (G60 documentation tip) to `5fe5ee5` (G61 code+workflow) and related tests. **No file changes, tests or network actions were performed by Codex.**
+
+**Confirmed by static inspection, unresolved in G61:**
+- A cyclic list↔tuple can reach `_assert_finite_payload_lab` after shallow `redact` leaves tuples untraversed. Without cycle detection, this can surface `RecursionError` before BEGIN rather than a specific cyclic JSON refusal. A synthetic negative test is still needed.
+- `aion_chat.privacy.redact` recursively handles lists and dicts but **not tuples**. Payload data nested in a tuple can bypass expected redaction. The G61 infinite-float tuple test does not prove sensitive data redaction. Require a separate privacy contract + RED/GREEN in G62.
+- Rollback fault G61 covers historical parse overflow *before* new reservations are written, not an exception thrown after the new semantic reservation but before transaction COMMIT. Add post-reservation serialization-fault injection test; do not infer broad crash safety.
+- A volatile custom object's string conversion can vary across digest and stored data; this is a hypothesis pending tests, not a verified exploit. No cross-host antirollback/trust is established.
+
+The test labeled foreign tenant in G61 test 08 only covers ordinary foreign tenant staging; it does **not** deliberately poison other-tenant history. Earlier G60 foreign tenant negative controls do cover overflow locality.
 
 ## Explicit open issues
 
