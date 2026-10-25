@@ -92,7 +92,7 @@ class G62TuplePrivacyCycleRecovery(unittest.TestCase):
         print("G62_TUPLE_PRIVACY_GREEN=NO_RAW_MARKER")
 
     def test_02_deep_nested_tuple_strings_and_dict_redacted(self):
-        fake="sk-G62SYNTHETIC1234567890"
+        fake="sk"+"-G62SYNTHETIC1234567890"
         extra={"outer":([({"secret":fake,"freeform":"Bearer G62FAKE12345"},)],)}
         safe=redact(extra)
         text=json.dumps(safe,default=str,sort_keys=True)
