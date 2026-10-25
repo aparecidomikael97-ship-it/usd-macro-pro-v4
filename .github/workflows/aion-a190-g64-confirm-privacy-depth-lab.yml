@@ -1,0 +1,176 @@
+name: A190 G64 opaque confirmation privacy and nesting bounds LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/test_g64_confirm_opaque_privacy_depth_lab.py'
+      - 'labs/a190/test_g63_confirm_cycle_volatile_payload_lab.py'
+      - 'labs/a190/test_g62_tuple_privacy_cycles_transaction_lab.py'
+      - 'labs/a190/test_g61_serializer_rollback_faults_lab.py'
+      - 'aion_chat/privacy.py'
+      - 'labs/a190/test_g60_finite_json_contract_lab.py'
+      - 'labs/a190/test_g59_historical_binding_orphan_lab.py'
+      - 'labs/a190/test_g58_historical_semantic_custody_lab.py'
+      - 'labs/a190/test_g57_semantic_assertion_required_lab.py'
+      - 'labs/a190/test_g38_codex_semantic_scope_red_lab.py'
+      - 'labs/a190/test_g39_atomic_semantic_lock_lab.py'
+      - 'labs/a190/test_g44_binding_integrity_lab.py'
+      - 'labs/a190/g37_test_fixtures_lab.py'
+      - 'labs/a190/test_g37_authority_witness_contract_lab.py'
+      - 'labs/a190/test_g37_real_outbox_authority_recovery_lab.py'
+      - 'atlasquant_aion_execution_outbox.py'
+      - '.github/workflows/aion-a190-g64-confirm-privacy-depth-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g64-synthetic:
+    name: G64 opaque privacy / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install local-LAB dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G64 opaque result privacy, bounded depth and zero-BEGIN tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g64_*.py' -v 2>&1 | tee g64.log
+          grep -F 'Ran 16 tests' g64.log
+          grep -F 'G64_OPAQUE_TOKEN_GREEN=NO_LEDGER_OR_BEGIN' g64.log
+          grep -F 'G64_OPAQUE_BEARER_GREEN=NO_LEDGER' g64.log
+          grep -F 'G64_OPAQUE_SAFE_GREEN=LEGITIMATE_SYNTHETIC_CONFIRM' g64.log
+          grep -F 'G64_DEEP_CONFIRM_GREEN=DENY_BEFORE_BEGIN' g64.log
+          grep -F 'G64_DEEP_ENQUEUE_GREEN=DENY_BEFORE_BEGIN' g64.log
+          grep -F 'G64_DEPTH_64_GREEN=BOUNDARY_ALLOWED' g64.log
+          grep -F 'G64_DEPTH_65_GREEN=BOUNDARY_DENIED' g64.log
+          grep -F 'G64_HIDDEN_DEPTH_GREEN=NO_BYPASS' g64.log
+          grep -F 'G64_CYCLE_ZERO_BEGIN_GREEN=INSTRUMENTED' g64.log
+      - name: G63 cycle denial and mutable custom payload binding
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g63_*.py' -v 2>&1 | tee g63.log
+          grep -F 'Ran 13 tests' g63.log
+          grep -F 'G63_CONFIRM_DICT_CYCLE_GREEN=NO_LEDGER_WRITE' g63.log
+          grep -F 'G63_CONFIRM_TUPLE_CYCLE_GREEN=NO_RECURSION' g63.log
+          grep -F 'G63_CONFIRM_LIST_CYCLE_GREEN=NO_LEDGER_WRITE' g63.log
+          grep -F 'G63_CONFIRM_CLEAN_GREEN=SYNTHETIC_LEDGER_ONLY' g63.log
+          grep -F 'G63_VOLATILE_DIGEST_GREEN=NO_MISMATCH_PERSISTED' g63.log
+          grep -F 'G63_VOLATILE_SECRET_GREEN=NO_FAKE_TOKEN_PERSISTED' g63.log
+          grep -F 'G63_STABLE_SECRET_GREEN=REDACTION_AFTER_ENCODING' g63.log
+          grep -F 'G63_DRIFT_QUARANTINE_GREEN=PRIMARY_NO_RETRY' g63.log
+          grep -F 'G63_STABLE_OBJECT_GREEN=LEGITIMATE_REPLAY' g63.log
+      - name: G62 private tuple, cycle and post-reservation transaction matrix
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g62_*.py' -v 2>&1 | tee g62.log
+          grep -F 'Ran 10 tests' g62.log
+          grep -F 'G62_TUPLE_PRIVACY_GREEN=NO_RAW_MARKER' g62.log
+          grep -F 'G62_DEEP_TUPLE_GREEN=PATTERNS_REDACTED' g62.log
+          grep -F 'G62_JSON_SHAPE_GREEN=TUPLE_NORMALIZED' g62.log
+          grep -F 'G62_TUPLE_CYCLE_GREEN=NO_RECURSION' g62.log
+          grep -F 'G62_SENSITIVE_CYCLE_GREEN=DENY_BEFORE_REDACT' g62.log
+          grep -F 'G62_POST_RESERVATION_GREEN=ROLLBACK_ALL_THREE_TABLES' g62.log
+          grep -F 'G62_QUARANTINE_GREEN=PRIMARY_ERROR_NO_AUTO_RETRY' g62.log
+      - name: G61 original exception vs nonfinite and failed historical rollback
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g61_*.py' -v 2>&1 | tee g61.log
+          grep -F 'Ran 9 tests' g61.log
+          grep -F 'G61_ORIGINAL_ERROR_GREEN=NOT_MISLABELED_NONFINITE' g61.log
+          grep -F 'G61_TRUE_NAN_GREEN=PROPER_CLASSIFICATION' g61.log
+          grep -F 'G61_OVERFLOW_ROLLBACK_GREEN=PRIMARY_AND_QUARANTINE' g61.log
+          grep -F 'G61_HEALTHY_ROLLBACK_GREEN=NO_AUTOMATIC_REPAIR' g61.log
+          grep -F 'G61_QUARANTINE_GREEN=NO_NEW_STAGING_OR_RETRY' g61.log
+      - name: G60 reject nonfinite JSON and overflow exponents
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g60_*.py' -v 2>&1 | tee g60.log
+          grep -F 'Ran 11 tests' g60.log
+          grep -F 'G60_NAN_GREEN=NO_ADMISSION' g60.log
+          grep -F 'G60_POS_INF_GREEN=NO_ADMISSION' g60.log
+          grep -F 'G60_NEG_INF_GREEN=NO_ADMISSION' g60.log
+          grep -F 'G60_LEGACY_NAN_GREEN=NO_UNSAFE_WRITE' g60.log
+          grep -F 'G60_FINITE_GREEN=STILL_IDEMPOTENT' g60.log
+          grep -F 'G60_OVERFLOW_HISTORY_GREEN=NO_SILENT_INF' g60.log
+          grep -F 'G60_LEGACY_BAD_GREEN=QUARANTINE_NOT_REPAIR' g60.log
+          grep -F 'G60_TENANT_ISOLATION_GREEN=NO_FOREIGN_SCAN' g60.log
+      - name: G59 tamper and orphan negative-controls
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g59_*.py' -v 2>&1 | tee g59.log
+          grep -F 'Ran 12 tests' g59.log
+          grep -F 'G59_TAMPER_RENAME_GREEN=HISTORICAL_DIGEST_MUST_BIND' g59.log
+          grep -F 'G59_TAMPER_REMOVE_GREEN=HISTORICAL_DIGEST_MUST_BIND' g59.log
+          grep -F 'G59_ORPHAN_OUTBOX_GREEN=STORAGE_FOREIGN_KEY_GATE_ALREADY_DENIES' g59.log
+          grep -F 'G59_COORDINATED_DIGEST_GREEN=SEMANTIC_FIELD_MUST_BIND' g59.log
+          grep -F 'G59_COORDINATED_SEMANTIC_GREEN=ORIGINAL_KEY_MUST_BIND' g59.log
+      - name: G58 preexisting tenant historical semantic-event scan
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g58_*.py' -v 2>&1 | tee g58.log
+          grep -F 'Ran 16 tests' g58.log
+          grep -F 'G58_MISSING_LOCK_GREEN=NO_SECOND_INTENT' g58.log
+          grep -F 'G58_CROSS_SCOPE_GREEN=ONE_TENANT_ONE_ASSERTED_EVENT' g58.log
+          grep -F 'G58_BAD_HISTORICAL_JSON_GREEN=NO_SILENT_SKIP' g58.log
+          grep -F 'G58_DUPLICATE_ESCAPED_GREEN=NO_LAST_WINS_PARSER' g58.log
+          grep -F 'G58_TENANT_BOUNDARY_GREEN=FOREIGN_CORRUPTION_NOT_LEAKED' g58.log
+          grep -F 'G58_ORPHAN_DECISION_GREEN=NO_HIDDEN_RECORD' g58.log
+          grep -F 'G58_EXTERNAL_IDENTITY_RED=TWO_DECLARED_IDS_NOT_VERIFIED_REAL_IDENTITY' g58.log
+      - name: G57 explicit business-event assertion fail-closed test
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g57_*.py' -v 2>&1 | tee g57.log
+          grep -F 'Ran 10 tests' g57.log
+          grep -F 'G57_MISSING_ASSERTION_GREEN=NO_ADMISSION' g57.log
+          grep -F 'G57_ALIAS_OMISSION_GREEN=ONE_LOCAL_RESERVATION' g57.log
+          grep -F 'G57_VALID_EVENT_GREEN=LEGITIMATE_REPLAY' g57.log
+          grep -F 'G57_NO_EVENT_GREEN=NO_UNSUPPORTED_GLOBAL_DEDUP_CLAIM' g57.log
+          grep -F 'G57_EXTERNAL_IDENTITY_LIMIT=DIFFERENT_DECLARATIONS_NOT_PROOF' g57.log
+          grep -F 'G58_G57_HISTORICAL_CUSTODY_GREEN=NO_ALIAS_WITH_LOST_LOCK' g57.log
+      - name: G56 strict-confirm BEGIN COMMIT rollback injection
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g56_*.py' -v 2>&1 | tee g56.log
+          grep -F 'Ran 8 tests' g56.log
+          grep -F 'G56_PRECOMMIT_GREEN=QUARANTINE_NO_RETRY' g56.log
+          grep -F 'G56_POSTCOMMIT_GREEN=ORIGINAL_RECEIPT_STILL_DURABLE' g56.log
+          grep -F 'G56_BEGIN_BEFORE_GREEN=NO_RETRY_NO_REPAIR' g56.log
+          grep -F 'G56_BEGIN_AFTER_GREEN=NO_FALSE_NEGATIVE' g56.log
+          grep -F 'G56_ROLLBACK_FAILED_GREEN=PRIMARY_ERROR_AND_QUARANTINE' g56.log
+          grep -F 'G56_ROLLBACK_OK_GREEN=INTEGRITY_DENY_NO_REPAIR' g56.log
+          grep -F 'G56_REOPEN_GREEN=STILL_NO_EXTERNAL_AUTHORITY' g56.log
+      - name: Inherited G55 through G30 synthetic regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          for entry in 'g55 11' 'g54 9' 'g53 11' 'g52 10' 'g50 11' 'g49 7' 'g48 11' 'g47 18' 'g46 10' 'g45 7' 'g44 39' 'g43 32' 'g42 28' 'g41 18' 'g40 36' 'g39 28' 'g38 24' 'g37 34' 'g36 20' 'g35 18' 'g34 16' 'g33 24' 'g32 20' 'g31 18' 'g30 23'; do
+            set -- $entry
+            python -B -m unittest discover -s labs/a190 -p "test_$1_*.py" -v 2>&1 | tee "$1.log"
+            grep -F "Ran $2 tests" "$1.log"
+          done
+      - name: Explicit operation hard no-go
+        shell: bash
+        run: |
+          echo 'Synthetic SQLite semantic admission plus historical regression only. No external source authenticity or crash-power guarantee.'
+          echo 'Local old historical lock gaps now deny, but synchronized rollback and distinct caller-declared IDs remain unproven.'
+          echo 'No deployment, main merge, provider SEND, customer, secrets, Worker, funds or paid resources.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND'
