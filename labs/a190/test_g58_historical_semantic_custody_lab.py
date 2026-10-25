@@ -155,5 +155,65 @@ class G58HistoricalSemanticCustody(unittest.TestCase):
         print("G58_EXTERNAL_IDENTITY_RED=TWO_DECLARED_IDS_NOT_VERIFIED_REAL_IDENTITY")
 
 
+    def test_12_escaped_duplicate_key_historical_json_denied(self):
+        self.stage()
+        self.delete_lock()
+        raw=self.store.db.execute("SELECT data FROM action_decisions").fetchone()[0]
+        poisoned='{"\u0070ayload":{"business_event_id":"different"},'+raw[1:]
+        self.store.db.execute(
+            "UPDATE action_decisions SET data=?",(poisoned,))
+        self.store.db.commit()
+        self.assert_fail_closed(
+            lambda:self.stage(intent="request-B"),
+            expected="G58_HISTORICAL_JSON_UNTRUSTED_DENY")
+        print("G58_DUPLICATE_ESCAPED_GREEN=NO_LAST_WINS_PARSER")
+
+    def test_13_nonfinite_historical_json_denied(self):
+        self.stage()
+        self.delete_lock()
+        raw=self.store.db.execute("SELECT data FROM action_decisions").fetchone()[0]
+        poisoned='{"synthetic_nonfinite":NaN,'+raw[1:]
+        self.store.db.execute(
+            "UPDATE action_decisions SET data=?",(poisoned,))
+        self.store.db.commit()
+        self.assert_fail_closed(
+            lambda:self.stage(intent="request-B"),
+            expected="G58_HISTORICAL_JSON_UNTRUSTED_DENY")
+
+    def test_14_noncanonical_historical_json_still_detects_event(self):
+        import json
+        self.stage()
+        self.delete_lock()
+        raw=self.store.db.execute("SELECT data FROM action_decisions").fetchone()[0]
+        reformatted=json.dumps(json.loads(raw),indent=2,ensure_ascii=True)
+        self.store.db.execute(
+            "UPDATE action_decisions SET data=?",(reformatted,))
+        self.store.db.commit()
+        self.assert_fail_closed(lambda:self.stage(intent="request-B"))
+
+    def test_15_corrupted_other_tenant_does_not_poison_this_tenant(self):
+        other=ExecutionOutbox(self.store,Scope("foreign-owner","foreign-tenant","other"))
+        self.stage(outbox=other)
+        self.store.db.execute(
+            "UPDATE action_decisions SET data='not-json' WHERE tenant=?",
+            ("foreign-tenant",))
+        self.store.db.commit()
+        clean=self.stage(intent="new-local-event")
+        self.assertEqual(clean["enqueue_state"],"ENQUEUED")
+        self.assertEqual(self.count(),2)
+        print("G58_TENANT_BOUNDARY_GREEN=FOREIGN_CORRUPTION_NOT_LEAKED")
+
+    def test_16_orphan_decision_cannot_be_silently_skipped(self):
+        self.stage()
+        self.delete_lock()
+        self.store.db.execute(
+            "DELETE FROM action_outbox WHERE tenant=?",(SCOPE.tenant_id,))
+        self.store.db.commit()
+        self.assert_fail_closed(
+            lambda:self.stage(intent="request-B"),
+            expected="G58_HISTORICAL_JSON_UNTRUSTED_DENY")
+        print("G58_ORPHAN_DECISION_GREEN=NO_HIDDEN_RECORD")
+
+
 if __name__=="__main__":
     unittest.main()
