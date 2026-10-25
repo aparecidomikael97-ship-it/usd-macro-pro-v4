@@ -1349,9 +1349,23 @@ class ExecutionOutbox:
                 current_before_send["lease_until"] != intent["lease_until"] or
                 current_before_send["attempts"] != intent["attempts"]):
             raise RuntimeError("G49_GETTER_CHANGED_CLAIM_NO_SEND")
+        def _g50_assert_nonfenced_inflight() -> None:
+            # G41 already fences every after-send update in strict mode.
+            # Without that opt-in, a reentrant synthetic callback can have
+            # independently confirmed this key before returning or raising.
+            if self._strict_claim_fencing_lab:
+                return
+            fresh = self.get(key)
+            if (fresh["state"] != "UNCERTAIN" or
+                    fresh["lease_owner"] != worker or
+                    fresh["lease_until"] != intent["lease_until"] or
+                    fresh["attempts"] != intent["attempts"]):
+                raise RuntimeError("G50_SEND_CALLBACK_CHANGED_NO_OVERWRITE")
+
         try:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
+            _g50_assert_nonfenced_inflight()
             with self._managed_write_transaction():
                 cursor = self.db.execute(
                     """UPDATE action_outbox
@@ -1375,6 +1389,7 @@ class ExecutionOutbox:
         self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
+        _g50_assert_nonfenced_inflight()
         if result.get("accepted") is not True:
             # The external boundary was already crossed. A bare adapter flag
             # retryable=True cannot prove that no effect was committed.
@@ -1388,6 +1403,7 @@ class ExecutionOutbox:
             state = "FAILED" if proved_zero else "UNCERTAIN"
             reason = ("ADAPTER_EFFECT_ZERO_VERIFIED_LAB" if proved_zero
                       else "ADAPTER_REJECTION_UNVERIFIED_OUTCOME_UNKNOWN")
+            _g50_assert_nonfenced_inflight()
             with self._managed_write_transaction():
                 cursor = self.db.execute(
                     """UPDATE action_outbox
@@ -1408,6 +1424,7 @@ class ExecutionOutbox:
         if result.get("confirmed") is True and effect_ref and self._verified_evidence(
             "EFFECT_CONFIRMED", intent, result
         ):
+            _g50_assert_nonfenced_inflight()
             out = self._confirm(
                 key,
                 effect_ref=effect_ref,
@@ -1418,6 +1435,7 @@ class ExecutionOutbox:
             )
             return {**out, "dispatch_state": "CONFIRMED"}
 
+        _g50_assert_nonfenced_inflight()
         with self._managed_write_transaction():
             cursor = self.db.execute(
                 """UPDATE action_outbox
