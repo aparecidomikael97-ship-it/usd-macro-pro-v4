@@ -28,7 +28,7 @@ Workflow `.github/workflows/aion-a190-g56-strict-reconfirm-transaction-faults-la
 
 - Windows local isolado `C:\Users\apare\AtlasQuant-G56-Faults-LAB-20261025`: **491/491 PASS**, exit code 0, worktree limpo, exato SHA de código/workflow `56a318bebc65918f91c8ec7f6e6c49aca95dcefb`.
 - [GitHub Actions run #40214675698](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40214675698): Ubuntu job `121233131862` **SUCCESS** com 491 casos e sete marcadores de proteção G56 confirmados no log.
-- No momento inicial deste relatório, o job GitHub Windows `121233131964` ainda estava executando; seu resultado deve ser consultado antes de declarar CI multiplataforma verde. O relatório foi adicionado depois do commit testado e não altera o código executado.
+- GitHub Windows job `121233131964` **SUCCESS**, com **491/491 testes** e sete marcadores G56 confirmados no log; Ubuntu e Windows, portanto, somam **982 execuções dos mesmos 491 casos distintos** no exato SHA `56a318bebc65918f91c8ec7f6e6c49aca95dcefb`. O relatório foi adicionado depois do commit testado e não altera o código executado.
 
 ## Limites permanentes e recomendações
 
