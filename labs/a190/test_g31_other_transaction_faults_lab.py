@@ -67,6 +67,12 @@ class G31OtherTransactions(unittest.TestCase):
 
     def test_03_confirm_effect_insert_error_quarantines(self):
         item=self.stage()
+        # G53: exercise the effect INSERT failure from a valid synthetic
+        # recovery phase instead of a now-prohibited PENDING confirmation.
+        self.real.execute(
+            "UPDATE action_outbox SET state='UNCERTAIN' "
+            "WHERE idempotency_key=?", (item["idempotency_key"],))
+        self.real.commit()
         self.fault("INSERT INTO action_effects")
         self.denied(lambda:self.outbox._confirm(item["idempotency_key"],
             effect_ref="synthetic-ref",confirmed_at=NOW))
