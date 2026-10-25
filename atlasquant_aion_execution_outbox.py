@@ -573,6 +573,71 @@ class ExecutionOutbox:
                     or semantic_lock["payload_digest"] != payload_digest
                 ):
                     raise ValueError("semantic business event collision")
+            if semantic_event:
+                # G58 LAB: a reservation is not sufficient when older local
+                # decisions may lack their semantic lock. Scan SAME-TENANT
+                # decisions under the existing BEGIN IMMEDIATE transaction;
+                # never backfill, trust JSON with ambiguous keys, or infer
+                # absence of a provider effect from missing local custody.
+                def g58_unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+                    result: dict[str, Any] = {}
+                    for label, value in pairs:
+                        if label in result:
+                            raise ValueError("duplicate historical JSON key")
+                        result[label] = value
+                    return result
+
+                def g58_bad_constant(value: str) -> Any:
+                    raise ValueError("nonfinite historical JSON value: " + value)
+
+                older_decisions = self.db.execute(
+                    """SELECT d.data, d.decision_id,
+                              d.owner AS decision_owner,
+                              d.tenant AS decision_tenant,
+                              d.workspace AS decision_workspace,
+                              d.intent_ref AS historical_intent,
+                              o.idempotency_key AS historical_key,
+                              o.owner AS outbox_owner,
+                              o.tenant AS outbox_tenant,
+                              o.workspace AS outbox_workspace
+                       FROM action_decisions d
+                       LEFT JOIN action_outbox o
+                         ON o.decision_id=d.decision_id
+                       WHERE d.tenant=?
+                       ORDER BY d.decision_id""",
+                    (tenant,),
+                ).fetchall()
+                for historical in older_decisions:
+                    try:
+                        decoded = json.loads(
+                            historical["data"],
+                            object_pairs_hook=g58_unique_pairs,
+                            parse_constant=g58_bad_constant,
+                        )
+                        if not isinstance(decoded, dict):
+                            raise ValueError("historical root is not an object")
+                        historical_payload = decoded.get("payload")
+                        if not isinstance(historical_payload, dict):
+                            raise ValueError("historical payload is not an object")
+                        if (historical["historical_key"] is None
+                                or historical["outbox_owner"] != historical["decision_owner"]
+                                or historical["outbox_tenant"] != tenant
+                                or historical["outbox_workspace"] != historical["decision_workspace"]):
+                            raise ValueError("historical decision/outbox scope missing")
+                        if "business_event_id" in historical_payload:
+                            stored_event = historical_payload["business_event_id"]
+                            if (not isinstance(stored_event, str)
+                                    or not _SAFE_TOKEN.fullmatch(stored_event)):
+                                raise ValueError("historical event identity invalid")
+                    except (ValueError, TypeError, UnicodeError):
+                        raise RuntimeError(
+                            "G58_HISTORICAL_JSON_UNTRUSTED_DENY"
+                        ) from None
+                    if (historical_payload.get("business_event_id") == semantic_event
+                            and historical["historical_key"] != idempotency_key):
+                        raise RuntimeError(
+                            "G58_HISTORICAL_SEMANTIC_CUSTODY_DENY"
+                        )
             existing = self.db.execute(
                 """SELECT o.idempotency_key, d.data AS decision_data
                    FROM action_decisions d
