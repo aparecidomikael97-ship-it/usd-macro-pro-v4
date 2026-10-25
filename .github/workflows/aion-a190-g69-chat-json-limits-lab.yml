@@ -51,7 +51,7 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g69_*.py' -v 2>&1 | tee g69.log
-          grep -F 'Ran 16 tests' g69.log
+          grep -F 'Ran 19 tests' g69.log
           grep -F 'G69_JSON_INPUT_262144_GREEN=BOUNDARY_ALLOWED' g69.log
           grep -F 'G69_JSON_INPUT_262145_GREEN=DENIED_BEFORE_PARSE' g69.log
           grep -F 'G69_JSON_MULTIBYTE_GREEN=CHECK_UTF8_NOT_CHARS' g69.log
@@ -64,6 +64,9 @@ jobs:
           grep -F 'G69_PUBLIC_FALLBACK_GREEN=NO_OVERREDACTION' g69.log
           grep -F 'G69_LEGACY_ASSIGN_GREEN=STILL_MASKED' g69.log
           grep -F 'G69_G68_COMPAT_GREEN=STRUCTURE_AND_DUPLICATES' g69.log
+          grep -F 'G69_MALFORMED_DEEP_GREEN=DENIED_BEFORE_JSON_PARSER' g69.log
+          grep -F 'G69_UNFINISHED_MEMBER_GREEN=FAKE_VALUE_REMOVED' g69.log
+          grep -F 'G69_UNFINISHED_CHAT_GREEN=MASKED_LOCAL_STORE' g69.log
       - name: G68 quoted JSON fake secrets and top-level Mapping preflight
         shell: bash
         run: |
