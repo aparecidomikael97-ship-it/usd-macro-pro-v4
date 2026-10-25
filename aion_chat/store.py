@@ -1,7 +1,7 @@
 """Local SQLite staging with scoped identity and explicit resilience controls."""
 import base64
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, fields
 import hashlib
 import json
 import os
@@ -787,7 +787,11 @@ class SQLiteChatStore:
             c = self.get_conversation(scope, message.conversation_id)
             for aid in message.attachments:
                 self.get_attachment(scope, c.id, aid)
-            message = Message(**redact(asdict(message)))
+            # Shallow dataclass field projection: let the bounded G70 guard inspect
+            # the original nested graph before any recursive asdict copy.
+            message = Message(**redact({
+                field.name: getattr(message, field.name) for field in fields(Message)
+            }))
             message.sequence = c.message_count + 1
             self.db.execute(
                 "INSERT INTO messages VALUES (?,?,?,?,?)",
