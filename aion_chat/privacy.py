@@ -14,6 +14,9 @@ def redact(value):
     elif isinstance(value, dict):
         value = {k: "[REDACTED]" if re.fullmatch(r"(?i)(password|senha|secret|api_key|token|credential)", k)
                  else redact(v) for k, v in value.items()}
-    elif isinstance(value, list):
+    elif isinstance(value, (list, tuple)):
+        # G62: json.dumps serializes tuples as JSON arrays, but the previous
+        # redactor left their nested secrets untouched. Normalize both to a
+        # redacted list BEFORE staging/hashing so no tuple bypass remains.
         value = [redact(v) for v in value]
     return value
