@@ -1495,10 +1495,10 @@ class ExecutionOutbox:
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
             raise ValueError("only SENT or UNCERTAIN intents require reconciliation")
-        snapshot_lab = (
-            self._g42_reconcile_snapshot_lab(intent)
-            if self._strict_reconcile_snapshot_cas_lab else None
-        )
+        # G52: a stale reconciliation reply must never override a newer
+        # local row even when the historical strict opt-in is disabled.
+        # This is still a local SQLite snapshot, NOT provider authority.
+        snapshot_lab = self._g42_reconcile_snapshot_lab(intent)
 
         def no_stale_reply_lab() -> bool:
             return (snapshot_lab is None or
@@ -1515,6 +1515,10 @@ class ExecutionOutbox:
         if self._strict_reconciliation_auth_lab and not self._reconciliation_authority_lab(
             intent, authorize,
         ):
+            # Authorization callback may itself have changed the local phase.
+            # Never return an obsolete pre-authorization snapshot as current.
+            if not no_stale_reply_lab():
+                return stale_reply_lab()
             return {**intent, "reconcile_state": "RECONCILE_AUTH_DENIED_NO_LOOKUP"}
         if not no_stale_reply_lab():
             return stale_reply_lab()
