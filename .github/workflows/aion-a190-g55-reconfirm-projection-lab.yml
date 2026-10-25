@@ -32,11 +32,14 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g55_*.py' -v 2>&1 | tee g55.log
-          grep -F 'Ran 8 tests' g55.log
+          grep -F 'Ran 11 tests' g55.log
           grep -F 'G55_CLEAN_RECONFIRM_GREEN=EXACTLY_ONE_LOCAL_RECEIPT' g55.log
           grep -F 'G55_PROJECTED_STATE_GREEN=DENY_NO_REPAIR' g55.log
           grep -F 'G55_INVALID_JSON_GREEN=NO_REPAIR' g55.log
           grep -F 'G55_LOCAL_TIMESTAMP_GREEN=ORIGINAL_PRESERVED' g55.log
+          grep -F 'G55_NONCANONICAL_GREEN=NO_SILENT_REPAIR' g55.log
+          grep -F 'G55_LEDGER_PRECEDENCE_GREEN=ORIGINAL_G42_GATE_FIRST' g55.log
+          grep -F 'G55_FLAG_OFF_GREEN=NO_IMPLICIT_REPAIR' g55.log
       - name: Inherited G54-G30 regression
         shell: bash
         run: |
