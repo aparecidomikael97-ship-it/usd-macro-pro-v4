@@ -103,14 +103,14 @@ def _assert_acyclic_payload_lab(
     active.add(object_id)
     try:
         if isinstance(value, Mapping):
-            children = (item for pair in value.items() for item in pair)
-        else:
-            children = iter(value)
-        for child in children:
-            if isinstance(value, Mapping) and isinstance(child, str):
-                if redact(child) != child:
+            for key, child in value.items():
+                if isinstance(key, str) and redact(key) != key:
                     raise ValueError("G65_SENSITIVE_JSON_KEY_DENY")
-            _assert_acyclic_payload_lab(child, active, depth + 1, budget)
+                _assert_acyclic_payload_lab(key, active, depth + 1, budget)
+                _assert_acyclic_payload_lab(child, active, depth + 1, budget)
+        else:
+            for child in value:
+                _assert_acyclic_payload_lab(child, active, depth + 1, budget)
     finally:
         active.remove(object_id)
 
