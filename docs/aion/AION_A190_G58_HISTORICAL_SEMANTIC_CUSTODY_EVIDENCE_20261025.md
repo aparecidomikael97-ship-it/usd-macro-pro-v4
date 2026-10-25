@@ -22,7 +22,7 @@ A G58 passa a auditar decisões existentes do **mesmo tenant** dentro do BEGIN I
 5. Codex identificou que o teste inicial de duplicate-escape estava usando uma sequência `\u0070` que Python interpretava antes do JSON. O teste foi corrigido no SHA `6ddbdf2fc35eefe02314cdc9d3288ad44a98d5c0`. **G58 16/16 PASS** no Windows após a correção.
 6. G57, G39, G44, G37 e o restante da regressão G30–G58 foram aprovados localmente no SHA `e90b9a0f9e96b28c01dcba9ff45949453b5467e1`: **517/517 PASS**, checkout isolado limpo. Esse é o SHA completo anterior à pequena correção de teste de escape; a bateria nova G58 foi repetida com a correção.
 
-## Codex independente: revisão e limites identificados
+**Reexecução completa após corrigir o teste de escape:** no SHA exato `6ddbdf2fc35eefe02314cdc9d3288ad44a98d5c0`, nova execução G30–G58 **517/517 PASS** no Windows, exit code 0, checkout limpo. A primeira bateria 517/517 ocorreu no SHA `e90b9a0f9e96b28c01dcba9ff45949453b5467e1` e não deve ser confundida com a nova verificação.\n\n## Codex independente: revisão e limites identificados
 
 - Codex CLI Windows, modo `read-only --ephemeral`, sessão `01a1741a-4028-7e81-a530-511e8caddfbd`, revisou a G57 e recomendou checagem histórica por tenant com parse JSON estrito no BEGIN já existente, sem editar nem rodar testes.
 - Codex sessão `01a17420-f0a2-7231-9634-f43227be801e`, revisão **real do código G58** somente leitura, apontou limitações adicionais. **NÃO CORRIGIDAS NESTA G58**:
