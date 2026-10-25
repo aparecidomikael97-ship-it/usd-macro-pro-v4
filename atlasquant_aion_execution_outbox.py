@@ -1332,6 +1332,18 @@ class ExecutionOutbox:
                 )
             return {**self.get(key), "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
+        # G49: adapter.send property lookup can execute arbitrary in-process
+        # code. A locally consistent CONFIRMED ledger can pass the G44 binder
+        # even though the original UNCERTAIN attempt has been consumed.
+        # Always recheck the original phase, claimant, lease and generation
+        # immediately after the getter, even without optional G41 fencing or
+        # a synthetic clock. Never invoke send for a superseded attempt.
+        current_before_send = self.get(key)
+        if (current_before_send["state"] != "UNCERTAIN" or
+                current_before_send["lease_owner"] != worker or
+                current_before_send["lease_until"] != intent["lease_until"] or
+                current_before_send["attempts"] != intent["attempts"]):
+            raise RuntimeError("G49_GETTER_CHANGED_CLAIM_NO_SEND")
         self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
