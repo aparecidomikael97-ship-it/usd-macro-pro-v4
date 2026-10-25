@@ -55,6 +55,24 @@ Actual detached isolated Windows worktree `C:\Users\apare\AtlasQuant-G69-Parse-L
 
 Separate dependency-limited chat Golden Path remains NOT verified (preexisting absent `pandas` on local Windows); do not infer full canonical Quality/Security approval from this focused suite.
 
+## Third RED-first (postpatch Codex) and corrected final source SHA
+
+A second independent Codex CLI read-only/ephemeral audit `01a174da-d974-73e0-8eb0-c06a5257a195` inspected the tested v2 code `2fa24c4`, **without edits, executing tests, network or supplier calls**. It found:
+- A 2000-`[` input followed by `0}` set `unbalanced=True`, evading the previous preparse depth denial even though it could overwhelm `json.loads`.
+- A Unicode-escaped sensitive key followed by a quoted value ending with one orphan backslash bypassed the unfinished-value fallback regex.
+- Earlier full-JSON 64/65 limits and the prior 19/19 cases remained valid; their coverage did not prove these additional cases.
+
+Three new tests were committed **BEFORE the third engine patch** at **`564a84d3778f1200974edbc2e53400271a83cfb3`**: actual Windows isolated run had **22 total, 20 PASS / 2 FAIL**. Tests check malformed mismatched very deep candidate, unfinished escaped quoted value ending in a backslash, and a normal 75-bracket prose string that should remain untouched.
+
+Third `aion_chat/privacy.py` patch SHA **`d0261375be3668ded15605db320d74859150fba4`**:
+- Rejects deeply unclosed/mismatched JSON-looking input with **more than 128 bracket nesting levels**, even when its bracket sequence was flagged `unbalanced`, before `json.loads`. A modest-depth malformed plain bracket text (75) keeps legacy fallback; **64 remains the maximum for balanced/consistent JSON input**. This intentional distinction avoids treating all malformed bracket-containing prose as valid JSON.
+- The specialized unfinished quoted member regex now admits a single trailing backslash at end-of-prose, masking the faux-secret before persistence.
+- All **22/22 G69 GREEN**, G68 **21/21**, G67 **14/14** in immediate Windows regression. No changes to external actions, transaction authority or COMMIT/rollback.
+
+The final **code+workflow SHA `61d6e3895ef9b31d14d59a3d8c1ff58508863b9f`** updates workflow `.github/workflows/aion-a190-g69-chat-json-limits-lab.yml` to require **22 G69 tests and 18 markers**, **676 focused distinct synthetic cases per OS**. The previous G69 CI #40233180908 (673 cases) cannot certify this final change.
+
+[Latest G69 v3 Actions run #40233604212](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40233604212) was QUEUED at this document amendment; **do not claim cross-OS success without inspecting completed job statuses and logs**. The local final Windows focused regression was still underway when this document was updated.
+
 ## Open limits and non-conflation
 
 - These are **input and nesting budgets for JSON-like chat strings**, not bounds on peak memory or CPU while running Python, regexes, parsing and producing redacted copies.
