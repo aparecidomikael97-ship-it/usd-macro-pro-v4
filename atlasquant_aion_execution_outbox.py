@@ -596,6 +596,14 @@ class ExecutionOutbox:
                               d.tenant AS decision_tenant,
                               d.workspace AS decision_workspace,
                               d.intent_ref AS historical_intent,
+                              d.action AS historical_action,
+                              d.aggregate_key AS historical_aggregate,
+                              d.aggregate_seq AS historical_sequence,
+                              d.payload_digest AS historical_digest,
+                              d.policy_version AS historical_policy,
+                              d.authorization_ref AS historical_authority,
+                              d.valid_until AS historical_valid_until,
+                              d.created_at AS historical_created_at,
                               o.idempotency_key AS historical_key,
                               o.owner AS outbox_owner,
                               o.tenant AS outbox_tenant,
@@ -624,6 +632,72 @@ class ExecutionOutbox:
                                 or historical["outbox_tenant"] != tenant
                                 or historical["outbox_workspace"] != historical["decision_workspace"]):
                             raise ValueError("historical decision/outbox scope missing")
+                        # G59: historical identity must be internally
+                        # consistent, regardless of whether its old semantic
+                        # reservation survived. A syntactically valid edit to
+                        # business_event_id cannot disguise an old obligation.
+                        if _digest(historical_payload) != historical["historical_digest"]:
+                            raise RuntimeError("G59_HISTORICAL_BINDING_DENY")
+                        historic_expected = {
+                            "schema": SCHEMA,
+                            "decision_id": historical["decision_id"],
+                            "idempotency_key": historical["historical_key"],
+                            "owner_id": historical["decision_owner"],
+                            "tenant_id": historical["decision_tenant"],
+                            "workspace_id": historical["decision_workspace"],
+                            "intent_ref": historical["historical_intent"],
+                            "action": historical["historical_action"],
+                            "aggregate_key": historical["historical_aggregate"],
+                            "aggregate_seq": historical["historical_sequence"],
+                            "payload_digest": historical["historical_digest"],
+                            "policy_version": historical["historical_policy"],
+                            "authorization_ref": historical["historical_authority"],
+                            "valid_until": historical["historical_valid_until"],
+                            "created_at": historical["historical_created_at"],
+                        }
+                        if (any(decoded.get(name) != value
+                                for name,value in historic_expected.items())
+                                or decoded.get("grants_authority") is not False):
+                            raise RuntimeError("G59_HISTORICAL_BINDING_DENY")
+                        # G59: the digest and JSON fields alone could be
+                        # rewritten together. Bind semantic ID and reconstruct
+                        # the ORIGINAL local idempotency material as well.
+                        historic_semantic=decoded.get("semantic_event_id_lab","")
+                        historic_reauth=decoded.get("requires_reauth",False)
+                        historic_reauth_ref=decoded.get("reauth_ref","")
+                        historic_risk=decoded.get("risk_points",0)
+                        if (not isinstance(historic_semantic,str)
+                                or type(historic_reauth) is not bool
+                                or not isinstance(historic_reauth_ref,str)
+                                or (historic_reauth and not historic_reauth_ref)
+                                or (not historic_reauth and historic_reauth_ref)
+                                or type(historic_risk) is not int
+                                or not 0 <= historic_risk <= 100):
+                            raise RuntimeError("G59_HISTORICAL_BINDING_DENY")
+                        if (historic_semantic and
+                                historical_payload.get("business_event_id") != historic_semantic):
+                            raise RuntimeError("G59_HISTORICAL_BINDING_DENY")
+                        historic_material={
+                            "scope":[historical["decision_owner"],tenant,
+                                     historical["decision_workspace"]],
+                            "intent_ref":historical["historical_intent"],
+                            "action":historical["historical_action"],
+                            "aggregate_key":historical["historical_aggregate"],
+                            "payload_digest":historical["historical_digest"],
+                            "transaction_id":decoded.get("transaction_id",""),
+                            "authority_budget_ref":decoded.get("authority_budget_ref",""),
+                            "risk_points":historic_risk,
+                            "capability_class":decoded.get("capability_class",""),
+                        }
+                        if historic_semantic:
+                            historic_material["semantic_event_id_lab"]=historic_semantic
+                        if historic_reauth:
+                            historic_material["requires_reauth"]=True
+                            historic_material["reauth_ref"]=historic_reauth_ref
+                        if (_digest(historic_material) != historical["historical_key"]
+                                or historical["decision_id"] !=
+                                "DEC-"+historical["historical_key"][:24].upper()):
+                            raise RuntimeError("G59_HISTORICAL_BINDING_DENY")
                         if "business_event_id" in historical_payload:
                             stored_event = historical_payload["business_event_id"]
                             if (not isinstance(stored_event, str)
