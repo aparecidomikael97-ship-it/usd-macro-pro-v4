@@ -30,7 +30,7 @@ Testes pós-patch: **G64 12/12 PASS**. Expansão da suíte em `4e7a290d3ce8ee35e
 
 Workflow `.github/workflows/aion-a190-g64-confirm-privacy-depth-lab.yml` no SHA de código e CI **`a8935e708736f01f3851dbf43447c08884fb5df7`**. Regressão Windows isolada `C:\Users\apare\AtlasQuant-G64-Confirm-LAB-20261025`: G30–G64 (G51 consolidado em G50) **588/588 PASS**, exit code 0, checkout Git limpo, exatamente nesse SHA.
 
-[GitHub Actions run G64 #40226802145](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40226802145): job Ubuntu `121269777059` **SUCCESS** quando foi escrita a versão inicial deste relatório; job Windows `121269776940` estava na fila. Conferir contagem e marcadores nos dois logs antes de declarar sucesso multiplataforma. Este documento é commit posterior, somente documentação, não substitui SHA de código testado.
+**CI GitHub Actions G64 MULTIPLATAFORMA VERIFICADO:** [run #40226802145](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40226802145), SHA exato de código/workflow **`a8935e708736f01f3851dbf43447c08884fb5df7`**. Ubuntu job `121269777059` **SUCCESS 588/588**; Windows job `121269776940` **SUCCESS 588/588**. Li os dois logs completos: **34 grupos por sistema**, nove marcadores G64 presentes em cada um. Total **1.176 execuções dos mesmos 588 cenários sintéticos**, além da bateria Windows local. Este documento é commit posterior, somente documentação, e não substitui SHA de código testado.
 
 ## Segunda revisão Codex independente, pós-patch
 
