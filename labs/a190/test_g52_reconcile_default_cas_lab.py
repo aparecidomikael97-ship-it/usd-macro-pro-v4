@@ -83,6 +83,8 @@ class G52DefaultSnapshot(unittest.TestCase):
         return {"allowed": True, "actor_id": SCOPE.owner_id,
                 "tenant_id": SCOPE.tenant_id,
                 "workspace_id": SCOPE.workspace_id,
+                "policy_version": "p1",
+                "authorization_ref": "g52-auth",
                 "purpose": "RECONCILE_LOOKUP"}
 
     def scan(self, adapter, engine=None, authorize=None):
