@@ -152,6 +152,13 @@ class G41PersistentClaimFencing(unittest.TestCase):
     def test_08_denial_callback_confirms_does_not_overwrite(self):
         claim=self.stage()
         def confirm_then_deny(decision):
+            # G53: model a local attempt already transitioned from CLAIMED
+            # to UNCERTAIN before injecting a synthetic reentrant effect.
+            # Direct confirmation of CLAIMED is now intentionally denied.
+            self.outbox.db.execute(
+                "UPDATE action_outbox SET state='UNCERTAIN' "
+                "WHERE idempotency_key=?", (claim["idempotency_key"],))
+            self.outbox.db.commit()
             self.confirm_fake(claim)
             return {"allowed":False}
         with self.assertRaisesRegex(RuntimeError,"FENCE_STALE_GENERATION"):
