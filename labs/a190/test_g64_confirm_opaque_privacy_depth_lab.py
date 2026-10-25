@@ -184,6 +184,50 @@ class G64ConfirmOpaqueAndDepth(unittest.TestCase):
             self.stage({"loop":obj})
         self.assertEqual(self.counts(),(0,0,0,0))
 
+    def test_13_depth_boundary_64_container_levels_allowed(self):
+        # Root mapping (level 1) + 63 nested lists = 64 levels.
+        key=self.stage({"deep":chain(63)})["idempotency_key"]
+        self.raw.execute(
+            "UPDATE action_outbox SET state='UNCERTAIN' WHERE idempotency_key=?",
+            (key,))
+        self.raw.commit()
+        done=self.confirm(key,{"deep":chain(63)})
+        self.assertEqual(done["state"],"CONFIRMED")
+        self.assertEqual(self.counts(),(1,1,1,1))
+        print("G64_DEPTH_64_GREEN=BOUNDARY_ALLOWED")
+
+    def test_14_depth_boundary_65_container_levels_denied(self):
+        # Root mapping + 64 nested lists = 65 container levels.
+        watch=BeginWatch(self.raw)
+        self.box.db=watch
+        with self.assertRaisesRegex(ValueError,"G64_EXCESSIVE_NESTING_DENY"):
+            self.stage({"deep":chain(64)})
+        self.assertEqual(watch.begins,0)
+        self.assertEqual(self.counts(),(0,0,0,0))
+        print("G64_DEPTH_65_GREEN=BOUNDARY_DENIED")
+
+    def test_15_hidden_deep_value_rejected_before_redact(self):
+        key=self.prepare()
+        watch=BeginWatch(self.raw)
+        self.box.db=watch
+        with self.assertRaisesRegex(ValueError,"G64_EXCESSIVE_NESTING_DENY"):
+            self.confirm(key,{"password":chain(90)})
+        self.assertEqual(watch.begins,0)
+        self.assertEqual(self.counts(),(1,1,1,0))
+        print("G64_HIDDEN_DEPTH_GREEN=NO_BYPASS")
+
+    def test_16_existing_cyclic_confirmation_proves_zero_begin(self):
+        key=self.prepare()
+        obj={}
+        obj["self"]=obj
+        watch=BeginWatch(self.raw)
+        self.box.db=watch
+        with self.assertRaisesRegex(ValueError,"G63_CYCLIC_RESULT_DENY"):
+            self.confirm(key,{"nested":obj})
+        self.assertEqual(watch.begins,0)
+        self.assertEqual(self.counts(),(1,1,1,0))
+        print("G64_CYCLE_ZERO_BEGIN_GREEN=INSTRUMENTED")
+
     def test_12_no_result_confirmation_regression(self):
         key=self.prepare()
         done=self.confirm(key,None)
