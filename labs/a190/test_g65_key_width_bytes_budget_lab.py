@@ -183,6 +183,44 @@ class G65KeyBudgetAndBoundary(unittest.TestCase):
             lambda:self.confirm(key,{"loop":cycle}),
             "G63_CYCLIC_RESULT_DENY",(1,1,1,0))
 
+    def test_15_width_exact_4096_visits_is_accepted(self):
+        # root 1 + 3 key/value pairs 6 + list 1 + 4088 leaves.
+        row=self.stage({"wide":list(range(4088))})
+        self.assertEqual(row["enqueue_state"],"ENQUEUED")
+        self.assertEqual(self.counts(),(1,1,1,0))
+        print("G65_NODE_4096_GREEN=BOUNDARY_ACCEPTED")
+
+    def test_16_width_4097_visits_is_denied(self):
+        self.watched_deny(
+            lambda:self.stage({"wide":list(range(4089))}),
+            "G65_NODE_BUDGET_DENY",(0,0,0,0))
+        print("G65_NODE_4097_GREEN=BOUNDARY_DENIED")
+
+    def test_17_confirm_exact_4096_visits_allowed(self):
+        key=self.uncertain()
+        # Root 1 + key/value pair 2 + list 1 + 4092 leaves.
+        done=self.confirm(key,{"wide":list(range(4092))})
+        self.assertEqual(done["state"],"CONFIRMED")
+        self.assertEqual(self.counts(),(1,1,1,1))
+        print("G65_CONFIRM_NODE_4096_GREEN=BOUNDARY_ACCEPTED")
+
+    def test_18_confirm_4097_visits_denied(self):
+        key=self.uncertain()
+        self.watched_deny(
+            lambda:self.confirm(key,{"wide":list(range(4093))}),
+            "G65_NODE_BUDGET_DENY",(1,1,1,0))
+        print("G65_CONFIRM_NODE_4097_GREEN=BOUNDARY_DENIED")
+
+    def test_19_sensitive_patterns_in_values_remain_redacted(self):
+        row=self.stage({"memo":"Bearer G65FAKEMEMO12345",
+                        "display":"sk-G65FAKEDISPLAY12345"})
+        self.assertEqual(row["enqueue_state"],"ENQUEUED")
+        stored=self.raw.execute("SELECT data FROM action_decisions").fetchone()[0]
+        self.assertNotIn("G65FAKEMEMO12345",stored)
+        self.assertNotIn("G65FAKEDISPLAY12345",stored)
+        self.assertEqual(self.counts(),(1,1,1,0))
+        print("G65_VALUE_PRIVACY_GREEN=STRINGS_REDACT_NOT_KEY_DENY")
+
     def test_14_extreme_cycle_at_depth_65_fails_closed(self):
         key=self.uncertain()
         circular=chain(63,leaf=[])
