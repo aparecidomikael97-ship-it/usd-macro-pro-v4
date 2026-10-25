@@ -101,17 +101,23 @@ class G50AfterSendReentry(unittest.TestCase):
 
     def test_02_confirm_then_return_must_preserve_local_terminal(self):
         adapter=SyntheticReentrantSend(self.outbox,self.key)
-        with self.assertRaisesRegex(RuntimeError,
-            "G50_SEND_CALLBACK_CHANGED_NO_OVERWRITE"):
-            self.dispatch(adapter)
+        # G51: both G50 candidates preserve state; the CAS-based variant
+        # reports a stale reply without claiming that a provider was verified.
+        result=self.dispatch(adapter)
+        self.assertEqual(result["dispatch_state"],
+                         "G50_STALE_SEND_REPLY_NO_WRITE")
+        self.assertEqual(result["state"],"CONFIRMED")
         self.verify_terminal(adapter)
         print("G50_REENTRY_RETURN_GREEN=CONFIRMED_LEDGER_IMMUTABLE")
 
     def test_03_confirm_then_raise_must_preserve_local_terminal(self):
         adapter=SyntheticReentrantSend(self.outbox,self.key,fail=True)
-        with self.assertRaisesRegex(RuntimeError,
-            "G50_SEND_CALLBACK_CHANGED_NO_OVERWRITE"):
-            self.dispatch(adapter)
+        # G51: both G50 candidates preserve state; the CAS-based variant
+        # reports a stale reply without claiming that a provider was verified.
+        result=self.dispatch(adapter)
+        self.assertEqual(result["dispatch_state"],
+                         "G50_STALE_SEND_REPLY_NO_WRITE")
+        self.assertEqual(result["state"],"CONFIRMED")
         self.verify_terminal(adapter)
         print("G50_REENTRY_EXCEPTION_GREEN=CONFIRMED_NOT_UNCERTAIN")
 
