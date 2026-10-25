@@ -38,6 +38,10 @@ The G68 Windows isolated detached worktree: `C:\Users\apare\AtlasQuant-G68-JSON-
 - An earlier [G68 CI run #40231486506](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40231486506) ran a previous revision with only 16 new G68 tests. It MUST NOT be represented as validation of the 21-test updated source.
 - **Full updated Windows local VERIFIED:** on exact code+workflow SHA **`fa1ebe5311a8cfdd73fa6ce244b1bf17248282b1`**, clean detached worktree G30–G68 ran **654/654 PASS**, exit 0. This supersedes the earlier G68 649-count local run. No canonical entire Security/Quality claim.
 
+## Additional chat suite check
+
+The isolated G68 Windows worktree on exact source+workflow SHA `fa1ebe5311a8cfdd73fa6ce244b1bf17248282b1` also ran root-level `test_atlasquant_aion_chat_foundation` and `test_atlasquant_aion_chat_sqlite_write_outcome` together: **6/6 PASS**, exit 0. This adds narrow, separate chat/write regression evidence. It does NOT clear full chat Golden Path or canonical Quality/Security; the Golden Path's missing `pandas` dependency was previously reproduced on G66/G67.
+
 ## Independent Codex sessions, local only
 
 Installed Windows Codex CLI v0.164.0-alpha.11.1, `-s read-only --ephemeral`:
