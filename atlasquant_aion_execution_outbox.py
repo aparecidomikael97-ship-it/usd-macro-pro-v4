@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
+import math
 import re
 from typing import Any, Callable, Mapping
 
@@ -70,6 +71,7 @@ def _canonical(value: Any) -> str:
         sort_keys=True,
         separators=(",", ":"),
         default=str,
+        allow_nan=False,
     )
 
 
@@ -536,7 +538,13 @@ class ExecutionOutbox:
             if "business_event_id" not in redact(raw_payload):
                 raise ValueError("semantic event must survive redaction")
         safe_payload = redact(raw_payload)
-        payload_digest = _digest(safe_payload)
+        try:
+            # G60: never persist non-standard JSON numeric tokens. This
+            # runs BEFORE BEGIN, so no reservation/intent can be partially
+            # admitted after a serialization failure.
+            payload_digest = _digest(safe_payload)
+        except ValueError:
+            raise ValueError("G60_NONFINITE_PAYLOAD_DENY") from None
         key_material = {
             "scope": [owner, tenant, workspace],
             "intent_ref": intent,
@@ -590,6 +598,14 @@ class ExecutionOutbox:
                 def g58_bad_constant(value: str) -> Any:
                     raise ValueError("nonfinite historical JSON value: " + value)
 
+                def g60_parse_finite_float(value: str) -> float:
+                    # parse_constant handles literal NaN/Infinity, but does
+                    # NOT detect valid JSON exponent overflow (e.g. 1e999).
+                    number = float(value)
+                    if not math.isfinite(number):
+                        raise ValueError("historical JSON float overflow")
+                    return number
+
                 older_decisions = self.db.execute(
                     """SELECT d.data, d.decision_id,
                               d.owner AS decision_owner,
@@ -621,6 +637,7 @@ class ExecutionOutbox:
                             historical["data"],
                             object_pairs_hook=g58_unique_pairs,
                             parse_constant=g58_bad_constant,
+                            parse_float=g60_parse_finite_float,
                         )
                         if not isinstance(decoded, dict):
                             raise ValueError("historical root is not an object")
