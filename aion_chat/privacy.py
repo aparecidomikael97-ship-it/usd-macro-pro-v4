@@ -16,6 +16,12 @@ _G69_JSON_MEMBER = re.compile(
     r'(?P<prefix>(?P<key>"(?:\\.|[^"\\])*")\s*:\s*")'
     r'(?:\\.|[^"\\])*"'
 )
+# G69: a truncated quoted value at end-of-prose must not leave a fake
+# credential visible merely because its terminating quote never arrived.
+_G69_JSON_MEMBER_UNFINISHED = re.compile(
+    r'(?P<prefix>(?P<key>"(?:\\.|[^"\\])*")\s*:\s*")'
+    r'(?:\\.|[^"\\])*\Z'
+)
 _G69_SENSITIVE_KEY = re.compile(
     r"(?i)(?:password|senha|secret|token|credential|authorization|"
     r"access[_-]?token|accessToken|refresh[_-]?token|refreshToken|"
@@ -68,7 +74,10 @@ def _g69_preparse_chat_json(value):
                     opening == "{" and char != "}"
                 ):
                     unbalanced = True
-    if excess and not (unbalanced or stack or quoted):
+    # G69 second RED: an unterminated but otherwise consistent 2000-[ JSON
+    # candidate must be rejected BEFORE json.loads, not allowed to recurse.
+    # Genuine unmatched/mismatched plain bracket text retains text fallback.
+    if excess and not unbalanced:
         raise ValueError("G69_CHAT_JSON_NESTING_DENY")
 
 
@@ -79,6 +88,16 @@ def _g69_redact_quoted_member(match):
         return match.group(0)
     if isinstance(key, str) and _G69_SENSITIVE_KEY.fullmatch(key.strip()):
         return match.group("prefix") + '[REDACTED]"'
+    return match.group(0)
+
+
+def _g69_redact_unfinished_member(match):
+    try:
+        key = json.loads(match.group("key"))
+    except (ValueError, UnicodeError):
+        return match.group(0)
+    if isinstance(key, str) and _G69_SENSITIVE_KEY.fullmatch(key.strip()):
+        return match.group("prefix") + "[REDACTED]"
     return match.group(0)
 
 
@@ -99,7 +118,10 @@ def redact(value):
         # Preserve original formatting when nothing needs masking.
         # Re-encode structurally if changed: legacy assignment regex alone
         # could consume JSON delimiters and corrupt an otherwise valid blob.
-        if value.lstrip().startswith(("{", "[")):
+        # Avoid allocating a potentially huge value.lstrip() copy before
+        # the G69 input-byte check. Only inspect the first non-space codepoint.
+        first_nonspace = next((ch for ch in value if not ch.isspace()), "")
+        if first_nonspace in ("{", "["):
             _g69_preparse_chat_json(value)
             try:
                 decoded = json.loads(
@@ -117,6 +139,9 @@ def redact(value):
                         )
                     return value
         value = _G69_JSON_MEMBER.sub(_g69_redact_quoted_member, value)
+        value = _G69_JSON_MEMBER_UNFINISHED.sub(
+            _g69_redact_unfinished_member, value
+        )
         for p in PATTERNS:
             value = p.sub("[REDACTED]", value)
     elif isinstance(value, Mapping):
