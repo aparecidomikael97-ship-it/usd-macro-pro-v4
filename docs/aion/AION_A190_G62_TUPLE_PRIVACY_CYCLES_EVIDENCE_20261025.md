@@ -34,6 +34,14 @@ Codex CLI Windows v0.164.0-alpha.11.1, read-only/ephemeral session `01a17451-7d0
 - GitHub Actions [G62 run #40221864032](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40221864032) was started at this SHA; Ubuntu job `121254959201` **SUCCESS** when the report was created; Windows job `121254959443` was queued. **Do not claim full cross-OS success without a completed Windows job and actual log markers.** This report is a subsequent documentation-only commit, not the source-tested SHA.
 - No claim of canonical full Quality/Security clearance.
 
+## Independent post-patch Codex review — explicit remaining risks
+
+A **second** Codex CLI review (`-s read-only --ephemeral`, session `01a17457-549a-7100-b5ce-447ab13105c7`) examined exact tested source/workflow SHA `79f22e586c3b044361420890eb8dc689c501019e` against G61. **No tests were executed or files changed by Codex.** Its findings:
+- Verified: `enqueue` order is cycle scan → one redaction → semantic presence check → finiteness → digest → BEGIN. Guard traverses mapping keys and values and tuples with active ancestors, retaining shared DAGs. The existing G62 tests actually observed an uncommitted semantic reservation during the second `__str__`, and no intermediate COMMIT.
+- **Important scope limitation:** `_confirm` still calls `redact(dict(result or {}))` **without a cycle preflight**. G62's cycle-safe claim applies to **`enqueue` only**; confirmation-result cycles remain a future G63 RED/test target.
+- **Unproven/high-value next tests:** custom objects with volatile `__str__` that changes digest vs stored data or reveals secrets; custom mappings/bytes/set and sensitive *dict keys* outside the redaction contract; deep acyclic nested input triggering Python recursion limits (especially below secret-key entries). No DLP or compatibility guarantee inferred.
+- The after-reservation failure tests cover partial state with a semantic reservation but before decision/outbox INSERT; they do **not** test interruption after all three INSERTs, physical crash or hostile rollback.
+
 ## Residual safety limits
 
 - This is **pattern redaction**, not universal DLP. An opaque Python object can have `__str__` emit a secret; `default=str` is still used. Extreme nesting/recursive limits, mutation during traversal, generator/set/custom Mapping behavior and durable legacy compatibility are not certified.
