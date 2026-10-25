@@ -20,11 +20,23 @@ SCOPE=Scope("g62-owner","g62-tenant","g62-space")
 E="g62-synthetic-event"
 
 class FailsOnSecondString:
-    def __init__(self):
+    def __init__(self, db=None):
         self.calls=0
+        self.db=db
+        self.observed_reservation=None
     def __str__(self):
         self.calls+=1
         if self.calls >= 2:
+            # At the second conversion the reservation must ALREADY be
+            # visible in the same uncommitted SQLite transaction; otherwise
+            # the test would not prove post-reservation rollback integrity.
+            if self.db is not None:
+                self.observed_reservation=(
+                    self.db.in_transaction,
+                    self.db.execute(
+                        "SELECT COUNT(*) FROM semantic_reservations_lab"
+                    ).fetchone()[0],
+                )
             raise ValueError("G62_SERIALIZATION_AFTER_RESERVATION")
         return "synthetic-first-string"
 
@@ -118,6 +130,15 @@ class G62TuplePrivacyCycleRecovery(unittest.TestCase):
         self.assertEqual(self.dbcounts(),(0,0,0,0))
         self.assertFalse(self.real.in_transaction)
 
+    def test_10_cycles_hidden_under_sensitive_key_still_fail_before_redact(self):
+        circular={}
+        circular["again"]=circular
+        with self.assertRaisesRegex(ValueError,"G62_CYCLIC_PAYLOAD_DENY"):
+            self.stage({"password":circular})
+        self.assertEqual(self.dbcounts(),(0,0,0,0))
+        self.assertFalse(self.real.in_transaction)
+        print("G62_SENSITIVE_CYCLE_GREEN=DENY_BEFORE_REDACT")
+
     def test_06_repeated_shared_acyclic_containers_still_allowed(self):
         shared={"simple":[2,3]}
         got=self.stage({"first":shared,"second":shared})
@@ -126,22 +147,24 @@ class G62TuplePrivacyCycleRecovery(unittest.TestCase):
         self.assertEqual(self.dbcounts(),(1,1,1,0))
 
     def test_07_second_serializer_failure_after_lock_rolls_back(self):
-        obj=FailsOnSecondString()
+        obj=FailsOnSecondString(self.real)
         with self.assertRaisesRegex(ValueError,"G62_SERIALIZATION_AFTER_RESERVATION"):
             self.stage({"opaque":obj})
         self.assertGreaterEqual(obj.calls,2)
+        self.assertEqual(obj.observed_reservation,(True,1))
         self.assertEqual(self.dbcounts(),(0,0,0,0))
         self.assertFalse(self.real.in_transaction)
         self.assertEqual(self.store.storage_health()["state"],"healthy")
         print("G62_POST_RESERVATION_GREEN=ROLLBACK_ALL_THREE_TABLES")
 
     def test_08_failed_rollback_after_reservation_quarantines_store(self):
-        obj=FailsOnSecondString()
+        obj=FailsOnSecondString(self.real)
         injected=FaultDB(self.real,trigger="G62_NO_INTERCEPT",rollback_fails=True)
         self.box.db=injected
         with self.assertRaisesRegex(ValueError,"G62_SERIALIZATION_AFTER_RESERVATION") as info:
             self.stage({"opaque":obj})
         self.assertGreaterEqual(obj.calls,2)
+        self.assertEqual(obj.observed_reservation,(True,1))
         self.assertEqual(injected.rollbacks,1)
         self.assertIsInstance(info.exception.__cause__,OSError)
         self.assertIn("G31_SECONDARY_ROLLBACK_FAILURE",str(info.exception.__cause__))
