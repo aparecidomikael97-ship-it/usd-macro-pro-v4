@@ -932,6 +932,15 @@ class ExecutionOutbox:
             ).fetchone()
             if existing is not None and existing["effect_ref"] != effect:
                 raise ValueError("effect ledger idempotency collision")
+            if existing is not None:
+                # G54: fence and snapshot paths cannot adopt a preexisting
+                # synthetic ledger while the associated row is nonterminal.
+                # A matching receipt reference is NOT proof of consistency.
+                # Collision denial above intentionally keeps G41 precedence.
+                current_effect_owner = self._outbox_row(key)
+                if (current_effect_owner is None or
+                        current_effect_owner["state"] != "CONFIRMED"):
+                    raise RuntimeError("G54_NONCONFIRMED_LEDGER_INCONSISTENT_DENY")
             if existing is None:
                 self.db.execute(
                     """INSERT INTO action_effects(
