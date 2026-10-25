@@ -50,7 +50,7 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g68_*.py' -v 2>&1 | tee g68.log
-          grep -F 'Ran 16 tests' g68.log
+          grep -F 'Ran 21 tests' g68.log
           grep -F 'G68_JSON_QUOTED_GREEN=VALID_REDACTED_JSON' g68.log
           grep -F 'G68_JSON_NESTED_GREEN=FAKE_FIELDS_MASKED' g68.log
           grep -F 'G68_JSON_ESCAPED_GREEN=STRUCTURE_PRESERVED' g68.log
@@ -61,6 +61,11 @@ jobs:
           grep -F 'G68_RESULT_ERROR_GREEN=NO_LOCAL_EFFECT' g68.log
           grep -F 'G68_TOP_BUDGET_GREEN=DENIED_BEFORE_BEGIN' g68.log
           grep -F 'G68_TOP_CONFIRM_BUDGET_GREEN=NO_LEDGER_EFFECT' g68.log
+          grep -F 'G68_ESCAPED_KEY_GREEN=NORMALIZED_AND_REDACTED' g68.log
+          grep -F 'G68_PUBLIC_JSON_GREEN=VALID_STRUCTURE' g68.log
+          grep -F 'G68_ARRAY_JSON_GREEN=VALID_REDACTED_ELEMENTS' g68.log
+          grep -F 'G68_DUP_JSON_GREEN=NO_AMBIGUOUS_KEY' g68.log
+          grep -F 'G68_CHAT_DUP_GREEN=TRANSACTION_ROLLBACK' g68.log
       - name: G67 shared redactor, stable Mapping and invalid Unicode
         shell: bash
         run: |
