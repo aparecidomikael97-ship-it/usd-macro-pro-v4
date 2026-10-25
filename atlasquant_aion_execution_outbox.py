@@ -899,6 +899,17 @@ class ExecutionOutbox:
                             original_effect["confirmed_at"] !=
                             existing_state["confirmed_at"]):
                         raise RuntimeError("G42_CONFIRMED_LEDGER_INVARIANT_DENY")
+                    if self._strict_projection_lab:
+                        # G55: idempotent replay must not silently accept a
+                        # corrupt/stale raw JSON projection. Strict mode
+                        # validates but NEVER repairs a historical record.
+                        expected_projection = self._g43_projection_candidate_lab(
+                            existing_state
+                        )
+                        if expected_projection != existing_state["data"]:
+                            raise RuntimeError(
+                                "G55_CONFIRMED_PROJECTION_INTEGRITY_DENY"
+                            )
                     self._commit_or_quarantine()
                     return self.get(key)
                 if existing_state["state"] not in {"UNCERTAIN", "SENT"}:
