@@ -39,7 +39,7 @@ Codex CLI Windows v0.164.0-alpha.11.1, `-s read-only --ephemeral`:
 Code/workflow SHA **`5882d35fd78e55ed64c98036afe657da54c4c96e`**:
 - Windows detached clean worktree `C:\Users\apare\AtlasQuant-G67-Snapshot-LAB-20261025`: synthetic focused suite **G30–G67 633/633 PASS**, exit 0, Git checkout clean. G51 cases are consolidated within G50.
 - New `.github/workflows/aion-a190-g67-redactor-snapshot-lab.yml` configured for Ubuntu and Windows, **633 focused synthetic cases per OS**.
-- [GitHub Actions G67 run #40230359407](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40230359407) was queued at initial evidence entry. **Do not claim completed cross-OS results until BOTH jobs are successful and actual test counts/markers verified.** Documentation commits after tested SHA are not runtime-code retests.
+- **Cross-OS G67 CI VERIFIED:** [GitHub Actions run #40230359407](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40230359407) ran the exact code+workflow SHA **`5882d35fd78e55ed64c98036afe657da54c4c96e`**. Windows job `121280553087` **SUCCESS 633/633**; Ubuntu job `121280553263` **SUCCESS 633/633**. Both complete logs were examined: **37 focused test groups per OS**, with **all ten G67 markers** on both. Total **1,266 executions of 633 distinct synthetic focused cases**, in addition to the separate Windows local run. Documentation-only commits followed tested code SHA and do not substitute for new runtime CI.
 
 ## Extra chat suite — environmental failure reproduced on inherited baseline
 
