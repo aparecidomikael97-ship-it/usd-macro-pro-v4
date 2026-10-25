@@ -104,6 +104,16 @@ def binding_issue_lab(
         return "DECISION_SCHEMA_OR_AUTHORITY_INVALID"
     if not isinstance(decision.get("payload"), dict):
         return "DECISION_PAYLOAD_INVALID"
+    # G47: strict exact-type and canonical-absence admission. Missing or
+    # ambiguous requirements cannot be coerced to "no reauth".
+    required_reauth = decision.get("requires_reauth")
+    reauth_ref = decision.get("reauth_ref")
+    if (type(required_reauth) is not bool or
+            not isinstance(reauth_ref, str) or
+            (required_reauth and (not reauth_ref or
+                                  reauth_ref.strip() != reauth_ref)) or
+            (not required_reauth and reauth_ref)):
+        return "DECISION_REAUTH_MATERIAL_INVALID"
     if _digest(decision["payload"]) != d["payload_digest"]:
         return "DECISION_PAYLOAD_DIGEST_MISMATCH"
     key_material = {
@@ -120,8 +130,11 @@ def binding_issue_lab(
     semantic = decision.get("semantic_event_id_lab") or ""
     if semantic:
         key_material["semantic_event_id_lab"] = semantic
+    if required_reauth:
+        key_material["requires_reauth"] = True
+        key_material["reauth_ref"] = reauth_ref
     if key != _digest(key_material):
-        return "DECISION_IDEMPOTENCY_MATERIAL_MISMATCH"
+        return "DECISION_REAUTH_MATERIAL_MISMATCH" if required_reauth else "DECISION_IDEMPOTENCY_MATERIAL_MISMATCH"
     if d["decision_id"] != "DEC-" + key[:24].upper():
         return "DECISION_ID_DERIVATION_MISMATCH"
     if semantic:
