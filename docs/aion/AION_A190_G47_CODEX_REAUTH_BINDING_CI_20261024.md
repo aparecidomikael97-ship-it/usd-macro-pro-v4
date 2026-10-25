@@ -30,6 +30,8 @@ Producer/auditor fixes:
 
 **Exact tested code/workflow SHA `aa9e58e9dfc29523838730ffc37e35dcbef00d4e`.** [G47 targeted two-OS Actions #40147093599](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40147093599) **SUCCESS**: Ubuntu and Windows **106/106 each**, **212 executions total**, covering G47 (18) plus G43-G46 (88). This evidence document is committed **after** that SHA and does not modify the tested code.
 
+**Canonical candidate full Quality at the G47 workflow SHA:** Job `121030643453` logged **Ran 6,449 tests; OK**. Candidate dependency Security-audit job `121030643392` reported **48 known vulnerabilities in 2 installed packages**: `pypdf==6.19.0` (11) and `pillow==12.3.0` (37). Candidate canonical security-unittest and security-pytest also succeeded, while BASE canonical security-unittest and quality failed. This is verified from original job logs and DOES NOT make the overall A184 workflow green.
+
 **A184 canonical run #40147093689 is separately RED**: candidate/base security-audit jobs failed, base canonical security-unittest and Quality failed, external RED and adversarial BASE RED by design, and other jobs can still be running. A G47 focused green check is **not** a successful canonical Security or complete system certification. Do not silently discount dependency vulnerabilities observed earlier (48 findings in pypdf/Pillow, subject to new specific log verification).
 
 ## Security gates not resolved
