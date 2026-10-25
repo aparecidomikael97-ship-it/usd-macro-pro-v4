@@ -71,7 +71,7 @@ Third `aion_chat/privacy.py` patch SHA **`d0261375be3668ded15605db320d74859150fb
 
 The final **code+workflow SHA `61d6e3895ef9b31d14d59a3d8c1ff58508863b9f`** updates workflow `.github/workflows/aion-a190-g69-chat-json-limits-lab.yml` to require **22 G69 tests and 18 markers**, **676 focused distinct synthetic cases per OS**. The previous G69 CI #40233180908 (673 cases) cannot certify this final change.
 
-[Latest G69 v3 Actions run #40233604212](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40233604212) was QUEUED at this document amendment; **do not claim cross-OS success without inspecting completed job statuses and logs**. The local final Windows focused regression was still underway when this document was updated.
+[Latest G69 v3 Actions run #40233604212](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40233604212) was QUEUED at this document amendment; **do not claim cross-OS success without inspecting completed job statuses and logs**. **Local FINAL Windows focused regression VERIFIED:** detached clean worktree on exact code+workflow SHA **`61d6e3895ef9b31d14d59a3d8c1ff58508863b9f`** executed G30–G69 **676/676 PASS**, exit code 0, clean `git status`, G51 consolidated in G50. This result is separate from queued GitHub CI.
 
 ## Open limits and non-conflation
 
