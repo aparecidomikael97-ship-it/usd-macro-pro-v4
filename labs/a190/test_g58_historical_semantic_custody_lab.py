@@ -51,10 +51,11 @@ class G58HistoricalSemanticCustody(unittest.TestCase):
             (SCOPE.tenant_id,event))
         self.store.db.commit()
 
-    def assert_fail_closed(self,run,expected="G58_HISTORICAL_SEMANTIC_CUSTODY_DENY"):
+    def assert_fail_closed(self,run,expected="G58_HISTORICAL_SEMANTIC_CUSTODY_DENY",
+                           error_type=RuntimeError):
         n=self.count()
         m=len(self.locks())
-        with self.assertRaisesRegex(RuntimeError,expected):
+        with self.assertRaisesRegex(error_type,expected):
             run()
         self.assertEqual(self.count(),n)
         self.assertEqual(len(self.locks()),m)
@@ -85,7 +86,9 @@ class G58HistoricalSemanticCustody(unittest.TestCase):
     def test_04_missing_lock_original_same_request_denies_replay(self):
         self.stage()
         self.delete_lock()
-        self.assert_fail_closed(lambda:self.stage(),expected="semantic lock missing for existing intent")
+        self.assert_fail_closed(lambda:self.stage(),
+                                expected="semantic lock missing for existing intent",
+                                error_type=ValueError)
         self.assertEqual(self.count(),1)
 
     def test_05_different_declared_event_remains_independent(self):
