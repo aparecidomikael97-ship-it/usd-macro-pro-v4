@@ -34,6 +34,19 @@ After patch: **G66 12/12 PASS** on Windows; G65 19/19, G64 16/16, G63 13/13 pass
 - Matrix GitHub Actions workflow `.github/workflows/aion-a190-g66-field-mapping-utf8-lab.yml` committed with unchanged source at SHA **`c258d1e0fba66ff7a68df395aaef39f2d57bcc99`**, Ubuntu and Windows, **619 focused synthetic cases per OS**. The final job logs and markers MUST be observed before cross-OS approval is claimed.
 - Any subsequent evidence-document-only commit is NOT a retest of source/workflow SHA.
 
+## Segunda revisão independente Codex pós-patch (limites reais e não demonstrados)
+
+Codex CLI Windows somente leitura/efêmero, sessão `01a174ab-3f2e-7a11-b59c-78004aa4b5da`, revisou o código G66 no checkout local, sem editar ou executar testes, rede, GitHub ou provider. Confirmou pela leitura que a política de `Mapping`/nomes sensíveis e a recusa de chaves não-string estão presentes, que a checagem ocorre antes de BEGIN nos caminhos usuais e que os limites G65 de UTF-8 permanecem. A sessão **não** validou resultados de testes nem comprovou diferenças de diff: inspecionou o estado atualmente montado.
+
+**Ainda ABERTO, não corrigido pela G66:**
+- `aion_chat.privacy.redact` também atua no chat/store. Um `Mapping` com chave não-string pode produzir `TypeError` ao passar diretamente no redator, sem a checagem específica da Outbox. Em alguns caminhos de store, a chamada de redaction ocorre depois de BEGIN.
+- Um `Mapping.items()` personalizado pode mudar de conteúdo entre a inspeção e a redação; G66 não faz snapshot autenticado único nem limita efeitos colaterais de código Python arbitrário.
+- Campos `refresh_token`, `private_key`, `authorization ` com espaço e variantes com caracteres invisíveis/Unicode não estão todos no matcher; não se pode inferir DLP universal.
+- Nenhuma migração para linhas antigas. Alterar a redaction muda digests/IDs de intents repetidos; leituras históricas que verificam hashes locais não provam ausência de dados antes persistidos em claro.
+- Surrogate Unicode isolado ainda pode gerar `UnicodeEncodeError` no `ensure_ascii=False` + UTF-8. A cota 256 KiB é de JSON *admitido*, não de pico de memória da serialização.
+
+**Próximos candidatos G67**, somente com testes RED independentes: Mapping variável em duas visitas; comportamento explícito de `redact` em chat/store com chaves não-string; matriz adicional de nomes e Unicode; regressão histórica pré-G66; exceção e controle de memória para texto excessivo. Nenhum desses problemas foi contado como fechado nesta G66.
+
 ## Deliberate limitations / gate
 
 This is pattern redaction, not DLP universal. The shared redactor modifies behavior for chat/store and historic digests, so some previously admitted intents may fail closed on replay. Custom mappings may execute methods with side effects or mutate during iteration; unsupported values may still be stringified via `default=str`. Input materialization and first JSON serialization can consume memory before byte cap. Physical rollback, H0 restart, unknown result after real supplier SEND, true owner identity/authentication and external signed receipts/custody are not verified. No merge, deploy, Worker, provider, real customers/credentials, funds or paid resources.
