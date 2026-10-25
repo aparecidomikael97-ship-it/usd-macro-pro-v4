@@ -1347,42 +1347,58 @@ class ExecutionOutbox:
         self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
+        # G50 LAB: send() is untrusted and may reenter SQLite locally.
+        # Record its exact pre-callback phase, lease and generation; a later
+        # response cannot take ownership of a superseded attempt.
+        g50_send_snapshot = self._g42_reconcile_snapshot_lab(current_before_send)
+
+        def g50_reply_is_stale() -> bool:
+            return self._g42_reconcile_snapshot_lab(self.get(key)) != g50_send_snapshot
+
+        def g50_stale_result() -> dict[str, Any]:
+            return {**self.get(key),
+                    "dispatch_state": "G50_STALE_SEND_REPLY_NO_WRITE"}
+
         try:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
+            if g50_reply_is_stale():
+                return g50_stale_result()
             with self._managed_write_transaction():
                 cursor = self.db.execute(
                     """UPDATE action_outbox
                        SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                         AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                         AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))
+                         AND state=? AND attempts=? AND lease_owner=?
+                         AND lease_until=? AND effect_ref=?""",
                     (
                         "",
                         "SEND_RESULT_UNKNOWN:" + type(exc).__name__,
-                        key,
-                        *self._scope_args(),
+                        key, *self._scope_args(),
                         int(not self._strict_claim_fencing_lab), worker,
-                        claim_generation_lab or 0,
+                        claim_generation_lab or 0, *g50_send_snapshot,
                     ),
                 )
                 if self._strict_claim_fencing_lab and cursor.rowcount != 1:
                     raise RuntimeError("FENCE_STALE_SEND_EXCEPTION_NO_WRITE")
+            if cursor.rowcount != 1:
+                return g50_stale_result()
             out = self.get(key)
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
         self._g44_assert_binding_lab(key)
         if self._strict_claim_fencing_lab:
             self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
+        if g50_reply_is_stale():
+            return g50_stale_result()
         if result.get("accepted") is not True:
-            # The external boundary was already crossed. A bare adapter flag
-            # retryable=True cannot prove that no effect was committed.
-            # Never convert a possibly executed send into an automatic retry.
+            # A possibly executed send is never authority for automatic retry.
             retry_claim = result.get("retryable") is True
-            # A definitive rejection is also untrusted after send(): the
-            # adapter may have produced the effect before returning False.
-            # EFFECT_ZERO verification is never a permission to auto-retry.
             proved_zero = (not retry_claim and
                            self._verified_evidence("EFFECT_ZERO", intent, result))
+            if g50_reply_is_stale():
+                return g50_stale_result()
             state = "FAILED" if proved_zero else "UNCERTAIN"
             reason = ("ADAPTER_EFFECT_ZERO_VERIFIED_LAB" if proved_zero
                       else "ADAPTER_REJECTION_UNVERIFIED_OUTCOME_UNKNOWN")
@@ -1391,13 +1407,17 @@ class ExecutionOutbox:
                     """UPDATE action_outbox
                        SET state=?,lease_owner='',lease_until='',last_error=?
                        WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                         AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                         AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))
+                         AND state=? AND attempts=? AND lease_owner=?
+                         AND lease_until=? AND effect_ref=?""",
                     (state, reason, key, *self._scope_args(),
                      int(not self._strict_claim_fencing_lab), worker,
-                     claim_generation_lab or 0),
+                     claim_generation_lab or 0, *g50_send_snapshot),
                 )
                 if self._strict_claim_fencing_lab and cursor.rowcount != 1:
                     raise RuntimeError("FENCE_STALE_SEND_REJECTION_NO_WRITE")
+            if cursor.rowcount != 1:
+                return g50_stale_result()
             dispatch_state = ("UNCERTAIN_RECONCILE_REQUIRED"
                               if state == "UNCERTAIN" else "FAILED")
             return {**self.get(key), "dispatch_state": dispatch_state}
@@ -1406,28 +1426,42 @@ class ExecutionOutbox:
         if result.get("confirmed") is True and effect_ref and self._verified_evidence(
             "EFFECT_CONFIRMED", intent, result
         ):
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-                fence_lab=(worker, claim_generation_lab) if
-                    self._strict_claim_fencing_lab else None,
-            )
+            if g50_reply_is_stale():
+                return g50_stale_result()
+            try:
+                out = self._confirm(
+                    key,
+                    effect_ref=effect_ref,
+                    confirmed_at=now_dt,
+                    result=result,
+                    fence_lab=(worker, claim_generation_lab) if
+                        self._strict_claim_fencing_lab else None,
+                    reconcile_snapshot_lab=g50_send_snapshot,
+                )
+            except RuntimeError as exc:
+                if str(exc) == "G42_RECONCILE_SNAPSHOT_STALE_NO_LEDGER":
+                    return g50_stale_result()
+                raise
             return {**out, "dispatch_state": "CONFIRMED"}
 
+        if g50_reply_is_stale():
+            return g50_stale_result()
         with self._managed_write_transaction():
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))""",
+                     AND (?=1 OR (state='UNCERTAIN' AND lease_owner=? AND attempts=?))
+                     AND state=? AND attempts=? AND lease_owner=?
+                     AND lease_until=? AND effect_ref=?""",
                 (_iso(now_dt), effect_ref, key, *self._scope_args(),
                  int(not self._strict_claim_fencing_lab), worker,
-                 claim_generation_lab or 0),
+                 claim_generation_lab or 0, *g50_send_snapshot),
             )
             if self._strict_claim_fencing_lab and cursor.rowcount != 1:
                 raise RuntimeError("FENCE_STALE_SEND_RESULT_NO_WRITE")
+        if cursor.rowcount != 1:
+            return g50_stale_result()
         return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
 
     @staticmethod
