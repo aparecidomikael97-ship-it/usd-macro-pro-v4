@@ -20,7 +20,7 @@ A G58 verificava documentos históricos por tenant, rejeitando JSON malformado, 
 - Herdadas G58 16, G57 10, G47 18, G39 28 e demais regressões G30–G58: verdes no isolamento Windows.
 - Workflow `.github/workflows/aion-a190-g59-historical-binding-lab.yml`, exato SHA de código e testes `0383ef41561a34f5a886b3ddaad822cfd19eb61c`, Ubuntu + Windows.
 - **Windows local:** G30–G59 **529/529 PASS**, exit code 0, checkout limpo no SHA `0383ef41561a34f5a886b3ddaad822cfd19eb61c`.
-- [GitHub Actions #40218291656](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40218291656): **Ubuntu e Windows em execução na última checagem**; a aprovação multiplataforma deve ser registrada somente depois de verificar ambos os jobs e contagens. Relatório escrito após o SHA testado; não substituir SHA de código pela revisão documental.
+- **CI multiplataforma VERIFICADO:** [GitHub Actions #40218291656](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40218291656) executou o exato SHA de código/workflow **`0383ef41561a34f5a886b3ddaad822cfd19eb61c`**. Ubuntu job `121244102534` **SUCCESS 529/529**; Windows job `121244102841` **SUCCESS 529/529**. Os logs foram lidos, contagens conferidas e marcadores de adulteração simples e coordenada encontrados em ambos. **1.058 execuções de 529 testes distintos**, além da bateria Windows local. O relatório foi escrito após o SHA testado; não substituir SHA de código pela revisão documental.
 
 ## Codex independente (real, somente leitura)
 
