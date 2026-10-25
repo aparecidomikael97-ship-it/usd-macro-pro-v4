@@ -64,14 +64,19 @@ def _token(value: Any, name: str, limit: int = 128) -> str:
     return text
 
 
-def _assert_acyclic_payload_lab(value: Any, active: set[int] | None = None) -> None:
-    """Reject container cycles before privacy redaction can recurse.
+def _assert_acyclic_payload_lab(
+    value: Any, active: set[int] | None = None, depth: int = 1,
+) -> None:
+    """Reject cycles and excessive nesting before recursive redaction.
 
-    Track only active traversal ancestors, not all seen nodes: multiple
-    references to a shared acyclic object remain valid JSON payloads.
+    G64 caps dict/list/tuple nesting at 64 container levels. Only ancestors
+    are tracked, so repeated shared *acyclic* objects remain valid. This
+    intentionally changes admission for formerly allowed deep structures.
     """
     if not isinstance(value, (Mapping, list, tuple)):
         return
+    if depth > 64:
+        raise ValueError("G64_EXCESSIVE_NESTING_DENY")
     if active is None:
         active = set()
     object_id = id(value)
@@ -84,7 +89,7 @@ def _assert_acyclic_payload_lab(value: Any, active: set[int] | None = None) -> N
             if isinstance(value, Mapping) else iter(value)
         )
         for child in children:
-            _assert_acyclic_payload_lab(child, active)
+            _assert_acyclic_payload_lab(child, active, depth + 1)
     finally:
         active.remove(object_id)
 
@@ -1102,6 +1107,11 @@ class ExecutionOutbox:
                 raise ValueError("G63_CYCLIC_RESULT_DENY") from None
             raise
         encoded = _canonical(redact(raw_result))
+        # G64: default=str may introduce faux-secret patterns only *after*
+        # the first redaction. Inspect the exact JSON bytes to be written,
+        # without stringifying the opaque objects again or silently repairing.
+        if redact(json.loads(encoded)) != json.loads(encoded):
+            raise ValueError("G64_CONFIRM_SERIALIZED_PRIVACY_DENY")
         self._begin_or_quarantine()
         try:
             self._g44_assert_binding_lab(key)
