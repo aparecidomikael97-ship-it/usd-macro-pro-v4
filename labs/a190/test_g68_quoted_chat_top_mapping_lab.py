@@ -231,6 +231,23 @@ class G68QuotedJSONAndMapping(unittest.TestCase):
         self.assertEqual(parsed["other"],"hello")
         print("G68_PUBLIC_JSON_GREEN=VALID_STRUCTURE")
 
+    def test_20_duplicate_escaped_json_key_fails_closed(self):
+        raw='{"refresh\\u005ftoken":"G68_FAKE_DUPLICATE","refresh_token":"[REDACTED]"}'
+        with self.assertRaisesRegex(ValueError,"G68_DUPLICATE_CHAT_JSON_KEY_DENY"):
+            redact(raw)
+        print("G68_DUP_JSON_GREEN=NO_AMBIGUOUS_KEY")
+
+    def test_21_chat_duplicate_sensitive_json_rolls_back(self):
+        conv=self.store.create_conversation(SCOPE,title="synthetic-g68")
+        raw='{"refresh\\u005ftoken":"G68_FAKE_DUPLICATE","refresh_token":"[REDACTED]"}'
+        with self.assertRaisesRegex(ValueError,"G68_DUPLICATE_CHAT_JSON_KEY_DENY"):
+            self.store.append_message(SCOPE,Message(
+                conversation_id=conv.id,role="user",content=raw))
+        self.assertFalse(self.real.in_transaction)
+        self.assertEqual(self.real.execute("SELECT COUNT(*) FROM messages").fetchone()[0],0)
+        self.assertEqual(self.store.get_conversation(SCOPE,conv.id).message_count,0)
+        print("G68_CHAT_DUP_GREEN=TRANSACTION_ROLLBACK")
+
     def test_19_json_array_sensitive_nested_fields_redacted(self):
         raw='[{"refresh_token":"G68_FAKE_ARRAY"},{"normal":"hello"}]'
         parsed=json.loads(redact(raw))
