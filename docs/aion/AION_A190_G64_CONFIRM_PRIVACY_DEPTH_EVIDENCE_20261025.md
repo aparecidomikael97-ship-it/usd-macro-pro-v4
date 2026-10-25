@@ -32,6 +32,21 @@ Workflow `.github/workflows/aion-a190-g64-confirm-privacy-depth-lab.yml` no SHA 
 
 [GitHub Actions run G64 #40226802145](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40226802145): job Ubuntu `121269777059` **SUCCESS** quando foi escrita a versão inicial deste relatório; job Windows `121269776940` estava na fila. Conferir contagem e marcadores nos dois logs antes de declarar sucesso multiplataforma. Este documento é commit posterior, somente documentação, não substitui SHA de código testado.
 
+## Segunda revisão Codex independente, pós-patch
+
+Codex CLI somente leitura/efêmero, sessão `01a17490-5f47-7b90-866c-1f7eea43b541`, inspecionou o **código corrigido** no SHA `a8935e708736f01f3851dbf43447c08884fb5df7` e os 16 testes G64, sem editar arquivos, executar testes ou usar rede. Confirmou pela leitura que:
+- A confirmação realiza teste de ciclo/profundidade, redaction, **uma serialização** e conferência do JSON persistível antes do BEGIN. As duas chamadas `json.loads` não repetem `__str__`.
+- O limite conta raiz como 1; 64 aceita e 65 recusa. Os testes G64 demonstram o limite exato em enqueue e o bloqueio de confirmação com profundidade 90, mas **ainda não testam exatamente 65 níveis em confirmação**.
+- Erros rasos de ciclo mantêm os códigos G62/G63; excesso de profundidade tem código G64; checks de G63 de privacidade permanecem anteriores aos de divergência de digest.
+
+**Lacunas remanescentes, não resolvidas:**
+1. Se o primeiro ancestral cíclico reaparecer exatamente no nível 65, a checagem de profundidade ocorre primeiro, alterando a precedência G62/G63 para G64. Verificar e documentar política via RED específico.
+2. O teste de objeto opaco benigno não instrumenta `__str__` para comprovar **exatamente uma** chamada. Testar retorno diferente numa segunda chamada, garantindo que não ocorre.
+3. O limite de profundidade não limita quantidade total de nós, largura de objetos, tamanho de bytes e expansão de DAG compartilhado. Exige cotas separadas e validação de disponibilidade.
+4. `privacy.redact` preserva **chaves** arbitrárias de dicionário; um marcador sintético no próprio nome da chave poderia escapar ao mesmo verificador de redação. Criar RED/solução separada, sem alegar DLP completo.
+
+Nenhuma dessas lacunas é homologação P0 ou autorização de deploy. Sugestão de próxima rodada LAB: G65 para chaves de JSON, limites de largura e testes de profundidade/begin.
+
 ## Limites explícitos, não resolvidos pela G64
 
 A redaction é baseada em padrões e não prova DLP universal; strings personalizadas com formatos desconhecidos ou efeitos colaterais em `__str__` não são cobertas. Outras estruturas Python não suportadas, chaves sensíveis fora do contrato, strings Unicode especiais, mudanças de função `default=str`, integridade após corrupção física e histórico legado exigem verificações separadas. O limite de 64 níveis é uma política conservadora, não um resultado de homologação com cargas reais.
