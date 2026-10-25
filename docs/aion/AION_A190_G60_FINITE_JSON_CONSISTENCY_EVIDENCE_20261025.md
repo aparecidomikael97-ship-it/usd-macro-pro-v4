@@ -32,7 +32,7 @@ The same G60 suite **11/11 GREEN** postpatch. Critical inherited G59 12, G58 16,
 
 - Two-OS CI workflow `.github/workflows/aion-a190-g60-finite-json-lab.yml` added at exact commit SHA **`e9413aa0a9f79778282eaf15c3a12ef44ee051c2`**.
 - Windows isolated worktree `C:\Users\apare\AtlasQuant-G60-Finite-LAB-20261025`, at same SHA: G30–G60 (G51 combined in G50), **540/540 GREEN**, exit code 0, git status clean.
-- GitHub Actions G60 matrix was started on the same SHA, pending final OS-job verification at report creation. **Do not claim CI successful without real completed jobs and logs.** This evidence document is a subsequent documentation-only commit, not the tested source SHA.
+- **GitHub Actions G60 verified:** [run #40219164861](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40219164861), exact tested source/workflow SHA **`e9413aa0a9f79778282eaf15c3a12ef44ee051c2`**. Ubuntu job `121246770554` **SUCCESS 540/540**; Windows job `121246770076` **SUCCESS 540/540**. Read the logs and verified all eight G60 protection markers on both systems. Total **1,080 executions of 540 distinct focused synthetic cases**. The evidence report is a subsequent documentation-only commit, not the tested source SHA.
 
 ## Unproven critical requirements
 
