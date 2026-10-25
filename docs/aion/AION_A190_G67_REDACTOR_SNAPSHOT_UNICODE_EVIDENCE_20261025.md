@@ -41,6 +41,13 @@ Code/workflow SHA **`5882d35fd78e55ed64c98036afe657da54c4c96e`**:
 - New `.github/workflows/aion-a190-g67-redactor-snapshot-lab.yml` configured for Ubuntu and Windows, **633 focused synthetic cases per OS**.
 - [GitHub Actions G67 run #40230359407](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40230359407) was queued at initial evidence entry. **Do not claim completed cross-OS results until BOTH jobs are successful and actual test counts/markers verified.** Documentation commits after tested SHA are not runtime-code retests.
 
+## Extra chat suite — environmental failure reproduced on inherited baseline
+
+To investigate shared redactor regression beyond A190, executed three existing root-level suites on isolated Windows G67 source:
+`test_atlasquant_aion_chat_foundation`, `test_atlasquant_aion_chat_golden_path`, `test_atlasquant_aion_chat_sqlite_write_outcome`: **22 tests, 5 ERROR, 0 FAIL**. The five errors occur in the Golden Path import chain `atlasquant_aion_chat_golden_path → atlasquant_aion_command_orchestrator → atlasquant_aion_local_executor → atlasquant_lab_matrix → atlasquant_setup_validation`, because the local interpreter lacks **`pandas`**: `ModuleNotFoundError: No module named 'pandas'`.
+
+A representative exact test `ReadonlyGoldenPathExecutionTests.test_status_read_completes_verified_golden_path` was re-executed on the **unmodified G66 Windows worktree**, same Python environment and **same `ModuleNotFoundError: No module named 'pandas'`**. Thus these additional five errors are **not evidence of a regression caused by G67**; nevertheless the chat Golden Path was **NOT validated** in this session, and this out-of-scope result cannot be called all-green. No dependency installation/new spending was performed. The focused synthetic G30–G67 suite passing 633/633 remains a separate fact and does NOT replace end-to-end chat testing.
+
 ## Critical remaining HARD NO-GO
 
 No genuine HUMAN_OWNER authentication, provider-signed receipt, first unknown-result external SEND deduplication, independent monotonic H0 custody, physical host rollback resistance, native SQLite compatibility P0 clearance or canonical complete Security/Quality proof has been furnished by these tests. Fail-closed synthetic admission is not operational homologation.
