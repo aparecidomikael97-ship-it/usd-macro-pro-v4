@@ -34,6 +34,12 @@ The same G60 suite **11/11 GREEN** postpatch. Critical inherited G59 12, G58 16,
 - Windows isolated worktree `C:\Users\apare\AtlasQuant-G60-Finite-LAB-20261025`, at same SHA: G30–G60 (G51 combined in G50), **540/540 GREEN**, exit code 0, git status clean.
 - **GitHub Actions G60 verified:** [run #40219164861](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40219164861), exact tested source/workflow SHA **`e9413aa0a9f79778282eaf15c3a12ef44ee051c2`**. Ubuntu job `121246770554` **SUCCESS 540/540**; Windows job `121246770076` **SUCCESS 540/540**. Read the logs and verified all eight G60 protection markers on both systems. Total **1,080 executions of 540 distinct focused synthetic cases**. The evidence report is a subsequent documentation-only commit, not the tested source SHA.
 
+## Codex independent post-patch review and next tests
+
+A **second** installed Codex CLI read-only/ephemeral session `01a17439-cc33-7033-b1bc-31caf1bcbf0d` reviewed the actual patch on clean `e9413aa0a9f79778282eaf15c3a12ef44ee051c2`, **without editing or executing tests**. It did not identify obvious regressions in finite floats, normal strings or existing BEGIN/COMMIT/rollback-quarantine boundaries. Two **OPEN** edge cases remain:
+1. `enqueue` labels *any* `ValueError` during `_digest(safe_payload)` as `G60_NONFINITE_PAYLOAD_DENY`. Because `_canonical(default=str)` supports arbitrary objects, a custom `__str__` that raises ValueError could be misclassified. Explicit classification/admission test is needed.
+2. The historical overflow tests verify fail-closed under a *healthy* rollback; they do not inject rollback failure into this exact G60 path. Need future G61 LAB with primary exception preserved, store quarantined/detached, ledger/reservations intact and no auto retry. Neither gap closes P0 or H0.
+
 ## Unproven critical requirements
 
 - The historical parser is fail-closed. Previously admitted nonstandard JSON that contains NaN/Infinity (or exponent overflow) can block later semantic staging until a separately audited migration/decision is made. G60 does not rewrite or certify old files.
