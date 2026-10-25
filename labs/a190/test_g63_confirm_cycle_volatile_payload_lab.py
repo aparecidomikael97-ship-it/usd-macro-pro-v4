@@ -40,7 +40,8 @@ class G63ConfirmCyclesAndStablePayload(unittest.TestCase):
     def setUp(self):
         t=tempfile.TemporaryDirectory(prefix="a190-g63-")
         self.addCleanup(t.cleanup)
-        self.store=SQLiteChatStore(Path(t.name)/"local-only.sqlite3")
+        self.path=Path(t.name)/"local-only.sqlite3"
+        self.store=SQLiteChatStore(self.path)
         self.addCleanup(self.store.close)
         self.db=self.store.db
         self.box=ExecutionOutbox(self.store,SCOPE)
@@ -190,7 +191,7 @@ class G63ConfirmCyclesAndStablePayload(unittest.TestCase):
         self.assertEqual(self.store.storage_health()["state"],"failed")
         with self.assertRaises(StorageUnavailableError):
             self.stage(intent="request-B",event="another-event")
-        disk=SQLiteChatStore(self.store.path)
+        disk=SQLiteChatStore(self.path)
         try:
             self.assertEqual(tuple(disk.db.execute(
                 "SELECT COUNT(*) FROM "+table).fetchone()[0]
