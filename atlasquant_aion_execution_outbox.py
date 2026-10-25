@@ -878,12 +878,11 @@ class ExecutionOutbox:
         self._begin_or_quarantine()
         try:
             self._g44_assert_binding_lab(key)
-            if ((self._strict_reconcile_snapshot_cas_lab or
-                  self._strict_binding_integrity_lab) and
-                    reconcile_snapshot_lab is None and fence_lab is None):
-                # G42 LAB contract: a second compatible confirmation is
-                # strictly read-only. A stale callback cannot overwrite the
-                # original confirmed timestamp, receipt reference or ledger.
+            if reconcile_snapshot_lab is None and fence_lab is None:
+                # G53: direct confirmation is idempotent/terminal-immutable
+                # regardless of optional integrity flags. Fence and snapshot
+                # callers retain their original stricter protocol precedence.
+                # Local SQLite integrity only; NOT trusted provider evidence.
                 existing_state = self._outbox_row(key)
                 if existing_state is None:
                     raise RuntimeError("G42_CONFIRM_OUTBOX_ABSENT")
@@ -904,6 +903,16 @@ class ExecutionOutbox:
                     return self.get(key)
                 if existing_state["state"] not in {"UNCERTAIN", "SENT"}:
                     raise RuntimeError("G42_UNSAFE_PRECONFIRM_PHASE_DENY")
+                # Nonterminal row plus an existing effect is a contradictory
+                # local history, never authority to rewrite its timestamp.
+                orphan_effect = self.db.execute(
+                    """SELECT 1 FROM action_effects
+                       WHERE idempotency_key=? AND owner=? AND tenant=?
+                         AND workspace=?""",
+                    (key, *self._scope_args()),
+                ).fetchone()
+                if orphan_effect is not None:
+                    raise RuntimeError("G53_NONCONFIRMED_HAS_EFFECT_DENY")
             if reconcile_snapshot_lab is not None:
                 # Read under BEGIN IMMEDIATE: no other SQLite writer can
                 # change the row between this preflight and the ledger insert.

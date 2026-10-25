@@ -1,0 +1,60 @@
+name: A190 G53 direct confirm terminal immutability LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g53_direct_confirm_terminal_immutability_lab.py'
+      - 'labs/a190/test_g41_persisted_claim_epoch_lab.py'
+      - 'labs/a190/test_g52_reconcile_default_cas_lab.py'
+      - 'labs/a190/test_g42_reconcile_snapshot_cas_lab.py'
+      - '.github/workflows/aion-a190-g53-direct-confirm-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g52-local-consistency:
+    name: G53 direct confirm / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install minimal isolated LAB dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G53 default direct confirmation integrity
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g53_*.py' -v 2>&1 | tee g53.log
+          grep -F 'Ran 11 tests' g53.log
+          grep -F 'G53_UNCERTAIN_GREEN=ONE_LOCAL_EFFECT' g53.log
+          grep -F 'G53_RECONFIRM_GREEN=ORIGINAL_RECEIPT_IMMUTABLE' g53.log
+          grep -F 'G53_TERMINAL_GREEN=NO_RESURRECT_OR_PREMATURE_EFFECT' g53.log
+          grep -F 'G53_MISSING_LEDGER_GREEN=DENY_NOT_REPAIR' g53.log
+          grep -F 'G53_CONTRADICTORY_LEDGER_GREEN=DENY_WITHOUT_REPAIR' g53.log
+          grep -F 'G53_ORPHAN_LEDGER_GREEN=DENY_INCONSISTENT_PHASE' g53.log
+      - name: Inherited G52-G30 synthetic regression
+        shell: bash
+        run: |
+          set -o pipefail
+          for entry in 'g52 10' 'g50 11' 'g49 7' 'g48 11' 'g47 18' 'g46 10' 'g45 7' 'g44 39' 'g43 32' 'g42 28' 'g41 18' 'g40 36' 'g39 28' 'g38 24' 'g37 34' 'g36 20' 'g35 18' 'g34 16' 'g33 24' 'g32 20' 'g31 18' 'g30 23'; do
+            set -- $entry
+            python -B -m unittest discover -s labs/a190 -p "test_$1_*.py" -v 2>&1 | tee "$1.log"
+            grep -F "Ran $2 tests" "$1.log"
+          done
+          grep -F 'G52_G42_LEGACY_STALE_GREEN=NO_OLD_SNAPSHOT' g42.log
+      - name: No operational authority — hard gate
+        shell: bash
+        run: |
+          echo 'G53 is only local synthetic direct-confirm SQLite idempotency and terminal phase validation.'
+          echo 'No real provider SEND, trusted receipt, external witness, keys, customer, Worker, main, merge or deploy.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'

@@ -36,6 +36,12 @@ class G46ReadOnlyAdversarial(unittest.TestCase):
             valid_until=NOW+timedelta(minutes=5),
         )
         self.key = result["idempotency_key"]
+        # G53: the synthetic receipt fixture must first be in a genuinely
+        # reconcilable local phase. Never confirm directly from PENDING.
+        self.store.db.execute(
+            "UPDATE action_outbox SET state='UNCERTAIN' "
+            "WHERE idempotency_key=?", (self.key,))
+        self.store.db.commit()
         self.outbox._confirm(
             self.key,effect_ref="local-synthetic-reference",
             confirmed_at=NOW+timedelta(seconds=1),

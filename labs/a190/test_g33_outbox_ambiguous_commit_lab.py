@@ -179,8 +179,18 @@ class G33OutboxCommitAmbiguity(unittest.TestCase):
             self.assertEqual(outbox.list()[0]["state"], "RETRY")
         print("G33_RELEASE_POSTCOMMIT_RED=RETRY_STATE_PERSISTED_UNKNOWN_ACK")
 
-    def test_08_internal_confirm_precommit_error_has_no_effect_row(self):
+    def stage_uncertain_receipt_fixture(self):
+        # G53: a synthetic receipt test must first cross into a locally
+        # reconcilable phase, not directly confirm a PENDING intent.
         key = self.stage()["idempotency_key"]
+        self.original.execute(
+            "UPDATE action_outbox SET state='UNCERTAIN' "
+            "WHERE idempotency_key=?", (key,))
+        self.original.commit()
+        return key
+
+    def test_08_internal_confirm_precommit_error_has_no_effect_row(self):
+        key = self.stage_uncertain_receipt_fixture()
         self.run_failure(
             lambda: self.outbox._confirm(
                 key, effect_ref="synthetic-effect", confirmed_at=NOW
@@ -189,12 +199,12 @@ class G33OutboxCommitAmbiguity(unittest.TestCase):
         )
         with self.reopened() as (_, outbox):
             self.assertEqual(outbox.effect_count(), 0)
-            self.assertEqual(outbox.get(key)["state"], "PENDING")
+            self.assertEqual(outbox.get(key)["state"], "UNCERTAIN")
 
     def test_09_internal_confirm_postcommit_error_has_effect_row(self):
         # Direct call to internal routine is only a laboratory fixture.
         # It does NOT represent an independently authenticated receipt.
-        key = self.stage()["idempotency_key"]
+        key = self.stage_uncertain_receipt_fixture()
         self.run_failure(
             lambda: self.outbox._confirm(
                 key, effect_ref="synthetic-effect", confirmed_at=NOW

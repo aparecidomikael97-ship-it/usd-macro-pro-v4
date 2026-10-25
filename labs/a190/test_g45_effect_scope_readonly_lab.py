@@ -41,6 +41,12 @@ class G45EffectScopeReadOnly(unittest.TestCase):
             valid_until=NOW + timedelta(minutes=5),
         )
         self.key = result["idempotency_key"]
+        # G53: synthetic confirmation starts from a recoverable phase,
+        # not a fresh PENDING admission.
+        self.store.db.execute(
+            "UPDATE action_outbox SET state='UNCERTAIN' "
+            "WHERE idempotency_key=?", (self.key,))
+        self.store.db.commit()
         self.outbox._confirm(
             self.key,
             effect_ref="same-local-synthetic-reference",
