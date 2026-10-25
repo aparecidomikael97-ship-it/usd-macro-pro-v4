@@ -524,6 +524,12 @@ class ExecutionOutbox:
             _token(semantic_event_id_lab, "semantic_event_id_lab")
             if semantic_event_id_lab else ""
         )
+        # G57: declaring a business event in the payload but omitting its
+        # asserted semantic ID silently skipped the tenant-wide reservation.
+        # Reject new unbound admissions; do not backfill historic rows, infer
+        # identity from untrusted text, or claim external event authenticity.
+        if "business_event_id" in raw_payload and not semantic_event:
+            raise ValueError("G57_SEMANTIC_ASSERTION_REQUIRED")
         if semantic_event:
             if raw_payload.get("business_event_id") != semantic_event:
                 raise ValueError("semantic event binding mismatch")

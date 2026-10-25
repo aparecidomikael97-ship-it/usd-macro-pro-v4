@@ -1,0 +1,76 @@
+name: A190 G57 explicit semantic event reservation contract LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/test_g57_semantic_assertion_required_lab.py'
+      - 'labs/a190/test_g38_codex_semantic_scope_red_lab.py'
+      - 'labs/a190/test_g39_atomic_semantic_lock_lab.py'
+      - 'labs/a190/test_g44_binding_integrity_lab.py'
+      - 'labs/a190/g37_test_fixtures_lab.py'
+      - 'labs/a190/test_g37_authority_witness_contract_lab.py'
+      - 'labs/a190/test_g37_real_outbox_authority_recovery_lab.py'
+      - 'atlasquant_aion_execution_outbox.py'
+      - '.github/workflows/aion-a190-g57-semantic-assertion-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g57-synthetic:
+    name: G57 local semantic assertion / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install local-LAB dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: G57 explicit business-event assertion fail-closed test
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g57_*.py' -v 2>&1 | tee g57.log
+          grep -F 'Ran 10 tests' g57.log
+          grep -F 'G57_MISSING_ASSERTION_GREEN=NO_ADMISSION' g57.log
+          grep -F 'G57_ALIAS_OMISSION_GREEN=ONE_LOCAL_RESERVATION' g57.log
+          grep -F 'G57_VALID_EVENT_GREEN=LEGITIMATE_REPLAY' g57.log
+          grep -F 'G57_NO_EVENT_GREEN=NO_UNSUPPORTED_GLOBAL_DEDUP_CLAIM' g57.log
+          grep -F 'G57_EXTERNAL_IDENTITY_LIMIT=DIFFERENT_DECLARATIONS_NOT_PROOF' g57.log
+          grep -F 'G57_HISTORICAL_CUSTODY_GAP_RED=LOCK_REMOVAL_ALLOWS_ALIAS' g57.log
+      - name: G56 strict-confirm BEGIN COMMIT rollback injection
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g56_*.py' -v 2>&1 | tee g56.log
+          grep -F 'Ran 8 tests' g56.log
+          grep -F 'G56_PRECOMMIT_GREEN=QUARANTINE_NO_RETRY' g56.log
+          grep -F 'G56_POSTCOMMIT_GREEN=ORIGINAL_RECEIPT_STILL_DURABLE' g56.log
+          grep -F 'G56_BEGIN_BEFORE_GREEN=NO_RETRY_NO_REPAIR' g56.log
+          grep -F 'G56_BEGIN_AFTER_GREEN=NO_FALSE_NEGATIVE' g56.log
+          grep -F 'G56_ROLLBACK_FAILED_GREEN=PRIMARY_ERROR_AND_QUARANTINE' g56.log
+          grep -F 'G56_ROLLBACK_OK_GREEN=INTEGRITY_DENY_NO_REPAIR' g56.log
+          grep -F 'G56_REOPEN_GREEN=STILL_NO_EXTERNAL_AUTHORITY' g56.log
+      - name: Inherited G56 through G30 synthetic regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          for entry in 'g56 8' 'g55 11' 'g54 9' 'g53 11' 'g52 10' 'g50 11' 'g49 7' 'g48 11' 'g47 18' 'g46 10' 'g45 7' 'g44 39' 'g43 32' 'g42 28' 'g41 18' 'g40 36' 'g39 28' 'g38 24' 'g37 34' 'g36 20' 'g35 18' 'g34 16' 'g33 24' 'g32 20' 'g31 18' 'g30 23'; do
+            set -- $entry
+            python -B -m unittest discover -s labs/a190 -p "test_$1_*.py" -v 2>&1 | tee "$1.log"
+            grep -F "Ran $2 tests" "$1.log"
+          done
+      - name: Explicit operation hard no-go
+        shell: bash
+        run: |
+          echo 'Synthetic SQLite semantic admission plus historical regression only. No external source authenticity or crash-power guarantee.'
+          echo 'Historical missing reservations and distinct caller-declared IDs remain unproven; never infer real-world event uniqueness.'
+          echo 'No deployment, main merge, provider SEND, customer, secrets, Worker, funds or paid resources.'
+          echo '0/6 P0 | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND'

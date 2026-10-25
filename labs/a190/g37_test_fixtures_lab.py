@@ -66,7 +66,8 @@ class G37Fixture(unittest.TestCase):
                      "currency": "BRL"},
             aggregate_key="synthetic-invoice-batch",
             policy_version="p1", authorization_ref="a1",
-            created_at=NOW, valid_until=NOW+timedelta(minutes=5))
+            created_at=NOW, valid_until=NOW+timedelta(minutes=5),
+            semantic_event_id_lab=event_id)
 
     def reserve(self, cert):
         return subprocess_witness(self.witness_dir, "reserve", {"certified": cert})

@@ -37,18 +37,17 @@ class G37AuthorityWitnessTests(G37Fixture):
         self.assertEqual(a["event_sequence"], b["event_sequence"])
         self.assertEqual(a["permit_digest"], b["permit_digest"])
 
-    def test_04_alias_request_ids_do_not_multiply_reservation(self):
+    def test_04_alias_request_ids_are_denied_locally_witness_idempotent_g57(self):
         c = self.certificate()
         first = self.stage(request_ref="request-A")
-        other = self.stage(request_ref="request-B")
-        self.assertNotEqual(first["idempotency_key"],other["idempotency_key"])
+        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
+            self.stage(request_ref="request-B")
         a,b=self.reserve(c),self.reserve(c)
         self.assertEqual(a["event_sequence"],b["event_sequence"])
         self.assertTrue(b["idempotent"])
         self.assertEqual(self.admit(first,c),Admission.UNCERTAIN)
-        self.assertEqual(self.admit(other,c),Admission.UNCERTAIN)
-        print("G37_SEMANTIC_DEDUP_GREEN=TWO_REQUEST_ALIASES_ONE_WITNESS_RESERVATION")
-        print("G37_LOCAL_ALIAS_RED=TWO_OUTBOX_ROWS_STILL_EXIST")
+        self.assertEqual(len(self.outbox.list()),1)
+        print("G57_G37_TWO_LAYER_DEDUP_GREEN=ONE_OUTBOX_ONE_WITNESS_RESERVATION")
 
     def test_05_conflicting_authority_signed_semantic_amount_denied(self):
         self.reserve(self.certificate())
