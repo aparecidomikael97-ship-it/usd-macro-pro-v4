@@ -144,5 +144,43 @@ class G55StrictProjectionReconfirm(unittest.TestCase):
         self.store.db.commit()
         self.assert_denial("G42_CONFIRMED_LEDGER_INVARIANT_DENY")
 
+    def test_09_semantically_identical_noncanonical_json_denied(self):
+        before=self.snapshot()
+        original=before[0][0]
+        self.replace_raw(json.dumps(json.loads(original),indent=2))
+        self.assert_denial()
+        print("G55_NONCANONICAL_GREEN=NO_SILENT_REPAIR")
+
+    def test_10_original_receipt_invariant_has_priority_over_projection(self):
+        self.corrupt(lambda d:d.update(state="UNCERTAIN"))
+        self.store.db.execute(
+            "DELETE FROM action_effects WHERE idempotency_key=?",
+            (self.key,),
+        )
+        self.store.db.commit()
+        before=self.snapshot()
+        with self.assertRaisesRegex(
+            RuntimeError, "G42_CONFIRMED_LEDGER_INVARIANT_DENY"
+        ):
+            self.repeat()
+        self.assertEqual(self.snapshot(),before)
+        self.assertEqual(len(before[1]),0)
+        self.assertFalse(self.store.db.in_transaction)
+        print("G55_LEDGER_PRECEDENCE_GREEN=ORIGINAL_G42_GATE_FIRST")
+
+    def test_11_projection_disabled_legacy_replay_remains_readonly(self):
+        self.corrupt(lambda d:d.update(state="UNCERTAIN"))
+        before=self.snapshot()
+        legacy=ExecutionOutbox(self.store,SCOPE)
+        got=legacy._confirm(
+            self.key,effect_ref=REF,
+            confirmed_at=NOW+timedelta(hours=3)
+        )
+        self.assertEqual(got["state"],"CONFIRMED")
+        self.assertEqual(self.snapshot(),before)
+        self.assertFalse(self.store.db.in_transaction)
+        print("G55_FLAG_OFF_GREEN=NO_IMPLICIT_REPAIR")
+
+
 if __name__=="__main__":
     unittest.main()
