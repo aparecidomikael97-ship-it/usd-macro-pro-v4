@@ -31,7 +31,7 @@ After patch: **G66 12/12 PASS** on Windows; G65 19/19, G64 16/16, G63 13/13 pass
 ## Full focused regression and CI provenance
 
 - Full isolated Windows G30–G66 regression at SOURCE SHA **`008630f172b49abc560ad58d4a485c3de6cb67f5`**: **619/619 PASS**, exit 0, clean detached checkout `C:\Users\apare\AtlasQuant-G66-Privacy-LAB-20261025`. G51 tests consolidated into G50.
-- Matrix GitHub Actions workflow `.github/workflows/aion-a190-g66-field-mapping-utf8-lab.yml` committed with unchanged source at SHA **`c258d1e0fba66ff7a68df395aaef39f2d57bcc99`**, Ubuntu and Windows, **619 focused synthetic cases per OS**. The final job logs and markers MUST be observed before cross-OS approval is claimed.
+- **GitHub Actions G66 MULTIPLATAFORMA VERIFICADO:** [run #40229108243](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40229108243) executou o SHA exato de código+workflow **`c258d1e0fba66ff7a68df395aaef39f2d57bcc99`** (código igual ao testado localmente em `008630f172b49abc560ad58d4a485c3de6cb67f5`). Ubuntu job `121276801057` **SUCCESS 619/619**; Windows job `121276800834` **SUCCESS 619/619**. Li os dois logs completos: **36 grupos por sistema**, todos os nove marcadores G66 presentes em cada. Total **1.238 execuções dos mesmos 619 testes sintéticos distintos**, além da bateria Windows local. Nenhum commit documental posterior substitui o SHA de código executado.
 - Any subsequent evidence-document-only commit is NOT a retest of source/workflow SHA.
 
 ## Segunda revisão independente Codex pós-patch (limites reais e não demonstrados)
