@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from aion_chat.models import Scope
-from aion_chat.store import SQLiteChatStore
+from aion_chat.store import SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_execution_outbox import ExecutionOutbox
 
 NOW=datetime(2026,10,25,22,tzinfo=timezone.utc)
@@ -88,7 +88,7 @@ class G59HistoricalBindingOrphans(unittest.TestCase):
         self.stage()
         self.missing_lock()
         self.modify_decision_json(lambda d:d.update(idempotency_key="a"*64))
-        self.deny()
+        self.deny(event="other-independent-event")
 
     def test_05_payload_digest_column_mismatch_cannot_pass_scan(self):
         self.stage()
@@ -97,7 +97,7 @@ class G59HistoricalBindingOrphans(unittest.TestCase):
             "UPDATE action_decisions SET payload_digest=? WHERE tenant=?",
             ("0"*64,SCOPE.tenant_id))
         self.store.db.commit()
-        self.deny()
+        self.deny(event="other-independent-event")
 
     def test_06_outbox_survives_missing_decision_is_rejected(self):
         self.stage()
@@ -113,8 +113,11 @@ class G59HistoricalBindingOrphans(unittest.TestCase):
             self.store.db.execute("SELECT COUNT(*) FROM action_outbox").fetchone()[0],1)
         self.assertEqual(
             self.store.db.execute("SELECT COUNT(*) FROM action_decisions").fetchone()[0],0)
-        self.deny("G59_ORPHAN_OUTBOX_DENY")
-        print("G59_ORPHAN_OUTBOX_GREEN=NO_HIDDEN_LOCAL_INTENT")
+        before=self.snapshot()
+        with self.assertRaises(StorageUnavailableError):
+            self.stage("req-B")
+        self.assertEqual(self.snapshot(),before)
+        print("G59_ORPHAN_OUTBOX_GREEN=STORAGE_FOREIGN_KEY_GATE_ALREADY_DENIES")
 
     def test_07_legitimate_new_event_from_different_tenant_still_allowed(self):
         self.stage()
