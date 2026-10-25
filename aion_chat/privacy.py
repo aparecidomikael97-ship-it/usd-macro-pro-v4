@@ -1,4 +1,5 @@
 """Credential redaction: defense in depth, not universal DLP."""
+import json
 import re
 from collections.abc import Mapping
 
@@ -20,8 +21,39 @@ _QUOTED_JSON_SECRET = re.compile(
 )
 
 
+def _g68_unique_chat_json_pairs(pairs):
+    """Reject duplicate logical JSON keys, including Unicode-escaped aliases."""
+    result = {}
+    for key, item in pairs:
+        if key in result:
+            raise ValueError("G68_DUPLICATE_CHAT_JSON_KEY_DENY")
+        result[key] = item
+    return result
+
+
 def redact(value):
     if isinstance(value, str):
+        # G68: use decoded member names when the ENTIRE text is JSON, so
+        # Unicode-escaped aliases cannot bypass a literal-name regex.
+        # Preserve original formatting when nothing needs masking.
+        # Re-encode structurally if changed: legacy assignment regex alone
+        # could consume JSON delimiters and corrupt an otherwise valid blob.
+        if value.lstrip().startswith(("{", "[")):
+            try:
+                decoded = json.loads(
+                    value, object_pairs_hook=_g68_unique_chat_json_pairs
+                )
+            except json.JSONDecodeError:
+                pass  # Not valid full JSON: retain legacy text-pattern redaction.
+            else:
+                if isinstance(decoded, (dict, list)):
+                    masked = redact(decoded)
+                    if masked != decoded:
+                        return json.dumps(
+                            masked, ensure_ascii=False,
+                            separators=(",", ":"), allow_nan=False
+                        )
+                    return value
         value = _QUOTED_JSON_SECRET.sub(
             lambda match: match.group("prefix") + '[REDACTED]"', value
         )
