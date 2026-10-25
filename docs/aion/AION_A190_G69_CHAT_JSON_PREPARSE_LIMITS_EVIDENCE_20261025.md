@@ -73,6 +73,10 @@ The final **code+workflow SHA `61d6e3895ef9b31d14d59a3d8c1ff58508863b9f`** updat
 
 [Latest G69 v3 Actions run #40233604212](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40233604212) was QUEUED at this document amendment; **do not claim cross-OS success without inspecting completed job statuses and logs**. **Local FINAL Windows focused regression VERIFIED:** detached clean worktree on exact code+workflow SHA **`61d6e3895ef9b31d14d59a3d8c1ff58508863b9f`** executed G30–G69 **676/676 PASS**, exit code 0, clean `git status`, G51 consolidated in G50. This result is separate from queued GitHub CI.
 
+## Additional chat/store regression on final G69 code
+
+Separate existing root-level chat foundation and SQLite write-outcome suites (`test_atlasquant_aion_chat_foundation`, `test_atlasquant_aion_chat_sqlite_write_outcome`) were executed on the same detached Windows G69 source checkout SHA `61d6e3895ef9b31d14d59a3d8c1ff58508863b9f`: **6/6 PASS**, exit 0. This is a narrow supplementary chat/write test. The full chat Golden Path suite is **not** claimed green because prior Windows execution on G66/G67 revealed a separately reproduced missing local `pandas` dependency.
+
 ## Open limits and non-conflation
 
 - These are **input and nesting budgets for JSON-like chat strings**, not bounds on peak memory or CPU while running Python, regexes, parsing and producing redacted copies.
