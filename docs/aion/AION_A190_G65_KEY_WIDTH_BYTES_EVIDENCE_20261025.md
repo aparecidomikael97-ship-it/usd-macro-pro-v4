@@ -34,6 +34,19 @@ Workflow `.github/workflows/aion-a190-g65-admission-budget-lab.yml` versionado c
 - Windows local isolado `C:\Users\apare\AtlasQuant-G65-Budget-LAB-20261025`, `git switch --detach` do SHA acima: G30–G65 (exceto G51, absorvido em G50) **607/607 PASS**, exit code 0, `git status` limpo.
 - GitHub Actions [G65 run #40227887293](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40227887293) iniciou matriz Ubuntu/Windows no mesmo SHA. **Não contabilizar CI como aprovado sem resultados finais dos dois jobs e conferência de logs.** Esta evidência é um commit documental posterior ao SHA do código testado.
 
+## Codex independente pós-patch e bloqueios para G66
+
+Codex CLI Windows `-s read-only --ephemeral`, sessão `01a1749d-3dc3-7ad2-9822-f1dc68c2a578`, leu o diff G65 no checkout local do SHA de código e CI `22b10df9bf4e0067437a4acab045ca7d88688282`, sem editar arquivos, executar testes ou consultar fornecedores. A inspeção confirmou a separação chave/valor, cota de 4096 visitas, tamanho máximo de 262144 bytes UTF-8 no início da admissão/confirm e a reutilização de `encoded` sem outra conversão `__str__` na confirmação.
+
+**Questões ainda abertas que os 19 testes G65 NÃO cobrem:**
+1. Nomes de chave como `authorization`, `access_token`, `api-key`, `apiKey` e `client_secret` com valores simples não são todos reconhecidos pela política herdada em `privacy.redact`. Pode existir dado que deveria ser ocultado sem ser rejeitado.
+2. Um `Mapping` customizado é percorrido na verificação, mas a função de redação lida com `dict` e pode tratar outro Mapping como objeto opaco via `default=str`.
+3. Materialização de `dict(payload/result)` e a primeira conversão `json.dumps` alocam bytes antes da cota de saída; **o limite é de admissão, não de memória máxima**.
+4. Chaves não string podem gerar `TypeError` herdado, sem contrato uniforme; faltam provas de fronteira exata 262144/262145 bytes com UTF-8 multibyte, strings JSON escapadas e recusa com rollback de decisão final maior que o orçamento após reserva.
+5. Casos históricos/replay que eram permitidos em G64 e agora excedem cotas G65 podem ficar fail-closed; não há migração ou garantia retroativa de compatibilidade.
+
+Esses são candidatos a testes RED e correções separadas **G66**, sem homologação, sem auto-limpeza e sem redefinir o contrato já testado da G65.
+
 ## Limites remanescentes, HARD NO-GO
 
 O limite de bytes impede **admissão e persistência** de JSON muito grande, mas não limita a alocação de memória temporária durante a primeira serialização nem o tamanho de objetos de entrada construídos pelo chamador. O walker executa `Mapping.items()` e percorre dados mutáveis: `__str__` e mappings personalizados têm efeitos colaterais possíveis. A proteção de padrões não é DLP universal; chaves não-`str`, Unicode e outros formatos de segredo exigem auditorias próprias. Registros históricos prévios e novas cotas podem bloquear a operação (fail-closed), mas não foram migrados, corrigidos ou apagados.
