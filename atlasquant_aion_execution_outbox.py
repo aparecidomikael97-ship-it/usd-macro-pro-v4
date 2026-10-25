@@ -578,12 +578,12 @@ class ExecutionOutbox:
         if semantic_event:
             if raw_payload.get("business_event_id") != semantic_event:
                 raise ValueError("semantic event binding mismatch")
-            if "business_event_id" not in redact(raw_payload):
-                raise ValueError("semantic event must survive redaction")
-        # G62: block dict/list/tuple cycles BEFORE redact recurses. The
-        # check runs before BEGIN and never writes a semantic reservation.
+        # G62: guard EVERY redaction call (including semantic validation)
+        # against cyclic dict/list/tuple structures. Redact only once.
         _assert_acyclic_payload_lab(raw_payload)
         safe_payload = redact(raw_payload)
+        if semantic_event and "business_event_id" not in safe_payload:
+            raise ValueError("semantic event must survive redaction")
         # G61: check numeric finiteness explicitly BEFORE BEGIN; a ValueError
         # raised by custom default=str conversion is not a nonfinite float.
         # Preserve the original serializer exception without mislabeling it.
