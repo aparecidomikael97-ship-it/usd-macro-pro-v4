@@ -4,6 +4,7 @@ on:
     paths:
       - 'atlasquant_aion_execution_outbox.py'
       - 'labs/a190/test_g50_postsend_stale_reply_lab.py'
+      - 'labs/a190/test_g50_send_callback_immutability_lab.py'
       - '.github/workflows/aion-a190-g50-postsend-cas-lab.yml'
   workflow_dispatch:
 permissions:
@@ -32,11 +33,13 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g50_*.py' -v 2>&1 | tee g50.log
-          grep -F 'Ran 7 tests' g50.log
+          grep -F 'Ran 11 tests' g50.log
           grep -F 'G50_POSTSEND_CONFIRMED_GREEN=LEDGER_NOT_DOWNGRADED' g50.log
           grep -F 'G50_POSTSEND_REVOKED_GREEN=NO_RESURRECTION' g50.log
           grep -F 'G50_POSTSEND_EPOCH_GREEN=NO_STALE_TRANSITION' g50.log
           grep -F 'G50_POSTSEND_EXCEPTION_GREEN=NO_OVERWRITE' g50.log
+          grep -F 'G50_REENTRY_RETURN_GREEN=CONFIRMED_LEDGER_IMMUTABLE' g50.log
+          grep -F 'G50_REENTRY_EXCEPTION_GREEN=CONFIRMED_NOT_UNCERTAIN' g50.log
       - name: G49-G30 inherited synthetic regression
         shell: bash
         run: |
