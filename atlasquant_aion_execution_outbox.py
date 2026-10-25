@@ -849,6 +849,17 @@ class ExecutionOutbox:
                 "grants_authority": False,
             }
             encoded = _canonical(decision)
+            # G63: default=str can produce a different string on the second
+            # serialization, after the semantic reservation is inserted.
+            # Verify the EXACT encoded bytes to be persisted, not the
+            # original mutable Python object. Never fix drift in place.
+            saved = json.loads(encoded)
+            saved_payload = saved.get("payload")
+            if (not isinstance(saved_payload, dict) or
+                    redact(saved_payload) != saved_payload):
+                raise RuntimeError("G63_STAGED_PAYLOAD_PRIVACY_DENY")
+            if _digest(saved_payload) != payload_digest:
+                raise RuntimeError("G63_STAGED_PAYLOAD_DRIFT_DENY")
             self.db.execute(
                 """INSERT INTO action_decisions(
                     decision_id,owner,tenant,workspace,intent_ref,action,
@@ -1080,7 +1091,17 @@ class ExecutionOutbox:
         reconcile_snapshot_lab: tuple[str, int, str, str, str] | None = None,
     ) -> dict[str, Any]:
         effect = _token(effect_ref, "effect_ref", 128)
-        encoded = _canonical(redact(dict(result or {})))
+        # G63: confirmation results can contain the same cycles as an
+        # enqueue payload. Reject before redact and BEFORE BEGIN, so the
+        # synthetic effect ledger cannot change on invalid input.
+        raw_result = dict(result or {})
+        try:
+            _assert_acyclic_payload_lab(raw_result)
+        except ValueError as cycle_error:
+            if str(cycle_error) == "G62_CYCLIC_PAYLOAD_DENY":
+                raise ValueError("G63_CYCLIC_RESULT_DENY") from None
+            raise
+        encoded = _canonical(redact(raw_result))
         self._begin_or_quarantine()
         try:
             self._g44_assert_binding_lab(key)
