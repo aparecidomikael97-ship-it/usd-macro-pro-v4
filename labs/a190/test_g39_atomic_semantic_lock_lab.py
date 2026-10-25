@@ -26,14 +26,19 @@ class G39AtomicSemanticReservation(unittest.TestCase):
         self.outbox=ExecutionOutbox(self.store,SCOPE)
 
     def stage(self, *, outbox=None, intent="request-A", event=EVENT,
-              amount=1000, strict=True):
+              amount=1000, strict=True, include_event=True):
+        # G57 keeps unnamed/no-event legacy payloads for compatibility, but
+        # a payload explicitly declaring an event can no longer skip its lock.
+        payload={"amount_minor":amount}
+        if include_event:
+            payload["business_event_id"]=event
         return (self.outbox if outbox is None else outbox).enqueue(
             intent_ref=intent,action="synthetic_no_provider",
-            payload={"business_event_id":event,"amount_minor":amount},
+            payload=payload,
             aggregate_key="synthetic-commercial-aggregate",
             policy_version="p1",authorization_ref="a1",
             created_at=NOW,valid_until=NOW+timedelta(minutes=5),
-            semantic_event_id_lab=event if strict else "",
+            semantic_event_id_lab=event if strict and include_event else "",
         )
 
     def locks(self):
@@ -116,19 +121,22 @@ class G39AtomicSemanticReservation(unittest.TestCase):
             self.stage(intent="request-B",amount=2000)
         self.assertEqual(len(self.outbox.list()),1)
 
-    def test_10_late_strict_upgrade_of_legacy_intent_denied(self):
-        self.stage(strict=False)
-        with self.assertRaisesRegex(ValueError,"intent_ref idempotency collision"):
-            self.stage(strict=True)
+    def test_10_legacy_declared_event_cannot_bypass_strict_reservation(self):
+        with self.assertRaisesRegex(ValueError,"G57_SEMANTIC_ASSERTION_REQUIRED"):
+            self.stage(strict=False)
+        first=self.stage(strict=True)
         self.assertEqual(len(self.outbox.list()),1)
-        self.assertEqual(len(self.locks()),0)
+        self.assertEqual(len(self.locks()),1)
+        self.assertEqual(self.locks()[0]["idempotency_key"],first["idempotency_key"])
 
-    def test_11_legacy_outbox_can_still_stage_aliases_red(self):
-        self.stage(strict=False)
-        self.stage(strict=False,intent="request-B")
-        self.assertEqual(len(self.outbox.list()),2)
+    def test_11_declared_event_without_strict_token_is_denied_g57(self):
+        with self.assertRaisesRegex(ValueError,"G57_SEMANTIC_ASSERTION_REQUIRED"):
+            self.stage(strict=False)
+        with self.assertRaisesRegex(ValueError,"G57_SEMANTIC_ASSERTION_REQUIRED"):
+            self.stage(strict=False,intent="request-B")
+        self.assertEqual(len(self.outbox.list()),0)
         self.assertEqual(len(self.locks()),0)
-        print("G39_LEGACY_PATH_RED=OPTIONAL_STRICT_MODE_NOT_GLOBAL_ENFORCEMENT")
+        print("G57_G39_LEGACY_BYPASS_GREEN=NO_DECLARED_EVENT_ADMITTED")
 
     def test_12_failed_outbox_write_rolls_back_semantic_lock(self):
         original=self.outbox.db
@@ -163,10 +171,11 @@ class G39AtomicSemanticReservation(unittest.TestCase):
             self.store.close()
 
     def test_14_existing_same_request_without_event_replays_legacy(self):
-        a=self.stage(strict=False)
-        b=self.stage(strict=False)
+        a=self.stage(strict=False,include_event=False)
+        b=self.stage(strict=False,include_event=False)
         self.assertEqual(a["idempotency_key"],b["idempotency_key"])
         self.assertEqual(b["enqueue_state"],"IDEMPOTENT")
+        self.assertEqual(len(self.locks()),0)
 
     def test_15_strict_lock_insert_under_same_transaction(self):
         self.stage()
