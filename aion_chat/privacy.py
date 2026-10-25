@@ -116,60 +116,122 @@ def _g68_unique_chat_json_pairs(pairs):
     return result
 
 
-def redact(value):
-    if isinstance(value, str):
-        # G68: use decoded member names when the ENTIRE text is JSON, so
-        # Unicode-escaped aliases cannot bypass a literal-name regex.
-        # Preserve original formatting when nothing needs masking.
-        # Re-encode structurally if changed: legacy assignment regex alone
-        # could consume JSON delimiters and corrupt an otherwise valid blob.
-        # Avoid allocating a potentially huge value.lstrip() copy before
-        # the G69 input-byte check. Only inspect the first non-space codepoint.
-        first_nonspace = next((ch for ch in value if not ch.isspace()), "")
-        if first_nonspace in ("{", "["):
-            _g69_preparse_chat_json(value)
-            try:
-                decoded = json.loads(
-                    value, object_pairs_hook=_g68_unique_chat_json_pairs
-                )
-            except json.JSONDecodeError:
-                pass  # Not valid full JSON: retain legacy text-pattern redaction.
-            else:
-                if isinstance(decoded, (dict, list)):
-                    masked = redact(decoded)
-                    if masked != decoded:
-                        return json.dumps(
-                            masked, ensure_ascii=False,
-                            separators=(",", ":"), allow_nan=False
-                        )
-                    return value
-        value = _G69_JSON_MEMBER.sub(_g69_redact_quoted_member, value)
-        value = _G69_JSON_MEMBER_UNFINISHED.sub(
-            _g69_redact_unfinished_member, value
-        )
-        for p in PATTERNS:
-            value = p.sub("[REDACTED]", value)
-    elif isinstance(value, Mapping):
-        # G66: custom Mapping (e.g. UserDict) must not become an opaque
-        # default=str repr with sensitive fields exposed in local JSON.
-        # Preserve ordinary key labels; redact their sensitive values.
-        sensitive = (r"(?i)(?:password|senha|secret|token|credential|"
-                     r"authorization|access[_-]?token|accessToken|"
-                     r"refresh[_-]?token|refreshToken|"
-                     r"private[_-]?key|privateKey|"
-                     r"client[_-]?secret|clientSecret|api[_-]?key|apiKey)")
-        def masked_items():
-            for k, v in value.items():
-                # G67: the redactor is shared by Outbox and chat/store,
-                # which does not run the Outbox's G66 pre-BEGIN key guard.
-                if not isinstance(k, str):
+
+# G70: the shared privacy entrypoint also serves chat/store, which does NOT
+# pass through the Outbox's separate G62/G65 container preflight.
+_G70_MAX_CONTAINER_DEPTH = 64
+_G70_MAX_VISITS = 4096
+
+
+def _g70_charge(budget):
+    budget[0] += 1
+    if budget[0] > _G70_MAX_VISITS:
+        raise ValueError("G70_REDACT_NODE_BUDGET_DENY")
+
+
+def _g70_enter(value, active, depth):
+    if depth > _G70_MAX_CONTAINER_DEPTH:
+        raise ValueError("G70_REDACT_DEPTH_DENY")
+    identity = id(value)
+    if identity in active:
+        raise ValueError("G70_REDACT_CYCLE_DENY")
+    active.add(identity)
+
+
+def _g70_check_only(value, active, budget, depth):
+    """Count and inspect hidden sensitive values without disclosing them."""
+    _g70_charge(budget)
+    if not isinstance(value, (Mapping, list, tuple)):
+        return
+    _g70_enter(value, active, depth)
+    try:
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                if not isinstance(key, str):
                     raise ValueError("G67_NONSTRING_REDACT_KEY_DENY")
-                yield k, ("[REDACTED]" if re.fullmatch(sensitive, k.strip())
-                          else redact(v))
-        value = dict(masked_items())
-    elif isinstance(value, (list, tuple)):
-        # G62: json.dumps serializes tuples as JSON arrays, but the previous
-        # redactor left their nested secrets untouched. Normalize both to a
-        # redacted list BEFORE staging/hashing so no tuple bypass remains.
-        value = [redact(v) for v in value]
-    return value
+                _g70_charge(budget)
+                _g70_check_only(child, active, budget, depth + 1)
+        else:
+            for child in value:
+                _g70_check_only(child, active, budget, depth + 1)
+    finally:
+        active.remove(id(value))
+
+
+def redact(value):
+    """Bounded local redaction; not a sandbox for custom Python methods."""
+    return _g70_redact(value, set(), [0], 1)
+
+
+def _g70_redact(value, active, budget, depth):
+    _g70_charge(budget)
+    is_container = isinstance(value, (Mapping, list, tuple))
+    # Save ORIGINAL identity: value is replaced by normalized dict/list.
+    container_id = id(value) if is_container else None
+    if is_container:
+        _g70_enter(value, active, depth)
+    try:
+        if isinstance(value, str):
+            # G68: use decoded member names when the ENTIRE text is JSON, so
+            # Unicode-escaped aliases cannot bypass a literal-name regex.
+            # Preserve original formatting when nothing needs masking.
+            # Re-encode structurally if changed: legacy assignment regex alone
+            # could consume JSON delimiters and corrupt an otherwise valid blob.
+            # Avoid allocating a potentially huge value.lstrip() copy before
+            # the G69 input-byte check. Only inspect the first non-space codepoint.
+            first_nonspace = next((ch for ch in value if not ch.isspace()), "")
+            if first_nonspace in ("{", "["):
+                _g69_preparse_chat_json(value)
+                try:
+                    decoded = json.loads(
+                        value, object_pairs_hook=_g68_unique_chat_json_pairs
+                    )
+                except json.JSONDecodeError:
+                    pass  # Not valid full JSON: retain legacy text-pattern redaction.
+                else:
+                    if isinstance(decoded, (dict, list)):
+                        masked = _g70_redact(decoded, active, budget, 1)
+                        if masked != decoded:
+                            return json.dumps(
+                                masked, ensure_ascii=False,
+                                separators=(",", ":"), allow_nan=False
+                            )
+                        return value
+            value = _G69_JSON_MEMBER.sub(_g69_redact_quoted_member, value)
+            value = _G69_JSON_MEMBER_UNFINISHED.sub(
+                _g69_redact_unfinished_member, value
+            )
+            for p in PATTERNS:
+                value = p.sub("[REDACTED]", value)
+        elif isinstance(value, Mapping):
+            # G66: custom Mapping (e.g. UserDict) must not become an opaque
+            # default=str repr with sensitive fields exposed in local JSON.
+            # Preserve ordinary key labels; redact their sensitive values.
+            sensitive = (r"(?i)(?:password|senha|secret|token|credential|"
+                         r"authorization|access[_-]?token|accessToken|"
+                         r"refresh[_-]?token|refreshToken|"
+                         r"private[_-]?key|privateKey|"
+                         r"client[_-]?secret|clientSecret|api[_-]?key|apiKey)")
+            def masked_items():
+                for k, v in value.items():
+                    # Account for mapping keys without rewriting their names.
+                    if not isinstance(k, str):
+                        raise ValueError("G67_NONSTRING_REDACT_KEY_DENY")
+                    _g70_charge(budget)
+                    if re.fullmatch(sensitive, k.strip()):
+                        # Hidden values still must not conceal hostile recursion.
+                        _g70_check_only(v, active, budget, depth + 1)
+                        yield k, "[REDACTED]"
+                    else:
+                        yield k, _g70_redact(v, active, budget, depth + 1)
+            value = dict(masked_items())
+        elif isinstance(value, (list, tuple)):
+            # G62: json.dumps serializes tuples as JSON arrays, but the previous
+            # redactor left their nested secrets untouched. Normalize both to a
+            # redacted list BEFORE staging/hashing so no tuple bypass remains.
+            value = [_g70_redact(v, active, budget, depth + 1) for v in value]
+        return value
+
+    finally:
+        if is_container:
+            active.remove(container_id)
