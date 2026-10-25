@@ -495,9 +495,16 @@ class ExecutionOutbox:
             raise ValueError("authority must expire after creation")
         if (valid_dt - created_dt).total_seconds() > MAX_AUTHORITY_TTL_SECONDS:
             raise ValueError("authority validity exceeds staging maximum")
+        # G47 LAB: do not let non-boolean values silently disable reauth.
+        if type(requires_reauth) is not bool:
+            raise TypeError("requires_reauth must be an exact boolean")
+        if not isinstance(reauth_ref, str):
+            raise TypeError("reauth_ref must be a string")
         reauth = _clean(reauth_ref, 160)
         if requires_reauth and not reauth:
             raise ValueError("transaction reauthentication reference required")
+        if not requires_reauth and reauth:
+            raise ValueError("reauth_ref without required reauthentication denied")
         transaction = _clean(transaction_id, 128)
         budget_ref = _clean(authority_budget_ref, 128)
         capability = _clean(capability_class, 80).upper()
@@ -537,6 +544,11 @@ class ExecutionOutbox:
         }
         if semantic_event:
             key_material["semantic_event_id_lab"] = semantic_event
+        # G47: a required reauthentication is part of the immutable intent
+        # identity; ordinary false/empty legacy key material is unchanged.
+        if requires_reauth:
+            key_material["requires_reauth"] = True
+            key_material["reauth_ref"] = reauth
         idempotency_key = _digest(key_material)
         decision_id = "DEC-" + idempotency_key[:24].upper()
 
