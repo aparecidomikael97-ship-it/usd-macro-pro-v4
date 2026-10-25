@@ -1338,15 +1338,17 @@ class ExecutionOutbox:
         # Always recheck the original phase, claimant, lease and generation
         # immediately after the getter, even without optional G41 fencing or
         # a synthetic clock. Never invoke send for a superseded attempt.
+        # Retain the established G41 fencing refusal code when its strict
+        # mode is enabled, then require the extra unconditional G49 check.
+        self._g44_assert_binding_lab(key)
+        if self._strict_claim_fencing_lab:
+            self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         current_before_send = self.get(key)
         if (current_before_send["state"] != "UNCERTAIN" or
                 current_before_send["lease_owner"] != worker or
                 current_before_send["lease_until"] != intent["lease_until"] or
                 current_before_send["attempts"] != intent["attempts"]):
             raise RuntimeError("G49_GETTER_CHANGED_CLAIM_NO_SEND")
-        self._g44_assert_binding_lab(key)
-        if self._strict_claim_fencing_lab:
-            self._fence_assert_lab(key, worker, claim_generation_lab, "UNCERTAIN")
         try:
             result = _mapping(_bound_callback(send, dict(intent["decision"]), key))
         except Exception as exc:
