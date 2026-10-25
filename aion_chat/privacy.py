@@ -9,16 +9,77 @@ PATTERNS = [re.compile(r"(?i)\b(password|senha|api[_ -]?key|access[_ -]?token|re
             re.compile(r"-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----")]
 
 
-# G68: quoted JSON member names in chat text have a closing '"' between
-# the field name and ':'. Preserve JSON punctuation and replace only the
-# string value (including escaped quote sequences), not the whole member.
-_QUOTED_JSON_SECRET = re.compile(
-    r'(?i)(?P<prefix>"(?:password|senha|secret|token|credential|'
-    r'authorization|access[_-]?token|accessToken|refresh[_-]?token|'
-    r'refreshToken|private[_-]?key|privateKey|client[_-]?secret|'
-    r'clientSecret|api[_-]?key|apiKey)"\s*:\s*")'
+# G69: fallback for JSON-looking members embedded in ordinary prose or
+# incomplete JSON. Decode only the quoted key before deciding whether the
+# associated quoted value requires masking; do NOT rewrite the whole prose.
+_G69_JSON_MEMBER = re.compile(
+    r'(?P<prefix>(?P<key>"(?:\\.|[^"\\])*")\s*:\s*")'
     r'(?:\\.|[^"\\])*"'
 )
+_G69_SENSITIVE_KEY = re.compile(
+    r"(?i)(?:password|senha|secret|token|credential|authorization|"
+    r"access[_-]?token|accessToken|refresh[_-]?token|refreshToken|"
+    r"private[_-]?key|privateKey|client[_-]?secret|clientSecret|"
+    r"api[_-]?key|apiKey)"
+)
+_G69_MAX_JSON_INPUT_BYTES = 262144
+_G69_MAX_JSON_DEPTH = 64
+
+
+def _g69_preparse_chat_json(value):
+    """Bound UTF-8 bytes and bracket depth BEFORE json.loads materializes.
+
+    Quotes/backslashes are tracked without parsing nodes. An invalid bracket
+    sequence is left for JSONDecodeError + old text fallback rather than
+    labeling arbitrary plain text as excessive JSON nesting.
+    """
+    if len(value) > _G69_MAX_JSON_INPUT_BYTES:
+        raise ValueError("G69_CHAT_JSON_INPUT_BYTES_DENY")
+    try:
+        if len(value.encode("utf-8")) > _G69_MAX_JSON_INPUT_BYTES:
+            raise ValueError("G69_CHAT_JSON_INPUT_BYTES_DENY")
+    except UnicodeEncodeError:
+        raise ValueError("G67_INVALID_UNICODE_DENY") from None
+    stack = []
+    quoted = False
+    escaped = False
+    excess = False
+    unbalanced = False
+    for char in value:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in "[{":
+            stack.append(char)
+            if len(stack) > _G69_MAX_JSON_DEPTH:
+                excess = True
+        elif char in "]}":
+            if not stack:
+                unbalanced = True
+            else:
+                opening = stack.pop()
+                if (opening == "[" and char != "]") or (
+                    opening == "{" and char != "}"
+                ):
+                    unbalanced = True
+    if excess and not (unbalanced or stack or quoted):
+        raise ValueError("G69_CHAT_JSON_NESTING_DENY")
+
+
+def _g69_redact_quoted_member(match):
+    try:
+        key = json.loads(match.group("key"))
+    except (ValueError, UnicodeError):
+        return match.group(0)
+    if isinstance(key, str) and _G69_SENSITIVE_KEY.fullmatch(key.strip()):
+        return match.group("prefix") + '[REDACTED]"'
+    return match.group(0)
 
 
 def _g68_unique_chat_json_pairs(pairs):
@@ -39,6 +100,7 @@ def redact(value):
         # Re-encode structurally if changed: legacy assignment regex alone
         # could consume JSON delimiters and corrupt an otherwise valid blob.
         if value.lstrip().startswith(("{", "[")):
+            _g69_preparse_chat_json(value)
             try:
                 decoded = json.loads(
                     value, object_pairs_hook=_g68_unique_chat_json_pairs
@@ -54,9 +116,7 @@ def redact(value):
                             separators=(",", ":"), allow_nan=False
                         )
                     return value
-        value = _QUOTED_JSON_SECRET.sub(
-            lambda match: match.group("prefix") + '[REDACTED]"', value
-        )
+        value = _G69_JSON_MEMBER.sub(_g69_redact_quoted_member, value)
         for p in PATTERNS:
             value = p.sub("[REDACTED]", value)
     elif isinstance(value, Mapping):
