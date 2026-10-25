@@ -36,14 +36,14 @@ Second `privacy.py` correction SHA **`cba532e6cc3b5c847e3b4db04512da8b04e0c12b`*
 The G68 Windows isolated detached worktree: `C:\Users\apare\AtlasQuant-G68-JSON-LAB-20261025`. Workflow `.github/workflows/aion-a190-g68-json-chat-top-mapping-lab.yml` was amended to **21 G68 tests** and extra marker checks at source+workflow SHA **`fa1ebe5311a8cfdd73fa6ce244b1bf17248282b1`**, configured for **654 distinct G30–G68 synthetic focused cases per OS** (G51 combined inside G50).
 - [GitHub Actions G68 UPDATED run #40231864079](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40231864079) was queued when the evidence report was drafted. **Do not claim CI cross-OS success before both jobs complete and their actual logs/marker counts are checked.**
 - An earlier [G68 CI run #40231486506](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40231486506) ran a previous revision with only 16 new G68 tests. It MUST NOT be represented as validation of the 21-test updated source.
-- Full local Windows re-run at the updated code+workflow SHA is in progress at initial evidence creation. No canonical entire Security/Quality claim.
+- **Full updated Windows local VERIFIED:** on exact code+workflow SHA **`fa1ebe5311a8cfdd73fa6ce244b1bf17248282b1`**, clean detached worktree G30–G68 ran **654/654 PASS**, exit 0. This supersedes the earlier G68 649-count local run. No canonical entire Security/Quality claim.
 
 ## Independent Codex sessions, local only
 
 Installed Windows Codex CLI v0.164.0-alpha.11.1, `-s read-only --ephemeral`:
 - Prepatch session `01a174c0-b936-71a3-a26c-37458f14b6ab` read G67 and independently located quoted-text JSON leakage and top-level Mapping implicit coercion, recommending tests first and value-only string masking.
 - Postpatch session `01a174c5-8c04-7cf0-8dfe-fa3b51ce6640` read exact first CI source `d0658a8`, confirmed G68 fixes in source and identified escaped Unicode-sensitive JSON key and potential corruption of valid JSON by legacy regex; this directly informed second RED.
-- A further post-second-fix read-only Codex session `01a174cb-3804-7872-b281-b88a35b0137a` was requested. Its final findings must not be inferred until read. Codex did not edit files, execute tests or contact providers.
+- A further **COMPLETED** post-second-fix Codex read-only session `01a174cb-3804-7872-b281-b88a35b0137a` inspected exact tested code+workflow SHA `fa1ebe5311a8cfdd73fa6ce244b1bf17248282b1`. It confirmed static behavior: full JSON parsing decodes Unicode-escaped field names; duplicate decoded keys raise the stable denial; changed JSON is serialized structurally to preserve syntax; unchanged JSON keeps original text; partial JSON/prose falls back to pattern redaction; top-level Mapping is snapshotted before BEGIN. The reviewer **did not execute tests, edit files, or use a network/provider**. Remaining *unverified* G69 targets: unbounded string-input parsing may allocate memory or cause recursion before outer admission byte budgets; quoted JSON-like text inside prose may contain escaped sensitive member names that the literal regex fallback misses; benign `token` keys and duplicate keys can be rejected/masked by policy even when not secrets.
 
 ## Unclosed architecture and privacy constraints
 
