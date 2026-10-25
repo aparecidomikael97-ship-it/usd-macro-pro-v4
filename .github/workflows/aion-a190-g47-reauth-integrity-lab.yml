@@ -1,0 +1,53 @@
+name: A190 G47 reauthorization idempotency integrity LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'atlasquant_aion_outbox_binding_lab.py'
+      - 'labs/a190/test_g47_reauth_integrity_lab.py'
+      - '.github/workflows/aion-a190-g47-reauth-integrity-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g47:
+    name: G47 reauth key contract / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Test-only dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Adversarial reauth and cross-version regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g47_*.py' -v 2>&1 | tee g47.log
+          grep -F 'Ran 18 tests' g47.log
+          grep -F 'G47_DOWNGRADE_GREEN=FALSE_CANNOT_ERASE_TRUE' g47.log
+          grep -F 'G47_DOUBLE_DOWNGRADE_GREEN=ORIGINAL_KEY_CANNOT_MATCH' g47.log
+          grep -F 'G47_PRE_SEND_GREEN=ZERO_EFFECT_ZERO_ADAPTER' g47.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g46_*.py' -v 2>&1 | tee g46.log
+          grep -F 'Ran 10 tests' g46.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g45_*.py' -v 2>&1 | tee g45.log
+          grep -F 'Ran 7 tests' g45.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g44_*.py' -v 2>&1 | tee g44.log
+          grep -F 'Ran 39 tests' g44.log
+          python -B -m unittest discover -s labs/a190 -p 'test_g43_*.py' -v 2>&1 | tee g43.log
+          grep -F 'Ran 32 tests' g43.log
+      - name: Explicit boundaries
+        shell: bash
+        run: |
+          echo 'Synthetic LAB test only. No external trusted owner or signed receipt.'
+          echo 'No Worker/provider send, merge, main, deploy, customer data, secrets or paid resources.'
+          echo '0/6 P0 HOMOLOGATED. HARD NO-GO. UNCERTAIN. ZERO_AUTO_RESEND.'
