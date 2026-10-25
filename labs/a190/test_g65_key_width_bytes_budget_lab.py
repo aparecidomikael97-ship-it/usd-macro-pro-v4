@@ -184,22 +184,22 @@ class G65KeyBudgetAndBoundary(unittest.TestCase):
             "G63_CYCLIC_RESULT_DENY",(1,1,1,0))
 
     def test_15_width_exact_4096_visits_is_accepted(self):
-        # root 1 + 3 key/value pairs 6 + list 1 + 4088 leaves.
-        row=self.stage({"wide":list(range(4088))})
+        # root 1 + 3 key/value pairs (including list itself) 6 + 4089 leaves.
+        row=self.stage({"wide":list(range(4089))})
         self.assertEqual(row["enqueue_state"],"ENQUEUED")
         self.assertEqual(self.counts(),(1,1,1,0))
         print("G65_NODE_4096_GREEN=BOUNDARY_ACCEPTED")
 
     def test_16_width_4097_visits_is_denied(self):
         self.watched_deny(
-            lambda:self.stage({"wide":list(range(4089))}),
+            lambda:self.stage({"wide":list(range(4090))}),
             "G65_NODE_BUDGET_DENY",(0,0,0,0))
         print("G65_NODE_4097_GREEN=BOUNDARY_DENIED")
 
     def test_17_confirm_exact_4096_visits_allowed(self):
         key=self.uncertain()
-        # Root 1 + key/value pair 2 + list 1 + 4092 leaves.
-        done=self.confirm(key,{"wide":list(range(4092))})
+        # Root 1 + key/list-value pair 2 + 4093 leaves.
+        done=self.confirm(key,{"wide":list(range(4093))})
         self.assertEqual(done["state"],"CONFIRMED")
         self.assertEqual(self.counts(),(1,1,1,1))
         print("G65_CONFIRM_NODE_4096_GREEN=BOUNDARY_ACCEPTED")
@@ -207,7 +207,7 @@ class G65KeyBudgetAndBoundary(unittest.TestCase):
     def test_18_confirm_4097_visits_denied(self):
         key=self.uncertain()
         self.watched_deny(
-            lambda:self.confirm(key,{"wide":list(range(4093))}),
+            lambda:self.confirm(key,{"wide":list(range(4094))}),
             "G65_NODE_BUDGET_DENY",(1,1,1,0))
         print("G65_CONFIRM_NODE_4097_GREEN=BOUNDARY_DENIED")
 
