@@ -64,6 +64,24 @@ def _token(value: Any, name: str, limit: int = 128) -> str:
     return text
 
 
+def _assert_finite_payload_lab(value: Any) -> None:
+    """Distinguish nonfinite JSON numbers from unrelated serializer errors.
+
+    The input is already redacted; this check does not coerce custom objects
+    or reinterpret strings. json.dumps(allow_nan=False) remains the backstop.
+    """
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("G60_NONFINITE_PAYLOAD_DENY")
+    elif isinstance(value, Mapping):
+        for key, element in value.items():
+            _assert_finite_payload_lab(key)
+            _assert_finite_payload_lab(element)
+    elif isinstance(value, (list, tuple)):
+        for element in value:
+            _assert_finite_payload_lab(element)
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(
         value,
@@ -538,13 +556,11 @@ class ExecutionOutbox:
             if "business_event_id" not in redact(raw_payload):
                 raise ValueError("semantic event must survive redaction")
         safe_payload = redact(raw_payload)
-        try:
-            # G60: never persist non-standard JSON numeric tokens. This
-            # runs BEFORE BEGIN, so no reservation/intent can be partially
-            # admitted after a serialization failure.
-            payload_digest = _digest(safe_payload)
-        except ValueError:
-            raise ValueError("G60_NONFINITE_PAYLOAD_DENY") from None
+        # G61: check numeric finiteness explicitly BEFORE BEGIN; a ValueError
+        # raised by custom default=str conversion is not a nonfinite float.
+        # Preserve the original serializer exception without mislabeling it.
+        _assert_finite_payload_lab(safe_payload)
+        payload_digest = _digest(safe_payload)
         key_material = {
             "scope": [owner, tenant, workspace],
             "intent_ref": intent,
