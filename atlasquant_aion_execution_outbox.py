@@ -70,7 +70,11 @@ _G65_MAX_BYTES = 262144
 
 def _assert_serialized_budget_lab(encoded: str) -> bytes:
     """Budget actual encoded UTF-8; do not re-stringify an opaque object."""
-    raw = encoded.encode("utf-8")
+    try:
+        raw = encoded.encode("utf-8")
+    except UnicodeEncodeError:
+        # G67: malformed unpaired surrogate is not valid UTF-8 JSON.
+        raise ValueError("G67_INVALID_UNICODE_DENY") from None
     if len(raw) > _G65_MAX_BYTES:
         raise ValueError("G65_SERIALIZED_BYTES_DENY")
     return raw
@@ -92,7 +96,7 @@ def _assert_acyclic_payload_lab(
     if budget[0] > _G65_MAX_NODES:
         raise ValueError("G65_NODE_BUDGET_DENY")
     if not isinstance(value, (Mapping, list, tuple)):
-        return
+        return value
     if depth > 64:
         raise ValueError("G64_EXCESSIVE_NESTING_DENY")
     if active is None:
@@ -103,18 +107,25 @@ def _assert_acyclic_payload_lab(
     active.add(object_id)
     try:
         if isinstance(value, Mapping):
+            snapshot = {}
             for key, child in value.items():
-                # G66: JSON objects have string keys. Non-string Mapping
-                # keys have no stable canonical/redaction interpretation.
+                # G67: inspect and SNAPSHOT each Mapping only once. The same
+                # immutable-shape built-in container is later redacted and
+                # serialized, so volatile UserDict.items() cannot change it.
                 if not isinstance(key, str):
                     raise ValueError("G66_NONSTRING_JSON_KEY_DENY")
                 if redact(key) != key:
                     raise ValueError("G65_SENSITIVE_JSON_KEY_DENY")
                 _assert_acyclic_payload_lab(key, active, depth + 1, budget)
-                _assert_acyclic_payload_lab(child, active, depth + 1, budget)
-        else:
-            for child in value:
-                _assert_acyclic_payload_lab(child, active, depth + 1, budget)
+                snapshot[key] = _assert_acyclic_payload_lab(
+                    child, active, depth + 1, budget
+                )
+            return snapshot
+        snapshot = [
+            _assert_acyclic_payload_lab(child, active, depth + 1, budget)
+            for child in value
+        ]
+        return tuple(snapshot) if isinstance(value, tuple) else snapshot
     finally:
         active.remove(object_id)
 
@@ -610,8 +621,8 @@ class ExecutionOutbox:
                 raise ValueError("semantic event binding mismatch")
         # G62: guard EVERY redaction call (including semantic validation)
         # against cyclic dict/list/tuple structures. Redact only once.
-        _assert_acyclic_payload_lab(raw_payload)
-        safe_payload = redact(raw_payload)
+        payload_snapshot = _assert_acyclic_payload_lab(raw_payload)
+        safe_payload = redact(payload_snapshot)
         if semantic_event and "business_event_id" not in safe_payload:
             raise ValueError("semantic event must survive redaction")
         # G61: check numeric finiteness explicitly BEFORE BEGIN; a ValueError
@@ -1132,7 +1143,7 @@ class ExecutionOutbox:
         # synthetic effect ledger cannot change on invalid input.
         raw_result = dict(result or {})
         try:
-            _assert_acyclic_payload_lab(raw_result)
+            raw_result = _assert_acyclic_payload_lab(raw_result)
         except ValueError as cycle_error:
             if str(cycle_error) == "G62_CYCLIC_PAYLOAD_DENY":
                 raise ValueError("G63_CYCLIC_RESULT_DENY") from None
