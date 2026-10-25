@@ -579,6 +579,17 @@ class ExecutionOutbox:
                     raise ValueError("intent_ref idempotency collision")
                 if semantic_event and semantic_lock is None:
                     raise ValueError("semantic lock missing for existing intent")
+                # G48: even a same-key existing intent may have been poisoned
+                # after its first admission. Never label it IDEMPOTENT until
+                # its persisted decision, reauth and ledger bind correctly.
+                from atlasquant_aion_outbox_binding_lab import binding_issue_lab
+                existing_issue = binding_issue_lab(
+                    self.db, idempotency_key, self._scope_args()
+                )
+                if existing_issue != "OK":
+                    raise RuntimeError(
+                        "G48_EXISTING_BINDING_DENIED:" + existing_issue
+                    )
                 self._commit_or_quarantine()
                 out = self.get(idempotency_key)
                 return {**out, "enqueue_state": "IDEMPOTENT"}
@@ -783,6 +794,18 @@ class ExecutionOutbox:
         if not callable(authorize):
             raise TypeError("authorization revalidator required")
         decision = _mapping(intent.get("decision"))
+        # G48: malformed local reauth metadata must never be interpreted as
+        # false/absent, even when optional G44 binding is not enabled.
+        requires_reauth = decision.get("requires_reauth")
+        reauth_ref = decision.get("reauth_ref")
+        if (type(requires_reauth) is not bool or
+                not isinstance(reauth_ref, str) or
+                (requires_reauth and
+                 (not reauth_ref or reauth_ref.strip() != reauth_ref)) or
+                (not requires_reauth and reauth_ref)):
+            return False, "BLOCKED_REAPPROVAL", {
+                "reason": "REAUTH_MATERIAL_INVALID"
+            }
         if now_dt >= _utc(decision.get("valid_until")):
             return False, "BLOCKED_REAPPROVAL", {"reason": "AUTHORITY_EXPIRED"}
         try:
