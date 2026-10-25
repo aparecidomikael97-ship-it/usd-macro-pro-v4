@@ -32,7 +32,7 @@ O conjunto original passou **14/14** após o patch, mais cinco casos de fronteir
 
 Workflow `.github/workflows/aion-a190-g65-admission-budget-lab.yml` versionado com o código no commit **`22b10df9bf4e0067437a4acab045ca7d88688282`**, para Ubuntu/Windows, 607 testes distintos por OS.
 - Windows local isolado `C:\Users\apare\AtlasQuant-G65-Budget-LAB-20261025`, `git switch --detach` do SHA acima: G30–G65 (exceto G51, absorvido em G50) **607/607 PASS**, exit code 0, `git status` limpo.
-- GitHub Actions [G65 run #40227887293](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40227887293) iniciou matriz Ubuntu/Windows no mesmo SHA. **Não contabilizar CI como aprovado sem resultados finais dos dois jobs e conferência de logs.** Esta evidência é um commit documental posterior ao SHA do código testado.
+- **GitHub Actions G65 MULTIPLATAFORMA VERIFICADO:** [run #40227887293](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40227887293) executou o SHA exato de código+workflow **`22b10df9bf4e0067437a4acab045ca7d88688282`**. Ubuntu job `121273098443` **SUCCESS 607/607**; Windows job `121273098269` **SUCCESS 607/607**. Os dois logs completos foram consultados: **35 grupos de testes por sistema**, todos os **17 marcadores G65** presentes em cada um. Total **1.214 execuções dos mesmos 607 testes sintéticos distintos**, além da bateria local Windows. Estes commits documentais são posteriores ao SHA de código testado.
 
 ## Codex independente pós-patch e bloqueios para G66
 
