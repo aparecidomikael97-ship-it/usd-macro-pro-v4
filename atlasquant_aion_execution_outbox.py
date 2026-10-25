@@ -64,15 +64,33 @@ def _token(value: Any, name: str, limit: int = 128) -> str:
     return text
 
 
+_G65_MAX_NODES = 4096
+_G65_MAX_BYTES = 262144
+
+
+def _assert_serialized_budget_lab(encoded: str) -> bytes:
+    """Budget actual encoded UTF-8; do not re-stringify an opaque object."""
+    raw = encoded.encode("utf-8")
+    if len(raw) > _G65_MAX_BYTES:
+        raise ValueError("G65_SERIALIZED_BYTES_DENY")
+    return raw
+
+
 def _assert_acyclic_payload_lab(
     value: Any, active: set[int] | None = None, depth: int = 1,
+    budget: list[int] | None = None,
 ) -> None:
-    """Reject cycles and excessive nesting before recursive redaction.
+    """Bound depth, expanded visits and sensitive JSON keys BEFORE BEGIN.
 
-    G64 caps dict/list/tuple nesting at 64 container levels. Only ancestors
-    are tracked, so repeated shared *acyclic* objects remain valid. This
-    intentionally changes admission for formerly allowed deep structures.
+    G65 visits count repeated shared DAG edges, not just unique Python IDs,
+    so a wide repeated reference cannot cause unbounded serialization work.
+    Retain G62 cycle and G64 depth error codes for existing contracts.
     """
+    if budget is None:
+        budget = [0]
+    budget[0] += 1
+    if budget[0] > _G65_MAX_NODES:
+        raise ValueError("G65_NODE_BUDGET_DENY")
     if not isinstance(value, (Mapping, list, tuple)):
         return
     if depth > 64:
@@ -84,12 +102,15 @@ def _assert_acyclic_payload_lab(
         raise ValueError("G62_CYCLIC_PAYLOAD_DENY")
     active.add(object_id)
     try:
-        children = (
-            (item for pair in value.items() for item in pair)
-            if isinstance(value, Mapping) else iter(value)
-        )
-        for child in children:
-            _assert_acyclic_payload_lab(child, active, depth + 1)
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                if isinstance(key, str) and redact(key) != key:
+                    raise ValueError("G65_SENSITIVE_JSON_KEY_DENY")
+                _assert_acyclic_payload_lab(key, active, depth + 1, budget)
+                _assert_acyclic_payload_lab(child, active, depth + 1, budget)
+        else:
+            for child in value:
+                _assert_acyclic_payload_lab(child, active, depth + 1, budget)
     finally:
         active.remove(object_id)
 
@@ -593,7 +614,12 @@ class ExecutionOutbox:
         # raised by custom default=str conversion is not a nonfinite float.
         # Preserve the original serializer exception without mislabeling it.
         _assert_finite_payload_lab(safe_payload)
-        payload_digest = _digest(safe_payload)
+        # G65: count encoded bytes and hash the SAME first conversion.
+        # This preserves G63's later independent serialization/drift check.
+        initial_payload_bytes = _assert_serialized_budget_lab(
+            _canonical(safe_payload)
+        )
+        payload_digest = sha256(initial_payload_bytes).hexdigest()
         key_material = {
             "scope": [owner, tenant, workspace],
             "intent_ref": intent,
@@ -854,6 +880,7 @@ class ExecutionOutbox:
                 "grants_authority": False,
             }
             encoded = _canonical(decision)
+            _assert_serialized_budget_lab(encoded)
             # G63: default=str can produce a different string on the second
             # serialization, after the semantic reservation is inserted.
             # Verify the EXACT encoded bytes to be persisted, not the
@@ -1107,6 +1134,7 @@ class ExecutionOutbox:
                 raise ValueError("G63_CYCLIC_RESULT_DENY") from None
             raise
         encoded = _canonical(redact(raw_result))
+        _assert_serialized_budget_lab(encoded)
         # G64: default=str may introduce faux-secret patterns only *after*
         # the first redaction. Inspect the exact JSON bytes to be written,
         # without stringifying the opaque objects again or silently repairing.
