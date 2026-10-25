@@ -159,6 +159,30 @@ class G69JSONPreparseGuards(unittest.TestCase):
             redact('{"a":1,"a":2}')
         print("G69_G68_COMPAT_GREEN=STRUCTURE_AND_DUPLICATES")
 
+    def test_17_malformed_unclosed_2000_brackets_denied_before_json_loads(self):
+        text="["*2000 + "0"
+        with self.assertRaisesRegex(ValueError,"G69_CHAT_JSON_NESTING_DENY"):
+            redact(text)
+        print("G69_MALFORMED_DEEP_GREEN=DENIED_BEFORE_JSON_PARSER")
+
+    def test_18_incomplete_quoted_escaped_secret_in_prose_masked(self):
+        source='Nota {"refresh\\u005ftoken":"G69_FAKE_UNCLOSED'
+        masked=redact(source)
+        self.assertNotIn("G69_FAKE_UNCLOSED",masked)
+        self.assertIn("[REDACTED]",masked)
+        print("G69_UNFINISHED_MEMBER_GREEN=FAKE_VALUE_REMOVED")
+
+    def test_19_unfinished_secret_in_chat_is_masked_not_persisted(self):
+        conv=self.store.create_conversation(SCOPE,title="g69 disposable")
+        value='Nota {"private\\u005fkey":"G69_FAKE_CHAT_UNCLOSED'
+        self.store.append_message(SCOPE,Message(
+            conversation_id=conv.id,role="user",content=value))
+        saved=self.db.execute("SELECT content FROM messages").fetchone()[0]
+        self.assertNotIn("G69_FAKE_CHAT_UNCLOSED",saved)
+        self.assertIn("[REDACTED]",saved)
+        self.assertFalse(self.db.in_transaction)
+        print("G69_UNFINISHED_CHAT_GREEN=MASKED_LOCAL_STORE")
+
     def test_16_nonjson_large_prose_unmodified_by_json_only_limit(self):
         # Deliberately documents scope: not a universal string memory cap.
         data="Just public prose "+"x"*(LIMIT+2)
