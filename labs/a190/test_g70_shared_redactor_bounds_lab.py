@@ -91,11 +91,18 @@ class G70SharedRedactorBounds(unittest.TestCase):
         self.assertEqual(done["two"],done["one"])
         print("G70_SHARED_ACYCLIC_GREEN=COMPATIBLE")
 
-    def test_11_sensitive_field_value_with_cycle_is_masked(self):
+    def test_11_sensitive_field_cycle_is_denied_even_if_hidden(self):
         secret=[]
         secret.append(secret)
-        safe=redact({"password":secret,"public":"okay"})
+        with self.assertRaisesRegex(ValueError,"G70_REDACT_CYCLE_DENY"):
+            redact({"password":secret,"public":"okay"})
+        print("G70_HIDDEN_CYCLE_GREEN=NO_BYPASS")
+
+    def test_17_normal_sensitive_container_is_masked(self):
+        safe=redact({"password":["synthetic-one","synthetic-two"],
+                     "public":"okay"})
         self.assertEqual(safe,{"password":"[REDACTED]","public":"okay"})
+        print("G70_HIDDEN_SAFE_GREEN=VALUE_MASKED")
 
     def test_12_shared_chat_message_deep_metadata_rolled_back(self):
         conv=self.store.create_conversation(SCOPE,title="g70 synthetic")
