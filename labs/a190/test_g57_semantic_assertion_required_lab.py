@@ -125,18 +125,21 @@ class G57RequiredSemanticAssertion(unittest.TestCase):
         self.assertEqual(len(self.locks()),2)
         print("G57_EXTERNAL_IDENTITY_LIMIT=DIFFERENT_DECLARATIONS_NOT_PROOF")
 
-    def test_10_removed_historical_lock_remains_unproven_gap(self):
-        # Simulate an existing row with lost/unbackfilled semantic custody.
-        # This is a diagnostic RED observation, NOT a new permitted workflow.
+    def test_10_removed_historical_lock_denies_alias_g58(self):
+        # G58 upgrades G57's diagnostic RED into a fail-closed invariant.
+        # Neither migration nor repair is performed on the old record.
         self.stage(semantic=EVENT)
         self.store.db.execute(
             "DELETE FROM semantic_reservations_lab WHERE tenant=? "
             "AND business_event_id=?",(SCOPE.tenant_id,EVENT))
         self.store.db.commit()
-        self.stage(intent="request-B",semantic=EVENT)
-        self.assertEqual(len(self.rows()),2)
-        self.assertEqual(len(self.locks()),1)
-        print("G57_HISTORICAL_CUSTODY_GAP_RED=LOCK_REMOVAL_ALLOWS_ALIAS")
+        with self.assertRaisesRegex(
+            RuntimeError,"G58_HISTORICAL_SEMANTIC_CUSTODY_DENY"
+        ):
+            self.stage(intent="request-B",semantic=EVENT)
+        self.assertEqual(len(self.rows()),1)
+        self.assertEqual(len(self.locks()),0)
+        print("G58_G57_HISTORICAL_CUSTODY_GREEN=NO_ALIAS_WITH_LOST_LOCK")
 
 if __name__ == "__main__":
     unittest.main()
