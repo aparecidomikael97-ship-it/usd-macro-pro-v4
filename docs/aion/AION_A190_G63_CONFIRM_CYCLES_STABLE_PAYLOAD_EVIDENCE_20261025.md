@@ -36,7 +36,7 @@ Additional tests were versioned before the final code+workflow snapshot at `073c
 
 At exact source+two-OS workflow commit SHA **`4d118bc38fc0a71f36da016287b178563a55a12a`**, Windows isolated worktree `C:\Users\apare\AtlasQuant-G63-Stability-LAB-20261025` ran all focused G30–G63 tests (G51 consolidated in G50), yielding **572/572 PASS, exit code 0, checkout clean**. No canonical full Quality/Security claim.
 
-[GitHub Actions G63 matrix #40222767593](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40222767593) was QUEUED at the evidence's initial creation. Its Ubuntu and Windows job logs and actual test totals must be inspected before claiming cross-OS success. The evidence report is a **documentation-only** commit after the runtime-tested SHA.
+**GitHub Actions G63 fully VERIFIED:** [run #40222767593](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40222767593), exact source+workflow SHA **`4d118bc38fc0a71f36da016287b178563a55a12a`**. Ubuntu job `121257715635` **SUCCESS 572/572**, Windows job `121257715860` **SUCCESS 572/572**. Both complete job logs inspected: 33 test groups per OS, all eight explicit G63 result-cycle/digest/redaction/rollback markers present. Total **1,144 test executions of the same 572 distinct focused synthetic cases**. Evidence-only commits after this SHA are not retested source changes.
 
 ## Independent Codex review
 
