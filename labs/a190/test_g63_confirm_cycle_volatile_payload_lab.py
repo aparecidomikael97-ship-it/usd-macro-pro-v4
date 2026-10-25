@@ -9,7 +9,8 @@ from pathlib import Path
 import json,tempfile,unittest
 
 from aion_chat.models import Scope
-from aion_chat.store import SQLiteChatStore
+from aion_chat.store import SQLiteChatStore,StorageUnavailableError
+from test_g31_transaction_quarantine_lab import FaultDB
 from atlasquant_aion_execution_outbox import ExecutionOutbox
 
 NOW=datetime(2026,10,25,23,tzinfo=timezone.utc)
@@ -165,6 +166,47 @@ class G63ConfirmCyclesAndStablePayload(unittest.TestCase):
         self.assertEqual(second["enqueue_state"],"IDEMPOTENT")
         self.assertEqual(self.table_counts(),(1,1,1,0))
         print("G63_STABLE_OBJECT_GREEN=LEGITIMATE_REPLAY")
+
+    def test_11_stable_custom_secret_rejected_even_if_digest_matches(self):
+        secret="sk-G63SYNTHETICSTABLE123456"
+        volatile=ChangesBetweenSerializations(secret,secret,self.db)
+        self.assert_drift_denial(volatile,"G63_STAGED_PAYLOAD_PRIVACY_DENY")
+        print("G63_STABLE_SECRET_GREEN=REDACTION_AFTER_ENCODING")
+
+    def test_12_drift_plus_failed_rollback_preserves_primary_and_quarantines(self):
+        volatile=ChangesBetweenSerializations("first-safe","second-safe",self.db)
+        original=self.db
+        fault=FaultDB(original,trigger="G63_NO_INTERCEPT",rollback_fails=True)
+        self.box.db=fault
+        with self.assertRaisesRegex(
+            RuntimeError,"G63_STAGED_PAYLOAD_DRIFT_DENY") as caught:
+            self.stage(extra={"unstable":volatile})
+        self.assertEqual(volatile.second_observation,(True,1))
+        self.assertEqual(fault.rollbacks,1)
+        self.assertIsInstance(caught.exception.__cause__,OSError)
+        self.assertIn("G31_SECONDARY_ROLLBACK_FAILURE",str(caught.exception.__cause__))
+        self.assertIsNone(self.box.db)
+        self.assertIsNone(self.store.db)
+        self.assertEqual(self.store.storage_health()["state"],"failed")
+        with self.assertRaises(StorageUnavailableError):
+            self.stage(intent="request-B",event="another-event")
+        disk=SQLiteChatStore(self.store.path)
+        try:
+            self.assertEqual(tuple(disk.db.execute(
+                "SELECT COUNT(*) FROM "+table).fetchone()[0]
+                for table in ("action_decisions","action_outbox",
+                              "semantic_reservations_lab","action_effects")),(0,0,0,0))
+        finally:
+            disk.close()
+        print("G63_DRIFT_QUARANTINE_GREEN=PRIMARY_NO_RETRY")
+
+    def test_13_confirm_list_self_cycle_denied(self):
+        key=self.prepare_uncertain()
+        values=[]
+        values.append(values)
+        self.assert_unchanged_confirmation_denial(
+            key,lambda:self.confirm(key,{"values":values}))
+        print("G63_CONFIRM_LIST_CYCLE_GREEN=NO_LEDGER_WRITE")
 
     def test_10_same_declared_event_with_different_request_still_denied(self):
         self.stage()
