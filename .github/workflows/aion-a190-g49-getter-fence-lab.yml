@@ -1,0 +1,63 @@
+name: A190 G49 adapter getter reentry pre-send fence LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g49_getter_reentry_fence_lab.py'
+      - '.github/workflows/aion-a190-g49-getter-fence-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g49:
+    name: G49 reentry phase fence / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install test-only dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Adversarial G49 read-before-call state epoch lease fences
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g49_*.py' -v 2>&1 | tee g49.log
+          grep -F 'Ran 7 tests' g49.log
+          grep -F 'G49_CONFIRM_REENTRY_GREEN=NO_SECOND_SEND' g49.log
+          grep -F 'G49_OWNER_DRIFT_GREEN=ZERO_SEND' g49.log
+          grep -F 'G49_EPOCH_DRIFT_GREEN=ZERO_SEND' g49.log
+          grep -F 'G49_LEASE_DRIFT_GREEN=ZERO_SEND' g49.log
+          grep -F 'G49_DEFAULT_BLOCK_GREEN=NO_STUB_ACCESS' g49.log
+      - name: Regressions G48 down to G43 and G40
+        shell: bash
+        run: |
+          set -o pipefail
+          check_group() {
+            group="$1"
+            count="$2"
+            python -B -m unittest discover -s labs/a190 -p "test_g${group}_*.py" -v 2>&1 | tee "g${group}.log"
+            grep -F "Ran ${count} tests" "g${group}.log"
+          }
+          check_group 48 11
+          check_group 47 18
+          check_group 46 10
+          check_group 45 7
+          check_group 44 39
+          check_group 43 32
+          check_group 40 36
+      - name: Explicit limitations
+        shell: bash
+        run: |
+          echo 'Local synthetic-only pre-send fence. No trustworthy external provider, owner, receipt or antirollback.'
+          echo 'No Worker, provider send, main, merge, deploy, customer data, new credentials or spend.'
+          echo '0/6 P0 HOMOLOGATED | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
