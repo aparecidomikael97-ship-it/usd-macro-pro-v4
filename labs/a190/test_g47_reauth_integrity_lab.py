@@ -68,7 +68,7 @@ class G47ReauthIntegrity(unittest.TestCase):
     def test_02_downgrade_requires_reauth_refused(self):
         key=self.enqueue()["idempotency_key"]
         self.rewrite_decision(key,lambda d:d.update(requires_reauth=False))
-        self.assertEqual(self.binding(key),"DECISION_REAUTH_MATERIAL_MISMATCH")
+        self.assertEqual(self.binding(key),"DECISION_REAUTH_MATERIAL_INVALID")
         print("G47_DOWNGRADE_GREEN=FALSE_CANNOT_ERASE_TRUE")
 
     def test_03_substitute_reauth_reference_refused(self):
@@ -96,7 +96,7 @@ class G47ReauthIntegrity(unittest.TestCase):
     def test_05_false_with_injected_reference_refused(self):
         key=self.enqueue(intent="plain",required=False,ref="")["idempotency_key"]
         self.rewrite_decision(key,lambda d:d.update(reauth_ref="foreign-claim"))
-        self.assertEqual(self.binding(key),"DECISION_REAUTH_MATERIAL_MISMATCH")
+        self.assertEqual(self.binding(key),"DECISION_REAUTH_MATERIAL_INVALID")
 
     def test_06_nonboolean_reauth_is_invalid(self):
         key=self.enqueue()["idempotency_key"]
@@ -119,7 +119,7 @@ class G47ReauthIntegrity(unittest.TestCase):
         key=self.enqueue()["idempotency_key"]
         self.rewrite_decision(key,lambda d:d.update(requires_reauth=False))
         with self.assertRaisesRegex(RuntimeError,
-                                    "G44_BINDING_INTEGRITY_DENIED:DECISION_REAUTH_MATERIAL_MISMATCH"):
+                                    "G44_BINDING_INTEGRITY_DENIED:DECISION_REAUTH_MATERIAL_INVALID"):
             self.strict.claim_next("g47-worker",now=NOW,lease_seconds=60)
         self.assertEqual(self.outbox.get(key)["state"],"PENDING")
         self.assertEqual(self.outbox.effect_count(),0)
@@ -139,13 +139,46 @@ class G47ReauthIntegrity(unittest.TestCase):
             self.dbpath,owner=SCOPE.owner_id,
             tenant=SCOPE.tenant_id,workspace=SCOPE.workspace_id,
         )
-        self.assertEqual(result["counts"],{"DECISION_REAUTH_MATERIAL_MISMATCH":1})
+        self.assertEqual(result["counts"],{"DECISION_REAUTH_MATERIAL_INVALID":1})
         self.assertNotIn("amount_minor",json.dumps(result))
 
     def test_12_nonboolean_producer_requires_reauth_rejected(self):
         with self.assertRaises((TypeError,ValueError)):
             self.enqueue(intent="bad-type",required="true",ref="ref")
         self.assertEqual(self.outbox.effect_count(),0)
+
+    def test_13_remove_both_reauth_fields_cannot_match_original_key(self):
+        key=self.enqueue()["idempotency_key"]
+        self.rewrite_decision(key, lambda d:d.update(
+            requires_reauth=False, reauth_ref=""))
+        self.assertEqual(self.binding(key),
+                         "DECISION_IDEMPOTENCY_MATERIAL_MISMATCH")
+        print("G47_DOUBLE_DOWNGRADE_GREEN=ORIGINAL_KEY_CANNOT_MATCH")
+
+    def test_14_plain_decision_upgraded_without_new_key_denied(self):
+        key=self.enqueue(intent="plain",required=False,ref="")["idempotency_key"]
+        self.rewrite_decision(key, lambda d:d.update(
+            requires_reauth=True, reauth_ref="forged-ref"))
+        self.assertEqual(self.binding(key),"DECISION_REAUTH_MATERIAL_MISMATCH")
+
+    def test_15_missing_required_flag_refused(self):
+        key=self.enqueue()["idempotency_key"]
+        self.rewrite_decision(key,lambda d:d.pop("requires_reauth"))
+        self.assertEqual(self.binding(key),"DECISION_REAUTH_MATERIAL_INVALID")
+
+    def test_16_changed_reauth_requirement_same_intent_collision(self):
+        self.enqueue(intent="same-intent",required=True,ref="r1")
+        with self.assertRaisesRegex(ValueError,"intent_ref idempotency collision"):
+            self.enqueue(intent="same-intent",required=False,ref="")
+
+    def test_17_producer_false_nonempty_reference_denied(self):
+        with self.assertRaisesRegex(ValueError,"reauth_ref without"):
+            self.enqueue(intent="bad-false",required=False,ref="unneeded")
+        self.assertEqual(self.outbox.effect_count(),0)
+
+    def test_18_producer_nonstring_reference_denied(self):
+        with self.assertRaises(TypeError):
+            self.enqueue(intent="bad-reference",required=True,ref=1000)
 
 
 if __name__ == "__main__":
