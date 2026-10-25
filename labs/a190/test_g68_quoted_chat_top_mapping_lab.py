@@ -180,6 +180,50 @@ class G68QuotedJSONAndMapping(unittest.TestCase):
             self.stage(top)
         self.assertEqual(self.counts(),(0,0,0,0))
 
+    def test_13_wide_top_level_mapping_denied_before_begin(self):
+        data=self.payload()
+        data.update({"field_%04d"%i: i for i in range(4300)})
+        top=TopLevelMapping(data)
+        watch=BeginWatch(self.real)
+        self.outbox.db=watch
+        with self.assertRaisesRegex(ValueError,"G65_NODE_BUDGET_DENY"):
+            self.stage(top)
+        self.assertEqual(top.item_calls,1)
+        self.assertEqual(top.getitem_calls,0)
+        self.assertEqual(watch.begins,0)
+        self.assertEqual(self.counts(),(0,0,0,0))
+        print("G68_TOP_BUDGET_GREEN=DENIED_BEFORE_BEGIN")
+
+    def test_14_wide_top_confirmation_denied_without_effect(self):
+        key=self.uncertain()
+        top=TopLevelMapping({"field_%04d"%i:i for i in range(4300)})
+        watch=BeginWatch(self.real)
+        self.outbox.db=watch
+        with self.assertRaisesRegex(ValueError,"G65_NODE_BUDGET_DENY"):
+            self.confirm(key,top)
+        self.assertEqual(top.item_calls,1)
+        self.assertEqual(top.getitem_calls,0)
+        self.assertEqual(watch.begins,0)
+        self.assertEqual(self.counts(),(1,1,1,0))
+        print("G68_TOP_CONFIRM_BUDGET_GREEN=NO_LEDGER_EFFECT")
+
+    def test_15_nonmapping_top_payload_explicit_denial(self):
+        watch=BeginWatch(self.real)
+        self.outbox.db=watch
+        with self.assertRaisesRegex(TypeError,"payload must be a Mapping"):
+            self.stage([("business_event_id",EVENT)])
+        self.assertEqual(watch.begins,0)
+        self.assertEqual(self.counts(),(0,0,0,0))
+
+    def test_16_nonmapping_confirm_result_explicit_denial(self):
+        key=self.uncertain()
+        watch=BeginWatch(self.real)
+        self.outbox.db=watch
+        with self.assertRaisesRegex(TypeError,"confirmation result must be a Mapping"):
+            self.confirm(key,[("status","fake")])
+        self.assertEqual(watch.begins,0)
+        self.assertEqual(self.counts(),(1,1,1,0))
+
     def test_12_normal_confirmation_and_replay_unchanged(self):
         key=self.uncertain()
         result=self.confirm(key,{"status":"synthetic"})
