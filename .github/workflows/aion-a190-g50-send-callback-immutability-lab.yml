@@ -1,0 +1,64 @@
+name: A190 G50 after-send confirmed-ledger preservation LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/a190/test_g50_send_callback_immutability_lab.py'
+      - '.github/workflows/aion-a190-g50-send-callback-immutability-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g50:
+    name: G50 local after-send immutable state / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Isolated LAB dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Check reentrant callback terminal preservation
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g50_*.py' -v 2>&1 | tee g50.log
+          grep -F 'Ran 4 tests' g50.log
+          grep -F 'G50_REENTRY_RETURN_GREEN=CONFIRMED_LEDGER_IMMUTABLE' g50.log
+          grep -F 'G50_REENTRY_EXCEPTION_GREEN=CONFIRMED_NOT_UNCERTAIN' g50.log
+      - name: Broad inherited synthetic dispatch regression G30 G40-G49
+        shell: bash
+        run: |
+          set -o pipefail
+          check_group() {
+            group="$1"
+            count="$2"
+            python -B -m unittest discover -s labs/a190 -p "test_g${group}_*.py" -v 2>&1 | tee "g${group}.log"
+            grep -F "Ran ${count} tests" "g${group}.log"
+          }
+          check_group 49 7
+          check_group 48 11
+          check_group 47 18
+          check_group 46 10
+          check_group 45 7
+          check_group 44 39
+          check_group 43 32
+          check_group 42 28
+          check_group 41 18
+          check_group 40 36
+          check_group 30 23
+      - name: No-go always
+        shell: bash
+        run: |
+          echo 'Synthetic local effects are not provider receipts.'
+          echo 'No real Worker/provider, customer data, external identity, credentials, main, merge or deploy.'
+          echo '0/6 P0 HOMOLOGATED | HARD NO-GO | UNCERTAIN | ZERO_AUTO_RESEND.'
