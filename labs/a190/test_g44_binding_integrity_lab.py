@@ -79,9 +79,9 @@ class G44BindingIntegrity(unittest.TestCase):
 
     def confirm_synthetic(self):
         # G53: a synthetic G44 receipt cannot be minted straight from
-        # PENDING. Do not alter a later CONFIRMED phase during idempotence
+        # PENDING or CLAIMED. Do not alter a later CONFIRMED phase during idempotence
         # checks. These are temporary local SQLite fixtures only.
-        if self.base.get(self.key)["state"] == "PENDING":
+        if self.base.get(self.key)["state"] in {"PENDING", "CLAIMED"}:
             self.store.db.execute(
                 "UPDATE action_outbox SET state='UNCERTAIN' "
                 "WHERE idempotency_key=?", (self.key,))
