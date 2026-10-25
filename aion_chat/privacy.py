@@ -18,9 +18,18 @@ def redact(value):
         # Preserve ordinary key labels; redact their sensitive values.
         sensitive = (r"(?i)(?:password|senha|secret|token|credential|"
                      r"authorization|access[_-]?token|accessToken|"
+                     r"refresh[_-]?token|refreshToken|"
+                     r"private[_-]?key|privateKey|"
                      r"client[_-]?secret|clientSecret|api[_-]?key|apiKey)")
-        value = {k: "[REDACTED]" if re.fullmatch(sensitive, k)
-                 else redact(v) for k, v in value.items()}
+        def masked_items():
+            for k, v in value.items():
+                # G67: the redactor is shared by Outbox and chat/store,
+                # which does not run the Outbox's G66 pre-BEGIN key guard.
+                if not isinstance(k, str):
+                    raise ValueError("G67_NONSTRING_REDACT_KEY_DENY")
+                yield k, ("[REDACTED]" if re.fullmatch(sensitive, k.strip())
+                          else redact(v))
+        value = dict(masked_items())
     elif isinstance(value, (list, tuple)):
         # G62: json.dumps serializes tuples as JSON arrays, but the previous
         # redactor left their nested secrets untouched. Normalize both to a
