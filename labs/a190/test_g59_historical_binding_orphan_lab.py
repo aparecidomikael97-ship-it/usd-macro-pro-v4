@@ -153,5 +153,35 @@ class G59HistoricalBindingOrphans(unittest.TestCase):
         self.assertEqual(out["enqueue_state"],"ENQUEUED")
 
 
+    def coordinated_history_edit(self, *, change_semantic=False):
+        from atlasquant_aion_execution_outbox import _digest
+        row=self.store.db.execute(
+            "SELECT decision_id,data FROM action_decisions").fetchone()
+        d=json.loads(row["data"])
+        d["payload"]["business_event_id"]="g59-forged-other-event"
+        d["payload_digest"]=_digest(d["payload"])
+        if change_semantic:
+            d["semantic_event_id_lab"]="g59-forged-other-event"
+        self.store.db.execute(
+            "UPDATE action_decisions SET payload_digest=?,data=? WHERE decision_id=?",
+            (d["payload_digest"],json.dumps(d,sort_keys=True,separators=(",",":")),
+             row["decision_id"]))
+        self.store.db.commit()
+
+    def test_11_coordinated_digest_rewrite_without_semantic_change_denied(self):
+        self.stage()
+        self.missing_lock()
+        self.coordinated_history_edit(change_semantic=False)
+        self.deny(event=E)
+        print("G59_COORDINATED_DIGEST_GREEN=SEMANTIC_FIELD_MUST_BIND")
+
+    def test_12_coordinated_digest_and_semantic_rewrite_denied_by_key(self):
+        self.stage()
+        self.missing_lock()
+        self.coordinated_history_edit(change_semantic=True)
+        self.deny(event=E)
+        print("G59_COORDINATED_SEMANTIC_GREEN=ORIGINAL_KEY_MUST_BIND")
+
+
 if __name__=="__main__":
     unittest.main()
