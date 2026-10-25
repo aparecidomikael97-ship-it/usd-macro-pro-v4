@@ -159,7 +159,7 @@ class G58HistoricalSemanticCustody(unittest.TestCase):
         self.stage()
         self.delete_lock()
         raw=self.store.db.execute("SELECT data FROM action_decisions").fetchone()[0]
-        poisoned='{"\u0070ayload":{"business_event_id":"different"},'+raw[1:]
+        poisoned='{"\\u0070ayload":{"business_event_id":"different"},'+raw[1:]
         self.store.db.execute(
             "UPDATE action_decisions SET data=?",(poisoned,))
         self.store.db.commit()
