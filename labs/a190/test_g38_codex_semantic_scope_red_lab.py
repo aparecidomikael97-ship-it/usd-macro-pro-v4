@@ -33,6 +33,12 @@ class G38SemanticRED(unittest.TestCase):
             policy_version="policy-v1",authorization_ref="auth-v1",
             created_at=NOW,valid_until=NOW+timedelta(minutes=5))
         options.update(kwargs)
+        # G57: fixtures with an explicitly declared business event must bind
+        # it to the tenant-wide semantic reservation. The old bypass RED is
+        # retained in Git history; do not reproduce unsafe admissions here.
+        raw=options.get("payload") or {}
+        if "business_event_id" in raw:
+            options["semantic_event_id_lab"]=raw["business_event_id"]
         return (outbox or self.outbox).enqueue(**options)
 
     def digest(self, scope, payload):
@@ -48,22 +54,22 @@ class G38SemanticRED(unittest.TestCase):
         self.assertEqual(b["enqueue_state"],"IDEMPOTENT")
         self.assertEqual(len(self.outbox.list()),1)
 
-    def test_02_different_requests_same_business_event_create_two_rows_red(self):
+    def test_02_different_requests_same_business_event_denied_g57(self):
         a=self.stage(intent_ref="request-A")
-        b=self.stage(intent_ref="request-B")
-        self.assertNotEqual(a["idempotency_key"],b["idempotency_key"])
-        self.assertEqual(len(self.outbox.list()),2)
-        print("G38_REQUEST_ALIAS_RED=SAME_BUSINESS_EVENT_TWO_LOCAL_ROWS")
+        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
+            self.stage(intent_ref="request-B")
+        self.assertEqual(len(self.outbox.list()),1)
+        print("G57_G38_REQUEST_ALIAS_GREEN=SECOND_LOCAL_ROW_DENIED")
 
-    def test_03_same_business_event_in_other_workspace_creates_new_row_red(self):
-        a=self.stage()
+    def test_03_same_business_event_in_other_workspace_denied_g57(self):
+        self.stage()
         alternate=Scope(SCOPE.owner_id,SCOPE.tenant_id,"g38-other-workspace")
         foreign=ExecutionOutbox(self.store,alternate)
-        b=self.stage(outbox=foreign)
-        self.assertNotEqual(a["idempotency_key"],b["idempotency_key"])
-        self.assertEqual(len(foreign.list()),1)
+        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
+            self.stage(outbox=foreign)
+        self.assertEqual(len(foreign.list()),0)
         self.assertEqual(len(self.outbox.list()),1)
-        print("G38_WORKSPACE_ALIAS_RED=TWO_SCOPED_RESERVATIONS_ONE_EVENT")
+        print("G57_G38_WORKSPACE_ALIAS_GREEN=CROSS_WORKSPACE_DENIED")
 
     def test_04_g13_semantic_digest_same_across_workspace_red(self):
         alternate=Scope(SCOPE.owner_id,SCOPE.tenant_id,"g38-other-workspace")
@@ -109,19 +115,24 @@ class G38SemanticRED(unittest.TestCase):
         self.assertEqual(replay["decision"]["authorization_ref"],"auth-v1")
         print("G38_REPLAY_AUTH_RED=OLD_AUTH_DECISION_REPRESENTED_AS_IDEMPOTENT")
 
-    def test_11_scope_isolation_does_not_alone_offer_global_dedup(self):
+    def test_11_scope_isolation_requires_semantic_reservation(self):
         self.stage()
         alternate=Scope(SCOPE.owner_id,SCOPE.tenant_id,"g38-workspace-2")
         other=ExecutionOutbox(self.store,alternate)
-        self.stage(outbox=other)
+        with self.assertRaisesRegex(ValueError,"semantic business event collision"):
+            self.stage(outbox=other)
         self.assertEqual(self.outbox.effect_count(),0)
         self.assertEqual(other.effect_count(),0)
-        self.assertEqual(len(self.outbox.list())+len(other.list()),2)
+        self.assertEqual(len(self.outbox.list())+len(other.list()),1)
 
     def test_12_staging_never_transmits(self):
         for name in ("request-A","request-B","request-C"):
-            self.stage(intent_ref=name)
+            self.stage(intent_ref=name,payload={
+                "business_event_id":"synthetic-event-"+name,
+                "amount_minor":1000,
+            })
         self.assertEqual(self.outbox.effect_count(),0)
+        self.assertEqual(len(self.outbox.list()),3)
         self.assertTrue(all(not row["executes_action"] for row in self.outbox.list()))
 
 
