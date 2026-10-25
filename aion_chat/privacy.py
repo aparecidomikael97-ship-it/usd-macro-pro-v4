@@ -8,8 +8,23 @@ PATTERNS = [re.compile(r"(?i)\b(password|senha|api[_ -]?key|access[_ -]?token|re
             re.compile(r"-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----")]
 
 
+# G68: quoted JSON member names in chat text have a closing '"' between
+# the field name and ':'. Preserve JSON punctuation and replace only the
+# string value (including escaped quote sequences), not the whole member.
+_QUOTED_JSON_SECRET = re.compile(
+    r'(?i)(?P<prefix>"(?:password|senha|secret|token|credential|'
+    r'authorization|access[_-]?token|accessToken|refresh[_-]?token|'
+    r'refreshToken|private[_-]?key|privateKey|client[_-]?secret|'
+    r'clientSecret|api[_-]?key|apiKey)"\s*:\s*")'
+    r'(?:\\.|[^"\\])*"'
+)
+
+
 def redact(value):
     if isinstance(value, str):
+        value = _QUOTED_JSON_SECRET.sub(
+            lambda match: match.group("prefix") + '[REDACTED]"', value
+        )
         for p in PATTERNS:
             value = p.sub("[REDACTED]", value)
     elif isinstance(value, Mapping):
