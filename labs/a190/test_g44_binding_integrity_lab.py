@@ -43,7 +43,8 @@ class G44BindingIntegrity(unittest.TestCase):
             payload={"amount_minor":1000,"business_event_id":"synthetic-commercial-event"},
             aggregate_key="synthetic-group",policy_version="p1",
             authorization_ref="auth1",created_at=NOW,
-            valid_until=NOW+timedelta(minutes=5))
+            valid_until=NOW+timedelta(minutes=5),
+            semantic_event_id_lab="synthetic-commercial-event")
         self.key=row["idempotency_key"]
         self.trap=NoExternalAdapter()
 
