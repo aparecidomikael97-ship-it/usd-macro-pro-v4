@@ -171,6 +171,25 @@ class G67SnapshotPrivacy(unittest.TestCase):
             self.stage({"loop":loop})
         self.assertEqual(self.counts(),(0,0,0,0))
 
+    def test_13_sensitive_alias_assignments_redacted_in_chat_text(self):
+        msg="refresh_token=G67FAKEREFRESH99; private_key: G67FAKEPRIVATE55"
+        output=redact(msg)
+        self.assertNotIn("G67FAKEREFRESH99",output)
+        self.assertNotIn("G67FAKEPRIVATE55",output)
+        self.assertIn("[REDACTED]",output)
+        print("G67_TEXT_ALIASES_GREEN=NO_FAKE_ASSIGNMENTS")
+
+    def test_14_chat_message_with_alias_text_is_redacted(self):
+        c=self.store.create_conversation(SCOPE,title="synthetic")
+        raw="refresh_token=G67FAKECONTENT99"
+        self.store.append_message(
+            SCOPE,Message(conversation_id=c.id,role="user",content=raw))
+        saved=self.db.execute("SELECT content FROM messages").fetchone()[0]
+        self.assertNotIn("G67FAKECONTENT99",saved)
+        self.assertIn("[REDACTED]",saved)
+        self.assertFalse(self.db.in_transaction)
+        print("G67_CHAT_TEXT_GREEN=NO_FAKE_REFRESH_VALUE")
+
     def test_12_nonstring_mapping_key_original_outbox_code(self):
         with self.assertRaisesRegex(ValueError,"G66_NONSTRING_JSON_KEY_DENY"):
             self.stage({"nested":{1:"x"}})
