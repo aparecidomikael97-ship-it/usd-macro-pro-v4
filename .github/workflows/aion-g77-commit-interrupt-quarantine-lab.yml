@@ -1,0 +1,44 @@
+name: AION G77 outbox pre-witness COMMIT interruption LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'aion_chat/store.py'
+      - 'labs/a190/test_g77_commit_interrupt_quarantine_lab.py'
+      - 'test_atlasquant_aion_first_attempt_witness_a180_lab.py'
+      - 'test_atlasquant_aion_execution_outbox.py'
+      - '.github/workflows/aion-g77-commit-interrupt-quarantine-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g77-pre-witness-quarantine:
+    name: G77 COMMIT interruption / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned cryptography test dependency
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2'
+      - name: Offline G77 and A180 Outbox regression tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v \
+            labs.a190.test_g77_commit_interrupt_quarantine_lab.G77CommitInterruptQuarantine \
+            test_atlasquant_aion_first_attempt_witness_a180_lab \
+            test_atlasquant_aion_execution_outbox \
+            test_atlasquant_aion_outbox_uncertain_retry_a176_lab \
+            test_atlasquant_aion_outbox_receipt_admission_a177_lab 2>&1 | tee g77.log
+          grep -F 'Ran 52 tests' g77.log
+          grep -Fx 'OK' g77.log
