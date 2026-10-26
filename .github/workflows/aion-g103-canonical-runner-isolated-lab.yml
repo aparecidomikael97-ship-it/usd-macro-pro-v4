@@ -1,0 +1,54 @@
+name: AION G103 isolated canonical runner import LAB
+on:
+  pull_request:
+    paths:
+      - 'scripts/run_a183_canonical_lab.py'
+      - '.github/workflows/aion-g103-canonical-runner-isolated-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  copied-runner:
+    name: G103 copied canonical Security unittest / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned LAB and canonical Security dependencies
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Copy A183 canonical runner outside repo as A184 does
+        shell: bash
+        run: |
+          cp scripts/run_a183_canonical_lab.py "$RUNNER_TEMP/run_a183_canonical_lab.py"
+          python -B -m compileall -q scripts/run_a183_canonical_lab.py
+      - name: Execute exact copied canonical 368-case Security selector
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B "$RUNNER_TEMP/run_a183_canonical_lab.py" security-unittest 2>&1 | tee g103.log
+          grep -F 'aion-core-security-gate.yml' g103.log
+          grep -F 'Ran 368 tests' g103.log
+          grep -F 'OK' g103.log
+      - name: Detached copy without checked-out guard must fail closed
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/g103-empty-worktree"
+          cd "$RUNNER_TEMP/g103-empty-worktree"
+          if python -B "$RUNNER_TEMP/run_a183_canonical_lab.py" security-unittest > g103-denied.log 2>&1; then
+            echo G103_UNEXPECTED_UNGUARDED_SUCCESS
+            exit 1
+          fi
+          grep -F 'A183_LAB_SOCKET_GUARD_MISSING_DENIED' g103-denied.log
