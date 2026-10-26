@@ -4,7 +4,7 @@ The 12 new contracts are appended to the 11 G115 inherited contracts.
 Every signer and test ledger is same-host synthetic; provider never contacted.
 GREEN here is NOT a first-SEND, immutable-source or external P0 certification.
 """
-from copy import deepcopy
+from contextlib import closing
 from dataclasses import FrozenInstanceError
 from hashlib import sha256
 import os
@@ -124,7 +124,7 @@ class G118WitnessRecoveryTests(G115CrossProcessOutboxLab):
 
     def test_18_signed_other_request_id_is_identity_conflict(self):
         self.reserve_once()
-        with sqlite3.connect(str(self.witness_db)) as conn:
+        with closing(sqlite3.connect(str(self.witness_db))) as conn, conn:
             conn.execute(
                 "UPDATE event_enrollments SET idempotency_key=? WHERE event_id=?",
                 ("f" * 64, self.business_event_id),
@@ -137,7 +137,7 @@ class G118WitnessRecoveryTests(G115CrossProcessOutboxLab):
         print("G118_SIGNED_OTHER_TECHNICAL_ID=IDENTITY_CONFLICT")
 
     def test_19_signed_other_original_is_identity_conflict(self):
-        with sqlite3.connect(str(self.witness_db)) as conn:
+        with closing(sqlite3.connect(str(self.witness_db))) as conn, conn:
             conn.execute(
                 "UPDATE event_enrollments SET original_sha256=? WHERE event_id=?",
                 ("f" * 64, self.business_event_id),
