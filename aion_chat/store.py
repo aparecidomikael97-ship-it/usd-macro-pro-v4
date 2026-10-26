@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
+from threading import current_thread
 from typing import Protocol
 from uuid import uuid4
 
@@ -382,6 +383,9 @@ class SQLiteChatStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._health_state = HEALTHY
         self._health_reason = "OK"
+        # Local Python construction-thread identity only, not native VFS
+        # ownership attestation. It can conservatively deny foreign closes.
+        self._connection_creator_thread = current_thread()
         self.db = None
         try:
             self.db = self._connection_factory(str(self.path), timeout=BUSY_TIMEOUT_MS / 1000)
