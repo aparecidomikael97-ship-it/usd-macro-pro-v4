@@ -66,7 +66,13 @@ class AionChatStore(Protocol):
 
 
 def dump(value):
-    return json.dumps(redact(asdict(value)), ensure_ascii=False, separators=(",", ":"))
+    # G73: dataclasses.asdict recursively copies untrusted nested containers
+    # BEFORE the bounded G70 redactor can inspect them. Project only the
+    # declared top-level dataclass fields; let redact guard nested cycles,
+    # depth, expanded visits and sensitive values before JSON serialization.
+    # The input must remain a dataclass instance (asdict's prior contract).
+    data = {item.name: getattr(value, item.name) for item in fields(value)}
+    return json.dumps(redact(data), ensure_ascii=False, separators=(",", ":"))
 
 
 class _ValidatedDatabaseReport(dict):
