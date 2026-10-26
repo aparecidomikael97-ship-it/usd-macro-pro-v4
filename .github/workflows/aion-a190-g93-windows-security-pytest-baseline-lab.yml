@@ -1,0 +1,36 @@
+name: A190 G93 Windows Security pytest historical baseline LAB
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aion-a190-g93-windows-security-pytest-baseline-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  historical-g89-security-pytest:
+    name: G93 G89 baseline Windows Security pytest exact canonical
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: b1808eb5bef98665c53ebf605cf3dcb322acdcb4
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install original G89 dependencies and exact test tooling
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0' 'pip-audit==2.10.1' 'bandit==1.9.4'
+          python -m pip check
+          grep -F 'streamlit==1.64.0' requirements.txt
+          grep -F 'pypdf==6.19.0' requirements.txt
+      - name: Run exact historical canonical Security pytest with identical A183 guard
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py security-pytest 2>&1 | tee g93-original-security-pytest.log
+          grep -F 'CANONICAL_SOURCE' g93-original-security-pytest.log
