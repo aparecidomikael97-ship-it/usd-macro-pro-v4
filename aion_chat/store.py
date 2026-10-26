@@ -536,6 +536,13 @@ class SQLiteChatStore:
         except Exception as primary_error:
             self._rollback_or_quarantine(primary_error)
             raise
+        except BaseException as interrupt:
+            try:
+                self.quarantine_failed_transaction()
+            except BaseException:
+                # Quarantine detaches before close; preserve the body interrupt.
+                pass
+            raise
         else:
             self._commit_or_quarantine()
 
@@ -837,6 +844,13 @@ class SQLiteChatStore:
             self._rollback_or_quarantine(exc)
             if isinstance(exc, sqlite3.DatabaseError) and not isinstance(exc, sqlite3.IntegrityError):
                 self._record_database_error(exc)
+            raise
+        except BaseException as interrupt:
+            try:
+                self.quarantine_failed_transaction()
+            except BaseException:
+                # Quarantine detaches before close; preserve the body interrupt.
+                pass
             raise
         else:
             self._commit_or_quarantine()
