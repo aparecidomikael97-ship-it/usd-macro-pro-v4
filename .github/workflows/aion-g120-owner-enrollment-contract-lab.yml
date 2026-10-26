@@ -1,0 +1,52 @@
+name: AION G120 independently signed original enrollment LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g120_synthetic_owner_enrollment_lab.py'
+      - 'labs/a190/g115_public_witness_outbox_guard_lab.py'
+      - 'labs/a190/test_g115_cross_process_outbox_guard_lab.py'
+      - 'labs/a190/test_g120_owner_enrollment_proof_lab.py'
+      - '.github/workflows/aion-g120-owner-enrollment-contract-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-original:
+    name: G120 synthetic owner enrollment / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install unchanged pinned application requirements
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Test business event original owner attestation and inherited G115
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g120_owner_enrollment_proof_lab 2>&1 | tee g120.log
+          grep -Fx 'OK' g120.log
+          grep -F 'G120_UNAPPROVED_SECOND_EVENT=NO_FAKE_SEND' g120.log
+          grep -F 'G115_HOST_CONTROLLED_WITNESS_ROLLBACK=STILL_VULNERABLE_NOT_P0' g120.log
+      - name: Keep original G118 recovery and G116 forged client regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g118_signed_witness_recovery_lab 2>&1 | tee g118.log
+          grep -F 'Ran 34 tests' g118.log
+          grep -Fx 'OK' g118.log
+          python -B -m unittest -v labs.a190.test_g116_unsigned_witness_client_injection_lab 2>&1 | tee g116.log
+          grep -F 'Ran 24 tests' g116.log
+          grep -Fx 'OK' g116.log
