@@ -1,0 +1,45 @@
+name: AION G99 scanner strict expiry at 60 minutes LAB
+on:
+  pull_request:
+    paths:
+      - 'master_panel_v102.py'
+      - 'test_scanner_freshness_v1074.py'
+      - 'labs/a190/test_g99_scanner_exact_expiry_boundary_lab.py'
+      - '.github/workflows/aion-g99-scanner-expiry-boundary-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g99-expiry:
+    name: G99 exact scanner expiry / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install previously approved G90 dependency pins
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: G99 real scanner and deterministic boundary tests, no waivers
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g99_scanner_exact_expiry_boundary_lab test_scanner_freshness_v1074 2>&1 | tee g99.log
+          grep -F 'Ran 12 tests' g99.log
+          grep -Fx 'OK' g99.log
+          grep -F 'G99_JUST_BEFORE_60=FRESH' g99.log
+          grep -F 'G99_AT_60=EXPIRED' g99.log
+          grep -F 'G99_AFTER_60=EXPIRED' g99.log
+          grep -F 'G99_UNVERIFIED=EXPIRED' g99.log
+          grep -F 'G99_UNAVAILABLE=EXPIRED' g99.log

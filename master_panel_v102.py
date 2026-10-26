@@ -353,7 +353,7 @@ def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dic
     Agora:
     - usa m15_fetched_at quando existir;
     - faz fallback para processado_em em registros antigos;
-    - usa o mesmo limite de 60 min do Autopilot.
+    - expira conservadoramente em 60 min exatos (idade < 60 min).
     """
     results = dict((scanner_state or {}).get("resultados", {}) or {})
     raw = results.get(pair, {}) if isinstance(results, dict) else {}
@@ -362,13 +362,12 @@ def _scanner_for_pair(scanner_state: Mapping[str, Any] | None, pair: str) -> dic
     fresh_ts = raw.get("m15_fetched_at", raw.get("processado_em"))
     age = _minutes_since(fresh_ts)
 
-    # Compatibilidade com registros antigos: o Painel Mestre original tratava
-    # timestamp ausente como "não comprovadamente velho". Mantemos isso apenas
-    # para legado; quando m15_fetched_at existe, a regra real é <=60 min.
+    # Valid evidence is strictly younger than 60 minutes: the exact expiry
+    # boundary is already stale. Legacy timestamps never bypass this rule.
     available = bool(tec.get("disponivel", False))
-    # Freshness must be positively proven by a valid timestamp. Missing or
-    # future-dated timestamps fail closed instead of being treated as fresh.
-    fresh = available and age is not None and age <= 60.0
+    # Freshness must be positively proven by a valid timestamp. Missing,
+    # future-dated, exactly-60-minute and older readings fail closed.
+    fresh = available and age is not None and age < 60.0
 
     return {
         "available": available,
