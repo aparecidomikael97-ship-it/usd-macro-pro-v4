@@ -1,0 +1,63 @@
+name: A190 G73 chat dump shallow dataclass fields bounded guard LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'labs/a190/test_g73_chat_dump_precopy_lab.py'
+      - 'labs/a190/test_g71_chat_precopy_guard_lab.py'
+      - '.github/workflows/aion-a190-g73-chat-dump-precopy-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g73-synthetic:
+    name: G73 dump precopy / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install local LAB cryptography fixture dependency
+        shell: bash
+        run: python -m pip install 'cryptography==46.0.3'
+      - name: Full G30 to G71 synthetic regression with stable denial markers
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s labs/a190 -p 'test_g[3-7]*.py' -v 2>&1 | tee g73.log
+          grep -F 'Ran 716 tests' g73.log
+          grep -F 'G73_DUMP_CYCLE_GREEN=STABLE_DENIAL' g73.log
+          grep -F 'G73_DUMP_LIST_CYCLE_GREEN=STABLE_DENIAL' g73.log
+          grep -F 'G73_DUMP_DEPTH_GREEN=BEFORE_ASDICT' g73.log
+          grep -F 'G73_DUMP_WIDE_GREEN=NO_EXPANSION' g73.log
+          grep -F 'G73_DUMP_DAG_GREEN=BOUNDED_EXPANSION' g73.log
+          grep -F 'G73_CHECKPOINT_ROLLBACK_GREEN=ZERO_RECORDS' g73.log
+          grep -F 'G73_CHECKPOINT_DAG_GREEN=NO_PARTIAL_INSERT' g73.log
+          grep -F 'G73_NO_ASDICT_GREEN=SHALLOW_DATACLASS_FIELDS' g73.log
+          grep -F 'G73_NESTED_DATACLASS_GREEN=EXPLICIT_DENIAL' g73.log
+          grep -F 'G73_POINTER_GREEN=PRIOR_CHECKPOINT_IMMUTABLE' g73.log
+          grep -F 'G73_DAG_PRECOPY_GREEN=ASDICT_NOT_EXECUTED' g73.log
+          grep -F 'G73_SUMMARY_MESSAGE_GREEN=COMPATIBLE' g73.log
+          grep -F 'G71_DICT_CYCLE_GREEN=DENY_AND_ROLLBACK' g73.log
+          grep -F 'G71_TUPLE_CYCLE_GREEN=DENY_AND_ROLLBACK' g73.log
+          grep -F 'G71_MASKED_CYCLE_GREEN=DENY_AND_ROLLBACK' g73.log
+          grep -F 'G71_PRECOPY_GREEN=GUARD_BEFORE_ASDICT' g73.log
+          grep -F 'G71_DAG_GREEN=BOUNDED_EXPANSION' g73.log
+          grep -F 'G71_NORMAL_GREEN=REDACTED_PERSISTED' g73.log
+          grep -F 'G70_CHAT_DEPTH_GREEN=ROLLED_BACK' g73.log
+          grep -F 'G69_CHAT_ROLLBACK_GREEN=NO_PARTIAL_MESSAGE' g73.log
+
+      - name: G72 repository fixture hygiene must remain green
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -q test_atlasquant_repository_secret_hygiene 2>&1 | tee g73-hygiene.log
+          grep -F 'Ran 2 tests' g73-hygiene.log
