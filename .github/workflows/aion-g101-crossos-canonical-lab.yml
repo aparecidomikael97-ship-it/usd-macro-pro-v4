@@ -1,0 +1,68 @@
+name: AION G101 cross OS canonical regression LAB
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aion-g101-crossos-canonical-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quality-ubuntu:
+    name: G101 canonical Quality Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install G90 audited dependency pins
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0'
+          python -m pip check
+      - name: Original canonical Quality suite without selector changes
+        run: python -B scripts/run_a183_canonical_lab.py quality
+  security-ubuntu:
+    name: G101 canonical Security Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install G90 audited dependency pins
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0'
+          python -m pip check
+      - name: Original canonical Security unittest selector
+        run: python -B scripts/run_a183_canonical_lab.py security-unittest
+      - name: Original canonical Security pytest selector
+        run: python -B scripts/run_a183_canonical_lab.py security-pytest
+  audit-ubuntu:
+    name: G101 canonical dependency and high severity audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned application and audit tools
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pip-audit==2.10.1' 'bandit==1.9.4'
+          python -m pip check
+      - name: Exact canonical dependency audit and Bandit critical selector
+        run: python -B scripts/run_a183_canonical_lab.py security-audit
