@@ -15,6 +15,7 @@ from threading import Lock
 from aion_chat.first_attempt_witness_lab import _effect_digest
 from aion_chat.intent_binding_a182_lab import semantic_bytes
 from labs.a190.g113_subprocess_witness_client_lab import WitnessProcessUnavailableLab
+from labs.a190.g114_public_key_witness_client_lab import G114PublicKeyWitnessClientLab
 
 
 class PublicOnlyWitnessOutboxGuardLab:
@@ -23,10 +24,17 @@ class PublicOnlyWitnessOutboxGuardLab:
     def __init__(self, *, witness_client, enrolled_event_id,
                  enrolled_original_sha256, original_decision,
                  minimum_sequence=0):
-        if not callable(getattr(witness_client, "reserve", None)):
-            raise TypeError("G115_PUBLIC_WITNESS_CLIENT_REQUIRED")
-        if not callable(getattr(witness_client, "status", None)):
-            raise TypeError("G115_PUBLIC_WITNESS_STATUS_REQUIRED")
+        # G115 previously trusted any object returning unsigned dictionaries,
+        # allowing a fake duck-typed status/reserve object to release Outbox.
+        # Require the exact opt-in G114 client implementation, which checks
+        # Ed25519 signatures and challenge nonces before yielding payloads.
+        # This is API hardening, NOT protection against privileged monkeypatch,
+        # forged constructor pins, or same-host ledger rollback.
+        if type(witness_client) is not G114PublicKeyWitnessClientLab:
+            raise TypeError("G116_AUTHENTICATED_CLIENT_REQUIRED")
+        if (not callable(getattr(witness_client, "reserve", None))
+                or not callable(getattr(witness_client, "status", None))):
+            raise TypeError("G116_SIGNED_CLIENT_METHODS_REQUIRED")
         if type(enrolled_event_id) is not str or len(enrolled_event_id) != 64:
             raise ValueError("G115_IMMUTABLE_EVENT_ID_REQUIRED")
         if type(minimum_sequence) is not int or minimum_sequence < 0:
