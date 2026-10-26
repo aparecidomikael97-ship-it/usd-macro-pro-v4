@@ -1,0 +1,34 @@
+name: A190 G86 bounded CI and canonical Quality rebaseline LAB
+on:
+  pull_request:
+    paths:
+      - 'scripts/run_a190_numeric_g_suites_lab.py'
+      - '.github/workflows/aion-a190-g71-chat-precopy-lab.yml'
+      - '.github/workflows/aion-a190-g73-chat-dump-precopy-lab.yml'
+      - '.github/workflows/aion-a190-g72-token-fixture-hygiene-lab.yml'
+      - '.github/workflows/aion-a190-g86-bounded-ci-quality-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quality:
+    name: G86 exact canonical Quality / Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install same pinned canonical dependencies as Q2
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0 pip-audit==2.10.1 bandit==1.9.4
+          python -m pip check
+      - name: Compile canonical sources
+        run: python -m compileall -q .
+      - name: Exact canonical Quality selectors with existing A183 network guard
+        run: python -B scripts/run_a183_canonical_lab.py quality
