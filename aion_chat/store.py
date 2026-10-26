@@ -439,7 +439,14 @@ class SQLiteChatStore:
 
     def close(self):
         if self.db is not None:
-            self.db.close()
+            try:
+                self.db.close()
+            except BaseException:
+                # Native close may not have released locks; never retry or reuse.
+                self.db = None
+                self._health_state = FAILED
+                self._health_reason = "CLOSE_OUTCOME_UNCERTAIN_NO_REUSE"
+                raise
             self.db = None
 
     def quarantine_failed_transaction(self):
