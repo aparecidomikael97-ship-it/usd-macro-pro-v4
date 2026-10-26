@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -61,7 +62,7 @@ class PersistentNonceRegistry:
         return conn
 
     def _initialize(self):
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 """
@@ -124,7 +125,7 @@ class PersistentNonceRegistry:
             return False
         now_us = _epoch_us(now)
         exp_us = _epoch_us(exp)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 conn.execute(
@@ -149,7 +150,7 @@ class PersistentNonceRegistry:
                 raise
 
     def contains(self, *, scope: str, nonce: str) -> bool:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT 1 FROM nonce_claims WHERE scope = ? AND nonce = ?",
                 (scope, nonce),
@@ -162,7 +163,7 @@ class PersistentNonceRegistry:
             raise ValueError("invalid nonce scope")
         if not isinstance(nonce, str) or not nonce or len(nonce) > 256:
             raise ValueError("invalid nonce")
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 """
                 SELECT expires_at, created_at
@@ -181,12 +182,12 @@ class PersistentNonceRegistry:
         }
 
     def count(self) -> int:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute("SELECT COUNT(*) FROM nonce_claims").fetchone()
         return int(row[0])
 
     def schema_version(self) -> int:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT schema_version FROM nonce_registry_meta WHERE singleton = 1"
             ).fetchone()
