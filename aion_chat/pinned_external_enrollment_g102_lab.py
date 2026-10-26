@@ -23,6 +23,15 @@ from .signed_receipt_lab import canonical_bytes
 
 ATTEST_SCHEMA = "AION:G102:LIVE_ENROLLMENT:V1"
 ATTEST_DOMAIN = b"AION:G102:EXTERNAL_ATTESTATION:V1\x00"
+# A distinct signature domain binds the *committed* attempt; preflight alone
+# cannot be treated as a first-attempt reservation confirmation.
+POST_SCHEMA = "AION:G104:POST_RESERVATION:V1"
+POST_DOMAIN = b"AION:G104:POST_RESERVATION_ATTESTATION:V1\x00"
+POST_FIELDS = frozenset({
+    "schema", "status", "issuer", "challenge", "original_sha256",
+    "trust_sha256", "high_water", "count", "sequence", "effect_digest",
+    "decision_sha256", "idempotency_key",
+})
 _FIELDS = frozenset({
     "schema", "status", "issuer", "challenge", "original_sha256",
     "trust_sha256", "high_water", "count",
@@ -42,7 +51,7 @@ class PinnedExternalEnrollmentAdmissionLab:
         self, *, original_decision, enrolled_original_sha256,
         issuer, key_id, public_key, expected_trust_sha256,
         anchor_issuer, anchor_public_key, probe_attestation,
-        minimum_sequence, checkpoint, reserve, now,
+        post_attestation, minimum_sequence, checkpoint, reserve, now,
     ):
         original = semantic_bytes(original_decision)
         if (type(enrolled_original_sha256) is not str
@@ -61,6 +70,8 @@ class PinnedExternalEnrollmentAdmissionLab:
             raise ValueError("G102_EXTERNAL_ATTESTOR_PIN_REQUIRED")
         if not callable(probe_attestation):
             raise TypeError("G102_ATTESTOR_PROBE_REQUIRED")
+        if not callable(post_attestation):
+            raise TypeError("G104_POST_COMMIT_ATTESTOR_REQUIRED")
         if not callable(checkpoint):
             raise TypeError("G102_CUSTODY_SNAPSHOT_REQUIRED")
         if type(minimum_sequence) is not int or minimum_sequence < 0:
@@ -74,14 +85,25 @@ class PinnedExternalEnrollmentAdmissionLab:
         self._issuer = anchor_issuer
         self._anchor = Ed25519PublicKey.from_public_bytes(anchor_public_key)
         self._probe = probe_attestation
+        self._post_probe = post_attestation
         self._checkpoint = checkpoint
         self._minimum = minimum_sequence
+        self._last_reservation = None
+
+        def capture_reservation(challenge, request):
+            # Save the actual A180 signed envelope returned by the reservation.
+            # It is not a second authority: the existing A182 verifier MUST
+            # cryptographically validate this receipt before it can be used.
+            envelope = reserve(challenge, request)
+            self._last_reservation = envelope
+            return envelope
+
         self._bound = BoundFirstAttemptWitnessLab(
             original_decision=original_decision,
             issuer=issuer, key_id=key_id, public_key=public_key,
             expected_trust_sha256=expected_trust_sha256,
             minimum_sequence=minimum_sequence,
-            checkpoint=checkpoint, reserve=reserve, now=now,
+            checkpoint=checkpoint, reserve=capture_reservation, now=now,
         )
 
     def _verify_fresh_enrollment(self, envelope, challenge, local):
@@ -112,6 +134,59 @@ class PinnedExternalEnrollmentAdmissionLab:
         self._anchor.verify(sig, ATTEST_DOMAIN + canonical_bytes(payload))
         return True
 
+    def _verify_post_reservation(self, envelope, challenge, after, before, receipt):
+        """Require external signature for this exact *committed* attempt.
+
+        The signature proves only what the configured attestor said. Real
+        monotonic storage, live independence, protected pinning and atomic
+        reservation ownership remain outside this opt-in LAB seam.
+        """
+        if type(receipt) is not dict or type(receipt.get("payload")) is not dict:
+            return False
+        recorded = receipt["payload"]
+        if (type(after) is not dict
+                or set(after) != {"high_water", "count"}
+                or type(after["high_water"]) is not int
+                or type(after["count"]) is not int
+                or after["high_water"] != before["high_water"] + 1
+                or after["count"] != before["count"] + 1
+                or after["count"] != after["high_water"]
+                or type(recorded.get("sequence")) is not int
+                or recorded["sequence"] != after["high_water"]):
+            return False
+        if type(envelope) is not dict or set(envelope) != {"payload", "signature"}:
+            return False
+        payload = envelope["payload"]
+        if type(payload) is not dict or set(payload) != POST_FIELDS:
+            return False
+        if (payload["schema"] != POST_SCHEMA
+                or payload["status"] != "RESERVED"
+                or payload["issuer"] != self._issuer
+                or payload["challenge"] != challenge
+                or payload["original_sha256"] != self._original_sha256
+                or payload["trust_sha256"] != self._expected_trust_sha256
+                or type(payload["high_water"]) is not int
+                or type(payload["count"]) is not int
+                or type(payload["sequence"]) is not int
+                or payload["high_water"] != after["high_water"]
+                or payload["count"] != after["count"]
+                or payload["sequence"] != recorded["sequence"]):
+            return False
+        # The post-commit attestor must commit to the same effect and business
+        # decision actually authenticated by the A180 signed receipt.
+        for field in ("effect_digest", "decision_sha256", "idempotency_key"):
+            if type(recorded.get(field)) is not str or payload[field] != recorded[field]:
+                return False
+        if type(envelope["signature"]) is not str:
+            return False
+        signature = base64.b64decode(envelope["signature"], validate=True)
+        if len(signature) != 64:
+            return False
+        self._anchor.verify(
+            signature, POST_DOMAIN + canonical_bytes(payload),
+        )
+        return True
+
     def __call__(self, intent):
         # The lock guards only this process. The external authority must keep
         # reservations monotonic and current across processes/restarts.
@@ -132,9 +207,32 @@ class PinnedExternalEnrollmentAdmissionLab:
                 attestation = self._probe(challenge)
                 if not self._verify_fresh_enrollment(attestation, challenge, local):
                     return False
-                # The existing A182 signed first-attempt reservation remains
-                # mandatory; the attestation alone never authorizes SEND.
-                return self._bound(intent) is True
+                # Preflight may succeed before a rollback or forged local
+                # reserve. The existing A182 signed reservation is necessary,
+                # but never sufficient until a *separate* challenge confirms
+                # its exact effect/decision/id/ordinal after the commit.
+                self._last_reservation = None
+                if self._bound(intent) is not True:
+                    return False
+                recorded = self._last_reservation
+                if type(recorded) is not dict or type(recorded.get("payload")) is not dict:
+                    return False
+                signed_reservation = recorded["payload"]
+                post_request = {
+                    field: signed_reservation.get(field)
+                    for field in ("sequence", "effect_digest",
+                                  "decision_sha256", "idempotency_key")
+                }
+                after = self._checkpoint()
+                post_challenge = secrets.token_hex(32)
+                if post_challenge == challenge:
+                    return False
+                proof_after = self._post_probe(post_challenge, post_request)
+                # False after a local reservation is UNKNOWN/SPENT, not
+                # rollback. The Outbox must not authorize a provider send.
+                return self._verify_post_reservation(
+                    proof_after, post_challenge, after, local, recorded,
+                )
             except (KeyError, TypeError, ValueError, RuntimeError, OSError,
                     InvalidSignature, binascii.Error):
                 return False
