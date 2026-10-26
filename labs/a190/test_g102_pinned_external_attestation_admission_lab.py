@@ -14,6 +14,7 @@ import unittest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from aion_chat.intent_binding_a182_lab import semantic_bytes, trust_fingerprint
+from labs.a190.g107_local_reservation_lookup import lookup_stored_reservation
 from aion_chat.pinned_external_enrollment_g102_lab import (
     ATTEST_DOMAIN, ATTEST_SCHEMA, POST_DOMAIN, POST_SCHEMA,
     PinnedExternalEnrollmentAdmissionLab,
@@ -123,7 +124,7 @@ class G102PinnedExternalAdmission(A182Fixture):
                    public_key=None, witness_fingerprint=None,
                    original_pin=None, anchor_public=None, probe=None,
                    minimum_sequence=0, reserve=None, checkpoint=None,
-                   post_probe=None):
+                   post_probe=None, reservation_lookup=None):
         public_key = public_key or public_bytes(PRIVATE)
         witness_fingerprint = witness_fingerprint or trust_fingerprint(
             issuer=issuer, key_id=key_id, public_key=public_key,
@@ -143,6 +144,10 @@ class G102PinnedExternalAdmission(A182Fixture):
             post_attestation=self.proof_after if post_probe is None else post_probe,
             minimum_sequence=minimum_sequence,
             checkpoint=self.custody.snapshot if checkpoint is None else checkpoint,
+            reservation_lookup=(
+                (lambda effect: lookup_stored_reservation(self.custody, effect))
+                if reservation_lookup is None else reservation_lookup
+            ),
             reserve=self.reserve_synced if reserve is None else reserve,
             now=NOW + timedelta(seconds=2),
         )
