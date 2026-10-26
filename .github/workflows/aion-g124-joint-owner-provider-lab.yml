@@ -1,0 +1,46 @@
+# G124 runs only in an isolated stacked LAB/Draft lineage.
+# The G122 five genuine external requirements remain separately RED.
+name: AION G124 owner plus provider synthetic contract integration LAB
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  joint-lab:
+    name: G124 joint owner/provider fail-closed / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install unmodified requirements
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Verify composed owner enrollment, first reservation and synthetic provider claim
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g124_owner_provider_composition_lab 2>&1 | tee g124.log
+          grep -F 'G124_OWNER_APPROVED_ONE_RESERVATION_PROVIDER_EXECUTED_STILL_UNKNOWN' g124.log
+          grep -F 'G124_NO_OWNER_PROOF_PROVIDER_CLAIM_CANNOT_AUTHORIZE' g124.log
+          grep -F 'G124_NEW_EVENT_REENROLLMENT_ZERO_RESERVATION_NO_PROVIDER_GO' g124.log
+      - name: Recheck independent original approval and recovery regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g120_owner_enrollment_proof_lab 2>&1 | tee g120.log
+          grep -F 'G120_HOST_CONTROLLED_OWNER_REPIN=STILL_VULNERABLE_NOT_P0' g120.log
+          python -B -m unittest -v labs.a190.test_g118_signed_witness_recovery_lab 2>&1 | tee g118.log
+          grep -F 'G115_HOST_CONTROLLED_WITNESS_ROLLBACK=STILL_VULNERABLE_NOT_P0' g118.log
