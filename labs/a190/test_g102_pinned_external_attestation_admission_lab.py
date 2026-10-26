@@ -15,7 +15,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from aion_chat.intent_binding_a182_lab import semantic_bytes, trust_fingerprint
 from aion_chat.pinned_external_enrollment_g102_lab import (
-    ATTEST_DOMAIN, ATTEST_SCHEMA, PinnedExternalEnrollmentAdmissionLab,
+    ATTEST_DOMAIN, ATTEST_SCHEMA, POST_DOMAIN, POST_SCHEMA,
+    PinnedExternalEnrollmentAdmissionLab,
 )
 from aion_chat.signed_receipt_lab import canonical_bytes
 from test_atlasquant_aion_signed_receipt_a178_lab import public_bytes
@@ -37,7 +38,9 @@ class G102PinnedExternalAdmission(A182Fixture):
         self.remote_sequence = {"high_water": 0, "count": 0}
         self.remote_original = None
         self.remote_root = None
+        self.remote_reservation = None
         self.probe_calls = 0
+        self.post_calls = 0
 
     def enroll_fixture(self):
         original = self.original()
@@ -71,6 +74,41 @@ class G102PinnedExternalAdmission(A182Fixture):
             ).decode("ascii"),
         }
 
+    def proof_after(self, challenge, expected, *, signer=None, overrides=None):
+        """Synthetic remote proof based on a retained record, NOT caller data.
+
+        A real external signer must independently verify a durable reservation
+        atomically under its own custodial control before signing. Here this
+        'remote' record is only an in-process test fixture.
+        """
+        self.post_calls += 1
+        if self.remote_reservation is None:
+            raise TimeoutError("G104_SYNTHETIC_REMOTE_RESERVATION_ABSENT")
+        recorded = self.remote_reservation
+        payload = {
+            "schema": POST_SCHEMA,
+            "status": "RESERVED",
+            "issuer": ANCHOR_ISSUER,
+            "challenge": challenge,
+            "original_sha256": self.remote_original,
+            "trust_sha256": self.remote_root,
+            "high_water": self.remote_sequence["high_water"],
+            "count": self.remote_sequence["count"],
+            "sequence": recorded["sequence"],
+            "effect_digest": recorded["effect_digest"],
+            "decision_sha256": recorded["decision_sha256"],
+            "idempotency_key": recorded["idempotency_key"],
+        }
+        if overrides:
+            payload.update(overrides)
+        signer = signer or ANCHOR_PRIVATE
+        return {
+            "payload": payload,
+            "signature": base64.b64encode(
+                signer.sign(POST_DOMAIN + canonical_bytes(payload)),
+            ).decode("ascii"),
+        }
+
     def reserve_synced(self, challenge, request):
         result = self.custody.reserve(challenge, request)
         if type(result) is dict and "signature" in result:
@@ -78,12 +116,14 @@ class G102PinnedExternalAdmission(A182Fixture):
             # A real independent custodian does not exist in this test.
             current = self.custody.snapshot()
             self.remote_sequence.update(current)
+            self.remote_reservation = deepcopy(result["payload"])
         return result
 
     def make_guard(self, original, *, issuer=ISSUER, key_id=KEY_ID,
                    public_key=None, witness_fingerprint=None,
                    original_pin=None, anchor_public=None, probe=None,
-                   minimum_sequence=0, reserve=None, checkpoint=None):
+                   minimum_sequence=0, reserve=None, checkpoint=None,
+                   post_probe=None):
         public_key = public_key or public_bytes(PRIVATE)
         witness_fingerprint = witness_fingerprint or trust_fingerprint(
             issuer=issuer, key_id=key_id, public_key=public_key,
@@ -100,6 +140,7 @@ class G102PinnedExternalAdmission(A182Fixture):
             anchor_issuer=ANCHOR_ISSUER,
             anchor_public_key=anchor_public or public_bytes(ANCHOR_PRIVATE),
             probe_attestation=self.proof if probe is None else probe,
+            post_attestation=self.proof_after if post_probe is None else post_probe,
             minimum_sequence=minimum_sequence,
             checkpoint=self.custody.snapshot if checkpoint is None else checkpoint,
             reserve=self.reserve_synced if reserve is None else reserve,
