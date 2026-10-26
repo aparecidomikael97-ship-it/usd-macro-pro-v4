@@ -1,0 +1,53 @@
+name: AION G113 process-separated witness emulator LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g113_subprocess_witness_lab.py'
+      - 'labs/a190/g113_subprocess_witness_client_lab.py'
+      - 'labs/a190/test_g113_subprocess_witness_lab.py'
+      - '.github/workflows/aion-g113-process-separated-witness-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  witness:
+    name: G113 process and durable test double / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install synthetic Ed25519 dependency
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install 'cryptography==50.0.2'
+          python -m pip check
+      - name: Run 13 cross-process tests with zero network or provider SEND
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g113_subprocess_witness_lab 2>&1 | tee g113.log
+          grep -F 'Ran 13 tests' g113.log
+          grep -F 'OK' g113.log
+          grep -F 'G113_DIFFERENT_PROCESSES=SIGNED_RESERVATION_PERSISTS' g113.log
+          grep -F 'G113_CHANGED_REQUEST_SAME_BUSINESS_EVENT=DENIED' g113.log
+          grep -F 'G113_COMMIT_ACK_LOST=UNCERTAIN_NO_SECOND_RESERVATION' g113.log
+          grep -F 'G113_LOCAL_HOST_FILE_LOSS=WITNESS_LEDGER_STILL_SPENT' g113.log
+          grep -F 'G113_UNKNOWN_ORIGINAL_BUSINESS_EVENT=DENIED' g113.log
+          grep -F 'G113_ORIGINAL_ENROLLMENT_SWAP=DENIED' g113.log
+          grep -F 'G113_WRONG_REMOTE_SIGNING_KEY=DENIED_BY_FIXED_PIN' g113.log
+          grep -F 'G113_REPLAYED_OR_TAMPERED_SIGNATURE=DENIED' g113.log
+          grep -F 'G113_LOST_EMULATOR_FILE=FAIL_CLOSED_NO_BOOTSTRAP' g113.log
+          grep -F 'G113_DISTINCT_ENROLLED_EVENTS_SAME_PAYLOAD=TWO_EXPLICIT_EFFECTS' g113.log
+          grep -F 'G113_FOUR_PARALLEL_PROCESSES=ONE_SYNTHETIC_COMMIT' g113.log
+          grep -F 'G113_SAME_HOST_WITNESS_ROLLBACK=STILL_VULNERABLE_NOT_P0' g113.log
+          grep -F 'G113_INVALID_WIRE_PROTOCOL=DENIED' g113.log
