@@ -52,7 +52,8 @@ class PinnedExternalEnrollmentAdmissionLab:
         self, *, original_decision, enrolled_original_sha256,
         issuer, key_id, public_key, expected_trust_sha256,
         anchor_issuer, anchor_public_key, probe_attestation,
-        post_attestation, minimum_sequence, checkpoint, reservation_lookup, reserve, now,
+        post_attestation, minimum_sequence, checkpoint, reservation_lookup,
+        coherent_observation, reserve, now,
     ):
         original = semantic_bytes(original_decision)
         if (type(enrolled_original_sha256) is not str
@@ -77,6 +78,8 @@ class PinnedExternalEnrollmentAdmissionLab:
             raise TypeError("G102_CUSTODY_SNAPSHOT_REQUIRED")
         if not callable(reservation_lookup):
             raise TypeError("G107_EXACT_RESERVATION_LOOKUP_REQUIRED")
+        if not callable(coherent_observation):
+            raise TypeError("G111_ATOMIC_OBSERVER_REQUIRED")
         if type(minimum_sequence) is not int or minimum_sequence < 0:
             raise ValueError("G102_SEQUENCE_FLOOR_REQUIRED")
         # A challenge at each call defeats replay of an earlier valid signed
@@ -91,6 +94,7 @@ class PinnedExternalEnrollmentAdmissionLab:
         self._post_probe = post_attestation
         self._checkpoint = checkpoint
         self._reservation_lookup = reservation_lookup
+        self._coherent_observation = coherent_observation
         self._minimum = minimum_sequence
         self._last_reservation = None
 
@@ -266,9 +270,31 @@ class PinnedExternalEnrollmentAdmissionLab:
                 )
                 if type(stored) is not dict or set(stored) != set(expected):
                     return False
-                return all(
+                if not all(
                     type(stored[name]) is type(signed_reservation[name])
                     and stored[name] == signed_reservation[name]
+                    for name in expected
+                ):
+                    return False
+                # G107's separate checkpoint and record reads can be correct
+                # at DIFFERENT points in time. A final coherent local SQLite
+                # transaction must observe both values in a single snapshot.
+                coherent = self._coherent_observation(
+                    signed_reservation["effect_digest"]
+                )
+                if (type(coherent) is not dict
+                        or set(coherent) != {"high_water", "count", "record"}
+                        or type(coherent["high_water"]) is not int
+                        or type(coherent["count"]) is not int
+                        or coherent["high_water"] != after["high_water"]
+                        or coherent["count"] != after["count"]):
+                    return False
+                record = coherent["record"]
+                if type(record) is not dict or set(record) != set(expected):
+                    return False
+                return all(
+                    type(record[name]) is type(signed_reservation[name])
+                    and record[name] == signed_reservation[name]
                     for name in expected
                 )
             except (KeyError, TypeError, ValueError, RuntimeError, OSError,
