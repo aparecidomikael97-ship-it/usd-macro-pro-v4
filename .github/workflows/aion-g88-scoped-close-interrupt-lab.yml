@@ -1,0 +1,47 @@
+name: AION G88 scoped SQLite native close interrupt LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/staged_store.py'
+      - 'labs/a190/test_g88_scoped_native_close_interrupt_lab.py'
+      - '.github/workflows/aion-g88-scoped-close-interrupt-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g88-scoped-close:
+    name: G88 scoped SQLite close / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned synthetic LAB dependencies
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2' 'requests==2.34.2'
+      - name: G88 RED-first scoped close and inherited G84/G85/SQLite lifecycle
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v \
+            labs.a190.test_g88_scoped_native_close_interrupt_lab \
+            labs.a190.test_g84_direct_constructor_interrupt_lab \
+            labs.a190.test_g85_legacy_owner_thread_preservation_lab \
+            test_atlasquant_aion_chat_sqlite_lifecycle.SQLiteLifecycleTests.test_close_failure_after_commit_is_not_reported_as_success \
+            test_atlasquant_aion_chat_sqlite_lifecycle.SQLiteLifecycleTests.test_native_connections_close_on_their_creating_thread_even_on_error 2>&1 | tee g88.log
+          grep -F 'Ran 19 tests' g88.log
+          grep -Fx 'OK' g88.log
+          grep -F 'G88_CLOSE_KI_GREEN=QUARANTINED_LOCK_UNCERTAIN' g88.log
+          grep -F 'G88_CLOSE_EXIT_GREEN=QUARANTINED_NATIVE_RELEASED' g88.log
+          grep -F 'G88_PRIMARY_LOOKUP_GREEN=NOT_MASKED_AND_QUARANTINED' g88.log
+          grep -F 'G88_PRIMARY_STORAGE_GREEN=NOT_MASKED_AND_QUARANTINED' g88.log
+          grep -F 'G88_BODY_KI_GREEN=NO_REUSE' g88.log
+          grep -F 'G88_BODY_EXIT_GREEN=NO_REUSE' g88.log
