@@ -483,8 +483,12 @@ class SQLiteChatStore:
         self._require_open()
         try:
             self.db.execute("BEGIN IMMEDIATE")
-        except Exception as begin_error:
-            self.quarantine_failed_transaction()
+        except BaseException as begin_error:
+            try:
+                self.quarantine_failed_transaction()
+            except BaseException:
+                # Quarantine detaches before close; preserve the begin error.
+                pass
             if hasattr(begin_error, "add_note"):
                 begin_error.add_note(
                     "AION_CHAT_BEGIN_OUTCOME_UNCERTAIN_STORE_QUARANTINED"

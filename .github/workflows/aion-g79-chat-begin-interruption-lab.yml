@@ -1,0 +1,45 @@
+name: AION G79 SQLite BEGIN interruption LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'labs/a190/test_g79_chat_begin_interrupt_lab.py'
+      - 'labs/a190/test_g78_chat_commit_interrupt_lab.py'
+      - 'labs/a190/test_g33_chat_ambiguous_commit_lab.py'
+      - 'labs/a190/test_g32_chat_store_rollback_quarantine_lab.py'
+      - '.github/workflows/aion-g79-chat-begin-interruption-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g79-begin-quarantine:
+    name: G79 BEGIN ambiguity / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned cryptography test dependency
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2'
+      - name: G79 RED-to-GREEN and inherited offline regression
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v \
+            labs.a190.test_g79_chat_begin_interrupt_lab.G79ChatBeginInterrupt \
+            labs.a190.test_g78_chat_commit_interrupt_lab.G78ChatCommitInterrupt \
+            labs.a190.test_g33_chat_ambiguous_commit_lab \
+            labs.a190.test_g32_chat_store_rollback_quarantine_lab \
+            test_atlasquant_aion_first_attempt_witness_a180_lab \
+            labs.a190.test_g77_commit_interrupt_quarantine_lab.G77CommitInterruptQuarantine 2>&1 | tee g79.log
+          grep -F 'Ran 73 tests' g79.log
+          grep -Fx 'OK' g79.log
