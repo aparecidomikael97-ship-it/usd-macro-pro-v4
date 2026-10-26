@@ -25,8 +25,9 @@ jobs:
           pubdir="$(mktemp -d /tmp/g128-probe.XXXXXXXX)"
           chmod 0755 "$pubdir"
           install -m 0644 labs/a190/g128_os_principal_probe_lab.py "$pubdir/probe.py"
-          privdir="$RUNNER_TEMP/g128-custodian-$GITHUB_RUN_ID"
-          sudo install -d -m 0700 -o g128cust -g g128cust "$privdir"
+          privdir="$(mktemp -d /tmp/g128-custodian.XXXXXXXX)"
+          sudo chown g128cust:g128cust "$privdir"
+          sudo chmod 0700 "$privdir"
           dbpath="$privdir/synthetic-probe.db"
           sudo -u g128cust /usr/bin/python3 -B "$pubdir/probe.py" owner-init "$dbpath" g128cust
           sudo -u g128app /usr/bin/python3 -B "$pubdir/probe.py" app "$dbpath" g128app
