@@ -8,6 +8,7 @@ and busy_timeout. This is not a production or distributed authorization gate.
 import os
 import sqlite3
 import stat
+import sys
 from pathlib import Path
 from threading import RLock
 
@@ -382,16 +383,38 @@ class OperationScopedSQLiteChatStore:
                     else:
                         self._failure = type(exc).__name__
                     raise
+                except (KeyboardInterrupt, SystemExit):
+                    # A native operation may have changed SQLite state before
+                    # a process-level interruption; no automatic reuse/replay.
+                    self._failure = "OPERATION_INTERRUPTED_OUTCOME_UNKNOWN"
+                    raise
                 finally:
+                    # Capture the exception being propagated BEFORE a secondary
+                    # native close can replace it (including BaseException).
+                    primary_error = sys.exc_info()[1]
                     try:
                         if store is not None:
                             if store._health_state == FAILED:
                                 self._failure = "DATABASE_FAILED"
                             try:
                                 store.close()
-                            except Exception as exc:
+                            except BaseException as close_error:
+                                # Driver close may fail before/after physical
+                                # release. Latch even when it raised KI/Exit.
                                 self._failure = "CONNECTION_CLOSE_FAILED"
-                                raise StorageUnavailableError(self._failure) from exc
+                                if primary_error is not None:
+                                    # Preserve the original operation outcome;
+                                    # NEVER retry/rollback the uncertain close.
+                                    if hasattr(primary_error, "add_note"):
+                                        primary_error.add_note(
+                                            "G88_NATIVE_CLOSE_UNCERTAIN_FACADE_QUARANTINED"
+                                        )
+                                elif isinstance(close_error, Exception):
+                                    raise StorageUnavailableError(
+                                        self._failure
+                                    ) from close_error
+                                else:
+                                    raise
                     finally:
                         if anchor is not None:
                             try:
