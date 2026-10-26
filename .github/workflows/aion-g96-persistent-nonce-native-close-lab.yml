@@ -1,0 +1,37 @@
+name: AION G96 persistent nonce SQLite native close LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_nonce_registry.py'
+      - 'labs/a190/test_g96_persistent_nonce_native_sqlite_close_lab.py'
+      - '.github/workflows/aion-g96-persistent-nonce-native-close-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nonce-native-close:
+    name: G96 nonce native close / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Four real nonce SQLite native-close proofs (RED first)
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g96_persistent_nonce_native_sqlite_close_lab 2>&1 | tee g96.log
+          grep -F 'Ran 4 tests' g96.log
+          grep -Fx 'OK' g96.log
+          grep -F 'G96_NONCE_SCHEMA_GREEN=PHYSICAL_CLOSE' g96.log
+          grep -F 'G96_NONCE_CLAIM_GREEN=SUCCESS_AND_REPLAY_CLOSE' g96.log
+          grep -F 'G96_NONCE_READS_GREEN=ALL_FOUR_CLOSE' g96.log
+          grep -F 'G96_NONCE_SQL_ERROR_GREEN=PRIMARY_ERROR_PRESERVED_AND_CLOSED' g96.log
