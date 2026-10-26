@@ -36,7 +36,7 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest -v labs.a190.test_g116_unsigned_witness_client_injection_lab 2>&1 | tee g116.log
-          grep -F 'Ran 13 tests' g116.log
+          grep -F 'Ran 24 tests' g116.log
           grep -Fx 'OK' g116.log
           grep -F 'G116_UNSIGNED_CLIENT_CONSTRUCTOR=DENIED' g116.log
           grep -F 'G116_UNSIGNED_BARE_RESPONSES=NO_ADAPTER_SEND' g116.log
