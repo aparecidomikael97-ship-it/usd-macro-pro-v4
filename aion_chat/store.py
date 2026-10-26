@@ -77,6 +77,8 @@ def _g73_nested_json_unsupported(value):
 
 
 def dump(value):
+    if not is_dataclass(value) or isinstance(value, type):
+        raise TypeError("dataclass instance required")
     # G73: dataclasses.asdict recursively copies untrusted nested containers
     # BEFORE the bounded G70 redactor can inspect them. Project only the
     # declared top-level dataclass fields; let redact guard nested cycles,
