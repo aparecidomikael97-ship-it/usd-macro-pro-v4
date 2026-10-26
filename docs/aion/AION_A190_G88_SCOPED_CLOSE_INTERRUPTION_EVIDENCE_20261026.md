@@ -35,7 +35,9 @@ Only `aion_chat/staged_store.py` changed:
 - Candidate canonical `security-unittest` and `security-pytest`: **SUCCESS**.
 - External requirements `external-red` still FAIL (unmet genuine external original identity, root of trust, independent monotonic custody, live SQLite VFS and rollback-proof authority).
 - Canonical dependency security-audit FAIL (known vulnerable pinned dependencies; no waiver).
-- Canonical Quality candidate was **in progress** when this evidence document was prepared; do not claim green until exact job result/log `Ran ... tests`, `OK` is confirmed.
+- Canonical Quality candidate **SUCCESS**, `Ran 6449 tests in 49.564s`, `OK`, source sha256 `67897c3b4340771ffb301f8779227f9bf93dfa115e9d1bc7142ec4cbcf33bfc0` (job `121572420084`).
+- Canonical Security unittest candidate **368/368 PASS**, `OK` (job `121572419827`), and canonical Security pytest candidate **2825 passed** (job `121572419636`). Both use unchanged Security gate source sha256 `927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485`.
+- External-red was rechecked on the G88 source SHA and genuinely failed **5/5**; dependency security audit remains **FAILED**. The five are independent monotonic custody/checkpoint, immutable original identity, external pin root, authenticated live SQLite VFS snapshot/version before read, and rollback-proof write admission after same-inode restore.
 
 ## Limits and remaining risks
 
