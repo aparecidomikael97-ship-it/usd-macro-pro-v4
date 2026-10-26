@@ -1,0 +1,56 @@
+name: AION G114 public-only witness client key boundary LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g114_witness_keyfile_server_lab.py'
+      - 'labs/a190/g114_witness_subprocess_transport_lab.py'
+      - 'labs/a190/g114_public_key_witness_client_lab.py'
+      - 'labs/a190/test_g114_public_only_witness_lab.py'
+      - '.github/workflows/aion-g114-public-only-key-boundary-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-verifier:
+    name: G114 synthetic key boundary / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic signer dependency
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install 'cryptography==50.0.2'
+          python -m pip check
+      - name: Public-only client 15 exact safety and explicit remaining-risk cases
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g114_public_only_witness_lab 2>&1 | tee g114.log
+          grep -F 'Ran 15 tests' g114.log
+          grep -Fx 'OK' g114.log
+          grep -F 'G114_LEGACY_SECRET_ARGV=CONFIRMED_NEW_CLIENT_PUBLIC_ONLY' g114.log
+          grep -F 'G114_PUBLIC_ONLY_CLIENT=SIGNED_COMMITTED_RESERVATION' g114.log
+          grep -F 'G114_LOST_ACK_AND_NEW_PUBLIC_CLIENT=SPENT_NO_RETRY' g114.log
+          grep -F 'G114_OTHER_SIGNER_WITH_FIXED_PUBLIC_PIN=DENIED' g114.log
+          grep -F 'G114_CONCURRENT_PUBLIC_ONLY_CLIENTS=ONE_TEST_COMMIT' g114.log
+          grep -F 'G114_SAME_HOST_ROLLBACK=STILL_VULNERABLE_NOT_P0' g114.log
+          grep -F 'G114_CALLER_INJECTED_FAKE_REMOTE_REPLY=DENIED' g114.log
+      - name: Inherited G113 signed same-host subprocess contract
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g113_subprocess_witness_lab 2>&1 | tee g113-inherited.log
+          grep -F 'Ran 13 tests' g113-inherited.log
+          grep -Fx 'OK' g113-inherited.log
+          grep -F 'G113_SAME_HOST_WITNESS_ROLLBACK=STILL_VULNERABLE_NOT_P0' g113-inherited.log
