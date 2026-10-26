@@ -1,6 +1,7 @@
 """Execute named canonical test/audit commands without editing their selectors.
 
-Harness difference: unittest/pytest socket egress is denied in this process.
+Harness difference: Python test socket egress is denied in this process; on
+Windows, only stdlib asyncio's internal 127.0.0.1 self-pipe socketpair works.
 Subprocesses do not inherit Python mocks. No CI/provider credentials are loaded.
 """
 import argparse
@@ -12,7 +13,7 @@ import subprocess
 import sys
 import textwrap
 import unittest
-from unittest.mock import Mock
+from aion_a190_scoped_socketpair_guard import canonical_lab_socket_guard
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument("suite",choices=["quality","security-unittest","security-pytest","security-audit"])
@@ -58,14 +59,15 @@ label={"quality":"Run quality suite",
        "security-pytest":"Run AION v2.1 scope and quarantine tests"}[args.suite]
 cmd=command(label)
 print("CANONICAL_COMMAND",shlex.join(cmd),flush=True)
-socket.socket.connect=Mock(side_effect=AssertionError("LAB network forbidden"))
-socket.socket.connect_ex=Mock(side_effect=AssertionError("LAB network forbidden"))
-socket.create_connection=Mock(side_effect=AssertionError("LAB network forbidden"))
 if cmd[:3]!=["python","-m","unittest"] and cmd[:3]!=["python","-m","pytest"]:
     raise RuntimeError("unexpected canonical command")
-if cmd[2]=="unittest":
-    result=unittest.main(module=None,argv=["canonical"]+cmd[3:],exit=False).result
-    raise SystemExit(0 if result.wasSuccessful() else 1)
-import pytest
-raise SystemExit(pytest.main(cmd[3:]))
+# Windows asyncio needs its own local self-pipe socketpair while external
+# socket connects (including arbitrary loopback) must remain denied.
+# Linux retains A183's original all-connects-denied behavior.
+with canonical_lab_socket_guard():
+    if cmd[2]=="unittest":
+        result=unittest.main(module=None,argv=["canonical"]+cmd[3:],exit=False).result
+        raise SystemExit(0 if result.wasSuccessful() else 1)
+    import pytest
+    raise SystemExit(pytest.main(cmd[3:]))
 
