@@ -36,6 +36,7 @@ class G115CrossProcessOutboxLab(A182Fixture):
         public = Ed25519PrivateKey.from_private_bytes(
             self.seed
         ).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        self.pinned_public_key = public
         self.client = G114PublicKeyWitnessClientLab(
             pinned_public_key=public,
             transport=G114SubprocessTransportLab(
@@ -60,6 +61,15 @@ class G115CrossProcessOutboxLab(A182Fixture):
         self.client.bootstrap_synthetic_only()
         self.assertEqual(
             self.client.enroll_synthetic_only(**self.enrollment), "ENROLLED"
+        )
+
+    def signed_client_with_transport(self, transport):
+        # Fault-inject the untrusted TRANSPORT, but retain the real G114
+        # signature verifier. Never replace the signed client with arbitrary
+        # duck-typed status()/reserve() dictionaries.
+        return G114PublicKeyWitnessClientLab(
+            pinned_public_key=self.pinned_public_key,
+            transport=transport,
         )
 
     def guard_for(self, *, client=None, event=None, original=None, pin=None):
@@ -102,15 +112,16 @@ class G115CrossProcessOutboxLab(A182Fixture):
         print("G115_UNENROLLED_EVENT=OUTBOX_UNCERTAIN_ZERO_SEND")
 
     def test_03_lost_commit_ack_is_uncertain_and_witness_spent(self):
-        class LoseAck:
-            def __init__(self, real):
-                self.real = real
-            def status(self, event_id):
-                return self.real.status(event_id)
-            def reserve(self, **kwargs):
-                return self.real.reserve(**kwargs, lost_response=True)
+        def lose_ack_transport(action, request, *, drop_response=False):
+            return self.client._transport(
+                action, request,
+                drop_response=drop_response or action == "reserve",
+            )
 
-        store, outbox, row = self.host(guard=self.guard_for(client=LoseAck(self.client)))
+        guard = self.guard_for(
+            client=self.signed_client_with_transport(lose_ack_transport),
+        )
+        store, outbox, row = self.host(guard=guard)
         try:
             result, adapter = self.claim_and_send(outbox, row)
             self.assertEqual(result["state"], "UNCERTAIN")
@@ -171,20 +182,20 @@ class G115CrossProcessOutboxLab(A182Fixture):
         print("G115_WRONG_SIGNER=OUTBOX_ZERO_SEND")
 
     def test_07_post_commit_key_swap_denies_even_with_valid_first_receipt(self):
-        class SwapAfterCommit:
-            def __init__(self, real, key_path):
-                self.real, self.path = real, key_path
-            def status(self, event_id):
-                return self.real.status(event_id)
-            def reserve(self, **kwargs):
-                signed = self.real.reserve(**kwargs)
-                self.path.write_bytes(b"\x62" * 32)
+        def swap_key_after_commit(action, request, *, drop_response=False):
+            signed = self.client._transport(
+                action, request, drop_response=drop_response,
+            )
+            if action == "reserve":
+                self.seed_file.write_bytes(b"\x62" * 32)
                 if os.name != "nt":
-                    self.path.chmod(0o600)
-                return signed
+                    self.seed_file.chmod(0o600)
+            return signed
 
-        wrapper = SwapAfterCommit(self.client, self.seed_file)
-        store, outbox, row = self.host(guard=self.guard_for(client=wrapper))
+        guard = self.guard_for(
+            client=self.signed_client_with_transport(swap_key_after_commit),
+        )
+        store, outbox, row = self.host(guard=guard)
         try:
             result, adapter = self.claim_and_send(outbox, row)
             self.assertEqual(result["state"], "UNCERTAIN")
@@ -198,15 +209,13 @@ class G115CrossProcessOutboxLab(A182Fixture):
         print("G115_POST_COMMIT_SIGNATURE_FAIL=SPENT_NO_SEND")
 
     def test_08_remote_transport_unavailable_denies_cleanly(self):
-        class NoTransport:
-            @staticmethod
-            def status(_event):
-                raise WitnessProcessUnavailableLab("g115 unavailable")
-            @staticmethod
-            def reserve(**_kwargs):
-                raise WitnessProcessUnavailableLab("g115 unavailable")
+        def no_transport(_action, _request, *, drop_response=False):
+            raise WitnessProcessUnavailableLab("g115 unavailable")
 
-        store, outbox, row = self.host(guard=self.guard_for(client=NoTransport()))
+        guard = self.guard_for(
+            client=self.signed_client_with_transport(no_transport),
+        )
+        store, outbox, row = self.host(guard=guard)
         try:
             result, adapter = self.claim_and_send(outbox, row)
             self.assertEqual(result["state"], "UNCERTAIN")
