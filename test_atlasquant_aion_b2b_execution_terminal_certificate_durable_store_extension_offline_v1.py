@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import tempfile
+from contextlib import closing
 import unittest
 from pathlib import Path
 
@@ -204,7 +205,9 @@ class DurableStoreExtensionOfflineV1Tests(unittest.TestCase):
             path = Path(tmp) / "execution.sqlite3"
             store = DurableExecutionStore(path)
             self.assertEqual(store.store_schema_version(), STORE_SCHEMA_VERSION)
-            with sqlite3.connect(str(path)) as conn:
+            # sqlite3.Connection.__exit__ commits but does not close. The
+            # extra closing() releases the fixture's native Windows handle.
+            with closing(sqlite3.connect(str(path))) as conn, conn:
                 tables = {
                     row[0]
                     for row in conn.execute(
