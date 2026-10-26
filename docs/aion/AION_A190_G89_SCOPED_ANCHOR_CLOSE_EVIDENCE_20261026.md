@@ -28,7 +28,10 @@ Only the `os.close(anchor)` finalization in `aion_chat/staged_store.py` changed.
   - All seven named G89 markers are present in both logs; 7 G89 + 6 G88 + 6 G84 + 5 G85 + 2 existing lifecycle = 26.
 - [G88 inherited run 40324033347](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40324033347): both OS jobs **SUCCESS**.
 - [SQLite staged lifecycle 40324033274](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40324033274): both OS jobs **SUCCESS**.
-- [A184 candidate security/Quality/external run 40324033279](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40324033279) is tracked separately. Candidate `security-unittest` succeeded; Quality / pytest may still be running at document creation. **Do not claim candidate canonical Quality/Security full green without checking each exact log.** Candidate security-audit and genuine five external requirements remain **FAILED**.
+- [A184 candidate security/Quality/external run 40324033279](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40324033279) on the same corrected source commit:
+  - Canonical Quality candidate **6449/6449 PASS**: `Ran 6449 tests in 51.875s`, `OK`, source SHA256 `67897c3b4340771ffb301f8779227f9bf93dfa115e9d1bc7142ec4cbcf33bfc0` (job `121575971118`).
+  - Canonical Security unittest candidate **368/368 PASS**, `OK` (job `121575971398`); canonical Security pytest candidate **2825 passed** (job `121575971216`). Both use Security gate SHA256 `927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485`.
+  - Candidate dependency security-audit remains **FAILED**, and external-red **five genuine unmet requirements** on both OS remain **FAILED**. Baseline deliberately RED and not waived.
 
 ## Precise non-claims
 
