@@ -438,9 +438,15 @@ class SQLiteChatStore:
             raise StorageUnavailableError("staging store unavailable") from exc
 
     def close(self):
-        if self.db is not None:
-            self.db.close()
-            self.db = None
+        connection = self.db
+        self.db = None
+        if connection is not None:
+            try:
+                connection.close()
+            except BaseException:
+                self._health_state = FAILED
+                self._health_reason = "CLOSE_OUTCOME_UNCERTAIN"
+                raise
 
     def quarantine_failed_transaction(self):
         """Detach an uncertain connection permanently until explicit recovery.
