@@ -347,9 +347,14 @@ class ExecutionOutbox:
         """
         try:
             self.db.commit()
-        except Exception as commit_error:
-            self.store.quarantine_failed_transaction()
-            self.db = None
+        except BaseException as commit_error:
+            try:
+                self.store.quarantine_failed_transaction()
+            except BaseException:
+                # Preserve the original commit failure even if close is interrupted.
+                pass
+            finally:
+                self.db = None
             if hasattr(commit_error, "add_note"):
                 commit_error.add_note(
                     "AION_OUTBOX_COMMIT_OUTCOME_UNCERTAIN_NO_AUTO_RESEND"
