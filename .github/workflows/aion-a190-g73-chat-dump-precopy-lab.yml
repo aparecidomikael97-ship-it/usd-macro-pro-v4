@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'aion_chat/store.py'
+      - 'aion_chat/privacy.py'
+      - 'aion_chat/models.py'
+      - 'test_atlasquant_repository_secret_hygiene.py'
       - 'labs/a190/test_g73_chat_dump_precopy_lab.py'
       - 'labs/a190/test_g71_chat_precopy_guard_lab.py'
       - '.github/workflows/aion-a190-g73-chat-dump-precopy-lab.yml'
@@ -33,7 +36,7 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s labs/a190 -p 'test_g[3-7]*.py' -v 2>&1 | tee g73.log
-          grep -F 'Ran 716 tests' g73.log
+          grep -F 'Ran 719 tests' g73.log
           grep -F 'G73_DUMP_CYCLE_GREEN=STABLE_DENIAL' g73.log
           grep -F 'G73_DUMP_LIST_CYCLE_GREEN=STABLE_DENIAL' g73.log
           grep -F 'G73_DUMP_DEPTH_GREEN=BEFORE_ASDICT' g73.log
@@ -43,6 +46,9 @@ jobs:
           grep -F 'G73_CHECKPOINT_DAG_GREEN=NO_PARTIAL_INSERT' g73.log
           grep -F 'G73_NO_ASDICT_GREEN=SHALLOW_DATACLASS_FIELDS' g73.log
           grep -F 'G73_NESTED_DATACLASS_GREEN=EXPLICIT_DENIAL' g73.log
+          grep -F 'G73_HIDDEN_DATACLASS_GREEN=NOT_MASKED_SILENTLY' g73.log
+          grep -F 'G73_HIDDEN_POINTER_GREEN=ROLLED_BACK' g73.log
+          grep -F 'G73_CLASS_INPUT_GREEN=ONLY_INSTANCES' g73.log
           grep -F 'G73_POINTER_GREEN=PRIOR_CHECKPOINT_IMMUTABLE' g73.log
           grep -F 'G73_DAG_PRECOPY_GREEN=ASDICT_NOT_EXECUTED' g73.log
           grep -F 'G73_SUMMARY_MESSAGE_GREEN=COMPATIBLE' g73.log
