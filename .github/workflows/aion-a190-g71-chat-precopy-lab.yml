@@ -5,6 +5,7 @@ on:
       - 'aion_chat/store.py'
       - 'labs/a190/test_g71_chat_precopy_guard_lab.py'
       - '.github/workflows/aion-a190-g71-chat-precopy-lab.yml'
+      - 'scripts/run_a190_numeric_g_suites_lab.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,11 +28,12 @@ jobs:
       - name: Install local LAB cryptography fixture dependency
         shell: bash
         run: python -m pip install 'cryptography==46.0.3'
-      - name: Full G30 to G71 synthetic regression with stable denial markers
+      - name: Exact bounded G30 to G71 synthetic regression with stable denial markers
         shell: bash
         run: |
           set -o pipefail
-          python -B -m unittest discover -s labs/a190 -p 'test_g[3-7]*.py' -v 2>&1 | tee g71.log
+          python -B scripts/run_a190_numeric_g_suites_lab.py --through 71 --expected-tests 699 2>&1 | tee g71.log
+          grep -F 'G86_SUITE_MANIFEST through=71' g71.log
           grep -F 'Ran 699 tests' g71.log
           grep -F 'G71_DICT_CYCLE_GREEN=DENY_AND_ROLLBACK' g71.log
           grep -F 'G71_TUPLE_CYCLE_GREEN=DENY_AND_ROLLBACK' g71.log
