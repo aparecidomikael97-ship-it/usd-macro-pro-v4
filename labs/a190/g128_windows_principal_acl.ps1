@@ -44,8 +44,11 @@ if (!$acl.AreAccessRulesProtected) { throw 'G128_WINDOWS_INHERITANCE_STILL_ON' }
 if ($LASTEXITCODE -ne 0) { throw 'G128_WINDOWS_OWNER_INIT_FAILED' }
 
 New-LocalUser -Name $accountName -Password $passwordSecure -PasswordNeverExpires -Description 'Disposable G128 restricted app principal on ephemeral GitHub runner only' | Out-Null
+$appSid = (Get-LocalUser -Name $accountName).SID.Value
+& icacls.exe $publicDir '/grant:r' ('*' + $appSid + ':(OI)(CI)M') | Out-Host
+if ($LASTEXITCODE -ne 0) { throw 'G128_WINDOWS_PUBLIC_PROBE_ACCESS_FAILED' }
 try {
-    $credential = New-Object System.Management.Automation.PSCredential(
+    $credential = [System.Management.Automation.PSCredential]::new(
         ($env:COMPUTERNAME + [char]92 + $accountName), $passwordSecure
     )
     $appStdout = Join-Path $publicDir 'app-stdout.txt'
