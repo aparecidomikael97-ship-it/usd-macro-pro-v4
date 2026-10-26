@@ -4,6 +4,7 @@ This is NOT the production Worker. The adapter, enrollment, Ed25519 signer
 and witness SQLite database are test-only/same-host. A successful simulated
 adapter call proves callback ordering, NOT a real provider SEND or P0 GO.
 """
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import timedelta
@@ -15,10 +16,15 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from aion_chat.intent_binding_a182_lab import semantic_bytes
+from aion_chat.signed_receipt_lab import canonical_bytes
 from labs.a190.g113_subprocess_witness_client_lab import WitnessProcessUnavailableLab
 from labs.a190.g114_witness_subprocess_transport_lab import G114SubprocessTransportLab
 from labs.a190.g114_public_key_witness_client_lab import G114PublicKeyWitnessClientLab
 from labs.a190.g115_public_witness_outbox_guard_lab import PublicOnlyWitnessOutboxGuardLab
+from labs.a190.g120_synthetic_owner_enrollment_lab import (
+    AUDIENCE as OWNER_AUDIENCE, DOMAIN as OWNER_DOMAIN,
+    ISSUER as OWNER_ISSUER, SCHEMA as OWNER_SCHEMA,
+)
 from test_atlasquant_aion_intent_binding_a182_lab import A182Fixture
 from test_atlasquant_aion_execution_outbox import NOW
 
@@ -62,6 +68,42 @@ class G115CrossProcessOutboxLab(A182Fixture):
         self.assertEqual(
             self.client.enroll_synthetic_only(**self.enrollment), "ENROLLED"
         )
+        # This fixture synthesizes a SECOND signer distinct from the G114
+        # custodial witness. It is NOT authentic HUMAN_OWNER enrollment.
+        self.owner_private = Ed25519PrivateKey.from_private_bytes(b"\x72" * 32)
+        self.owner_public = self.owner_private.public_key().public_bytes(
+            Encoding.Raw, PublicFormat.Raw,
+        )
+        self.owner_proof = self.issue_test_owner_enrollment(
+            event_id=self.business_event_id,
+            decision=self.original_row["decision"],
+        )
+
+    def issue_test_owner_enrollment(self, *, event_id, decision, signer=None):
+        payload = {
+            "schema": OWNER_SCHEMA, "issuer": OWNER_ISSUER,
+            "audience": OWNER_AUDIENCE,
+            "event_id": event_id,
+            "original_sha256": sha256(semantic_bytes(decision)).hexdigest(),
+            "owner_id": decision["owner_id"],
+            "tenant_id": decision["tenant_id"],
+            "workspace_id": decision["workspace_id"],
+            "action": decision["action"],
+            "idempotency_key": decision["idempotency_key"],
+            "authorization_ref": decision["authorization_ref"],
+            "policy_version": decision["policy_version"],
+            "approval_id": sha256(b"g120-fixture-owner-approval-v1").hexdigest(),
+            "nonce": sha256(b"g120-fixture-owner-approval-nonce-v1").hexdigest(),
+            "issued_at": NOW.isoformat(),
+            "expires_at": (NOW + timedelta(minutes=5)).isoformat(),
+        }
+        signer = self.owner_private if signer is None else signer
+        return {
+            "payload": payload,
+            "signature": base64.b64encode(
+                signer.sign(OWNER_DOMAIN + canonical_bytes(payload))
+            ).decode("ascii"),
+        }
 
     def signed_client_with_transport(self, transport):
         # Fault-inject the untrusted TRANSPORT, but retain the real G114
@@ -72,7 +114,8 @@ class G115CrossProcessOutboxLab(A182Fixture):
             transport=transport,
         )
 
-    def guard_for(self, *, client=None, event=None, original=None, pin=None):
+    def guard_for(self, *, client=None, event=None, original=None, pin=None,
+                  owner_receipt=None, owner_public_pin=None, approval_clock=None):
         return PublicOnlyWitnessOutboxGuardLab(
             witness_client=self.client if client is None else client,
             enrolled_event_id=self.business_event_id if event is None else event,
@@ -81,6 +124,16 @@ class G115CrossProcessOutboxLab(A182Fixture):
             ),
             original_decision=(
                 self.original_row["decision"] if original is None else original
+            ),
+            owner_enrollment_receipt=(
+                self.owner_proof if owner_receipt is None else owner_receipt
+            ),
+            pinned_owner_enrollment_public_key=(
+                self.owner_public if owner_public_pin is None else owner_public_pin
+            ),
+            owner_approval_clock=(
+                (lambda: NOW + timedelta(seconds=2))
+                if approval_clock is None else approval_clock
             ),
         )
 
@@ -99,17 +152,15 @@ class G115CrossProcessOutboxLab(A182Fixture):
 
     def test_02_unknown_original_enrollment_is_uncertain_no_send(self):
         unknown_id = sha256(b"g115-other-event-not-enrolled").hexdigest()
-        store, outbox, row = self.host(guard=self.guard_for(event=unknown_id))
-        try:
-            result, adapter = self.claim_and_send(outbox, row)
-            self.assertEqual(result["state"], "UNCERTAIN")
-            self.assertEqual(adapter.send_calls, 0)
-            self.assertEqual(
-                self.client.status(self.business_event_id)["high_water"], 0
-            )
-        finally:
-            store.close()
-        print("G115_UNENROLLED_EVENT=OUTBOX_UNCERTAIN_ZERO_SEND")
+        # G120 rejects a different business identity BEFORE an Outbox can be
+        # constructed; this is stronger than accepting and later returning
+        # UNCERTAIN. The test witness remains unchanged.
+        with self.assertRaisesRegex(ValueError, "G120_OWNER_ENROLLMENT_EVENT_MISMATCH"):
+            self.guard_for(event=unknown_id)
+        self.assertEqual(
+            self.client.status(self.business_event_id)["high_water"], 0
+        )
+        print("G115_UNENROLLED_EVENT=CONSTRUCTOR_DENIED_NO_SEND")
 
     def test_03_lost_commit_ack_is_uncertain_and_witness_spent(self):
         def lose_ack_transport(action, request, *, drop_response=False):

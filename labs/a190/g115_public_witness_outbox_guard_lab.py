@@ -8,6 +8,7 @@ still exist under SAME-HOST test-harness control and may be restored.
 Do not wire into production Worker or treat this as first-provider-SEND
 certification, independently authenticated enrollment or external P0 custody.
 """
+from copy import deepcopy
 from hashlib import sha256
 import sqlite3
 from threading import Lock
@@ -16,6 +17,7 @@ from aion_chat.first_attempt_witness_lab import _effect_digest
 from aion_chat.intent_binding_a182_lab import semantic_bytes
 from labs.a190.g113_subprocess_witness_client_lab import WitnessProcessUnavailableLab
 from labs.a190.g114_public_key_witness_client_lab import G114PublicKeyWitnessClientLab
+from labs.a190.g120_synthetic_owner_enrollment_lab import verify_synthetic_owner_enrollment
 
 
 class PublicOnlyWitnessOutboxGuardLab:
@@ -23,7 +25,8 @@ class PublicOnlyWitnessOutboxGuardLab:
 
     def __init__(self, *, witness_client, enrolled_event_id,
                  enrolled_original_sha256, original_decision,
-                 minimum_sequence=0):
+                 minimum_sequence=0, owner_enrollment_receipt=None,
+                 pinned_owner_enrollment_public_key=None, owner_approval_clock=None):
         # G115 previously trusted any object returning unsigned dictionaries,
         # allowing a fake duck-typed status/reserve object to release Outbox.
         # Require the exact opt-in G114 client implementation, which checks
@@ -44,6 +47,23 @@ class PublicOnlyWitnessOutboxGuardLab:
         if (type(enrolled_original_sha256) is not str
                 or enrolled_original_sha256 != expected_hash):
             raise ValueError("G115_ORIGINAL_DECISION_PIN_REQUIRED")
+        # Require a second, separately signed owner enrollment for exactly
+        # THIS original business event. A locally re-enrolled new event_id is
+        # not approved merely because the witness signed it.
+        # The signing key, pin and clock are SYNTHETIC HOST-OWNED fixtures,
+        # not proof of actual HUMAN_OWNER authority.
+        if not callable(owner_approval_clock):
+            raise ValueError("G120_OWNER_ENROLLMENT_CLOCK_REQUIRED")
+        verify_synthetic_owner_enrollment(
+            owner_enrollment_receipt,
+            pinned_public_key=pinned_owner_enrollment_public_key,
+            expected_event_id=enrolled_event_id,
+            original_decision=original_decision,
+            now=owner_approval_clock(),
+        )
+        self._owner_approval_receipt = deepcopy(owner_enrollment_receipt)
+        self._owner_approval_pin = pinned_owner_enrollment_public_key
+        self._owner_clock = owner_approval_clock
         # These pins are supplied from a LAB fixture. A real trusted event
         # authority must enroll them outside both host and request context.
         self._event_id = enrolled_event_id
@@ -83,6 +103,16 @@ class PublicOnlyWitnessOutboxGuardLab:
                 decision = intent["decision"]
                 if semantic_bytes(decision) != self._original:
                     return False
+                # A previously valid synthetic approval MUST be checked
+                # again at the moment of use; an expired one never lets the
+                # Outbox attempt a first reservation.
+                verify_synthetic_owner_enrollment(
+                    self._owner_approval_receipt,
+                    pinned_public_key=self._owner_approval_pin,
+                    expected_event_id=self._event_id,
+                    original_decision=decision,
+                    now=self._owner_clock(),
+                )
                 request_id = intent.get("idempotency_key")
                 if (type(request_id) is not str or len(request_id) != 64
                         or request_id != decision.get("idempotency_key")):
