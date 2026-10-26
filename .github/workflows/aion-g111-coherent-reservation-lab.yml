@@ -1,0 +1,43 @@
+name: AION G111 coherent SQLite reservation view LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/pinned_external_enrollment_g102_lab.py'
+      - 'labs/a190/g111_atomic_reservation_observation.py'
+      - 'labs/a190/test_g111_coherent_sqlite_reservation_observation_lab.py'
+      - '.github/workflows/aion-g111-coherent-reservation-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  coherent-local:
+    name: G111 coherent SQLite snapshot / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic crypto prerequisites
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2' 'requests==2.34.2'
+      - name: Run G111 cross-read race and G109 original error paths
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v \
+            labs.a190.test_g111_coherent_sqlite_reservation_observation_lab \
+            labs.a190.test_g109_sqlite_final_lookup_failclosed_lab \
+            2>&1 | tee g111.log
+          grep -Fx 'OK' g111.log
+          grep -F 'G111_COUNTER_RECORD_RACE=DENIED' g111.log
+          grep -F 'G111_MISSING_ATOMIC_READER=DENIED' g111.log
+          grep -F 'G111_ATOMIC_RECORD_MISMATCH=DENIED' g111.log
+          grep -F 'G111_COHERENT_SQLITE_VIEW=PASS_SYNTHETIC_ONLY' g111.log
