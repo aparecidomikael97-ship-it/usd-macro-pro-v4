@@ -1,0 +1,53 @@
+name: AION G115 public-only witness Outbox integration LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g115_public_witness_outbox_guard_lab.py'
+      - 'labs/a190/test_g115_cross_process_outbox_guard_lab.py'
+      - '.github/workflows/aion-g115-cross-process-outbox-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  outbox-boundary:
+    name: G115 synthetic Outbox with process witness / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install synthetic application test dependencies
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Execute 11 G115 Outbox adapter denial and negative control tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g115_cross_process_outbox_guard_lab 2>&1 | tee g115.log
+          grep -F 'Ran 11 tests' g115.log
+          grep -Fx 'OK' g115.log
+          grep -F 'G115_VALID_SIGNED_CROSS_PROCESS_RESERVATION=ONE_FAKE_SEND' g115.log
+          grep -F 'G115_LOST_REMOTE_ACK=NO_PROVIDER_SEND_SPENT' g115.log
+          grep -F 'G115_HOST_RESET_NEW_REQUEST_ID=REMOTE_EVENT_STILL_SPENT' g115.log
+          grep -F 'G115_POST_COMMIT_SIGNATURE_FAIL=SPENT_NO_SEND' g115.log
+          grep -F 'G115_REMOTE_UNAVAILABLE=ZERO_SEND' g115.log
+          grep -F 'G115_FOUR_CONCURRENT_FIRST_ATTEMPTS=ONE_LAB_ADMISSION' g115.log
+          grep -F 'G115_HOST_CONTROLLED_WITNESS_ROLLBACK=STILL_VULNERABLE_NOT_P0' g115.log
+      - name: Retain full G114 public-only witness regression
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g114_public_only_witness_lab 2>&1 | tee g114-inherited.log
+          grep -F 'Ran 15 tests' g114-inherited.log
+          grep -Fx 'OK' g114-inherited.log
