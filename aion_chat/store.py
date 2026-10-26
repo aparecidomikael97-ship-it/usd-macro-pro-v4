@@ -502,8 +502,12 @@ class SQLiteChatStore:
         self._require_open()
         try:
             self.db.commit()
-        except Exception as commit_error:
-            self.quarantine_failed_transaction()
+        except BaseException as commit_error:
+            try:
+                self.quarantine_failed_transaction()
+            except BaseException:
+                # Quarantine detaches before close; preserve the commit error.
+                pass
             if hasattr(commit_error, "add_note"):
                 commit_error.add_note(
                     "AION_CHAT_COMMIT_OUTCOME_UNCERTAIN_STORE_QUARANTINED_NO_RETRY"
