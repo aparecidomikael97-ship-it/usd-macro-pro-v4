@@ -15,6 +15,8 @@ from typing import Any
 
 import requests
 
+from atlasquant_external_first_send_gate import require_external_first_send_authority
+
 SCHEMA="ATLASQUANT_NEURAL_TTS_V2"
 DEFAULT_PROVIDER="openai"
 DEFAULT_MODEL="gpt-4o-mini-tts"
@@ -129,6 +131,9 @@ def generate_neural_speech(
     secret=str(api_key or "").strip()
     if not secret:
         raise RuntimeError("provedor neural não configurado")
+
+    # G75 LAB: credentials and transcript caching are not first-send custody.
+    require_external_first_send_authority()
 
     response=requests.post(
         cfg.endpoint,
