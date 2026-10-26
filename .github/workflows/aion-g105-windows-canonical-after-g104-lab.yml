@@ -1,0 +1,84 @@
+name: AION G105 Windows canonical regression after G104 LAB
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aion-g105-windows-canonical-after-g104-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quality:
+    name: G105 full canonical Quality 6449 / Windows
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install full pinned G90 application and canonical test tools
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0'
+          python -m pip check
+      - name: Run unchanged A183 original canonical Quality selectors
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py quality 2>&1 | tee g105-quality.log
+          grep -F 'Ran 6449 tests' g105-quality.log
+  security:
+    name: G105 original canonical unittest and pytest Security / Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install full pinned G90 application and canonical test tools
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0'
+          python -m pip check
+      - name: Run unchanged A183 original Security unittest selectors
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py security-unittest 2>&1 | tee g105-security-unittest.log
+          grep -F 'Ran 368 tests' g105-security-unittest.log
+      - name: Run unchanged A183 original Security pytest selectors
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py security-pytest 2>&1 | tee g105-security-pytest.log
+          grep -F 'passed' g105-security-pytest.log
+  audit:
+    name: G105 canonical pip-audit and Bandit / Windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install original G90 pins and audit tooling
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pip-audit==2.10.1' 'bandit==1.9.4'
+          python -m pip check
+      - name: Run exact canonical Security audit without ignored advisories
+        shell: bash
+        run: python -B scripts/run_a183_canonical_lab.py security-audit
