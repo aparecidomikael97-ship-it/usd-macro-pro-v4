@@ -166,7 +166,11 @@ class SubprocessWitnessClientLab:
         if not self._verified(reply, challenge=challenge, event_id=event_id):
             raise WitnessProcessUnavailableLab("G113_SIGNED_RESERVATION_INVALID")
         payload = reply["payload"]
-        if payload["status"] == "RESERVED" and any(
+        # A valid signature on ALREADY_RESERVED is a signed DENIAL, not a
+        # second permission. Only the unique first COMMIT is a candidate.
+        if payload["status"] != "RESERVED":
+            raise WitnessProcessUnavailableLab("G113_DUPLICATE_OR_DENIED_NO_SEND")
+        if any(
             payload[k] != value for k, value in (
                 ("original_sha256", original_sha256),
                 ("effect_digest", effect_digest),
