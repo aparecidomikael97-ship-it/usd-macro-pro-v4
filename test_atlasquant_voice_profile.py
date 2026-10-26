@@ -3,6 +3,8 @@ from unittest.mock import Mock, patch
 
 from atlasquant_neural_tts import (
     NeuralVoiceConfig,
+    build_neural_speech_payload,
+    parse_neural_speech_response,
     VOICE_INSTRUCTIONS,
     generate_neural_speech,
     neural_voice_identity,
@@ -50,6 +52,14 @@ class AtlasQuantVoiceProfileTests(unittest.TestCase):
 
 
 class AtlasQuantNeuralTtsTests(unittest.TestCase):
+    def setUp(self):
+        for target in ("requests.sessions.Session.request", "requests.post",
+                       "socket.socket.connect", "socket.create_connection"):
+            guard=patch(target,side_effect=AssertionError("G76_FORBIDDEN_NETWORK"))
+            mock=guard.start()
+            self.addCleanup(guard.stop)
+            self.addCleanup(mock.assert_not_called)
+
     def test_identity_never_allows_browser_or_device_fallback(self):
         identity=neural_voice_identity()
         self.assertEqual(identity["model"],"gpt-4o-mini-tts")
@@ -77,21 +87,17 @@ class AtlasQuantNeuralTtsTests(unittest.TestCase):
         response.status_code=200
         response.content=b"MP3DATA"
         response.headers={"content-type":"audio/mpeg"}
-        with patch("atlasquant_neural_tts.requests.post",return_value=response) as post:
-            audio=generate_neural_speech(
-                "Texto exato.",
-                api_key="secret",
-                config=NeuralVoiceConfig(),
-            )
+        with self.assertRaisesRegex(RuntimeError,"^G75_EXTERNAL_FIRST_SEND_AUTHORITY_UNAVAILABLE$"):
+            generate_neural_speech("Texto exato.",api_key="secret",config=NeuralVoiceConfig())
+        audio=parse_neural_speech_response(response)
         self.assertEqual(audio,b"MP3DATA")
-        kwargs=post.call_args.kwargs
-        self.assertNotIn("secret",str(kwargs["json"]))
-        self.assertEqual(kwargs["json"]["model"],"gpt-4o-mini-tts")
-        self.assertEqual(kwargs["json"]["voice"],"cedar")
-        self.assertEqual(kwargs["json"]["input"],"Texto exato.")
-        self.assertEqual(kwargs["json"]["instructions"],VOICE_INSTRUCTIONS)
-        self.assertEqual(kwargs["json"]["response_format"],"mp3")
-        self.assertEqual(kwargs["headers"]["Authorization"],"Bearer secret")
+        payload=build_neural_speech_payload("Texto exato.",config=NeuralVoiceConfig())
+        self.assertNotIn("secret",str(payload))
+        self.assertEqual(payload["model"],"gpt-4o-mini-tts")
+        self.assertEqual(payload["voice"],"cedar")
+        self.assertEqual(payload["input"],"Texto exato.")
+        self.assertEqual(payload["instructions"],VOICE_INSTRUCTIONS)
+        self.assertEqual(payload["response_format"],"mp3")
 
     def test_missing_provider_never_generates_or_falls_back(self):
         with patch("atlasquant_neural_tts.requests.post") as post:
@@ -104,9 +110,10 @@ class AtlasQuantNeuralTtsTests(unittest.TestCase):
         response.status_code=401
         response.content=b'{"error":"sensitive provider detail"}'
         response.headers={"content-type":"application/json"}
-        with patch("atlasquant_neural_tts.requests.post",return_value=response):
-            with self.assertRaisesRegex(RuntimeError,"HTTP 401") as ctx:
-                generate_neural_speech("Texto.",api_key="bad-secret")
+        with self.assertRaisesRegex(RuntimeError,"^G75_EXTERNAL_FIRST_SEND_AUTHORITY_UNAVAILABLE$"):
+            generate_neural_speech("Texto.",api_key="bad-secret")
+        with self.assertRaisesRegex(RuntimeError,"HTTP 401") as ctx:
+            parse_neural_speech_response(response)
         self.assertNotIn("sensitive provider detail",str(ctx.exception))
         self.assertNotIn("bad-secret",str(ctx.exception))
 

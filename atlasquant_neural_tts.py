@@ -118,6 +118,11 @@ def transcript_cache_key(
     return sha256(raw.encode("utf-8")).hexdigest()
 
 
+def _build_neural_speech_headers(api_key:str)->dict[str,str]:
+    """Pure historical header data; caller retains existing key normalization."""
+    return {"Authorization":f"Bearer {api_key}","Content-Type":"application/json"}
+
+
 def generate_neural_speech(
     text:Any,
     *,
@@ -137,20 +142,29 @@ def generate_neural_speech(
 
     response=requests.post(
         cfg.endpoint,
-        headers={
-            "Authorization":f"Bearer {secret}",
-            "Content-Type":"application/json",
-        },
-        json={
-            "model":cfg.model,
-            "voice":cfg.voice,
-            "input":transcript,
-            "instructions":VOICE_INSTRUCTIONS,
-            "response_format":cfg.response_format,
-            "speed":cfg.speed,
-        },
+        headers=_build_neural_speech_headers(secret),
+        json=build_neural_speech_payload(transcript,config=cfg),
         timeout=max(5,int(timeout)),
     )
+    return parse_neural_speech_response(response)
+
+
+def build_neural_speech_payload(text:Any, *, config:NeuralVoiceConfig|None=None)->dict[str,Any]:
+    """Build offline request data; no credentials, transport or send authority."""
+    cfg=(config or NeuralVoiceConfig()).validated()
+    transcript=validate_transcript(text)
+    return {
+        "model":cfg.model,
+        "voice":cfg.voice,
+        "input":transcript,
+        "instructions":VOICE_INSTRUCTIONS,
+        "response_format":cfg.response_format,
+        "speed":cfg.speed,
+    }
+
+
+def parse_neural_speech_response(response:Any)->bytes:
+    """Validate an existing response offline; never sends or authorizes a POST."""
     if response.status_code!=200:
         # Deliberately do not surface provider response bodies; they can contain
         # operational/account details and are not useful to the end user.
@@ -177,4 +191,5 @@ __all__=[
     "DEFAULT_ENDPOINT","MAX_INPUT_CHARS","VOICE_INSTRUCTIONS",
     "NeuralVoiceConfig","validate_transcript","neural_voice_identity",
     "transcript_cache_key","generate_neural_speech","provider_configured",
+    "build_neural_speech_payload","parse_neural_speech_response",
 ]
