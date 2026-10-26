@@ -3,6 +3,7 @@
 LAB synthetic fake values, disposable SQLite, no providers/Worker/SEND.
 """
 from pathlib import Path
+from dataclasses import dataclass
 from unittest.mock import patch
 import json
 import tempfile
@@ -204,6 +205,42 @@ class G73ChatDumpPrecopy(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"G70_REDACT_NODE_BUDGET_DENY"):
                 dump(val)
         print("G73_DAG_PRECOPY_GREEN=ASDICT_NOT_EXECUTED")
+
+    def test_18_nested_dataclass_under_sensitive_key_denied(self):
+        nested=Message(conversation_id="fake",role="user",
+                       content="synthetic-not-secret")
+        cp=ConversationCheckpoint(conversation_id="fake",through_sequence=0,
+                                  decisions={"password":nested})
+        with self.assertRaisesRegex(ValueError,"G73_UNSUPPORTED_NESTED_DATACLASS_DENY"):
+            dump(cp)
+        print("G73_HIDDEN_DATACLASS_GREEN=NOT_MASKED_SILENTLY")
+
+    def test_19_hidden_nested_dataclass_checkpoint_preserves_prior(self):
+        conv=self.conv()
+        self.store.append_message(SCOPE,Message(conversation_id=conv.id,
+                                  role="user",content="synthetic"))
+        prior=ConversationCheckpoint(conversation_id=conv.id,through_sequence=0,
+                                     decisions={"public":"prior"})
+        self.store.save_checkpoint(SCOPE,prior)
+        attempted=ConversationCheckpoint(
+            conversation_id=conv.id,through_sequence=1,
+            decisions={"secret":Message(conversation_id=conv.id,
+                                       role="user",content="synthetic")})
+        with self.assertRaisesRegex(ValueError,"G73_UNSUPPORTED_NESTED_DATACLASS_DENY"):
+            self.store.save_checkpoint(SCOPE,attempted)
+        self.assertEqual(self.store.get_latest_checkpoint(SCOPE,conv.id).id,prior.id)
+        self.assertEqual(self.store.get_conversation(SCOPE,conv.id).latest_checkpoint,prior.id)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM records").fetchone()[0],1)
+        self.assertFalse(self.db.in_transaction)
+        print("G73_HIDDEN_POINTER_GREEN=ROLLED_BACK")
+
+    def test_20_dump_dataclass_class_not_instance_is_denied(self):
+        @dataclass
+        class ClassWithDefaults:
+            public: str="ordinary"
+        with self.assertRaisesRegex(TypeError,"dataclass instance"):
+            dump(ClassWithDefaults)
+        print("G73_CLASS_INPUT_GREEN=ONLY_INSTANCES")
 
     def test_14_direct_hidden_cyclic_value_still_denied(self):
         loop=[]
