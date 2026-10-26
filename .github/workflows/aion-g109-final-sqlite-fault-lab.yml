@@ -1,0 +1,45 @@
+name: AION G109 SQLite final lookup fail-closed LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/pinned_external_enrollment_g102_lab.py'
+      - 'labs/a190/g107_local_reservation_lookup.py'
+      - 'labs/a190/test_g109_sqlite_final_lookup_failclosed_lab.py'
+      - '.github/workflows/aion-g109-final-sqlite-fault-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  strict-failure:
+    name: G109 strict local SQLite lookup / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic crypto prerequisites
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2' 'requests==2.34.2'
+      - name: Execute G109 fault-path and inherited G107 contracts
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v \
+            labs.a190.test_g109_sqlite_final_lookup_failclosed_lab \
+            labs.a190.test_g107_same_count_reservation_identity_lab \
+            2>&1 | tee g109.log
+          grep -Fx 'OK' g109.log
+          grep -F 'G109_SQLITE_MISSING_TABLE=NORMALIZED_DENY' g109.log
+          grep -F 'G109_SQLITE_OPERATIONAL_AFTER_COMMIT=LITERAL_FALSE' g109.log
+          grep -F 'G109_CORRUPT_SQLITE_AFTER_COMMIT=LITERAL_FALSE' g109.log
+          grep -F 'G109_CLOSED_SQLITE_AFTER_COMMIT=LITERAL_FALSE' g109.log
+          grep -F 'G109_OUTBOX_UNCERTAIN_AFTER_SQL_FAULT=ZERO_SEND' g109.log
+          grep -F 'G109_ORIGINAL_RECORD=PASS_SYNTHETIC_ONLY' g109.log
