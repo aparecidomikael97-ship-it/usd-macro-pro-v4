@@ -6,8 +6,8 @@ adapter call proves callback ordering, NOT a real provider SEND or P0 GO.
 """
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from datetime import timedelta
 from hashlib import sha256
-import json
 import os
 from pathlib import Path
 
@@ -20,6 +20,7 @@ from labs.a190.g114_witness_subprocess_transport_lab import G114SubprocessTransp
 from labs.a190.g114_public_key_witness_client_lab import G114PublicKeyWitnessClientLab
 from labs.a190.g115_public_witness_outbox_guard_lab import PublicOnlyWitnessOutboxGuardLab
 from test_atlasquant_aion_intent_binding_a182_lab import A182Fixture
+from test_atlasquant_aion_execution_outbox import NOW
 
 
 class G115CrossProcessOutboxLab(A182Fixture):
@@ -114,7 +115,7 @@ class G115CrossProcessOutboxLab(A182Fixture):
             result, adapter = self.claim_and_send(outbox, row)
             self.assertEqual(result["state"], "UNCERTAIN")
             self.assertEqual(adapter.send_calls, 0)
-            self.assertIsNone(outbox.claim_next("retry", now=row["created_at"] if False else __import__("test_atlasquant_aion_execution_outbox").NOW))
+            self.assertIsNone(outbox.claim_next("retry", now=NOW + timedelta(seconds=4)))
             record = self.client.status(self.business_event_id)
             self.assertEqual(record["status"], "RESERVED")
             self.assertEqual(record["sequence"], 1)
@@ -131,7 +132,6 @@ class G115CrossProcessOutboxLab(A182Fixture):
         print("G115_ALTERED_ORIGINAL=DENIED_BEFORE_REMOTE_COMMIT")
 
     def test_05_new_technical_request_after_host_reset_denied(self):
-        original = self.original_row
         store, outbox, row = self.host(guard=self.guard_for())
         try:
             first, adapter = self.claim_and_send(outbox, row)
