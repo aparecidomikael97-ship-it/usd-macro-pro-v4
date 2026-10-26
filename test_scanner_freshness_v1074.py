@@ -42,12 +42,14 @@ class ScannerFreshnessV1074Tests(unittest.TestCase):
         self.assertFalse(info["fresh"])
 
     def test_exactly_60_minutes_is_stale_by_conservative_boundary(self):
-        now=time.time()
-        state={"resultados":{"EUR/USD":{"m15_fetched_at":now-3600,"tecnico":{"disponivel":True}}}}
-        with patch("master_panel_v102._time.time",return_value=now):
+        # _minutes_since uses pandas' UTC clock, not _time.time. Pin the
+        # *computed elapsed age* to avoid a 1-microsecond timing race.
+        state={"resultados":{"EUR/USD":{"m15_fetched_at":1700000000,"tecnico":{"disponivel":True}}}}
+        with patch("master_panel_v102._minutes_since",return_value=60.0) as age:
             info=m._scanner_for_pair(state,"EUR/USD")
+        age.assert_called_once_with(1700000000)
         self.assertFalse(info["fresh"])
-        self.assertGreaterEqual(info["age_minutes"],60)
+        self.assertEqual(info["age_minutes"],60.0)
 
     def test_future_timestamp_does_not_create_negative_age(self):
         now=time.time()
