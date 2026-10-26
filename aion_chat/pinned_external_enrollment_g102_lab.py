@@ -11,6 +11,7 @@ import base64
 import binascii
 from hashlib import sha256
 import secrets
+import sqlite3
 from threading import Lock
 
 from cryptography.exceptions import InvalidSignature
@@ -271,5 +272,8 @@ class PinnedExternalEnrollmentAdmissionLab:
                     for name in expected
                 )
             except (KeyError, TypeError, ValueError, RuntimeError, OSError,
-                    InvalidSignature, binascii.Error):
+                    sqlite3.Error, InvalidSignature, binascii.Error):
+                # The opt-in verifier itself must return literal False even
+                # when a supplied local record reader leaks a raw SQLite
+                # exception. A spent reservation remains UNCERTAIN/NO SEND.
                 return False
