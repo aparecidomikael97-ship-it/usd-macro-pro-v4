@@ -140,19 +140,14 @@ class G119ProviderStatementTests(G115CrossProcessOutboxLab):
         self.assertEqual(first.provider_claim, "EXECUTED")
         replay_without_challenge = verifier.inspect_statement(old)
         self.assertFalse(replay_without_challenge.signed_statement)
-        with self.assertRaisesRegex(RuntimeError, "G119_OUTSTANDING_CHALLENGE"):
-            verifier.challenge() if False else self._test_outstanding(verifier)
         fresh_nonce = verifier.challenge()
+        with self.assertRaisesRegex(RuntimeError, "G119_OUTSTANDING_CHALLENGE"):
+            verifier.challenge()
         self.assertNotEqual(fresh_nonce, nonce)
         repeated = verifier.inspect_statement(old)
         self.assertFalse(repeated.signed_statement)
         self.assert_no_operational_permission(repeated)
         print("G119_REPLAYED_PROVIDER_STATEMENT=DENIED_WITH_FRESH_NONCE")
-
-    @staticmethod
-    def _test_outstanding(verifier):
-        verifier.challenge()
-        verifier.challenge()
 
     def test_18_signed_original_identity_scope_request_and_sequence_bound(self):
         self.reserve()
