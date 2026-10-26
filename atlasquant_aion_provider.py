@@ -23,6 +23,8 @@ import os
 
 import requests
 
+from atlasquant_external_first_send_gate import require_external_first_send_authority
+
 from atlasquant_aion_model_router import (
     budget_decision,
     normalize_budget,
@@ -370,7 +372,7 @@ def execute_openai_answer(
     values:Mapping[str,Any]|None=None,
     session:requests.Session|None=None,
 )->dict[str,Any]:
-    """Call the configured provider only after every preflight gate passes."""
+    """G75 LAB: preserve preflight checks, then deny external first send."""
     cfg=provider_config(values)
     status=provider_configuration_status(values)
     clean_prompt=str(prompt or "").strip()[:MAX_PROMPT_CHARS]
@@ -419,6 +421,17 @@ def execute_openai_answer(
         return {
             "schema":SCHEMA,"state":"BLOCKED_MODEL","called":False,
             "reason":"Modelo da rota não foi configurado.",
+        }
+
+    # G75 LAB: neither approval nor a caller-owned session proves reservation.
+    try:
+        require_external_first_send_authority()
+    except RuntimeError as exc:
+        return {
+            "schema":SCHEMA,
+            "state":"BLOCKED_FIRST_SEND_AUTHORITY_UNAVAILABLE",
+            "called":False,
+            "reason":str(exc),
         }
 
     body={

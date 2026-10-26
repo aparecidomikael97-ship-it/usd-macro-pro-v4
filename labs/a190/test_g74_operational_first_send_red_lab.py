@@ -69,7 +69,7 @@ class G74UnwitnessedSendRed(unittest.TestCase):
     def test_voice_no_reservation_must_block_before_first_post(self):
         transport = _AcceptedThenLostAck()
         with patch("atlasquant_neural_tts.requests.post", transport.post):
-            with self.assertRaises(TimeoutError):
+            with self.assertRaisesRegex(RuntimeError, "G75_EXTERNAL_FIRST_SEND_AUTHORITY_UNAVAILABLE"):
                 generate_neural_speech("synthetic public audio", api_key="FAKE_G74_LAB_ONLY")
         self.assertEqual(
             transport.calls, 0,
@@ -80,7 +80,7 @@ class G74UnwitnessedSendRed(unittest.TestCase):
         transport = _AcceptedThenLostAck()
         with patch("atlasquant_neural_tts.requests.post", transport.post):
             for _ in range(2):
-                with self.assertRaises(TimeoutError):
+                with self.assertRaisesRegex(RuntimeError, "G75_EXTERNAL_FIRST_SEND_AUTHORITY_UNAVAILABLE"):
                     generate_neural_speech("synthetic public audio", api_key="FAKE_G74_LAB_ONLY")
         self.assertLessEqual(
             transport.calls, 1,
