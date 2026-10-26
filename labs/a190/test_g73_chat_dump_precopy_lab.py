@@ -164,6 +164,47 @@ class G73ChatDumpPrecopy(unittest.TestCase):
         self.assertEqual(saved["decisions"]["two"],saved["decisions"]["one"])
         print("G73_SHARED_DAG_GREEN=SMALL_GRAPH_ALLOWED")
 
+    def test_15_nested_dataclass_is_explicitly_denied(self):
+        nested=Message(conversation_id="fake",role="user",content="ordinary")
+        cp=ConversationCheckpoint(conversation_id="fake",through_sequence=0,
+                                  decisions={"nested_model":nested})
+        with self.assertRaisesRegex(ValueError,"G73_UNSUPPORTED_NESTED_DATACLASS_DENY"):
+            dump(cp)
+        print("G73_NESTED_DATACLASS_GREEN=EXPLICIT_DENIAL")
+
+    def test_16_failed_later_checkpoint_preserves_prior_pointer(self):
+        conv=self.conv()
+        self.store.append_message(SCOPE,Message(conversation_id=conv.id,
+                                  role="user",content="ordinary"))
+        old=ConversationCheckpoint(conversation_id=conv.id,through_sequence=0,
+                                   decisions={"status":"valid"})
+        self.store.save_checkpoint(SCOPE,old)
+        loop={}
+        loop["self"]=loop
+        attempted=ConversationCheckpoint(conversation_id=conv.id,through_sequence=1,
+                                          decisions={"bad":loop})
+        with self.assertRaisesRegex(ValueError,"G70_REDACT_CYCLE_DENY"):
+            self.store.save_checkpoint(SCOPE,attempted)
+        self.assertFalse(self.db.in_transaction)
+        self.assertEqual(self.db.execute(
+            "SELECT COUNT(*) FROM records WHERE kind='checkpoint'").fetchone()[0],1)
+        current=self.store.get_conversation(SCOPE,conv.id)
+        self.assertEqual(current.latest_checkpoint,old.id)
+        self.assertEqual(current.message_count,1)
+        self.assertEqual(self.store.get_latest_checkpoint(SCOPE,conv.id).id,old.id)
+        self.assertEqual(self.store.storage_health()["state"],"healthy")
+        print("G73_POINTER_GREEN=PRIOR_CHECKPOINT_IMMUTABLE")
+
+    def test_17_checkpoint_dag_denial_before_serializer_recursion(self):
+        val=ConversationCheckpoint(conversation_id="fake",through_sequence=0,
+                                   decisions={"graph":compact_dag(24)})
+        # The recursive dataclass copy must not run even on a compact DAG.
+        with patch("aion_chat.store.asdict",side_effect=RuntimeError(
+            "G73_ASDICT_PRECOPY_SENTINEL")):
+            with self.assertRaisesRegex(ValueError,"G70_REDACT_NODE_BUDGET_DENY"):
+                dump(val)
+        print("G73_DAG_PRECOPY_GREEN=ASDICT_NOT_EXECUTED")
+
     def test_14_direct_hidden_cyclic_value_still_denied(self):
         loop=[]
         loop.append(loop)
