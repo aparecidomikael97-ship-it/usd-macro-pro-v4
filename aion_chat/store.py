@@ -430,7 +430,7 @@ class SQLiteChatStore:
             if self.db is not None:
                 try:
                     self.db.close()
-                except Exception:
+                except BaseException:
                     pass
             self.db = None
             if isinstance(exc, StorageUnavailableError):
