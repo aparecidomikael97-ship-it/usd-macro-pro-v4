@@ -1,6 +1,7 @@
 """Credential redaction: defense in depth, not universal DLP."""
 import json
 import re
+from dataclasses import is_dataclass
 from collections.abc import Mapping
 
 PATTERNS = [re.compile(r"(?i)\b(password|senha|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|private[_ -]?key|client[_ -]?secret|secret|authorization)\b\s*[:=]\s*[^\s,;]+"),
@@ -141,6 +142,10 @@ def _g70_enter(value, active, depth):
 def _g70_check_only(value, active, budget, depth):
     """Count and inspect hidden sensitive values without disclosing them."""
     _g70_charge(budget)
+    # G73: nested dataclasses were implicitly expanded by unsafe asdict.
+    # Even hidden fields may not bypass the unsupported-type admission rule.
+    if is_dataclass(value):
+        raise ValueError("G73_UNSUPPORTED_NESTED_DATACLASS_DENY")
     if not isinstance(value, (Mapping, list, tuple)):
         return
     _g70_enter(value, active, depth)
@@ -165,6 +170,8 @@ def redact(value):
 
 def _g70_redact(value, active, budget, depth):
     _g70_charge(budget)
+    if is_dataclass(value):
+        raise ValueError("G73_UNSUPPORTED_NESTED_DATACLASS_DENY")
     is_container = isinstance(value, (Mapping, list, tuple))
     # Save ORIGINAL identity: value is replaced by normalized dict/list.
     container_id = id(value) if is_container else None

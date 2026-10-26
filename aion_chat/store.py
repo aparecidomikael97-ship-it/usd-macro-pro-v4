@@ -1,7 +1,7 @@
 """Local SQLite staging with scoped identity and explicit resilience controls."""
 import base64
 from contextlib import contextmanager
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, is_dataclass
 import hashlib
 import json
 import os
@@ -65,8 +65,30 @@ class AionChatStore(Protocol):
     def retrieve_messages(self, scope: Scope, conversation_id: str, query: str, **options): ...
 
 
+def _g73_nested_json_unsupported(value):
+    # Nested dataclasses were implicitly expanded by asdict without a
+    # budget. Refuse them explicitly rather than re-introducing pre-copy or
+    # silently dumping an opaque Python representation.
+    if is_dataclass(value):
+        raise ValueError("G73_UNSUPPORTED_NESTED_DATACLASS_DENY")
+    raise TypeError(
+        f"Object of type {type(value).__name__} is not JSON serializable"
+    )
+
+
 def dump(value):
-    return json.dumps(redact(asdict(value)), ensure_ascii=False, separators=(",", ":"))
+    if not is_dataclass(value) or isinstance(value, type):
+        raise TypeError("dataclass instance required")
+    # G73: dataclasses.asdict recursively copies untrusted nested containers
+    # BEFORE the bounded G70 redactor can inspect them. Project only the
+    # declared top-level dataclass fields; let redact guard nested cycles,
+    # depth, expanded visits and sensitive values before JSON serialization.
+    # The input must remain a dataclass instance (asdict's prior contract).
+    data = {item.name: getattr(value, item.name) for item in fields(value)}
+    return json.dumps(
+        redact(data), ensure_ascii=False, separators=(",", ":"),
+        default=_g73_nested_json_unsupported,
+    )
 
 
 class _ValidatedDatabaseReport(dict):
