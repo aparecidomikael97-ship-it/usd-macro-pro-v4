@@ -1,0 +1,38 @@
+name: AION G94 durable execution SQLite native close LAB
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_durable_execution_kernel.py'
+      - 'labs/a190/test_g94_durable_execution_native_connection_close_lab.py'
+      - '.github/workflows/aion-g94-durable-execution-native-close-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-close:
+    name: G94 native sqlite close / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Run five real SQLite native-close invariants (RED first)
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g94_durable_execution_native_connection_close_lab 2>&1 | tee g94.log
+          grep -F 'Ran 5 tests' g94.log
+          grep -Fx 'OK' g94.log
+          grep -F 'G94_CONSTRUCTOR_GREEN=NATIVE_CLOSE_AFTER_SCHEMA_COMMIT' g94.log
+          grep -F 'G94_GET_MISSING_GREEN=PRIMARY_ERROR_NATIVE_CLOSED' g94.log
+          grep -F 'G94_IDEMPOTENCY_GREEN=NO_LINGERING_CONNECTION' g94.log
+          grep -F 'G94_SQLITE_ERROR_GREEN=TRANSACTION_EXIT_AND_NATIVE_CLOSE' g94.log
+          grep -F 'G94_PREPARE_GREEN=TRANSACTIONS_COMMIT_AND_CLOSE' g94.log
