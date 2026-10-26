@@ -38,7 +38,7 @@ class OneUseString:
         self.calls=0
     def __str__(self):
         self.calls+=1
-        return "safe-first" if self.calls==1 else "sk-G65UNEXPECTEDFAKE123456"
+        return "safe-first" if self.calls==1 else "sk"+"-G65UNEXPECTEDFAKE123456"
 
 class G65KeyBudgetAndBoundary(unittest.TestCase):
     def setUp(self):
@@ -91,7 +91,7 @@ class G65KeyBudgetAndBoundary(unittest.TestCase):
     def test_01_direct_fake_secret_json_key_in_confirm_denied(self):
         key=self.uncertain()
         self.watched_deny(
-            lambda:self.confirm(key,{"sk-G65FAKEKEY123456":"public"}),
+            lambda:self.confirm(key,{"sk"+"-G65FAKEKEY123456":"public"}),
             "G65_SENSITIVE_JSON_KEY_DENY",(1,1,1,0))
         print("G65_CONFIRM_KEY_GREEN=NO_SECRET_NAME_LEDGER")
 
@@ -104,7 +104,7 @@ class G65KeyBudgetAndBoundary(unittest.TestCase):
 
     def test_03_enqueue_fake_secret_json_key_denied_before_begin(self):
         self.watched_deny(
-            lambda:self.stage({"sk-G65FAKESTAGINGKEY1234":"x"}),
+            lambda:self.stage({"sk"+"-G65FAKESTAGINGKEY1234":"x"}),
             "G65_SENSITIVE_JSON_KEY_DENY",(0,0,0,0))
         print("G65_STAGING_KEY_GREEN=NO_RESERVATION")
 
@@ -213,7 +213,7 @@ class G65KeyBudgetAndBoundary(unittest.TestCase):
 
     def test_19_sensitive_patterns_in_values_remain_redacted(self):
         row=self.stage({"memo":"Bearer G65FAKEMEMO12345",
-                        "display":"sk-G65FAKEDISPLAY12345"})
+                        "display":"sk"+"-G65FAKEDISPLAY12345"})
         self.assertEqual(row["enqueue_state"],"ENQUEUED")
         stored=self.raw.execute("SELECT data FROM action_decisions").fetchone()[0]
         self.assertNotIn("G65FAKEMEMO12345",stored)

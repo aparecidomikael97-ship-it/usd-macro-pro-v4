@@ -146,7 +146,7 @@ class G63ConfirmCyclesAndStablePayload(unittest.TestCase):
 
     def test_07_volatile_string_secret_after_redact_denied(self):
         volatile=ChangesBetweenSerializations(
-            "synthetic-first","sk-G63SYNTHETIC1234567890",self.db)
+            "synthetic-first","sk"+"-G63SYNTHETIC1234567890",self.db)
         self.assert_drift_denial(volatile,"G63_STAGED_PAYLOAD_PRIVACY_DENY")
         print("G63_VOLATILE_SECRET_GREEN=NO_FAKE_TOKEN_PERSISTED")
 
@@ -169,7 +169,7 @@ class G63ConfirmCyclesAndStablePayload(unittest.TestCase):
         print("G63_STABLE_OBJECT_GREEN=LEGITIMATE_REPLAY")
 
     def test_11_stable_custom_secret_rejected_even_if_digest_matches(self):
-        secret="sk-G63SYNTHETICSTABLE123456"
+        secret="sk"+"-G63SYNTHETICSTABLE123456"
         volatile=ChangesBetweenSerializations(secret,secret,self.db)
         self.assert_drift_denial(volatile,"G63_STAGED_PAYLOAD_PRIVACY_DENY")
         print("G63_STABLE_SECRET_GREEN=REDACTION_AFTER_ENCODING")

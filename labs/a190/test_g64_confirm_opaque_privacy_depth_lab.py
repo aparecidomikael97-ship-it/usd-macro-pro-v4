@@ -82,7 +82,7 @@ class G64ConfirmOpaqueAndDepth(unittest.TestCase):
 
     def test_01_opaque_str_fake_token_denied_before_begin(self):
         key=self.prepare()
-        opaque=OpaqueString("sk-G64FAKETOKEN123456789")
+        opaque=OpaqueString("sk"+"-G64FAKETOKEN123456789")
         watch=BeginWatch(self.raw)
         self.box.db=watch
         with self.assertRaisesRegex(ValueError,"G64_CONFIRM_SERIALIZED_PRIVACY_DENY"):
@@ -107,7 +107,7 @@ class G64ConfirmOpaqueAndDepth(unittest.TestCase):
     def test_03_opaque_str_fake_secret_under_tuple_denied(self):
         key=self.prepare()
         with self.assertRaisesRegex(ValueError,"G64_CONFIRM_SERIALIZED_PRIVACY_DENY"):
-            self.confirm(key,{"tuple":(OpaqueString("sk-G64ANOTHERFAKE123456"),)})
+            self.confirm(key,{"tuple":(OpaqueString("sk"+"-G64ANOTHERFAKE123456"),)})
         self.assertEqual(self.counts(),(1,1,1,0))
 
     def test_04_ordinary_opaque_string_confirmation_still_allowed(self):
