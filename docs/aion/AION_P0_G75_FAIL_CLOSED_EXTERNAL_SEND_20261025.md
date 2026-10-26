@@ -7,7 +7,7 @@
 
 A G74 documentou 4/4 FAIL reais do baseline: POST de texto e de voz sem reserva e repetição em chamadas manuais após perda simulada de ACK. Nenhuma rede/credencial real foi usada. Codex prepatch na sessão `01a175d5-5f65-75f2-9b84-70711ca99729` localizou `atlasquant_aion_provider.py` e `atlasquant_neural_tts.py` como fronteiras de transporte independentes do Outbox; **não** encontrou retry automático no próprio Outbox.
 
-A G75 acrescenta `atlasquant_external_first_send_gate.require_external_first_send_authority`, sem configuração de bypass, callback do usuário ou modo produtor: atualmente **sempre nega** com `G75_EXTERNAL_FIRST_SEND_AUTHORITY_UNAVAILABLE`. 
+A G75 acrescenta `atlasquant_external_first_send_gate.require_external_first_send_authority`, sem configuração de bypass, callback do usuário ou modo produtor: atualmente **sempre nega** com `G75_EXTERNAL_FIRST_SEND_AUTHORITY_UNAVAILABLE`.
 - Texto: depois das proteções existentes de privacidade, feature flag, credencial, aprovação e orçamento, retorna `BLOCKED_FIRST_SEND_AUTHORITY_UNAVAILABLE`, `called=False`, **antes de `post`**.
 - Voz: após validação da configuração, texto e chave, lança `RuntimeError(G75_EXTERNAL_FIRST_SEND_AUTHORITY_UNAVAILABLE)`, **antes de `requests.post`**.
 - Mesmo valores sintéticos aprovados, configuração pronta, objeto `session` falso, clique repetido ou ambiente falso **não** constituem reserva.
