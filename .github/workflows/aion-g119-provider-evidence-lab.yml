@@ -1,0 +1,57 @@
+name: AION G119 synthetic provider evidence separate trust LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g119_provider_evidence_separate_root_lab.py'
+      - 'labs/a190/test_g119_provider_evidence_separate_root_lab.py'
+      - '.github/workflows/aion-g119-provider-evidence-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  provider-evidence:
+    name: G119 signed simulated provider statement / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install canonical pinned application dependencies
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Provider-like signed statement 12 new plus G115 inherited
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g119_provider_evidence_separate_root_lab 2>&1 | tee g119.log
+          grep -F 'Ran 34 tests' g119.log
+          grep -Fx 'OK' g119.log
+          grep -F 'G119_SYNTHETIC_EXECUTED=NOT_REAL_PROVIDER_CONFIRMATION' g119.log
+          grep -F 'G119_SYNTHETIC_REJECTED=NO_AUTOMATIC_RETRY' g119.log
+          grep -F 'G119_SYNTHETIC_PENDING=PROVIDER_UNKNOWN_NO_SEND' g119.log
+          grep -F 'G119_WITNESS_ROOT_SIGNATURE=NOT_PROVIDER_ROOT' g119.log
+          grep -F 'G119_REPLAYED_PROVIDER_STATEMENT=DENIED_WITH_FRESH_NONCE' g119.log
+          grep -F 'G119_SIGNED_OTHER_BUSINESS_EVENT=DENIED_ALL_FIELDS' g119.log
+          grep -F 'G119_LOST_ACK_AND_SYNTHETIC_PROVIDER_CLAIM=NO_SEND_NO_CONFIRM' g119.log
+          grep -F 'G115_HOST_CONTROLLED_WITNESS_ROLLBACK=STILL_VULNERABLE_NOT_P0' g119.log
+      - name: Original signed witness recovery and unsigned G116 guard regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g118_signed_witness_recovery_lab 2>&1 | tee g118.log
+          grep -F 'Ran 34 tests' g118.log
+          grep -Fx 'OK' g118.log
+          python -B -m unittest -v labs.a190.test_g116_unsigned_witness_client_injection_lab 2>&1 | tee g116.log
+          grep -F 'Ran 24 tests' g116.log
+          grep -Fx 'OK' g116.log
