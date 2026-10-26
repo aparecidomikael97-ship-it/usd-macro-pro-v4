@@ -1,0 +1,37 @@
+name: AION G122 genuine external P0 acceptance MUST STAY RED
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aion-g122-five-external-no-go-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  external-required:
+    name: G122 FIVE EXTERNAL UNMET guarantees / ${{ matrix.os }} / RED
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install original pinned dependencies without bypasses
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Run ALL FIVE genuine external/native P0 acceptance assertions — FAIL on unmet
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v lab_a183_external_requirements_red 2>&1 | tee g122-external-acceptance.log
+          # Do NOT force success, xfail, skip, mask the runner status, or
+          # infer P0 clearance from a local synthetic signature.
