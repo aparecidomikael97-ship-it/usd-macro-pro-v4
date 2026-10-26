@@ -1,0 +1,53 @@
+# G128 uses only GitHub-hosted disposable Windows/Ubuntu VMs.
+# This tests REAL OS user/token separation, not self-asserted OS_DENIED.
+# Root/Administrator remain powerful. External origin and all P0 gates stay RED.
+name: AION G128 actual disposable OS principal SQLite ACL boundary LAB
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-principals:
+    name: G128 Linux two OS principals / NOT P0
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Exercise native SQLite under two actual separate OS UIDs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo useradd --system --no-create-home --shell /usr/sbin/nologin g128cust
+          sudo useradd --system --no-create-home --shell /usr/sbin/nologin g128app
+          pubdir="$(mktemp -d /tmp/g128-probe.XXXXXXXX)"
+          chmod 0755 "$pubdir"
+          install -m 0644 labs/a190/g128_os_principal_probe_lab.py "$pubdir/probe.py"
+          privdir="$(mktemp -d /tmp/g128-custodian.XXXXXXXX)"
+          sudo chown g128cust:g128cust "$privdir"
+          sudo chmod 0700 "$privdir"
+          dbpath="$privdir/synthetic-probe.db"
+          sudo -u g128cust /usr/bin/python3 -B "$pubdir/probe.py" owner-init "$dbpath" g128cust
+          sudo -u g128app /usr/bin/python3 -B "$pubdir/probe.py" app "$dbpath" g128app
+          sudo -u g128cust /usr/bin/python3 -B "$pubdir/probe.py" owner-check "$dbpath" g128cust
+          sudo /usr/bin/python3 -B "$pubdir/probe.py" owner-check "$dbpath" root
+          echo 'G128_LINUX_APP_UID_NATIVE_SQLITE=OS_DENIED'
+          echo 'G128_LINUX_ROOT_OVERRIDE=STILL_VULNERABLE_NOT_P0'
+  windows-principals:
+    name: G128 Windows actual local standard user token / NOT P0
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Exercise native SQLite from a disposable restricted Windows user
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & ./labs/a190/g128_windows_principal_acl.ps1
