@@ -1,0 +1,37 @@
+name: AION G104 post-reservation witness requirement LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/pinned_external_enrollment_g102_lab.py'
+      - 'labs/a190/test_g102_pinned_external_attestation_admission_lab.py'
+      - 'labs/a190/test_g104_post_reservation_attestation_lab.py'
+      - '.github/workflows/aion-g104-two-phase-attestation-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  two-phase:
+    name: G104 two-phase reservation / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install synthetic crypto and test dependencies
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2' 'requests==2.34.2'
+      - name: Run G104 adversarial and inherited G102 regression tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g104_post_reservation_attestation_lab 2>&1 | tee g104.log
+          grep -F 'G104_UNATTESTED_POST_RESERVATION=DENIED_NO_SEND' g104.log
+          grep -Fx 'OK' g104.log
