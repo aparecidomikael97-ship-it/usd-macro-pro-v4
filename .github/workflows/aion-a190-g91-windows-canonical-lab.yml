@@ -1,0 +1,52 @@
+name: A190 G91 Windows canonical Quality Security after G90 LAB
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - '.github/workflows/aion-a190-g91-windows-canonical-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-canonical:
+    name: G91 Windows exact 6449 Quality + 368 and 2825 Security
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install same pinned canonical dependencies as G90
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0' 'pip-audit==2.10.1' 'bandit==1.9.4'
+          python -m pip check
+      - name: Compile canonical sources
+        shell: bash
+        run: python -m compileall -q .
+      - name: Run exact canonical Quality selector with LAB socket guard
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py quality 2>&1 | tee g91-quality.log
+          grep -F 'Ran 6449 tests' g91-quality.log
+          grep -F 'CANONICAL_SOURCE .github/workflows/quality-tests.yml' g91-quality.log
+      - name: Run exact canonical Security unittest selector
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py security-unittest 2>&1 | tee g91-security-unittest.log
+          grep -F 'Ran 368 tests' g91-security-unittest.log
+          grep -F 'CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml' g91-security-unittest.log
+      - name: Run exact canonical Security pytest selector
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py security-pytest 2>&1 | tee g91-security-pytest.log
+          grep -F '2825 passed' g91-security-pytest.log
+          grep -F 'CANONICAL_SOURCE .github/workflows/aion-core-security-gate.yml' g91-security-pytest.log
