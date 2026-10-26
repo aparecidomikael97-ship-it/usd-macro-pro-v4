@@ -14,6 +14,7 @@ import hashlib
 import json
 import secrets
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -144,7 +145,7 @@ class DurableExecutionStore:
         return conn
 
     def _initialize(self):
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -298,7 +299,7 @@ class DurableExecutionStore:
         return item
 
     def get(self, execution_id: str) -> dict[str, Any]:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT * FROM executions WHERE execution_id = ?",
                 (_clean(execution_id, 96),),
@@ -306,7 +307,7 @@ class DurableExecutionStore:
         return self._row(row)
 
     def _find_by_idempotency(self, key: str):
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             return conn.execute(
                 "SELECT * FROM executions WHERE idempotency_key = ?",
                 (key,),
@@ -360,7 +361,7 @@ class DurableExecutionStore:
                 raise DurableExecutionError("IDEMPOTENCY_CONFLICT", row)
             return PreparedExecution(row, True)
 
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 conflict = conn.execute(
@@ -400,7 +401,7 @@ class DurableExecutionStore:
 
     def _deadline_check(self, row: dict[str, Any], now_ts: str) -> None:
         if _parse_ts(now_ts) >= _parse_ts(row["deadline_at"]):
-            with self._connect() as conn:
+            with closing(self._connect()) as conn, conn:
                 conn.execute(
                     "UPDATE executions SET state='DLQ', updated_at=?, lease_owner='', lease_token='', lease_expires_at='' WHERE execution_id=?",
                     (now_ts, row["execution_id"]),
@@ -423,7 +424,7 @@ class DurableExecutionStore:
             raise DurableExecutionError("LEASE_SECONDS_INVALID")
         token = _clean(lease_token or secrets.token_urlsafe(24), 128)
         now = _parse_ts(now_ts)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute("SELECT * FROM executions WHERE execution_id=?", (execution_id,)).fetchone()
             if row is None:
@@ -479,7 +480,7 @@ class DurableExecutionStore:
         if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 1 <= lease_seconds <= MAX_LEASE_SECONDS:
             raise DurableExecutionError("LEASE_SECONDS_INVALID", row)
         expires = _ts(now + timedelta(seconds=lease_seconds))
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 "UPDATE executions SET lease_expires_at=?, updated_at=? WHERE execution_id=? AND lease_token=?",
                 (expires, now_ts, execution_id, lease_token),
@@ -501,7 +502,7 @@ class DurableExecutionStore:
         if row["lease_token"] != lease_token or not lease_token:
             raise DurableExecutionError("LEASE_TOKEN_MISMATCH", row)
         self._deadline_check(row, now_ts)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 UPDATE executions
@@ -533,7 +534,7 @@ class DurableExecutionStore:
             raise DurableExecutionError("LEASE_TOKEN_MISMATCH", row)
         if not digest:
             raise DurableExecutionError("RESULT_DIGEST_REQUIRED", row)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 UPDATE executions
@@ -582,7 +583,7 @@ class DurableExecutionStore:
                 max_seconds=max_backoff_seconds,
             )
             next_attempt = _ts(_parse_ts(now_ts) + timedelta(seconds=delay))
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 UPDATE executions
@@ -609,7 +610,7 @@ class DurableExecutionStore:
         if row["lease_token"] != lease_token or not lease_token:
             raise DurableExecutionError("LEASE_TOKEN_MISMATCH", row)
         error = _clean(error_fingerprint, 128) or "OUTCOME_UNKNOWN"
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 UPDATE executions
@@ -624,7 +625,7 @@ class DurableExecutionStore:
     def recover_expired_leases(self, *, now_ts: str) -> list[dict[str, Any]]:
         now = _parse_ts(now_ts)
         changed = []
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             rows = conn.execute(
                 "SELECT * FROM executions WHERE state IN ('LEASED','DISPATCH_RECORDED')"
@@ -666,7 +667,7 @@ class DurableExecutionStore:
             raise DurableExecutionError("CANCEL_OUTCOME_UNCERTAIN_OR_TERMINAL", row)
         if row["state"] in {"CANCELED", "DLQ"}:
             return row
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 UPDATE executions
@@ -715,7 +716,7 @@ class DurableExecutionStore:
             # Authoritative reconciliation proved the prior dispatch caused no
             # effect, so a future attempt starts a fresh dispatch lifecycle.
             dispatch_recorded_at = ""
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute(
                 """
                 UPDATE executions
@@ -730,7 +731,7 @@ class DurableExecutionStore:
 
 
     def store_schema_version(self) -> int:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT value FROM execution_store_meta WHERE key='schema_version'"
             ).fetchone()
@@ -743,7 +744,7 @@ class DurableExecutionStore:
 
     def get_execution_scope(self, execution_id: str) -> dict[str, Any]:
         execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT * FROM execution_scope_bindings WHERE execution_id=?",
                 (execution_id,),
@@ -775,7 +776,7 @@ class DurableExecutionStore:
             "bound_at": _required_text(bound_at, "BOUND_AT_REQUIRED", 64),
         }
         _parse_ts(values["bound_at"])
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 parent = conn.execute(
@@ -825,7 +826,7 @@ class DurableExecutionStore:
 
     def get_terminal_finalization(self, execution_id: str) -> dict[str, Any]:
         execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT * FROM execution_terminal_finalizations WHERE execution_id=?",
                 (execution_id,),
@@ -894,7 +895,7 @@ class DurableExecutionStore:
         }
         _parse_ts(values["persisted_at"])
 
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 execution = conn.execute(
@@ -985,7 +986,7 @@ class DurableExecutionStore:
 
     def get_audit_seal(self, execution_id: str) -> dict[str, Any]:
         execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT * FROM execution_audit_seals WHERE execution_id=?",
                 (execution_id,),
@@ -1029,7 +1030,7 @@ class DurableExecutionStore:
             "persisted_at": _required_text(persisted_at, "PERSISTED_AT_REQUIRED", 64),
         }
         _parse_ts(values["persisted_at"])
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 finalization = conn.execute(
@@ -1110,7 +1111,7 @@ class DurableExecutionStore:
 
     def get_terminal_certificate(self, execution_id: str) -> dict[str, Any]:
         execution_id = _required_text(execution_id, "EXECUTION_ID_REQUIRED", 96)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT * FROM execution_terminal_certificates WHERE execution_id=?",
                 (execution_id,),
@@ -1191,7 +1192,7 @@ class DurableExecutionStore:
         }
         _parse_ts(values["persisted_at"])
 
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 scope = conn.execute(
@@ -1322,7 +1323,7 @@ class DurableExecutionStore:
         owner = _required_text(owner_id, "OWNER_ID_REQUIRED", 128)
         tenant = _required_text(tenant_id, "TENANT_ID_REQUIRED", 128)
         workspace = _required_text(workspace_id, "WORKSPACE_ID_REQUIRED", 128)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             conn.execute("BEGIN")
             try:
                 scope = conn.execute(
@@ -1420,12 +1421,12 @@ class DurableExecutionStore:
         }
 
     def list_dlq(self) -> list[dict[str, Any]]:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             rows = conn.execute(
                 "SELECT * FROM executions WHERE state='DLQ' ORDER BY updated_at, execution_id"
             ).fetchall()
         return [self._row(row) for row in rows]
 
     def count(self) -> int:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             return int(conn.execute("SELECT COUNT(*) FROM executions").fetchone()[0])
