@@ -417,12 +417,25 @@ class OperationScopedSQLiteChatStore:
                                     raise
                     finally:
                         if anchor is not None:
+                            # The file descriptor is a separate identity
+                            # anchor, not SQLite's native VFS handle. A close
+                            # failure must latch without masking an already
+                            # propagating operation or native-close error.
+                            pending_error = sys.exc_info()[1]
                             try:
                                 os.close(anchor)
                             except OSError as exc:
-                                # A prior write may have committed: do not
-                                # return ordinary success or attempt replay.
+                                # The operation may already have committed.
+                                # Never replay or treat this as a rollback.
                                 self._failure = "BOUND_DATABASE_ANCHOR_CLOSE_FAILED"
-                                raise StorageUnavailableError(self._failure) from exc
+                                if pending_error is not None:
+                                    if hasattr(pending_error, "add_note"):
+                                        pending_error.add_note(
+                                            "G89_ANCHOR_CLOSE_UNCERTAIN_FACADE_QUARANTINED"
+                                        )
+                                else:
+                                    raise StorageUnavailableError(
+                                        self._failure
+                                    ) from exc
 
         return operation
