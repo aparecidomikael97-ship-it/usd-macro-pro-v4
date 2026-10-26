@@ -14,11 +14,21 @@ import sys
 import textwrap
 import unittest
 
-# A184 invokes this entrypoint through runpy.run_path, which does not set
-# sys.path[0] to the script's directory like direct `python scripts/x.py`.
-# Resolve the sibling LAB guard from this file's own trusted directory in
-# both invocation modes; never fall back to site-packages or caller input.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# A184 deliberately copies this canonical runner to RUNNER_TEMP before
+# launching it; the helper remains under the checked-out repo's scripts/.
+# Direct execution finds its sibling, while isolated copy execution locates
+# the helper from the same repository worktree used by canonical selectors.
+# A missing helper is always an error; never fall back to site-packages.
+_guard_name = "aion_a190_scoped_socketpair_guard.py"
+_script_dir = Path(__file__).resolve().parent
+_repo_scripts = Path.cwd().resolve() / "scripts"
+if (_script_dir / _guard_name).is_file():
+    _guard_dir = _script_dir
+elif (_repo_scripts / _guard_name).is_file():
+    _guard_dir = _repo_scripts
+else:
+    raise RuntimeError("A183_LAB_SOCKET_GUARD_MISSING_DENIED")
+sys.path.insert(0, str(_guard_dir))
 from aion_a190_scoped_socketpair_guard import canonical_lab_socket_guard
 
 p=argparse.ArgumentParser(description=__doc__)
