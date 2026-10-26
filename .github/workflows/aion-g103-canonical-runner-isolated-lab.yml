@@ -39,7 +39,7 @@ jobs:
         run: |
           set -o pipefail
           python -B "$RUNNER_TEMP/run_a183_canonical_lab.py" security-unittest 2>&1 | tee g103.log
-          grep -F 'CANONICAL_SOURCE .github/' g103.log
+          grep -F 'aion-core-security-gate.yml' g103.log
           grep -F 'Ran 368 tests' g103.log
           grep -F 'OK' g103.log
       - name: Detached copy without checked-out guard must fail closed
