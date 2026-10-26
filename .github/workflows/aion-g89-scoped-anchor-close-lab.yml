@@ -1,0 +1,49 @@
+name: AION G89 scoped SQLite anchor close error LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/staged_store.py'
+      - 'labs/a190/test_g89_scoped_anchor_close_fault_lab.py'
+      - '.github/workflows/aion-g89-scoped-anchor-close-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  anchor-close:
+    name: G89 anchor close / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic dependencies
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2' 'requests==2.34.2'
+      - name: G89 real descriptor faults plus G88/G84/G85/lifecycle regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v \
+            labs.a190.test_g89_scoped_anchor_close_fault_lab \
+            labs.a190.test_g88_scoped_native_close_interrupt_lab \
+            labs.a190.test_g84_direct_constructor_interrupt_lab \
+            labs.a190.test_g85_legacy_owner_thread_preservation_lab \
+            test_atlasquant_aion_chat_sqlite_lifecycle.SQLiteLifecycleTests.test_close_failure_after_commit_is_not_reported_as_success \
+            test_atlasquant_aion_chat_sqlite_lifecycle.SQLiteLifecycleTests.test_native_connections_close_on_their_creating_thread_even_on_error 2>&1 | tee g89.log
+          grep -F 'Ran 26 tests' g89.log
+          grep -Fx 'OK' g89.log
+          grep -F 'G89_READ_PRECLOSE_GREEN=ANCHOR_RETAINED_NO_REUSE' g89.log
+          grep -F 'G89_WRITE_POSTCLOSE_GREEN=COMMIT_UNCERTAIN_NO_RETRY' g89.log
+          grep -F 'G89_LOOKUP_PRIMARY_GREEN=NOT_MASKED' g89.log
+          grep -F 'G89_STORAGE_PRIMARY_GREEN=NOT_MASKED' g89.log
+          grep -F 'G89_KI_PRIMARY_GREEN=NOT_MASKED' g89.log
+          grep -F 'G89_EXIT_PRIMARY_GREEN=NOT_MASKED' g89.log
+          grep -F 'G89_NORMAL_GREEN=HEALTHY_CONTROL' g89.log
