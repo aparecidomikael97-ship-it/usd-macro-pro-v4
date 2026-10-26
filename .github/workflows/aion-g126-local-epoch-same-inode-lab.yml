@@ -1,0 +1,39 @@
+name: AION G126 local epoch same-inode containment and bypass LAB
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-epoch:
+    name: G126 local detection NOT P0 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install unchanged requirements
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Run local fence and deliberately surviving host bypasses
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g126_local_epoch_fence_lab 2>&1 | tee g126.log
+          grep -F 'Ran 6 tests' g126.log
+          grep -Fx 'OK' g126.log
+          grep -F 'G126_SAME_INODE_ROLLBACK_LIVE_READ=LOCALLY_DENIED' g126.log
+          grep -F 'G126_SAME_INODE_ROLLBACK_LIVE_WRITE=LOCALLY_DENIED' g126.log
+          grep -F 'G126_HOST_REPINS_DB_AND_LOCAL_EPOCH=STILL_VULNERABLE_NOT_P0' g126.log
+          grep -F 'G126_RESTART_WITH_RESTORED_DB=STILL_VULNERABLE_NOT_P0' g126.log
