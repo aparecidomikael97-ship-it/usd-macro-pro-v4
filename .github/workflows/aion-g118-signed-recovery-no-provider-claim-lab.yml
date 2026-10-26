@@ -1,0 +1,56 @@
+name: AION G118 read-only witness recovery without SEND LAB
+on:
+  pull_request:
+    paths:
+      - 'labs/a190/g118_signed_witness_recovery_lab.py'
+      - 'labs/a190/test_g118_signed_witness_recovery_lab.py'
+      - '.github/workflows/aion-g118-signed-recovery-no-provider-claim-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery:
+    name: G118 signed recovery / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install canonical pinned dependencies
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Execute read-only G118 recovery and inherited G115 scenarios
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g118_signed_witness_recovery_lab 2>&1 | tee g118.log
+          grep -F 'Ran 34 tests' g118.log
+          grep -Fx 'OK' g118.log
+          grep -F 'G118_SIGNED_RESERVED=PROVIDER_UNKNOWN_NOT_CONFIRMED' g118.log
+          grep -F 'G118_LOST_ACK_RESTART=SIGNED_SPENT_PROVIDER_UNKNOWN' g118.log
+          grep -F 'G118_RECOVERY_READ_DOES_NOT_PROMOTE_OUTBOX_CONFIRMED' g118.log
+          grep -F 'G118_SIGNED_NOT_FOUND=NOT_AUTHORITATIVE_PROVIDER_ABSENCE' g118.log
+          grep -F 'G118_RESET_LOCAL_FLOOR=STILL_NOT_EXTERNAL_ANTIROLLBACK' g118.log
+          grep -F 'G118_RECOVERY_RESULT=IMMUTABLE_NO_SEND_NO_CONFIRM' g118.log
+      - name: Verify original G116 and G114 LAB regressions
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g116_unsigned_witness_client_injection_lab 2>&1 | tee g116.log
+          grep -F 'Ran 24 tests' g116.log
+          grep -Fx 'OK' g116.log
+          grep -F 'G116_UNSIGNED_BARE_RESPONSES=NO_ADAPTER_SEND' g116.log
+          python -B -m unittest -v labs.a190.test_g114_public_only_witness_lab 2>&1 | tee g114.log
+          grep -F 'Ran 15 tests' g114.log
+          grep -Fx 'OK' g114.log
