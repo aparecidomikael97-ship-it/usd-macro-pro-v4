@@ -152,17 +152,15 @@ class G115CrossProcessOutboxLab(A182Fixture):
 
     def test_02_unknown_original_enrollment_is_uncertain_no_send(self):
         unknown_id = sha256(b"g115-other-event-not-enrolled").hexdigest()
-        store, outbox, row = self.host(guard=self.guard_for(event=unknown_id))
-        try:
-            result, adapter = self.claim_and_send(outbox, row)
-            self.assertEqual(result["state"], "UNCERTAIN")
-            self.assertEqual(adapter.send_calls, 0)
-            self.assertEqual(
-                self.client.status(self.business_event_id)["high_water"], 0
-            )
-        finally:
-            store.close()
-        print("G115_UNENROLLED_EVENT=OUTBOX_UNCERTAIN_ZERO_SEND")
+        # G120 rejects a different business identity BEFORE an Outbox can be
+        # constructed; this is stronger than accepting and later returning
+        # UNCERTAIN. The test witness remains unchanged.
+        with self.assertRaisesRegex(ValueError, "G120_OWNER_ENROLLMENT_EVENT_MISMATCH"):
+            self.guard_for(event=unknown_id)
+        self.assertEqual(
+            self.client.status(self.business_event_id)["high_water"], 0
+        )
+        print("G115_UNENROLLED_EVENT=CONSTRUCTOR_DENIED_NO_SEND")
 
     def test_03_lost_commit_ack_is_uncertain_and_witness_spent(self):
         def lose_ack_transport(action, request, *, drop_response=False):
