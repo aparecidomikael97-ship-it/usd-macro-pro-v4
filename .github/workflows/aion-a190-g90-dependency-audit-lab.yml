@@ -1,0 +1,89 @@
+name: A190 G90 patched dependencies security audit LAB
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - '.github/workflows/aion-a190-g90-dependency-audit-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  patched-dependencies:
+    name: G90 pinned deps + exact security audit / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned application and audit dependencies
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pip-audit==2.10.1' 'bandit==1.9.4'
+          python -m pip check
+      - name: Verify pypdf Pillow and Streamlit API compatibility in-memory
+        shell: bash
+        run: |
+          python -B - <<'PY'
+          import importlib.metadata as meta
+          from io import BytesIO
+          import streamlit
+          from PIL import Image
+          from pypdf import PdfReader, PdfWriter
+          required = {'streamlit': '1.66.1', 'pypdf': '6.21.2', 'pillow': '13.0.0'}
+          for package, version in required.items():
+              found = meta.version(package)
+              assert found == version, (package, found, version)
+              print('G90_VERSION_PIN=' + package + '==' + found)
+          buffer = BytesIO()
+          image = Image.new('RGB', (2, 2), 'white')
+          image.save(buffer, 'PNG')
+          buffer.seek(0)
+          with Image.open(buffer) as loaded:
+              loaded.load()
+              assert loaded.size == (2, 2)
+          writer = PdfWriter()
+          writer.add_blank_page(width=72, height=72)
+          pdf_data = BytesIO()
+          writer.write(pdf_data)
+          assert len(PdfReader(BytesIO(pdf_data.getvalue())).pages) == 1
+          assert streamlit.__version__ == '1.66.1'
+          print('G90_PDF_IMAGE_STREAMLIT_INMEMORY_SMOKE=PASS')
+          PY
+      - name: Run unchanged canonical security audit
+        shell: bash
+        run: python -B scripts/run_a183_canonical_lab.py security-audit
+  canonical-quality-security:
+    name: G90 canonical Quality + Security / Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned canonical dependencies
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0' 'pip-audit==2.10.1' 'bandit==1.9.4'
+          python -m pip check
+      - name: Compile all sources
+        run: python -m compileall -q .
+      - name: Run exact canonical Quality (A183 network guard)
+        run: python -B scripts/run_a183_canonical_lab.py quality
+      - name: Run exact canonical Security unittest
+        run: python -B scripts/run_a183_canonical_lab.py security-unittest
+      - name: Run exact canonical Security pytest
+        run: python -B scripts/run_a183_canonical_lab.py security-pytest
