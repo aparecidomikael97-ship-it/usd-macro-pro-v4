@@ -1,0 +1,49 @@
+name: AION G102 signed out-of-band enrollment contract LAB
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/pinned_external_enrollment_g102_lab.py'
+      - 'labs/a190/test_g102_pinned_external_attestation_admission_lab.py'
+      - '.github/workflows/aion-g102-external-enrollment-admission-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  enrollment:
+    name: G102 signed enrollment fail-closed / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install pinned synthetic cryptographic prerequisites
+        shell: bash
+        run: python -m pip install 'cryptography==50.0.2' 'requests==2.34.2'
+      - name: Execute G102 and inherited A182 bind/negative-risk tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v \
+            labs.a190.test_g102_pinned_external_attestation_admission_lab \
+            test_atlasquant_aion_intent_binding_a182_lab.A182ProtectionTests \
+            test_atlasquant_aion_intent_binding_a182_lab.A182RemainingBoundaryTests \
+            2>&1 | tee g102.log
+          grep -Fx 'OK' g102.log
+          grep -F 'G102_SYNTHETIC_VALID=ONE_IN_MEMORY_EFFECT_ONLY' g102.log
+          grep -F 'G102_UNAVAILABLE=NO_RESERVATION_NO_SEND' g102.log
+          grep -F 'G102_WRONG_SIGNER=DENIED' g102.log
+          grep -F 'G102_REPLAYED_SIGNATURE=DENIED' g102.log
+          grep -F 'G102_REPLACEMENT_ORIGINAL=DENIED_BY_PIN' g102.log
+          grep -F 'G102_REPIN_LOCAL_ROOT=DENIED_BY_ATTESTED_ROOT' g102.log
+          grep -F 'G102_LOCAL_CUSTODY_REBOOTSTRAP=DENIED_WITH_RETAINED_EXTERNAL' g102.log
+          grep -F 'G102_SIGNED_SEQUENCE_DIVERGENCE=DENIED' g102.log
+          grep -F 'G102_MALFORMED_ENVELOPE=DENIED' g102.log
+          grep -F 'G102_SAME_GUARD_CONCURRENCY=ONE_SYNTHETIC_RESERVATION' g102.log
