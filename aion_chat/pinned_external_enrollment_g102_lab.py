@@ -51,7 +51,7 @@ class PinnedExternalEnrollmentAdmissionLab:
         self, *, original_decision, enrolled_original_sha256,
         issuer, key_id, public_key, expected_trust_sha256,
         anchor_issuer, anchor_public_key, probe_attestation,
-        post_attestation, minimum_sequence, checkpoint, reserve, now,
+        post_attestation, minimum_sequence, checkpoint, reservation_lookup, reserve, now,
     ):
         original = semantic_bytes(original_decision)
         if (type(enrolled_original_sha256) is not str
@@ -74,6 +74,8 @@ class PinnedExternalEnrollmentAdmissionLab:
             raise TypeError("G104_POST_COMMIT_ATTESTOR_REQUIRED")
         if not callable(checkpoint):
             raise TypeError("G102_CUSTODY_SNAPSHOT_REQUIRED")
+        if not callable(reservation_lookup):
+            raise TypeError("G107_EXACT_RESERVATION_LOOKUP_REQUIRED")
         if type(minimum_sequence) is not int or minimum_sequence < 0:
             raise ValueError("G102_SEQUENCE_FLOOR_REQUIRED")
         # A challenge at each call defeats replay of an earlier valid signed
@@ -87,6 +89,7 @@ class PinnedExternalEnrollmentAdmissionLab:
         self._probe = probe_attestation
         self._post_probe = post_attestation
         self._checkpoint = checkpoint
+        self._reservation_lookup = reservation_lookup
         self._minimum = minimum_sequence
         self._last_reservation = None
 
@@ -240,7 +243,7 @@ class PinnedExternalEnrollmentAdmissionLab:
                 # cryptographic verification. This is an additional fail-
                 # closed local check, NOT an atomic remote/host/provider lock.
                 final = self._checkpoint()
-                return (
+                if not (
                     type(final) is dict
                     and set(final) == {"high_water", "count"}
                     and type(final["high_water"]) is int
@@ -248,6 +251,24 @@ class PinnedExternalEnrollmentAdmissionLab:
                     and final["high_water"] == final["count"]
                     and final["high_water"] == after["high_water"]
                     and final["count"] == after["count"]
+                ):
+                    return False
+                # Counters alone are susceptible to an equal-ordinal ABA
+                # database substitution. The same LOCAL journal must also
+                # contain the exact reservation authenticated by A180.
+                stored = self._reservation_lookup(
+                    signed_reservation["effect_digest"]
+                )
+                expected = (
+                    "effect_digest", "idempotency_key", "decision_sha256",
+                    "owner_id", "tenant_id", "workspace_id", "sequence",
+                )
+                if type(stored) is not dict or set(stored) != set(expected):
+                    return False
+                return all(
+                    type(stored[name]) is type(signed_reservation[name])
+                    and stored[name] == signed_reservation[name]
+                    for name in expected
                 )
             except (KeyError, TypeError, ValueError, RuntimeError, OSError,
                     InvalidSignature, binascii.Error):
