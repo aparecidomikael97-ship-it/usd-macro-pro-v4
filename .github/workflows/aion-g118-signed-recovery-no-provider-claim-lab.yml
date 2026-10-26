@@ -35,7 +35,7 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest -v labs.a190.test_g118_signed_witness_recovery_lab 2>&1 | tee g118.log
-          grep -F 'Ran 23 tests' g118.log
+          grep -F 'Ran 34 tests' g118.log
           grep -Fx 'OK' g118.log
           grep -F 'G118_SIGNED_RESERVED=PROVIDER_UNKNOWN_NOT_CONFIRMED' g118.log
           grep -F 'G118_LOST_ACK_RESTART=SIGNED_SPENT_PROVIDER_UNKNOWN' g118.log
