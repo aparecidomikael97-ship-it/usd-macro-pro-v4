@@ -466,8 +466,12 @@ class SQLiteChatStore:
         self._require_open()
         try:
             self.db.rollback()
-        except Exception as rollback_error:
-            self.quarantine_failed_transaction()
+        except BaseException as rollback_error:
+            try:
+                self.quarantine_failed_transaction()
+            except BaseException:
+                # Quarantine detaches before close; preserve the primary error.
+                pass
             if hasattr(primary_error, "add_note"):
                 primary_error.add_note(
                     "AION_CHAT_ROLLBACK_FAILED_STORE_QUARANTINED_NO_RETRY"
