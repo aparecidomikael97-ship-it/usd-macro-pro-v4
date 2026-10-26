@@ -12,6 +12,7 @@ from hashlib import sha256
 import os
 from pathlib import Path
 import re
+from threading import current_thread
 from typing import Any, Mapping
 
 from aion_chat.models import Scope
@@ -145,6 +146,20 @@ def _store_path(scope: Scope, root: Path) -> Path:
     return root / ("aion-chat-" + _scope_digest(scope) + ".sqlite3")
 
 
+def _require_legacy_native_close_on_creator_thread(store) -> None:
+    """Reject foreign cleanup BEFORE the SQLite driver can strand its handle.
+
+    The Python constructor-thread marker is a conservative local sentinel,
+    never native VFS ownership or independent authority attestation. A custom
+    connection factory might supply a handle from an unrelated thread; callers
+    remain responsible for validating that factory.
+    """
+    if (isinstance(store, SQLiteChatStore) and store.db is not None
+            and getattr(store, "_connection_creator_thread", None)
+            is not current_thread()):
+        raise StorageUnavailableError("STAGED_LEGACY_CREATOR_THREAD_CLOSE_REQUIRED")
+
+
 def close_all_staged_host_stores(session_state: Any) -> int:
     """Close every staged SQLite handle in the current UI session."""
     closed = 0
@@ -160,6 +175,7 @@ def close_all_staged_host_stores(session_state: Any) -> int:
         store = holder.get("store")
         if isinstance(store, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
             try:
+                _require_legacy_native_close_on_creator_thread(store)
                 store.close()
             except Exception as exc:
                 raise StorageUnavailableError("staged store cleanup failed") from exc
@@ -213,6 +229,7 @@ def get_or_create_staged_store(
             return existing
         if isinstance(existing, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
             try:
+                _require_legacy_native_close_on_creator_thread(existing)
                 existing.close()
             except Exception as exc:
                 # A legacy thread-affine connection must be closed by its owner.
@@ -243,6 +260,7 @@ def close_staged_host_store(
         return False
     store = holder.get("store")
     if isinstance(store, (SQLiteChatStore, OperationScopedSQLiteChatStore)):
+        _require_legacy_native_close_on_creator_thread(store)
         store.close()
         session_state.pop(key, None)
         if session_state.get(_ACTIVE_SCOPE_KEY) == key:
