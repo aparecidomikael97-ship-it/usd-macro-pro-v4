@@ -13,6 +13,12 @@ import subprocess
 import sys
 import textwrap
 import unittest
+
+# A184 invokes this entrypoint through runpy.run_path, which does not set
+# sys.path[0] to the script's directory like direct `python scripts/x.py`.
+# Resolve the sibling LAB guard from this file's own trusted directory in
+# both invocation modes; never fall back to site-packages or caller input.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aion_a190_scoped_socketpair_guard import canonical_lab_socket_guard
 
 p=argparse.ArgumentParser(description=__doc__)
