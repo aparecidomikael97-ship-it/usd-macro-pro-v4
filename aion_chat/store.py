@@ -424,7 +424,9 @@ class SQLiteChatStore:
                 raise StorageUnavailableError(
                     "staging store failed startup integrity gate: " + report["reason"]
                 )
-        except (sqlite3.DatabaseError, OSError, StorageUnavailableError) as exc:
+        except BaseException as exc:
+            # Even a direct KeyboardInterrupt/SystemExit from connection setup
+            # may leave an active native writer. Detach once and re-raise it.
             self._health_state = FAILED
             self._health_reason = type(exc).__name__
             if self.db is not None:
@@ -435,7 +437,10 @@ class SQLiteChatStore:
             self.db = None
             if isinstance(exc, StorageUnavailableError):
                 raise
-            raise StorageUnavailableError("staging store unavailable") from exc
+            if isinstance(exc, (sqlite3.DatabaseError, OSError)):
+                raise StorageUnavailableError("staging store unavailable") from exc
+            # Never convert process interrupts to ordinary storage exceptions.
+            raise
 
     def close(self):
         if self.db is not None:
