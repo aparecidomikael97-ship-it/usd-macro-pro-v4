@@ -1,0 +1,33 @@
+name: A190 Q1 canonical Quality G72 recheck (LAB only)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/aion-a190-q1-canonical-quality-g72-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-quality-candidate:
+    name: Q1 exact canonical Quality after G72 (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install same pinned canonical dependencies as A184
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==9.1.1 playwright==1.63.0 pip-audit==2.10.1 bandit==1.9.4
+          python -m pip check
+      - name: Compile canonical sources
+        run: python -m compileall -q .
+      - name: Re-run exact canonical Quality selectors with A183 network guard
+        run: python -B scripts/run_a183_canonical_lab.py quality
