@@ -230,8 +230,24 @@ class PinnedExternalEnrollmentAdmissionLab:
                 proof_after = self._post_probe(post_challenge, post_request)
                 # False after a local reservation is UNKNOWN/SPENT, not
                 # rollback. The Outbox must not authorize a provider send.
-                return self._verify_post_reservation(
+                if not self._verify_post_reservation(
                     proof_after, post_challenge, after, local, recorded,
+                ):
+                    return False
+                # The postproof observer may have signed the correct earlier
+                # state while the host-owned SQLite custodian was replaced,
+                # erased, or advanced before this call returned. Reread after
+                # cryptographic verification. This is an additional fail-
+                # closed local check, NOT an atomic remote/host/provider lock.
+                final = self._checkpoint()
+                return (
+                    type(final) is dict
+                    and set(final) == {"high_water", "count"}
+                    and type(final["high_water"]) is int
+                    and type(final["count"]) is int
+                    and final["high_water"] == final["count"]
+                    and final["high_water"] == after["high_water"]
+                    and final["count"] == after["count"]
                 )
             except (KeyError, TypeError, ValueError, RuntimeError, OSError,
                     InvalidSignature, binascii.Error):
