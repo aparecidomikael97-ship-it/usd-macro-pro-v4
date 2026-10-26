@@ -1,0 +1,98 @@
+# G125 checks the exact original canonical selectors on the G124 combined LAB tree.
+# All original 6449/368/pytest/audit selectors remain unchanged; no P0 clearance.
+name: AION G125 unchanged canonical suite after G124 joint owner/provider LAB
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quality:
+    name: G125 exact canonical Quality / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install unchanged Python deps and canonical test tools
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0'
+          python -m pip check
+      - name: Execute exact unchanged original Quality selectors
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py quality 2>&1 | tee g125-quality.log
+          grep -F 'Ran 6449 tests' g125-quality.log
+          grep -F 'OK' g125-quality.log
+  security:
+    name: G125 exact canonical Security / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install unchanged Python deps and canonical test tools
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest==9.1.1' 'playwright==1.63.0'
+          python -m pip check
+      - name: Execute original 368-case Security unittest selector
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py security-unittest 2>&1 | tee g125-unit.log
+          grep -F 'Ran 368 tests' g125-unit.log
+          grep -F 'OK' g125-unit.log
+      - name: Execute original Security pytest selectors
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B scripts/run_a183_canonical_lab.py security-pytest 2>&1 | tee g125-pytest.log
+          grep -F 'passed' g125-pytest.log
+  audit:
+    name: G125 unchanged pip-audit and Bandit / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install original dependencies plus pinned canonical audit tools
+        shell: bash
+        run: |
+          python -m pip install pip==26.2.1
+          python -m pip install -r requirements.txt
+          python -m pip install 'pip-audit==2.10.1' 'bandit==1.9.4'
+          python -m pip check
+      - name: Run original Security audit without exclusions
+        shell: bash
+        run: python -B scripts/run_a183_canonical_lab.py security-audit
