@@ -25,7 +25,8 @@ Upstream references: `https://pypi.org/project/streamlit/1.66.1/`, `https://pypi
 
 - Ubuntu Python 3.12: `pip check` **PASS**. Exact installed package versions checked. In-memory synthetic PNG and PDF roundtrip/Streamlit import **PASS**. `pip-audit -r requirements.txt` reported **"No known vulnerabilities found"**. Same unchanged canonical Bandit high-severity selector returned success.
 - Windows Python 3.12: `pip check` **PASS**. Exact package versions, synthetic PNG/PDF, Streamlit smoke **PASS**. Same `pip-audit` **"No known vulnerabilities found"** and canonical Bandit selector returned success.
-- Canonical Quality + Security jobs against the upgraded package environment **must be checked separately**. This paragraph deliberately does not claim pending jobs green.
+- Ubuntu canonical Quality + Security on the **same upgraded exact code/dependency environment**: job `121579339384` **SUCCESS**. The original Quality selectors from `.github/workflows/quality-tests.yml` SHA256 `67897c3b4340771ffb301f8779227f9bf93dfa115e9d1bc7142ec4cbcf33bfc0` executed `Ran 6449 tests in 83.883s` and `OK`. The unchanged core Security gate SHA256 `927c30233f38f7727d5e15c5a78af3d31176d0ade1614aec0fc17b63fa132485` passed `Ran 368 tests in 1.706s`, `OK`, and `2825 passed in 29.87s` via pytest.
+- **Entire G90 three-job workflow completed SUCCESS**, both OS security-audit jobs plus Ubuntu canonical Quality/Security. These are exact-source checks on `eb8dbc6aa8d0ea57ec2e6fa14c85693b79c9e097` (before documentation-only commits).
 
 The prior 48 findings have been remediated in this **specific pinned runtime environment and advisory snapshot**. A clean pip-audit is NOT a general absence-of-vulnerabilities certificate: future advisories, transitive runtime environments, binary/source provenance, unseen import paths, or unsafe PDF/image parsing remain outside its proof.
 
