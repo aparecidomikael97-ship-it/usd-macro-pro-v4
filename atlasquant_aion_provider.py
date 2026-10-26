@@ -362,6 +362,11 @@ def _usage_cost(payload:Mapping[str,Any],cfg:ProviderConfig)->dict[str,Any]:
     }
 
 
+def _build_openai_headers(api_key:str)->dict[str,str]:
+    """Pure historical header data; grants no first-send authority."""
+    return {"Authorization":f"Bearer {api_key}","Content-Type":"application/json"}
+
+
 def execute_openai_answer(
     prompt:Any,
     *,
@@ -439,10 +444,7 @@ def execute_openai_answer(
         "input":clean_prompt,
         "max_output_tokens":cfg.max_output_tokens,
     }
-    headers={
-        "Authorization":f"Bearer {cfg.api_key}",
-        "Content-Type":"application/json",
-    }
+    headers=_build_openai_headers(cfg.api_key)
     client=session or requests
     try:
         response=client.post(
@@ -458,9 +460,23 @@ def execute_openai_answer(
             "estimate":estimate,
         }
 
+    result=parse_openai_response(response,config=cfg,model=model,estimate=estimate)
+    result["called"]=True
+    return result
+
+
+def parse_openai_response(
+    response:Any, *, config:ProviderConfig, model:str, estimate:Mapping[str,Any],
+)->dict[str,Any]:
+    """Offline interpretation only; called=False never attests a provider send.
+
+    Response objects must already exist. This helper has no transport, approval,
+    environment or callback authority and cannot authorize first send.
+    """
+    cfg=config
     if int(getattr(response,"status_code",0) or 0)>=400:
         return {
-            "schema":SCHEMA,"state":"PROVIDER_HTTP_ERROR","called":True,
+            "schema":SCHEMA,"state":"PROVIDER_HTTP_ERROR","called":False,
             "http_status":int(getattr(response,"status_code",0) or 0),
             "reason":"Provider returned non-success HTTP status.",
             "model":model,"estimate":estimate,
@@ -469,20 +485,20 @@ def execute_openai_answer(
         payload=response.json()
     except Exception:
         return {
-            "schema":SCHEMA,"state":"PROVIDER_INVALID_JSON","called":True,
+            "schema":SCHEMA,"state":"PROVIDER_INVALID_JSON","called":False,
             "reason":"Provider response was not valid JSON.","model":model,
             "estimate":estimate,
         }
     if not isinstance(payload,Mapping):
         return {
-            "schema":SCHEMA,"state":"PROVIDER_INVALID_PAYLOAD","called":True,
+            "schema":SCHEMA,"state":"PROVIDER_INVALID_PAYLOAD","called":False,
             "reason":"Provider response was not an object.","model":model,
             "estimate":estimate,
         }
     answer=_extract_text(payload)
     if not answer:
         return {
-            "schema":SCHEMA,"state":"PROVIDER_EMPTY_OUTPUT","called":True,
+            "schema":SCHEMA,"state":"PROVIDER_EMPTY_OUTPUT","called":False,
             "reason":"Provider returned no output text.","model":model,
             "estimate":estimate,
             "usage":_usage_cost(payload,cfg),
@@ -491,7 +507,7 @@ def execute_openai_answer(
     return {
         "schema":SCHEMA,
         "state":"ANSWER_READY",
-        "called":True,
+        "called":False,
         "answer":answer,
         "model":model,
         "response_id":str(payload.get("id") or "")[:160],
@@ -506,4 +522,5 @@ def execute_openai_answer(
 __all__=[
     "SCHEMA","ProviderConfig","provider_config","provider_configuration_status",
     "estimate_request_cost","build_provider_prompt","execute_openai_answer",
+    "parse_openai_response",
 ]

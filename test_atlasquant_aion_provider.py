@@ -1,7 +1,9 @@
 import unittest
+from unittest.mock import patch
 
 from atlasquant_aion_provider import (
     ProviderConfig,
+    parse_openai_response,
     build_provider_prompt,
     estimate_request_cost,
     execute_openai_answer,
@@ -33,6 +35,14 @@ class _FakeSession:
 
 
 class AtlasQuantAionProviderTests(unittest.TestCase):
+    def setUp(self):
+        for target in ("requests.sessions.Session.request", "requests.post",
+                       "socket.socket.connect", "socket.create_connection"):
+            guard=patch(target,side_effect=AssertionError("G76_FORBIDDEN_NETWORK"))
+            mock=guard.start()
+            self.addCleanup(guard.stop)
+            self.addCleanup(mock.assert_not_called)
+
     def _env(self):
         return {
             "AION_MODEL_PROVIDER":"openai",
@@ -237,14 +247,23 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
             values=self._env(),
             session=session,
         )
-        self.assertTrue(result["called"])
+        self.assertEqual(result["state"],"BLOCKED_FIRST_SEND_AUTHORITY_UNAVAILABLE")
+        self.assertFalse(result["called"])
+        self.assertEqual(session.calls,[])
+        cfg=provider_config(self._env())
+        result=parse_openai_response(session.response,config=cfg,
+            model=cfg.model_for_lane("EXTERNAL_REASONING"),
+            estimate=estimate_request_cost("synthetic public question",config=cfg))
+        self.assertFalse(result["called"])
         self.assertEqual(result["state"],"ANSWER_READY")
         self.assertEqual(result["answer"],"Resposta do modelo")
         self.assertEqual(result["truth_state"],"MODEL_OUTPUT_UNVERIFIED")
         self.assertFalse(result["executes_action"])
         self.assertFalse(result["real_orders_enabled"])
-        self.assertEqual(session.calls[0]["json"]["model"],"reasoning-model")
-        self.assertIn("Authorization",session.calls[0]["headers"])
+        self.assertEqual(result["model"],"reasoning-model")
+        self.assertEqual(result["response_id"],"resp_test")
+        self.assertEqual(result["usage"]["input_tokens"],100)
+        self.assertEqual(result["usage"]["output_tokens"],50)
         self.assertNotIn("sk-test-secret-value",str(result))
 
     def test_budget_blocks_call_before_network(self):
