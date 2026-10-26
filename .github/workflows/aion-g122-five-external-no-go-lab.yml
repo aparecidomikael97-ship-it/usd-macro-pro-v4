@@ -1,8 +1,10 @@
+# LAB-only stacked lineage: do not path-filter this intentionally RED gate.
+# The five real external/native requirements must run even when the next
+# pull request edits only Python contracts, fixtures, or dependencies.
+# Never waive these failures to make CI green; no production integration.
 name: AION G122 genuine external P0 acceptance MUST STAY RED
 on:
   pull_request:
-    paths:
-      - '.github/workflows/aion-g122-five-external-no-go-lab.yml'
   workflow_dispatch:
 permissions:
   contents: read
