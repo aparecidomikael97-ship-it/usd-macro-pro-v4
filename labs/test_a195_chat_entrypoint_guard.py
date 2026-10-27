@@ -79,16 +79,18 @@ class A195ChatHostEntrypointTests(unittest.TestCase):
             "user.01": {"role": "USER", "password_hash": cls.other_hash, "active": True},
         }}
         cls.users = load_users_config(cls.registry)
-        cls.production_wrapper = compile_host_wrapper(
+        # Avoid Python descriptor binding of the compiled top-level functions
+        # when accessed through a unittest.TestCase instance.
+        cls.production_wrapper = staticmethod(compile_host_wrapper(
             "atlasquant_aion_chat_render_production_host_v1.py",
             "build_streamlit_production_binding",
             production=True,
-        )
-        cls.staging_wrapper = compile_host_wrapper(
+        ))
+        cls.staging_wrapper = staticmethod(compile_host_wrapper(
             "atlasquant_aion_chat_host_staging.py",
             "build_streamlit_staged_binding",
             production=False,
-        )
+        ))
 
     def setUp(self):
         self.now = time.time()
