@@ -1,17 +1,17 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1793056746.6019921,
+  "last_batch_ts": 1793067963.8618371,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
-      "updated_at": "2026-10-26T19:13:23.126240+00:00",
-      "candle_m15": "2026-10-26T18:45:00+00:00",
-      "price": 0.82734,
+      "updated_at": "2026-10-27T02:24:47.341685+00:00",
+      "candle_m15": "2026-10-27T02:00:00+00:00",
+      "price": 0.82757,
       "macro_direction": "🟢 COMPRA USD/CHF",
-      "macro_score": 86.0,
+      "macro_score": 91.0,
       "quality": 91.0,
-      "rank_index": 88.0,
+      "rank_index": 91.2,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
@@ -86,7 +86,7 @@
         "bias": "BAIXISTA",
         "score": 20.0,
         "ema20": 0.8264557807103105,
-        "ema50": 0.8240493202424645,
+        "ema50": 0.8240493180982874,
         "last": 0.82415,
         "ema_bias": "NEUTRO",
         "confirmation": "CONFIRMADA",
@@ -473,46 +473,46 @@
         "PML": 0.80525,
         "EQH": 0.8273,
         "EQL": 0.806875,
-        "Asia High": 0.82473,
-        "Asia Low": 0.82323
+        "Asia High": 0.8284,
+        "Asia Low": 0.82735
       },
       "premium_discount": {
         "zone": "ACIMA DO RANGE",
-        "position": 104.15094339622568,
+        "position": 107.04402515723275,
         "equilibrium": 0.823035,
         "inside_range": false,
-        "expansion_pct": 4.150943396225685
+        "expansion_pct": 7.044025157232753
       },
       "bsl": [
-        "PMH",
-        0.8362
+        "Asia High",
+        0.8284
       ],
       "ssl": [
         "Asia Low",
-        0.82323
+        0.82735
       ],
       "latest_sweep": {
-        "level": "EQH",
-        "type": "SWEEP BSL",
-        "datetime": "2026-10-26 18:30:00+00:00",
-        "price": 0.8273,
-        "high": 0.82737,
-        "low": 0.82691,
-        "close": 0.82729,
-        "excess_abs": 7.00000000000145e-05,
-        "rejection": "fechou de volta abaixo do nível"
+        "level": "Asia Low",
+        "type": "SWEEP SSL",
+        "datetime": "2026-10-26 23:00:00+00:00",
+        "price": 0.82735,
+        "high": 0.82754,
+        "low": 0.82733,
+        "close": 0.82747,
+        "excess_abs": 2.0000000000020002e-05,
+        "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-10-26 15:13:34.131359-04:00",
+        "now_ny": "2026-10-26 22:26:03.449197-04:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-10-26 13:30:00-04:00",
-          "end": "2026-10-26 16:00:00-04:00"
-        },
-        "next": {
           "name": "Asian Range",
           "start": "2026-10-26 20:00:00-04:00",
           "end": "2026-10-27 00:00:00-04:00"
+        },
+        "next": {
+          "name": "London Killzone",
+          "start": "2026-10-27 02:00:00-04:00",
+          "end": "2026-10-27 05:00:00-04:00"
         },
         "windows": [
           {
@@ -594,19 +594,19 @@
       },
       "macro_regime": {
         "side": "ALTISTA",
-        "weekly_label": "FRÁGIL / CONFLITANTE",
-        "consistency": 50.0,
+        "weekly_label": "MODERADO",
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ATENÇÃO",
-          "score": 0.75,
-          "text": "FOMC — Decisão de juros em 2 dias; narrativa pode mudar rapidamente."
+          "level": "ELEVADO",
+          "score": 0.55,
+          "text": "FOMC — Decisão de juros é amanhã; reduzir agressividade e evitar carregar risco sem plano."
         },
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 57/100",
+            "ok": true,
+            "detail": "USD 60/100",
             "weight": 25.0
           },
           {
@@ -618,7 +618,7 @@
           {
             "name": "Tendência macro recente",
             "ok": false,
-            "detail": "38/100",
+            "detail": "32/100",
             "weight": 20.0
           },
           {
@@ -628,11 +628,11 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 86.0,
+        "macro_score": 91.0,
         "quality": 91.0
       },
       "readiness": {
-        "score": 57.0,
+        "score": 60.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -640,7 +640,7 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 86/100"
+            "detail": "Score 91/100"
           },
           {
             "name": "Qualidade dos dados",
@@ -674,9 +674,9 @@
           },
           {
             "name": "Sweep coerente",
-            "ok": false,
+            "ok": true,
             "weight": 8.0,
-            "detail": "SWEEP BSL"
+            "detail": "SWEEP SSL"
           },
           {
             "name": "Killzone ativa",
@@ -686,28 +686,28 @@
           },
           {
             "name": "Risco de evento",
-            "ok": true,
+            "ok": false,
             "weight": 5.0,
-            "detail": "ATENÇÃO"
+            "detail": "ELEVADO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 57.0,
-      "event_risk": "ATENÇÃO",
+      "readiness_score": 60.0,
+      "event_risk": "ELEVADO",
       "adr": {
         "available": true,
         "adr": 0.004533571428571447,
-        "today_range": 0.004109999999999947,
-        "used_pct": 90.65700330864823,
+        "today_range": 0.0048000000000000265,
+        "used_pct": 105.87679218528454,
         "state": "🟠 DIA ESTICADO",
         "length": 14
       },
-      "adr_used_pct": 90.65700330864823,
+      "adr_used_pct": 105.87679218528454,
       "intraday_opens": {
         "available": true,
-        "current": 0.82734,
+        "current": 0.82757,
         "day_open": 0.82373,
         "week_open": 0.82373,
         "above_day_open": true,
@@ -717,13 +717,13 @@
     },
     "NZD/USD": {
       "pair": "NZD/USD",
-      "updated_at": "2026-10-26T19:12:28.659001+00:00",
-      "candle_m15": "2026-10-26T18:45:00+00:00",
-      "price": 0.56867,
+      "updated_at": "2026-10-27T02:23:51.923423+00:00",
+      "candle_m15": "2026-10-27T02:00:00+00:00",
+      "price": 0.56978,
       "macro_direction": "🔴 VENDA NZD/USD",
-      "macro_score": 81.0,
+      "macro_score": 87.0,
       "quality": 91.0,
-      "rank_index": 85.2,
+      "rank_index": 88.4,
       "w1": {
         "bias": "BAIXISTA",
         "score": 20.0,
@@ -786,7 +786,7 @@
         "bias": "NEUTRO",
         "score": 60.0,
         "ema20": 0.5664301605456754,
-        "ema50": 0.569530935658709,
+        "ema50": 0.5695309374921358,
         "last": 0.5696,
         "ema_bias": "NEUTRO",
         "confirmation": "NEUTRA",
@@ -1160,46 +1160,46 @@
         "PMH": 0.59291,
         "PML": 0.56262,
         "EQL": 0.558155,
-        "Asia High": 0.57057,
-        "Asia Low": 0.56959
+        "Asia High": 0.57012,
+        "Asia Low": 0.56866
       },
       "premium_discount": {
         "zone": "PRÊMIO",
-        "position": 70.02457002457018,
+        "position": 83.66093366093308,
         "equilibrium": 0.56704,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "PDH",
-        0.57048
+        "Asia High",
+        0.57012
       ],
       "ssl": [
-        "PDL",
-        0.56791
+        "Asia Low",
+        0.56866
       ],
       "latest_sweep": {
-        "level": "PDL",
+        "level": "Asia Low",
         "type": "SWEEP SSL",
-        "datetime": "2026-10-26 15:45:00+00:00",
-        "price": 0.56791,
-        "high": 0.56814,
-        "low": 0.56784,
-        "close": 0.5681,
-        "excess_abs": 7.00000000000145e-05,
+        "datetime": "2026-10-26 23:45:00+00:00",
+        "price": 0.56866,
+        "high": 0.56884,
+        "low": 0.56865,
+        "close": 0.5688,
+        "excess_abs": 1.0000000000065512e-05,
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-10-26 15:13:33.390934-04:00",
+        "now_ny": "2026-10-26 22:26:02.978149-04:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-10-26 13:30:00-04:00",
-          "end": "2026-10-26 16:00:00-04:00"
-        },
-        "next": {
           "name": "Asian Range",
           "start": "2026-10-26 20:00:00-04:00",
           "end": "2026-10-27 00:00:00-04:00"
+        },
+        "next": {
+          "name": "London Killzone",
+          "start": "2026-10-27 02:00:00-04:00",
+          "end": "2026-10-27 05:00:00-04:00"
         },
         "windows": [
           {
@@ -1281,19 +1281,19 @@
       },
       "macro_regime": {
         "side": "BAIXISTA",
-        "weekly_label": "FRÁGIL / CONFLITANTE",
-        "consistency": 50.0,
+        "weekly_label": "MODERADO",
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ATENÇÃO",
-          "score": 0.75,
-          "text": "FOMC — Decisão de juros em 2 dias; narrativa pode mudar rapidamente."
+          "level": "ELEVADO",
+          "score": 0.55,
+          "text": "FOMC — Decisão de juros é amanhã; reduzir agressividade e evitar carregar risco sem plano."
         },
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 57/100",
+            "ok": true,
+            "detail": "USD 60/100",
             "weight": 25.0
           },
           {
@@ -1305,7 +1305,7 @@
           {
             "name": "Tendência macro recente",
             "ok": false,
-            "detail": "38/100",
+            "detail": "32/100",
             "weight": 20.0
           },
           {
@@ -1315,19 +1315,19 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 81.0,
+        "macro_score": 87.0,
         "quality": 91.0
       },
       "readiness": {
-        "score": 67.0,
-        "grade": "B",
-        "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
+        "score": 62.0,
+        "grade": "WAIT",
+        "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 81/100"
+            "detail": "Score 87/100"
           },
           {
             "name": "Qualidade dos dados",
@@ -1373,16 +1373,16 @@
           },
           {
             "name": "Risco de evento",
-            "ok": true,
+            "ok": false,
             "weight": 5.0,
-            "detail": "ATENÇÃO"
+            "detail": "ELEVADO"
           }
         ],
         "hard_conflict": true
       },
-      "readiness_grade": "B",
-      "readiness_score": 67.0,
-      "event_risk": "ATENÇÃO",
+      "readiness_grade": "WAIT",
+      "readiness_score": 62.0,
+      "event_risk": "ELEVADO",
       "adr": {
         "available": true,
         "adr": 0.0035285714285714204,
@@ -1394,7 +1394,7 @@
       "adr_used_pct": 91.53846153846362,
       "intraday_opens": {
         "available": true,
-        "current": 0.56867,
+        "current": 0.56978,
         "day_open": 0.57014,
         "week_open": 0.57014,
         "above_day_open": false,
@@ -1404,13 +1404,13 @@
     },
     "USD/JPY": {
       "pair": "USD/JPY",
-      "updated_at": "2026-10-26T19:12:26.427977+00:00",
-      "candle_m15": "2026-10-26T18:45:00+00:00",
-      "price": 157.40388,
+      "updated_at": "2026-10-27T02:23:49.903542+00:00",
+      "candle_m15": "2026-10-27T02:00:00+00:00",
+      "price": 157.61952,
       "macro_direction": "🟢 COMPRA USD/JPY",
-      "macro_score": 81.0,
+      "macro_score": 87.0,
       "quality": 84.0,
-      "rank_index": 82.0,
+      "rank_index": 85.6,
       "w1": {
         "bias": "NEUTRO",
         "score": 40.0,
@@ -1485,7 +1485,7 @@
         "bias": "BAIXISTA",
         "score": 0.0,
         "ema20": 157.66353810822415,
-        "ema50": 157.74379868772638,
+        "ema50": 157.74380159367664,
         "last": 156.9018,
         "ema_bias": "BAIXISTA",
         "confirmation": "CONFIRMADA",
@@ -1896,46 +1896,46 @@
         "PML": 152.37945,
         "EQH": 158.55273,
         "EQL": 157.516635,
-        "Asia High": 157.20313,
-        "Asia Low": 156.66118
+        "Asia High": 157.75875,
+        "Asia Low": 157.42818
       },
       "premium_discount": {
-        "zone": "EQUILÍBRIO",
-        "position": 52.70171588267093,
+        "zone": "PRÊMIO",
+        "position": 61.213630747733475,
         "equilibrium": 157.335435,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "EQH",
-        158.55273
+        "Asia High",
+        157.75875
       ],
       "ssl": [
-        "PDL",
-        156.72548
+        "EQL",
+        157.516635
       ],
       "latest_sweep": {
         "level": "EQL",
         "type": "SWEEP SSL",
-        "datetime": "2026-10-26 15:15:00+00:00",
+        "datetime": "2026-10-27 00:15:00+00:00",
         "price": 157.516635,
-        "high": 157.59275,
-        "low": 157.49104,
-        "close": 157.59076,
-        "excess_abs": 0.025595000000009804,
+        "high": 157.5682,
+        "low": 157.42818,
+        "close": 157.56652,
+        "excess_abs": 0.08845500000001039,
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-10-26 15:13:33.790712-04:00",
+        "now_ny": "2026-10-26 22:26:03.238861-04:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-10-26 13:30:00-04:00",
-          "end": "2026-10-26 16:00:00-04:00"
-        },
-        "next": {
           "name": "Asian Range",
           "start": "2026-10-26 20:00:00-04:00",
           "end": "2026-10-27 00:00:00-04:00"
+        },
+        "next": {
+          "name": "London Killzone",
+          "start": "2026-10-27 02:00:00-04:00",
+          "end": "2026-10-27 05:00:00-04:00"
         },
         "windows": [
           {
@@ -2017,19 +2017,19 @@
       },
       "macro_regime": {
         "side": "ALTISTA",
-        "weekly_label": "FRÁGIL / CONFLITANTE",
-        "consistency": 50.0,
+        "weekly_label": "MODERADO",
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ATENÇÃO",
-          "score": 0.75,
-          "text": "FOMC — Decisão de juros em 2 dias; narrativa pode mudar rapidamente."
+          "level": "ELEVADO",
+          "score": 0.55,
+          "text": "FOMC — Decisão de juros é amanhã; reduzir agressividade e evitar carregar risco sem plano."
         },
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 57/100",
+            "ok": true,
+            "detail": "USD 60/100",
             "weight": 25.0
           },
           {
@@ -2041,7 +2041,7 @@
           {
             "name": "Tendência macro recente",
             "ok": false,
-            "detail": "38/100",
+            "detail": "32/100",
             "weight": 20.0
           },
           {
@@ -2051,11 +2051,11 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 81.0,
+        "macro_score": 87.0,
         "quality": 84.0
       },
       "readiness": {
-        "score": 60.0,
+        "score": 45.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -2063,7 +2063,7 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 81/100"
+            "detail": "Score 87/100"
           },
           {
             "name": "Qualidade dos dados",
@@ -2091,9 +2091,9 @@
           },
           {
             "name": "Localização eficiente",
-            "ok": true,
+            "ok": false,
             "weight": 10.0,
-            "detail": "EQUILÍBRIO"
+            "detail": "PRÊMIO"
           },
           {
             "name": "Sweep coerente",
@@ -2109,28 +2109,28 @@
           },
           {
             "name": "Risco de evento",
-            "ok": true,
+            "ok": false,
             "weight": 5.0,
-            "detail": "ATENÇÃO"
+            "detail": "ELEVADO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 60.0,
-      "event_risk": "ATENÇÃO",
+      "readiness_score": 45.0,
+      "event_risk": "ELEVADO",
       "adr": {
         "available": true,
         "adr": 0.7126464285714259,
-        "today_range": 0.8139400000000023,
-        "used_pct": 114.21372048852191,
-        "state": "🟠 DIA ESTICADO",
+        "today_range": 0.9232499999999959,
+        "used_pct": 129.55232258032174,
+        "state": "🔴 RANGE EXTREMO",
         "length": 14
       },
-      "adr_used_pct": 114.21372048852191,
+      "adr_used_pct": 129.55232258032174,
       "intraday_opens": {
         "available": true,
-        "current": 157.40388,
+        "current": 157.61952,
         "day_open": 156.8573,
         "week_open": 156.8573,
         "above_day_open": true,
@@ -2140,13 +2140,13 @@
     },
     "EUR/USD": {
       "pair": "EUR/USD",
-      "updated_at": "2026-10-26T19:12:22.477595+00:00",
-      "candle_m15": "2026-10-26T18:45:00+00:00",
-      "price": 1.11826,
+      "updated_at": "2026-10-27T02:23:46.713749+00:00",
+      "candle_m15": "2026-10-27T02:00:00+00:00",
+      "price": 1.11722,
       "macro_direction": "🔴 VENDA EUR/USD",
-      "macro_score": 81.0,
+      "macro_score": 89.0,
       "quality": 70.0,
-      "rank_index": 77.0,
+      "rank_index": 81.3,
       "w1": {
         "bias": "BAIXISTA",
         "score": 0.0,
@@ -2217,7 +2217,7 @@
         "bias": "BAIXISTA",
         "score": 20.0,
         "ema20": 1.1230628703237389,
-        "ema50": 1.1319643774902912,
+        "ema50": 1.1319643738234377,
         "last": 1.12182,
         "ema_bias": "BAIXISTA",
         "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
@@ -2612,36 +2612,46 @@
         "PML": 1.13097,
         "EQH": 1.125565,
         "EQL": 1.1165850000000002,
-        "Asia High": 1.12265,
-        "Asia Low": 1.12137
+        "Asia High": 1.11772,
+        "Asia Low": 1.11628
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 14.06250000000031,
+        "position": 2.455357142858338,
         "equilibrium": 1.12148,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
         "Asia High",
-        1.12265
+        1.11772
       ],
       "ssl": [
         "PWL",
         1.117
       ],
-      "latest_sweep": null,
+      "latest_sweep": {
+        "level": "PWL",
+        "type": "SWEEP SSL",
+        "datetime": "2026-10-27 02:00:00+00:00",
+        "price": 1.117,
+        "high": 1.11742,
+        "low": 1.11698,
+        "close": 1.11722,
+        "excess_abs": 1.999999999990898e-05,
+        "rejection": "fechou de volta acima do nível"
+      },
       "killzone": {
-        "now_ny": "2026-10-26 15:13:32.382187-04:00",
+        "now_ny": "2026-10-26 22:26:02.353650-04:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-10-26 13:30:00-04:00",
-          "end": "2026-10-26 16:00:00-04:00"
-        },
-        "next": {
           "name": "Asian Range",
           "start": "2026-10-26 20:00:00-04:00",
           "end": "2026-10-27 00:00:00-04:00"
+        },
+        "next": {
+          "name": "London Killzone",
+          "start": "2026-10-27 02:00:00-04:00",
+          "end": "2026-10-27 05:00:00-04:00"
         },
         "windows": [
           {
@@ -2723,19 +2733,19 @@
       },
       "macro_regime": {
         "side": "BAIXISTA",
-        "weekly_label": "FRÁGIL / CONFLITANTE",
-        "consistency": 50.0,
+        "weekly_label": "MODERADO",
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ATENÇÃO",
-          "score": 0.75,
-          "text": "FOMC — Decisão de juros em 2 dias; narrativa pode mudar rapidamente."
+          "level": "ELEVADO",
+          "score": 0.55,
+          "text": "FOMC — Decisão de juros é amanhã; reduzir agressividade e evitar carregar risco sem plano."
         },
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 57/100",
+            "ok": true,
+            "detail": "USD 60/100",
             "weight": 25.0
           },
           {
@@ -2747,7 +2757,7 @@
           {
             "name": "Tendência macro recente",
             "ok": false,
-            "detail": "38/100",
+            "detail": "32/100",
             "weight": 20.0
           },
           {
@@ -2757,11 +2767,11 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 81.0,
+        "macro_score": 89.0,
         "quality": 70.0
       },
       "readiness": {
-        "score": 57.0,
+        "score": 52.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -2769,7 +2779,7 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 81/100"
+            "detail": "Score 89/100"
           },
           {
             "name": "Qualidade dos dados",
@@ -2805,7 +2815,7 @@
             "name": "Sweep coerente",
             "ok": false,
             "weight": 8.0,
-            "detail": "Sem sweep recente"
+            "detail": "SWEEP SSL"
           },
           {
             "name": "Killzone ativa",
@@ -2815,28 +2825,28 @@
           },
           {
             "name": "Risco de evento",
-            "ok": true,
+            "ok": false,
             "weight": 5.0,
-            "detail": "ATENÇÃO"
+            "detail": "ELEVADO"
           }
         ],
         "hard_conflict": false
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 57.0,
-      "event_risk": "ATENÇÃO",
+      "readiness_score": 52.0,
+      "event_risk": "ELEVADO",
       "adr": {
         "available": true,
         "adr": 0.005585714285714305,
-        "today_range": 0.0048000000000001375,
-        "used_pct": 85.9335038363193,
-        "state": "🟡 RANGE MODERADO",
+        "today_range": 0.005990000000000162,
+        "used_pct": 107.23785166240663,
+        "state": "🟠 DIA ESTICADO",
         "length": 14
       },
-      "adr_used_pct": 85.9335038363193,
+      "adr_used_pct": 107.23785166240663,
       "intraday_opens": {
         "available": true,
-        "current": 1.11826,
+        "current": 1.11722,
         "day_open": 1.12222,
         "week_open": 1.12222,
         "above_day_open": false,
@@ -2846,13 +2856,13 @@
     },
     "USD/CAD": {
       "pair": "USD/CAD",
-      "updated_at": "2026-10-26T19:12:30.645911+00:00",
-      "candle_m15": "2026-10-26T18:45:00+00:00",
-      "price": 1.40197,
+      "updated_at": "2026-10-27T02:23:53.668882+00:00",
+      "candle_m15": "2026-10-27T02:00:00+00:00",
+      "price": 1.40137,
       "macro_direction": "🟢 COMPRA USD/CAD",
-      "macro_score": 86.0,
+      "macro_score": 91.0,
       "quality": 91.0,
-      "rank_index": 88.0,
+      "rank_index": 91.2,
       "w1": {
         "bias": "ALTISTA",
         "score": 100.0,
@@ -2915,7 +2925,7 @@
         "bias": "NEUTRO",
         "score": 40.0,
         "ema20": 1.4108073277203668,
-        "ema50": 1.4089951901236923,
+        "ema50": 1.4089951898440167,
         "last": 1.40284,
         "ema_bias": "NEUTRO",
         "confirmation": "NEUTRA",
@@ -2926,10 +2936,6 @@
           "regime": "EQUILÍBRIO / LIQUIDEZ",
           "quality": "MISTA",
           "highs": [
-            [
-              "2025-12-10 00:00:00+00:00",
-              1.38664
-            ],
             [
               "2025-12-22 00:00:00+00:00",
               1.38062
@@ -3258,46 +3264,36 @@
         "PML": 1.37547,
         "EQH": 1.430045,
         "EQL": 1.375725,
-        "Asia High": 1.40168,
-        "Asia Low": 1.39988
+        "Asia High": 1.40241,
+        "Asia Low": 1.40106
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 26.910656620020895,
+        "position": 23.681377825618675,
         "equilibrium": 1.40626,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "PDH",
-        1.40361
+        "Asia High",
+        1.40241
       ],
       "ssl": [
         "Asia Low",
-        1.39988
+        1.40106
       ],
-      "latest_sweep": {
-        "level": "Asia High",
-        "type": "SWEEP BSL",
-        "datetime": "2026-10-26 18:15:00+00:00",
-        "price": 1.40168,
-        "high": 1.40177,
-        "low": 1.40125,
-        "close": 1.40163,
-        "excess_abs": 8.999999999992347e-05,
-        "rejection": "fechou de volta abaixo do nível"
-      },
+      "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-10-26 15:13:34.471720-04:00",
+        "now_ny": "2026-10-26 22:26:03.659821-04:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-10-26 13:30:00-04:00",
-          "end": "2026-10-26 16:00:00-04:00"
-        },
-        "next": {
           "name": "Asian Range",
           "start": "2026-10-26 20:00:00-04:00",
           "end": "2026-10-27 00:00:00-04:00"
+        },
+        "next": {
+          "name": "London Killzone",
+          "start": "2026-10-27 02:00:00-04:00",
+          "end": "2026-10-27 05:00:00-04:00"
         },
         "windows": [
           {
@@ -3379,19 +3375,19 @@
       },
       "macro_regime": {
         "side": "ALTISTA",
-        "weekly_label": "FRÁGIL / CONFLITANTE",
-        "consistency": 50.0,
+        "weekly_label": "MODERADO",
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ATENÇÃO",
-          "score": 0.75,
-          "text": "FOMC — Decisão de juros em 2 dias; narrativa pode mudar rapidamente."
+          "level": "ELEVADO",
+          "score": 0.55,
+          "text": "FOMC — Decisão de juros é amanhã; reduzir agressividade e evitar carregar risco sem plano."
         },
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 57/100",
+            "ok": true,
+            "detail": "USD 60/100",
             "weight": 25.0
           },
           {
@@ -3403,7 +3399,7 @@
           {
             "name": "Tendência macro recente",
             "ok": false,
-            "detail": "38/100",
+            "detail": "32/100",
             "weight": 20.0
           },
           {
@@ -3413,19 +3409,19 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 86.0,
+        "macro_score": 91.0,
         "quality": 91.0
       },
       "readiness": {
-        "score": 67.0,
-        "grade": "B",
-        "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
+        "score": 62.0,
+        "grade": "WAIT",
+        "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 86/100"
+            "detail": "Score 91/100"
           },
           {
             "name": "Qualidade dos dados",
@@ -3461,7 +3457,7 @@
             "name": "Sweep coerente",
             "ok": false,
             "weight": 8.0,
-            "detail": "SWEEP BSL"
+            "detail": "Sem sweep recente"
           },
           {
             "name": "Killzone ativa",
@@ -3471,16 +3467,16 @@
           },
           {
             "name": "Risco de evento",
-            "ok": true,
+            "ok": false,
             "weight": 5.0,
-            "detail": "ATENÇÃO"
+            "detail": "ELEVADO"
           }
         ],
         "hard_conflict": true
       },
-      "readiness_grade": "B",
-      "readiness_score": 67.0,
-      "event_risk": "ATENÇÃO",
+      "readiness_grade": "WAIT",
+      "readiness_score": 62.0,
+      "event_risk": "ELEVADO",
       "adr": {
         "available": true,
         "adr": 0.005572857142857125,
@@ -3492,7 +3488,7 @@
       "adr_used_pct": 90.25890797231271,
       "intraday_opens": {
         "available": true,
-        "current": 1.40197,
+        "current": 1.40137,
         "day_open": 1.40063,
         "week_open": 1.40063,
         "above_day_open": true,
@@ -3502,13 +3498,13 @@
     },
     "GBP/USD": {
       "pair": "GBP/USD",
-      "updated_at": "2026-10-26T19:12:20.298635+00:00",
-      "candle_m15": "2026-10-26T18:45:00+00:00",
-      "price": 1.3351,
-      "macro_direction": "⚪ AGUARDAR CONFIRMAÇÃO",
-      "macro_score": 71.0,
+      "updated_at": "2026-10-27T02:23:45.041813+00:00",
+      "candle_m15": "2026-10-27T02:00:00+00:00",
+      "price": 1.33438,
+      "macro_direction": "🔴 VENDA GBP/USD",
+      "macro_score": 78.0,
       "quality": 70.0,
-      "rank_index": 70.9,
+      "rank_index": 75.2,
       "w1": {
         "bias": "BAIXISTA",
         "score": 20.0,
@@ -3579,7 +3575,7 @@
         "bias": "ALTISTA",
         "score": 80.0,
         "ema20": 1.3324825372442817,
-        "ema50": 1.3341099705642343,
+        "ema50": 1.3341099627954773,
         "last": 1.33813,
         "ema_bias": "NEUTRO",
         "confirmation": "CONFIRMADA",
@@ -3990,36 +3986,36 @@
         "PML": 1.3199,
         "EQH": 1.3566699999999998,
         "EQL": 1.318825,
-        "Asia High": 1.33879,
-        "Asia Low": 1.33731
+        "Asia High": 1.33493,
+        "Asia Low": 1.33332
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 42.80964256026596,
+        "position": 36.82460515378171,
         "equilibrium": 1.3359649999999998,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "PDH",
-        1.33874
+        "Asia High",
+        1.33493
       ],
       "ssl": [
-        "PWL",
-        1.32995
+        "Asia Low",
+        1.33332
       ],
       "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-10-26 15:13:32.718860-04:00",
+        "now_ny": "2026-10-26 22:26:02.560833-04:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-10-26 13:30:00-04:00",
-          "end": "2026-10-26 16:00:00-04:00"
-        },
-        "next": {
           "name": "Asian Range",
           "start": "2026-10-26 20:00:00-04:00",
           "end": "2026-10-27 00:00:00-04:00"
+        },
+        "next": {
+          "name": "London Killzone",
+          "start": "2026-10-27 02:00:00-04:00",
+          "end": "2026-10-27 05:00:00-04:00"
         },
         "windows": [
           {
@@ -4100,32 +4096,32 @@
         ]
       },
       "macro_regime": {
-        "side": "NEUTRO",
-        "weekly_label": "SEM LADO",
-        "consistency": 50.0,
-        "recent_label": "NEUTRO / SEM DADO",
+        "side": "BAIXISTA",
+        "weekly_label": "MODERADO",
+        "consistency": 69.23076923076923,
+        "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ATENÇÃO",
-          "score": 0.75,
-          "text": "FOMC — Decisão de juros em 2 dias; narrativa pode mudar rapidamente."
+          "level": "ELEVADO",
+          "score": 0.55,
+          "text": "FOMC — Decisão de juros é amanhã; reduzir agressividade e evitar carregar risco sem plano."
         },
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 57/100",
+            "ok": true,
+            "detail": "USD 60/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
+            "ok": true,
             "detail": "Restritivo",
             "weight": 20.0
           },
           {
             "name": "Tendência macro recente",
-            "ok": null,
-            "detail": "38/100",
+            "ok": false,
+            "detail": "32/100",
             "weight": 20.0
           },
           {
@@ -4135,19 +4131,19 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 71.0,
+        "macro_score": 78.0,
         "quality": 70.0
       },
       "readiness": {
-        "score": 44.44444444444444,
+        "score": 37.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
-            "ok": null,
+            "ok": true,
             "weight": 15.0,
-            "detail": "Score 71/100"
+            "detail": "Score 78/100"
           },
           {
             "name": "Qualidade dos dados",
@@ -4157,31 +4153,31 @@
           },
           {
             "name": "W1 alinhado",
-            "ok": null,
+            "ok": true,
             "weight": 15.0,
             "detail": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
           },
           {
             "name": "D1 alinhado",
-            "ok": null,
+            "ok": false,
             "weight": 15.0,
             "detail": "CONFIRMADA"
           },
           {
             "name": "Estrutura W1+D1 limpa",
-            "ok": null,
+            "ok": false,
             "weight": 10.0,
             "detail": "W1 EXPANSÃO DOS DOIS LADOS · D1 TENDÊNCIA ALTISTA"
           },
           {
             "name": "Localização eficiente",
-            "ok": null,
+            "ok": false,
             "weight": 10.0,
             "detail": "DESCONTO"
           },
           {
             "name": "Sweep coerente",
-            "ok": null,
+            "ok": false,
             "weight": 8.0,
             "detail": "Sem sweep recente"
           },
@@ -4193,16 +4189,16 @@
           },
           {
             "name": "Risco de evento",
-            "ok": true,
+            "ok": false,
             "weight": 5.0,
-            "detail": "ATENÇÃO"
+            "detail": "ELEVADO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 44.44444444444444,
-      "event_risk": "ATENÇÃO",
+      "readiness_score": 37.0,
+      "event_risk": "ELEVADO",
       "adr": {
         "available": true,
         "adr": 0.006254999999999995,
@@ -4214,7 +4210,7 @@
       "adr_used_pct": 84.89208633093413,
       "intraday_opens": {
         "available": true,
-        "current": 1.3351,
+        "current": 1.33438,
         "day_open": 1.33817,
         "week_open": 1.33817,
         "above_day_open": false,
@@ -4224,13 +4220,13 @@
     },
     "AUD/USD": {
       "pair": "AUD/USD",
-      "updated_at": "2026-10-26T19:12:24.575213+00:00",
-      "candle_m15": "2026-10-26T18:45:00+00:00",
-      "price": 0.70228,
-      "macro_direction": "⚪ AGUARDAR",
-      "macro_score": 53.0,
+      "updated_at": "2026-10-27T02:23:48.243827+00:00",
+      "candle_m15": "2026-10-27T02:00:00+00:00",
+      "price": 0.70265,
+      "macro_direction": "⚪ AGUARDAR CONFIRMAÇÃO",
+      "macro_score": 59.0,
       "quality": 84.0,
-      "rank_index": 65.4,
+      "rank_index": 69.0,
       "w1": {
         "bias": "NEUTRO",
         "score": 40.0,
@@ -4288,8 +4284,8 @@
       "d1": {
         "bias": "NEUTRO",
         "score": 60.0,
-        "ema20": 0.7000887001268026,
-        "ema50": 0.7024122346827837,
+        "ema20": 0.7000887001268027,
+        "ema50": 0.7024122396237132,
         "last": 0.70371,
         "ema_bias": "NEUTRO",
         "confirmation": "NEUTRA",
@@ -4711,46 +4707,46 @@
         "PMH": 0.72381,
         "PML": 0.69423,
         "EQL": 0.69332,
-        "Asia High": 0.70338,
-        "Asia Low": 0.70258
+        "Asia High": 0.70276,
+        "Asia Low": 0.70129
       },
       "premium_discount": {
         "zone": "PRÊMIO",
-        "position": 83.5743801652895,
+        "position": 87.39669421487606,
         "equilibrium": 0.69903,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
         "Asia High",
-        0.70338
+        0.70276
       ],
       "ssl": [
         "PDL",
         0.70158
       ],
       "latest_sweep": {
-        "level": "Asia Low",
+        "level": "PDL",
         "type": "SWEEP SSL",
-        "datetime": "2026-10-26 17:15:00+00:00",
-        "price": 0.70258,
-        "high": 0.70275,
-        "low": 0.70234,
-        "close": 0.7027,
-        "excess_abs": 0.00024000000000001798,
+        "datetime": "2026-10-27 01:15:00+00:00",
+        "price": 0.70158,
+        "high": 0.70212,
+        "low": 0.70138,
+        "close": 0.70208,
+        "excess_abs": 0.00019999999999997797,
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-10-26 15:13:33.053963-04:00",
+        "now_ny": "2026-10-26 22:26:02.768619-04:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-10-26 13:30:00-04:00",
-          "end": "2026-10-26 16:00:00-04:00"
-        },
-        "next": {
           "name": "Asian Range",
           "start": "2026-10-26 20:00:00-04:00",
           "end": "2026-10-27 00:00:00-04:00"
+        },
+        "next": {
+          "name": "London Killzone",
+          "start": "2026-10-27 02:00:00-04:00",
+          "end": "2026-10-27 05:00:00-04:00"
         },
         "windows": [
           {
@@ -4836,15 +4832,15 @@
         "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
-          "level": "ATENÇÃO",
-          "score": 0.75,
-          "text": "FOMC — Decisão de juros em 2 dias; narrativa pode mudar rapidamente."
+          "level": "ELEVADO",
+          "score": 0.55,
+          "text": "FOMC — Decisão de juros é amanhã; reduzir agressividade e evitar carregar risco sem plano."
         },
         "components": [
           {
             "name": "Regime macro USD",
             "ok": null,
-            "detail": "USD 57/100",
+            "detail": "USD 60/100",
             "weight": 25.0
           },
           {
@@ -4856,7 +4852,7 @@
           {
             "name": "Tendência macro recente",
             "ok": null,
-            "detail": "38/100",
+            "detail": "32/100",
             "weight": 20.0
           },
           {
@@ -4866,7 +4862,7 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 53.0,
+        "macro_score": 59.0,
         "quality": 84.0
       },
       "readiness": {
@@ -4878,7 +4874,7 @@
             "name": "Macro forte",
             "ok": null,
             "weight": 15.0,
-            "detail": "Score 53/100"
+            "detail": "Score 59/100"
           },
           {
             "name": "Qualidade dos dados",
@@ -4924,28 +4920,28 @@
           },
           {
             "name": "Risco de evento",
-            "ok": true,
+            "ok": false,
             "weight": 5.0,
-            "detail": "ATENÇÃO"
+            "detail": "ELEVADO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "B",
       "readiness_score": 69.0,
-      "event_risk": "ATENÇÃO",
+      "event_risk": "ELEVADO",
       "adr": {
         "available": true,
         "adr": 0.004198571428571433,
-        "today_range": 0.002650000000000041,
-        "used_pct": 63.11670636270932,
+        "today_range": 0.002929999999999988,
+        "used_pct": 69.78564137461687,
         "state": "🟡 RANGE MODERADO",
         "length": 14
       },
-      "adr_used_pct": 63.11670636270932,
+      "adr_used_pct": 69.78564137461687,
       "intraday_opens": {
         "available": true,
-        "current": 0.70228,
+        "current": 0.70265,
         "day_open": 0.70282,
         "week_open": 0.70282,
         "above_day_open": false,
@@ -4954,5 +4950,5 @@
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-10-26T23:19:06.602005+00:00"
+  "autopilot_updated_at": "2026-10-27T02:26:03.861838+00:00"
 }
