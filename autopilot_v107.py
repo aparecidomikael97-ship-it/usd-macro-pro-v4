@@ -342,19 +342,30 @@ def _td_initialize():
     stage="BOOTSTRAP"
     try:
         _TD_BUDGET=Budget(GitHubStore(TOKEN,REPO,BRANCH))
+        # A unique in-memory sentinel distinguishes a missing required
+        # remote file (HTTP 404) from a legitimate empty JSON object.
+        # gh_get_json() already returns its default with err="" on 404.
+        missing=object()
         stage="READ_PREVIOUS_STATUS"
-        previous,err=gh_get_json(STATUS_PATH,{})
+        previous,err=gh_get_json(STATUS_PATH,missing)
         stage="READ_SCANNER"
-        old_scanner,err2=gh_get_json(SCANNER_PATH,{})
+        old_scanner,err2=gh_get_json(SCANNER_PATH,missing)
         stage="READ_CACHE"
-        _TD_SERIES,err3=gh_get_json(SERIES_PATH,{"series":{}})
+        series_candidate,err3=gh_get_json(SERIES_PATH,missing)
+        if previous is missing: err=err or "Arquivo obrigatório ausente"
+        if old_scanner is missing: err2=err2 or "Arquivo obrigatório ausente"
+        if series_candidate is missing: err3=err3 or "Arquivo obrigatório ausente"
         # The stage identifies which read failed, without ever publishing the
         # raw exception or remote endpoint. No extra I/O/retry is attempted.
-        if err: stage="READ_PREVIOUS_STATUS"
-        elif err2: stage="READ_SCANNER"
-        elif err3: stage="READ_CACHE"
-        if err or err2 or err3:
-            raise BudgetUnavailable("Falha ao ler estado persistido; coleta adiada")
+        if err or not isinstance(previous,dict): stage="READ_PREVIOUS_STATUS"
+        elif err2 or not isinstance(old_scanner,dict): stage="READ_SCANNER"
+        elif err3 or not isinstance(series_candidate,dict): stage="READ_CACHE"
+        elif not isinstance(series_candidate.get("series",{}),dict): stage="READ_CACHE"
+        if stage in ("READ_PREVIOUS_STATUS","READ_SCANNER","READ_CACHE"):
+            raise BudgetUnavailable("Estado persistido obrigatório ausente ou inválido")
+        # Assign only after all required reads are validated, so a failed
+        # preflight cannot replace the in-memory series with an empty default.
+        _TD_SERIES=series_candidate
         _TD_SERIES.setdefault("series",{})
         stage="BOOTSTRAP"
         _TD_BUDGET.bootstrap(previous,old_scanner,utcnow().to_pydatetime())
@@ -1408,7 +1419,13 @@ def main() -> int:
     if not research_tf_ok:
         all_errors.append("Salvar timeframes de pesquisa: "+str(research_tf_err))
 
-    cache_ok,cache_err=gh_put_json(SERIES_PATH,_TD_SERIES,"V11.0.8: cache compartilhado sem duplicar consultas")
+    # Never overwrite the shared market cache while the durable budget
+    # control is unavailable; an initialization read failure may leave the
+    # in-memory cache empty even when the remote copy held real candles.
+    if _TD_BLOCK_TYPE=="CONTROLE_INDISPONIVEL":
+        cache_ok,cache_err=True,""
+    else:
+        cache_ok,cache_err=gh_put_json(SERIES_PATH,_TD_SERIES,"V11.0.8: cache compartilhado sem duplicar consultas")
     if not cache_ok: all_errors.append("Salvar cache compartilhado: "+cache_err)
 
     master,map_errors=update_market_map(inputs,m15_frames,daily_cache)
