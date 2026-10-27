@@ -1,0 +1,43 @@
+# G138 wire acceptance uses a separate process with caller-owned synthetic
+# signing seed: it explicitly does NOT create off-host trusted custody.
+name: AION G138 synthetic signed custody wire NOT external P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g138-custody-wire-lab:
+    name: G138 synthetic signed custody wire + real Outbox / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install exactly declared project requirements
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Reproduce 14 synthetic crypto/identity/rollback controls with zero provider SEND
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g138_signed_custody_wire_lab 2>&1 | tee g138.log
+          grep -F 'Ran 14 tests' g138.log
+          grep -Fx 'OK' g138.log
+          grep -F 'G138_SEPARATE_PROCESS_ED25519_WIRE=VALID_SYNTHETIC_NOT_EXTERNAL' g138.log
+          grep -F 'G138_ACK_LOST_OR_MISSING=UNCERTAIN_ZERO_AUTO_RESEND_LAB' g138.log
+          grep -F 'G138_SYNTHETIC_OWNER_CUSTODY_WIRE_LOCAL_SQLITE_TRIGGER_REAL_OUTBOX=STAGE_ONLY' g138.log
+          grep -F 'G138_LOCAL_MONOTONIC_FLOOR_RESTORE=REISSUED_FIRST_CLAIM_ACCEPTED_RED_NOT_P0' g138.log
+          grep -F 'G138_CALLER_REPLACES_ROOT_AND_ORIGINAL=FAKE_FIRST_PROOF_GREEN_RED_NOT_P0' g138.log
+          grep -F 'G138_DEFAULT_REAL_EXECUTION_OUTBOX=ZERO_PROVIDER_SEND' g138.log
