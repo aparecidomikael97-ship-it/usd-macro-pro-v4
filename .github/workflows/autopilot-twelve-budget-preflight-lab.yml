@@ -1,0 +1,35 @@
+# Read-only LAB validation; never runs operational collector or provider.
+name: AtlasQuant Twelve budget preflight diagnostic LAB
+on:
+  pull_request:
+    paths:
+      - 'autopilot_v107.py'
+      - 'atlasquant_twelve_preflight_diagnostic.py'
+      - 'test_autopilot_budget_preflight_diag_lab.py'
+      - 'docs/AUTOPILOT_TWELVE_BUDGET_PREFLIGHT_DIAGNOSTIC_LAB_20261027.md'
+      - '.github/workflows/autopilot-twelve-budget-preflight-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sanitized-budget-preflight:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: 15 synthetic preflight tests only, zero provider network
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v test_autopilot_budget_preflight_diag_lab 2>&1 | tee preflight_diagnostic_lab.log
+          grep -F 'Ran 15 tests' preflight_diagnostic_lab.log
+          grep -Fx 'OK' preflight_diagnostic_lab.log
