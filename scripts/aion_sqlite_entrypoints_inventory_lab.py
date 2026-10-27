@@ -42,6 +42,29 @@ STORE_CONSTRUCTORS = {
     "VaultPhysicalBackend",
 }
 
+# REVIEW DEBT: known, explicitly gated non-test Python constructor sites.
+# The absence of direct CoreStore/DurableExecutionStore/NonceRegistry/Vault
+# construction in the inspected operational modules is a static observation,
+# NOT proof that injection/dynamic import or external host activation is safe.
+REVIEWED_STORE_CONSTRUCTOR_MAX = {
+    "aion_chat/staged_store.py::SQLiteChatStore": 2,
+    "atlasquant_aion_chat_host_staging.py::OperationScopedSQLiteChatStore": 1,
+    "atlasquant_aion_chat_storage_resilience.py::SQLiteChatStore": 1,
+    "atlasquant_aion_chat_ui.py::SQLiteChatStore": 1,
+    "tools/aion_durable_task_cas_process_worker.py::SQLiteChatStore": 1,
+}
+
+
+def new_unreviewed_constructors(
+    observed: dict[str, int],
+    baseline: dict[str, int] | None = None,
+) -> dict[str, int]:
+    limits = REVIEWED_STORE_CONSTRUCTOR_MAX if baseline is None else baseline
+    return {
+        site: count for site, count in sorted(observed.items())
+        if count > limits.get(site, 0)
+    }
+
 
 def is_production_path(path: str) -> bool:
     parts = Path(path).parts
@@ -147,11 +170,24 @@ def audit(root: Path = REPO_ROOT) -> dict:
         path: count for path, count in sorted(native_counts.items())
         if path in REVIEWED_NATIVE_OPEN_MAX
     }
+    constructor_counts = Counter(
+        item["path"] + "::" + item["symbol"] for item in findings
+        if item["kind"] == "store_constructor"
+    )
+    unreviewed_constructors = new_unreviewed_constructors(constructor_counts)
+    # Constructor review debt is not an activation proof. It covers explicit
+    # AST construction only and deliberately cannot see dynamic injection.
+    old_constructors = {
+        site: count for site, count in sorted(constructor_counts.items())
+        if site in REVIEWED_STORE_CONSTRUCTOR_MAX
+    }
     return {
         "status": "INVENTORY_ONLY_NOT_P0",
         "production_python_files_scanned": len(paths),
         "legacy_direct_sqlite_calls": unresolved,
         "new_or_expanded_unreviewed_direct_sqlite_calls": new_or_expanded,
+        "legacy_store_constructor_calls": old_constructors,
+        "new_or_expanded_unreviewed_store_constructors": unreviewed_constructors,
         "findings": findings,
         "limitations": [
             "No dynamic imports, generated code, non-Python native callers",
@@ -166,7 +202,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--check-known", action="store_true",
-        help="Fail ONLY for newly added/unreviewed direct native sqlite opens",
+        help="Fail for new unreviewed native sqlite opens OR store constructors",
     )
     args = parser.parse_args()
     result = audit()
@@ -174,7 +210,11 @@ def main() -> int:
     if args.check_known and result["new_or_expanded_unreviewed_direct_sqlite_calls"]:
         print("G129_NEW_UNREVIEWED_NATIVE_OPEN=FAIL", file=sys.stderr)
         return 1
+    if args.check_known and result["new_or_expanded_unreviewed_store_constructors"]:
+        print("G130_NEW_UNREVIEWED_STORE_CONSTRUCTOR=FAIL", file=sys.stderr)
+        return 1
     print("G129_INVENTORY_CHECK=PASS_NOT_P0")
+    print("G130_CONSTRUCTOR_GROWTH_GATE=PASS_NOT_P0")
     return 0
 
 

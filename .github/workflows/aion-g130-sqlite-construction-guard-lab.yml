@@ -1,0 +1,35 @@
+# G130 protects the *inventory* from NEW direct SQLite store construction.
+# Green means no growth beyond recorded debt, NOT actual native/H0 P0 safety.
+name: AION G130 SQLite store construction growth guard NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  constructor-inventory:
+    name: G130 explicit physical store constructor review / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Validate actual construction growth and honest legacy review debt
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g130_sqlite_construction_guard_lab 2>&1 | tee g130-tests.log
+          grep -F 'Ran 6 tests' g130-tests.log
+          grep -Fx 'OK' g130-tests.log
+          grep -F 'G130_NEW_NONCE_STORE_CONSTRUCTOR=DETECTED' g130-tests.log
+          grep -F 'G130_KNOWN_SQLITE_CONSTRUCTORS=REVIEW_DEBT_NOT_P0' g130-tests.log
+          python -B scripts/aion_sqlite_entrypoints_inventory_lab.py --check-known 2>&1 | tee g130-inventory.log
+          grep -F 'G130_CONSTRUCTOR_GROWTH_GATE=PASS_NOT_P0' g130-inventory.log
