@@ -4,13 +4,14 @@ import shutil
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 
 def make_store(root):
     db = root / "operations.sqlite3"
     witness = root / "local_witness.json"
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn, conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("CREATE TABLE reservations (seq INTEGER PRIMARY KEY, original_event TEXT UNIQUE NOT NULL, request_id TEXT NOT NULL)")
     witness.write_text(json.dumps({"epoch": 0}), encoding="utf-8")
@@ -27,7 +28,7 @@ def reserve(db, witness, original_event, request_id):
             return "DENIED_INVALID_WITNESS"
     except (ValueError, OSError, KeyError, TypeError):
         return "DENIED_INVALID_WITNESS"
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn, conn:
         conn.execute("PRAGMA journal_mode=WAL")
         db_epoch = conn.execute("SELECT COUNT(*) FROM reservations").fetchone()[0]
         if db_epoch != epoch:
@@ -46,7 +47,7 @@ def reserve(db, witness, original_event, request_id):
 def snapshot(db, witness, directory):
     directory.mkdir()
     copydb = directory / "snapshot.sqlite3"
-    with sqlite3.connect(db) as conn, sqlite3.connect(copydb) as target:
+    with closing(sqlite3.connect(db)) as conn, closing(sqlite3.connect(copydb)) as target:
         conn.backup(target)  # Includes committed WAL; unlike raw main-file copy.
     shutil.copy2(witness, directory / "witness.json")
     return copydb
