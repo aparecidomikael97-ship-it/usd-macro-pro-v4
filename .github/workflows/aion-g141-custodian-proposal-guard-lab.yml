@@ -1,0 +1,38 @@
+# G141 validates an untrusted PAPER DESIGN only, never external P0 evidence.
+name: AION G141 custodian paper design guard NOT external P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g141-custodian-design-guard:
+    name: G141 design guard NOT P0 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Execute strict non-authorizing G141 design checks
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g141_custodian_proposal_guard_lab 2>&1 | tee g141.log
+          grep -F 'Ran 19 tests' g141.log
+          grep -Fx 'OK' g141.log
+          grep -F 'G141_PAPER_PERFECT=EXTERNAL_PROOF_MISSING_ZERO_P0_NO_SEND' g141.log
+          grep -F 'G141_T9_TWO_WRITERS=DENY_NOT_GLOBAL_ONCE' g141.log
+          grep -F 'G141_T10_TRANSACTION_CALLBACK_EFFECT=DENY' g141.log
+          grep -F 'G141_T11_WORM_UNPINNED_VERSION=DENY' g141.log
+          grep -F 'G141_T12_10_MIN_TOKEN_ONLY=DENY' g141.log
+          grep -F 'G141_T13_UNFENCED_FAILOVER=DENY' g141.log
+          grep -F 'G141_SELF_CLAIMED_APPROVAL=HARD_NO_GO' g141.log
+          grep -F 'G141_T9_TO_T13=SPEC_ONLY_NOT_REAL_EXTERNAL_TEST' g141.log
