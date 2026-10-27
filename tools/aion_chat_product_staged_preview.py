@@ -30,24 +30,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-ACCESS = {
-    "allowed": True,
-    "mode": "AUTHENTICATED",
-    "reason": "QA_LOCAL_ONLY",
-    "role": "ADMIN",
-    "session": {
-        "username": "mikael",
-        "role": "ADMIN",
-        "permissions": [
-            "app:read",
-            "aion:admin",
-            "aion:checkpoint",
-        ],
-        "credential_fingerprint": "staged-browser-qa-fingerprint",
-        "authenticated_at": 1.0,
-        "last_seen": 1.0,
-    },
-}
+# Exercise the REAL login gate in the browser harness instead of passing a
+# fabricated AUTHENTICATED mapping. The QA runner supplies a local synthetic
+# PBKDF2 user registry via ATLASQUANT_USERS_JSON and must enable auth.
+from atlasquant_access_panel import render_access_gate
+
+ACCESS = render_access_gate()
+if not ACCESS.get("allowed"):
+    st.stop()
+if ACCESS.get("mode") != "AUTHENTICATED":
+    st.error("QA staged chat requires a verified local login.")
+    st.stop()
 
 binding = build_streamlit_staged_binding(
     st,
