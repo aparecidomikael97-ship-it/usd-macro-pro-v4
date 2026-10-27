@@ -246,4 +246,42 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(ap._TD_BLOCK_TYPE,'LIMITE_MINUTO')
 
 
+
+class MissingRemoteBudgetLedgerTests(unittest.TestCase):
+    """An absent durable ledger must never be treated as zero consumed credits."""
+
+    def store(self):
+        from twelve_budget_v1108 import GitHubStore
+        return GitHubStore('synthetic-token', 'example/synthetic', 'atlasquant-runtime')
+
+    def test_missing_ledger_blocks_bootstrap_without_creating_or_spending(self):
+        old_status={'last_run':NOW.isoformat(),
+                    'twelve_budget':{'day':NOW.date().isoformat(),'used':14}}
+        old_scanner={'autopilot_v107':{'daily_budget':{'day':NOW.date().isoformat(),'calls':7}}}
+        with patch('twelve_budget_v1108.requests.get',return_value=Mock(status_code=404)) as get, \
+             patch('twelve_budget_v1108.requests.put',side_effect=AssertionError('no write')) as put:
+            with self.assertRaises(BudgetUnavailable):
+                Budget(self.store()).bootstrap(old_status,old_scanner,NOW)
+        self.assertEqual(get.call_count,1)
+        put.assert_not_called()
+
+    def test_missing_ledger_blocks_summary_and_reservation(self):
+        with patch('twelve_budget_v1108.requests.get',return_value=Mock(status_code=404)), \
+             patch('twelve_budget_v1108.requests.put',side_effect=AssertionError('no write')):
+            with self.assertRaises(BudgetUnavailable):
+                Budget(self.store()).summary(NOW)
+            with self.assertRaises(BudgetUnavailable):
+                Budget(self.store()).reserve(NOW)
+
+    def test_present_ledger_still_reads_exact_counter(self):
+        import base64, json
+        payload={'day':NOW.date().isoformat(),'used':14,'hours':{'12':14},'recent':[]}
+        response=Mock(status_code=200,json=Mock(return_value={
+            'sha':'synthetic-sha',
+            'content':base64.b64encode(json.dumps(payload).encode('utf-8')).decode('ascii')}))
+        with patch('twelve_budget_v1108.requests.get',return_value=response):
+            state,revision=self.store().load()
+        self.assertEqual(revision,'synthetic-sha')
+        self.assertEqual(state['used'],14)
+
 if __name__=='__main__': unittest.main()
