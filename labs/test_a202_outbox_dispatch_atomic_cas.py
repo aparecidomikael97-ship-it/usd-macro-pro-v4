@@ -72,53 +72,69 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
 
     def test_01_two_real_sqlite_connections_same_worker_must_only_send_once(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path,store1,outbox1,key=self.seed_claim(tmp)
-            store2=SQLiteChatStore(path)
-            outbox2=ExecutionOutbox(store2,SCOPE)
-            try:
-                self.assertIsNot(store1.db,store2.db)
-                self.assertEqual(outbox2.get(key)["state"],"CLAIMED")
-                gate=Barrier(2,timeout=20)
-                adapter=FakeNonIdempotentEffect()
+            path,seed_store,seed_outbox,key=self.seed_claim(tmp)
+            seed_store.close()
+            # Python sqlite3 enforces check_same_thread=True. Each contender
+            # MUST open its own SQLite connection inside its worker thread.
+            # Both pass read+authorization before either tries the CAS.
+            gate=Barrier(2,timeout=20)
+            adapter=FakeNonIdempotentEffect()
+            connection_ids=[]
+            connection_ids_lock=Lock()
 
-                def authorized_with_barrier(decision):
-                    try:
-                        gate.wait()
-                    except BrokenBarrierError as e:
-                        raise AssertionError("both dispatches must pass read+auth") from e
-                    return self.authorize(decision)
+            def authorized_with_barrier(decision):
+                try:
+                    gate.wait()
+                except BrokenBarrierError as e:
+                    raise AssertionError(
+                        "both dispatches must pass read+auth before CAS"
+                    ) from e
+                return self.authorize(decision)
 
-                def dispatch(outbox):
-                    return outbox.dispatch_claimed(
+            def dispatch(_):
+                local_store=SQLiteChatStore(path)
+                try:
+                    local=ExecutionOutbox(local_store,SCOPE)
+                    with connection_ids_lock:
+                        connection_ids.append(id(local_store.db))
+                    self.assertEqual(local.get(key)["state"],"CLAIMED")
+                    return local.dispatch_claimed(
                         key,worker_id=WORKER,
                         authorize=authorized_with_barrier,
                         adapter=adapter,now=NOW,
                     )
+                finally:
+                    local_store.close()
 
-                with ThreadPoolExecutor(max_workers=2) as pool:
-                    a=pool.submit(dispatch,outbox1)
-                    b=pool.submit(dispatch,outbox2)
-                    results=[a.result(timeout=40),b.result(timeout=40)]
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                a=pool.submit(dispatch,0)
+                b=pool.submit(dispatch,1)
+                results=[a.result(timeout=40),b.result(timeout=40)]
 
-                # Before A202 fix, this is RED: actual two sends despite the
-                # persisted single local lease, and effects could diverge.
+            self.assertEqual(len(connection_ids),2)
+            self.assertNotEqual(connection_ids[0],connection_ids[1])
+            # Before the CAS fix, this is RED if both callers pass through
+            # UPDATE and invoke the fake non-idempotent SEND.
+            self.assertEqual(
+                len(adapter.effects),1,
+                "A202_FAIL: two calls reached synthetic SEND for same "
+                "claimed semantic intent and worker ID",
+            )
+            self.assertEqual(
+                sum(x.get("dispatch_state")=="CONFIRMED" for x in results),
+                1,
+            )
+            self.assertEqual(
+                sum(x.get("dispatch_state")=="NOT_DISPATCHED_STATE_CHANGED" for x in results),
+                1,
+            )
+            check=SQLiteChatStore(path)
+            try:
                 self.assertEqual(
-                    len(adapter.effects),1,
-                    "A202_FAIL: two calls reached synthetic SEND for same "
-                    "claimed semantic intent and worker ID",
+                    ExecutionOutbox(check,SCOPE).get(key)["state"],"CONFIRMED",
                 )
-                self.assertEqual(
-                    sum(x.get("dispatch_state")=="CONFIRMED" for x in results),
-                    1,
-                )
-                self.assertEqual(
-                    sum(x.get("dispatch_state")=="NOT_DISPATCHED_STATE_CHANGED" for x in results),
-                    1,
-                )
-                self.assertEqual(outbox1.get(key)["state"],"CONFIRMED")
             finally:
-                store2.close()
-                store1.close()
+                check.close()
 
     def test_02_repeated_claimed_dispatch_after_confirm_never_resends(self):
         with tempfile.TemporaryDirectory() as tmp:
