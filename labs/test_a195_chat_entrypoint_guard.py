@@ -5,12 +5,18 @@ Synthetic AccessUser registry is used; imports the real login/auth primitives.
 """
 import ast
 from pathlib import Path
+import tempfile
 import time
 import unittest
 from unittest.mock import patch
 
 from atlasquant_access_control import (
     AccessUser, authenticate, hash_password, load_users_config,
+)
+from atlasquant_aion_chat_host_staging import (
+    FLAG as STAGING_FLAG,
+    TENANT_KEY, WORKSPACE_KEY, DIRECTORY_KEY,
+    build_streamlit_staged_binding, close_all_staged_host_stores,
 )
 from atlasquant_aion_chat_entrypoint_guard import (
     REGISTRY_KEY, SESSION_KEY, MAX_AGE_SECONDS, MAX_IDLE_SECONDS,
@@ -266,6 +272,68 @@ class A195ChatHostEntrypointTests(unittest.TestCase):
         out = self.production_wrapper(self.st, self.access, environment="PRODUCTION")
         self.assertEqual(out["state"], "SYNTHETIC_CONSTRUCTOR_CALLED")
         self.assertEqual(out["environment"], "PRODUCTION")
+
+    def _open_real_staged_store(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.st.secrets.vals.update({
+            STAGING_FLAG: "true",
+            TENANT_KEY: "tenant-a195",
+            WORKSPACE_KEY: "aion-a195",
+            DIRECTORY_KEY: str(Path(tmp.name).resolve()),
+        })
+        binding = build_streamlit_staged_binding(
+            self.st, self.access, environment="STAGING",
+        )
+        self.addCleanup(close_all_staged_host_stores, self.st.session_state)
+        self.assertEqual(binding["state"], "STAGED_BOUND")
+        store = binding["store"]
+        store.create_conversation(binding["scope"], "SYNTHETIC_SCOPED_CHAT")
+        self.assertIsNotNone(store.db)
+        return store
+
+    def test_logout_recheck_closes_existing_actual_sqlite_handle(self):
+        store = self._open_real_staged_store()
+        self.st.session_state.pop(SESSION_KEY)
+        with self.assertRaisesRegex(PermissionError, "SERVER_SESSION_REQUIRED"):
+            build_streamlit_staged_binding(
+                self.st, self.access, environment="STAGING",
+            )
+        self.assertIsNone(store.db)
+        self.assertFalse(any(
+            str(key).startswith("aq_aion_chat_staged_store_")
+            for key in self.st.session_state
+        ))
+
+    def test_revoked_password_recheck_closes_existing_actual_sqlite_handle(self):
+        store = self._open_real_staged_store()
+        changed = {"users": dict(self.registry["users"])}
+        changed["users"]["owner.01"] = {
+            "role": "ADMIN",
+            "password_hash": self.other_hash,
+            "active": True,
+        }
+        self.st.secrets.vals[REGISTRY_KEY] = changed
+        with self.assertRaisesRegex(
+            PermissionError, "CURRENT_USER_REGISTRY_MISMATCH",
+        ):
+            build_streamlit_staged_binding(
+                self.st, self.access, environment="STAGING",
+            )
+        self.assertIsNone(store.db)
+
+    def test_switched_user_recheck_closes_existing_actual_sqlite_handle(self):
+        store = self._open_real_staged_store()
+        other = authenticate("user.01", OTHER_PASSWORD, self.users)
+        self.assertIsNotNone(other)
+        other["authenticated_at"] = self.now - 100
+        other["last_seen"] = self.now - 5
+        self.st.session_state[SESSION_KEY] = other
+        with self.assertRaisesRegex(PermissionError, "SESSION_BINDING_MISMATCH"):
+            build_streamlit_staged_binding(
+                self.st, self.access, environment="STAGING",
+            )
+        self.assertIsNone(store.db)
 
     def test_host_settings_self_managed_red_remains(self):
         # A user able to rewrite both the server's configured users and
