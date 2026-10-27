@@ -1,0 +1,42 @@
+# G133: actual AION SQLite store and Outbox, rather than a toy reservations table.
+# A green test proves a counterexample, NOT external identity/custody or P0 approval.
+name: AION G133 real AION Outbox rollback boundary NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-outbox-sqlite-rollback-lab:
+    name: G133 actual AION Outbox rollback / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install exactly declared project requirements
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Verify actual AION Outbox and SQLite rollback with zero real SEND
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g133_real_aion_outbox_rollback_lab 2>&1 | tee g133-tests.log
+          grep -F 'Ran 5 tests' g133-tests.log
+          grep -Fx 'OK' g133-tests.log
+          grep -F 'G133_ACTUAL_OUTBOX_INTACT_SEMANTIC_LOCK=DENIED_LOCAL_ONLY' g133-tests.log
+          grep -F 'G133_REAL_AION_OUTBOX_ROLLBACK=RELABELED_EVENT_READMITTED_NOT_P0' g133-tests.log
+          grep -F 'G133_DEFAULT_REAL_OUTBOX_ROLLBACK=NO_ADAPTER_SEND' g133-tests.log
+          grep -F 'G133_UNSAFE_SYNTHETIC_LAB_CALLBACKS=DOUBLE_IN_MEMORY_EFFECT_NOT_P0' g133-tests.log
+          grep -F 'G133_REAL_OUTBOX_EXACT_REPLAY_AFTER_ROLLBACK=REQUEUED_NO_EXTERNAL_EFFECT' g133-tests.log
