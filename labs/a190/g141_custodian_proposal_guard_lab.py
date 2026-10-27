@@ -60,7 +60,8 @@ def review_custodian_proposal_lab(proposal: Any) -> DesignVerdict:
     """Reject known UNSAFE designs; a passing PAPER design is never a GO."""
     if type(proposal) is not dict or set(proposal) != EXPECTED_FIELDS:
         return _deny("DENY_INVALID_DESIGN_HARD_NO_GO", ("EXACT_FIELDS_REQUIRED",))
-    if proposal["schema"] != SCHEMA or proposal["vendor"] not in VENDORS:
+    if (type(proposal["schema"]) is not str or proposal["schema"] != SCHEMA or
+            type(proposal["vendor"]) is not str or proposal["vendor"] not in VENDORS):
         return _deny("DENY_INVALID_DESIGN_HARD_NO_GO", ("SCHEMA_OR_VENDOR_INVALID",))
     if any(type(proposal[name]) is not bool for name in BOOLEAN_FIELDS):
         return _deny("DENY_INVALID_DESIGN_HARD_NO_GO", ("EXACT_BOOLEAN_TYPES_REQUIRED",))
