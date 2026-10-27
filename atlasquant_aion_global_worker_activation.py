@@ -804,6 +804,22 @@ def activate_global_worker_feature_flag(
         }
 
     write = dict(flag_writer(config, pre_state, timeout=timeout) or {})
+    if (
+        write.get("status") == "BLOCKED"
+        and write.get("reason") == "EXTERNAL_ENABLE_CUSTODY_NOT_HOMOLOGATED"
+    ):
+        # A201: the production writer is known to have denied BEFORE any
+        # outbound mutation. Do not perform another GitHub read or retry.
+        return {
+            "schema": SCHEMA,
+            "status": "BLOCKED",
+            "reason": "EXTERNAL_ENABLE_CUSTODY_NOT_HOMOLOGATED",
+            "feature_flag_modified": False,
+            "global_worker_executed": False,
+            "real_trading_enabled": False,
+            "live_heartbeat_confirmed": False,
+            "flag_write": write,
+        }
     if write.get("status") != "WRITE_ACCEPTED" or write.get("modified") is not True:
         observed_after_failed_write = dict(
             flag_reader(config, timeout=timeout) or {}
