@@ -357,6 +357,7 @@ def _td_initialize():
         if series_candidate is missing: err3=err3 or "Arquivo obrigatório ausente"
         # The stage identifies which read failed, without ever publishing the
         # raw exception or remote endpoint. No extra I/O/retry is attempted.
+        stage="BOOTSTRAP"
         if err or not isinstance(previous,dict): stage="READ_PREVIOUS_STATUS"
         elif err2 or not isinstance(old_scanner,dict): stage="READ_SCANNER"
         elif err3 or not isinstance(series_candidate,dict): stage="READ_CACHE"
