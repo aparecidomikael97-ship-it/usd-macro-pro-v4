@@ -42,11 +42,18 @@ class AtlasQuantAccessPanelTests(unittest.TestCase):
         self.assertFalse(out["allowed"])
         self.assertEqual(out["mode"],"LOGIN")
 
-    def test_valid_user_session_can_read_app_but_invalid_role_cannot(self):
-        ok=panel.evaluate_access(required=True,users_count=1,session={"role":"USER"})
+    def test_valid_user_session_requires_current_registry_not_just_role(self):
+        forged=panel.evaluate_access(required=True,users_count=1,session={"role":"USER"})
         bad=panel.evaluate_access(required=True,users_count=1,session={"role":"ROOT"})
-        self.assertTrue(ok["allowed"])
+        self.assertFalse(forged["allowed"])
+        self.assertEqual(forged["reason"],"SESSION_REVOKED")
         self.assertFalse(bad["allowed"])
+        encoded=hash_password("SenhaSegura#2026",salt=b"0123456789abcdef",iterations=200000)
+        users=load_users_config({"users":{"user.01":{"role":"USER","password_hash":encoded,"active":True}}})
+        session=authenticate("user.01","SenhaSegura#2026",users)
+        ok=panel.evaluate_access(required=True,users_count=1,session=session,users=users)
+        self.assertTrue(ok["allowed"])
+        self.assertEqual(ok["mode"],"AUTHENTICATED")
 
 
 
