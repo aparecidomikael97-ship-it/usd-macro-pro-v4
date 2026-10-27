@@ -1,0 +1,43 @@
+# G137 proves a narrow LAB-only SQLite INSERT trigger, not off-host trust.
+name: AION G137 native SQLite stage-permit trigger counterexamples NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g137-real-outbox-native-insert:
+    name: G137 SQLite decision INSERT native tripwire / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install unchanged requirements
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Run 15 actual SQLite native Outbox stage tripwire cases
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g137_native_stage_trigger_lab 2>&1 | tee g137.log
+          grep -F 'Ran 15 tests' g137.log
+          grep -Fx 'OK' g137.log
+          grep -F 'G137_DIRECT_ENQUEUE_WITHOUT_PERMIT=SQLITE_INSERT_DENIED_LOCAL_LAB' g137.log
+          grep -F 'G137_DIRECT_ENQUEUE_NO_SEMANTIC_ID=SQLITE_INSERT_DENIED_LOCAL_LAB' g137.log
+          grep -F 'G137_FORGED_LOCAL_PERMIT_SELF_MINT=UNAUTHORIZED_STAGE_RED_NOT_P0' g137.log
+          grep -F 'G137_HOST_CAN_DROP_NATIVE_TRIGGER=DIRECT_STAGE_RED_NOT_P0' g137.log
+          grep -F 'G137_NEW_UNGUARDED_NATIVE_DB=STAGE_BYPASS_RED_NOT_P0' g137.log
+          grep -F 'G137_JOINT_ROLLBACK_READMITS_LOCAL_EFFECT=RED_NOT_P0' g137.log
+          grep -F 'G137_ACTUAL_OUTBOX_DEFAULT_ADAPTER_SEND=ZERO_NO_REAL_EFFECT' g137.log
