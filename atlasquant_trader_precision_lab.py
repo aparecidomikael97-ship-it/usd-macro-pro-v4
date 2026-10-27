@@ -7,24 +7,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from itertools import combinations
+from atlasquant_instrument_registry import FX_28, FX_CURRENCIES
 from math import isfinite
 from typing import Mapping
 
-CURRENCIES = ("AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD", "USD")
-PAIRS = (
-    "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF", "USDJPY",
-    "EURGBP", "EURAUD", "EURNZD", "EURCAD", "EURCHF", "EURJPY",
-    "GBPAUD", "GBPNZD", "GBPCAD", "GBPCHF", "GBPJPY",
-    "AUDNZD", "AUDCAD", "AUDCHF", "AUDJPY",
-    "NZDCAD", "NZDCHF", "NZDJPY", "CADCHF", "CADJPY", "CHFJPY",
-)
-assert len(PAIRS) == 28
-assert {frozenset((p[:3], p[3:])) for p in PAIRS} == {
-    frozenset(x) for x in combinations(CURRENCIES, 2)
-}
-assert len(set(PAIRS)) == len(PAIRS)
-
+# Canonical registry is the only authority for pair symbols and market direction.
+CURRENCIES = tuple(sorted(FX_CURRENCIES))
+PAIRS = FX_28
+assert len(PAIRS) == 28 and len(set(PAIRS)) == 28
 
 @dataclass(frozen=True)
 class PairWindow:
