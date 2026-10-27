@@ -8,8 +8,8 @@ Decisões do proprietário: avaliar a força das oito moedas principais sobre **
 
 ## Força cambial 8 × 28
 
-- Moedas: AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD.
-- Pares: 28 combinações não redundantes, em símbolos de negociação convencionais.
+- Moedas: AUD, CAD, CHF, EUR, GBP, JPY, NZD, USD, importadas do cadastro canônico `atlasquant_instrument_registry.FX_CURRENCIES`.
+- Pares: os 28 símbolos oficiais de `atlasquant_instrument_registry.FX_28`, sem segunda lista de pares independente.
 - Fonte exigida: log-retorno para o **mesmo intervalo sincronizado e mesma origem**, com horário UTC consciente, prazo máximo de atualização explícito e todos os 28 pares presentes.
 - Estimador: solução de mínimos quadrados da rede completa de oito moedas. Para moeda c: **S(c) = soma dos log-retornos assinados dos sete pares envolvendo c / 8**. A força é relativa (soma das oito forças = zero).
 - Direção contextual do par X/Y: **S(X) − S(Y)**. Não se trata de um gatilho de entrada; não confundir força de moeda com retorno esperado.
@@ -27,6 +27,16 @@ Decisões do proprietário: avaliar a força das oito moedas principais sobre **
 
 **Atenção:** `detector_quality_score` é apenas um campo de entrada. Esta etapa **não** define seus pesos, não prova que o FVG é mais assertivo que OB, não calcula probabilidade calibrada e não incorpora dados de mercado em tempo real. Isso requer prova empírica fora da amostra.
 
+## Ponte de cache M15 existente — laboratório somente leitura
+
+`atlasquant_trader_precision_cache_bridge_lab.py` consome **um dicionário de cache que o chamador já possui** no formato de `dados/twelve_series_v1108.json`. Não abre arquivo, não chama `cached_series`/`_load`, não busca preços, não carrega secrets, não aciona o Trader e não decide operação.
+
+Para cada um dos 28 pares, aceita `EUR/USD|15min` (ou exclusivamente `EURUSD|15min`) com `fetched_at` e candles OHLC. Exige timestamp com fuso, OHLC finito e coerente, dois candles fechados consecutivos de 15 minutos, coleta posterior ao fechamento, ausência de timestamps duplicados, dados atuais e mesma janela de comparação em todos os pares. Uma barra ainda em formação é ignorada; nunca entra no cálculo.
+
+Um único par ausente, antigo, inconsistente ou duplicado -> `WAIT_NO_CONTEXT`, com `missing_pairs`/`invalid_pairs` para auditoria. Os log-retornos extraídos alimentam o cálculo G8/FX28 já isolado. A saída `COMPLETE_RESEARCH_ONLY` **não** é signal, alert, probabilidade, autorização ou prova de cobertura real do cache.
+
+**Limitação honesta:** os testes usam snapshots sintéticos no formato do cache, não são prova de que o cache operacional contenha os 28 pares, nem autenticam independentemente o provedor. A matriz macro atual de sete pares USD e o Radar não foram alterados.
+
 ## Critérios para o próximo bloco
 
 - Conectar snapshot de dados históricos *somente leitura* com 28 séries sincronizadas, fixando timezone, ajuste de calendário, fonte, spread e timestamp de disponibilidade — sem vazar velas futuras.
@@ -37,6 +47,6 @@ Decisões do proprietário: avaliar a força das oito moedas principais sobre **
 
 ## Evidência desta PR
 
-`test_atlasquant_trader_precision_lab.py` cobre **23 testes determinísticos**: 28 combinações, recuperação de forças sintéticas, soma zero, inconsistência triangular exposta, falhas fechadas de dados, sobreposição FVG/OB, preferência condicionada, isolamento por mercado/TF/direção, zonas invalidadas, duplicação e invariância da ordem.
+`test_atlasquant_trader_precision_lab.py` cobre **38 testes determinísticos** (23 do motor + 15 da ponte): 28 combinações, recuperação de forças sintéticas, soma zero, inconsistência triangular exposta, falhas fechadas de dados, sobreposição FVG/OB, preferência condicionada, isolamento por mercado/TF/direção, zonas invalidadas, duplicação e invariância da ordem.
 
-**Resultado local inicial:** 23/23. GitHub Actions independente deverá confirmar Ubuntu + Windows. Testes sintéticos não são ganho financeiro nem acurácia de sinal.
+**Resultado local após a ponte:** 38/38. GitHub Actions deverá confirmar Ubuntu + Windows. Testes sintéticos não são ganho financeiro nem acurácia de sinal.
