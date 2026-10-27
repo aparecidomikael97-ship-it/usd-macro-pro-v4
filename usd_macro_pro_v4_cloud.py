@@ -375,6 +375,7 @@ else:
         _auth_fallback_environment = os.getenv("ATLASQUANT_ENV", "")
     _auth_required_fallback = (
         str(_auth_required_raw or "").strip().lower() in {"1","true","yes","on","sim"}
+        or str(os.getenv("ATLASQUANT_AUTH_REQUIRED", "")).strip().lower() in {"1","true","yes","on","sim"}
         or str(_auth_fallback_environment or "").strip().upper() == "PRODUCTION"
         or str(os.getenv("ATLASQUANT_ENV", "")).strip().upper() == "PRODUCTION"
     )
