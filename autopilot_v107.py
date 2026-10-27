@@ -33,6 +33,7 @@ import requests
 from engine import closed_candles
 from twelve_budget_v1108 import Budget, GitHubStore, BudgetUnavailable, classify_limit
 from twelve_cache_v1108 import SERIES_PATH, read_series, valid_records
+from atlasquant_twelve_preflight_diagnostic import preflight_diagnostic
 from currency_news_v107 import (
     CURRENCY_PROFILES,
     PAIR_ORDER,
@@ -133,6 +134,7 @@ _TD_BUDGET = None
 _TD_SERIES = {"series":{}}
 _TD_CACHE_HITS = 0
 _TD_STOP_UNTIL = ""
+_TD_PREFLIGHT_DIAGNOSTIC = preflight_diagnostic("NOT_RUN", failed=True)
 
 
 
@@ -333,24 +335,51 @@ def _td_is_daily_quota(message: str) -> bool:
 
 
 def _td_initialize():
-    global _TD_BUDGET, _TD_SERIES, _TD_DAILY_BLOCKED, _TD_BLOCK_TYPE, _TD_DAILY_BLOCK_REASON, _TD_STOP_UNTIL, _TD_HTTP_CALLS, _TD_CACHE_HITS, _TD_CALL_TIMES
+    global _TD_BUDGET, _TD_SERIES, _TD_DAILY_BLOCKED, _TD_BLOCK_TYPE, _TD_DAILY_BLOCK_REASON, _TD_STOP_UNTIL, _TD_HTTP_CALLS, _TD_CACHE_HITS, _TD_CALL_TIMES, _TD_PREFLIGHT_DIAGNOSTIC
     _TD_DAILY_BLOCKED=False; _TD_BLOCK_TYPE=''; _TD_DAILY_BLOCK_REASON=''; _TD_STOP_UNTIL=''
     _TD_HTTP_CALLS=0; _TD_CACHE_HITS=0; _TD_CALL_TIMES=[]
-    _TD_BUDGET=Budget(GitHubStore(TOKEN,REPO,BRANCH))
+    _TD_PREFLIGHT_DIAGNOSTIC=preflight_diagnostic("NOT_RUN",failed=True)
+    stage="BOOTSTRAP"
     try:
-        previous,err=gh_get_json(STATUS_PATH,{})
-        old_scanner,err2=gh_get_json(SCANNER_PATH,{})
-        _TD_SERIES,err3=gh_get_json(SERIES_PATH,{"series":{}})
-        if err or err2 or err3: raise BudgetUnavailable("Falha ao ler estado persistido; coleta adiada")
+        _TD_BUDGET=Budget(GitHubStore(TOKEN,REPO,BRANCH))
+        # A unique in-memory sentinel distinguishes a missing required
+        # remote file (HTTP 404) from a legitimate empty JSON object.
+        # gh_get_json() already returns its default with err="" on 404.
+        missing=object()
+        stage="READ_PREVIOUS_STATUS"
+        previous,err=gh_get_json(STATUS_PATH,missing)
+        stage="READ_SCANNER"
+        old_scanner,err2=gh_get_json(SCANNER_PATH,missing)
+        stage="READ_CACHE"
+        series_candidate,err3=gh_get_json(SERIES_PATH,missing)
+        if previous is missing: err=err or "Arquivo obrigatório ausente"
+        if old_scanner is missing: err2=err2 or "Arquivo obrigatório ausente"
+        if series_candidate is missing: err3=err3 or "Arquivo obrigatório ausente"
+        # The stage identifies which read failed, without ever publishing the
+        # raw exception or remote endpoint. No extra I/O/retry is attempted.
+        stage="BOOTSTRAP"
+        if err or not isinstance(previous,dict): stage="READ_PREVIOUS_STATUS"
+        elif err2 or not isinstance(old_scanner,dict): stage="READ_SCANNER"
+        elif err3 or not isinstance(series_candidate,dict): stage="READ_CACHE"
+        elif not isinstance(series_candidate.get("series",{}),dict): stage="READ_CACHE"
+        if stage in ("READ_PREVIOUS_STATUS","READ_SCANNER","READ_CACHE"):
+            raise BudgetUnavailable("Estado persistido obrigatório ausente ou inválido")
+        # Assign only after all required reads are validated, so a failed
+        # preflight cannot replace the in-memory series with an empty default.
+        _TD_SERIES=series_candidate
         _TD_SERIES.setdefault("series",{})
+        stage="BOOTSTRAP"
         _TD_BUDGET.bootstrap(previous,old_scanner,utcnow().to_pydatetime())
+        stage="SUMMARY"
         summary=_TD_BUDGET.summary(utcnow().to_pydatetime())
+        _TD_PREFLIGHT_DIAGNOSTIC=preflight_diagnostic("COMPLETE",failed=False)
         if summary.get("blocked_until"):
             _TD_DAILY_BLOCKED=True
             _TD_BLOCK_TYPE=summary.get("block_type","")
             _TD_DAILY_BLOCK_REASON=summary.get("block_reason","")
             _TD_STOP_UNTIL=summary["blocked_until"]
     except Exception as exc:
+        _TD_PREFLIGHT_DIAGNOSTIC=preflight_diagnostic(stage,failed=True,error=exc)
         _TD_DAILY_BLOCKED=True
         _TD_BLOCK_TYPE="CONTROLE_INDISPONIVEL"
         _TD_DAILY_BLOCK_REASON="Orçamento persistido indisponível; nenhuma consulta liberada."
@@ -1250,6 +1279,7 @@ def status_summary(
     )
     return {
         "twelve_budget":budget,
+        "twelve_budget_preflight":dict(_TD_PREFLIGHT_DIAGNOSTIC),
         "twelve_cache_hits":_TD_CACHE_HITS,
         "twelve_retry_after":_TD_STOP_UNTIL,
         "version":"V11.0.8_BUDGET_AUTOPILOT",
@@ -1390,7 +1420,13 @@ def main() -> int:
     if not research_tf_ok:
         all_errors.append("Salvar timeframes de pesquisa: "+str(research_tf_err))
 
-    cache_ok,cache_err=gh_put_json(SERIES_PATH,_TD_SERIES,"V11.0.8: cache compartilhado sem duplicar consultas")
+    # Never overwrite the shared market cache while the durable budget
+    # control is unavailable; an initialization read failure may leave the
+    # in-memory cache empty even when the remote copy held real candles.
+    if _TD_BLOCK_TYPE=="CONTROLE_INDISPONIVEL":
+        cache_ok,cache_err=True,""
+    else:
+        cache_ok,cache_err=gh_put_json(SERIES_PATH,_TD_SERIES,"V11.0.8: cache compartilhado sem duplicar consultas")
     if not cache_ok: all_errors.append("Salvar cache compartilhado: "+cache_err)
 
     master,map_errors=update_market_map(inputs,m15_frames,daily_cache)
