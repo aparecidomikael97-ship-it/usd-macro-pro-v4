@@ -21,9 +21,18 @@ O campo `request_approved`, a chave API, a presença de quota e o estado `EXTERN
 
 Na execução local original do Codex (Windows, Python 3.12), 11/11 testes atuais passaram. Os testes cobrem: chamadas repetidas, 32 chamadas concorrentes por rota, subprocesso encerrado depois da negação e reabertura, duas rotas de texto, UI do player e reprodução local do áudio previamente cacheado. A simulação de interrupção ocorre **após a negação**, não após um envio autorizado; ela não prova receipt H0.
 
-A suíte local ampliada original teve **97 testes: 67 PASS, 2 FAIL, 28 ERROR**. Não escondemos nem transformamos isso em homologação. Os resultados incluíam três expectativas antigas de sucesso em SEND incompatíveis com a contenção, e falhas de ambiente: 14 testes SQLite sem permissão para bancos temporários, 10 agendamentos sem ZoneInfo UTC, 3 módulos sem Streamlit. Código antigo dos testes ainda está na branch e a CI geral irá apontar as mudanças de contrato. O dado local é histórico, não resultado desta PR.
+A suíte local ampliada original teve **97 testes: 67 PASS, 2 FAIL, 28 ERROR**. Não escondemos nem transformamos isso em homologação. Os resultados incluíam três expectativas antigas de sucesso em SEND incompatíveis com a contenção, e falhas de ambiente: 14 testes SQLite sem permissão para bancos temporários, 10 agendamentos sem ZoneInfo UTC, 3 módulos sem Streamlit. No primeiro HEAD desta PR os testes legados ainda continham as expectativas anteriores, produzindo três falhas comprovadas no Quality; essas expectativas foram depois migradas explicitamente, preservadas em Git e documentadas na seção abaixo. O dado local é histórico, não resultado desta PR.
 
 **Obrigatório conferir na PR**: workflow dedicado A200 em Ubuntu e Windows; Quality geral, navegador, Security Gate/pip-audit, Core Certification e Release Readiness. Em caso de falha de contrato legado, registrar a expectativa original e sua substituição verificável antes de qualquer revisão. Não falsificar sucesso removendo, `skip` ou `xfail` sem justificativa.
+
+## Regressões de Quality no primeiro HEAD da PR #1650 e migração explícita
+
+[Quality #40600296344](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40600296344) executou **6.117 testes: 2 FAIL e 1 ERROR**, exclusivamente os três casos já vistos pelo Codex local:
+1. `test_atlasquant_aion_provider.test_successful_response_is_unverified_model_output_and_no_action` esperava `ANSWER_READY,called=True` mesmo que não houvesse testemunho independente.
+2. `test_atlasquant_voice_profile.test_generation_uses_fixed_neural_model_voice_and_ptbr_instructions` esperava áudio `MP3DATA` a partir de um POST falso.
+3. `test_atlasquant_voice_profile.test_provider_error_is_sanitized` esperava um erro HTTP 401 *após* atingir o provedor falso.
+
+**Tratamento:** esses três testes de contrato foram **reescritos explicitamente e renomeados**, mantendo o mesmo número total de verificações, para exigir `BLOCKED_SEND_CUSTODY`, ausência de `session.calls`/`requests.post`, ausência de cobrança/answer e ausência de vazamento de chave. Nenhum `skip`, `xfail` nem supressão por ambiente foi aplicado. As expectativas e o código anteriores são verificáveis diretamente no commit pai `dfcb15ca5d4ba1b566be6d38da80cc9984bfe487` e nos diffs desta PR. O transporte e tratamento de erros antigos ainda existem como código **inacessível** para revisão, não como contrato operacional. Validar novamente **todos os testes** no HEAD atualizado antes de afirmar compatibilidade.
 
 ## Outros caminhos externos não cobertos
 
