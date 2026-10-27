@@ -56,7 +56,11 @@ class GitHubStore:
             raise BudgetUnavailable('Persistência do orçamento não configurada')
         r=requests.get(f'https://api.github.com/repos/{self.repo}/contents/{self.path}',
                        headers={'Authorization':f'Bearer {self.token}'}, params={'ref':self.branch}, timeout=20)
-        if r.status_code==404: return {}, None
+        # A missing remote ledger is not a fresh account. Automatically
+        # re-creating it could reset previously reserved provider credits.
+        # A new installation must seed this file explicitly, out of band.
+        if r.status_code==404:
+            raise BudgetUnavailable('Diário de orçamento ausente; inicialização manual necessária')
         if r.status_code!=200: raise BudgetUnavailable(f'Leitura do orçamento: HTTP {r.status_code}')
         data=r.json()
         try:
