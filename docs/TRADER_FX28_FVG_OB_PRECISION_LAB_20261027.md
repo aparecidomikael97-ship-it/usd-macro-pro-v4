@@ -37,6 +37,12 @@ Um único par ausente, antigo, inconsistente ou duplicado -> `WAIT_NO_CONTEXT`, 
 
 **Limitação honesta:** os testes usam snapshots sintéticos no formato do cache, não são prova de que o cache operacional contenha os 28 pares, nem autenticam independentemente o provedor. A matriz macro atual de sete pares USD e o Radar não foram alterados.
 
+## Inferência alternativa e explicitamente não observada
+
+`atlasquant_trader_implied_fx28_lab.py` usa sete pares com USD (até sete observações, dependentes do mesmo intervalo) para derivar apenas **contexto cambial teórico** de 21 cruzamentos adicionais, sempre com `IMPLIED_CROSS_NOT_QUOTED` e estado `IMPLIED_28_CONTEXT_ONLY`. Nunca é confundido com `COMPLETE_CONTEXT_ONLY` derivado de 28 pares realmente observados. O procedimento aproveita somente um cache fornecido pelo chamador e não executa fetch.
+
+A investigação da branch runtime de 27/10/2026 encontrou o cache compartilhado com **zero séries**, ainda sem permitir cálculo por nenhuma das duas vias. O Autopilot reportou `CONTROLE_INDISPONIVEL`, e o coletor atual aceita apenas sete pares. [Auditoria de runtime](TRADER_FX28_RUNTIME_CACHE_AUDIT_20261027.md) distingue esses limites da prova sintética.
+
 ## Critérios para o próximo bloco
 
 - Conectar snapshot de dados históricos *somente leitura* com 28 séries sincronizadas, fixando timezone, ajuste de calendário, fonte, spread e timestamp de disponibilidade — sem vazar velas futuras.
@@ -47,6 +53,6 @@ Um único par ausente, antigo, inconsistente ou duplicado -> `WAIT_NO_CONTEXT`, 
 
 ## Evidência desta PR
 
-`test_atlasquant_trader_precision_lab.py` cobre **38 testes determinísticos** (23 do motor + 15 da ponte): 28 combinações, recuperação de forças sintéticas, soma zero, inconsistência triangular exposta, falhas fechadas de dados, sobreposição FVG/OB, preferência condicionada, isolamento por mercado/TF/direção, zonas invalidadas, duplicação e invariância da ordem.
+`test_atlasquant_trader_precision_lab.py` cobre **53 testes determinísticos** (23 do motor + 15 da ponte completa + 15 da inferência identificada): 28 combinações, recuperação de forças sintéticas, soma zero, inconsistência triangular exposta, falhas fechadas de dados, sobreposição FVG/OB, preferência condicionada, isolamento por mercado/TF/direção, zonas invalidadas, duplicação e invariância da ordem.
 
-**Resultado local após a ponte:** 38/38. GitHub Actions deverá confirmar Ubuntu + Windows. Testes sintéticos não são ganho financeiro nem acurácia de sinal.
+**Resultado local após inferência:** 53/53. GitHub Actions deverá confirmar Ubuntu + Windows. Testes sintéticos não são ganho financeiro nem acurácia de sinal.
