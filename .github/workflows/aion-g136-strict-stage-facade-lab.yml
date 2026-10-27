@@ -1,0 +1,41 @@
+# G136 only exercises a caller-facing LAB facade; it does NOT enforce
+# an externally pinned trusted first-intent boundary on ExecutionOutbox.
+name: AION G136 strict staging facade direct-bypass RED NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g136-real-outbox-stage-facade:
+    name: G136 real Outbox staging interface / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install project requirements without overrides
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Verify signed-original staging and direct bypass under 16 adversarial tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g136_strict_stage_facade_lab 2>&1 | tee g136.log
+          grep -F 'Ran 16 tests' g136.log
+          grep -Fx 'OK' g136.log
+          grep -F 'G136_STRICT_FACADE_SIGNED_AND_RESERVED=REAL_OUTBOX_LAB_STAGE_NO_SEND' g136.log
+          grep -F 'G136_ACTUAL_OUTBOX_HOST_ROLLBACK=LOCAL_CUSTODY_PREVENTS_RESTAGE_NOT_P0' g136.log
+          grep -F 'G136_CUSTODY_COMMIT_BUT_OUTBOX_STAGE_FAIL=UNCERTAIN_ZERO_AUTO_RETRY' g136.log
+          grep -F 'G136_UNMODIFIED_EXECUTION_OUTBOX_DIRECT_ENQUEUE=LOCAL_STAGE_BYPASS_RED_NO_SEND' g136.log
