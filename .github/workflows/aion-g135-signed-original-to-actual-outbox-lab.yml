@@ -1,0 +1,45 @@
+# G135 links A183 synthetic owner/identity-authority signatures to G134 local
+# process custody and ACTUAL AION ExecutionOutbox. No operational SEND or P0.
+name: AION G135 lab signed original tied to local custody NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-original-actual-outbox-lab:
+    name: G135 original binding / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install declared project requirements
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Run 14 signed identity and real Outbox adversarial lab tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g135_signed_original_to_actual_outbox_lab 2>&1 | tee g135.log
+          grep -F 'Ran 14 tests' g135.log
+          grep -Fx 'OK' g135.log
+          grep -F 'G135_PINNED_ORIGINAL_PLUS_TWO_SIGNATURES=LAB_STAGE_ONLY_NOT_SEND' g135.log
+          grep -F 'G135_RELABELED_EVENT_AGAINST_RETAINED_ORIGINAL=DENIED_LOCAL_LAB' g135.log
+          grep -F 'G135_ATTACKER_OWNER_SIGNATURE_WITH_OLD_PIN=DENIED' g135.log
+          grep -F 'G135_JOINT_ORIGINAL_AND_TRUST_ROOT_REPLACEMENT=SELF_REPIN_RED_NOT_P0' g135.log
+          grep -F 'G135_REAL_OUTBOX_HOST_ROLLBACK_WITH_PINNED_ORIGINAL=NO_RESTAGE_LOCAL_ONLY' g135.log
+          grep -F 'G135_FAKE_EVENT_RELABEL_BEFORE_CUSTODY=NO_AION_STAGE' g135.log
+          grep -F 'G135_JOINT_SELF_REPIN_AND_RELABEL=SECOND_SEMANTIC_STAGE_RED_NO_P0' g135.log
+          grep -F 'G135_VOLUNTARY_BRIDGE_CAN_BE_BYPASSED_BY_DIRECT_ENQUEUE_RED_NO_SEND' g135.log
