@@ -72,7 +72,7 @@ def isolated_preflight(*, missing=None):
 class CombinedSafetyTests(unittest.TestCase):
     def test_01_missing_budget_404_blocks_bootstrap_without_http_provider_or_write(self):
         with patch("twelve_budget_v1108.requests.get",
-                   return_value=Mock(status_code=404)) as get, \\
+                   return_value=Mock(status_code=404)) as get, \
              patch("twelve_budget_v1108.requests.put",
                    side_effect=AssertionError("never write")) as put:
             env,reads=isolated_preflight()
@@ -88,7 +88,7 @@ class CombinedSafetyTests(unittest.TestCase):
 
     def test_02_missing_required_cache_blocks_before_budget_io(self):
         with patch("twelve_budget_v1108.requests.get",
-                   side_effect=AssertionError("should not read budget")) as get, \\
+                   side_effect=AssertionError("should not read budget")) as get, \
              patch("twelve_budget_v1108.requests.put",
                    side_effect=AssertionError("never write")) as put:
             env,reads=isolated_preflight(missing="series")
@@ -108,7 +108,7 @@ class CombinedSafetyTests(unittest.TestCase):
                  "content":base64.b64encode(json.dumps(state).encode()).decode()}
         response=Mock(status_code=200,json=Mock(return_value=payload))
         with patch("twelve_budget_v1108.requests.get",
-                   return_value=response) as get, \\
+                   return_value=response) as get, \
              patch("twelve_budget_v1108.requests.put",
                    side_effect=AssertionError("never write")) as put:
             env,reads=isolated_preflight()
