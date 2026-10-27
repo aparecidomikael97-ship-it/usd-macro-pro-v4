@@ -150,7 +150,8 @@ class G141CustodianProposalSafetyTests(unittest.TestCase):
         self.assertEqual(len(result.risks), 10)
 
     def test_15_unknown_vendor_or_schema_rejected(self):
-        for k, value in (("schema", "AION_APPROVED"), ("vendor", "PRODUCTION")):
+        for k, value in (("schema", "AION_APPROVED"), ("vendor", "PRODUCTION"),
+                         ("vendor", [])):
             with self.subTest(k=k):
                 self.deny(
                     self.edit(k, value),
