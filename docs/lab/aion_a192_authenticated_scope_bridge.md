@@ -26,19 +26,19 @@ local senha→perfil da fixture→SQLite. Não estabelece MFA, sessão HTTP prot
 cookies seguros, CSRF, credencial real do HUMAN_OWNER, ACL nativa do sistema
 operacional, custódia externa ou proteção da própria configuração.
 
-## Três contraexemplos RED documentados
+## Quatro contraexemplos RED documentados
 
 - O helper existente has_permission() recebe só uma role auto-declarada;
   isso NÃO autentica usuário (a ponte A192 deliberadamente não confia nele).
 - Qualquer código que obtenha a referência do SQLiteChatStore pode construir
   Scope com strings conhecidas e acessar outro escopo. A ponte não corrige
   consumidores que contornem a fronteira.
-- Se o atacante controlar simultaneamente cadastro AccessUser e perfil OWNER
+- Com SQLiteChatStore fechado, a chamada crua get_conversation ainda dispara AttributeError. A fachada A192 devolve STORE_CLOSED de maneira controlada, sem fallback e sem alterar o store original.\n- Se o atacante controlar simultaneamente cadastro AccessUser e perfil OWNER
   'do servidor', ele pode autenticar sua própria senha e vincular-se à
   identidade de outrem. **Não existe raiz externa independente hoje**.
   A função A192 não resolve root enrollment, P0 G122 ou anti-rollback.
 
-Os três testes mostram o fato e imprimem RED. O sucesso desses testes representa
+Os quatro testes mostram o fato e imprimem RED. O sucesso desses testes representa
 um contraexemplo confirmado, NÃO uma vulnerabilidade corrigida.
 
 ## Critérios para a próxima etapa
