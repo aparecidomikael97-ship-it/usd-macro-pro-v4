@@ -261,10 +261,17 @@ def _bool_setting(value:Any)->bool:
     return str(value or "").strip().lower() in {"1","true","yes","on","sim"}
 
 def access_required()->bool:
+    # A lower-trust conflicting configuration must never downgrade a genuine
+    # PRODUCTION/auth-required signal into OPEN. Both the Streamlit secrets
+    # source and the process environment can independently require auth.
     environment=_setting("ATLASQUANT_ENV","").upper()
-    if environment=="PRODUCTION":
+    process_environment=str(os.getenv("ATLASQUANT_ENV","") or "").strip().upper()
+    if environment=="PRODUCTION" or process_environment=="PRODUCTION":
         return True
-    return _bool_setting(_setting("ATLASQUANT_AUTH_REQUIRED","false"))
+    return (
+        _bool_setting(_setting("ATLASQUANT_AUTH_REQUIRED","false"))
+        or _bool_setting(os.getenv("ATLASQUANT_AUTH_REQUIRED","false"))
+    )
 
 def configured_users():
     return load_users_config(_setting("ATLASQUANT_USERS_JSON",""))
