@@ -70,6 +70,14 @@ if st.button(
     ) + 1
     st.rerun()
 
+if st.button(
+    "QA · encerrar sessão",
+    key="qa_log_out_and_close_staged_store",
+):
+    from atlasquant_access_panel import clear_session
+    clear_session()
+    st.rerun()
+
 st.caption(
     "QA LOCAL · SQLite staged · provider desligado · produção desligada · "
     f"remounts={int(st.session_state.get('qa_staged_store_remounts', 0))}"
