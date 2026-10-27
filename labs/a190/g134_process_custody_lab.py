@@ -21,8 +21,8 @@ UNAVAILABLE = "DENY_CUSTODY_UNAVAILABLE_NO_SEND"
 BAD_INPUT = "DENY_UNAUTHENTICATED_INPUT_NO_SEND"
 BAD_STATE = "DENY_CUSTODY_INTEGRITY_NO_SEND"
 
-_TOKEN = re.compile(r"[A-Za-z0-9._:-]{1,128}\\Z")
-_SHA = re.compile(r"[0-9a-f]{64}\\Z")
+_TOKEN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
+_SHA = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def bootstrap_fixture(path: Path) -> None:
