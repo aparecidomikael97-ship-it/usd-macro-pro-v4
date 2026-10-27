@@ -9,6 +9,7 @@ import base64
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -37,8 +38,26 @@ class A196AuthorityScopeCollisionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
+        # The production registry uses "with conn", which commits but does
+        # not guarantee close() on Windows. This synthetic CI fixture retains
+        # every REAL SQLite connection and explicitly closes it before the
+        # temporary database directory is deleted.
+        self._all_connections = []
+        original_connect = PersistentNonceRegistry._connect
+        def tracked_connect(instance):
+            conn = original_connect(instance)
+            self._all_connections.append(conn)
+            return conn
+        self.addCleanup(self._close_test_connections)
+        patcher = patch.object(PersistentNonceRegistry, "_connect", tracked_connect)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.nonce_db = Path(self.temp.name) / "nonces.sqlite3"
         self.nonces = PersistentNonceRegistry(self.nonce_db)
+
+    def _close_test_connections(self):
+        for conn in self._all_connections:
+            conn.close()
         self.key = Ed25519PrivateKey.generate()
         public = self.key.public_key().public_bytes(
             serialization.Encoding.Raw,
