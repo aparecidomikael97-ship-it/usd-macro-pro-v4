@@ -113,7 +113,6 @@ class A195ChatHostEntrypointTests(unittest.TestCase):
         self.assertTrue(require_chat_host_session(self.st, self.access, now=self.now))
 
     def test_missing_access_rejected(self):
-        self.deny("ACCESS_MAPPING_REQUIRED", access={}) if False else None
         with self.assertRaisesRegex(PermissionError, "ACCESS_MAPPING_REQUIRED"):
             require_chat_host_session(self.st, None, now=self.now)
 
@@ -218,6 +217,7 @@ class A195ChatHostEntrypointTests(unittest.TestCase):
         self.deny("SESSION_MAX_AGE")
 
     def test_expired_idle_denied(self):
+        self.session["authenticated_at"] = self.now - MAX_IDLE_SECONDS - 1000
         self.session["last_seen"] = self.now - MAX_IDLE_SECONDS - 10
         self.access["session"] = dict(self.session)
         self.deny("SESSION_IDLE_TIMEOUT")
