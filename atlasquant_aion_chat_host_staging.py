@@ -17,6 +17,7 @@ from typing import Any, Mapping
 from aion_chat.models import Scope
 from aion_chat.store import HEALTHY, SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_chat_product_bridge import validate_product_binding
+from atlasquant_aion_chat_entrypoint_guard import require_chat_host_session
 from atlasquant_aion_chat_storage_resilience import (
     STAGING_RPO_SECONDS,
     STAGING_RTO_SECONDS,
@@ -338,6 +339,10 @@ def build_streamlit_staged_binding(
 ) -> dict[str, Any] | None:
     """Host-facing entrypoint used by the real Streamlit shell."""
     config = streamlit_staged_config(st)
+    if not staged_feature_enabled(config):
+        return None
+    # Deny before allocating or reusing a SQLite handle.
+    require_chat_host_session(st, access)
     return build_staged_host_binding(
         st.session_state,
         access,
