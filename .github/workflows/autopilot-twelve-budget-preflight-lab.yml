@@ -26,10 +26,10 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
-      - name: 15 synthetic preflight tests only, zero provider network
+      - name: 19 synthetic preflight tests only, zero provider network
         shell: bash
         run: |
           set -o pipefail
           python -B -m unittest -v test_autopilot_budget_preflight_diag_lab 2>&1 | tee preflight_diagnostic_lab.log
-          grep -F 'Ran 15 tests' preflight_diagnostic_lab.log
+          grep -F 'Ran 19 tests' preflight_diagnostic_lab.log
           grep -Fx 'OK' preflight_diagnostic_lab.log
