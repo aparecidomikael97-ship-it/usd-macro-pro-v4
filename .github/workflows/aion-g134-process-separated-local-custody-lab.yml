@@ -1,0 +1,44 @@
+# G134 is a falsifiable LOCAL process-separation experiment, not an external P0 proof.
+name: AION G134 process-separated local custody + real Outbox NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  process-custody-lab:
+    name: G134 real Outbox + separate local custodian / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install declared Python dependencies
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Exercise 11 adversarial process-separated local custodian cases
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g134_process_custody_outbox_lab 2>&1 | tee g134.log
+          grep -F 'Ran 11 tests' g134.log
+          grep -Fx 'OK' g134.log
+          grep -F 'G134_AION_SQLITE_ROLLBACK_WITH_CUSTODY_INTACT=SECOND_STAGE_DENIED_LAB_ONLY' g134.log
+          grep -F 'G134_JOINT_AION_AND_CUSTODIAN_ROLLBACK=READMISSION_RED_NOT_P0' g134.log
+          grep -F 'G134_CUSTODY_POST_COMMIT_LOST_ACK=UNCERTAIN_ZERO_AUTO_RESEND' g134.log
+          grep -F 'G134_CUSTODY_UNAVAILABLE=DENY_WITHOUT_BOOTSTRAP_OR_SEND' g134.log
+          grep -F 'G134_CALLER_RELABELED_ORIGINAL_EVENT=SECOND_STAGE_RED_NO_HUMAN_OWNER_AUTH' g134.log
+          grep -F 'G134_CRASH_BETWEEN_CUSTODY_AND_AION_COMMIT=NO_BLIND_RESTAGE' g134.log
+          grep -F 'G134_PROCESS_SEPARATED_LOCAL_RESERVATION=DEFAULT_OUTBOX_NO_SEND' g134.log
+          grep -F 'G134_CONCURRENT_PROCESS_RESERVATION=ONE_LOCAL_WINNER_NO_PROVIDER' g134.log
