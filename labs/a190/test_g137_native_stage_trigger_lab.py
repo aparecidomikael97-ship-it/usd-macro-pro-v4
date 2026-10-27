@@ -34,6 +34,7 @@ class G137NativeSqliteTripwireActualOutboxTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="aion-g137-")
         self.addCleanup(self.tmp.cleanup)
         root = Path(self.tmp.name)
+        self.root = root
         self.aion = root / "aion" / "real-outbox.sqlite3"
         self.aion.parent.mkdir()
         self.custody = root / "separate-same-host" / "custody.sqlite3"
