@@ -1,0 +1,37 @@
+# G131 catches simple lexical import/assignment aliases bypassing G130 AST calls.
+# Static inventory only; not a SQLite native VFS or P0 authority control.
+name: AION G131 SQLite lexical alias bypass guard NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  alias-regression:
+    name: G131 SQLite aliases static LAB / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Verify aliases are seen without hiding inherited review debt
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g131_sqlite_alias_inventory_lab 2>&1 | tee g131-tests.log
+          grep -F 'Ran 8 tests' g131-tests.log
+          grep -Fx 'OK' g131-tests.log
+          grep -F 'G131_DIRECT_IMPORT_ALIAS=DETECTED' g131-tests.log
+          grep -F 'G131_NATIVE_CONNECT_ALIAS=DETECTED' g131-tests.log
+          grep -F 'G131_LEXICAL_ALIAS_GROWTH=ZERO_THIS_SHA_NOT_P0' g131-tests.log
+          python -B scripts/aion_sqlite_entrypoints_inventory_lab.py --check-known 2>&1 | tee g131-inventory.log
+          grep -F 'G129_INVENTORY_CHECK=PASS_NOT_P0' g131-inventory.log
+          grep -F 'G130_CONSTRUCTOR_GROWTH_GATE=PASS_NOT_P0' g131-inventory.log
