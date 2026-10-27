@@ -1,0 +1,31 @@
+name: AION A191 Real SQLite Scope Boundary LAB
+
+on:
+  pull_request:
+    paths:
+      - "labs/test_a191_real_sqlite_chat_scope_lab.py"
+      - "docs/lab/aion_a191_chat_sqlite_scope_lab.md"
+      - ".github/workflows/aion-a191-real-sqlite-scope-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-scope-lab:
+    name: A191 SQLite scoped chat / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Real SQLiteChatStore synthetic adversarial unit tests, no deps or providers
+        run: python -B -m unittest -v labs.test_a191_real_sqlite_chat_scope_lab
