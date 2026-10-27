@@ -41,7 +41,7 @@ class G136StrictStagingFacadeLab:
             raise TypeError("G136_REAL_EXECUTION_OUTBOX_REQUIRED")
         if type(claim) is not PinnedOriginalClaimLab:
             raise TypeError("G136_PINNED_LAB_CLAIM_REQUIRED")
-        if type(custody_path) is not Path:
+        if not isinstance(custody_path, Path):
             raise TypeError("G136_EXPLICIT_CUSTODY_PATH_REQUIRED")
         if not isinstance(outbox.scope, Scope):
             raise TypeError("G136_TRUSTED_SCOPE_REQUIRED")
