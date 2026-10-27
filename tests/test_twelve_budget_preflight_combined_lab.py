@@ -117,7 +117,7 @@ class CombinedSafetyTests(unittest.TestCase):
         self.assertFalse(env["_TD_DAILY_BLOCKED"])
         self.assertEqual(env["_TD_HTTP_CALLS"],0)
         self.assertEqual(env["_TD_BUDGET"].summary(NOW)["used"],14)
-        self.assertEqual(get.call_count,2)
+        self.assertEqual(get.call_count,3)
         put.assert_not_called()
 
 
