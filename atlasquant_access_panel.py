@@ -322,7 +322,9 @@ def evaluate_access(
         return {"allowed":False,"mode":"LOCKED","reason":"NO_USERS_CONFIGURED"}
     if not isinstance(session,dict) or not has_permission(session,"app:read"):
         return {"allowed":False,"mode":"LOGIN","reason":"AUTH_REQUIRED"}
-    if users is not None and not session_is_current(session,users):
+    # A role-only session is not an authentication proof. A trusted current
+    # registry is mandatory before any AUTHENTICATED decision can be issued.
+    if users is None or not session_is_current(session,users):
         return {"allowed":False,"mode":"LOGIN","reason":"SESSION_REVOKED"}
     return {"allowed":True,"mode":"AUTHENTICATED","reason":"OK"}
 
