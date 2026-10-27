@@ -127,7 +127,9 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         expect(page.locator(".aq-chat-root")).to_be_visible(timeout=30000)
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
 
-        _send(page, "QA_PRIVACY_MARKER_ONLY_USER_A_20261027")
+        # Use a confirmed read-only query; arbitrary marker strings may be
+        # intentionally rejected by AION read-only intent policy.
+        _send(page, "status geral")
         assistant = page.locator(
             '.aq-chat-message.assistant[data-state="CONFIRMED_SUCCESS"]'
         )
@@ -183,7 +185,9 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         _login(page, QA_USER_B, QA_PASSWORD_B)
         expect(marker).to_have_attribute("data-state", "STAGED_BOUND", timeout=30000)
         expect(page.locator(".aq-chat-root")).to_be_visible(timeout=30000)
-        expect(page.get_by_text("QA_PRIVACY_MARKER_ONLY_USER_A_20261027")).to_have_count(0)
+        # New user has a distinct, empty UI state. In particular, the
+        # original conversation ID and all four prior messages are absent.
+        expect(page.locator(".aq-chat-message")).to_have_count(0)
         other_cid = page.locator(".aq-chat-id").inner_text().strip()
         assert other_cid != conversation_id
 
@@ -194,7 +198,8 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
         _login(page, QA_USER_A, QA_PASSWORD_A)
         expect(marker).to_have_attribute("data-state", "STAGED_BOUND", timeout=30000)
         expect(page.locator(".aq-chat-id")).to_have_text(conversation_id, timeout=30000)
-        expect(page.get_by_text("QA_PRIVACY_MARKER_ONLY_USER_A_20261027")).to_be_visible(timeout=30000)
+        expect(page.locator(".aq-chat-message")).to_have_count(4)
+        expect(assistant).to_have_count(2)
         expect(page.locator('[data-testid="stException"]')).to_have_count(0)
         assert not errors
         browser.close()
