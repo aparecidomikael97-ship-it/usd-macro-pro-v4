@@ -5,6 +5,8 @@ on:
     paths:
       - 'atlasquant_trader_precision_lab.py'
       - 'test_atlasquant_trader_precision_lab.py'
+      - 'atlasquant_trader_precision_cache_bridge_lab.py'
+      - 'test_atlasquant_trader_precision_cache_bridge_lab.py'
       - 'docs/TRADER_FX28_FVG_OB_PRECISION_LAB_20261027.md'
       - '.github/workflows/trader-precision-fx28-fvg-ob-lab.yml'
   workflow_dispatch:
@@ -26,10 +28,10 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
-      - name: 23 isolated research tests, zero orders or network
+      - name: 38 isolated research tests, zero orders or network
         shell: bash
         run: |
           set -o pipefail
-          python -B -m unittest -v test_atlasquant_trader_precision_lab 2>&1 | tee trader_precision_lab.log
-          grep -F 'Ran 23 tests' trader_precision_lab.log
+          python -B -m unittest -v test_atlasquant_trader_precision_lab test_atlasquant_trader_precision_cache_bridge_lab 2>&1 | tee trader_precision_lab.log
+          grep -F 'Ran 38 tests' trader_precision_lab.log
           grep -Fx 'OK' trader_precision_lab.log
