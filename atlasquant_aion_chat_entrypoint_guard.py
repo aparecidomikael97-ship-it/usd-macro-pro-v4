@@ -83,7 +83,9 @@ def require_chat_host_session(
         _stop("OWNER_ADMIN_REQUIRED")
 
     permissions = current.get("permissions")
-    if not isinstance(permissions, (list, tuple, frozenset, set)):
+    if not isinstance(permissions, (list, tuple, frozenset, set)) or not all(
+        isinstance(item, str) for item in permissions
+    ):
         _stop("SESSION_PERMISSIONS_REQUIRED")
     if set(permissions) != set(ROLE_PERMISSIONS["ADMIN"]):
         _stop("ROLE_PERMISSIONS_NOT_SERVER_CANONICAL")
