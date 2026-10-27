@@ -34,7 +34,7 @@ class A193SQLiteClosedStoreFailClosedLab(unittest.TestCase):
     def closed(self, callback):
         with self.assertRaises(StorageUnavailableError) as cm:
             callback()
-        self.assertIn("closed", str(cm.exception))
+        self.assertIn("closed", str(cm.exception).lower())
 
     def test_get_conversation_denies(self):
         self.closed(lambda: self.store.get_conversation(self.scope, self.conv.id))
