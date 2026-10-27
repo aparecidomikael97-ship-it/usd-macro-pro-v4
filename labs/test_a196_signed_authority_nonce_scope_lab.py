@@ -55,9 +55,6 @@ class A196AuthorityScopeCollisionTests(unittest.TestCase):
         self.nonce_db = Path(self.temp.name) / "nonces.sqlite3"
         self.nonces = PersistentNonceRegistry(self.nonce_db)
 
-    def _close_test_connections(self):
-        for conn in self._all_connections:
-            conn.close()
         self.key = Ed25519PrivateKey.generate()
         public = self.key.public_key().public_bytes(
             serialization.Encoding.Raw,
@@ -76,6 +73,10 @@ class A196AuthorityScopeCollisionTests(unittest.TestCase):
             }],
             "revoked_key_ids": [],
         })
+
+    def _close_test_connections(self):
+        for conn in self._all_connections:
+            conn.close()
 
     def statement(self, **overrides):
         values = {
