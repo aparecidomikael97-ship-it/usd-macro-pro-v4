@@ -1,0 +1,34 @@
+# G132: real SQLite WAL rollback counterexample, not a production guard or P0.
+name: AION G132 real SQLite joint rollback counterexample NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sqlite-joint-rollback-lab:
+    name: G132 real SQLite rollback LAB / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Reproduce unsafe readmission and keep absence of external proof explicit
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g132_joint_rollback_sqlite_lab 2>&1 | tee g132-tests.log
+          grep -F 'Ran 6 tests' g132-tests.log
+          grep -Fx 'OK' g132-tests.log
+          grep -F 'G132_JOINT_DB_WITNESS_ROLLBACK=UNSAFE_READMISSION_REPRODUCED_NOT_P0' g132-tests.log
+          grep -F 'G132_H0_WITNESS_MISSING=NO_EFFECT' g132-tests.log
+          grep -F 'G132_ACK_LOSS_WITH_INTACT_STATE=UNCERTAIN_ZERO_AUTO_RESEND' g132-tests.log
+          grep -F 'G132_SELF_CLAIMED_EVENT_ID=DOUBLE_SYNTHETIC_EFFECT_NOT_AUTHENTICATED' g132-tests.log
