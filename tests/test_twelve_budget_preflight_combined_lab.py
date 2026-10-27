@@ -112,11 +112,12 @@ class CombinedSafetyTests(unittest.TestCase):
              patch("twelve_budget_v1108.requests.put",
                    side_effect=AssertionError("never write")) as put:
             env,reads=isolated_preflight()
+            final_used=env["_TD_BUDGET"].summary(NOW)["used"]
         self.assertEqual(reads,["status","scanner","series"])
         self.assertEqual(env["_TD_PREFLIGHT_DIAGNOSTIC"]["stage"],"COMPLETE")
         self.assertFalse(env["_TD_DAILY_BLOCKED"])
         self.assertEqual(env["_TD_HTTP_CALLS"],0)
-        self.assertEqual(env["_TD_BUDGET"].summary(NOW)["used"],14)
+        self.assertEqual(final_used,14)
         self.assertEqual(get.call_count,3)
         put.assert_not_called()
 
