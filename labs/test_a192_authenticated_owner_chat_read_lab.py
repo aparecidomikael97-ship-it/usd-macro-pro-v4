@@ -190,8 +190,17 @@ class A192AuthenticatedOwnerChatReadLab(unittest.TestCase):
 
     def test_no_fallback_if_local_store_closed(self):
         self.store.close()
-        with self.assertRaises(StorageUnavailableError):
-            self.read()
+        # Existing raw SQLiteChatStore lacks closed-state checking here:
+        # a direct call raises AttributeError instead of StorageUnavailableError.
+        with self.assertRaises(AttributeError):
+            self.store.get_conversation(
+                Scope("owner-id-a", "tenant-owner-a", "aion"),
+                self.own["aion"].id,
+            )
+        print("A192_RAW_CLOSED_STORE_GET=UNHANDLED_ATTRIBUTE_ERROR_RED", flush=True)
+        out = self.read()
+        self.assert_blocked(out)
+        self.assertEqual(out["reason"], "STORE_CLOSED")
 
     def test_role_only_has_permission_is_not_authentication_expected_red(self):
         # Existing helper has_permission checks role, not actual credentials.
