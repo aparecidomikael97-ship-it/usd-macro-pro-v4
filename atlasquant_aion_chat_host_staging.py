@@ -341,8 +341,18 @@ def build_streamlit_staged_binding(
     config = streamlit_staged_config(st)
     if not staged_feature_enabled(config):
         return None
-    # Deny before allocating or reusing a SQLite handle.
-    require_chat_host_session(st, access)
+    # Deny before allocating or reusing a SQLite handle. A revoked or
+    # swapped session must also lose existing staging handles, not only UI access.
+    try:
+        require_chat_host_session(st, access)
+    except PermissionError:
+        try:
+            close_all_staged_host_stores(st.session_state)
+        except Exception:
+            # Never turn failed cleanup into permission or allow the caller
+            # to reuse the old chat handle from this entrypoint.
+            pass
+        raise
     return build_staged_host_binding(
         st.session_state,
         access,
