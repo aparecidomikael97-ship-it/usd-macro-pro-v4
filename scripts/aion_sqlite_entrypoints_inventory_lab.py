@@ -80,19 +80,72 @@ def is_production_path(path: str) -> bool:
 
 
 def scan_source(source: str, filename: str = "<fixture>") -> list[dict]:
+    """Conservatively inventory explicit calls, including lexical aliases.
+
+    This is an AST review trigger, NOT scope-aware data flow, executable
+    provenance, or a reliable defense against dynamic lookup/rebinding.
+    False positives due to shadowing require human review; they are not
+    silently excluded from a security-relevant inventory.
+    """
     tree = ast.parse(source, filename=filename)
     module_names = set()
     connect_names = set()
+    constructor_aliases = {name: name for name in STORE_CONSTRUCTORS}
+    assignments = []
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for item in node.names:
                 if item.name == "sqlite3":
                     module_names.add(item.asname or "sqlite3")
-        elif isinstance(node, ast.ImportFrom) and node.module == "sqlite3":
+        elif isinstance(node, ast.ImportFrom):
             for item in node.names:
-                if item.name == "connect":
+                if node.module == "sqlite3" and item.name == "connect":
                     connect_names.add(item.asname or "connect")
+                if item.name in STORE_CONSTRUCTORS:
+                    constructor_aliases[item.asname or item.name] = item.name
+        elif isinstance(node, ast.Assign):
+            names = [target.id for target in node.targets
+                     if isinstance(target, ast.Name)]
+            if names:
+                assignments.append((names, node.value))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if node.value is not None:
+                assignments.append(([node.target.id], node.value))
+
+    # A bounded fixed point is sufficient for chains of simple assignments:
+    # RegistryAlias = PersistentNonceRegistry; Another = RegistryAlias.
+    # Unknown computed expressions, getattr and imports at runtime remain
+    # explicitly untracked, NOT "proved safe".
+    changed = True
+    while changed:
+        changed = False
+        for targets, value in assignments:
+            connect_alias = False
+            module_alias = False
+            constructor = None
+            if isinstance(value, ast.Name):
+                connect_alias = value.id in connect_names
+                module_alias = value.id in module_names
+                constructor = constructor_aliases.get(value.id)
+            elif isinstance(value, ast.Attribute):
+                connect_alias = (
+                    value.attr == "connect"
+                    and isinstance(value.value, ast.Name)
+                    and value.value.id in module_names
+                )
+                if value.attr in STORE_CONSTRUCTORS:
+                    constructor = value.attr
+            for name in targets:
+                if connect_alias and name not in connect_names:
+                    connect_names.add(name)
+                    changed = True
+                if module_alias and name not in module_names:
+                    module_names.add(name)
+                    changed = True
+                if constructor and constructor_aliases.get(name) != constructor:
+                    constructor_aliases[name] = constructor
+                    changed = True
 
     observations = []
     for node in ast.walk(tree):
@@ -110,8 +163,9 @@ def scan_source(source: str, filename: str = "<fixture>") -> list[dict]:
                 observations.append({"line": node.lineno, "kind": "native_connect"})
                 continue
             constructor = (
-                func.id if isinstance(func, ast.Name)
-                else func.attr if isinstance(func, ast.Attribute) else None
+                constructor_aliases.get(func.id) if isinstance(func, ast.Name)
+                else func.attr if isinstance(func, ast.Attribute)
+                and func.attr in STORE_CONSTRUCTORS else None
             )
             if constructor in STORE_CONSTRUCTORS:
                 observations.append({
@@ -125,8 +179,6 @@ def scan_source(source: str, filename: str = "<fixture>") -> list[dict]:
             and isinstance(node.value, ast.Name)
             and node.value.id in module_names
         ):
-            # Includes calls; the extra reference observation is intentional,
-            # making caller-controlled factory/default bindings visible.
             observations.append({
                 "line": node.lineno, "kind": "native_connect_reference"
             })
@@ -190,9 +242,9 @@ def audit(root: Path = REPO_ROOT) -> dict:
         "new_or_expanded_unreviewed_store_constructors": unreviewed_constructors,
         "findings": findings,
         "limitations": [
-            "No dynamic imports, generated code, non-Python native callers",
+            "No dynamic imports, getattr, generated code, non-Python native callers",
             "No SQLite VFS fd/handle identity or WAL/SHM attestation",
-            "No call graph/runtime activation nor OS ACL enforcement",
+            "Alias detection is lexical, not scope-aware or a call graph; no OS ACL enforcement",
             "Legacy reviewed means tracked debt, NOT safe or P0-approved",
         ],
     }
