@@ -143,7 +143,9 @@ def scan_source(source: str, filename: str = "<fixture>") -> list[dict]:
                 if module_alias and name not in module_names:
                     module_names.add(name)
                     changed = True
-                if constructor and constructor_aliases.get(name) != constructor:
+                if constructor and name not in constructor_aliases:
+                    # Preserve the first lexical candidate if a name is rebound.
+                    # Rebinding is outside this static checker and needs review.
                     constructor_aliases[name] = constructor
                     changed = True
 
