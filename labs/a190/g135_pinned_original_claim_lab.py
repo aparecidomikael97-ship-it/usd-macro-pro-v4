@@ -28,8 +28,8 @@ def _exact_event(event):
     return (
         type(event) is dict
         and set(event) == _EVENT
-        and all(type(v) is str and _TOKEN.fullmatch(v) for v in event.values()
-                if v is not None and v != event.get("original_sha256"))
+        and all(type(event[k]) is str and bool(_TOKEN.fullmatch(event[k]))
+                for k in ("event_id", "owner_id", "tenant_id", "workspace_id"))
         and type(event.get("original_sha256")) is str
         and bool(_SHA.fullmatch(event["original_sha256"]))
     )
@@ -40,6 +40,7 @@ def _exact_effect(effect):
         type(effect) is dict
         and set(effect) == _EFFECT
         and all(type(v) is str and _TOKEN.fullmatch(v) for v in effect.values())
+        and len(effect["amount_minor"]) <= 18
         and effect["amount_minor"].isdigit()
         and effect["amount_minor"].lstrip("0") != ""
         and effect["amount_minor"] == str(int(effect["amount_minor"]))
