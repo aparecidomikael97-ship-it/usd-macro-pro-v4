@@ -616,6 +616,25 @@ def write_repository_feature_flag_enabled(
             "reason": "Feature flag is not in an enable-safe prior state.",
         }
 
+    # A201 LAB: readiness, an ADMIN ceremony, a caller-supplied prior_state
+    # and a GitHub token do not constitute an independently anchored first-
+    # attempt authority. Until externally controlled admission/custody is
+    # proven, this lowest-level ENABLE writer must never reach POST/PATCH.
+    # A future activation requires a separately reviewed code change, not
+    # a feature flag, request argument, local ticket or environment override.
+    # The separate force_disable_repository_feature_flag safety path remains
+    # usable to turn OFF an already-present unsafe flag.
+    return {
+        "status": "BLOCKED",
+        "modified": False,
+        "reason": "EXTERNAL_ENABLE_CUSTODY_NOT_HOMOLOGATED",
+        "previous_state": state,
+        "target_state": "ENABLED",
+        "raw_value_exposed": False,
+    }
+
+    # Historical enable transport retained for audit, deliberately
+    # unreachable after the unconditional custody denial.
     headers = _headers(config.token)
     try:
         if state == "UNSET":
