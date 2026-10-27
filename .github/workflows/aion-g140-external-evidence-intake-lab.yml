@@ -1,0 +1,42 @@
+# G140 is *offline document triage*, not an independent evidence verifier.
+# No emitted verdict can close a P0 or enable external effects.
+name: AION G140 external P0 evidence intake anti-greenwash NOT P0
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  g140-external-evidence-intake:
+    name: G140 canonical G122 evidence anti-greenwash / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install exactly current declared requirements
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Check 19 evidence admission negative guarantees
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest -v labs.a190.test_g140_external_p0_evidence_intake_lab 2>&1 | tee g140.log
+          grep -F 'Ran 19 tests' g140.log
+          grep -Fx 'OK' g140.log
+          grep -F 'G140_FIVE_CLAIMED_EXTERNAL_GREEN=REVIEW_REQUIRED_HARD_NO_GO_ZERO_P0' g140.log
+          grep -F 'G140_G125_GREEN_AND_G139_LOCAL_KEYS=NOT_EXTERNAL_P0_EVIDENCE' g140.log
+          grep -F 'G140_REAL_G122_RED=REMAINS_RED_WITH_NO_PASS_RECLASSIFICATION' g140.log
+          grep -F 'G140_FIVE_G122_CANONICAL_TEST_NAMES=UNCHANGED_AND_UNMASKED' g140.log
+          grep -F 'G140_SELF_ATTESTED_READY_FLAG_CANNOT_ENABLE_SEND_OR_WORKER' g140.log
