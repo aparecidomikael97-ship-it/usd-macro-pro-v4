@@ -174,6 +174,8 @@ class G135OriginalEconomicBindingTests(unittest.TestCase):
             self.bridge(effect={**self.economic, "amount_minor": "000100"})
         with self.assertRaises(ValueError):
             self.bridge(effect={**self.economic, "amount_minor": "-100"})
+        self.assertIsNone(self.check(
+            self.bridge(), effect={**self.economic, "amount_minor": "9" * 5000}))
 
     def test_09_both_manifest_and_keys_replaced_still_self_enroll_red_not_p0(self):
         alternate_private, alternate_pins = lab_keys()
