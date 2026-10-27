@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from aion_chat.models import Scope
+from aion_chat.store import SQLiteChatStore
 from atlasquant_access_control import AccessUser, authenticate, normalize_username
 
 SCHEMA = "AION_A192_AUTHENTICATED_CHAT_READ_LAB_V1"
@@ -99,6 +100,10 @@ def authenticated_owner_conversation_read(
 
     # Only HERE is Scope derived from authenticated username + server registry.
     scope = Scope(owner_id, tenant_id, workspace)
+    # SQLiteChatStore.get_conversation() does not guard a closed db handle.
+    # Do not let a closed store become an unhandled exception or fallback.
+    if isinstance(store, SQLiteChatStore) and store.db is None:
+        return _denied("STORE_CLOSED")
     try:
         conv = store.get_conversation(scope, conversation_id)
     except LookupError:
