@@ -6,6 +6,9 @@ on:
       - 'autopilot_v107.py'
       - 'atlasquant_twelve_preflight_diagnostic.py'
       - 'test_autopilot_budget_preflight_diag_lab.py'
+      - 'twelve_budget_v1108.py'
+      - 'test_twelve_budget_v1108.py'
+      - 'tests/test_twelve_budget_preflight_combined_lab.py'
       - 'docs/AUTOPILOT_TWELVE_BUDGET_PREFLIGHT_DIAGNOSTIC_LAB_20261027.md'
       - '.github/workflows/autopilot-twelve-budget-preflight-lab.yml'
   workflow_dispatch:
@@ -33,3 +36,10 @@ jobs:
           python -B -m unittest -v test_autopilot_budget_preflight_diag_lab 2>&1 | tee preflight_diagnostic_lab.log
           grep -F 'Ran 19 tests' preflight_diagnostic_lab.log
           grep -Fx 'OK' preflight_diagnostic_lab.log
+      - name: 3 combined real-ledger fake-GitHub tests, no provider calls
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p 'test_twelve_budget_preflight_combined_lab.py' -v 2>&1 | tee combined_preflight_lab.log
+          grep -F 'Ran 3 tests' combined_preflight_lab.log
+          grep -Fx 'OK' combined_preflight_lab.log
