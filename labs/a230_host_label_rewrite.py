@@ -142,6 +142,8 @@ def preflight_host_label_rewrite(
         expected_owner_id=expected_owner_id, expected_tenant_id=expected_tenant_id,
         expected_workspace_id=expected_workspace_id,
     )
+    if type(a229_graph) is not dict:
+        return _out("A229_BASELINE_OBJECT_REQUIRED")
     baseline = preflight_common_control_claims(a229_graph, **prior_args)
     if not baseline.source_envelope_valid or baseline.external_evidence_accepted:
         return _out("A229_UNTRUSTED_BASELINE_REQUIRED")
