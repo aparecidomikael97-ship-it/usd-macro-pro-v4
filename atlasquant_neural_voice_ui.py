@@ -132,7 +132,13 @@ def render_neural_voice_player(
                 "O AtlasQuant não vai trocar para a voz do aparelho."
             )
             st.caption(f"Diagnóstico de voz: {type(exc).__name__}: {exc}")
-            return {**status,"state":"PROVIDER_ERROR","audio_ready":False}
+            state=(
+                "BLOCKED_SEND_CUSTODY"
+                if isinstance(exc,RuntimeError)
+                and str(exc).startswith("BLOCKED_SEND_CUSTODY:")
+                else "PROVIDER_ERROR"
+            )
+            return {**status,"state":state,"audio_ready":False}
 
     if isinstance(audio,(bytes,bytearray)) and audio:
         st.audio(bytes(audio),format="audio/mp3")

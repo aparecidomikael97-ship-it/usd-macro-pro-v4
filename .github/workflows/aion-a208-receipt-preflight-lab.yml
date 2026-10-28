@@ -1,0 +1,32 @@
+name: AION A208 Receipt Preflight Contract LAB
+
+on:
+  pull_request:
+    paths:
+      - "labs/a208_independent_receipt_preflight.py"
+      - "labs/test_a208_independent_receipt_preflight.py"
+      - "docs/lab/aion_a208_independent_receipt_contract.md"
+      - ".github/workflows/aion-a208-receipt-preflight-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  receipt-preflight:
+    name: A208 structural checks confer zero authority / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Run receipt contract and A206 regression (no provider)
+        run: python -B -m unittest -v labs.test_a208_independent_receipt_preflight labs.test_a206_late_send_outcome_cas
