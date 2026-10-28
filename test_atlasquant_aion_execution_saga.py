@@ -179,6 +179,7 @@ class ExecutionSagaTests(unittest.TestCase):
         offset=1,
         approval_ref="approval-forward",
         reauth_ref="",
+        allowed=True,
     ):
         when = NOW + timedelta(seconds=offset)
         claimed = outbox.claim_next(worker, now=when, lease_seconds=60)
@@ -188,6 +189,7 @@ class ExecutionSagaTests(unittest.TestCase):
             worker_id=worker,
             authorize=policy(
                 self.scope,
+                allowed=allowed,
                 authorization_ref=approval_ref,
                 reauthenticated=True,
                 reauth_ref=reauth_ref,
@@ -223,7 +225,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self.assertEqual(saga.integrity_report("saga-1")["state"], "MATCH")
             store.close()
 
-    def test_second_step_failure_requires_explicit_compensation_then_compensates(self):
+    def test_second_step_pre_send_revocation_requires_explicit_compensation_then_compensates(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(raw)
             self._create(saga)
@@ -233,8 +235,11 @@ class ExecutionSagaTests(unittest.TestCase):
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
 
             self._enqueue_forward(saga, offset=2)
-            failed = self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
-            self.assertEqual(failed["state"], "FAILED")
+            failed = self._dispatch_claimed(outbox, budget, FakeAdapter("confirmed"), offset=3, allowed=False)
+            # A205: an explicit authorization revocation BEFORE SEND can
+            # safely trigger the compensation workflow. An adapter-owned
+            # rejection after SEND must instead stay UNCERTAIN.
+            self.assertEqual(failed["state"], "REVOKED")
             synced = saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
             self.assertEqual(synced["state"], "COMPENSATION_REQUIRED")
 
@@ -282,7 +287,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self.assertEqual(budget.snapshot("saga-1", now=NOW + timedelta(seconds=7))["transaction_effects"], 2)
             store.close()
 
-    def test_three_step_failure_compensates_confirmed_effects_in_reverse_order(self):
+    def test_three_step_revocation_compensates_confirmed_effects_in_reverse_order(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(
                 raw,
@@ -300,7 +305,7 @@ class ExecutionSagaTests(unittest.TestCase):
                 )
 
             self._enqueue_forward(saga, offset=6)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=7)
+            self._dispatch_claimed(outbox, budget, FakeAdapter("confirmed"), offset=7, allowed=False)
             out = saga.sync_forward_outcome("saga-1", "three", now=NOW + timedelta(seconds=7))
             self.assertEqual(out["state"], "COMPENSATION_REQUIRED")
 
@@ -354,7 +359,7 @@ class ExecutionSagaTests(unittest.TestCase):
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
 
             self._enqueue_forward(saga, offset=2)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
+            self._dispatch_claimed(outbox, budget, FakeAdapter("confirmed"), offset=3, allowed=False)
             out = saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
             self.assertEqual(out["state"], "MANUAL_INTERVENTION_REQUIRED")
             self.assertEqual(out["saga"]["steps"][0]["state"], "MANUAL_REQUIRED")
@@ -414,7 +419,7 @@ class ExecutionSagaTests(unittest.TestCase):
                 self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=index * 2 + 1)
                 saga.sync_forward_outcome("saga-1", key, now=NOW + timedelta(seconds=index * 2 + 1))
             self._enqueue_forward(saga, offset=6)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=7)
+            self._dispatch_claimed(outbox, budget, FakeAdapter("confirmed"), offset=7, allowed=False)
             saga.sync_forward_outcome("saga-1", "three", now=NOW + timedelta(seconds=7))
             saga.prepare_compensation(
                 "saga-1",
@@ -472,7 +477,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self.assertEqual(active["step_key"], "one")
             store.close()
 
-    def test_compensation_failure_escalates_manual(self):
+    def test_compensation_revocation_escalates_manual(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox, budget, saga = self._components(raw)
             self._create(saga)
@@ -480,7 +485,7 @@ class ExecutionSagaTests(unittest.TestCase):
             self._dispatch_claimed(outbox, budget, FakeAdapter(), offset=1)
             saga.sync_forward_outcome("saga-1", "one", now=NOW + timedelta(seconds=1))
             self._enqueue_forward(saga, offset=2)
-            self._dispatch_claimed(outbox, budget, FakeAdapter("reject"), offset=3)
+            self._dispatch_claimed(outbox, budget, FakeAdapter("confirmed"), offset=3, allowed=False)
             saga.sync_forward_outcome("saga-1", "two", now=NOW + timedelta(seconds=3))
             saga.prepare_compensation(
                 "saga-1",
@@ -497,8 +502,9 @@ class ExecutionSagaTests(unittest.TestCase):
             self._dispatch_claimed(
                 outbox,
                 budget,
-                FakeAdapter("reject"),
+                FakeAdapter("confirmed"),
                 offset=6,
+                allowed=False,
                 approval_ref="approval-comp",
                 reauth_ref="reauth-comp",
             )
