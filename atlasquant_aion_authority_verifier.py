@@ -115,6 +115,17 @@ def verify_authority_statement(
         if not isinstance(value, str) or not value or len(value) > 256:
             blockers.append(f"AUTHORITY_FIELD_INVALID:{field}")
 
+    # The legacy nonce-registry scope is a pipe-delimited concatenation of
+    # these five fields. Allowing a literal pipe inside an identity creates
+    # collisions: ("a|b", "c") and ("a", "b|c") share one scope key.
+    # Reject ambiguous identifiers BEFORE signature or nonce-registration.
+    # Do not silently switch to a new serialization that could accidentally
+    # re-admit previously claimed nonces in existing local SQLite registries.
+    for field in ("authority_id", *REQUIRED_BINDINGS):
+        value = data.get(field)
+        if isinstance(value, str) and "|" in value:
+            blockers.append(f"AUTHORITY_NONCE_SCOPE_DELIMITER_RESERVED:{field}")
+
     version = data.get("key_version")
     if not isinstance(version, int) or isinstance(version, bool) or version < 1:
         blockers.append("AUTHORITY_KEY_VERSION_INVALID")
