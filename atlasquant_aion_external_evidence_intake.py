@@ -25,7 +25,9 @@ _BOUND = frozenset({
     "decision_id", "intent_ref", "action", "payload_digest",
     "policy_version", "authorization_ref", "aggregate_seq",
     "attempts", "state", "dispatch_started_at", "sent_at",
-    "created_at", "valid_until",
+    "created_at", "valid_until", "aggregate_key", "requires_reauth",
+    "reauth_ref", "transaction_id", "authority_budget_ref",
+    "risk_points", "capability_class", "grants_authority",
 })
 _CANDIDATE_KEYS = _BOUND | frozenset({
     "schema", "challenge_digest", "provider_id", "provider_event_id",
@@ -35,7 +37,7 @@ _CANDIDATE_KEYS = _BOUND | frozenset({
 })
 _TOK_FIELDS = frozenset({
     "owner_id", "tenant_id", "workspace_id", "decision_id", "intent_ref",
-    "action", "policy_version", "authorization_ref",
+    "action", "policy_version", "authorization_ref", "aggregate_key",
 })
 _HEX_FIELDS = frozenset({"idempotency_key", "payload_digest"})
 
@@ -134,6 +136,14 @@ def make_local_evidence_challenge(outbox_record: Any) -> LocalEvidenceChallenge:
         "sent_at": outbox_record.get("sent_at"),
         "created_at": decision.get("created_at"),
         "valid_until": decision.get("valid_until"),
+        "aggregate_key": decision.get("aggregate_key"),
+        "requires_reauth": decision.get("requires_reauth"),
+        "reauth_ref": decision.get("reauth_ref"),
+        "transaction_id": decision.get("transaction_id"),
+        "authority_budget_ref": decision.get("authority_budget_ref"),
+        "risk_points": decision.get("risk_points"),
+        "capability_class": decision.get("capability_class"),
+        "grants_authority": decision.get("grants_authority"),
     }
 
     for name in _TOK_FIELDS:
@@ -145,6 +155,19 @@ def make_local_evidence_challenge(outbox_record: Any) -> LocalEvidenceChallenge:
     for name in ("aggregate_seq", "attempts"):
         if type(body[name]) is not int or body[name] < 1:
             raise ValueError("local positive sequence required")
+    for name, maximum in (("reauth_ref", 160), ("transaction_id", 128),
+                          ("authority_budget_ref", 128), ("capability_class", 80)):
+        value = body[name]
+        if not isinstance(value, str) or len(value) > maximum or "\\x00" in value:
+            raise ValueError("local optional authority field malformed")
+    if type(body["requires_reauth"]) is not bool or body["grants_authority"] is not False:
+        raise ValueError("local authority flag malformed")
+    if body["requires_reauth"] and not body["reauth_ref"]:
+        raise ValueError("local reauth binding incomplete")
+    if type(body["risk_points"]) is not int or not 0 <= body["risk_points"] <= 100:
+        raise ValueError("local authority risk points malformed")
+    if body["aggregate_key"] != outbox_record.get("aggregate_key"):
+        raise ValueError("local aggregate key mismatch")
     if outbox_record["idempotency_key"] != decision.get("idempotency_key"):
         raise ValueError("local idempotency mismatch")
     if outbox_record["decision_id"] != decision.get("decision_id"):
