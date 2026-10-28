@@ -1,0 +1,34 @@
+name: AION A197 Offline Root Pin LAB
+
+on:
+  pull_request:
+    paths:
+      - "labs/a197_offline_owner_root_pin_lab.py"
+      - "labs/test_a197_offline_owner_root_pin_lab.py"
+      - "docs/lab/aion_a197_root_pin_integration_lab.md"
+      - ".github/workflows/aion-a197-offline-root-pin-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-root-lab:
+    name: A197 offline Ed25519 and nonce loss / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install pinned Ed25519 verification library only
+        run: python -m pip install cryptography==50.0.2
+      - name: 17 offline root pin/red replay tests using actual Ed25519 and SQLite
+        run: python -B -m unittest -v labs.test_a197_offline_owner_root_pin_lab

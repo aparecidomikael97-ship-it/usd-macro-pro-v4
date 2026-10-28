@@ -632,14 +632,32 @@ class ExecutionOutbox:
 
         # Persist ambiguity BEFORE crossing the external boundary. If the process
         # dies after this commit, restart must reconcile and must not blind-retry.
+        #
+        # A202: this UPDATE is the atomic dispatch admission CAS, not just a
+        # state annotation. Two calls can read the same CLAIMED row with the
+        # same lease owner on separate SQLite connections. Only the call
+        # that transitions exactly ONE row may enter adapter.send. A failed
+        # transition MUST be fail-closed: never send, retry, reauthorize, or
+        # reset UNCERTAIN. Also bind the lease snapshot from the initial read.
         with self.db:
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='UNCERTAIN',dispatch_started_at=?,last_error='DISPATCH_IN_PROGRESS'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_owner=?""",
-                (_iso(now_dt), key, *self._scope_args(), worker),
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?""",
+                (
+                    _iso(now_dt), key, *self._scope_args(),
+                    worker, intent["lease_until"],
+                ),
             )
+            dispatch_admitted = cursor.rowcount == 1
+        if not dispatch_admitted:
+            # The other contender may now be UNCERTAIN, SENT or CONFIRMED.
+            # This local result is NOT proof of an external effect or absence.
+            return {
+                **self.get(key),
+                "dispatch_state": "NOT_DISPATCHED_STATE_CHANGED",
+            }
 
         try:
             result = _mapping(send(dict(intent["decision"]), key))
