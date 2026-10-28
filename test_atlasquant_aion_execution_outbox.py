@@ -301,10 +301,10 @@ class ExecutionOutboxTests(unittest.TestCase):
                 authorize=policy(self.scope),
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(reconciled["state"], "CONFIRMED")
-            self.assertEqual(reconciled["reconcile_state"], "CONFIRMED")
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(reconciled["reconcile_state"], "UNTRUSTED_POSITIVE_HARD_NO_GO")
             self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
     def test_self_reported_absence_after_lost_ack_never_authorizes_retry(self):
@@ -343,7 +343,7 @@ class ExecutionOutboxTests(unittest.TestCase):
             self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
-    def test_same_aggregate_is_ordered_until_previous_intent_is_terminal(self):
+    def test_same_aggregate_stays_blocked_until_independent_confirmation(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             first = self._enqueue(outbox, ref="intent-1", aggregate="customer-7")
@@ -375,7 +375,8 @@ class ExecutionOutboxTests(unittest.TestCase):
                 now=NOW + timedelta(seconds=3),
                 lease_seconds=60,
             )
-            self.assertEqual(claimed_second["idempotency_key"], second["idempotency_key"])
+            self.assertIsNone(claimed_second)
+            self.assertEqual(outbox.get(first["idempotency_key"])["state"], "UNCERTAIN")
             store.close()
 
     def test_expired_claim_before_dispatch_is_retryable_because_boundary_not_crossed(self):
@@ -454,9 +455,9 @@ class ExecutionOutboxTests(unittest.TestCase):
                 authorize=policy(self.scope),
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(confirmed["state"], "CONFIRMED")
+            self.assertEqual(confirmed["state"], "SENT")
             self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
     def test_module_has_no_built_in_external_execution_capability(self):
