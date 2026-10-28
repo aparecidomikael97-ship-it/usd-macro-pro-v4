@@ -1,0 +1,34 @@
+name: AION A203 Stale Outbox Revocation CAS LAB
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_execution_outbox.py"
+      - "labs/test_a203_outbox_stale_revocation_cas.py"
+      - "docs/lab/aion_a203_stale_outbox_revocation.md"
+      - ".github/workflows/aion-a203-stale-outbox-revocation-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stale-auth:
+    name: A203 Stale local denial vs newer effect / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install no-cost requests package only for importing actual AION source
+        run: python -m pip install requests==2.34.2
+      - name: Test stale revocation races actual SQLite WAL with two connections
+        run: python -B -m unittest -v labs.test_a203_outbox_stale_revocation_cas labs.test_a202_outbox_dispatch_atomic_cas
