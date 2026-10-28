@@ -229,6 +229,9 @@ class A230HostRenameTests(unittest.TestCase):
         case = setup_case()
         case[0]["claimed_gate_state"] = "GO"
         self.denied(case, "A229_UNTRUSTED_BASELINE_REQUIRED")
+        fresh = setup_case()
+        serialized = (json.dumps(fresh[0]), fresh[1], fresh[2], fresh[3])
+        self.denied(serialized, "A229_BASELINE_OBJECT_REQUIRED")
 
     def test_20_missing_top_field_rejected(self):
         case = setup_case()
