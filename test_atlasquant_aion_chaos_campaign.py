@@ -141,7 +141,7 @@ class AionChaosCampaignTests(unittest.TestCase):
         self.assertEqual(safe["mode"], "DEGRADED_READ_ONLY")
         self.assertFalse(safe["external_side_effects_allowed"])
 
-    def test_network_timeout_never_blind_resends_without_authoritative_absence(self):
+    def test_network_timeout_keeps_uncertain_without_independent_absence(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox, "network-1")
@@ -162,8 +162,18 @@ class AionChaosCampaignTests(unittest.TestCase):
                 authorize=authorization(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(reconciled["state"], "RETRY")
+            # A205: the injected adapter's local 'authoritative_absence'
+            # boolean is not external NO_EFFECT_FENCED evidence. Even the
+            # simulated absence cannot re-open a possible provider effect.
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"],
+                "ABSENCE_UNVERIFIED_HARD_NO_GO",
+            )
             self.assertEqual(adapter.send_calls, 1)
+            self.assertIsNone(
+                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=3))
+            )
             self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
@@ -224,7 +234,7 @@ class AionChaosCampaignTests(unittest.TestCase):
             self.assertEqual(outbox.effect_count(), 1)
             store.close()
 
-    def test_tool_failure_after_prior_effect_requires_manual_compensation_approval(self):
+    def test_tool_rejection_after_prior_effect_requires_reconciliation_first(self):
         with tempfile.TemporaryDirectory() as raw:
             store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
             outbox = ExecutionOutbox(store, self.scope)
@@ -301,14 +311,21 @@ class AionChaosCampaignTests(unittest.TestCase):
                 cumulative_authority_guard=lambda d: budget.guard(d, now=NOW + timedelta(seconds=2)),
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(failed["state"], "FAILED")
+            # A205: a rejection after entering the adapter is not proof
+            # that the second synthetic action had no effect.
+            self.assertEqual(failed["state"], "UNCERTAIN")
+            self.assertEqual(
+                failed["dispatch_state"], "UNCERTAIN_RECONCILE_REQUIRED",
+            )
             synced = saga.sync_forward_outcome(
                 "chaos-saga",
                 "two",
                 now=NOW + timedelta(seconds=3),
             )
-            self.assertEqual(synced["state"], "COMPENSATION_REQUIRED")
-            with self.assertRaisesRegex(ValueError, "explicit human approval"):
+            # Must not start compensation while the later action may
+            # itself have caused an irreversible or ambiguous effect.
+            self.assertEqual(synced["state"], "RECONCILIATION_REQUIRED")
+            with self.assertRaisesRegex(ValueError, "saga is not eligible"):
                 saga.prepare_compensation(
                     "chaos-saga",
                     explicit_human_approval=False,
