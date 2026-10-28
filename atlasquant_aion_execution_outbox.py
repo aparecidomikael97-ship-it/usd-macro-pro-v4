@@ -688,20 +688,31 @@ class ExecutionOutbox:
         try:
             result = _mapping(send(dict(intent["decision"]), key))
         except Exception as exc:
+            # A206: a slow SEND callback must not undo a newer reconciliation
+            # which already stored a matching confirmed effect. This is
+            # a CAS over the exact write-ahead UNCERTAIN dispatch attempt.
             with self.db:
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
-                       SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=?
+                         AND lease_until=? AND dispatch_started_at=?""",
                     (
-                        "",
                         "SEND_RESULT_UNKNOWN:" + type(exc).__name__,
-                        key,
-                        *self._scope_args(),
+                        key, *self._scope_args(), worker,
+                        intent["lease_until"], _iso(now_dt),
                     ),
                 )
+                updated = cursor.rowcount == 1
             out = self.get(key)
-            return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
+            return {
+                **out,
+                "dispatch_state": (
+                    "UNCERTAIN_RECONCILE_REQUIRED" if updated
+                    else "NOT_DISPATCHED_STATE_CHANGED"
+                ),
+            }
 
         if result.get("accepted") is not True:
             # A205 H0: a caller-controlled adapter's rejection, including
@@ -744,14 +755,29 @@ class ExecutionOutbox:
             )
             return {**out, "dispatch_state": "CONFIRMED"}
 
+        # A206: do not regress from a newer CONFIRMED to an old
+        # "accepted, not yet confirmed" reply. No re-send and no reset.
         with self.db:
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(now_dt), effect_ref, key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='UNCERTAIN' AND lease_owner=?
+                     AND lease_until=? AND dispatch_started_at=?""",
+                (
+                    _iso(now_dt), effect_ref, key, *self._scope_args(),
+                    worker, intent["lease_until"], _iso(now_dt),
+                ),
             )
-        return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
+            updated = cursor.rowcount == 1
+        out = self.get(key)
+        return {
+            **out,
+            "dispatch_state": (
+                "SENT_RECONCILE_REQUIRED" if updated
+                else "NOT_DISPATCHED_STATE_CHANGED"
+            ),
+        }
 
     def reconcile(
         self,
