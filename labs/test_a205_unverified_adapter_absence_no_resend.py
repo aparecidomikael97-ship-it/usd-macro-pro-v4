@@ -117,7 +117,7 @@ class A205UntrustedAdapterCannotCauseAutoResend(unittest.TestCase):
             finally:
                 store.close()
 
-    def test_04_real_synthetic_confirmation_is_still_recorded(self):
+    def test_04_self_asserted_positive_is_quarantined_without_effect_ledger(self):
         with tempfile.TemporaryDirectory() as root:
             store,outbox,key,helper=self.fixture(root)
             try:
@@ -126,8 +126,8 @@ class A205UntrustedAdapterCannotCauseAutoResend(unittest.TestCase):
                     key,worker_id=WORKER,authorize=helper.authorize,
                     adapter=adapter,now=NOW,
                 )
-                self.assertEqual(result["state"],"CONFIRMED")
-                self.assertEqual(outbox.effect_count(),1)
+                self.assertEqual(result["state"],"UNCERTAIN")
+                self.assertEqual(outbox.effect_count(),0)
                 self.assertEqual(adapter.send_calls,1)
             finally:
                 store.close()
