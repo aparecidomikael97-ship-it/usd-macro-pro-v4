@@ -124,9 +124,10 @@ class A204StaleAbsenceVersusConfirmedTests(unittest.TestCase):
     def test_02_late_absence_cannot_reopen_confirmed_sent_intent(self):
         self.prove_no_stale_retry("sent")
 
-    def test_03_current_absence_of_uncertain_can_remain_retryable_in_lab(self):
-        # Existing offline staging contract, NOT proof that a real provider
-        # can establish NO_EFFECT_FENCED with trust and causal binding.
+    def test_03_current_unverified_absence_cannot_reopen_uncertain(self):
+        # A205 changed the staging contract: adapter boolean claims are not
+        # independently authenticated provider NO_EFFECT_FENCED witnesses.
+        # Original RETRY expectation remains in prior A204 Git history.
         with tempfile.TemporaryDirectory() as raw:
             path,store,outbox,key,helper,adapter,_=self.setup_case(raw,"uncertain")
             class CurrentAbsence:
@@ -137,11 +138,13 @@ class A204StaleAbsenceVersusConfirmedTests(unittest.TestCase):
                     key,adapter=CurrentAbsence(),
                     authorize=helper.authorize,now=NOW,
                 )
-                self.assertEqual(out["state"],"RETRY")
-                self.assertEqual(out["reconcile_state"],"RETRY")
+                self.assertEqual(out["state"],"UNCERTAIN")
+                self.assertEqual(out["reconcile_state"],"ABSENCE_UNVERIFIED_HARD_NO_GO")
+                self.assertIsNone(outbox.claim_next("other-worker",now=NOW))
                 self.assertEqual(adapter.send_calls,1)
             finally:
                 store.close()
+
 
 
 if __name__=="__main__":
