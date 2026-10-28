@@ -71,6 +71,15 @@ def _utc(value: Any) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _observed_utc(value: Any) -> datetime:
+    """Caller observation may be aware datetime or ISO text; neither is trusted."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("timezone required for observed_at")
+        return value.astimezone(timezone.utc)
+    return _utc(value)
+
+
 def _token(value: Any) -> bool:
     return isinstance(value, str) and _TOK.fullmatch(value) is not None
 
@@ -244,7 +253,7 @@ def preflight_untrusted_effect_candidate(
         return _deny("CLAIMED_EFFECT_NOT_FINAL")
 
     try:
-        observed = _utc(observed_at)
+        observed = _observed_utc(observed_at)
         event_time = _utc(candidate["occurred_at"])
         started = _utc(body["dispatch_started_at"])
     except (ValueError, OverflowError, TypeError):
