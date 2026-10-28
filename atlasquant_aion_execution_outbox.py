@@ -218,6 +218,22 @@ class ExecutionOutbox:
     def get(self, idempotency_key: str) -> dict[str, Any]:
         return self._view(self._outbox_row(_clean(idempotency_key, 64)))
 
+    def evidence_challenge(self, idempotency_key: str):
+        """A214 read-only local intent binding; this grants NO authority."""
+        from atlasquant_aion_external_evidence_intake import make_local_evidence_challenge
+        return make_local_evidence_challenge(self.get(idempotency_key))
+
+    def inspect_untrusted_effect_candidate(
+        self, idempotency_key: str, candidate: Any, *, observed_at: Any,
+    ):
+        """A214 read-only preflight; NEVER records an effect or CONFIRMED."""
+        from atlasquant_aion_external_evidence_intake import (
+            preflight_untrusted_effect_candidate,
+        )
+        return preflight_untrusted_effect_candidate(
+            self.get(idempotency_key), candidate, observed_at=observed_at,
+        )
+
     def list(self, *, state: str = "") -> list[dict[str, Any]]:
         args: list[Any] = [*self._scope_args()]
         sql = """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
@@ -507,16 +523,34 @@ class ExecutionOutbox:
                 return False, "BLOCKED_REAPPROVAL", {"reason": "REAUTH_TRANSACTION_MISMATCH"}
         return True, "ALLOW", current
 
-    def _set_blocked(self, key: str, state: str, reason: str) -> dict[str, Any]:
+    def _set_blocked(
+        self, key: str, state: str, reason: str,
+        *, observed: Mapping[str, Any],
+    ) -> dict[str, Any]:
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
+        # A203: the decision can be stale while a concurrent dispatcher
+        # crosses the effect boundary. Never turn a newer UNCERTAIN,
+        # SENT or CONFIRMED record into REVOKED based on an earlier
+        # authorization snapshot. This is a local compare-and-set only;
+        # it is not an independently witnessed cancellation or authority.
+        prior_state = str(observed.get("state") or "")
+        if prior_state not in {"CLAIMED", "UNCERTAIN", "SENT"}:
+            return self.get(key)
         with self.db:
             self.db.execute(
                 """UPDATE action_outbox
                    SET state=?,lease_owner='',lease_until='',last_error=?
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (state, _clean(reason, 240), key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state=? AND lease_owner=? AND lease_until=?""",
+                (
+                    state, _clean(reason, 240), key, *self._scope_args(),
+                    prior_state, str(observed.get("lease_owner") or ""),
+                    str(observed.get("lease_until") or ""),
+                ),
             )
+        # If the snapshot lost the CAS, expose current state without
+        # clearing the newer effect marker or inventing a receipt.
         return self.get(key)
 
     def _confirm(
@@ -527,42 +561,14 @@ class ExecutionOutbox:
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        effect = _token(effect_ref, "effect_ref", 128)
-        encoded = _canonical(redact(dict(result or {})))
-        self.db.execute("BEGIN IMMEDIATE")
-        try:
-            existing = self.db.execute(
-                """SELECT effect_ref FROM action_effects
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (key, *self._scope_args()),
-            ).fetchone()
-            if existing is not None and existing["effect_ref"] != effect:
-                raise ValueError("effect ledger idempotency collision")
-            if existing is None:
-                self.db.execute(
-                    """INSERT INTO action_effects(
-                        idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
-                    ) VALUES (?,?,?,?,?,?,?)""",
-                    (
-                        key,
-                        *self._scope_args(),
-                        effect,
-                        _iso(confirmed_at),
-                        encoded,
-                    ),
-                )
-            self.db.execute(
-                """UPDATE action_outbox
-                   SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
-                       lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(confirmed_at), effect, key, *self._scope_args()),
-            )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-        return self.get(key)
+        """A213: no trusted receipt verifier is currently wired to this Outbox.
+
+        A private method must not become a backdoor for self-reported adapter
+        effects. This gate also protects accidental direct internal calls.
+        A future independent receipt verifier requires a separately reviewed
+        design; callback flags, claimed signatures and host keys are insufficient.
+        """
+        raise PermissionError("A213_INDEPENDENT_EFFECT_RECEIPT_REQUIRED")
 
     def dispatch_claimed(
         self,
@@ -588,7 +594,10 @@ class ExecutionOutbox:
 
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
         if not allowed:
-            return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+            return self._set_blocked(
+                key, blocked_state, auth.get("reason", blocked_state),
+                observed=intent,
+            )
 
         decision = _mapping(intent.get("decision"))
         budget_ref = _clean(decision.get("authority_budget_ref"), 128)
@@ -598,6 +607,7 @@ class ExecutionOutbox:
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_REQUIRED",
+                    observed=intent,
                 )
             try:
                 budget = _mapping(cumulative_authority_guard(dict(decision)))
@@ -606,24 +616,28 @@ class ExecutionOutbox:
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_FAILED",
+                    observed=intent,
                 )
             if budget.get("allowed") is not True:
                 return self._set_blocked(
                     key,
                     "BLOCKED_REAPPROVAL",
                     _clean(budget.get("reason") or "CUMULATIVE_AUTHORITY_BUDGET_EXCEEDED", 240),
+                    observed=intent,
                 )
             if _clean(budget.get("authority_budget_ref"), 128) != budget_ref:
                 return self._set_blocked(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_BUDGET_REF_MISMATCH",
+                    observed=intent,
                 )
             if _clean(budget.get("transaction_id"), 128) != _clean(decision.get("transaction_id"), 128):
                 return self._set_blocked(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
+                    observed=intent,
                 )
 
         send = getattr(adapter, "send", None)
@@ -632,69 +646,143 @@ class ExecutionOutbox:
 
         # Persist ambiguity BEFORE crossing the external boundary. If the process
         # dies after this commit, restart must reconcile and must not blind-retry.
+        #
+        # A202: this UPDATE is the atomic dispatch admission CAS, not just a
+        # state annotation. Two calls can read the same CLAIMED row with the
+        # same lease owner on separate SQLite connections. Only the call
+        # that transitions exactly ONE row may enter adapter.send. A failed
+        # transition MUST be fail-closed: never send, retry, reauthorize, or
+        # reset UNCERTAIN. Also bind the lease snapshot from the initial read.
         with self.db:
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='UNCERTAIN',dispatch_started_at=?,last_error='DISPATCH_IN_PROGRESS'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_owner=?""",
-                (_iso(now_dt), key, *self._scope_args(), worker),
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?""",
+                (
+                    _iso(now_dt), key, *self._scope_args(),
+                    worker, intent["lease_until"],
+                ),
             )
+            dispatch_admitted = cursor.rowcount == 1
+        if not dispatch_admitted:
+            # The other contender may now be UNCERTAIN, SENT or CONFIRMED.
+            # This local result is NOT proof of an external effect or absence.
+            return {
+                **self.get(key),
+                "dispatch_state": "NOT_DISPATCHED_STATE_CHANGED",
+            }
 
         try:
             result = _mapping(send(dict(intent["decision"]), key))
         except Exception as exc:
+            # A206: a slow SEND callback must not undo a newer reconciliation
+            # which already stored a matching confirmed effect. This is
+            # a CAS over the exact write-ahead UNCERTAIN dispatch attempt.
             with self.db:
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
-                       SET state='UNCERTAIN',lease_owner='',lease_until=?,last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',last_error=?
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=?
+                         AND lease_until=? AND dispatch_started_at=?""",
                     (
-                        "",
                         "SEND_RESULT_UNKNOWN:" + type(exc).__name__,
-                        key,
-                        *self._scope_args(),
+                        key, *self._scope_args(), worker,
+                        intent["lease_until"], _iso(now_dt),
                     ),
                 )
+                updated = cursor.rowcount == 1
             out = self.get(key)
-            return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
+            return {
+                **out,
+                "dispatch_state": (
+                    "UNCERTAIN_RECONCILE_REQUIRED" if updated
+                    else "NOT_DISPATCHED_STATE_CHANGED"
+                ),
+            }
 
         if result.get("accepted") is not True:
-            state = "RETRY" if result.get("retryable") is True else "FAILED"
+            # A205 H0: a caller-controlled adapter's rejection, including
+            # retryable=True, is NOT external proof of NO_EFFECT_FENCED.
+            # send() has already crossed the potential effect boundary.
+            # Never mark this attempt RETRY or conclusively FAILED merely
+            # because its caller claims rejection. Preserve UNCERTAIN.
             with self.db:
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
-                       SET state=?,lease_owner='',lease_until='',last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error='ADAPTER_REJECTION_UNVERIFIED'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                         AND dispatch_started_at=?""",
                     (
-                        state,
-                        _clean(result.get("reason") or "ADAPTER_REJECTED", 240),
-                        key,
-                        *self._scope_args(),
+                        key, *self._scope_args(), worker,
+                        intent["lease_until"], _iso(now_dt),
                     ),
                 )
-            return {**self.get(key), "dispatch_state": state}
+                updated = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "dispatch_state": (
+                    "UNCERTAIN_RECONCILE_REQUIRED" if updated
+                    else "NOT_DISPATCHED_STATE_CHANGED"
+                ),
+            }
 
         effect_ref = _clean(result.get("effect_ref"), 128)
         if result.get("confirmed") is True:
-            if not effect_ref:
-                raise ValueError("confirmed adapter result requires effect_ref")
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "dispatch_state": "CONFIRMED"}
+            # A213: this callback can lie. Preserve the write-ahead
+            # UNCERTAIN state, do not record its fake effect_ref and never
+            # call _confirm. Row-level CAS protects a newer reconciliation
+            # from a delayed self-asserted SEND outcome.
+            with self.db:
+                cursor = self.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error='UNTRUSTED_SEND_POSITIVE_NO_EXTERNAL_RECEIPT'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                         AND dispatch_started_at=?""",
+                    (
+                        key, *self._scope_args(), worker,
+                        intent["lease_until"], _iso(now_dt),
+                    ),
+                )
+                updated = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "dispatch_state": (
+                    "UNTRUSTED_POSITIVE_RECONCILE_REQUIRED" if updated
+                    else "NOT_DISPATCHED_STATE_CHANGED"
+                ),
+            }
 
+        # A206: do not regress from a newer CONFIRMED to an old
+        # "accepted, not yet confirmed" reply. No re-send and no reset.
         with self.db:
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='SENT',sent_at=?,effect_ref=?,lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(now_dt), effect_ref, key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='UNCERTAIN' AND lease_owner=?
+                     AND lease_until=? AND dispatch_started_at=?""",
+                (
+                    _iso(now_dt), effect_ref, key, *self._scope_args(),
+                    worker, intent["lease_until"], _iso(now_dt),
+                ),
             )
-        return {**self.get(key), "dispatch_state": "SENT_RECONCILE_REQUIRED"}
+            updated = cursor.rowcount == 1
+        out = self.get(key)
+        return {
+            **out,
+            "dispatch_state": (
+                "SENT_RECONCILE_REQUIRED" if updated
+                else "NOT_DISPATCHED_STATE_CHANGED"
+            ),
+        }
 
     def reconcile(
         self,
@@ -716,35 +804,102 @@ class ExecutionOutbox:
 
         result = _mapping(reconcile(key, dict(intent["decision"])))
         if result.get("found") is True and result.get("confirmed") is True:
-            effect_ref = _clean(result.get("effect_ref"), 128)
-            if not effect_ref:
-                raise ValueError("confirmed reconciliation requires effect_ref")
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "reconcile_state": "CONFIRMED"}
+            # A213: even a "found" callback can forge effect_ref. Never
+            # publish CONFIRMED or action_effects on adapter testimony.
+            # Bind this audit marker to the exact observed snapshot, so a
+            # stale callback cannot overwrite newer state/error evidence.
+            with self.db:
+                cursor = self.db.execute(
+                    """UPDATE action_outbox
+                       SET lease_owner='',lease_until='',
+                           last_error='UNTRUSTED_RECONCILE_POSITIVE_NO_EXTERNAL_RECEIPT'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state=? AND attempts=? AND lease_owner=? AND lease_until=?
+                         AND dispatch_started_at=? AND sent_at=?
+                         AND confirmed_at=? AND effect_ref=? AND last_error=?""",
+                    (
+                        key, *self._scope_args(),
+                        intent["state"], intent["attempts"],
+                        intent["lease_owner"], intent["lease_until"],
+                        intent["dispatch_started_at"], intent["sent_at"],
+                        intent["confirmed_at"], intent["effect_ref"], intent["last_error"],
+                    ),
+                )
+                updated = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "reconcile_state": (
+                    "UNTRUSTED_POSITIVE_HARD_NO_GO" if updated
+                    else "NOT_RECONCILED_STATE_CHANGED"
+                ),
+            }
 
         if result.get("found") is False and result.get("authoritative_absence") is True:
+            # A205 H0: this boolean is supplied by an injected callback. It
+            # is NOT a cryptographically and causally independently fenced
+            # NO_EFFECT receipt. Even a fresh absence claim cannot justify
+            # RETRY after a potentially irreversible SEND. No host-local
+            # token/flag/caller assertion may turn this into a SEND license.
+            latest = self.get(key)
+            return {
+                **latest,
+                "reconcile_state": (
+                    "ABSENCE_UNVERIFIED_HARD_NO_GO"
+                    if latest["state"] in {"UNCERTAIN", "SENT"}
+                    else "NOT_RECONCILED_STATE_CHANGED"
+                ),
+            }
+
+            # Previous local-only simulated approval/retry flow retained
+            # below for historical audit, deliberately unreachable until
+            # externally independent NO_EFFECT_FENCED custody is proven.
             allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
             if not allowed:
                 out = self._set_blocked(
                     key,
                     blocked_state,
                     auth.get("reason", blocked_state),
+                    observed=intent,
                 )
-                return {**out, "reconcile_state": blocked_state}
+                return {
+                    **out,
+                    "reconcile_state": (
+                        blocked_state if out["state"] == blocked_state
+                        else "NOT_RECONCILED_STATE_CHANGED"
+                    ),
+                }
+            # A204: provider reconciliation is a potentially delayed reply.
+            # Do not let a stale "absence" replace a newer CONFIRMED, SENT,
+            # UNCERTAIN or re-claimed snapshot. Only a CAS winner may make
+            # the particular originally observed attempt locally retryable.
+            # This local CAS does NOT authenticate NO_EFFECT_FENCED evidence.
             with self.db:
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
                        SET state='RETRY',lease_owner='',lease_until='',
                            last_error='AUTHORITATIVE_ABSENCE_CONFIRMED'
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (key, *self._scope_args()),
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state=? AND attempts=? AND lease_owner=?
+                         AND lease_until=? AND dispatch_started_at=?
+                         AND sent_at=? AND confirmed_at=? AND effect_ref=?""",
+                    (
+                        key, *self._scope_args(),
+                        intent["state"], intent["attempts"],
+                        intent["lease_owner"], intent["lease_until"],
+                        intent["dispatch_started_at"], intent["sent_at"],
+                        intent["confirmed_at"], intent["effect_ref"],
+                    ),
                 )
-            return {**self.get(key), "reconcile_state": "RETRY"}
+                transitioned = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "reconcile_state": (
+                    "RETRY" if transitioned
+                    else "NOT_RECONCILED_STATE_CHANGED"
+                ),
+            }
 
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
