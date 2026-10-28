@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
 from typing import Any, Mapping
 
 from atlasquant_aion_external_evidence_intake import (
@@ -89,7 +90,7 @@ def inspect_synthetic_origin_bridge(
 
     try:
         challenge = make_local_evidence_challenge(outbox_record)
-        intent = __import__("json").loads(challenge.challenge_json)
+        intent = json.loads(challenge.challenge_json)
     except (ValueError, TypeError, OverflowError):
         return _deny("LOCAL_INTENT_SNAPSHOT_INVALID")
 
