@@ -56,9 +56,11 @@ class A235SQLitePostPublishUncertaintyTests(unittest.TestCase):
                     SQLiteChatStore.restore_from_backup(src, target)
             self.assertIn("SIDECAR_RACE_ZERO_AUTO_RETRY", str(cm.exception))
             self.assertTrue(target.exists())
-            self.assertEqual(_read(target), 13)
+            # SQLite may remove an orphan -wal/-journal on a subsequent
+            # connection. Assert the simulated race BEFORE reopening it.
             self.assertTrue(Path(str(target) + suffix).exists())
             self.assertEqual(list(Path(raw).glob("restored.db.restore-*")), [])
+            self.assertEqual(_read(target), 13)
             # As publication took place, the next attempt is never allowed.
             with self.assertRaises(StorageUnavailableError):
                 SQLiteChatStore.restore_from_backup(src, target)
