@@ -218,6 +218,22 @@ class ExecutionOutbox:
     def get(self, idempotency_key: str) -> dict[str, Any]:
         return self._view(self._outbox_row(_clean(idempotency_key, 64)))
 
+    def evidence_challenge(self, idempotency_key: str):
+        """A214 read-only local intent binding; this grants NO authority."""
+        from atlasquant_aion_external_evidence_intake import make_local_evidence_challenge
+        return make_local_evidence_challenge(self.get(idempotency_key))
+
+    def inspect_untrusted_effect_candidate(
+        self, idempotency_key: str, candidate: Any, *, observed_at: Any,
+    ):
+        """A214 read-only preflight; NEVER records an effect or CONFIRMED."""
+        from atlasquant_aion_external_evidence_intake import (
+            preflight_untrusted_effect_candidate,
+        )
+        return preflight_untrusted_effect_candidate(
+            self.get(idempotency_key), candidate, observed_at=observed_at,
+        )
+
     def list(self, *, state: str = "") -> list[dict[str, Any]]:
         args: list[Any] = [*self._scope_args()]
         sql = """SELECT o.*, d.data AS decision_data, d.aggregate_key, d.aggregate_seq
