@@ -16,6 +16,7 @@ from labs.a223_owner_security_priority import (
 
 
 OWNER, TENANT, WORKSPACE = "synthetic-owner", "synthetic-tenant", "synthetic-workspace"
+_UNSET = object()
 
 
 def unfilled_a222():
@@ -79,10 +80,10 @@ def research_note(matrix=None):
 
 
 class A223OwnerSecurityPriorityTests(unittest.TestCase):
-    def check(self, note=None, matrix=None, **kwargs):
+    def check(self, note=_UNSET, matrix=None, **kwargs):
         if matrix is None:
             matrix = unfilled_a222()
-        if note is None:
+        if note is _UNSET:
             note = research_note(matrix)
         args = {
             "a222_matrix": matrix,
