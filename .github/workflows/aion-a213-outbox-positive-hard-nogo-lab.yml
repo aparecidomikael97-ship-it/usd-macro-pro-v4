@@ -12,6 +12,7 @@ on:
       - "labs/test_a205_unverified_adapter_absence_no_resend.py"
       - "labs/test_a206_late_send_outcome_cas.py"
       - "test_atlasquant_aion_execution_outbox.py"
+      - "test_atlasquant_aion_execution_saga.py"
       - "test_atlasquant_aion_chaos_campaign.py"
       - "docs/lab/aion_a213_outbox_positive_custody_hard_nogo.md"
       - ".github/workflows/aion-a213-outbox-positive-hard-nogo-lab.yml"
@@ -39,4 +40,4 @@ jobs:
       - name: Test-only dependencies for historical regressions
         run: python -m pip install cryptography==44.0.3 requests==2.34.2
       - name: Outbox production-code quarantine, A207 original RED fixture and historical state regressions
-        run: python -B -m unittest -v labs.test_a213_outbox_untrusted_positive_hard_nogo labs.test_a207_untrusted_confirmation_requires_receipt labs.test_a206_late_send_outcome_cas labs.test_a205_unverified_adapter_absence_no_resend labs.test_a204_outbox_stale_absence_confirmed labs.test_a203_outbox_stale_revocation_cas labs.test_a202_outbox_dispatch_atomic_cas test_atlasquant_aion_execution_outbox test_atlasquant_aion_chaos_campaign labs.test_a212_synthetic_signed_effect_preflight labs.test_a211_claimed_witness_coherence labs.test_a210_offline_root_rotation_proposal labs.test_a209_root_provenance_failclosed labs.test_a208_independent_receipt_preflight
+        run: python -B -m unittest -v labs.test_a213_outbox_untrusted_positive_hard_nogo labs.test_a207_untrusted_confirmation_requires_receipt labs.test_a206_late_send_outcome_cas labs.test_a205_unverified_adapter_absence_no_resend labs.test_a204_outbox_stale_absence_confirmed labs.test_a203_outbox_stale_revocation_cas labs.test_a202_outbox_dispatch_atomic_cas test_atlasquant_aion_execution_outbox test_atlasquant_aion_execution_saga test_atlasquant_aion_chaos_campaign labs.test_a212_synthetic_signed_effect_preflight labs.test_a211_claimed_witness_coherence labs.test_a210_offline_root_rotation_proposal labs.test_a209_root_provenance_failclosed labs.test_a208_independent_receipt_preflight
