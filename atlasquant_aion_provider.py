@@ -370,7 +370,7 @@ def execute_openai_answer(
     values:Mapping[str,Any]|None=None,
     session:requests.Session|None=None,
 )->dict[str,Any]:
-    """Call the configured provider only after every preflight gate passes."""
+    """Preserve preflights; deny direct SEND without independent custody."""
     cfg=provider_config(values)
     status=provider_configuration_status(values)
     clean_prompt=str(prompt or "").strip()[:MAX_PROMPT_CHARS]
@@ -421,6 +421,17 @@ def execute_openai_answer(
             "reason":"Modelo da rota não foi configurado.",
         }
 
+    # A200 LAB: the direct caller has no independent durable first-attempt
+    # reservation. Neither request_approved nor credentials constitute custody.
+    # Deny BEFORE paid transport; no runtime flag or caller token enables it.
+    return {
+        "schema":SCHEMA,"state":"BLOCKED_SEND_CUSTODY","called":False,
+        "reason":"Independent durable first-attempt SEND custody is unavailable.",
+    }
+
+    # Historical paid-provider implementation retained for review but
+    # deliberately unreachable until a separate externally witnessed gate
+    # is implemented, independently tested and approved.
     body={
         "model":model,
         "input":clean_prompt,

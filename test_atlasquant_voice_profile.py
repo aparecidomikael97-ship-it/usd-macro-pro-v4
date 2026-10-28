@@ -72,26 +72,22 @@ class AtlasQuantNeuralTtsTests(unittest.TestCase):
             transcript_cache_key(text+" Novo dado."),
         )
 
-    def test_generation_uses_fixed_neural_model_voice_and_ptbr_instructions(self):
+    def test_configured_neural_voice_still_requires_independent_send_custody(self):
+        # Prior success expectation (MP3DATA from mock HTTP) preserved in
+        # Git history; now verify no outbound call under HARD NO-GO.
         response=Mock()
         response.status_code=200
         response.content=b"MP3DATA"
         response.headers={"content-type":"audio/mpeg"}
         with patch("atlasquant_neural_tts.requests.post",return_value=response) as post:
-            audio=generate_neural_speech(
-                "Texto exato.",
-                api_key="secret",
-                config=NeuralVoiceConfig(),
-            )
-        self.assertEqual(audio,b"MP3DATA")
-        kwargs=post.call_args.kwargs
-        self.assertNotIn("secret",str(kwargs["json"]))
-        self.assertEqual(kwargs["json"]["model"],"gpt-4o-mini-tts")
-        self.assertEqual(kwargs["json"]["voice"],"cedar")
-        self.assertEqual(kwargs["json"]["input"],"Texto exato.")
-        self.assertEqual(kwargs["json"]["instructions"],VOICE_INSTRUCTIONS)
-        self.assertEqual(kwargs["json"]["response_format"],"mp3")
-        self.assertEqual(kwargs["headers"]["Authorization"],"Bearer secret")
+            with self.assertRaisesRegex(RuntimeError,"^BLOCKED_SEND_CUSTODY:") as ctx:
+                generate_neural_speech(
+                    "Texto exato.",
+                    api_key="secret",
+                    config=NeuralVoiceConfig(),
+                )
+        post.assert_not_called()
+        self.assertNotIn("secret",str(ctx.exception))
 
     def test_missing_provider_never_generates_or_falls_back(self):
         with patch("atlasquant_neural_tts.requests.post") as post:
@@ -99,16 +95,20 @@ class AtlasQuantNeuralTtsTests(unittest.TestCase):
                 generate_neural_speech("Texto.",api_key="")
         post.assert_not_called()
 
-    def test_provider_error_is_sanitized(self):
+    def test_provider_error_body_unobservable_without_send_custody(self):
+        # No HTTP 401 response can be observed because TTS is denied before
+        # POST. The historical HTTP error-handling test remains in Git history.
         response=Mock()
         response.status_code=401
         response.content=b'{"error":"sensitive provider detail"}'
         response.headers={"content-type":"application/json"}
-        with patch("atlasquant_neural_tts.requests.post",return_value=response):
-            with self.assertRaisesRegex(RuntimeError,"HTTP 401") as ctx:
+        with patch("atlasquant_neural_tts.requests.post",return_value=response) as post:
+            with self.assertRaisesRegex(RuntimeError,"^BLOCKED_SEND_CUSTODY:") as ctx:
                 generate_neural_speech("Texto.",api_key="bad-secret")
+        post.assert_not_called()
         self.assertNotIn("sensitive provider detail",str(ctx.exception))
         self.assertNotIn("bad-secret",str(ctx.exception))
+
 
 if __name__=="__main__":
     unittest.main()
