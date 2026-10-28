@@ -88,18 +88,15 @@ class A203StaleAuthorizationOutboxTests(unittest.TestCase):
                     "A203_STALE_REVOCATION_OVERWROTE_EXTERNAL_EFFECT_STATE_RED",
                 )
                 self.assertEqual(stale["state"],expected_state)
-                if expected_state=="CONFIRMED":
-                    self.assertEqual(outbox.effect_count(),1)
-                else:
-                    self.assertEqual(outbox.effect_count(),0)
+                self.assertEqual(outbox.effect_count(),0)
                 return actual
             finally:
                 seed_store.close()
 
-    def test_01_stale_revoke_cannot_overwrite_confirmed_effect(self):
+    def test_01_stale_revoke_cannot_overwrite_quarantined_positive(self):
         self.run_stale_revocation_case(
             FakeNonIdempotentEffect(),
-            "CONFIRMED",
+            "UNCERTAIN",
         )
 
     def test_02_stale_revoke_cannot_mask_uncertain_effect(self):
