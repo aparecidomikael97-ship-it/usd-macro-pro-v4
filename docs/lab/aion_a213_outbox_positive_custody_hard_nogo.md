@@ -21,7 +21,7 @@ A branch histórica A207 Draft #1658 mantém três testes, dois RED no código a
 
 As respostas positivas não são ignoradas silenciosamente: sua falta de confiança fica no campo last_error. Não persistir effect_ref falso como prova. Pode existir um efeito real que o host não consegue provar; o estado continua ambíguo. Isso é **intencionalmente seguro**, pois não autoriza retry e não inventa sucesso.
 
-## Concorrrência e persistência
+## Concorrência e persistência
 
 - SEND grava UNCERTAIN antes de atravessar a borda do efeito, com CAS de lease e dispatch_started_at.
 - Um SEND positivo atrasado não pode reverter um estado mais recente: atualização condicionada a estado, lease e instante observados.
@@ -37,6 +37,7 @@ Fundamento técnico de transações e isolamento: https://sqlite.org/isolation.h
 - A207: trouxe, **sem modificar**, os três testes originais de regressão para a branch A213; agora devem passar os cenários de efeito forjado.
 - A213: 12 testes adicionais com SQLite real, adapters falsos, callbacks simultâneos, fraude em flags de recibo, bypass direto a _confirm, replay, lease, ausência e ZERO_AUTO_RESEND.
 - A202–A206, teste amplo do Outbox e campanha de caos: expectativas migradas **porque não existe mais uma origem confiável de CONFIRMED nessa etapa**; ficam preservadas as provas de exclusão mútua, CAS de stale, status incerto, bloqueio de retry, ordenação e congelamento da saga.
+- Testes de saga: cenários históricos de conclusão/compensação que precisam exercitar estados posteriores a CONFIRMED usam agora um **fixture explícito de banco de teste**, _test_only_seed_hypothetical_confirmed. Ele injeta dados diretamente na SQLite temporária para representar um estado **hipotético** do sistema de destino; não existe verifier, API de confirmação nem bypass habilitado no código de produção. Isso testa orçamento, contabilidade, ordem e compensação, não a confiabilidade do recibo. Outros cenários de saga exigem que o positivo falso continue UNCERTAIN e bloqueie a próxima ação.
 - A212/A211/A210/A209/A208: regressões de contrato de prova, sem conexão externa.
 
 **Limite de regressão declarado:** A204/A206 já não exercitam uma transição CONFIRMED realmente autorizada. Isso ainda é impossível, pois falta P0 de recibo externo. Quando a integração independente for proposta, terão de existir novos testes de corrida entre confirmação *com prova validada* e callback antigo — sem ativar produção prematuramente. Versões históricas dos testes continuam disponíveis nos PRs/commits anteriores. A207 original continua auditável como RED na branch antiga.
