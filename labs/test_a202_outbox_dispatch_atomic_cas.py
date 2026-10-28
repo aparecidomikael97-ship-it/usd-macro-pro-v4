@@ -121,7 +121,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
                 "claimed semantic intent and worker ID",
             )
             self.assertEqual(
-                sum(x.get("dispatch_state")=="CONFIRMED" for x in results),
+                sum(x.get("dispatch_state")=="UNTRUSTED_POSITIVE_RECONCILE_REQUIRED" for x in results),
                 1,
             )
             self.assertEqual(
@@ -131,7 +131,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
             check=SQLiteChatStore(path)
             try:
                 self.assertEqual(
-                    ExecutionOutbox(check,SCOPE).get(key)["state"],"CONFIRMED",
+                    ExecutionOutbox(check,SCOPE).get(key)["state"],"UNCERTAIN",
                 )
             finally:
                 check.close()
@@ -145,7 +145,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
                     key,worker_id=WORKER,authorize=self.authorize,
                     adapter=adapter,now=NOW,
                 )
-                self.assertEqual(first["dispatch_state"],"CONFIRMED")
+                self.assertEqual(first["dispatch_state"],"UNTRUSTED_POSITIVE_RECONCILE_REQUIRED")
                 with self.assertRaisesRegex(ValueError,"must be CLAIMED"):
                     outbox.dispatch_claimed(
                         key,worker_id=WORKER,authorize=self.authorize,
