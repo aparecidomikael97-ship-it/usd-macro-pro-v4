@@ -329,9 +329,12 @@ class SQLiteChatStore:
         return scope.owner_id, scope.tenant_id, scope.workspace_id
 
     def get_conversation(self, scope, conversation_id):
+        # Guard the connection before attribute lookup: a closed db handle is None.
+        # The check must precede `self.db.execute`, not occur in its arguments.
+        requested_scope = self._scope(scope)
         row = self.db.execute(
             "SELECT data FROM conversations WHERE id=? AND owner=? AND tenant=? AND workspace=?",
-            (conversation_id, *self._scope(scope)),
+            (conversation_id, *requested_scope),
         ).fetchone()
         if row is None:
             raise LookupError("conversation unavailable")
@@ -406,6 +409,7 @@ class SQLiteChatStore:
         return self.list_conversations(scope, query=query, **filters)
 
     def archive_conversation(self, scope, conversation_id):
+        self._require_open()
         with self.db:
             c = self.get_conversation(scope, conversation_id)
             c.archived, c.updated_at = True, now()
@@ -473,6 +477,7 @@ class SQLiteChatStore:
         )
 
     def add_attachment_metadata(self, scope, attachment):
+        self._require_open()
         from .attachments import validate_metadata
         validate_metadata(attachment)
         with self.db:
@@ -501,6 +506,7 @@ class SQLiteChatStore:
         return self._latest(scope, conversation_id, "checkpoint", ConversationCheckpoint)
 
     def save_checkpoint(self, scope, checkpoint):
+        self._require_open()
         with self.db:
             prior = self.get_latest_checkpoint(scope, checkpoint.conversation_id)
             if prior and checkpoint.through_sequence <= prior.through_sequence:
@@ -511,6 +517,7 @@ class SQLiteChatStore:
             self._update(c)
 
     def save_context_summary(self, scope, summary):
+        self._require_open()
         with self.db:
             for mid in summary.source_message_ids:
                 if self.get_message(scope, summary.conversation_id, mid).sequence > summary.through_sequence:
