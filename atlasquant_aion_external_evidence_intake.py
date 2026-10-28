@@ -158,7 +158,7 @@ def make_local_evidence_challenge(outbox_record: Any) -> LocalEvidenceChallenge:
     for name, maximum in (("reauth_ref", 160), ("transaction_id", 128),
                           ("authority_budget_ref", 128), ("capability_class", 80)):
         value = body[name]
-        if not isinstance(value, str) or len(value) > maximum or "\\x00" in value:
+        if not isinstance(value, str) or len(value) > maximum or chr(0) in value:
             raise ValueError("local optional authority field malformed")
     if type(body["requires_reauth"]) is not bool or body["grants_authority"] is not False:
         raise ValueError("local authority flag malformed")
