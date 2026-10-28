@@ -130,6 +130,13 @@ def generate_neural_speech(
     if not secret:
         raise RuntimeError("provedor neural não configurado")
 
+    # A200 LAB: neither a configured key nor a UI click is independent
+    # durable first-attempt custody. Block before any paid TTS transport.
+    raise RuntimeError(
+        "BLOCKED_SEND_CUSTODY: independent durable first-attempt SEND custody is unavailable"
+    )
+
+    # Historical TTS transport retained for audit, deliberately unreachable.
     response=requests.post(
         cfg.endpoint,
         headers={
