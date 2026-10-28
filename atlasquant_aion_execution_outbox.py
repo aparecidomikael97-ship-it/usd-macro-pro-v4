@@ -704,20 +704,33 @@ class ExecutionOutbox:
             return {**out, "dispatch_state": "UNCERTAIN_RECONCILE_REQUIRED"}
 
         if result.get("accepted") is not True:
-            state = "RETRY" if result.get("retryable") is True else "FAILED"
+            # A205 H0: a caller-controlled adapter's rejection, including
+            # retryable=True, is NOT external proof of NO_EFFECT_FENCED.
+            # send() has already crossed the potential effect boundary.
+            # Never mark this attempt RETRY or conclusively FAILED merely
+            # because its caller claims rejection. Preserve UNCERTAIN.
             with self.db:
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
-                       SET state=?,lease_owner='',lease_until='',last_error=?
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error='ADAPTER_REJECTION_UNVERIFIED'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                         AND dispatch_started_at=?""",
                     (
-                        state,
-                        _clean(result.get("reason") or "ADAPTER_REJECTED", 240),
-                        key,
-                        *self._scope_args(),
+                        key, *self._scope_args(), worker,
+                        intent["lease_until"], _iso(now_dt),
                     ),
                 )
-            return {**self.get(key), "dispatch_state": state}
+                updated = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "dispatch_state": (
+                    "UNCERTAIN_RECONCILE_REQUIRED" if updated
+                    else "NOT_DISPATCHED_STATE_CHANGED"
+                ),
+            }
 
         effect_ref = _clean(result.get("effect_ref"), 128)
         if result.get("confirmed") is True:
@@ -772,6 +785,24 @@ class ExecutionOutbox:
             return {**out, "reconcile_state": "CONFIRMED"}
 
         if result.get("found") is False and result.get("authoritative_absence") is True:
+            # A205 H0: this boolean is supplied by an injected callback. It
+            # is NOT a cryptographically and causally independently fenced
+            # NO_EFFECT receipt. Even a fresh absence claim cannot justify
+            # RETRY after a potentially irreversible SEND. No host-local
+            # token/flag/caller assertion may turn this into a SEND license.
+            latest = self.get(key)
+            return {
+                **latest,
+                "reconcile_state": (
+                    "ABSENCE_UNVERIFIED_HARD_NO_GO"
+                    if latest["state"] in {"UNCERTAIN", "SENT"}
+                    else "NOT_RECONCILED_STATE_CHANGED"
+                ),
+            }
+
+            # Previous local-only simulated approval/retry flow retained
+            # below for historical audit, deliberately unreachable until
+            # externally independent NO_EFFECT_FENCED custody is proven.
             allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
             if not allowed:
                 out = self._set_blocked(
