@@ -14,12 +14,12 @@ from labs import test_a202_outbox_dispatch_atomic_cas as a202
 from labs.a216_synthetic_key_custody import (
     SCHEMA, custody_signing_message, inspect_synthetic_key_custody,
 )
-from labs.test_a215_synthetic_origin_bridge import A215SyntheticOriginBridgeTests
+from labs import test_a215_synthetic_origin_bridge as a215_tests
 
 
 class A216SyntheticKeyCustodyTests(unittest.TestCase):
     def setUp(self):
-        self.a215 = A215SyntheticOriginBridgeTests()
+        self.a215 = a215_tests.A215SyntheticOriginBridgeTests()
         self.a215.setUp()
         self.issuer = Ed25519PrivateKey.generate()
         self.issuer_public = self.issuer.public_key().public_bytes(
