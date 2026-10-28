@@ -25,6 +25,10 @@ class StorageUnavailableError(RuntimeError):
     """Raised when a staging store cannot prove a safe local storage state."""
 
 
+class RestorePublicationUncertainError(StorageUnavailableError):
+    """Restore target may have been published: NEVER retry without inspection."""
+
+
 class AionChatStore(Protocol):
     def create_conversation(self, scope: Scope, title="Nova conversa", metadata=None) -> Conversation: ...
     def get_conversation(self, scope: Scope, conversation_id: str) -> Conversation: ...
@@ -313,7 +317,31 @@ class SQLiteChatStore:
                     "restore denied: destination or SQLite sidecars appeared"
                 )
             os.link(temp, target)
-            temp.unlink()
+            # Publication may already be visible to other SQLite clients.
+            # Any failure AFTER this point is an uncertain outcome, not
+            # "nothing happened". Do not delete the published target or retry.
+            try:
+                if any(os.path.lexists(str(target) + suffix)
+                       for suffix in ("-wal", "-shm", "-journal")):
+                    raise RestorePublicationUncertainError(
+                        "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_SIDECAR_RACE_ZERO_AUTO_RETRY"
+                    )
+                # A host may rename/swap the just-published target even if
+                # the directory preflight passed. This detects a visible
+                # replacement, not an authentic VFS handle or a complete lock.
+                before_cleanup = temp.stat()
+                after_link = target.stat(follow_symlinks=False)
+                if (before_cleanup.st_dev, before_cleanup.st_ino) != (
+                    after_link.st_dev, after_link.st_ino
+                ):
+                    raise RestorePublicationUncertainError(
+                        "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_TARGET_CHANGED_ZERO_AUTO_RETRY"
+                    )
+                temp.unlink()
+            except OSError as exc:
+                raise RestorePublicationUncertainError(
+                    "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_POST_LINK_IO_ZERO_AUTO_RETRY"
+                ) from exc
             return {
                 "state": "RESTORE_VERIFIED",
                 "backup_path": str(source),
