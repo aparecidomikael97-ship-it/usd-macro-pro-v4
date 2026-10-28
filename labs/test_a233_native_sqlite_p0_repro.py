@@ -1,4 +1,5 @@
 """A233: adversarial experiments on real, disposable SQLite files."""
+from contextlib import closing
 import dataclasses
 from pathlib import Path
 import sqlite3
@@ -83,7 +84,7 @@ class A233NativeSQLiteP0Tests(unittest.TestCase):
                 store.create_conversation(scope, "A233 TEST ONLY")
                 report = store.backup_to(target)
                 self.assertEqual(report["state"], "BACKUP_VERIFIED")
-                with sqlite3.connect(str(target)) as target_db:
+                with closing(sqlite3.connect(str(target))) as target_db:
                     self.assertEqual(
                         target_db.execute("SELECT COUNT(*) FROM conversations").fetchone()[0],
                         1,
