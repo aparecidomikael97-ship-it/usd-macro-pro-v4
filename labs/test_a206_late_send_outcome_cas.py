@@ -90,8 +90,8 @@ class A206DelayedSendOutcomeDoesNotEraseConfirmedTests(unittest.TestCase):
                             key,adapter=adapter,
                             authorize=helper.authorize,now=NOW,
                         )
-                        self.assertEqual(fresh["state"],"CONFIRMED")
-                        self.assertEqual(outbox.effect_count(),1)
+                        self.assertEqual(fresh["state"],"UNCERTAIN")
+                        self.assertEqual(outbox.effect_count(),0)
                     finally:
                         adapter.release.set()
                     stale=pending.result(timeout=25)
@@ -99,11 +99,11 @@ class A206DelayedSendOutcomeDoesNotEraseConfirmedTests(unittest.TestCase):
                 self.assertEqual(adapter.send_calls,1)
                 self.assertEqual(len(adapter.effects),1)
                 self.assertEqual(
-                    outbox.get(key)["state"],"CONFIRMED",
-                    "A206_RED_LATE_SEND_OUTCOME_ERASED_CONFIRMED_EFFECT",
+                    outbox.get(key)["state"],"UNCERTAIN",
+                    "A213_RED_LATE_SEND_OVERWROTE_QUARANTINED_POSITIVE",
                 )
-                self.assertEqual(outbox.effect_count(),1)
-                self.assertEqual(stale["state"],"CONFIRMED")
+                self.assertEqual(outbox.effect_count(),0)
+                self.assertEqual(stale["state"],"UNCERTAIN")
                 self.assertEqual(
                     stale["dispatch_state"],"NOT_DISPATCHED_STATE_CHANGED",
                 )
