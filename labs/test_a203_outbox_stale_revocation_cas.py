@@ -13,11 +13,14 @@ import unittest
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
-from labs.test_a202_outbox_dispatch_atomic_cas import (
-    A202SameLeaseOwnerDispatchRaceTests,
-    FakeNonIdempotentEffect,
-    NOW, SCOPE, WORKER,
-)
+# Import the module, not its TestCase class into this test module.
+# unittest discovers imported TestCase classes and otherwise runs A202 twice.
+from labs import test_a202_outbox_dispatch_atomic_cas as a202
+
+FakeNonIdempotentEffect=a202.FakeNonIdempotentEffect
+NOW=a202.NOW
+SCOPE=a202.SCOPE
+WORKER=a202.WORKER
 
 
 class _EffectThenUnknown(FakeNonIdempotentEffect):
@@ -28,7 +31,7 @@ class _EffectThenUnknown(FakeNonIdempotentEffect):
 
 class A203StaleAuthorizationOutboxTests(unittest.TestCase):
     def fixture(self, root):
-        helper = A202SameLeaseOwnerDispatchRaceTests()
+        helper = a202.A202SameLeaseOwnerDispatchRaceTests()
         return helper.seed_claim(root), helper
 
     def run_stale_revocation_case(self, adapter, expected_state):
