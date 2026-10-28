@@ -1,0 +1,32 @@
+name: AION A193 Closed SQLite Store Failclosed LAB
+
+on:
+  pull_request:
+    paths:
+      - "aion_chat/store.py"
+      - "labs/test_a193_sqlite_store_closed_failclosed_lab.py"
+      - "docs/lab/aion_a193_closed_sqlite_store_failclosed.md"
+      - ".github/workflows/aion-a193-sqlite-closed-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-closed:
+    name: A193 closed SQLite actual store / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: AION original SQLiteChatStore closed-handle regression without pip/provider
+        run: python -B -m unittest -v labs.test_a193_sqlite_store_closed_failclosed_lab
