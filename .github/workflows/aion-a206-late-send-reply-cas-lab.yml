@@ -1,0 +1,34 @@
+name: AION A206 Late SEND Reply CAS LAB
+
+on:
+  pull_request:
+    paths:
+      - "atlasquant_aion_execution_outbox.py"
+      - "labs/test_a206_outbox_late_send_reply_cas.py"
+      - ".github/workflows/aion-a206-late-send-reply-cas-lab.yml"
+      - "docs/lab/aion_a206_late_send_reply_cas.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stale-send-reply:
+    name: A206 late send reply cannot downgrade CONFIRMED / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Install import-only dependency (no real external SEND)
+        run: python -m pip install requests==2.34.2
+      - name: Run A206 and A202-A205 real SQLite synthetic effect regressions
+        run: python -B -m unittest -v labs.test_a206_outbox_late_send_reply_cas labs.test_a205_unverified_adapter_absence_no_resend labs.test_a204_outbox_stale_absence_confirmed labs.test_a203_outbox_stale_revocation_cas labs.test_a202_outbox_dispatch_atomic_cas
