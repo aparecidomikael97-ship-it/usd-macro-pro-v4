@@ -507,16 +507,34 @@ class ExecutionOutbox:
                 return False, "BLOCKED_REAPPROVAL", {"reason": "REAUTH_TRANSACTION_MISMATCH"}
         return True, "ALLOW", current
 
-    def _set_blocked(self, key: str, state: str, reason: str) -> dict[str, Any]:
+    def _set_blocked(
+        self, key: str, state: str, reason: str,
+        *, observed: Mapping[str, Any],
+    ) -> dict[str, Any]:
         if state not in {"REVOKED", "BLOCKED_REAPPROVAL"}:
             raise ValueError("invalid blocked state")
+        # A203: the decision can be stale while a concurrent dispatcher
+        # crosses the effect boundary. Never turn a newer UNCERTAIN,
+        # SENT or CONFIRMED record into REVOKED based on an earlier
+        # authorization snapshot. This is a local compare-and-set only;
+        # it is not an independently witnessed cancellation or authority.
+        prior_state = str(observed.get("state") or "")
+        if prior_state not in {"CLAIMED", "UNCERTAIN", "SENT"}:
+            return self.get(key)
         with self.db:
             self.db.execute(
                 """UPDATE action_outbox
                    SET state=?,lease_owner='',lease_until='',last_error=?
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (state, _clean(reason, 240), key, *self._scope_args()),
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state=? AND lease_owner=? AND lease_until=?""",
+                (
+                    state, _clean(reason, 240), key, *self._scope_args(),
+                    prior_state, str(observed.get("lease_owner") or ""),
+                    str(observed.get("lease_until") or ""),
+                ),
             )
+        # If the snapshot lost the CAS, expose current state without
+        # clearing the newer effect marker or inventing a receipt.
         return self.get(key)
 
     def _confirm(
@@ -588,7 +606,10 @@ class ExecutionOutbox:
 
         allowed, blocked_state, auth = self._authorization_gate(intent, authorize, now_dt)
         if not allowed:
-            return self._set_blocked(key, blocked_state, auth.get("reason", blocked_state))
+            return self._set_blocked(
+                key, blocked_state, auth.get("reason", blocked_state),
+                observed=intent,
+            )
 
         decision = _mapping(intent.get("decision"))
         budget_ref = _clean(decision.get("authority_budget_ref"), 128)
@@ -598,6 +619,7 @@ class ExecutionOutbox:
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_REQUIRED",
+                    observed=intent,
                 )
             try:
                 budget = _mapping(cumulative_authority_guard(dict(decision)))
@@ -606,24 +628,28 @@ class ExecutionOutbox:
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_GUARD_FAILED",
+                    observed=intent,
                 )
             if budget.get("allowed") is not True:
                 return self._set_blocked(
                     key,
                     "BLOCKED_REAPPROVAL",
                     _clean(budget.get("reason") or "CUMULATIVE_AUTHORITY_BUDGET_EXCEEDED", 240),
+                    observed=intent,
                 )
             if _clean(budget.get("authority_budget_ref"), 128) != budget_ref:
                 return self._set_blocked(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_BUDGET_REF_MISMATCH",
+                    observed=intent,
                 )
             if _clean(budget.get("transaction_id"), 128) != _clean(decision.get("transaction_id"), 128):
                 return self._set_blocked(
                     key,
                     "BLOCKED_REAPPROVAL",
                     "CUMULATIVE_AUTHORITY_TRANSACTION_MISMATCH",
+                    observed=intent,
                 )
 
         send = getattr(adapter, "send", None)
@@ -632,14 +658,32 @@ class ExecutionOutbox:
 
         # Persist ambiguity BEFORE crossing the external boundary. If the process
         # dies after this commit, restart must reconcile and must not blind-retry.
+        #
+        # A202: this UPDATE is the atomic dispatch admission CAS, not just a
+        # state annotation. Two calls can read the same CLAIMED row with the
+        # same lease owner on separate SQLite connections. Only the call
+        # that transitions exactly ONE row may enter adapter.send. A failed
+        # transition MUST be fail-closed: never send, retry, reauthorize, or
+        # reset UNCERTAIN. Also bind the lease snapshot from the initial read.
         with self.db:
-            self.db.execute(
+            cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='UNCERTAIN',dispatch_started_at=?,last_error='DISPATCH_IN_PROGRESS'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
-                     AND state='CLAIMED' AND lease_owner=?""",
-                (_iso(now_dt), key, *self._scope_args(), worker),
+                     AND state='CLAIMED' AND lease_owner=? AND lease_until=?""",
+                (
+                    _iso(now_dt), key, *self._scope_args(),
+                    worker, intent["lease_until"],
+                ),
             )
+            dispatch_admitted = cursor.rowcount == 1
+        if not dispatch_admitted:
+            # The other contender may now be UNCERTAIN, SENT or CONFIRMED.
+            # This local result is NOT proof of an external effect or absence.
+            return {
+                **self.get(key),
+                "dispatch_state": "NOT_DISPATCHED_STATE_CHANGED",
+            }
 
         try:
             result = _mapping(send(dict(intent["decision"]), key))
@@ -734,17 +778,46 @@ class ExecutionOutbox:
                     key,
                     blocked_state,
                     auth.get("reason", blocked_state),
+                    observed=intent,
                 )
-                return {**out, "reconcile_state": blocked_state}
+                return {
+                    **out,
+                    "reconcile_state": (
+                        blocked_state if out["state"] == blocked_state
+                        else "NOT_RECONCILED_STATE_CHANGED"
+                    ),
+                }
+            # A204: provider reconciliation is a potentially delayed reply.
+            # Do not let a stale "absence" replace a newer CONFIRMED, SENT,
+            # UNCERTAIN or re-claimed snapshot. Only a CAS winner may make
+            # the particular originally observed attempt locally retryable.
+            # This local CAS does NOT authenticate NO_EFFECT_FENCED evidence.
             with self.db:
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
                        SET state='RETRY',lease_owner='',lease_until='',
                            last_error='AUTHORITATIVE_ABSENCE_CONFIRMED'
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (key, *self._scope_args()),
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state=? AND attempts=? AND lease_owner=?
+                         AND lease_until=? AND dispatch_started_at=?
+                         AND sent_at=? AND confirmed_at=? AND effect_ref=?""",
+                    (
+                        key, *self._scope_args(),
+                        intent["state"], intent["attempts"],
+                        intent["lease_owner"], intent["lease_until"],
+                        intent["dispatch_started_at"], intent["sent_at"],
+                        intent["confirmed_at"], intent["effect_ref"],
+                    ),
                 )
-            return {**self.get(key), "reconcile_state": "RETRY"}
+                transitioned = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "reconcile_state": (
+                    "RETRY" if transitioned
+                    else "NOT_RECONCILED_STATE_CHANGED"
+                ),
+            }
 
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
