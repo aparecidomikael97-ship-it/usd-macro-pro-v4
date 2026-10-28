@@ -787,15 +787,37 @@ class ExecutionOutbox:
                         else "NOT_RECONCILED_STATE_CHANGED"
                     ),
                 }
+            # A204: provider reconciliation is a potentially delayed reply.
+            # Do not let a stale "absence" replace a newer CONFIRMED, SENT,
+            # UNCERTAIN or re-claimed snapshot. Only a CAS winner may make
+            # the particular originally observed attempt locally retryable.
+            # This local CAS does NOT authenticate NO_EFFECT_FENCED evidence.
             with self.db:
-                self.db.execute(
+                cursor = self.db.execute(
                     """UPDATE action_outbox
                        SET state='RETRY',lease_owner='',lease_until='',
                            last_error='AUTHORITATIVE_ABSENCE_CONFIRMED'
-                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                    (key, *self._scope_args()),
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state=? AND attempts=? AND lease_owner=?
+                         AND lease_until=? AND dispatch_started_at=?
+                         AND sent_at=? AND confirmed_at=? AND effect_ref=?""",
+                    (
+                        key, *self._scope_args(),
+                        intent["state"], intent["attempts"],
+                        intent["lease_owner"], intent["lease_until"],
+                        intent["dispatch_started_at"], intent["sent_at"],
+                        intent["confirmed_at"], intent["effect_ref"],
+                    ),
                 )
-            return {**self.get(key), "reconcile_state": "RETRY"}
+                transitioned = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "reconcile_state": (
+                    "RETRY" if transitioned
+                    else "NOT_RECONCILED_STATE_CHANGED"
+                ),
+            }
 
         return {**intent, "reconcile_state": "STILL_UNCERTAIN"}
 
