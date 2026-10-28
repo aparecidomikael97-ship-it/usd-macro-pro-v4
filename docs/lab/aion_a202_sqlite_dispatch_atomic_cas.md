@@ -24,10 +24,19 @@ seguro: exatamente uma chamada ao adapter, uma transição `CONFIRMED`
 e uma saída `NOT_DISPATCHED_STATE_CHANGED`. **Não é efeito real; não conecta
 provedor, GitHub API ou rede.**
 
-A primeira rodada do workflow A202 deve apresentar RED na implementação
-antiga se a hipótese estiver correta. Só depois de observar os logs,
-implementar CAS transacional com `rowcount == 1` e comportamento fail-closed,
-sem retry cego em `UNCERTAIN`.
+### RED antes da correção — logs reais preservados
+
+- [A202 #40605487544](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40605487544) apresentou **ERROR no Ubuntu** por um erro **do fixture**, que tentava usar uma conexão SQLite criada numa thread em outra (check_same_thread=True). Esta primeira execução NÃO comprova duplicação.
+- Corrigimos o fixture para que cada thread construa seu próprio `SQLiteChatStore`, com duas conexões independentes, sincronizadas após leitura e autorização.
+- [A202 RED #40605588340](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40605588340), na **implementação anterior sem CAS checado**, reproduziu **uma colisão real do registro local de efeitos no Ubuntu e Windows**. Logs: `ValueError: effect ledger idempotency collision`. O adapter sintético registra referências de efeito diferentes a cada chamada: o erro só acontece quando as duas execuções chegaram a `adapter.send`, ainda que o SQLite tenha permitido apenas uma transição `CLAIMED` → `UNCERTAIN`. Não houve provedor real.
+
+### Patch mínimo e GREEN
+
+O código real `ExecutionOutbox.dispatch_claimed` agora mede o `cursor.rowcount` da atualização `CLAIMED` → `UNCERTAIN` que inclui o escopo, o mesmo `worker_id` e o `lease_until` observado. Só o vencedor (rowcount == 1) entra em `adapter.send`; o perdedor retorna `dispatch_state=NOT_DISPATCHED_STATE_CHANGED`, sem segundo envio nem reenvio cego. A transição é persistida **antes de qualquer efeito** e o resultado do perdedor não é um recibo externo.
+
+[A202 corrigida #40605732278](https://github.com/aparecidomikael97-ship-it/usd-macro-pro-v4/actions/runs/40605732278): **3/3 PASS no Ubuntu e 3/3 PASS no Windows**, com duas conexões reais. O fixture não foi silenciado nem marcado como skip/xfail. Os dois testes complementares preservaram a proibição de replay após CONFIRMED e a recusa sem SEND na revogação.
+
+Estes testes demonstram somente o CAS local para duas conexões no mesmo arquivo SQLite; não demonstram efeitos externos exatamente uma vez, nem resistência à restauração do banco/host.
 
 ## Limitações externas mantidas
 
