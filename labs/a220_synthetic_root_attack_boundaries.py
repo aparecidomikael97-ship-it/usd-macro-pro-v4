@@ -118,7 +118,7 @@ def simulate_untrusted_root_attack(
     if any(type(candidate[k]) is not str or candidate[k] != v for k, v in scope.items()):
         return _deny("SYNTHETIC_SCOPE_MISMATCH")
 
-    if candidate["model_id"] not in MODELS or type(candidate["model_id"]) is not str:
+    if type(candidate["model_id"]) is not str or candidate["model_id"] not in MODELS:
         return _deny("UNKNOWN_ROOT_MODEL")
     attack_id = candidate["attack_id"]
     if type(attack_id) is not str or attack_id not in SCENARIOS:
