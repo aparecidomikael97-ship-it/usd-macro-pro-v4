@@ -163,7 +163,10 @@ class A214ReadOnlyEvidenceIntakeTests(unittest.TestCase):
                 "decision_id", "intent_ref", "action", "payload_digest",
                 "policy_version", "authorization_ref", "aggregate_seq",
                 "attempts", "state", "dispatch_started_at", "sent_at",
-                "created_at", "valid_until",
+                "created_at", "valid_until", "aggregate_key",
+                "requires_reauth", "reauth_ref", "transaction_id",
+                "authority_budget_ref", "risk_points", "capability_class",
+                "grants_authority",
             )
             for field in bound:
                 with self.subTest(field=field):
