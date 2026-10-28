@@ -267,11 +267,25 @@ class SQLiteChatStore:
 
     @classmethod
     def restore_from_backup(cls, backup_path, target_path):
-        """Restore a verified backup atomically; never replace target on invalid input."""
+        """Publish a verified staging backup only to an unused path; never overwrite.
+
+        Neither a pathname precheck nor this API proves that a compromised host
+        has no detached SQLite handles or controls no other copies. This only
+        closes the known destructive replacement path, not P0-5/6 overall.
+        """
         source = Path(backup_path)
         target = Path(target_path)
         if source.resolve() == target.resolve():
             raise ValueError("restore target must differ from backup")
+        # A live WAL/-shm/-journal is a veto, even when main .db is absent.
+        # os.path.lexists also detects dangling symlinks and directories.
+        # This preflight is NOT a lock: os.link below provides the final
+        # atomic publish-if-absent check against another creator of target.
+        if any(os.path.lexists(str(target) + suffix)
+               for suffix in ("", "-wal", "-shm", "-journal")):
+            raise StorageUnavailableError(
+                "restore denied: destination or SQLite sidecars already exist"
+            )
         source_report = _validate_database_file(source)
         target.parent.mkdir(parents=True, exist_ok=True)
         temp = target.with_name(target.name + ".restore-" + uuid4().hex)
@@ -287,7 +301,19 @@ class SQLiteChatStore:
             source_db.close()
             source_db = None
             restored_report = _validate_database_file(temp)
-            os.replace(temp, target)
+            # Never use os.replace here: Linux permits a live connection
+            # to keep reading an unlinked OLD database while new openers see
+            # the NEW file at the same pathname. Windows may reject the swap.
+            # Hardlinking a temp file in the same directory publishes ONLY
+            # when the destination does not already exist (no TOCTOU replace).
+            # This may be unsupported by a filesystem: fail closed instead.
+            if any(os.path.lexists(str(target) + suffix)
+                   for suffix in ("", "-wal", "-shm", "-journal")):
+                raise StorageUnavailableError(
+                    "restore denied: destination or SQLite sidecars appeared"
+                )
+            os.link(temp, target)
+            temp.unlink()
             return {
                 "state": "RESTORE_VERIFIED",
                 "backup_path": str(source),
