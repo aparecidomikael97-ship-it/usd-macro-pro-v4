@@ -93,23 +93,23 @@ class A204StaleAbsenceVersusConfirmedTests(unittest.TestCase):
                             key,adapter=FreshReceipt(),
                             authorize=helper.authorize,now=NOW,
                         )
-                        self.assertEqual(newer["state"],"CONFIRMED")
-                        self.assertEqual(outbox.effect_count(),1)
+                        self.assertEqual(newer["state"],prior)
+                        self.assertEqual(outbox.effect_count(),0)
                     finally:
                         release_old_reconcile.set()
                     stale=pending.result(timeout=25)
 
                 after=outbox.get(key)
                 self.assertEqual(
-                    after["state"],"CONFIRMED",
+                    after["state"],prior,
                     "A204_STALE_ABSENCE_REOPENED_CONFIRMED_INTENT_RED",
                 )
-                self.assertEqual(stale["state"],"CONFIRMED")
+                self.assertEqual(stale["state"],prior)
                 self.assertEqual(
                     stale["reconcile_state"],
-                    "NOT_RECONCILED_STATE_CHANGED",
+                    "ABSENCE_UNVERIFIED_HARD_NO_GO",
                 )
-                self.assertEqual(outbox.effect_count(),1)
+                self.assertEqual(outbox.effect_count(),0)
                 self.assertEqual(adapter.send_calls,1)
                 self.assertIsNone(
                     outbox.claim_next("new-worker",now=NOW),
