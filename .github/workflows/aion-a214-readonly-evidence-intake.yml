@@ -1,0 +1,55 @@
+name: AION A214 Read-Only Evidence Intake Lab
+
+on:
+  pull_request:
+    paths:
+      - atlasquant_aion_external_evidence_intake.py
+      - atlasquant_aion_execution_outbox.py
+      - labs/test_a214_external_evidence_intake.py
+      - labs/test_a213_outbox_untrusted_positive_hard_nogo.py
+      - labs/test_a207_untrusted_confirmation_requires_receipt.py
+      - .github/workflows/aion-a214-readonly-evidence-intake.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-intake-negative-authority:
+    name: Evidence intake HARD NO-GO (${{ matrix.os }}, Python 3.12)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout untrusted Draft source
+        uses: actions/checkout@v4
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test-only dependencies
+        run: python -m pip install cryptography==44.0.3 requests==2.32.3
+      - name: A214 candidate intake and full Outbox provenance regression
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: >-
+          python -B -m unittest -v
+          labs.test_a214_external_evidence_intake
+          labs.test_a213_outbox_untrusted_positive_hard_nogo
+          labs.test_a207_untrusted_confirmation_requires_receipt
+          labs.test_a206_late_send_outcome_cas
+          labs.test_a205_unverified_adapter_absence_no_resend
+          labs.test_a204_outbox_stale_absence_confirmed
+          labs.test_a203_outbox_stale_revocation_cas
+          labs.test_a202_outbox_dispatch_atomic_cas
+          test_atlasquant_aion_execution_outbox
+          test_atlasquant_aion_execution_saga
+          test_atlasquant_aion_chaos_campaign
+          labs.test_a212_synthetic_signed_effect_preflight
+          labs.test_a211_claimed_witness_coherence
+          labs.test_a210_offline_root_rotation_proposal
+          labs.test_a209_root_provenance_failclosed
+          labs.test_a208_independent_receipt_preflight
