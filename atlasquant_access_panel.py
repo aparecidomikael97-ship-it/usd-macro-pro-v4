@@ -261,10 +261,17 @@ def _bool_setting(value:Any)->bool:
     return str(value or "").strip().lower() in {"1","true","yes","on","sim"}
 
 def access_required()->bool:
+    # A lower-trust conflicting configuration must never downgrade a genuine
+    # PRODUCTION/auth-required signal into OPEN. Both the Streamlit secrets
+    # source and the process environment can independently require auth.
     environment=_setting("ATLASQUANT_ENV","").upper()
-    if environment=="PRODUCTION":
+    process_environment=str(os.getenv("ATLASQUANT_ENV","") or "").strip().upper()
+    if environment=="PRODUCTION" or process_environment=="PRODUCTION":
         return True
-    return _bool_setting(_setting("ATLASQUANT_AUTH_REQUIRED","false"))
+    return (
+        _bool_setting(_setting("ATLASQUANT_AUTH_REQUIRED","false"))
+        or _bool_setting(os.getenv("ATLASQUANT_AUTH_REQUIRED","false"))
+    )
 
 def configured_users():
     return load_users_config(_setting("ATLASQUANT_USERS_JSON",""))
@@ -322,7 +329,9 @@ def evaluate_access(
         return {"allowed":False,"mode":"LOCKED","reason":"NO_USERS_CONFIGURED"}
     if not isinstance(session,dict) or not has_permission(session,"app:read"):
         return {"allowed":False,"mode":"LOGIN","reason":"AUTH_REQUIRED"}
-    if users is not None and not session_is_current(session,users):
+    # A role-only session is not an authentication proof. A trusted current
+    # registry is mandatory before any AUTHENTICATED decision can be issued.
+    if users is None or not session_is_current(session,users):
         return {"allowed":False,"mode":"LOGIN","reason":"SESSION_REVOKED"}
     return {"allowed":True,"mode":"AUTHENTICATED","reason":"OK"}
 

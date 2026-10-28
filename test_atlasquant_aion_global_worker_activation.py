@@ -354,34 +354,29 @@ class GlobalWorkerActivationCeremonyTests(unittest.TestCase):
             "ACTIVATION_APPROVAL_RUNTIME_DIGEST_CHANGED",
         )
 
-    def test_writer_creates_when_unset_and_updates_when_disabled(self):
-        create = Mock()
-        create.raise_for_status.return_value = None
+    def test_worker_enable_writer_denies_unset_and_disabled_without_any_http_mutation(self):
+        # A201: the historical success mock expected ENABLED from local
+        # ceremony/token alone. This unsafe expectation remains in Git history.
+        # The only supported real contract until custody exists is denial.
         with patch(
             "atlasquant_aion_global_worker_activation.requests.post",
-            return_value=create,
-        ) as post:
-            result = write_repository_feature_flag_enabled(
-                _config(),
-                "UNSET",
-            )
-        post.assert_called_once()
-        self.assertEqual(result["status"], "WRITE_ACCEPTED")
-        self.assertTrue(result["modified"])
-        self.assertFalse(result["raw_value_exposed"])
-
-        update = Mock()
-        update.raise_for_status.return_value = None
-        with patch(
+            side_effect=AssertionError("ENABLE_POST_FORBIDDEN"),
+        ) as post, patch(
             "atlasquant_aion_global_worker_activation.requests.patch",
-            return_value=update,
+            side_effect=AssertionError("ENABLE_PATCH_FORBIDDEN"),
         ) as patch_call:
-            result = write_repository_feature_flag_enabled(
-                _config(),
-                "DISABLED",
-            )
-        patch_call.assert_called_once()
-        self.assertEqual(result["status"], "WRITE_ACCEPTED")
+            for previous in ("UNSET", "DISABLED"):
+                result=write_repository_feature_flag_enabled(_config(),previous)
+                self.assertEqual(result["status"],"BLOCKED")
+                self.assertFalse(result["modified"])
+                self.assertEqual(
+                    result["reason"],"EXTERNAL_ENABLE_CUSTODY_NOT_HOMOLOGATED",
+                )
+                self.assertEqual(result["previous_state"],previous)
+                self.assertEqual(result["target_state"],"ENABLED")
+                self.assertFalse(result["raw_value_exposed"])
+        post.assert_not_called()
+        patch_call.assert_not_called()
 
     def test_safety_disabler_falls_back_to_create_disabled_when_missing(self):
         missing = Mock(status_code=404)
