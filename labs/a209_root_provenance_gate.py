@@ -99,7 +99,7 @@ def inspect_claimed_root(
         return _deny("ROOT_FINGERPRINT_MISMATCH")
 
     origin = claim.get("claimed_origin")
-    if origin in _UNTRUSTED_ORIGINS:
+    if isinstance(origin, str) and origin in _UNTRUSTED_ORIGINS:
         return _deny("ROOT_SOURCE_CONTROLLED_BY_HOST")
     if origin != "claimed_external_sealed":
         return _deny("ROOT_ORIGIN_UNKNOWN")
