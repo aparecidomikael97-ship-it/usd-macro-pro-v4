@@ -545,42 +545,14 @@ class ExecutionOutbox:
         confirmed_at: datetime,
         result: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        effect = _token(effect_ref, "effect_ref", 128)
-        encoded = _canonical(redact(dict(result or {})))
-        self.db.execute("BEGIN IMMEDIATE")
-        try:
-            existing = self.db.execute(
-                """SELECT effect_ref FROM action_effects
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (key, *self._scope_args()),
-            ).fetchone()
-            if existing is not None and existing["effect_ref"] != effect:
-                raise ValueError("effect ledger idempotency collision")
-            if existing is None:
-                self.db.execute(
-                    """INSERT INTO action_effects(
-                        idempotency_key,owner,tenant,workspace,effect_ref,confirmed_at,data
-                    ) VALUES (?,?,?,?,?,?,?)""",
-                    (
-                        key,
-                        *self._scope_args(),
-                        effect,
-                        _iso(confirmed_at),
-                        encoded,
-                    ),
-                )
-            self.db.execute(
-                """UPDATE action_outbox
-                   SET state='CONFIRMED',confirmed_at=?,effect_ref=?,
-                       lease_owner='',lease_until='',last_error=''
-                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?""",
-                (_iso(confirmed_at), effect, key, *self._scope_args()),
-            )
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-        return self.get(key)
+        """A213: no trusted receipt verifier is currently wired to this Outbox.
+
+        A private method must not become a backdoor for self-reported adapter
+        effects. This gate also protects accidental direct internal calls.
+        A future independent receipt verifier requires a separately reviewed
+        design; callback flags, claimed signatures and host keys are insufficient.
+        """
+        raise PermissionError("A213_INDEPENDENT_EFFECT_RECEIPT_REQUIRED")
 
     def dispatch_claimed(
         self,
@@ -745,15 +717,32 @@ class ExecutionOutbox:
 
         effect_ref = _clean(result.get("effect_ref"), 128)
         if result.get("confirmed") is True:
-            if not effect_ref:
-                raise ValueError("confirmed adapter result requires effect_ref")
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "dispatch_state": "CONFIRMED"}
+            # A213: this callback can lie. Preserve the write-ahead
+            # UNCERTAIN state, do not record its fake effect_ref and never
+            # call _confirm. Row-level CAS protects a newer reconciliation
+            # from a delayed self-asserted SEND outcome.
+            with self.db:
+                cursor = self.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error='UNTRUSTED_SEND_POSITIVE_NO_EXTERNAL_RECEIPT'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                         AND dispatch_started_at=?""",
+                    (
+                        key, *self._scope_args(), worker,
+                        intent["lease_until"], _iso(now_dt),
+                    ),
+                )
+                updated = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "dispatch_state": (
+                    "UNTRUSTED_POSITIVE_RECONCILE_REQUIRED" if updated
+                    else "NOT_DISPATCHED_STATE_CHANGED"
+                ),
+            }
 
         # A206: do not regress from a newer CONFIRMED to an old
         # "accepted, not yet confirmed" reply. No re-send and no reset.
@@ -799,16 +788,36 @@ class ExecutionOutbox:
 
         result = _mapping(reconcile(key, dict(intent["decision"])))
         if result.get("found") is True and result.get("confirmed") is True:
-            effect_ref = _clean(result.get("effect_ref"), 128)
-            if not effect_ref:
-                raise ValueError("confirmed reconciliation requires effect_ref")
-            out = self._confirm(
-                key,
-                effect_ref=effect_ref,
-                confirmed_at=now_dt,
-                result=result,
-            )
-            return {**out, "reconcile_state": "CONFIRMED"}
+            # A213: even a "found" callback can forge effect_ref. Never
+            # publish CONFIRMED or action_effects on adapter testimony.
+            # Bind this audit marker to the exact observed snapshot, so a
+            # stale callback cannot overwrite newer state/error evidence.
+            with self.db:
+                cursor = self.db.execute(
+                    """UPDATE action_outbox
+                       SET lease_owner='',lease_until='',
+                           last_error='UNTRUSTED_RECONCILE_POSITIVE_NO_EXTERNAL_RECEIPT'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state=? AND attempts=? AND lease_owner=? AND lease_until=?
+                         AND dispatch_started_at=? AND sent_at=?
+                         AND confirmed_at=? AND effect_ref=? AND last_error=?""",
+                    (
+                        key, *self._scope_args(),
+                        intent["state"], intent["attempts"],
+                        intent["lease_owner"], intent["lease_until"],
+                        intent["dispatch_started_at"], intent["sent_at"],
+                        intent["confirmed_at"], intent["effect_ref"], intent["last_error"],
+                    ),
+                )
+                updated = cursor.rowcount == 1
+            out = self.get(key)
+            return {
+                **out,
+                "reconcile_state": (
+                    "UNTRUSTED_POSITIVE_HARD_NO_GO" if updated
+                    else "NOT_RECONCILED_STATE_CHANGED"
+                ),
+            }
 
         if result.get("found") is False and result.get("authoritative_absence") is True:
             # A205 H0: this boolean is supplied by an injected callback. It
