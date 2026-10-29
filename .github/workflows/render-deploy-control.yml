@@ -30,6 +30,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # A262 LAB draft: executable hard-stop immediately before any hook,
+      # secret access, provider traffic or deployment attempt. NO P0 is
+      # homologated. This is NOT a live control until separately reviewed
+      # and integrated into the protected main release workflow.
+      - name: A262 HARD NO-GO before Render deploy hook
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::error::AION HARD NO-GO: 0/6 P0, Render hook forbidden."
+          exit 2
+
       - name: Require Render deploy hook
         shell: bash
         env:
