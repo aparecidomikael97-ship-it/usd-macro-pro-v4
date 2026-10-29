@@ -30,8 +30,8 @@ def evidence(tf="M5", *, close=1.152, date=NOW):
         "closed_candles": True,
         "fetched_at": date.isoformat(),
         "bars": [
-            candle(date - 2 * period, close=close),
-            candle(date - period, close=close),
+            candle(date - 2 * period, close=close, high=max(1.154, close + 0.001)),
+            candle(date - period, close=close, high=max(1.154, close + 0.001)),
         ],
     }
 
