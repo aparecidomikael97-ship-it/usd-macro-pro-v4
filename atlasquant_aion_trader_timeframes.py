@@ -140,6 +140,7 @@ def merge_mtf_readonly(
     resident_rows: Any,
 ) -> dict:
     """Annotate an already-created A268 board; never promote trade permission."""
+    invalid_root = type(evidence) is not dict or len(evidence) > 100
     indexed, dupes, unknown = evaluate_mtf_input(evidence, now=now)
     resident = {}
     if type(resident_rows) is list:
@@ -151,7 +152,12 @@ def merge_mtf_readonly(
     for row in board["rows"]:
         pair = row["asset"]
         periods = indexed.get(pair)
-        if periods is not None:
+        if invalid_root:
+            # A malformed supplied package cannot silently fall back to
+            # resident M15 and claim 28/28 current coverage.
+            row["timeframes"] = {tf: INVALID for tf in PERIOD_MINUTES}
+            row["market_evidence"] = INVALID
+        elif periods is not None:
             if pair in dupes or type(periods) is not dict or any(
                     type(k) is not str or k not in PERIOD_MINUTES for k in periods):
                 periods = {tf: None for tf in PERIOD_MINUTES}
@@ -180,11 +186,15 @@ def merge_mtf_readonly(
                     "INPUT_FRESH_CLOSED_" + tf + "_UNATTESTED"):
                 counts[tf] += 1
     board["fresh_m15_pairs"] = counts["M15"]
+    board["historical_m15_pairs"] = sum(
+        row["timeframes"]["M15"] == STALE for row in board["rows"]
+    )
     board["all_28_fresh_closed_m15"] = (
         counts["M15"] == 28 and not board["duplicate_pairs"] and not dupes
     )
     board["mtf_coverage"] = counts
     board["mtf_input_duplicate_pairs"] = dupes
     board["mtf_input_unknown_pairs"] = unknown
+    board["mtf_input_root_valid"] = not invalid_root
     board["mtf_verification"] = "CALLER_INPUT_STRUCTURAL_ONLY_NO_EXTERNAL_ATTESTATION"
     return board
