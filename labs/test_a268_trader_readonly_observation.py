@@ -257,7 +257,7 @@ class A268TraderReadOnlyObservationTests(unittest.TestCase):
             side_effect=ValueError("invalid snapshot"),
         ):
             atlasquant_trader_resident.hydrate_trader_resident_state(session, {})
-        self.assertEqual(session["atlasquant_aion_trader_observation"], {})
+        self.assertNotIn("atlasquant_aion_trader_observation", session)
         self.assertEqual(session["atlasquant_validated_market_items"], [])
 
     def test_20_does_not_mutate_inputs_or_suggest_order_execution(self):
