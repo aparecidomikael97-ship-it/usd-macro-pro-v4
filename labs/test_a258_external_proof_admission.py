@@ -128,16 +128,23 @@ class A258OfflineProofAdmissionTests(unittest.TestCase):
         )
         self.assertEqual((result["state"], sends, effects), ("UNCERTAIN", 0, 0))
 
-    @unittest.expectedFailure
-    def test_13_red_outbox_still_accepts_caller_supplied_true_as_witness(self):
-        """P0-4 open: local guard callback True can trigger LAB adapter.send.
-
-        This property FAILS by design until an independently authenticated
-        reservation protocol replaces the caller-controlled boolean callback.
-        """
-        result, sends, effects = _attempt(lambda intent: True)
-        # Desired production invariant, not currently enforced by the outbox:
-        self.assertEqual((result["state"], sends, effects), ("UNCERTAIN", 0, 0))
+    def test_13_production_outbox_rejects_caller_true_callback(self):
+        """A259 migrates unsafe callback to explicit labs-only test fixture."""
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from aion_chat.models import Scope
+        from aion_chat.store import SQLiteChatStore
+        from atlasquant_aion_execution_outbox import ExecutionOutbox
+        with TemporaryDirectory(prefix="a259-prod-reject-") as tmp:
+            store = SQLiteChatStore(Path(tmp) / "outbox.db")
+            try:
+                with self.assertRaises(TypeError):
+                    ExecutionOutbox(
+                        store, Scope("owner-a258", "tenant-a258", "workspace-a258"),
+                        first_attempt_guard=lambda intent: True,
+                    )
+            finally:
+                store.close()
 
 
 if __name__ == "__main__":

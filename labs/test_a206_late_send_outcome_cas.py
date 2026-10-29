@@ -15,6 +15,7 @@ import unittest
 
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 from labs import test_a202_outbox_dispatch_atomic_cas as a202
 
 NOW=a202.NOW
@@ -69,7 +70,7 @@ class A206DelayedSendOutcomeDoesNotEraseConfirmedTests(unittest.TestCase):
             def worker():
                 local=SQLiteChatStore(path)
                 try:
-                    scoped=ExecutionOutbox(local, SCOPE, first_attempt_guard=lambda _intent: True)
+                    scoped=SyntheticFirstAttemptOutboxLab(local, SCOPE, first_attempt_guard=lambda _intent: True)
                     return scoped.dispatch_claimed(
                         key,worker_id=WORKER,
                         authorize=helper.authorize,

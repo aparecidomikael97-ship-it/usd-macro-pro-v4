@@ -104,23 +104,20 @@ def _mapping(value: Any) -> dict[str, Any]:
 class ExecutionOutbox:
     """Scoped outbox bound to the same SQLite database as staged chat state."""
 
-    def __init__(
-        self, store: SQLiteChatStore, scope: Scope, *,
-        first_attempt_guard: Callable[[Mapping[str, Any]], bool] | None = None,
-    ):
+    def __init__(self, store: SQLiteChatStore, scope: Scope):
+        # A259: the ordinary Outbox constructor has NO caller-injected
+        # reservation callback. Synthetic callbacks belong ONLY in the
+        # separate labs/ fixture subclass, never in this runtime interface.
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
-        if first_attempt_guard is not None and not callable(first_attempt_guard):
-            raise TypeError("callable first_attempt_guard required")
         store.require_healthy()
         _scope(scope)
         self.store = store
         self.scope = scope
         self.db = store.db
-        # A242: mandatory pre-send reservation gate; defaults to DENY. A
-        # caller-controlled True callback is only a synthetic LAB mechanism,
-        # never proof of an external witness or trustworthy owner.
-        self._first_attempt_guard = first_attempt_guard
+        # A259: production-facing Outbox cannot receive a local boolean
+        # 'reservation' callback. It remains permanently NO-SEND pending an
+        # independently authenticated first-attempt protocol.
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
@@ -193,14 +190,11 @@ class ExecutionOutbox:
         return _scope(self.scope)
 
     def _reserved_first_attempt(self, intent: Mapping[str, Any]) -> bool:
-        if self._first_attempt_guard is None:
-            return False
-        try:
-            # A return value other than literal True is not a reservation.
-            # The production trust boundary is not implemented here.
-            return self._first_attempt_guard(dict(intent)) is True
-        except Exception:
-            return False
+        # A259: NEVER equate a caller-controlled bool with independent
+        # testimony. This ordinary Outbox has no connected trusted witness.
+        # A lab-only subclass in labs/ reproduces the legacy callback for
+        # strictly synthetic offline tests; it is NOT a production authority.
+        return False
 
     def _decision_row(self, decision_id: str):
         return self.db.execute(

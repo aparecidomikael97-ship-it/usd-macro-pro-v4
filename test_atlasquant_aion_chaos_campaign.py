@@ -20,6 +20,7 @@ from atlasquant_aion_durable_task_repository import (
 )
 from atlasquant_aion_durable_tasks import new_durable_task, pause_durable_task
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 from atlasquant_aion_execution_saga import ExecutionSagaCoordinator
 from atlasquant_aion_memory import checkpoint_integrity_report, default_checkpoint
 from atlasquant_aion_resilience import circuit_breaker, safe_mode_posture, watchdog
@@ -114,7 +115,7 @@ class AionChaosCampaignTests(unittest.TestCase):
 
     def _outbox(self, root):
         store = SQLiteChatStore(Path(root) / "chat.sqlite3")
-        return store, ExecutionOutbox(store, self.scope, first_attempt_guard=lambda _intent: True)
+        return store, SyntheticFirstAttemptOutboxLab(store, self.scope, first_attempt_guard=lambda _intent: True)
 
     def _enqueue(self, outbox, ref):
         return outbox.enqueue(
@@ -237,7 +238,7 @@ class AionChaosCampaignTests(unittest.TestCase):
     def test_unverified_positive_blocks_saga_and_compensation(self):
         with tempfile.TemporaryDirectory() as raw:
             store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
-            outbox = ExecutionOutbox(store, self.scope, first_attempt_guard=lambda _intent: True)
+            outbox = SyntheticFirstAttemptOutboxLab(store, self.scope, first_attempt_guard=lambda _intent: True)
             budget = CumulativeAuthorityBudget(
                 store,
                 self.scope,
