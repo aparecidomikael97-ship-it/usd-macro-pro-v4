@@ -184,12 +184,19 @@ def _local_commit_gate(method):
             try:
                 with _cross_process_message_lifecycle_lock(path):
                     return method(*args, **kwargs)
-            except (OSError, MessageLifecycleLockIdentityError) as exc:
+            except MessageLifecycleLockIdentityError as exc:
                 if method.__name__ == "append_message":
                     args[0]._health_state = FAILED
-                    args[0]._health_reason = "LIFECYCLE_LOCK_IDENTITY_OR_ACCESS_UNCERTAIN_ZERO_AUTO_RETRY"
+                    args[0]._health_reason = "LIFECYCLE_LOCK_IDENTITY_UNCERTAIN_ZERO_AUTO_RETRY"
                 raise StorageUnavailableError(
-                    "staging SQLite message lifecycle lock uncertain; no automatic retry"
+                    "staging SQLite message lifecycle lock identity uncertain; no automatic retry"
+                ) from exc
+            except OSError as exc:
+                if method.__name__ == "append_message":
+                    args[0]._health_state = FAILED
+                    args[0]._health_reason = "LIFECYCLE_LOCK_UNAVAILABLE_ZERO_AUTO_RETRY"
+                raise StorageUnavailableError(
+                    "staging SQLite message lifecycle lock unavailable"
                 ) from exc
     return locked
 
