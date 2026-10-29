@@ -195,7 +195,9 @@ class A264AdminBlueprintContractTests(unittest.TestCase):
     def test_15_unrecognized_schema_and_invalid_input_fail_closed(self):
         for bad in (None, [], "active", {}, {"name": PROPOSAL["name"]}):
             with self.subTest(type=type(bad).__name__):
-                result = _analyze(bad)
+                result = review_blueprint(
+                    bad, codeowners_text=OWNERS, quality_text=QUALITY,
+                )
                 self.assertFalse(result["proposal_structure_valid"])
                 self.assert_no_authority(result)
 
