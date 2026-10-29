@@ -121,17 +121,27 @@ class A267HostCallbackIsolationTests(unittest.TestCase):
                     tmp.cleanup()
 
     def test_05_expired_authority_blocked_without_callback(self):
-        tmp, store, outbox, key = _claimed()
+        tmp = TemporaryDirectory(prefix="a267-expiry-")
+        store = SQLiteChatStore(Path(tmp.name) / "outbox.db")
         try:
+            outbox = ExecutionOutbox(store, SCOPE)
+            item = outbox.enqueue(
+                intent_ref="a267-expiry", action="lab-only",
+                payload={"mock": True}, aggregate_key="expiry",
+                policy_version="lab", authorization_ref="lab-auth",
+                created_at=NOW, valid_until=NOW + timedelta(seconds=40),
+            )
+            outbox.claim_next("expiry-worker", now=NOW, lease_seconds=90)
             spy = SpyCallback()
             result = outbox.dispatch_claimed(
-                key, worker_id="a259-worker", authorize=spy,
-                adapter=object(), now=NOW + timedelta(minutes=5),
+                item["idempotency_key"], worker_id="expiry-worker",
+                authorize=spy, adapter=object(),
+                now=NOW + timedelta(seconds=41),
             )
-            # Lease expires at 90s, so use a separate longer lease in the
-            # expiry test below; this case only demonstrates lease veto.
             self.assertEqual(result["state"], "BLOCKED_REAPPROVAL")
+            self.assertEqual(result["last_error"], "AUTHORITY_EXPIRED")
             self.assertEqual(spy.calls, 0)
+            self.assertEqual(outbox.effect_count(), 0)
         finally:
             store.close()
             tmp.cleanup()
