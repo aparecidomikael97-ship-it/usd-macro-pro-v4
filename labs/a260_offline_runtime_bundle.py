@@ -134,7 +134,7 @@ def verify_offline_candidate(raw: bytes | Path) -> dict:
             for entry in entries:
                 name = entry.filename
                 _path_ok(name)
-                mode = (entry.external_attr >> 16) & stat.S_IFMT(0o777777)
+                mode = (entry.external_attr >> 16) & 0o170000  # POSIX S_IFMT mask, portable on Windows
                 if entry.is_dir() or entry.flag_bits & 1 or (
                     entry.create_system == 3 and mode != stat.S_IFREG
                 ):
