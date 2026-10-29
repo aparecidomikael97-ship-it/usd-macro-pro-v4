@@ -47,7 +47,7 @@ def _authorize(decision):
 def _fixture(root, claimed=False):
     path = Path(root) / "live.db"
     store = SQLiteChatStore(path)
-    outbox = ExecutionOutbox(store, SCOPE)
+    outbox = ExecutionOutbox(store, SCOPE, first_attempt_guard=lambda _intent: True)
     item = outbox.enqueue(
         intent_ref="synthetic-intent", action="synthetic-only", payload={"offline": True},
         aggregate_key="target-a", policy_version="policy-a241",
@@ -146,7 +146,7 @@ class A241OutboxStoreBindingTests(unittest.TestCase):
                 store.close()
             reopened = SQLiteChatStore(path)
             try:
-                fresh = ExecutionOutbox(reopened, SCOPE)
+                fresh = ExecutionOutbox(reopened, SCOPE, first_attempt_guard=lambda _intent: True)
                 self.assertEqual(fresh.get(key)["state"], "UNCERTAIN")
                 self.assertIsNone(fresh.claim_next("other-worker", now=NOW + timedelta(minutes=10)))
             finally:
