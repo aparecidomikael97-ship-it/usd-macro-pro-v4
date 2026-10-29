@@ -29,6 +29,23 @@ class RestorePublicationUncertainError(StorageUnavailableError):
     """Restore target may have been published: NEVER retry without inspection."""
 
 
+def _sync_staging_restore_directory(directory: Path) -> bool:
+    """Request a parent-directory fsync on POSIX, or report unsupported.
+
+    False means unsupported on this host; True means the OS call returned.
+    Neither value certifies physical power-loss durability or trust in the
+    filesystem, disk controller or administrator.
+    """
+    if os.name != "posix" or not hasattr(os, "O_DIRECTORY"):
+        return False
+    fd = os.open(str(directory), os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    return True
+
+
 class AionChatStore(Protocol):
     def create_conversation(self, scope: Scope, title="Nova conversa", metadata=None) -> Conversation: ...
     def get_conversation(self, scope: Scope, conversation_id: str) -> Conversation: ...
@@ -329,11 +346,18 @@ class SQLiteChatStore:
                 guard.write(b"AION_STAGING_RESTORE_PENDING_V0\nNO_AUTO_RETRY\n")
                 guard.flush()
                 os.fsync(guard.fileno())
+            # A file fsync alone does not flush the marker's directory entry.
+            # On POSIX, request metadata flush before creating target. On
+            # unsupported OSes do NOT claim power-loss durability.
+            dirsync_supported = _sync_staging_restore_directory(target.parent)
             os.link(temp, target)
             # Publication may already be visible to other SQLite clients.
             # Any failure AFTER this point is an uncertain outcome, not
             # "nothing happened". Do not delete the published target or retry.
             try:
+                # POSIX flush of the newly linked target name; failure after
+                # link means the outcome is uncertain and the marker is kept.
+                _sync_staging_restore_directory(target.parent)
                 if any(os.path.lexists(str(target) + suffix)
                        for suffix in ("-wal", "-shm", "-journal")):
                     raise RestorePublicationUncertainError(
@@ -354,6 +378,9 @@ class SQLiteChatStore:
                 # Only a fully checked, successful local publication may
                 # clear its own marker; any cleanup exception leaves a veto.
                 marker.unlink()
+                # Persist the unlink request on POSIX where supported.
+                # Failure is STILL uncertain: target may already be visible.
+                _sync_staging_restore_directory(target.parent)
             except OSError as exc:
                 raise RestorePublicationUncertainError(
                     "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_POST_LINK_IO_ZERO_AUTO_RETRY"
@@ -365,6 +392,8 @@ class SQLiteChatStore:
                 "source_sha256": source_report["sha256"],
                 "restored_sha256": restored_report["sha256"],
                 "size_bytes": restored_report["size_bytes"],
+                "directory_sync_requested": dirsync_supported,
+                "power_loss_durability_verified": False,
             }
         except (sqlite3.DatabaseError, OSError, StorageUnavailableError) as exc:
             for db in (target_db, source_db):
