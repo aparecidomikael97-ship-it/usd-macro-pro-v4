@@ -201,9 +201,8 @@ finally:
             finally:
                 reopened.close()
 
-    @unittest.expectedFailure
-    def test_08_red_archive_writer_still_outside_shared_commit_fence(self):
-        """Other SQLite writers still require the same protection in future."""
+    def test_08_archive_writer_now_uses_shared_commit_fence(self):
+        """A251 fences archiving; host-independent P0 proof still absent."""
         with TemporaryDirectory(prefix="a250-red-") as raw:
             path = Path(raw) / "chat.db"
             store = SQLiteChatStore(path)
@@ -211,10 +210,12 @@ finally:
                 conv = store.create_conversation(SCOPE, "archive needs fencing")
                 with mock.patch.object(
                     store, "_publish_message_commit_marker",
+                    wraps=store._publish_message_commit_marker,
                 ) as publish:
-                    store.archive_conversation(SCOPE, conv.id)
-                # Desired: every mutating operation must prepare the crash veto.
-                publish.assert_called()
+                    archived = store.archive_conversation(SCOPE, conv.id)
+                publish.assert_called_once()
+                self.assertTrue(archived.archived)
+                self.assertTrue(store.get_conversation(SCOPE, conv.id).archived)
             finally:
                 store.close()
 
