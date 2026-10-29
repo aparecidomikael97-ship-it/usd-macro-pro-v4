@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
-from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 from labs.a243_signed_first_attempt import (
     DOMAIN, SCHEMA, PinnedFirstAttemptWitnessLab, canonical_bytes,
 )
@@ -101,7 +101,7 @@ def _guard(server, public=None, **options):
 def _attempt(guard, *, intent_ref="request-a", payload=None):
     with TemporaryDirectory(prefix="a243-") as raw:
         store = SQLiteChatStore(Path(raw) / "outbox.db")
-        outbox = ExecutionOutbox(store, SCOPE, first_attempt_guard=guard)
+        outbox = SyntheticFirstAttemptOutboxLab(store, SCOPE, first_attempt_guard=guard)
         adapter = Adapter()
         try:
             item = outbox.enqueue(
