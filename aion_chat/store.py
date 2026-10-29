@@ -43,6 +43,10 @@ class StoreCommitOutcomeUncertainError(StorageUnavailableError):
     """Chat message COMMIT may have persisted; block this store, never retry blind."""
 
 
+class MessageLifecycleLockIdentityError(StorageUnavailableError):
+    """Advisory lock pathname no longer matches its acquired kernel handle."""
+
+
 def _sync_staging_restore_directory(directory: Path) -> bool:
     """Request a parent-directory fsync on POSIX, or report unsupported.
 
@@ -113,6 +117,28 @@ def _cross_process_message_lifecycle_lock(db_path, *, wait_seconds=5.0):
             import fcntl
             lock_retry = lambda: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             unlock = lambda: fcntl.flock(fd, fcntl.LOCK_UN)
+        def require_matching_lock_path():
+            # A249: pathname and acquired OS handle must visibly agree.
+            # This is a local tamper *detection*, not proof against host ABA,
+            # in-place rollback, or a malicious uncooperative process.
+            try:
+                handle = os.fstat(fd)
+                named = lock_path.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise MessageLifecycleLockIdentityError(
+                    "SQLite lifecycle lock pathname missing or unreadable"
+                ) from exc
+            if (
+                not stat.S_ISREG(named.st_mode)
+                or not stat.S_ISREG(handle.st_mode)
+                or int(handle.st_ino) <= 0
+                or int(named.st_ino) <= 0
+                or (handle.st_dev, handle.st_ino) != (named.st_dev, named.st_ino)
+            ):
+                raise MessageLifecycleLockIdentityError(
+                    "SQLite lifecycle lock filename no longer binds acquired handle"
+                )
+
         deadline = time.monotonic() + wait_seconds
         while True:
             try:
@@ -126,7 +152,16 @@ def _cross_process_message_lifecycle_lock(db_path, *, wait_seconds=5.0):
                 if time.monotonic() >= deadline:
                     raise TimeoutError("SQLite lifecycle lock busy: deny access") from exc
                 time.sleep(0.02)
-        yield
+        # A249: a pathname swap immediately after lock acquisition must
+        # veto access BEFORE the SQLite operation.
+        require_matching_lock_path()
+        try:
+            yield
+        finally:
+            # Also detect a visible detachment while the operation ran.
+            # The operation may have COMMITTED: report uncertainty, never
+            # silently authorize a retry just because the lock is released.
+            require_matching_lock_path()
     finally:
         try:
             if acquired:
@@ -149,12 +184,12 @@ def _local_commit_gate(method):
             try:
                 with _cross_process_message_lifecycle_lock(path):
                     return method(*args, **kwargs)
-            except OSError as exc:
+            except (OSError, MessageLifecycleLockIdentityError) as exc:
                 if method.__name__ == "append_message":
                     args[0]._health_state = FAILED
-                    args[0]._health_reason = "LIFECYCLE_LOCK_UNAVAILABLE_ZERO_AUTO_RETRY"
+                    args[0]._health_reason = "LIFECYCLE_LOCK_IDENTITY_OR_ACCESS_UNCERTAIN_ZERO_AUTO_RETRY"
                 raise StorageUnavailableError(
-                    "staging SQLite message lifecycle lock unavailable"
+                    "staging SQLite message lifecycle lock uncertain; no automatic retry"
                 ) from exc
     return locked
 
