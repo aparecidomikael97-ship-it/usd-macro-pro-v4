@@ -171,7 +171,11 @@ class A266AdapterGetterIsolationTests(unittest.TestCase):
             tmp.cleanup()
 
     def test_09_source_resolves_send_only_after_reservation_cas(self):
-        code = inspect.getsource(ExecutionOutbox.dispatch_claimed)
+        # A267 moved the full callback-enabled dispatch into the explicit
+        # LAB-only subclass. Ordinary Outbox has no adapter access at all.
+        ordinary = inspect.getsource(ExecutionOutbox.dispatch_claimed)
+        self.assertNotIn('getattr(adapter, "send", None)', ordinary)
+        code = inspect.getsource(SyntheticFirstAttemptOutboxLab.dispatch_claimed)
         self.assertEqual(code.count('getattr(adapter, "send", None)'), 1)
         self.assertLess(
             code.index("reservation_ok = self._reserved_first_attempt(intent)"),
