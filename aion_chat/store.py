@@ -1,6 +1,8 @@
 """Local SQLite staging with scoped identity and explicit resilience controls."""
 import base64
+from contextlib import contextmanager
 from dataclasses import asdict
+import errno
 import hashlib
 import json
 import os
@@ -82,11 +84,78 @@ class AionChatStore(Protocol):
 _STAGING_LOCAL_CONNECT_WRITE_GATE = threading.RLock()
 
 
+@contextmanager
+def _cross_process_message_lifecycle_lock(db_path, *, wait_seconds=5.0):
+    """A248 LAB: coordinate SQLite startup/append across cooperative processes.
+
+    Kernel advisory lock on a companion file, automatically released on
+    process exit. The A247 pending marker remains the crash/restart veto.
+    This does NOT bind the SQLite VFS/FD or resist unlink/rollback by the host.
+    """
+    lock_path = Path(str(db_path) + ".aion-message-lifecycle.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(str(lock_path), flags, 0o600)
+    acquired = False
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OSError("message lifecycle lock is not a regular file")
+        if os.name == "nt":
+            import msvcrt
+            # msvcrt.locking reserves one byte from the current seek offset.
+            if metadata.st_size == 0:
+                os.write(fd, b"0")
+            lock_retry = lambda: msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            unlock = lambda: msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            lock_retry = lambda: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            unlock = lambda: fcntl.flock(fd, fcntl.LOCK_UN)
+        deadline = time.monotonic() + wait_seconds
+        while True:
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                lock_retry()
+                acquired = True
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EBUSY, errno.EDEADLK):
+                    raise
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("SQLite lifecycle lock busy: deny access") from exc
+                time.sleep(0.02)
+        yield
+    finally:
+        try:
+            if acquired:
+                os.lseek(fd, 0, os.SEEK_SET)
+                unlock()
+        finally:
+            os.close(fd)
+
+
 def _local_commit_gate(method):
     @wraps(method)
     def locked(*args, **kwargs):
+        # The RLock handles threads; file lock handles *cooperating processes*.
+        # Both are held around the complete start or message-COMMIT lifecycle.
+        if method.__name__ == "__init__":
+            path = args[1] if len(args) > 1 else kwargs.get("path")
+        else:
+            path = args[0].path
         with _STAGING_LOCAL_CONNECT_WRITE_GATE:
-            return method(*args, **kwargs)
+            try:
+                with _cross_process_message_lifecycle_lock(path):
+                    return method(*args, **kwargs)
+            except OSError as exc:
+                if method.__name__ == "append_message":
+                    args[0]._health_state = FAILED
+                    args[0]._health_reason = "LIFECYCLE_LOCK_UNAVAILABLE_ZERO_AUTO_RETRY"
+                raise StorageUnavailableError(
+                    "staging SQLite message lifecycle lock unavailable"
+                ) from exc
     return locked
 
 
