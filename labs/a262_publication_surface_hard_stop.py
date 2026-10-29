@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from collections.abc import Mapping
 
@@ -84,10 +85,14 @@ def _guard_step(step) -> bool:
 
 def _actions_deploy_review(data: bytes) -> dict:
     try:
-        workflow = _strict_yaml(data)
+        # PyYAML 1.1 treats the GitHub Actions key `on:` as boolean True.
+        # Only normalize the unindented `on:` mapping key, never the YAML
+        # value text or nested keys. Duplicate-key checks remain enabled.
+        raw = data.decode("utf-8")
+        raw = re.sub(r"(?m)^on:(?=\\s|$)", '"on":', raw)
+        workflow = _strict_yaml(raw.encode("utf-8"))
         jobs = workflow.get("jobs")
-        # YAML 1.1 SafeLoader parses 'on' as True: prefer either form.
-        trigger = workflow.get("on", workflow.get(True))
+        trigger = workflow.get("on")
         if type(jobs) is not dict or type(trigger) is not dict:
             raise ValueError("workflow triggers/jobs invalid")
         manual = "workflow_dispatch" in trigger
