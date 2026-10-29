@@ -165,19 +165,21 @@ def merge_mtf_readonly(
                 if tf not in periods:
                     continue
                 status, close = classify_tf(periods[tf], tf, now=now)
-                if status.startswith("INPUT_FRESH_CLOSED_M15_"):
-                    # If an already-current resident M15 has an independent
-                    # close value, conflicting values deny current status.
+                if status == "INPUT_FRESH_CLOSED_M15_UNATTESTED":
+                    # A supplemental claim alone never promotes the legacy
+                    # verified-resident 28/28 counter. If a validated resident
+                    # M15 already exists, it must agree on last close.
                     old = resident.get(pair, {})
-                    if (row["market_evidence"] == "FRESH_CLOSED_M15"
-                            and type(old.get("series")) in (list, tuple)
-                            and old["series"]
-                            and _number(old["series"][-1])
-                            and not math.isclose(
-                                close, old["series"][-1],
-                                rel_tol=1e-9, abs_tol=1e-9
-                            )):
-                        status = CONFLICT
+                    if row["market_evidence"] == "FRESH_CLOSED_M15":
+                        if (type(old.get("series")) not in (list, tuple)
+                                or not old["series"] or not _number(old["series"][-1])
+                                or not math.isclose(
+                                    close, old["series"][-1],
+                                    rel_tol=1e-9, abs_tol=1e-9
+                                )):
+                            status = CONFLICT
+                        else:
+                            status = "FRESH_CLOSED_M15"
                 row["timeframes"][tf] = status
                 if tf == "M15":
                     row["market_evidence"] = status
@@ -185,14 +187,21 @@ def merge_mtf_readonly(
             if status == "FRESH_CLOSED_M15" or status == (
                     "INPUT_FRESH_CLOSED_" + tf + "_UNATTESTED"):
                 counts[tf] += 1
-    board["fresh_m15_pairs"] = counts["M15"]
+    # Never turn 28 unverified caller-supplied M15 records into a verified
+    # 28/28 resident claim. Count those only in 'mtf_coverage' with caveat.
+    verified_m15 = sum(
+        row["timeframes"]["M15"] == "FRESH_CLOSED_M15"
+        for row in board["rows"]
+    )
+    board["fresh_m15_pairs"] = verified_m15
     board["historical_m15_pairs"] = sum(
         row["timeframes"]["M15"] == STALE for row in board["rows"]
     )
     board["all_28_fresh_closed_m15"] = (
-        counts["M15"] == 28 and not board["duplicate_pairs"] and not dupes
+        verified_m15 == 28 and not board["duplicate_pairs"] and not dupes
     )
     board["mtf_coverage"] = counts
+    board["mtf_coverage_is_external_attestation"] = False
     board["mtf_input_duplicate_pairs"] = dupes
     board["mtf_input_unknown_pairs"] = unknown
     board["mtf_input_root_valid"] = not invalid_root
