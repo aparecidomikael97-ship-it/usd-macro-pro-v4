@@ -34,6 +34,10 @@ class RestorePublicationUncertainError(StorageUnavailableError):
     """Restore target may have been published: NEVER retry without inspection."""
 
 
+class StoreCommitOutcomeUncertainError(StorageUnavailableError):
+    """Chat message COMMIT may have persisted; block this store, never retry blind."""
+
+
 def _sync_staging_restore_directory(directory: Path) -> bool:
     """Request a parent-directory fsync on POSIX, or report unsupported.
 
@@ -670,13 +674,27 @@ class SQLiteChatStore:
             )
             c.message_count, c.updated_at = message.sequence, now()
             self._update(c)
-            self.db.commit()
+            # A246 LAB: once COMMIT is attempted, any missing acknowledgment
+            # may conceal a durable write. A best-effort rollback cannot
+            # prove that the COMMIT did not happen.
+            try:
+                self.db.commit()
+            except Exception as exc:
+                self._health_state = FAILED
+                self._health_reason = "COMMIT_OUTCOME_UNKNOWN_ZERO_AUTO_RETRY"
+                raise StoreCommitOutcomeUncertainError(
+                    "chat COMMIT outcome unknown; this store cannot be reused"
+                ) from exc
         except Exception as exc:
             try:
                 self.db.rollback()
             except Exception:
                 pass
-            if isinstance(exc, sqlite3.DatabaseError) and not isinstance(exc, sqlite3.IntegrityError):
+            if (
+                not isinstance(exc, StoreCommitOutcomeUncertainError)
+                and isinstance(exc, sqlite3.DatabaseError)
+                and not isinstance(exc, sqlite3.IntegrityError)
+            ):
                 self._record_database_error(exc)
             raise
         return message
