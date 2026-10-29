@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import stat
 from typing import Protocol
 from uuid import uuid4
 
@@ -110,9 +111,16 @@ class SQLiteChatStore:
         self._health_state = HEALTHY
         self._health_reason = "OK"
         self.db = None
+        self._pathname_identity = None
         try:
             self.db = sqlite3.connect(str(self.path), timeout=BUSY_TIMEOUT_MS / 1000)
             self.db.row_factory = sqlite3.Row
+            # Staging pathname comparison only; Python sqlite3 does NOT expose
+            # an authenticated native VFS/FD identity of the opened handle.
+            opened_name = self.path.stat(follow_symlinks=False)
+            if not stat.S_ISREG(opened_name.st_mode) or int(opened_name.st_ino) <= 0:
+                raise StorageUnavailableError("staging SQLite pathname identity unavailable")
+            self._pathname_identity = (opened_name.st_dev, opened_name.st_ino)
             self.db.executescript(f"""
             PRAGMA foreign_keys=ON;
             PRAGMA journal_mode=WAL;
@@ -152,11 +160,32 @@ class SQLiteChatStore:
             self.db.close()
             self.db = None
 
+    def _pathname_binding_reason(self):
+        """Detect visible pathname replacement; NOT proof of the SQLite FD."""
+        if self._pathname_identity is None:
+            return "PATH_IDENTITY_NOT_CAPTURED"
+        try:
+            current = self.path.stat(follow_symlinks=False)
+        except OSError:
+            return "PATH_MISSING_OR_UNREADABLE"
+        if not stat.S_ISREG(current.st_mode):
+            return "PATH_NOT_REGULAR"
+        if int(current.st_ino) <= 0:
+            return "PATH_IDENTITY_UNAVAILABLE"
+        if (current.st_dev, current.st_ino) != self._pathname_identity:
+            return "PATH_IDENTITY_CHANGED"
+        return "OK"
+
     def _require_open(self):
         if self.db is None:
             raise StorageUnavailableError("staging store is closed")
         if self._health_state == FAILED:
             raise StorageUnavailableError("staging store health is failed")
+        reason = self._pathname_binding_reason()
+        if reason != "OK":
+            self._health_state = FAILED
+            self._health_reason = reason
+            raise StorageUnavailableError("staging store pathname binding lost: " + reason)
 
     def storage_health(self, *, deep=False):
         if self.db is None:
@@ -167,6 +196,31 @@ class SQLiteChatStore:
                 "journal_mode": "",
                 "busy_timeout_ms": 0,
                 "quick_check": "",
+                "foreign_key_violations": None,
+            }
+        # A failed identity/health gate cannot be cleared by a later
+        # "healthy" check on the same connection: reopen is required.
+        if self._health_state == FAILED:
+            return {
+                "state": FAILED,
+                "reason": self._health_reason,
+                "path": str(self.path),
+                "journal_mode": "",
+                "busy_timeout_ms": 0,
+                "quick_check": "not_run",
+                "foreign_key_violations": None,
+            }
+        reason = self._pathname_binding_reason()
+        if reason != "OK":
+            self._health_state = FAILED
+            self._health_reason = reason
+            return {
+                "state": FAILED,
+                "reason": reason,
+                "path": str(self.path),
+                "journal_mode": "",
+                "busy_timeout_ms": 0,
+                "quick_check": "not_run",
                 "foreign_key_violations": None,
             }
         try:
