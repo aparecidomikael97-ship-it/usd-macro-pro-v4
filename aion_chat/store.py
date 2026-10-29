@@ -25,6 +25,10 @@ class StorageUnavailableError(RuntimeError):
     """Raised when a staging store cannot prove a safe local storage state."""
 
 
+class RestorePublicationUncertainError(StorageUnavailableError):
+    """Restore target may have been published: NEVER retry without inspection."""
+
+
 class AionChatStore(Protocol):
     def create_conversation(self, scope: Scope, title="Nova conversa", metadata=None) -> Conversation: ...
     def get_conversation(self, scope: Scope, conversation_id: str) -> Conversation: ...
@@ -267,11 +271,28 @@ class SQLiteChatStore:
 
     @classmethod
     def restore_from_backup(cls, backup_path, target_path):
-        """Restore a verified backup atomically; never replace target on invalid input."""
+        """Publish a verified staging backup only to an unused path; never overwrite.
+
+        Neither a pathname precheck nor this API proves that a compromised host
+        has no detached SQLite handles or controls no other copies. This only
+        closes the known destructive replacement path, not P0-5/6 overall.
+        """
         source = Path(backup_path)
         target = Path(target_path)
         if source.resolve() == target.resolve():
             raise ValueError("restore target must differ from backup")
+        # A local .aion-restore-pending marker is a *veto*, not authenticated
+        # evidence of successful restore. Never automatically clear/retry it.
+        marker = Path(str(target) + ".aion-restore-pending")
+        # A live WAL/-shm/-journal is a veto, even when main .db is absent.
+        # os.path.lexists also detects dangling symlinks and directories.
+        # This preflight is NOT a lock: os.link below provides the final
+        # atomic publish-if-absent check against another creator of target.
+        if any(os.path.lexists(str(target) + suffix)
+               for suffix in ("", "-wal", "-shm", "-journal", ".aion-restore-pending")):
+            raise StorageUnavailableError(
+                "restore denied: destination or SQLite sidecars already exist"
+            )
         source_report = _validate_database_file(source)
         target.parent.mkdir(parents=True, exist_ok=True)
         temp = target.with_name(target.name + ".restore-" + uuid4().hex)
@@ -287,7 +308,56 @@ class SQLiteChatStore:
             source_db.close()
             source_db = None
             restored_report = _validate_database_file(temp)
-            os.replace(temp, target)
+            # Never use os.replace here: Linux permits a live connection
+            # to keep reading an unlinked OLD database while new openers see
+            # the NEW file at the same pathname. Windows may reject the swap.
+            # Hardlinking a temp file in the same directory publishes ONLY
+            # when the destination does not already exist (no TOCTOU replace).
+            # This may be unsupported by a filesystem: fail closed instead.
+            if any(os.path.lexists(str(target) + suffix)
+                   for suffix in ("", "-wal", "-shm", "-journal", ".aion-restore-pending")):
+                raise StorageUnavailableError(
+                    "restore denied: destination or SQLite sidecars appeared"
+                )
+            # Create an exclusive local crash fence BEFORE the irreversible
+            # pathname publication. If the process exits abruptly at/after
+            # this point, a later call must not silently try again.
+            # File fsync helps process-crash observation; without an
+            # independently synced directory/witness this is NOT proof of
+            # power-loss durability or hostile-root tamper resistance.
+            with marker.open("xb") as guard:
+                guard.write(b"AION_STAGING_RESTORE_PENDING_V0\nNO_AUTO_RETRY\n")
+                guard.flush()
+                os.fsync(guard.fileno())
+            os.link(temp, target)
+            # Publication may already be visible to other SQLite clients.
+            # Any failure AFTER this point is an uncertain outcome, not
+            # "nothing happened". Do not delete the published target or retry.
+            try:
+                if any(os.path.lexists(str(target) + suffix)
+                       for suffix in ("-wal", "-shm", "-journal")):
+                    raise RestorePublicationUncertainError(
+                        "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_SIDECAR_RACE_ZERO_AUTO_RETRY"
+                    )
+                # A host may rename/swap the just-published target even if
+                # the directory preflight passed. This detects a visible
+                # replacement, not an authentic VFS handle or a complete lock.
+                before_cleanup = temp.stat()
+                after_link = target.stat(follow_symlinks=False)
+                if (before_cleanup.st_dev, before_cleanup.st_ino) != (
+                    after_link.st_dev, after_link.st_ino
+                ):
+                    raise RestorePublicationUncertainError(
+                        "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_TARGET_CHANGED_ZERO_AUTO_RETRY"
+                    )
+                temp.unlink()
+                # Only a fully checked, successful local publication may
+                # clear its own marker; any cleanup exception leaves a veto.
+                marker.unlink()
+            except OSError as exc:
+                raise RestorePublicationUncertainError(
+                    "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_POST_LINK_IO_ZERO_AUTO_RETRY"
+                ) from exc
             return {
                 "state": "RESTORE_VERIFIED",
                 "backup_path": str(source),
@@ -329,9 +399,12 @@ class SQLiteChatStore:
         return scope.owner_id, scope.tenant_id, scope.workspace_id
 
     def get_conversation(self, scope, conversation_id):
+        # Guard the connection before attribute lookup: a closed db handle is None.
+        # The check must precede `self.db.execute`, not occur in its arguments.
+        requested_scope = self._scope(scope)
         row = self.db.execute(
             "SELECT data FROM conversations WHERE id=? AND owner=? AND tenant=? AND workspace=?",
-            (conversation_id, *self._scope(scope)),
+            (conversation_id, *requested_scope),
         ).fetchone()
         if row is None:
             raise LookupError("conversation unavailable")
@@ -406,6 +479,7 @@ class SQLiteChatStore:
         return self.list_conversations(scope, query=query, **filters)
 
     def archive_conversation(self, scope, conversation_id):
+        self._require_open()
         with self.db:
             c = self.get_conversation(scope, conversation_id)
             c.archived, c.updated_at = True, now()
@@ -473,6 +547,7 @@ class SQLiteChatStore:
         )
 
     def add_attachment_metadata(self, scope, attachment):
+        self._require_open()
         from .attachments import validate_metadata
         validate_metadata(attachment)
         with self.db:
@@ -501,6 +576,7 @@ class SQLiteChatStore:
         return self._latest(scope, conversation_id, "checkpoint", ConversationCheckpoint)
 
     def save_checkpoint(self, scope, checkpoint):
+        self._require_open()
         with self.db:
             prior = self.get_latest_checkpoint(scope, checkpoint.conversation_id)
             if prior and checkpoint.through_sequence <= prior.through_sequence:
@@ -511,6 +587,7 @@ class SQLiteChatStore:
             self._update(c)
 
     def save_context_summary(self, scope, summary):
+        self._require_open()
         with self.db:
             for mid in summary.source_message_ids:
                 if self.get_message(scope, summary.conversation_id, mid).sequence > summary.through_sequence:
