@@ -5,6 +5,7 @@ on:
     paths:
       - atlasquant_aion_execution_outbox.py
       - labs/a259_synthetic_outbox_fixture.py
+      - test_atlasquant_aion_execution_outbox.py
       - labs/test_a202_outbox_dispatch_atomic_cas.py
       - labs/test_a203_outbox_stale_revocation_cas.py
       - labs/test_a206_late_send_outcome_cas.py
@@ -43,6 +44,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
         run: >-
           python -B -m unittest -v
+          test_atlasquant_aion_execution_outbox
           labs.test_a259_synthetic_callback_isolation
           labs.test_a258_external_proof_admission
           labs.test_a257_monotonic_origin_gate
