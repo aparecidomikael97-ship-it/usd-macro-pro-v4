@@ -10,6 +10,7 @@ import unittest
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 
 
 NOW = datetime(2026, 10, 29, 11, 0, tzinfo=timezone.utc)
@@ -40,7 +41,7 @@ def _auth(decision):
 def _fixture(root, guard=None):
     path = Path(root) / "outbox.db"
     store = SQLiteChatStore(path)
-    outbox = ExecutionOutbox(store, SCOPE, first_attempt_guard=guard)
+    outbox = SyntheticFirstAttemptOutboxLab(store, SCOPE, first_attempt_guard=guard)
     item = outbox.enqueue(
         intent_ref="synthetic-first-attempt", action="fake-effect",
         payload={"never_network": True}, aggregate_key="a242-aggregate",
