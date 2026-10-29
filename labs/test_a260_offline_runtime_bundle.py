@@ -126,8 +126,9 @@ class A260OfflineArtifactSeparationTests(unittest.TestCase):
         try:
             with zipfile.ZipFile(archive) as zf:
                 outbox = zf.read("atlasquant_aion_execution_outbox.py")
-            old = b"        return False\n\n    def _decision_row("
-            new = b"        return True\n\n    def _decision_row("
+            newline = b"\r\n" if b"\r\n" in outbox else b"\n"
+            old = b"        return False" + newline + newline + b"    def _decision_row("
+            new = b"        return True" + newline + newline + b"    def _decision_row("
             self.assertEqual(outbox.count(old), 1)
             modified = outbox.replace(old, new)
             with self.assertRaises(OfflineBundleRejected):
