@@ -11,6 +11,7 @@ import unittest
 
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 from labs import test_a202_outbox_dispatch_atomic_cas as a202
 
 SCOPE=a202.SCOPE
@@ -76,7 +77,7 @@ class A204StaleAbsenceVersusConfirmedTests(unittest.TestCase):
             def stale_worker():
                 local=SQLiteChatStore(path)
                 try:
-                    local_outbox=ExecutionOutbox(local,SCOPE)
+                    local_outbox=SyntheticFirstAttemptOutboxLab(local,SCOPE)
                     return local_outbox.reconcile(
                         key,adapter=LateAbsence(),
                         authorize=helper.authorize,now=NOW,

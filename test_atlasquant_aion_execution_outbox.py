@@ -470,7 +470,9 @@ class ExecutionOutboxTests(unittest.TestCase):
         self.assertNotIn("import subprocess", source)
         self.assertNotIn("os.system", source)
         self.assertIn('getattr(adapter, "send"', source)
-        self.assertIn('getattr(adapter, "reconcile"', source)
+        # A265: the ordinary Outbox must not execute injected
+        # adapter.reconcile callbacks. Legacy simulation is only in labs/.
+        self.assertNotIn('getattr(adapter, "reconcile"', source)
 
 
 if __name__ == "__main__":
