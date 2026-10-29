@@ -469,7 +469,11 @@ class ExecutionOutboxTests(unittest.TestCase):
         self.assertNotIn("import socket", source)
         self.assertNotIn("import subprocess", source)
         self.assertNotIn("os.system", source)
-        self.assertIn('getattr(adapter, "send"', source)
+        # A267: normal Outbox now contains zero host-supplied send,
+        # authorization or budget callbacks; synthetic code lives in labs/.
+        self.assertNotIn('getattr(adapter, "send"', source)
+        self.assertNotIn("cumulative_authority_guard(dict(decision))", source)
+        self.assertNotIn("result = _mapping(send(", source)
         # A265: the ordinary Outbox must not execute injected
         # adapter.reconcile callbacks. Legacy simulation is only in labs/.
         self.assertNotIn('getattr(adapter, "reconcile"', source)
