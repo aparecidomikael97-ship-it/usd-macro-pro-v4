@@ -143,7 +143,7 @@ def hydrate_trader_resident_state(session_state, snapshot, runtime_status=None):
     # Clear previously accepted evidence too: a failed refresh cannot retain it.
     session_state["atlasquant_reference_fx_population"] = {}
     session_state["atlasquant_validated_market_items"] = []
-    session_state["atlasquant_aion_trader_observation"] = {}
+    session_state.pop("atlasquant_aion_trader_observation", None)
     try:
         state = resident_trader_state(snapshot, runtime_status=runtime_status)
         session_state.update(state)
