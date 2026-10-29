@@ -69,7 +69,7 @@ class A206DelayedSendOutcomeDoesNotEraseConfirmedTests(unittest.TestCase):
             def worker():
                 local=SQLiteChatStore(path)
                 try:
-                    scoped=ExecutionOutbox(local,SCOPE)
+                    scoped=ExecutionOutbox(local, SCOPE, first_attempt_guard=lambda _intent: True)
                     return scoped.dispatch_claimed(
                         key,worker_id=WORKER,
                         authorize=helper.authorize,
