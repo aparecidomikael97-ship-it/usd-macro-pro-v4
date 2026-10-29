@@ -8,6 +8,8 @@ from pathlib import Path
 import sqlite3
 import stat
 import time
+import threading
+from functools import wraps
 from typing import Protocol
 from uuid import uuid4
 
@@ -74,6 +76,20 @@ class AionChatStore(Protocol):
     def retrieve_messages(self, scope: Scope, conversation_id: str, query: str, **options): ...
 
 
+# A247 LAB: serialize startup with message COMMIT+marker lifecycle only
+# within this Python process. Other processes and other write paths remain
+# uncoordinated; this is a concurrency guard, not external custodial proof.
+_STAGING_LOCAL_CONNECT_WRITE_GATE = threading.RLock()
+
+
+def _local_commit_gate(method):
+    @wraps(method)
+    def locked(*args, **kwargs):
+        with _STAGING_LOCAL_CONNECT_WRITE_GATE:
+            return method(*args, **kwargs)
+    return locked
+
+
 def dump(value):
     return json.dumps(redact(asdict(value)), ensure_ascii=False, separators=(",", ":"))
 
@@ -110,6 +126,7 @@ def _validate_database_file(path: Path) -> dict:
 
 
 class SQLiteChatStore:
+    @_local_commit_gate
     def __init__(self, path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -725,6 +742,7 @@ class SQLiteChatStore:
                 "message COMMIT succeeded but pending-fence cleanup uncertain"
             ) from exc
 
+    @_local_commit_gate
     def append_message(self, scope, message):
         if message.role not in {"user", "assistant", "system", "task"}:
             raise ValueError("invalid role")
