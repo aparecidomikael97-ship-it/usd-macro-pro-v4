@@ -18,6 +18,7 @@ import unittest
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 
 NOW=datetime(2026, 10, 27, 22, 0, tzinfo=timezone.utc)
 WORKER="same-worker-reentered"
@@ -44,7 +45,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
     def seed_claim(self, root):
         path=Path(root)/"a202.sqlite3"
         store=SQLiteChatStore(path)
-        outbox=ExecutionOutbox(store, SCOPE, first_attempt_guard=lambda _intent: True)
+        outbox=SyntheticFirstAttemptOutboxLab(store, SCOPE, first_attempt_guard=lambda _intent: True)
         pending=outbox.enqueue(
             intent_ref="one-original-intent",
             action="synthetic_local_effect",
@@ -94,7 +95,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
             def dispatch(_):
                 local_store=SQLiteChatStore(path)
                 try:
-                    local=ExecutionOutbox(local_store, SCOPE, first_attempt_guard=lambda _intent: True)
+                    local=SyntheticFirstAttemptOutboxLab(local_store, SCOPE, first_attempt_guard=lambda _intent: True)
                     with connection_ids_lock:
                         connection_ids.append(id(local_store.db))
                     self.assertEqual(local.get(key)["state"],"CLAIMED")
@@ -131,7 +132,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
             check=SQLiteChatStore(path)
             try:
                 self.assertEqual(
-                    ExecutionOutbox(check, SCOPE, first_attempt_guard=lambda _intent: True).get(key)["state"],"UNCERTAIN",
+                    SyntheticFirstAttemptOutboxLab(check, SCOPE, first_attempt_guard=lambda _intent: True).get(key)["state"],"UNCERTAIN",
                 )
             finally:
                 check.close()
