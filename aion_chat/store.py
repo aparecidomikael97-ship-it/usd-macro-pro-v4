@@ -472,7 +472,18 @@ class SQLiteChatStore:
             )
         return report
 
+    @_local_commit_gate
     def wal_checkpoint(self, mode="PASSIVE"):
+        """A253: serialize explicit checkpoint with cooperative chat commits.
+
+        Public entry owns the kernel lock; backup_to already owns that lock
+        and MUST call the private implementation to avoid nested file locks.
+        Neither path guards uncooperative raw SQLite clients or a hostile host.
+        """
+        return self._wal_checkpoint_under_lifecycle_lock(mode)
+
+    def _wal_checkpoint_under_lifecycle_lock(self, mode):
+        """Run checkpoint only while caller owns the lifecycle lock."""
         self._require_open()
         normalized = str(mode or "").upper()
         if normalized not in {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}:
@@ -515,7 +526,9 @@ class SQLiteChatStore:
             raise StorageUnavailableError(
                 "backup denied: destination or SQLite sidecars already exist"
             )
-        checkpoint = self.wal_checkpoint("FULL")
+        # Already inside @_local_commit_gate: nested kernel advisory locks
+        # are not guaranteed reentrant, especially across Windows/POSIX.
+        checkpoint = self._wal_checkpoint_under_lifecycle_lock("FULL")
         if checkpoint["busy"]:
             raise StorageUnavailableError("backup refused while WAL checkpoint is busy")
 
