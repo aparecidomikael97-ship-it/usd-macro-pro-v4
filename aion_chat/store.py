@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 import sqlite3
 import stat
+import time
+import threading
+from functools import wraps
 from typing import Protocol
 from uuid import uuid4
 
@@ -73,6 +76,20 @@ class AionChatStore(Protocol):
     def retrieve_messages(self, scope: Scope, conversation_id: str, query: str, **options): ...
 
 
+# A247 LAB: serialize startup with message COMMIT+marker lifecycle only
+# within this Python process. Other processes and other write paths remain
+# uncoordinated; this is a concurrency guard, not external custodial proof.
+_STAGING_LOCAL_CONNECT_WRITE_GATE = threading.RLock()
+
+
+def _local_commit_gate(method):
+    @wraps(method)
+    def locked(*args, **kwargs):
+        with _STAGING_LOCAL_CONNECT_WRITE_GATE:
+            return method(*args, **kwargs)
+    return locked
+
+
 def dump(value):
     return json.dumps(redact(asdict(value)), ensure_ascii=False, separators=(",", ":"))
 
@@ -109,14 +126,23 @@ def _validate_database_file(path: Path) -> dict:
 
 
 class SQLiteChatStore:
+    @_local_commit_gate
     def __init__(self, path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # A247 LAB: local crash/ACK-loss veto only; host-admin can tamper.
+        self._message_commit_marker = Path(str(self.path) + ".aion-message-commit-pending")
         self._health_state = HEALTHY
         self._health_reason = "OK"
         self.db = None
         self._pathname_identity = None
         try:
+            # A local marker is a veto, never a proof of successful COMMIT.
+            # No automatic marker deletion/recovery at startup.
+            if self._pending_message_commit_fence():
+                raise StorageUnavailableError(
+                    "staging message COMMIT outcome pending; manual review required"
+                )
             # A245 LAB: check the existing pathname both before and after
             # connect(). A rename during connect() must not silently pin the
             # *new* pathname while SQLite still holds the previous file.
@@ -203,11 +229,33 @@ class SQLiteChatStore:
             return "PATH_IDENTITY_CHANGED"
         return "OK"
 
+    def _pending_message_commit_fence(self) -> bool:
+        """Bounded grace for an in-flight *normal* COMMIT cleanup.
+
+        Avoid falsely treating another concurrent writer's brief marker as a
+        persistent failure. No DB access occurs while the marker is visible;
+        failure to clear within this bound remains a sticky veto. This is not
+        reconciliation of an uncertain external/local effect.
+        """
+        if not os.path.lexists(self._message_commit_marker):
+            return False
+        for _ in range(50):
+            time.sleep(0.01)
+            if not os.path.lexists(self._message_commit_marker):
+                return False
+        return True
+
     def _require_open(self):
         if self.db is None:
             raise StorageUnavailableError("staging store is closed")
         if self._health_state == FAILED:
             raise StorageUnavailableError("staging store health is failed")
+        if self._pending_message_commit_fence():
+            self._health_state = FAILED
+            self._health_reason = "MESSAGE_COMMIT_PENDING_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError(
+                "staging message COMMIT pending; refuse reuse"
+            )
         reason = self._pathname_binding_reason()
         if reason != "OK":
             self._health_state = FAILED
@@ -225,6 +273,12 @@ class SQLiteChatStore:
                 "quick_check": "",
                 "foreign_key_violations": None,
             }
+        # A marker can be created by another writer after this handle opened.
+        # Allow a bounded grace for a concurrent, successfully completed
+        # commit to remove its transient marker; persistent uncertainty vetoes.
+        if self._pending_message_commit_fence():
+            self._health_state = FAILED
+            self._health_reason = "MESSAGE_COMMIT_PENDING_ZERO_AUTO_RETRY"
         # A failed identity/health gate cannot be cleared by a later
         # "healthy" check on the same connection: reopen is required.
         if self._health_state == FAILED:
@@ -657,6 +711,38 @@ class SQLiteChatStore:
             self._update(c)
         return c
 
+    def _publish_message_commit_marker(self):
+        """Publish local pre-COMMIT veto; never treat as independent custody."""
+        try:
+            # Under the SQLite IMMEDIATE writer lock, mark the possibility of
+            # an attempted COMMIT BEFORE calling commit(). Never overwrite.
+            with self._message_commit_marker.open("xb") as marker:
+                marker.write(b"AION_STAGING_MESSAGE_COMMIT_PENDING_V0\nNO_AUTO_RETRY\n")
+                marker.flush()
+                os.fsync(marker.fileno())
+            # The directory sync is best-effort across platforms. Windows
+            # returns False; neither result certifies power-loss durability.
+            _sync_staging_restore_directory(self.path.parent)
+        except OSError as exc:
+            self._health_state = FAILED
+            self._health_reason = "COMMIT_MARKER_PREPARE_UNKNOWN_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError(
+                "cannot prepare message COMMIT fence; no COMMIT permitted"
+            ) from exc
+
+    def _clear_message_commit_marker(self):
+        """Clear only after a COMMIT acknowledgement; failed cleanup denies reuse."""
+        try:
+            self._message_commit_marker.unlink()
+            _sync_staging_restore_directory(self.path.parent)
+        except OSError as exc:
+            self._health_state = FAILED
+            self._health_reason = "COMMIT_MARKER_CLEAR_UNKNOWN_ZERO_AUTO_RETRY"
+            raise StoreCommitOutcomeUncertainError(
+                "message COMMIT succeeded but pending-fence cleanup uncertain"
+            ) from exc
+
+    @_local_commit_gate
     def append_message(self, scope, message):
         if message.role not in {"user", "assistant", "system", "task"}:
             raise ValueError("invalid role")
@@ -674,6 +760,10 @@ class SQLiteChatStore:
             )
             c.message_count, c.updated_at = message.sequence, now()
             self._update(c)
+            # A247: publish the veto before calling COMMIT, while holding
+            # BEGIN IMMEDIATE. A crash after a durable COMMIT but before ACK
+            # leaves a marker for the next opener to refuse automatically.
+            self._publish_message_commit_marker()
             # A246 LAB: once COMMIT is attempted, any missing acknowledgment
             # may conceal a durable write. A best-effort rollback cannot
             # prove that the COMMIT did not happen.
@@ -685,6 +775,7 @@ class SQLiteChatStore:
                 raise StoreCommitOutcomeUncertainError(
                     "chat COMMIT outcome unknown; this store cannot be reused"
                 ) from exc
+            self._clear_message_commit_marker()
         except Exception as exc:
             try:
                 self.db.rollback()
