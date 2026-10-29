@@ -21,7 +21,7 @@ Três cenários propositalmente demonstram que a assinatura sozinha não fecha P
 2. **Repinagem pelo próprio host:** quem troca a chave pública esperada pode aceitar a assinatura do atacante como se fosse raiz autêntica.
 3. **Identidade semântica insuficiente:** eventos legítimos com atributos iguais podem ser bloqueados como duplicados; alterar descritores pode escapar do pareamento. Falta ID de evento imutável de origem independente.
 
-Estes casos têm teste **GREEN como contraprova de segurança**: um teste verde que detecta uma vulnerabilidade não significa que ela tenha sido corrigida.
+A244 converte esses três casos em `@unittest.expectedFailure`: cada teste afirma a **propriedade de segurança desejada** e falha, como esperado, porque a implementação LAB ainda a viola. Os relatórios mostram `expected failures=3` (não três casos seguros), e uma correção futura não pode ser confundida silenciosamente com sucesso: `unexpected success` faz a bateria falhar e exige revisão consciente da marcação.
 
 ## Bateria e limites
 
