@@ -199,6 +199,7 @@ class A243SyntheticSignedFirstAttemptTests(unittest.TestCase):
         result, sends, _ = _attempt(_guard(server, high_water=1))
         self.assertEqual((result["state"], sends), ("UNCERTAIN", 0))
 
+    @unittest.expectedFailure
     def test_14_restored_witness_state_repermits_same_semantic_effect_red_property(self):
         server = SyntheticServer()
         first, sends1, _ = _attempt(_guard(server), intent_ref="request-a")
@@ -207,19 +208,24 @@ class A243SyntheticSignedFirstAttemptTests(unittest.TestCase):
         server.reserved.clear()
         server.seq = 0
         second, sends2, _ = _attempt(_guard(server, high_water=0), intent_ref="request-b")
-        self.assertEqual((second["state"], sends2), ("SENT", 1))
-        # Test intentionally GREEN because it proves P0-4 remains UNSOLVED.
+        # Desired security invariant: rollback must NOT allow a second send.
+        # Current code violates this; unittest reports an expected failure.
+        self.assertEqual((second["state"], sends2), ("UNCERTAIN", 0))
 
+    @unittest.expectedFailure
     def test_15_caller_repins_attacker_root_fake_proof_still_passes(self):
         attacker_server = SyntheticServer(signer=ATTACKER)
         result, sends, _ = _attempt(_guard(attacker_server, public=_public(ATTACKER)))
-        self.assertEqual((result["state"], sends), ("SENT", 1))
-        # A signature is not independent trust if host controls the pin.
+        # Desired security invariant: a host-pinned attacker key cannot authorize send.
+        # Current code violates this; external root provenance remains missing.
+        self.assertEqual((result["state"], sends), ("UNCERTAIN", 0))
 
+    @unittest.expectedFailure
     def test_16_same_semantic_payload_blocks_distinct_legitimate_event(self):
         server = SyntheticServer()
         first, sends1, _ = _attempt(_guard(server), intent_ref="legitimate-a")
         second, sends2, _ = _attempt(_guard(server), intent_ref="legitimate-b")
         self.assertEqual((first["state"], sends1), ("SENT", 1))
-        self.assertEqual((second["state"], sends2), ("UNCERTAIN", 0))
-        # Missing authoritative business-event ID can cause false positives.
+        # Desired semantic invariant: distinct authentic events should not collide.
+        # Current heuristic wrongly blocks event B; an authoritative event ID is absent.
+        self.assertEqual((second["state"], sends2), ("SENT", 1))
