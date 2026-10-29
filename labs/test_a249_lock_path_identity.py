@@ -120,7 +120,7 @@ class A249LockPathIdentityTests(unittest.TestCase):
             store._clear_message_commit_marker = cleanup_and_unlink_lock
             try:
                 with self.assertRaisesRegex(
-                    StorageUnavailableError, "lock uncertain",
+                    StorageUnavailableError, "lock identity uncertain",
                 ):
                     store.append_message(
                         SCOPE, Message(c.id, "user", "persisted", id="a249-real-commit")
