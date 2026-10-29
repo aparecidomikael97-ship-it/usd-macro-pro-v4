@@ -52,7 +52,7 @@ class A203StaleAuthorizationOutboxTests(unittest.TestCase):
                 def old_decision_attempt():
                     separate_store=SQLiteChatStore(path)
                     try:
-                        separate_outbox=ExecutionOutbox(separate_store,SCOPE)
+                        separate_outbox=ExecutionOutbox(separate_store, SCOPE, first_attempt_guard=lambda _intent: True)
                         return separate_outbox.dispatch_claimed(
                             key,
                             worker_id=WORKER,
