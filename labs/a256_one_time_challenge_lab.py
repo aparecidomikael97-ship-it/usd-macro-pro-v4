@@ -6,15 +6,20 @@ Every result explicitly denies permission to send.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import base64
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+import math
 import secrets
+import time
 from threading import Lock
 from typing import Mapping
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
 from labs.a254_synthetic_origin_event_identity import (
-    EVENT_ID, FIELDS as ORIGIN_FIELDS, MATCH_FIELDS,
-    SCHEMA as ORIGIN_SCHEMA, canonical_bytes,
+    DOMAIN as ORIGIN_DOMAIN, EVENT_ID, FIELDS as ORIGIN_FIELDS,
+    MATCH_FIELDS, SCHEMA as ORIGIN_SCHEMA, canonical_bytes,
 )
 from labs.a255_two_party_reservation_binding import SyntheticTwoPartyReservationLab
 
@@ -48,12 +53,23 @@ class SyntheticOneTimeChallengeLab:
     def __init__(
         self, *, origin_issuer, origin_key_id, origin_public_key,
         witness_issuer, witness_key_id, witness_public_key,
-        now, high_water=0, ttl_seconds=60,
+        now, high_water=0, ttl_seconds=60, monotonic_clock=None,
     ):
         if type(ttl_seconds) is not int or not 1 <= ttl_seconds <= 90:
             raise ValueError("challenge TTL must be 1..90 seconds")
         self._start = _clock(now)
         self._ttl = ttl_seconds
+        # A257: elapsed time must never default to the startup wall time.
+        # The monotonic clock is a HOST clock; tests inject a deterministic one.
+        self._ticks = time.monotonic if monotonic_clock is None else monotonic_clock
+        if not callable(self._ticks):
+            raise ValueError("monotonic clock callable required")
+        self._first_tick = None
+        self._last_tick = None
+        self._clock_failed = False
+        self._issuer = origin_issuer
+        self._key_id = origin_key_id
+        self._origin_key = Ed25519PublicKey.from_public_bytes(origin_public_key)
         self._link = SyntheticTwoPartyReservationLab(
             origin_issuer=origin_issuer, origin_key_id=origin_key_id,
             origin_public_key=origin_public_key,
@@ -100,6 +116,46 @@ class SyntheticOneTimeChallengeLab:
         })).hexdigest()
         return identity, origin_hash, decision_hash
 
+    def _tick_locked(self):
+        """Strictly increasing/nondecreasing clock observation under mutex."""
+        if self._clock_failed:
+            raise ValueError("local LAB clock already unsafe")
+        try:
+            value = self._ticks()
+            if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+                raise ValueError("invalid monotonic tick")
+            tick = float(value)
+            if self._last_tick is not None and tick < self._last_tick:
+                raise ValueError("monotonic clock went backward")
+        except Exception:
+            self._clock_failed = True
+            raise
+        if self._first_tick is None:
+            self._first_tick = tick
+        self._last_tick = tick
+        return tick
+
+    def _lab_time_at(self, tick):
+        # Host-injected anchor + monotonic elapsed: not external trusted time.
+        return self._start + timedelta(seconds=tick - self._first_tick)
+
+    def _verify_origin_before_issue(self, origin_envelope, observed):
+        """Verify cryptographic format BEFORE reserving/issuing a nonce."""
+        payload = origin_envelope["payload"]
+        if (payload["issuer"] != self._issuer or payload["key_id"] != self._key_id):
+            raise ValueError("host-pinned issuer/key ID mismatch")
+        signature = origin_envelope["signature"]
+        if type(signature) is not str or len(signature) > 128:
+            raise ValueError("bad origin signature encoding")
+        raw = base64.b64decode(signature, validate=True)
+        if len(raw) != 64:
+            raise ValueError("bad origin signature size")
+        self._origin_key.verify(raw, ORIGIN_DOMAIN + canonical_bytes(payload))
+        start = _clock(datetime.fromisoformat(payload["issued_at"].replace("Z", "+00:00")))
+        end = _clock(datetime.fromisoformat(payload["expires_at"].replace("Z", "+00:00")))
+        if not (start <= observed <= end) or end <= start or (end - start).total_seconds() > 300:
+            raise ValueError("origin event outside signed time window")
+
     def begin(self, decision, origin_envelope):
         """Issue random nonce for one candidate event; not a proof of identity."""
         try:
@@ -107,15 +163,26 @@ class SyntheticOneTimeChallengeLab:
         except Exception:
             return _deny("DENY_INVALID_EVENT_CANDIDATE")
         with self._lock:
+            try:
+                issued_tick = self._tick_locked()
+            except Exception:
+                return _deny("DENY_LOCAL_CLOCK_UNSAFE")
             if identity in self._events_seen:
                 return _deny("DENY_EVENT_ALREADY_SEEN_OR_PENDING")
+            try:
+                self._verify_origin_before_issue(
+                    origin_envelope, self._lab_time_at(issued_tick)
+                )
+            except Exception:
+                return _deny("DENY_UNVERIFIED_OR_EXPIRED_ORIGIN")
             challenge = secrets.token_hex(32)
             if challenge in self._issued:
                 return _deny("DENY_CHALLENGE_COLLISION")
             self._issued[challenge] = {
                 "identity": identity, "origin_hash": origin_hash,
-                "decision_hash": decision_hash, "issued_at": self._start,
-                "consumed": False,
+                "decision_hash": decision_hash,
+                "issued_at": self._lab_time_at(issued_tick),
+                "issued_tick": issued_tick, "consumed": False,
             }
             # This remains reserved even after a malformed response, a
             # timeout, or an abandoned request: no blind reissuance.
@@ -139,12 +206,30 @@ class SyntheticOneTimeChallengeLab:
             if record["consumed"]:
                 return _deny("DENY_CHALLENGE_ALREADY_CONSUMED")
             record["consumed"] = True
+            try:
+                observed_tick = self._tick_locked()
+            except Exception:
+                return _deny("DENY_LOCAL_CLOCK_UNSAFE")
+            effective_now = self._lab_time_at(observed_tick)
         try:
-            observed = self._start if observed_at is None else _clock(observed_at)
-            if observed < record["issued_at"] or (
-                observed - record["issued_at"]
-            ).total_seconds() > self._ttl:
+            # A caller-provided observed_at is *only* an extra denial check.
+            # It cannot replace or rewind the measured monotonic elapsed time.
+            if (observed_tick - record["issued_tick"] > self._ttl):
                 return _deny("DENY_EXPIRED_CHALLENGE")
+            if observed_at is not None:
+                reported = _clock(observed_at)
+                if reported < record["issued_at"] or (
+                    reported - record["issued_at"]
+                ).total_seconds() > self._ttl:
+                    return _deny("DENY_EXPIRED_CHALLENGE")
+            # A255 has a fixed host LAB clock. Reject witness envelopes that
+            # are expired/future relative to A257's progressing local time.
+            if type(witness_envelope) is dict and type(witness_envelope.get("payload")) is dict:
+                proof = witness_envelope["payload"]
+                signed_from = _clock(datetime.fromisoformat(proof["issued_at"].replace("Z", "+00:00")))
+                signed_until = _clock(datetime.fromisoformat(proof["expires_at"].replace("Z", "+00:00")))
+                if signed_from > effective_now or signed_until < effective_now:
+                    return _deny("DENY_WITNESS_TIME_ELAPSED")
             try:
                 identity, origin_hash, decision_hash = self._binding(
                     decision, origin_envelope
