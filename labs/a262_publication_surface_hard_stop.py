@@ -89,7 +89,7 @@ def _actions_deploy_review(data: bytes) -> dict:
         # Only normalize the unindented `on:` mapping key, never the YAML
         # value text or nested keys. Duplicate-key checks remain enabled.
         raw = data.decode("utf-8")
-        raw = re.sub(r"(?m)^on:(?=\\s|$)", '"on":', raw)
+        raw = re.sub(r"(?m)^on:(?=\s|$)", '"on":', raw)
         workflow = _strict_yaml(raw.encode("utf-8"))
         jobs = workflow.get("jobs")
         trigger = workflow.get("on")
