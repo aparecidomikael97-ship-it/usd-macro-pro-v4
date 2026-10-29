@@ -119,9 +119,8 @@ class A246ChatCommitUncertaintyTests(unittest.TestCase):
             finally:
                 store.close()
 
-    @unittest.expectedFailure
-    def test_05_red_reopen_after_lost_ack_requires_external_reconciliation(self):
-        """A fresh host process cannot identify this unresolved local event."""
+    def test_05_restart_denied_by_local_fence_after_lost_ack(self):
+        """A247 adds local restart veto; still no independent authority."""
         with TemporaryDirectory(prefix="a246-restart-") as raw:
             path = Path(raw) / "chat.db"
             first = SQLiteChatStore(path)
@@ -134,8 +133,8 @@ class A246ChatCommitUncertaintyTests(unittest.TestCase):
                     )
             finally:
                 first.close()
-            # Desired invariant: automatic reopen is denied until independently
-            # reconciled. Current LAB lacks persisted independent uncertainty.
+            # A247: local marker persists and vetoes re-open. A hostile host
+            # can delete it, so this is NOT independent reconciliation.
             with self.assertRaises(StorageUnavailableError):
                 second = SQLiteChatStore(path)
                 second.close()
