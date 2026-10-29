@@ -494,8 +494,14 @@ class SQLiteChatStore:
             self._health_reason = type(exc).__name__
             raise StorageUnavailableError("WAL checkpoint failed") from exc
 
+    @_local_commit_gate
     def backup_to(self, destination):
-        """Create an online SQLite backup after a FULL WAL checkpoint and verify it."""
+        """Create backup only outside cooperating chat-write COMMIT windows.
+
+        A252 LAB: the existing kernel lifecycle lock coordinates backup with
+        fenced public SQLiteChatStore writers across cooperative processes.
+        It does not authenticate the host/VFS nor prevent direct SQL writers.
+        """
         self.require_healthy()
         destination = Path(destination)
         if destination.resolve() == self.path.resolve():
