@@ -190,9 +190,10 @@ class A261ReleasePreflightTests(unittest.TestCase):
     def test_11_two_services_cannot_hide_second_unprotected_entry(self):
         tmp, candidate, _ = _candidate()
         try:
-            copied = RENDER.decode().split("  - type: web\n", 1)[1]
+            normalized = RENDER.decode().replace("\r\n", "\n")
+            copied = normalized.split("  - type: web\n", 1)[1]
             copied = copied.replace("name: atlasquant-private", "name: another-service")
-            multi = RENDER + ("  - type: web\n" + copied).encode()
+            multi = (normalized + "  - type: web\n" + copied).encode()
             result = inspect_release_boundary(
                 candidate=candidate, render_config=multi
             )
