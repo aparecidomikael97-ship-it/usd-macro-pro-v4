@@ -178,10 +178,13 @@ def trader_readonly_observation(
             has_current_m15 = (
                 obs.get("validated") is True
                 and obs.get("presentation_state") == "CURRENT"
-                and obs.get("series_state") == "CURRENT" if "series_source" in obs
-                else obs.get("validated") is True
-                and obs.get("presentation_state") == "CURRENT"
-                and obs.get("quote_source") == "twelve_series_v1108 / closed M15"
+                and (
+                    (obs.get("series_source") == "scanner/cache_v110/m15"
+                     and obs.get("series_state") == "CURRENT")
+                    or (obs.get("quote_source") ==
+                        "twelve_series_v1108 / closed M15")
+                )
+                and "historical_series" not in obs
             )
             if (
                 has_current_m15
