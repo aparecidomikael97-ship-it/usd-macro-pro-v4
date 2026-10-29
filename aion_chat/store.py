@@ -337,13 +337,19 @@ class SQLiteChatStore:
             raise StorageUnavailableError("verified SQLite backup failed") from exc
 
     @classmethod
-    def restore_from_backup(cls, backup_path, target_path):
+    def restore_from_backup(cls, backup_path, target_path, *, expected_sha256=None):
         """Publish a verified staging backup only to an unused path; never overwrite.
 
         Neither a pathname precheck nor this API proves that a compromised host
         has no detached SQLite handles or controls no other copies. This only
         closes the known destructive replacement path, not P0-5/6 overall.
         """
+        if expected_sha256 is not None and (
+            not isinstance(expected_sha256, str)
+            or len(expected_sha256) != 64
+            or any(ch not in "0123456789abcdef" for ch in expected_sha256)
+        ):
+            raise ValueError("expected backup SHA-256 must be 64 lowercase hex characters")
         source = Path(backup_path)
         target = Path(target_path)
         if source.resolve() == target.resolve():
@@ -361,6 +367,8 @@ class SQLiteChatStore:
                 "restore denied: destination or SQLite sidecars already exist"
             )
         source_report = _validate_database_file(source)
+        if expected_sha256 is not None and source_report["sha256"] != expected_sha256:
+            raise StorageUnavailableError("restore denied: source differs from manifest")
         target.parent.mkdir(parents=True, exist_ok=True)
         temp = target.with_name(target.name + ".restore-" + uuid4().hex)
         source_db = None
@@ -375,6 +383,8 @@ class SQLiteChatStore:
             source_db.close()
             source_db = None
             restored_report = _validate_database_file(temp)
+            if expected_sha256 is not None and restored_report["sha256"] != expected_sha256:
+                raise StorageUnavailableError("restore denied: copied pages differ from manifest")
             # Never use os.replace here: Linux permits a live connection
             # to keep reading an unlinked OLD database while new openers see
             # the NEW file at the same pathname. Windows may reject the swap.
@@ -444,6 +454,7 @@ class SQLiteChatStore:
                 "size_bytes": restored_report["size_bytes"],
                 "directory_sync_requested": dirsync_supported,
                 "power_loss_durability_verified": False,
+                "manifest_sha256_verified": expected_sha256 is not None,
             }
         except (sqlite3.DatabaseError, OSError, StorageUnavailableError) as exc:
             for db in (target_db, source_db):
