@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sqlite3
 import stat
+import time
 from typing import Protocol
 from uuid import uuid4
 
@@ -121,7 +122,7 @@ class SQLiteChatStore:
         try:
             # A local marker is a veto, never a proof of successful COMMIT.
             # No automatic marker deletion/recovery at startup.
-            if os.path.lexists(self._message_commit_marker):
+            if self._pending_message_commit_fence():
                 raise StorageUnavailableError(
                     "staging message COMMIT outcome pending; manual review required"
                 )
@@ -211,12 +212,28 @@ class SQLiteChatStore:
             return "PATH_IDENTITY_CHANGED"
         return "OK"
 
+    def _pending_message_commit_fence(self) -> bool:
+        """Bounded grace for an in-flight *normal* COMMIT cleanup.
+
+        Avoid falsely treating another concurrent writer's brief marker as a
+        persistent failure. No DB access occurs while the marker is visible;
+        failure to clear within this bound remains a sticky veto. This is not
+        reconciliation of an uncertain external/local effect.
+        """
+        if not os.path.lexists(self._message_commit_marker):
+            return False
+        for _ in range(50):
+            time.sleep(0.01)
+            if not os.path.lexists(self._message_commit_marker):
+                return False
+        return True
+
     def _require_open(self):
         if self.db is None:
             raise StorageUnavailableError("staging store is closed")
         if self._health_state == FAILED:
             raise StorageUnavailableError("staging store health is failed")
-        if os.path.lexists(self._message_commit_marker):
+        if self._pending_message_commit_fence():
             self._health_state = FAILED
             self._health_reason = "MESSAGE_COMMIT_PENDING_ZERO_AUTO_RETRY"
             raise StorageUnavailableError(
