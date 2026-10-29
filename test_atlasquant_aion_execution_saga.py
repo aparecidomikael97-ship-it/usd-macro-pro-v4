@@ -9,6 +9,7 @@ from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_cumulative_authority_budget import CumulativeAuthorityBudget
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 from atlasquant_aion_execution_saga import ExecutionSagaCoordinator
 
 
@@ -99,7 +100,7 @@ class ExecutionSagaTests(unittest.TestCase):
 
     def _components(self, raw, **budget_limits):
         store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
-        outbox = ExecutionOutbox(store, self.scope, first_attempt_guard=lambda _intent: True)
+        outbox = SyntheticFirstAttemptOutboxLab(store, self.scope, first_attempt_guard=lambda _intent: True)
         budget = CumulativeAuthorityBudget(
             store,
             self.scope,
@@ -679,7 +680,7 @@ class ExecutionSagaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "chat.sqlite3"
             store = SQLiteChatStore(path)
-            outbox = ExecutionOutbox(store, self.scope, first_attempt_guard=lambda _intent: True)
+            outbox = SyntheticFirstAttemptOutboxLab(store, self.scope, first_attempt_guard=lambda _intent: True)
             budget = CumulativeAuthorityBudget(
                 store,
                 self.scope,
@@ -697,7 +698,7 @@ class ExecutionSagaTests(unittest.TestCase):
             store.close()
 
             reopened = SQLiteChatStore(path)
-            outbox2 = ExecutionOutbox(reopened, self.scope, first_attempt_guard=lambda _intent: True)
+            outbox2 = SyntheticFirstAttemptOutboxLab(reopened, self.scope, first_attempt_guard=lambda _intent: True)
             budget2 = CumulativeAuthorityBudget(
                 reopened,
                 self.scope,
