@@ -106,7 +106,7 @@ class ExecutionOutboxTests(unittest.TestCase):
 
     def _outbox(self, root):
         store = SQLiteChatStore(Path(root) / "chat.sqlite3")
-        return store, ExecutionOutbox(store, self.scope)
+        return store, ExecutionOutbox(store, self.scope, first_attempt_guard=lambda _intent: True)
 
     def _enqueue(self, outbox, *, ref="intent-1", payload=None, aggregate="client-1",
                  valid_until=None, requires_reauth=False, reauth_ref=""):
@@ -166,14 +166,14 @@ class ExecutionOutboxTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "chat.sqlite3"
             seed = SQLiteChatStore(path)
-            seed_outbox = ExecutionOutbox(seed, self.scope)
+            seed_outbox = ExecutionOutbox(seed, self.scope, first_attempt_guard=lambda _intent: True)
             item = self._enqueue(seed_outbox)
             seed.close()
 
             def claim(index):
                 local = SQLiteChatStore(path)
                 try:
-                    candidate = ExecutionOutbox(local, self.scope).claim_next(
+                    candidate = ExecutionOutbox(local, self.scope, first_attempt_guard=lambda _intent: True).claim_next(
                         f"worker-{index}",
                         now=NOW,
                         lease_seconds=60,
@@ -188,7 +188,7 @@ class ExecutionOutboxTests(unittest.TestCase):
             self.assertEqual(len(claimed), 1)
             self.assertEqual(claimed[0]["idempotency_key"], item["idempotency_key"])
             reopened = SQLiteChatStore(path)
-            state = ExecutionOutbox(reopened, self.scope).get(item["idempotency_key"])
+            state = ExecutionOutbox(reopened, self.scope, first_attempt_guard=lambda _intent: True).get(item["idempotency_key"])
             self.assertEqual(state["state"], "CLAIMED")
             self.assertEqual(state["attempts"], 1)
             reopened.close()
