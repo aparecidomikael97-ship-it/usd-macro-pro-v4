@@ -831,9 +831,9 @@ class SQLiteChatStore:
     def search_conversations(self, scope, query, **filters):
         return self.list_conversations(scope, query=query, **filters)
 
+    @_local_commit_gate
     def archive_conversation(self, scope, conversation_id):
-        self._require_open()
-        with self.db:
+        with self._fenced_chat_transaction():
             c = self.get_conversation(scope, conversation_id)
             c.archived, c.updated_at = True, now()
             self._update(c)
@@ -906,6 +906,32 @@ class SQLiteChatStore:
                 "chat COMMIT acknowledged but marker cleanup outcome uncertain"
             ) from exc
 
+    @contextmanager
+    def _fenced_chat_transaction(self):
+        """A251: protect remaining staged-chat writers with one shared fence.
+
+        Caller must hold @_local_commit_gate. An uncertain local COMMIT
+        blocks this store and leaves its marker; no automatic replay.
+        This provides no independent host antirollback or VFS proof.
+        """
+        self._require_open()
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            yield
+            self._commit_fenced_chat_write()
+        except Exception as exc:
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            if (
+                not isinstance(exc, StoreCommitOutcomeUncertainError)
+                and isinstance(exc, sqlite3.DatabaseError)
+                and not isinstance(exc, sqlite3.IntegrityError)
+            ):
+                self._record_database_error(exc)
+            raise
+
     @_local_commit_gate
     def append_message(self, scope, message):
         if message.role not in {"user", "assistant", "system", "task"}:
@@ -971,11 +997,12 @@ class SQLiteChatStore:
             (value.id, c.id, kind, seq, dump(value)),
         )
 
+    @_local_commit_gate
     def add_attachment_metadata(self, scope, attachment):
         self._require_open()
         from .attachments import validate_metadata
         validate_metadata(attachment)
-        with self.db:
+        with self._fenced_chat_transaction():
             self._save_record(scope, "attachment", attachment)
         return attachment
 
@@ -1000,9 +1027,9 @@ class SQLiteChatStore:
     def get_latest_checkpoint(self, scope, conversation_id):
         return self._latest(scope, conversation_id, "checkpoint", ConversationCheckpoint)
 
+    @_local_commit_gate
     def save_checkpoint(self, scope, checkpoint):
-        self._require_open()
-        with self.db:
+        with self._fenced_chat_transaction():
             prior = self.get_latest_checkpoint(scope, checkpoint.conversation_id)
             if prior and checkpoint.through_sequence <= prior.through_sequence:
                 raise ValueError("coverage must advance")
@@ -1011,9 +1038,9 @@ class SQLiteChatStore:
             c.latest_checkpoint = checkpoint.id
             self._update(c)
 
+    @_local_commit_gate
     def save_context_summary(self, scope, summary):
-        self._require_open()
-        with self.db:
+        with self._fenced_chat_transaction():
             for mid in summary.source_message_ids:
                 if self.get_message(scope, summary.conversation_id, mid).sequence > summary.through_sequence:
                     raise ValueError("source beyond coverage")
