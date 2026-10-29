@@ -281,12 +281,15 @@ class SQLiteChatStore:
         target = Path(target_path)
         if source.resolve() == target.resolve():
             raise ValueError("restore target must differ from backup")
+        # A local .aion-restore-pending marker is a *veto*, not authenticated
+        # evidence of successful restore. Never automatically clear/retry it.
+        marker = Path(str(target) + ".aion-restore-pending")
         # A live WAL/-shm/-journal is a veto, even when main .db is absent.
         # os.path.lexists also detects dangling symlinks and directories.
         # This preflight is NOT a lock: os.link below provides the final
         # atomic publish-if-absent check against another creator of target.
         if any(os.path.lexists(str(target) + suffix)
-               for suffix in ("", "-wal", "-shm", "-journal")):
+               for suffix in ("", "-wal", "-shm", "-journal", ".aion-restore-pending")):
             raise StorageUnavailableError(
                 "restore denied: destination or SQLite sidecars already exist"
             )
@@ -312,10 +315,23 @@ class SQLiteChatStore:
             # when the destination does not already exist (no TOCTOU replace).
             # This may be unsupported by a filesystem: fail closed instead.
             if any(os.path.lexists(str(target) + suffix)
-                   for suffix in ("", "-wal", "-shm", "-journal")):
+                   for suffix in ("", "-wal", "-shm", "-journal", ".aion-restore-pending")):
                 raise StorageUnavailableError(
                     "restore denied: destination or SQLite sidecars appeared"
                 )
+            # Create an exclusive local crash fence BEFORE the irreversible
+            # pathname publication. If the process exits abruptly at/after
+            # this point, a later call must not silently try again.
+            # File fsync helps process-crash observation; without an
+            # independently synced directory/witness this is NOT proof of
+            # power-loss durability or hostile-root tamper resistance.
+            with marker.open("xb") as guard:
+                guard.write(
+                    ("AION_STAGING_RESTORE_PENDING_V0\\n"
+                     "NO_AUTO_RETRY\n").encode("ascii")
+                )
+                guard.flush()
+                os.fsync(guard.fileno())
             os.link(temp, target)
             # Publication may already be visible to other SQLite clients.
             # Any failure AFTER this point is an uncertain outcome, not
@@ -338,6 +354,9 @@ class SQLiteChatStore:
                         "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_TARGET_CHANGED_ZERO_AUTO_RETRY"
                     )
                 temp.unlink()
+                # Only a fully checked, successful local publication may
+                # clear its own marker; any cleanup exception leaves a veto.
+                marker.unlink()
             except OSError as exc:
                 raise RestorePublicationUncertainError(
                     "RESTORE_PUBLICATION_OUTCOME_UNKNOWN_POST_LINK_IO_ZERO_AUTO_RETRY"
