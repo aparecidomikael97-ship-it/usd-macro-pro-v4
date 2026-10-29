@@ -19,7 +19,12 @@ RENDER = "render.yaml"
 
 
 def _sources():
-    return {path: (ROOT / path).read_bytes() for path in SURFACES}
+    # Git may checkout CRLF on Windows; adversarial byte fixtures should be
+    # platform-independent. The production reader still reads raw YAML.
+    return {
+        path: (ROOT / path).read_bytes().replace(b"\r\n", b"\n")
+        for path in SURFACES
+    }
 
 
 def _changed(path, before, after):
