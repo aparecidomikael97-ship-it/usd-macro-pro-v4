@@ -326,10 +326,7 @@ class SQLiteChatStore:
             # independently synced directory/witness this is NOT proof of
             # power-loss durability or hostile-root tamper resistance.
             with marker.open("xb") as guard:
-                guard.write(
-                    ("AION_STAGING_RESTORE_PENDING_V0\\n"
-                     "NO_AUTO_RETRY\n").encode("ascii")
-                )
+                guard.write(b"AION_STAGING_RESTORE_PENDING_V0\nNO_AUTO_RETRY\n")
                 guard.flush()
                 os.fsync(guard.fileno())
             os.link(temp, target)
