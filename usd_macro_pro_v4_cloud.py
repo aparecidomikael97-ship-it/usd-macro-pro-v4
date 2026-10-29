@@ -365,7 +365,20 @@ else:
         )
     except Exception:
         _auth_required_raw = os.getenv("ATLASQUANT_AUTH_REQUIRED","false")
-    _auth_required_fallback = str(_auth_required_raw or "").strip().lower() in {"1","true","yes","on","sim"}
+    # If the login module failed to import, production must never fall back to
+    # OPEN merely because ATLASQUANT_AUTH_REQUIRED was unset/false.
+    try:
+        _auth_fallback_environment = st.secrets.get(
+            "ATLASQUANT_ENV", os.getenv("ATLASQUANT_ENV", ""),
+        )
+    except Exception:
+        _auth_fallback_environment = os.getenv("ATLASQUANT_ENV", "")
+    _auth_required_fallback = (
+        str(_auth_required_raw or "").strip().lower() in {"1","true","yes","on","sim"}
+        or str(os.getenv("ATLASQUANT_AUTH_REQUIRED", "")).strip().lower() in {"1","true","yes","on","sim"}
+        or str(_auth_fallback_environment or "").strip().upper() == "PRODUCTION"
+        or str(os.getenv("ATLASQUANT_ENV", "")).strip().upper() == "PRODUCTION"
+    )
     if _auth_required_fallback:
         st.error("🔒 Camada de acesso indisponível; aplicação bloqueada por segurança.")
         st.caption(_ATLASQUANT_ACCESS_IMPORT_ERROR)

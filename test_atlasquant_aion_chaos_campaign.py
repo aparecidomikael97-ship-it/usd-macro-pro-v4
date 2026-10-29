@@ -141,7 +141,7 @@ class AionChaosCampaignTests(unittest.TestCase):
         self.assertEqual(safe["mode"], "DEGRADED_READ_ONLY")
         self.assertFalse(safe["external_side_effects_allowed"])
 
-    def test_network_timeout_never_blind_resends_without_authoritative_absence(self):
+    def test_network_timeout_keeps_uncertain_without_independent_absence(self):
         with tempfile.TemporaryDirectory() as raw:
             store, outbox = self._outbox(raw)
             item = self._enqueue(outbox, "network-1")
@@ -162,8 +162,18 @@ class AionChaosCampaignTests(unittest.TestCase):
                 authorize=authorization(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(reconciled["state"], "RETRY")
+            # A205: the injected adapter's local 'authoritative_absence'
+            # boolean is not external NO_EFFECT_FENCED evidence. Even the
+            # simulated absence cannot re-open a possible provider effect.
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
+            self.assertEqual(
+                reconciled["reconcile_state"],
+                "ABSENCE_UNVERIFIED_HARD_NO_GO",
+            )
             self.assertEqual(adapter.send_calls, 1)
+            self.assertIsNone(
+                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=3))
+            )
             self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
@@ -219,12 +229,12 @@ class AionChaosCampaignTests(unittest.TestCase):
                 authorize=authorization(self.scope),
                 now=NOW + timedelta(seconds=2),
             )
-            self.assertEqual(reconciled["state"], "CONFIRMED")
+            self.assertEqual(reconciled["state"], "UNCERTAIN")
             self.assertEqual(adapter.send_calls, 1)
-            self.assertEqual(outbox.effect_count(), 1)
+            self.assertEqual(outbox.effect_count(), 0)
             store.close()
 
-    def test_tool_failure_after_prior_effect_requires_manual_compensation_approval(self):
+    def test_unverified_positive_blocks_saga_and_compensation(self):
         with tempfile.TemporaryDirectory() as raw:
             store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
             outbox = ExecutionOutbox(store, self.scope)
@@ -283,32 +293,22 @@ class AionChaosCampaignTests(unittest.TestCase):
                 cumulative_authority_guard=lambda d: budget.guard(d, now=NOW),
                 now=NOW + timedelta(seconds=1),
             )
-            self.assertEqual(confirmed["state"], "CONFIRMED")
-            saga.sync_forward_outcome("chaos-saga", "one", now=NOW + timedelta(seconds=1))
-
-            saga.enqueue_next(
-                "chaos-saga",
-                authorization_ref="approval-1",
-                valid_until=NOW + timedelta(minutes=5),
-                created_at=NOW + timedelta(seconds=2),
+            # A213: an adapter's claimed CONFIRMED must not advance the
+            # saga budget, release its next action, or authorize compensation.
+            self.assertEqual(confirmed["state"], "UNCERTAIN")
+            self.assertEqual(
+                confirmed["dispatch_state"],
+                "UNTRUSTED_POSITIVE_RECONCILE_REQUIRED",
             )
-            claimed = outbox.claim_next("worker-1", now=NOW + timedelta(seconds=2), lease_seconds=60)
-            failed = outbox.dispatch_claimed(
-                claimed["idempotency_key"],
-                worker_id="worker-1",
-                authorize=authorization(self.scope),
-                adapter=ChaosAdapter("reject"),
-                cumulative_authority_guard=lambda d: budget.guard(d, now=NOW + timedelta(seconds=2)),
-                now=NOW + timedelta(seconds=3),
-            )
-            self.assertEqual(failed["state"], "FAILED")
+            self.assertEqual(outbox.effect_count(), 0)
             synced = saga.sync_forward_outcome(
-                "chaos-saga",
-                "two",
-                now=NOW + timedelta(seconds=3),
+                "chaos-saga", "one", now=NOW + timedelta(seconds=1),
             )
-            self.assertEqual(synced["state"], "COMPENSATION_REQUIRED")
-            with self.assertRaisesRegex(ValueError, "explicit human approval"):
+            self.assertEqual(synced["state"], "RECONCILIATION_REQUIRED")
+            self.assertIsNone(
+                outbox.claim_next("worker-2", now=NOW + timedelta(seconds=2)),
+            )
+            with self.assertRaisesRegex(ValueError, "saga is not eligible"):
                 saga.prepare_compensation(
                     "chaos-saga",
                     explicit_human_approval=False,
@@ -347,7 +347,7 @@ class AionChaosCampaignTests(unittest.TestCase):
             observation("PROVIDER", failure_mode="provider outage", containment="circuit OPEN", recovery="safe mode read-only"),
             observation("NETWORK", failure_mode="timeout before effect", containment="UNCERTAIN", recovery="authoritative absence -> RETRY"),
             observation("STORE", failure_mode="crash before CAS commit", containment="transaction rollback", recovery="reopen revision unchanged"),
-            observation("QUEUE", failure_mode="response lost after effect", containment="UNCERTAIN", recovery="reconcile -> CONFIRMED exactly once"),
+            observation("QUEUE", failure_mode="response lost after effect", containment="UNCERTAIN", recovery="reconcile blocked until independent receipt"),
             observation("TOOL", failure_mode="second tool rejected", containment="COMPENSATION_REQUIRED", recovery="manual approval required"),
             observation("AGENT", failure_mode="loop/error storm", containment="ISOLATE_RECOMMENDED", recovery="read-only diagnosis"),
             observation("STATE_CORRUPTION", failure_mode="ledger digest tamper", containment="integrity MISMATCH", recovery="blocked for review"),
