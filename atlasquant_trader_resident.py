@@ -147,10 +147,15 @@ def hydrate_trader_resident_state(session_state, snapshot, runtime_status=None):
     try:
         state = resident_trader_state(snapshot, runtime_status=runtime_status)
         session_state.update(state)
-        # A268 is an offline, in-memory read model. It cannot trigger
-        # quote fetching, orders, alerts or additional paid provider calls.
-        from atlasquant_aion_trader_observation import trader_readonly_observation
-        session_state["atlasquant_aion_trader_observation"] = trader_readonly_observation(state)
+        # Only attach the AION board if the original resident loader actually
+        # produced a validated presentation. Invalid snapshots return two
+        # empty fields and MUST preserve the old strict clear-on-failure
+        # contract, without leaving a new synthetic "empty board" behind.
+        if (state.get("atlasquant_reference_fx_population")
+                or state.get("atlasquant_validated_market_items")):
+            # No market data fetch, broker, order, alert or paid provider call.
+            from atlasquant_aion_trader_observation import trader_readonly_observation
+            session_state["atlasquant_aion_trader_observation"] = trader_readonly_observation(state)
     except (TypeError, ValueError, KeyError, AttributeError):
         # Malformed resident artifacts stay absent, never repaired by this adapter.
         pass
