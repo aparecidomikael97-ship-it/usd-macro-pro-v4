@@ -752,17 +752,34 @@ class SQLiteChatStore:
             (c.updated_at, c.archived, c.title, dump(c), c.id),
         )
 
+    @_local_commit_gate
     def create_conversation(self, scope, title="Nova conversa", metadata=None):
+        """A250 LAB: protect conversation creation with the message COMMIT fence.
+
+        A lost SQLite COMMIT acknowledgment must never look like a known
+        failure that authorizes creation of another conversation. Only local
+        coordination and crash veto are provided, not independent custody.
+        """
         self._scope(scope)
         c = Conversation(**asdict(scope), title=redact(title), metadata=redact(metadata or {}))
         try:
-            with self.db:
-                self.db.execute(
-                    "INSERT INTO conversations VALUES (?,?,?,?,?,?,?,?)",
-                    (c.id, *self._scope(scope), c.updated_at, c.archived, c.title, dump(c)),
-                )
-        except sqlite3.DatabaseError as exc:
-            self._record_database_error(exc)
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute(
+                "INSERT INTO conversations VALUES (?,?,?,?,?,?,?,?)",
+                (c.id, *self._scope(scope), c.updated_at, c.archived, c.title, dump(c)),
+            )
+            self._commit_fenced_chat_write()
+        except Exception as exc:
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            if (
+                not isinstance(exc, StoreCommitOutcomeUncertainError)
+                and isinstance(exc, sqlite3.DatabaseError)
+                and not isinstance(exc, sqlite3.IntegrityError)
+            ):
+                self._record_database_error(exc)
             raise
         return c
 
@@ -853,6 +870,24 @@ class SQLiteChatStore:
                 "message COMMIT succeeded but pending-fence cleanup uncertain"
             ) from exc
 
+    def _commit_fenced_chat_write(self):
+        """Shared A247/A250 local pre-COMMIT veto and uncertain-ACK policy.
+
+        Caller MUST hold BEGIN IMMEDIATE and the cooperative lifecycle lock.
+        A failed ACK leaves the local marker in place. The marker may be
+        removed by a hostile host, so it never authenticates external state.
+        """
+        self._publish_message_commit_marker()
+        try:
+            self.db.commit()
+        except Exception as exc:
+            self._health_state = FAILED
+            self._health_reason = "COMMIT_OUTCOME_UNKNOWN_ZERO_AUTO_RETRY"
+            raise StoreCommitOutcomeUncertainError(
+                "chat COMMIT outcome unknown; this store cannot be reused"
+            ) from exc
+        self._clear_message_commit_marker()
+
     @_local_commit_gate
     def append_message(self, scope, message):
         if message.role not in {"user", "assistant", "system", "task"}:
@@ -871,22 +906,7 @@ class SQLiteChatStore:
             )
             c.message_count, c.updated_at = message.sequence, now()
             self._update(c)
-            # A247: publish the veto before calling COMMIT, while holding
-            # BEGIN IMMEDIATE. A crash after a durable COMMIT but before ACK
-            # leaves a marker for the next opener to refuse automatically.
-            self._publish_message_commit_marker()
-            # A246 LAB: once COMMIT is attempted, any missing acknowledgment
-            # may conceal a durable write. A best-effort rollback cannot
-            # prove that the COMMIT did not happen.
-            try:
-                self.db.commit()
-            except Exception as exc:
-                self._health_state = FAILED
-                self._health_reason = "COMMIT_OUTCOME_UNKNOWN_ZERO_AUTO_RETRY"
-                raise StoreCommitOutcomeUncertainError(
-                    "chat COMMIT outcome unknown; this store cannot be reused"
-                ) from exc
-            self._clear_message_commit_marker()
+            self._commit_fenced_chat_write()
         except Exception as exc:
             try:
                 self.db.rollback()
