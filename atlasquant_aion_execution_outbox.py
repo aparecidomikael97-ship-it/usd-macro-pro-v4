@@ -104,14 +104,23 @@ def _mapping(value: Any) -> dict[str, Any]:
 class ExecutionOutbox:
     """Scoped outbox bound to the same SQLite database as staged chat state."""
 
-    def __init__(self, store: SQLiteChatStore, scope: Scope):
+    def __init__(
+        self, store: SQLiteChatStore, scope: Scope, *,
+        first_attempt_guard: Callable[[Mapping[str, Any]], bool] | None = None,
+    ):
         if not isinstance(store, SQLiteChatStore):
             raise TypeError("SQLiteChatStore required")
+        if first_attempt_guard is not None and not callable(first_attempt_guard):
+            raise TypeError("callable first_attempt_guard required")
         store.require_healthy()
         _scope(scope)
         self.store = store
         self.scope = scope
         self.db = store.db
+        # A242: mandatory pre-send reservation gate; defaults to DENY. A
+        # caller-controlled True callback is only a synthetic LAB mechanism,
+        # never proof of an external witness or trustworthy owner.
+        self._first_attempt_guard = first_attempt_guard
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
@@ -182,6 +191,16 @@ class ExecutionOutbox:
     def _scope_args(self) -> tuple[str, str, str]:
         self._require_bound_store()
         return _scope(self.scope)
+
+    def _reserved_first_attempt(self, intent: Mapping[str, Any]) -> bool:
+        if self._first_attempt_guard is None:
+            return False
+        try:
+            # A return value other than literal True is not a reservation.
+            # The production trust boundary is not implemented here.
+            return self._first_attempt_guard(dict(intent)) is True
+        except Exception:
+            return False
 
     def _decision_row(self, decision_id: str):
         return self.db.execute(
@@ -666,7 +685,7 @@ class ExecutionOutbox:
         with self.db:
             cursor = self.db.execute(
                 """UPDATE action_outbox
-                   SET state='UNCERTAIN',dispatch_started_at=?,last_error='DISPATCH_IN_PROGRESS'
+                   SET state='UNCERTAIN',dispatch_started_at=?,last_error='FIRST_ATTEMPT_WITNESS_PENDING'
                    WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
                      AND state='CLAIMED' AND lease_owner=? AND lease_until=?""",
                 (
@@ -683,8 +702,57 @@ class ExecutionOutbox:
                 "dispatch_state": "NOT_DISPATCHED_STATE_CHANGED",
             }
 
+        # A242: the write-ahead UNKNOWN is durable BEFORE any possible
+        # reservation request. Lost witness ACK means NO SEND and NO RETRY.
+        self._require_bound_store()
+        reservation_ok = self._reserved_first_attempt(intent)
+        if not reservation_ok:
+            with self.db:
+                cursor = self.db.execute(
+                    """UPDATE action_outbox
+                       SET state='UNCERTAIN',lease_owner='',lease_until='',
+                           last_error='FIRST_ATTEMPT_WITNESS_UNVERIFIED_NO_SEND'
+                       WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                         AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                         AND dispatch_started_at=?""",
+                    (
+                        key, *self._scope_args(), worker,
+                        intent["lease_until"], _iso(now_dt),
+                    ),
+                )
+                denied = cursor.rowcount == 1
+            return {
+                **self.get(key),
+                "dispatch_state": (
+                    "UNCERTAIN_PRE_DISPATCH_RESERVATION_REQUIRED" if denied
+                    else "NOT_DISPATCHED_STATE_CHANGED"
+                ),
+            }
+
+        # A positive response is STILL untrusted without external root
+        # provenance. CAS prevents a delayed guard from authorizing SEND
+        # against a newer lease/state/reconciliation.
+        with self.db:
+            cursor = self.db.execute(
+                """UPDATE action_outbox
+                   SET last_error='FIRST_ATTEMPT_RESERVATION_LAB_UNVERIFIED'
+                   WHERE idempotency_key=? AND owner=? AND tenant=? AND workspace=?
+                     AND state='UNCERTAIN' AND lease_owner=? AND lease_until=?
+                     AND dispatch_started_at=?""",
+                (
+                    key, *self._scope_args(), worker,
+                    intent["lease_until"], _iso(now_dt),
+                ),
+            )
+            reservation_admitted = cursor.rowcount == 1
+        if not reservation_admitted:
+            return {
+                **self.get(key),
+                "dispatch_state": "NOT_DISPATCHED_STATE_CHANGED",
+            }
+
         # Recheck just before the potentially irreversible adapter boundary.
-        # A pathname race after this check still requires an external witness.
+        # Pathname comparison is local and does not attest the SQLite FD.
         self._require_bound_store()
         try:
             result = _mapping(send(dict(intent["decision"]), key))
