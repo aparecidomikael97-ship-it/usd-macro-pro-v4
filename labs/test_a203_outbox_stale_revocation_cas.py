@@ -13,6 +13,7 @@ import unittest
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 # Import the module, not its TestCase class into this test module.
 # unittest discovers imported TestCase classes and otherwise runs A202 twice.
 from labs import test_a202_outbox_dispatch_atomic_cas as a202
@@ -52,7 +53,7 @@ class A203StaleAuthorizationOutboxTests(unittest.TestCase):
                 def old_decision_attempt():
                     separate_store=SQLiteChatStore(path)
                     try:
-                        separate_outbox=ExecutionOutbox(separate_store, SCOPE, first_attempt_guard=lambda _intent: True)
+                        separate_outbox=SyntheticFirstAttemptOutboxLab(separate_store, SCOPE, first_attempt_guard=lambda _intent: True)
                         return separate_outbox.dispatch_claimed(
                             key,
                             worker_id=WORKER,
