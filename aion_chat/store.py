@@ -113,6 +113,22 @@ class SQLiteChatStore:
         self.db = None
         self._pathname_identity = None
         try:
+            # A245 LAB: check the existing pathname both before and after
+            # connect(). A rename during connect() must not silently pin the
+            # *new* pathname while SQLite still holds the previous file.
+            # This does NOT authenticate the native SQLite VFS/FD or protect
+            # a newly created path or same-inode rollback from host control.
+            try:
+                before_connect = self.path.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                before_connect = None
+            if before_connect is not None and (
+                not stat.S_ISREG(before_connect.st_mode)
+                or int(before_connect.st_ino) <= 0
+            ):
+                raise StorageUnavailableError(
+                    "staging SQLite preconnect pathname is not a regular file"
+                )
             self.db = sqlite3.connect(str(self.path), timeout=BUSY_TIMEOUT_MS / 1000)
             self.db.row_factory = sqlite3.Row
             # Staging pathname comparison only; Python sqlite3 does NOT expose
@@ -120,6 +136,13 @@ class SQLiteChatStore:
             opened_name = self.path.stat(follow_symlinks=False)
             if not stat.S_ISREG(opened_name.st_mode) or int(opened_name.st_ino) <= 0:
                 raise StorageUnavailableError("staging SQLite pathname identity unavailable")
+            if before_connect is not None and (
+                (before_connect.st_dev, before_connect.st_ino)
+                != (opened_name.st_dev, opened_name.st_ino)
+            ):
+                raise StorageUnavailableError(
+                    "staging SQLite pathname changed while opening connection"
+                )
             self._pathname_identity = (opened_name.st_dev, opened_name.st_ino)
             self.db.executescript(f"""
             PRAGMA foreign_keys=ON;
