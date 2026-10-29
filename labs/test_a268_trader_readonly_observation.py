@@ -276,7 +276,34 @@ class A268TraderReadOnlyObservationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     trader_readonly_observation(_resident(_row()), now=time)
 
-    def test_22_no_provider_network_or_order_imports_in_read_model(self):
+    def test_22_invalid_resident_empty_snapshot_preserves_legacy_exact_keys(self):
+        session = {
+            "atlasquant_reference_fx_population": {"old": True},
+            "atlasquant_validated_market_items": [{"old": True}],
+            "atlasquant_aion_trader_observation": {"old": True},
+        }
+        empty = {
+            "atlasquant_reference_fx_population": {},
+            "atlasquant_validated_market_items": [],
+        }
+        with mock.patch.object(
+            atlasquant_trader_resident, "resident_trader_state",
+            return_value=empty,
+        ):
+            atlasquant_trader_resident.hydrate_trader_resident_state(session, {})
+        self.assertEqual(session, empty)
+
+    def test_23_dxy_and_non_fx_market_rows_do_not_invalidate_real_28fx(self):
+        pairs = [_row(pair) for pair in FX_28]
+        board = trader_readonly_observation(
+            _resident(*pairs, {"asset": "DXY", "score": 10}), now=NOW,
+        )
+        self.assertEqual(board["fresh_m15_pairs"], 28)
+        self.assertTrue(board["all_28_fresh_closed_m15"])
+        self.assertEqual(board["unknown_or_invalid_rows"], 1)
+        self.assertEqual(len(board["rows"]), 28)
+
+    def test_24_no_provider_network_or_order_imports_in_read_model(self):
         source = inspect.getsource(trader_readonly_observation)
         from atlasquant_aion_trader_observation import __file__ as location
         file = Path(location).read_text(encoding="utf-8")
