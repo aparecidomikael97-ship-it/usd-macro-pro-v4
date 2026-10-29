@@ -98,8 +98,11 @@ class A250ConversationCommitFenceTests(unittest.TestCase):
                     store, "_publish_message_commit_marker",
                     side_effect=OSError("synthetic pre-COMMIT failure"),
                 ):
-                    with self.assertRaises(OSError):
+                    with self.assertRaisesRegex(
+                        StorageUnavailableError, "marker preparation uncertain"
+                    ):
                         store.create_conversation(SCOPE, "must not persist")
+                self.assertEqual(store._health_state, FAILED)
                 self.assertEqual(count_conversations(path), 0)
             finally:
                 store.close()
@@ -116,8 +119,11 @@ class A250ConversationCommitFenceTests(unittest.TestCase):
 
             store._clear_message_commit_marker = fail_after_commit
             try:
-                with self.assertRaises(OSError):
+                with self.assertRaisesRegex(
+                    StoreCommitOutcomeUncertainError, "cleanup outcome uncertain"
+                ):
                     store.create_conversation(SCOPE, "persisted before cleanup")
+                self.assertEqual(store._health_state, FAILED)
                 self.assertTrue(marker(path).exists())
             finally:
                 store._clear_message_commit_marker = original
