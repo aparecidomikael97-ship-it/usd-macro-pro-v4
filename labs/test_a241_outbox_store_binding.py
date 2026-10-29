@@ -14,6 +14,7 @@ from unittest import mock
 from aion_chat.models import Scope
 from aion_chat.store import SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 
 
 NOW = datetime(2026, 10, 29, 10, 0, tzinfo=timezone.utc)
@@ -47,7 +48,7 @@ def _authorize(decision):
 def _fixture(root, claimed=False):
     path = Path(root) / "live.db"
     store = SQLiteChatStore(path)
-    outbox = ExecutionOutbox(store, SCOPE, first_attempt_guard=lambda _intent: True)
+    outbox = SyntheticFirstAttemptOutboxLab(store, SCOPE, first_attempt_guard=lambda _intent: True)
     item = outbox.enqueue(
         intent_ref="synthetic-intent", action="synthetic-only", payload={"offline": True},
         aggregate_key="target-a", policy_version="policy-a241",
@@ -146,7 +147,7 @@ class A241OutboxStoreBindingTests(unittest.TestCase):
                 store.close()
             reopened = SQLiteChatStore(path)
             try:
-                fresh = ExecutionOutbox(reopened, SCOPE, first_attempt_guard=lambda _intent: True)
+                fresh = SyntheticFirstAttemptOutboxLab(reopened, SCOPE, first_attempt_guard=lambda _intent: True)
                 self.assertEqual(fresh.get(key)["state"], "UNCERTAIN")
                 self.assertIsNone(fresh.claim_next("other-worker", now=NOW + timedelta(minutes=10)))
             finally:
