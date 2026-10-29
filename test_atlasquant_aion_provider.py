@@ -218,7 +218,10 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
         self.assertEqual(result["state"],"BLOCKED_PRIVACY")
         self.assertEqual(session.calls,[])
 
-    def test_successful_response_is_unverified_model_output_and_no_action(self):
+    def test_legacy_success_payload_cannot_override_missing_send_custody(self):
+        # A200 contract migration: the historical test expected ANSWER_READY
+        # from this fake provider. Prior assertions remain in Git history.
+        # A request with no independently trusted reservation must not call.
         payload={
             "id":"resp_test",
             "output":[{
@@ -237,14 +240,11 @@ class AtlasQuantAionProviderTests(unittest.TestCase):
             values=self._env(),
             session=session,
         )
-        self.assertTrue(result["called"])
-        self.assertEqual(result["state"],"ANSWER_READY")
-        self.assertEqual(result["answer"],"Resposta do modelo")
-        self.assertEqual(result["truth_state"],"MODEL_OUTPUT_UNVERIFIED")
-        self.assertFalse(result["executes_action"])
-        self.assertFalse(result["real_orders_enabled"])
-        self.assertEqual(session.calls[0]["json"]["model"],"reasoning-model")
-        self.assertIn("Authorization",session.calls[0]["headers"])
+        self.assertEqual(result["state"],"BLOCKED_SEND_CUSTODY")
+        self.assertIs(result["called"],False)
+        self.assertEqual(session.calls,[])
+        self.assertNotIn("answer",result)
+        self.assertNotIn("usage",result)
         self.assertNotIn("sk-test-secret-value",str(result))
 
     def test_budget_blocks_call_before_network(self):
