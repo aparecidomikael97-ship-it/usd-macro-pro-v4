@@ -663,10 +663,10 @@ class ExecutionOutbox:
                     observed=intent,
                 )
 
-        send = getattr(adapter, "send", None)
-        if not callable(send):
-            raise TypeError("adapter.send required")
-
+        # A266: DO NOT inspect adapter.send here. A hostile Python object
+        # may perform effects merely from a property getter or __getattribute__.
+        # The ordinary Outbox never obtains an independently reserved first
+        # attempt, so adapter attributes must remain untouched on that path.
         # Persist ambiguity BEFORE crossing the external boundary. If the process
         # dies after this commit, restart must reconcile and must not blind-retry.
         #
@@ -749,6 +749,13 @@ class ExecutionOutbox:
         # Pathname comparison is local and does not attest the SQLite FD.
         self._require_bound_store()
         try:
+            # A266: resolve the potentially effectful adapter attribute ONLY
+            # AFTER the durable attempt marker, independent reservation gate,
+            # and exact lease CAS have all succeeded. Currently that positive
+            # path is available ONLY in deliberately synthetic LAB subclasses.
+            send = getattr(adapter, "send", None)
+            if not callable(send):
+                raise TypeError("adapter.send required")
             result = _mapping(send(dict(intent["decision"]), key))
         except Exception as exc:
             # A206: a slow SEND callback must not undo a newer reconciliation
