@@ -24,7 +24,7 @@ from typing import Any, Callable, Mapping
 
 from aion_chat.models import Scope
 from aion_chat.privacy import redact
-from aion_chat.store import SQLiteChatStore
+from aion_chat.store import SQLiteChatStore, StorageUnavailableError
 
 SCHEMA = "ATLASQUANT_AION_EXECUTION_OUTBOX_V1"
 MAX_AUTHORITY_TTL_SECONDS = 900
@@ -171,7 +171,16 @@ class ExecutionOutbox:
                 ON action_effects(owner,tenant,workspace,confirmed_at,idempotency_key);
             """)
 
+    def _require_bound_store(self) -> None:
+        # A241: the Outbox owns a direct sqlite3.Connection pointer. A store
+        # pathname swap or close must veto its use before any SQL statement.
+        # This is a staging host-path guard, NOT an authenticated SQLite FD.
+        self.store._require_open()
+        if self.db is not self.store.db:
+            raise StorageUnavailableError("outbox SQLite connection binding changed")
+
     def _scope_args(self) -> tuple[str, str, str]:
+        self._require_bound_store()
         return _scope(self.scope)
 
     def _decision_row(self, decision_id: str):
@@ -409,6 +418,7 @@ class ExecutionOutbox:
         return {**out, "enqueue_state": "ENQUEUED"}
 
     def release_expired_claims(self, *, now: Any | None = None) -> int:
+        self._require_bound_store()
         current = _iso(_utc(now))
         self.db.execute("BEGIN IMMEDIATE")
         try:
@@ -673,6 +683,9 @@ class ExecutionOutbox:
                 "dispatch_state": "NOT_DISPATCHED_STATE_CHANGED",
             }
 
+        # Recheck just before the potentially irreversible adapter boundary.
+        # A pathname race after this check still requires an external witness.
+        self._require_bound_store()
         try:
             result = _mapping(send(dict(intent["decision"]), key))
         except Exception as exc:
