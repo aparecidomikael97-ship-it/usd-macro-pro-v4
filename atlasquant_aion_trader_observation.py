@@ -127,6 +127,7 @@ def trader_readonly_observation(
     *,
     now: datetime | None = None,
     currency_strength: Any = None,
+    timeframe_evidence: Any = None,
     risk_limits: RiskLimits | None = None,
     risk_state: RiskState | None = None,
 ) -> dict[str, Any]:
@@ -236,7 +237,7 @@ def trader_readonly_observation(
         }
         rows.append(row)
 
-    return {
+    board = {
         "schema": SCHEMA,
         "mode": dict(NO_SEND_MODES),
         "generated_at": now.isoformat(),
@@ -260,3 +261,13 @@ def trader_readonly_observation(
         "no_alerts": True,
         "no_new_data_calls": True,
     }
+    # Explicit external-in-memory candle evidence is optional. If omitted,
+    # A268 behavior and its M15-only compatibility stay unchanged. There is
+    # no provider/client/aggregator anywhere in this read-only extension.
+    if timeframe_evidence is not None:
+        from atlasquant_aion_trader_timeframes import merge_mtf_readonly
+        merge_mtf_readonly(
+            board, evidence=timeframe_evidence, now=now,
+            resident_rows=raw_items,
+        )
+    return board
