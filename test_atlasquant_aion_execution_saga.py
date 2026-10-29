@@ -99,7 +99,7 @@ class ExecutionSagaTests(unittest.TestCase):
 
     def _components(self, raw, **budget_limits):
         store = SQLiteChatStore(Path(raw) / "chat.sqlite3")
-        outbox = ExecutionOutbox(store, self.scope)
+        outbox = ExecutionOutbox(store, self.scope, first_attempt_guard=lambda _intent: True)
         budget = CumulativeAuthorityBudget(
             store,
             self.scope,
@@ -679,7 +679,7 @@ class ExecutionSagaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "chat.sqlite3"
             store = SQLiteChatStore(path)
-            outbox = ExecutionOutbox(store, self.scope)
+            outbox = ExecutionOutbox(store, self.scope, first_attempt_guard=lambda _intent: True)
             budget = CumulativeAuthorityBudget(
                 store,
                 self.scope,
@@ -697,7 +697,7 @@ class ExecutionSagaTests(unittest.TestCase):
             store.close()
 
             reopened = SQLiteChatStore(path)
-            outbox2 = ExecutionOutbox(reopened, self.scope)
+            outbox2 = ExecutionOutbox(reopened, self.scope, first_attempt_guard=lambda _intent: True)
             budget2 = CumulativeAuthorityBudget(
                 reopened,
                 self.scope,
