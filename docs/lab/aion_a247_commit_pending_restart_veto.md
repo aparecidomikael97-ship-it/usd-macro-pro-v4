@@ -7,6 +7,9 @@ A246 detecta um COMMIT com retorno incerto enquanto o mesmo objeto SQLite está 
 
 O marcador é um **veto local**, não uma raiz de confiança. É possível também bloquear a instância atual se outro escritor criar o marcador; durante operações normais isso pode reduzir disponibilidade, aceitável para laboratório. Não elimina corrida externa, mesma identidade do arquivo, adulteração host ou ambiente SQLite com WAL de origem não confiável.
 
+## Concorrência e limite de disponibilidade
+A primeira tentativa A247 quebrou o teste de 64 gravações concorrentes porque um `append_message` ou startup podia interpretar um marcador **temporário de outro escritor** como incerteza duradoura. A mitigação atual usa um gate `threading.RLock` **somente deste processo** para serializar a abertura de `SQLiteChatStore` e o ciclo completo `append_message + COMMIT + limpeza`. Uma espera limitada de no máximo aproximadamente 0,5 segundo serve apenas a condições transientes **entre processos**; se o marcador não desaparecer, o acesso é vetado. O gate não cobre outros writers, múltiplos processos nem usuários maliciosos, e tem custo de throughput. Qualquer falha longa de CI deve bloquear promoção.
+
 ## Ensaios
 - Operação normal remove o marcador e permite reabrir.
 - SQLite COMMIT verdadeiro seguido de exceção sintética antes do ACK deixa registro confirmado e marcador pendente; reabertura é recusada.
