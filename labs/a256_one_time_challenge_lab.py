@@ -145,7 +145,14 @@ class SyntheticOneTimeChallengeLab:
                 observed - record["issued_at"]
             ).total_seconds() > self._ttl:
                 return _deny("DENY_EXPIRED_CHALLENGE")
-            identity, origin_hash, decision_hash = self._binding(decision, origin_envelope)
+            try:
+                identity, origin_hash, decision_hash = self._binding(
+                    decision, origin_envelope
+                )
+            except Exception:
+                # A submitted nonce is already spent. A semantic or malformed
+                # event mismatch must remain an explicit fail-closed result.
+                return _deny("DENY_CHALLENGE_EVENT_MISMATCH")
             if (
                 identity != record["identity"]
                 or origin_hash != record["origin_hash"]
