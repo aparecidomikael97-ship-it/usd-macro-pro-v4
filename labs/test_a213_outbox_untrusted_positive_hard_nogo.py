@@ -10,6 +10,7 @@ import unittest
 
 from aion_chat.store import SQLiteChatStore
 from atlasquant_aion_execution_outbox import ExecutionOutbox
+from labs.a259_synthetic_outbox_fixture import SyntheticFirstAttemptOutboxLab
 from labs import test_a202_outbox_dispatch_atomic_cas as a202
 
 NOW = a202.NOW
@@ -214,7 +215,7 @@ class A213OutboxPositiveHardNoGoTests(unittest.TestCase):
             def old_reader():
                 local_store = SQLiteChatStore(path)
                 try:
-                    return ExecutionOutbox(local_store, SCOPE).reconcile(
+                    return SyntheticFirstAttemptOutboxLab(local_store, SCOPE).reconcile(
                         key, adapter=StalePositive(),
                         authorize=self.helper.authorize, now=NOW,
                     )
