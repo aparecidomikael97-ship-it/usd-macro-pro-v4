@@ -25,6 +25,10 @@ class StorageUnavailableError(RuntimeError):
     """Raised when a staging store cannot prove a safe local storage state."""
 
 
+class BackupPublicationUncertainError(StorageUnavailableError):
+    """A backup may already be visible; never retry blindly."""
+
+
 class RestorePublicationUncertainError(StorageUnavailableError):
     """Restore target may have been published: NEVER retry without inspection."""
 
@@ -251,6 +255,14 @@ class SQLiteChatStore:
         if destination.resolve() == self.path.resolve():
             raise ValueError("backup destination must differ from live database")
         destination.parent.mkdir(parents=True, exist_ok=True)
+        # Never treat an existing SQLite database, WAL or interrupted backup
+        # as an available backup destination. This check is advisory; the
+        # atomic hardlink below is the final publish-if-absent gate.
+        if any(os.path.lexists(str(destination) + suffix)
+               for suffix in ("", "-wal", "-shm", "-journal")):
+            raise StorageUnavailableError(
+                "backup denied: destination or SQLite sidecars already exist"
+            )
         checkpoint = self.wal_checkpoint("FULL")
         if checkpoint["busy"]:
             raise StorageUnavailableError("backup refused while WAL checkpoint is busy")
@@ -264,12 +276,50 @@ class SQLiteChatStore:
             target.close()
             target = None
             verified = _validate_database_file(temp)
-            os.replace(temp, destination)
+            # os.replace can detach a live SQLite handle while new readers
+            # open a different inode at the same destination pathname.
+            # Publish only under a free name; never overwrite any target.
+            if any(os.path.lexists(str(destination) + suffix)
+                   for suffix in ("", "-wal", "-shm", "-journal")):
+                raise StorageUnavailableError(
+                    "backup denied: destination or SQLite sidecars appeared"
+                )
+            try:
+                os.link(temp, destination)
+            except FileExistsError as exc:
+                raise StorageUnavailableError(
+                    "backup denied: destination created concurrently"
+                ) from exc
+            # From here, the destination may be visible even if a later step
+            # fails. Fail as UNCERTAIN, retain the published file, and require
+            # inspection before any manual recovery or reuse.
+            try:
+                dirsync_supported = _sync_staging_restore_directory(destination.parent)
+                if any(os.path.lexists(str(destination) + suffix)
+                       for suffix in ("-wal", "-shm", "-journal")):
+                    raise BackupPublicationUncertainError(
+                        "BACKUP_PUBLICATION_OUTCOME_UNKNOWN_SIDECAR_ZERO_AUTO_RETRY"
+                    )
+                before_cleanup = temp.stat()
+                published = destination.stat(follow_symlinks=False)
+                if (before_cleanup.st_dev, before_cleanup.st_ino) != (
+                    published.st_dev, published.st_ino
+                ):
+                    raise BackupPublicationUncertainError(
+                        "BACKUP_PUBLICATION_OUTCOME_UNKNOWN_TARGET_CHANGED_ZERO_AUTO_RETRY"
+                    )
+                temp.unlink()
+            except OSError as exc:
+                raise BackupPublicationUncertainError(
+                    "BACKUP_PUBLICATION_OUTCOME_UNKNOWN_POST_LINK_IO_ZERO_AUTO_RETRY"
+                ) from exc
             return {
                 "state": "BACKUP_VERIFIED",
                 "source_path": str(self.path),
                 "backup_path": str(destination),
                 "checkpoint": checkpoint,
+                "directory_sync_requested": dirsync_supported,
+                "power_loss_durability_verified": False,
                 **verified,
             }
         except (sqlite3.DatabaseError, OSError, StorageUnavailableError) as exc:
