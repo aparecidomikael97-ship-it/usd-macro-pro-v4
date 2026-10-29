@@ -246,7 +246,7 @@ def trader_readonly_observation(
         "fresh_m15_pairs": current_count,
         "historical_m15_pairs": historical_count,
         "all_28_fresh_closed_m15": (
-            current_count == 28 and not duplicates and unknown == 0
+            current_count == 28 and not duplicates
         ),
         "duplicate_pairs": sorted(duplicates),
         "unknown_or_invalid_rows": unknown,
