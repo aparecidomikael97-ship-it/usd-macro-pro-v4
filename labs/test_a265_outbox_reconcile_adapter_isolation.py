@@ -154,12 +154,23 @@ class A265ReconcileIsolationTests(unittest.TestCase):
         tmp, store, outbox, key = self.setup_uncertain()
         try:
             adapter = ActiveAdapter()
-            with ThreadPoolExecutor(max_workers=10) as pool:
-                results = list(pool.map(
-                    lambda _: outbox.reconcile(
+            # SQLite connections are thread-affine. Use a fresh connection
+            # in each worker to exercise concurrent READS without violating
+            # sqlite3.check_same_thread. No adapter callback may be reached.
+            path = Path(tmp.name) / "outbox.db"
+
+            def read_from_separate_handle(_):
+                local_store = SQLiteChatStore(path)
+                try:
+                    local = ExecutionOutbox(local_store, SCOPE)
+                    return local.reconcile(
                         key, adapter=adapter, authorize=_authorize, now=NOW,
-                    ), range(64),
-                ))
+                    )
+                finally:
+                    local_store.close()
+
+            with ThreadPoolExecutor(max_workers=10) as pool:
+                results = list(pool.map(read_from_separate_handle, range(64)))
             self.assertEqual(len(results), 64)
             self.assertTrue(all(x["state"] == "UNCERTAIN" for x in results))
             self.assertEqual(adapter.reconcile_calls, 0)
