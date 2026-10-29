@@ -877,7 +877,16 @@ class SQLiteChatStore:
         A failed ACK leaves the local marker in place. The marker may be
         removed by a hostile host, so it never authenticates external state.
         """
-        self._publish_message_commit_marker()
+        try:
+            self._publish_message_commit_marker()
+        except Exception as exc:
+            # No COMMIT attempted, but marker preparation may have partially
+            # published a veto. Never allow this handle to continue blindly.
+            self._health_state = FAILED
+            self._health_reason = "COMMIT_MARKER_PREPARE_UNKNOWN_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError(
+                "chat COMMIT marker preparation uncertain; no COMMIT permitted"
+            ) from exc
         try:
             self.db.commit()
         except Exception as exc:
@@ -886,7 +895,16 @@ class SQLiteChatStore:
             raise StoreCommitOutcomeUncertainError(
                 "chat COMMIT outcome unknown; this store cannot be reused"
             ) from exc
-        self._clear_message_commit_marker()
+        try:
+            self._clear_message_commit_marker()
+        except Exception as exc:
+            # The transaction may already have committed. A cleanup failure
+            # must be explicit UNCERTAIN, never mislabeled lock unavailable.
+            self._health_state = FAILED
+            self._health_reason = "COMMIT_MARKER_CLEAR_UNKNOWN_ZERO_AUTO_RETRY"
+            raise StoreCommitOutcomeUncertainError(
+                "chat COMMIT acknowledged but marker cleanup outcome uncertain"
+            ) from exc
 
     @_local_commit_gate
     def append_message(self, scope, message):
