@@ -257,8 +257,9 @@ class SQLiteChatStore:
                 "foreign_key_violations": None,
             }
         # A marker can be created by another writer after this handle opened.
-        # It vetoes all later operations, without proving a write happened.
-        if os.path.lexists(self._message_commit_marker):
+        # Allow a bounded grace for a concurrent, successfully completed
+        # commit to remove its transient marker; persistent uncertainty vetoes.
+        if self._pending_message_commit_fence():
             self._health_state = FAILED
             self._health_reason = "MESSAGE_COMMIT_PENDING_ZERO_AUTO_RETRY"
         # A failed identity/health gate cannot be cleared by a later
