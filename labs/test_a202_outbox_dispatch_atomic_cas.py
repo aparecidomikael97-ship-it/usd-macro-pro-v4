@@ -44,7 +44,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
     def seed_claim(self, root):
         path=Path(root)/"a202.sqlite3"
         store=SQLiteChatStore(path)
-        outbox=ExecutionOutbox(store,SCOPE)
+        outbox=ExecutionOutbox(store, SCOPE, first_attempt_guard=lambda _intent: True)
         pending=outbox.enqueue(
             intent_ref="one-original-intent",
             action="synthetic_local_effect",
@@ -94,7 +94,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
             def dispatch(_):
                 local_store=SQLiteChatStore(path)
                 try:
-                    local=ExecutionOutbox(local_store,SCOPE)
+                    local=ExecutionOutbox(local_store, SCOPE, first_attempt_guard=lambda _intent: True)
                     with connection_ids_lock:
                         connection_ids.append(id(local_store.db))
                     self.assertEqual(local.get(key)["state"],"CLAIMED")
@@ -131,7 +131,7 @@ class A202SameLeaseOwnerDispatchRaceTests(unittest.TestCase):
             check=SQLiteChatStore(path)
             try:
                 self.assertEqual(
-                    ExecutionOutbox(check,SCOPE).get(key)["state"],"UNCERTAIN",
+                    ExecutionOutbox(check, SCOPE, first_attempt_guard=lambda _intent: True).get(key)["state"],"UNCERTAIN",
                 )
             finally:
                 check.close()
