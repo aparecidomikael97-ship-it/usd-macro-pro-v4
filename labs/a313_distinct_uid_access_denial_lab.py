@@ -53,13 +53,13 @@ if mode == "restricted":
     except PermissionError:
         out["directory_list_denied"] = True
 elif mode == "public_read":
-    with closing(sqlite3.connect(
-        "file:" + path + "?mode=ro", uri=True, timeout=3
-    )) as db:
-        out["public_row_count"] = db.execute(
-            "SELECT COUNT(*) FROM conversations"
-        ).fetchone()[0]
-        out["public_read_observed"] = out["public_row_count"] == 1
+    # The control is OS-level file readability, not SQLite WAL/SHM
+    # semantics. A read-only SQLite connection may fail when WAL
+    # sidecars cannot be opened by an otherwise valid non-writer UID.
+    with open(path, "rb") as handle:
+        header = handle.read(16)
+    out["public_header_length"] = len(header)
+    out["public_read_observed"] = header == b"SQLite format 3\\x00"
 else:
     raise ValueError("Unknown A313 LAB subtest")
 print(json.dumps(out, sort_keys=True))
@@ -148,7 +148,11 @@ def probe_real_different_uid_fixture(*, timeout_seconds=15):
     if _known_distinct_uid() is None or shutil.which("sudo") is None:
         result["status"] = "DISTINCT_UID_LAB_RUNNER_UNAVAILABLE"
         return result
-    with TemporaryDirectory(prefix="a311-lab-a313-") as directory:
+    # /tmp is a traversable POSIX parent; hosted-runner TMPDIR may
+    # otherwise sit inside a runner-private directory unreadable by
+    # nobody, invalidating the positive permission control.
+    with TemporaryDirectory(prefix="a311-lab-a313-",
+                            dir="/tmp" if os.name == "posix" else None) as directory:
         folder = create_fixture(directory)
         create = run_lab_request(folder, {
             "schema": A311_SCHEMA, "action": "CREATE_SYNTHETIC_CONVERSATION",
