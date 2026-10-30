@@ -200,6 +200,9 @@ class A319OfflineRootContinuityTests(unittest.TestCase):
         self.next["roots"] = {
             k: pub(v) for k, v in self.new_signers.items()
         }
+        # Keep candidate structurally valid to isolate the cross-generation
+        # root-ID reuse check; removing revocation remains a separate veto.
+        self.next["revoked_root_ids"] = ["root-B-v4"]
         self.resign()
         r = self.assess()
         self.assertIn("ROOT_ID_REUSED_ON_ROTATION", r["issues"])
