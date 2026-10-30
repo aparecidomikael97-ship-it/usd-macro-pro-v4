@@ -316,5 +316,41 @@ class A268TraderReadOnlyObservationTests(unittest.TestCase):
         self.assertNotIn("resident_trader_state(", source)
 
 
+    def test_25_oversized_integer_resident_series_is_not_fresh(self):
+        giant = 10 ** 1000
+        for position in range(3):
+            with self.subTest(position=position):
+                row = _row()
+                row["series"][position] = giant
+                result = trader_readonly_observation(_resident(row), now=NOW)
+                self.assertEqual(
+                    _find(result, "EURUSD")["market_evidence"],
+                    "INSUFFICIENT_OR_UNVERIFIED",
+                )
+                self.assertEqual(result["fresh_m15_pairs"], 0)
+                self.assertFalse(result["all_28_fresh_closed_m15"])
+                self.assertTrue(result["no_orders"])
+
+    def test_26_oversized_currency_strength_is_unavailable_not_signal(self):
+        for score in (10 ** 1000, -(10 ** 1000)):
+            with self.subTest(sign="positive" if score > 0 else "negative"):
+                raw = _strength()
+                raw["scores"]["EUR"] = score
+                result = trader_readonly_observation(
+                    _resident(_row()), now=NOW, currency_strength=raw,
+                )
+                self.assertEqual(
+                    result["relative_strength_status"], "UNAVAILABLE_OR_STALE"
+                )
+                self.assertEqual(
+                    _find(result, "EURUSD")["relative_currency"]["direction"],
+                    "UNKNOWN",
+                )
+                self.assertTrue(all(
+                    item["recommendation"] == "NONE_READ_ONLY"
+                    for item in result["rows"]
+                ))
+
+
 if __name__ == "__main__":
     unittest.main()
