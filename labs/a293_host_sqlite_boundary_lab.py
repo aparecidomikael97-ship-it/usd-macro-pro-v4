@@ -102,7 +102,9 @@ def probe_external_process_write(*, strict=True):
                 "guard_rejected_next_read": denied_next_read,
                 "store_health_failed": store._health_state == FAILED,
                 "local_reason": store._health_reason,
-                "external_change_visible_before_guard": (\n                    affected == "external-process-tampered"\n                ),
+                "external_change_visible_before_guard": (
+                    affected == "external-process-tampered"
+                ),
             })
         finally:
             store.close()
