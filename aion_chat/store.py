@@ -238,7 +238,8 @@ def _validate_database_file(path: Path) -> dict:
 
 class SQLiteChatStore:
     @_local_commit_gate
-    def __init__(self, path, *, strict_local_data_version=False):
+    def __init__(self, path, *, strict_local_data_version=False,
+                 strict_private_write_helpers=False):
         """Open local staging. Strict data_version is opt-in single-writer LAB.
 
         A changed SQLite data_version indicates another connection committed.
@@ -248,6 +249,13 @@ class SQLiteChatStore:
         """
         if type(strict_local_data_version) is not bool:
             raise TypeError("strict_local_data_version must be bool")
+        if type(strict_private_write_helpers) is not bool:
+            raise TypeError("strict_private_write_helpers must be bool")
+        # A309 LAB opt-in only: this is a cooperative in-process check,
+        # not a secure barrier against direct sqlite3 or hostile host code.
+        self._strict_private_write_helpers = strict_private_write_helpers
+        self._private_helper_write_owner = None
+        self._private_helper_write_depth = 0
         self._strict_local_data_version = strict_local_data_version
         self._local_data_version_baseline = None
         self.path = Path(path)
@@ -838,6 +846,7 @@ class SQLiteChatStore:
         return Conversation(**json.loads(row[0]))
 
     def _update(self, c):
+        self._require_fenced_private_helper_write()
         self.db.execute(
             "UPDATE conversations SET updated=?,archived=?,title=?,data=? WHERE id=?",
             (c.updated_at, c.archived, c.title, dump(c), c.id),
@@ -999,6 +1008,61 @@ class SQLiteChatStore:
             ) from exc
 
     @contextmanager
+    def _private_helper_write_scope(self):
+        """A309 cooperative opt-in: only permit helpers in public write phase.
+
+        This private scope is not an independent authority, and untrusted
+        Python code can invoke it or self.db directly. It reduces accidental
+        and same-process raw helper bypasses, not the canonical P0-6.
+        """
+        # The default remains legacy-compatible, including synthetic
+        # connection proxies that do not expose sqlite3.in_transaction.
+        # Strict A309 checks are opt-in and never silently activated.
+        if not self._strict_private_write_helpers:
+            yield
+            return
+        self._require_open()
+        # Fail closed if a connection proxy does not expose this native
+        # sqlite3 property; do not mistake a missing proof for a transaction.
+        if getattr(self.db, "in_transaction", None) is not True:
+            self._health_state = FAILED
+            self._health_reason = "PRIVATE_HELPER_TRANSACTION_UNVERIFIED_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError(
+                "private helper scope cannot prove SQLite transaction"
+            )
+        owner = threading.get_ident()
+        if self._private_helper_write_depth and (
+            self._private_helper_write_owner != owner
+        ):
+            self._health_state = FAILED
+            self._health_reason = "PRIVATE_HELPER_SCOPE_THREAD_MISMATCH_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError("private helper scope thread mismatch")
+        self._private_helper_write_owner = owner
+        self._private_helper_write_depth += 1
+        try:
+            yield
+        finally:
+            self._private_helper_write_depth -= 1
+            if self._private_helper_write_depth == 0:
+                self._private_helper_write_owner = None
+
+    def _require_fenced_private_helper_write(self):
+        """Reject direct helpers before the first DML in strict A309 LAB mode."""
+        if not self._strict_private_write_helpers:
+            return
+        self._require_open()
+        if (
+            self._private_helper_write_depth < 1
+            or self._private_helper_write_owner != threading.get_ident()
+            or getattr(self.db, "in_transaction", None) is not True
+        ):
+            self._health_state = FAILED
+            self._health_reason = "PRIVATE_HELPER_OUTSIDE_FENCED_WRITE_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError(
+                "unfenced private SQL helper denied; ZERO_AUTO_RESEND"
+            )
+
+    @contextmanager
     def _fenced_chat_transaction(self):
         """A251: protect remaining staged-chat writers with one shared fence.
 
@@ -1009,7 +1073,8 @@ class SQLiteChatStore:
         self._require_open()
         try:
             self.db.execute("BEGIN IMMEDIATE")
-            yield
+            with self._private_helper_write_scope():
+                yield
             self._commit_fenced_chat_write()
         except Exception as exc:
             try:
@@ -1041,7 +1106,8 @@ class SQLiteChatStore:
                 (message.id, c.id, message.sequence, message.content, dump(message)),
             )
             c.message_count, c.updated_at = message.sequence, now()
-            self._update(c)
+            with self._private_helper_write_scope():
+                self._update(c)
             self._commit_fenced_chat_write()
         except Exception as exc:
             try:
@@ -1083,6 +1149,7 @@ class SQLiteChatStore:
         return Message(**json.loads(row[0]))
 
     def _save_record(self, scope, kind, value, seq=0):
+        self._require_fenced_private_helper_write()
         c = self.get_conversation(scope, value.conversation_id)
         if not isinstance(seq, int) or not 0 <= seq <= c.message_count:
             raise ValueError("invalid coverage sequence")

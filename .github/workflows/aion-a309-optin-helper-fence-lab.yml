@@ -1,0 +1,31 @@
+name: A309 opt-in SQLite private helper fence LAB
+
+on:
+  pull_request:
+    paths:
+      - 'aion_chat/store.py'
+      - 'labs/test_a309_optin_private_helper_write_fence_lab.py'
+      - 'docs/lab/aion_a309_optin_private_helper_write_fence_lab.md'
+      - '.github/workflows/aion-a309-optin-helper-fence-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-helper-lab:
+    name: A309 opt-in private helper fence — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A309 opt-in and A246/A247/A292/A293/A299 native regressions
+        run: |
+          python -m unittest -v labs.test_a309_optin_private_helper_write_fence_lab labs.test_a246_chat_commit_uncertainty labs.test_a247_commit_pending_restart_veto labs.test_a292_staged_chat_write_inventory_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab
