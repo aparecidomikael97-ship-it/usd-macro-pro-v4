@@ -18,6 +18,7 @@ from aion_chat.store import (
     StoreCommitOutcomeUncertainError,
 )
 from labs.a291_chat_write_gate_commit_fence_lab import SyntheticAckLossConnection
+from labs.test_a246_chat_commit_uncertainty import LostAckConnection
 from labs.a292_staged_chat_write_inventory_lab import (
     _synthetic_attachment, probe_real_raw_helper_bypasses,
 )
@@ -268,6 +269,71 @@ class A309UncertainAckTests(unittest.TestCase):
                     path, strict_private_write_helpers=True,
                 )
                 reopened.close()
+
+
+class A309LegacyConnectionProxyRegressionTests(unittest.TestCase):
+    def test_legacy_lost_ack_proxy_without_in_transaction_preserves_veto(self):
+        """Regression for six A246/A247 failures seen on first A309 CI."""
+        with TemporaryDirectory(prefix="a309-legacy-lost-ack-") as raw:
+            path = Path(raw) / "storage.db"
+            store = SQLiteChatStore(path)  # opt-in MUST be false
+            try:
+                c = store.create_conversation(SCOPE, "legacy ack")
+                proxy = LostAckConnection(store.db, after_commit=True)
+                self.assertFalse(hasattr(proxy, "in_transaction"))
+                store.db = proxy
+                with self.assertRaises(StoreCommitOutcomeUncertainError):
+                    store.append_message(
+                        SCOPE, Message(c.id, "user", "once",
+                                       id="a309-legacy-lost-ack"),
+                    )
+                self.assertEqual(_count(path, "messages"), 1)
+                self.assertEqual(proxy.commit_calls, 1)
+                self.assertEqual(
+                    store._health_reason,
+                    "COMMIT_OUTCOME_UNKNOWN_ZERO_AUTO_RETRY",
+                )
+                self.assertTrue(store._message_commit_marker.exists())
+                with self.assertRaises(StorageUnavailableError):
+                    store.append_message(
+                        SCOPE, Message(c.id, "user", "no retry",
+                                       id="a309-retry-denied"),
+                    )
+                self.assertEqual(_count(path, "messages"), 1)
+            finally:
+                store.close()
+
+    def test_strict_mode_proxy_without_transaction_property_fails_closed(self):
+        """An unknown transaction status is no authority to COMMIT."""
+        with TemporaryDirectory(prefix="a309-strict-proxy-") as raw:
+            path = Path(raw) / "storage.db"
+            store = SQLiteChatStore(
+                path, strict_private_write_helpers=True,
+            )
+            try:
+                c = store.create_conversation(SCOPE, "strict")
+                proxy = LostAckConnection(store.db, after_commit=True)
+                self.assertFalse(hasattr(proxy, "in_transaction"))
+                store.db = proxy
+                with self.assertRaises(StorageUnavailableError):
+                    store.append_message(
+                        SCOPE, Message(c.id, "user", "untrusted",
+                                       id="a309-strict-unknown-transaction"),
+                    )
+                self.assertEqual(
+                    store._health_reason,
+                    "PRIVATE_HELPER_TRANSACTION_UNVERIFIED_ZERO_AUTO_RETRY",
+                )
+                self.assertEqual(store._health_state, FAILED)
+                self.assertEqual(proxy.commit_calls, 0)
+                self.assertEqual(_count(path, "messages"), 0)
+                with self.assertRaises(StorageUnavailableError):
+                    store.append_message(
+                        SCOPE, Message(c.id, "user", "retry",
+                                       id="a309-no-retry-strict"),
+                    )
+            finally:
+                store.close()
 
 
 if __name__ == "__main__":
