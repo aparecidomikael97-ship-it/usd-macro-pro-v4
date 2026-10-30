@@ -1346,12 +1346,25 @@ class SQLiteChatStore:
                     "SELECT cid, content, seq, data FROM messages WHERE id=?",
                     (row["message_id"],),
                 ).fetchone()
+                # A316: cross-check the separate message artifact too.
+                # A pre-A316 receipt without matching metadata is ambiguous,
+                # and MUST NOT be silently promoted to an authentic receipt.
+                trace = None
+                if stored is not None:
+                    try:
+                        raw_message = json.loads(stored["data"])
+                        trace = raw_message.get("metadata")
+                    except (TypeError, ValueError, AttributeError):
+                        trace = None
                 if (
                     stored is None
                     or stored["cid"] != row["cid"]
                     or row["cid"] != message.conversation_id
                     or stored["content"] != message.content
                     or stored["seq"] != row["seq"]
+                    or type(trace) is not dict
+                    or trace.get("a316_semantic_intent_id") != intent_id
+                    or trace.get("a316_payload_digest") != digest
                 ):
                     self._health_state = FAILED
                     self._health_reason = "A315_LOCAL_INTENT_RECEIPT_DIVERGED"
@@ -1362,10 +1375,35 @@ class SQLiteChatStore:
                 return report("DUPLICATE_LOCAL_NO_EFFECT",
                               stored_id=row["message_id"],
                               sequence=row["seq"])
+            # A316 local orphan check: if a privileged same-host process
+            # deletes only the receipt, the original message still carries
+            # its intent metadata and can veto a duplicate. This is NOT
+            # independent rollback custody; host can erase both artifacts.
+            orphan = self.db.execute(
+                "SELECT m.id FROM messages AS m "
+                "JOIN conversations AS c ON c.id=m.cid "
+                "WHERE c.owner=? AND c.tenant=? AND c.workspace=? "
+                "AND json_extract(m.data, "
+                "'$.metadata.a316_semantic_intent_id')=? LIMIT 1",
+                (scope.owner_id, scope.tenant_id,
+                 scope.workspace_id, intent_id),
+            ).fetchone()
+            if orphan is not None:
+                self._health_state = FAILED
+                self._health_reason = (
+                    "A316_LOCAL_INTENT_RECEIPT_MISSING_ZERO_AUTO_RETRY"
+                )
+                raise StorageUnavailableError(
+                    "orphan semantic intent message without receipt; NO RETRY"
+                )
             conversation = self.get_conversation(
                 scope, message.conversation_id
             )
             recorded = Message(**redact(asdict(message)))
+            recorded.metadata = {
+                "a316_semantic_intent_id": intent_id,
+                "a316_payload_digest": digest,
+            }
             recorded.sequence = conversation.message_count + 1
             self.db.execute(
                 "INSERT INTO messages VALUES (?,?,?,?,?)",
