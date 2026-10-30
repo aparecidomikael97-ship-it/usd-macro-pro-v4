@@ -100,6 +100,41 @@ def _check_python_source(name: str, data: bytes) -> None:
         ):
             raise OfflineBundleRejected("first-attempt gate must be literal False")
 
+        # A274: a literal False in _reserved_first_attempt is insufficient
+        # if dispatch/reconciliation reads a host adapter or calls a
+        # forged authorizer elsewhere. This is a narrow AST negative guard,
+        # NOT a proof against arbitrary Python/host mutation.
+        forbidden_params = {
+            "adapter", "authorize", "cumulative_authority_guard",
+        }
+        forbidden_builtins = {
+            "eval", "exec", "getattr", "setattr", "locals", "globals",
+            "__import__",
+        }
+        forbidden_methods = {
+            "_authorization_gate", "_reserved_first_attempt",
+            "_confirm", "send", "reconcile",
+        }
+        for method_name in ("dispatch_claimed", "reconcile"):
+            methods = [
+                node for node in klass.body
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == method_name
+            ]
+            if len(methods) != 1 or not isinstance(methods[0], ast.FunctionDef):
+                raise OfflineBundleRejected("normal no-send method missing or duplicated")
+            method = methods[0]
+            for node in ast.walk(method):
+                if isinstance(node, ast.Name) and node.id in forbidden_params:
+                    raise OfflineBundleRejected("host callback or adapter used by runtime")
+                if isinstance(node, ast.Call):
+                    if (isinstance(node.func, ast.Name)
+                            and node.func.id in forbidden_builtins):
+                        raise OfflineBundleRejected("dynamic callback lookup in no-send method")
+                    if (isinstance(node.func, ast.Attribute)
+                            and node.func.attr in forbidden_methods):
+                        raise OfflineBundleRejected("send or authorization method called")
+
 
 def _canonical(value) -> bytes:
     return (json.dumps(
