@@ -285,5 +285,83 @@ class A267HostCallbackIsolationTests(unittest.TestCase):
             tmp.cleanup()
 
 
+    def test_14_dispatch_rejects_hostile_stringification_before_any_effect(self):
+        class HostileKey:
+            def __init__(self):
+                self.calls = 0
+
+            def __str__(self):
+                self.calls += 1
+                raise AssertionError("must never stringify host object")
+
+        tmp, store, outbox, key = _claimed()
+        try:
+            for field in ("idempotency_key", "worker_id", "now"):
+                with self.subTest(field=field):
+                    hostile = HostileKey()
+                    auth, adapter = SpyCallback(), SyntheticAdapter()
+                    kwargs = {
+                        "idempotency_key": key,
+                        "worker_id": "a259-worker",
+                        "authorize": auth,
+                        "adapter": adapter,
+                        "now": NOW,
+                    }
+                    kwargs[field] = hostile
+                    with self.assertRaises(TypeError):
+                        outbox.dispatch_claimed(**kwargs)
+                    self.assertEqual(hostile.calls, 0)
+                    self.assertEqual((auth.calls, adapter.calls), (0, 0))
+                    self.assertEqual(outbox.get(key)["state"], "CLAIMED")
+                    self.assertEqual(outbox.effect_count(), 0)
+        finally:
+            store.close()
+            tmp.cleanup()
+
+    def test_15_string_subclass_with_hostile_str_is_also_rejected(self):
+        class StringSubclass(str):
+            def __str__(self):
+                raise AssertionError("do not call subclass __str__")
+
+        tmp, store, outbox, key = _claimed()
+        try:
+            with self.assertRaises(TypeError):
+                outbox.dispatch_claimed(
+                    StringSubclass(key), worker_id="a259-worker",
+                    authorize=SpyCallback(), adapter=object(), now=NOW,
+                )
+            self.assertEqual(outbox.get(key)["state"], "CLAIMED")
+        finally:
+            store.close()
+            tmp.cleanup()
+
+    def test_16_reconcile_rejects_object_key_without_stringification(self):
+        class HostileKey:
+            def __init__(self):
+                self.calls = 0
+
+            def __str__(self):
+                self.calls += 1
+                raise AssertionError("reconciliation must not stringify")
+
+        tmp, store, outbox, key = _claimed()
+        try:
+            outbox.dispatch_claimed(
+                key, worker_id="a259-worker", authorize=SpyCallback(),
+                adapter=object(), now=NOW,
+            )
+            hostile = HostileKey()
+            with self.assertRaises(TypeError):
+                outbox.reconcile(
+                    hostile, authorize=SpyCallback(), adapter=object(), now=NOW,
+                )
+            self.assertEqual(hostile.calls, 0)
+            self.assertEqual(outbox.get(key)["state"], "UNCERTAIN")
+            self.assertEqual(outbox.effect_count(), 0)
+        finally:
+            store.close()
+            tmp.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()
