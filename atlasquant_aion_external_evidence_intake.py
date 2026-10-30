@@ -63,8 +63,8 @@ def _deny(code: str) -> CandidatePreflight:
 
 
 def _utc(value: Any) -> datetime:
-    if not isinstance(value, str):
-        raise ValueError("ISO-8601 timestamp text required")
+    if type(value) is not str:
+        raise ValueError("plain ISO-8601 timestamp text required")
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("timezone required")
@@ -73,7 +73,7 @@ def _utc(value: Any) -> datetime:
 
 def _observed_utc(value: Any) -> datetime:
     """Caller observation may be aware datetime or ISO text; neither is trusted."""
-    if isinstance(value, datetime):
+    if type(value) is datetime:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("timezone required for observed_at")
         return value.astimezone(timezone.utc)
@@ -81,16 +81,16 @@ def _observed_utc(value: Any) -> datetime:
 
 
 def _token(value: Any) -> bool:
-    return isinstance(value, str) and _TOK.fullmatch(value) is not None
+    return type(value) is str and _TOK.fullmatch(value) is not None
 
 
 def _hex(value: Any) -> bool:
-    return isinstance(value, str) and _HEX.fullmatch(value) is not None
+    return type(value) is str and _HEX.fullmatch(value) is not None
 
 
 def decode_candidate_json(raw: Any) -> dict[str, Any]:
     """Reject duplicate keys before the host can collapse them silently."""
-    if not isinstance(raw, str) or len(raw.encode("utf-8")) > 8192:
+    if type(raw) is not str or len(raw.encode("utf-8")) > 8192:
         raise ValueError("candidate JSON must be text and <=8192 bytes")
 
     def unique_pairs(pairs):
@@ -118,12 +118,24 @@ def decode_candidate_json(raw: Any) -> dict[str, Any]:
 
 def make_local_evidence_challenge(outbox_record: Any) -> LocalEvidenceChallenge:
     """Derive a deterministic *local* question from one ambiguous intent."""
-    if not isinstance(outbox_record, Mapping) or outbox_record.get("schema") != OUTBOX_SCHEMA:
+    # Dict/field subclasses may execute arbitrary Python in get/eq/iteration.
+    # This is untrusted local input, never an external authority proof.
+    if type(outbox_record) is not dict:
+        raise ValueError("outbox record must be a plain dict")
+    if (type(outbox_record.get("schema")) is not str
+            or outbox_record["schema"] != OUTBOX_SCHEMA):
         raise ValueError("outbox record unavailable")
-    if outbox_record.get("state") not in {"SENT", "UNCERTAIN"}:
+    if (type(outbox_record.get("state")) is not str
+            or outbox_record["state"] not in {"SENT", "UNCERTAIN"}):
         raise ValueError("only ambiguous SENT or UNCERTAIN may be examined")
+    for field in ("idempotency_key", "decision_id", "aggregate_key",
+                  "aggregate_seq", "sent_at"):
+        if type(outbox_record.get(field)) not in (str, int, type(None)):
+            raise ValueError("local record has nonprimitive binding")
     decision = outbox_record.get("decision")
-    if not isinstance(decision, Mapping) or decision.get("schema") != OUTBOX_SCHEMA:
+    if (type(decision) is not dict
+            or type(decision.get("schema")) is not str
+            or decision["schema"] != OUTBOX_SCHEMA):
         raise ValueError("decision missing or malformed")
 
     body = {
@@ -155,6 +167,10 @@ def make_local_evidence_challenge(outbox_record: Any) -> LocalEvidenceChallenge:
         "grants_authority": decision.get("grants_authority"),
     }
 
+    # A273: no Python object equality/stringification during preflight.
+    if any(type(value) not in (str, int, float, bool, type(None))
+           for value in body.values()):
+        raise ValueError("local binding has nonprimitive value")
     for name in _TOK_FIELDS:
         if not _token(body[name]):
             raise ValueError("local token binding malformed")
@@ -218,13 +234,18 @@ def preflight_untrusted_effect_candidate(
     except (ValueError, OverflowError, TypeError):
         return _deny("LOCAL_INTENT_UNAVAILABLE")
 
-    if isinstance(candidate, str):
+    if type(candidate) is str:
         try:
             candidate = decode_candidate_json(candidate)
         except ValueError:
             return _deny("MALFORMED_OR_AMBIGUOUS_CANDIDATE")
-    if not isinstance(candidate, Mapping) or set(candidate) != _CANDIDATE_KEYS:
+    if (type(candidate) is not dict
+            or any(type(key) is not str for key in candidate)
+            or set(candidate) != _CANDIDATE_KEYS):
         return _deny("CANDIDATE_ENVELOPE_NOT_EXACT")
+    if any(type(value) not in (str, int, float, bool, type(None))
+           for value in candidate.values()):
+        return _deny("CANDIDATE_NONPRIMITIVE_UNTRUSTED")
     if candidate.get("schema") != CANDIDATE_SCHEMA:
         return _deny("UNSUPPORTED_CANDIDATE_SCHEMA")
     if not _hex(candidate.get("challenge_digest")):
