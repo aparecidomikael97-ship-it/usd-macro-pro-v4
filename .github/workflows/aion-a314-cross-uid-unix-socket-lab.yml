@@ -1,0 +1,34 @@
+name: A314 real Linux SO_PEERCRED SQLite IPC writer LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a314_cross_uid_sqlite_socket_lab.py'
+      - 'labs/test_a314_cross_uid_sqlite_socket_lab.py'
+      - 'docs/lab/aion_a314_cross_uid_unix_socket_lab.md'
+      - '.github/workflows/aion-a314-cross-uid-unix-socket-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-ipc-boundary:
+    name: A314 Linux kernel peer UID socket test — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prove cross-UID IPC in disposable Ubuntu and regressions on both OS
+        env:
+          A314_REQUIRE_CROSS_UID_SOCKET: ${{ runner.os == 'Linux' && '1' || '0' }}
+          A313_REQUIRE_DIFFERENT_UID: ${{ runner.os == 'Linux' && '1' || '0' }}
+        run: |
+          python -m unittest -v labs.test_a314_cross_uid_sqlite_socket_lab labs.test_a313_distinct_uid_access_denial_lab labs.test_a312_os_principal_file_boundary_lab labs.test_a311_process_isolated_sqlite_lab labs.test_a310_optin_sqlite_authorizer_composition_lab labs.test_a309_optin_private_helper_write_fence_lab labs.test_a246_chat_commit_uncertainty labs.test_a247_commit_pending_restart_veto labs.test_a292_staged_chat_write_inventory_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab
