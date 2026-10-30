@@ -190,7 +190,12 @@ class A314ActualCrossUIDIPCTests(unittest.TestCase):
             private = Path(temp) / "a311-lab-a314-private"
             private.mkdir()
             create_fixture(private)
-            self.assertIsNotNone(_clean_fixture(temp))
+            if os.name == "posix":
+                self.assertIsNotNone(_clean_fixture(temp))
+            else:
+                # This POSIX-only helper must never claim socket/UID
+                # authentication on Windows merely because a marker exists.
+                self.assertIsNone(_clean_fixture(temp))
             (private / ".a311-disposable-synthetic-only").unlink()
             self.assertIsNone(_clean_fixture(temp))
 
