@@ -238,7 +238,18 @@ def _validate_database_file(path: Path) -> dict:
 
 class SQLiteChatStore:
     @_local_commit_gate
-    def __init__(self, path):
+    def __init__(self, path, *, strict_local_data_version=False):
+        """Open local staging. Strict data_version is opt-in single-writer LAB.
+
+        A changed SQLite data_version indicates another connection committed.
+        It cannot authenticate that connection, detect own writes, attest older
+        history after reopening, or prove native VFS/FD / off-host custody.
+        Shared multi-connection chat workloads must keep the default False.
+        """
+        if type(strict_local_data_version) is not bool:
+            raise TypeError("strict_local_data_version must be bool")
+        self._strict_local_data_version = strict_local_data_version
+        self._local_data_version_baseline = None
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         # A247 LAB: local crash/ACK-loss veto only; host-admin can tamper.
@@ -301,6 +312,12 @@ class SQLiteChatStore:
                 kind TEXT NOT NULL,seq INTEGER NOT NULL,data TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS record_history ON records(cid,kind,seq,id);
             """)
+            if self._strict_local_data_version:
+                self._local_data_version_baseline = self._read_local_data_version()
+                if self._local_data_version_baseline is None:
+                    raise StorageUnavailableError(
+                        "staging SQLite local data_version unavailable at startup"
+                    )
             report = self.storage_health(deep=True)
             if report["state"] != HEALTHY:
                 raise StorageUnavailableError(
@@ -340,6 +357,27 @@ class SQLiteChatStore:
             return "PATH_IDENTITY_CHANGED"
         return "OK"
 
+    def _read_local_data_version(self):
+        """Local connection counter only; never an independent witness."""
+        if self.db is None:
+            return None
+        try:
+            row = self.db.execute("PRAGMA data_version").fetchone()
+            value = row[0] if row is not None else None
+            return value if type(value) is int and value >= 0 else None
+        except (sqlite3.DatabaseError, TypeError, ValueError):
+            return None
+
+    def _local_data_version_reason(self):
+        if not self._strict_local_data_version:
+            return "OK"
+        version = self._read_local_data_version()
+        if version is None or self._local_data_version_baseline is None:
+            return "LOCAL_DATA_VERSION_UNAVAILABLE"
+        if version != self._local_data_version_baseline:
+            return "LOCAL_DATA_VERSION_CHANGED"
+        return "OK"
+
     def _pending_message_commit_fence(self) -> bool:
         """Bounded grace for an in-flight *normal* COMMIT cleanup.
 
@@ -372,6 +410,14 @@ class SQLiteChatStore:
             self._health_state = FAILED
             self._health_reason = reason
             raise StorageUnavailableError("staging store pathname binding lost: " + reason)
+        # A286 LAB: fail closed only in explicitly selected single-writer mode.
+        reason = self._local_data_version_reason()
+        if reason != "OK":
+            self._health_state = FAILED
+            self._health_reason = reason
+            raise StorageUnavailableError(
+                "staging SQLite local external-change guard failed: " + reason
+            )
 
     def storage_health(self, *, deep=False):
         if self.db is None:
@@ -409,6 +455,20 @@ class SQLiteChatStore:
             return {
                 "state": FAILED,
                 "reason": reason,
+                "path": str(self.path),
+                "journal_mode": "",
+                "busy_timeout_ms": 0,
+                "quick_check": "not_run",
+                "foreign_key_violations": None,
+            }
+        # A286 LAB: health checks must not silently clear a strict-mode veto.
+        local_reason = self._local_data_version_reason()
+        if local_reason != "OK":
+            self._health_state = FAILED
+            self._health_reason = local_reason
+            return {
+                "state": FAILED,
+                "reason": local_reason,
                 "path": str(self.path),
                 "journal_mode": "",
                 "busy_timeout_ms": 0,
