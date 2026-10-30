@@ -1015,6 +1015,12 @@ class SQLiteChatStore:
         Python code can invoke it or self.db directly. It reduces accidental
         and same-process raw helper bypasses, not the canonical P0-6.
         """
+        # The default remains legacy-compatible, including synthetic
+        # connection proxies that do not expose sqlite3.in_transaction.
+        # Strict A309 checks are opt-in and never silently activated.
+        if not self._strict_private_write_helpers:
+            yield
+            return
         self._require_open()
         if not self.db.in_transaction:
             raise StorageUnavailableError(
