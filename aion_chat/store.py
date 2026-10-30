@@ -1022,9 +1022,13 @@ class SQLiteChatStore:
             yield
             return
         self._require_open()
-        if not self.db.in_transaction:
+        # Fail closed if a connection proxy does not expose this native
+        # sqlite3 property; do not mistake a missing proof for a transaction.
+        if getattr(self.db, "in_transaction", None) is not True:
+            self._health_state = FAILED
+            self._health_reason = "PRIVATE_HELPER_TRANSACTION_UNVERIFIED_ZERO_AUTO_RETRY"
             raise StorageUnavailableError(
-                "private helper write scope requires an active SQLite transaction"
+                "private helper scope cannot prove SQLite transaction"
             )
         owner = threading.get_ident()
         if self._private_helper_write_depth and (
@@ -1050,7 +1054,7 @@ class SQLiteChatStore:
         if (
             self._private_helper_write_depth < 1
             or self._private_helper_write_owner != threading.get_ident()
-            or not self.db.in_transaction
+            or getattr(self.db, "in_transaction", None) is not True
         ):
             self._health_state = FAILED
             self._health_reason = "PRIVATE_HELPER_OUTSIDE_FENCED_WRITE_ZERO_AUTO_RETRY"
