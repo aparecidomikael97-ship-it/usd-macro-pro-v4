@@ -56,7 +56,14 @@ def _asset(value: Any) -> str | None:
 
 
 def _number(value: Any) -> bool:
-    return type(value) in (int, float) and math.isfinite(value) and value > 0
+    # Even native Python ints can overflow float conversion inside isfinite.
+    # Reject oversized untrusted OHLC values instead of propagating an error.
+    if type(value) not in (int, float) or value <= 0:
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        return False
 
 
 def classify_tf(record: Any, timeframe: str, *, now: datetime) -> tuple[str, float | None]:
