@@ -284,7 +284,7 @@ class A320OfflineCustodyCeremonyTests(unittest.TestCase):
     def test_manifest_incident_epoch_does_not_match_precommit(self):
         pre = dict(self.precommit)
         pre["incident_epoch"] += 1
-        self.assert_veto(self.verify(), "LAB_CUSTODY_CEREMONY_VETO") if False else self.assert_veto(
+        self.assert_veto(
             self.verify(offline_precommit=pre),
             "PRECOMMIT_INCIDENT_EPOCH_MISMATCH",
         )
