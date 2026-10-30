@@ -31,7 +31,7 @@ PRECOMMIT_FIELDS = frozenset((
 ))
 SIGNED_FIELDS = PRECOMMIT_FIELDS | frozenset((
     "custodian_id", "custody_domain", "channel_id", "device_id",
-    "evidence_digest", "decision",
+    "evidence_digest", "witnessed_at", "decision",
 ))
 ALL_FIELDS = SIGNED_FIELDS | {"signature_hex"}
 
@@ -111,7 +111,7 @@ def _shape_packet(value):
         ))
         and all(_nonneg_int(value[k]) for k in (
             "root_generation", "incident_epoch", "high_water_sequence",
-            "recorded_at",
+            "recorded_at", "witnessed_at",
         ))
         and value["decision"] == "HOLD_ONLY"
         and type(value["signature_hex"]) is str
@@ -153,7 +153,8 @@ def verify_offline_custody_ceremony(
         rotation["status"] == "LAB_MATH_CONTINUITY_VALID_NO_EXTERNAL_PIN"
     )
     if not transition_math:
-        issues.append("A319_ROTATION_MATHEMATICS_DENIED")
+        return outcome("LAB_CUSTODY_CEREMONY_VETO",
+                       ["A319_ROTATION_MATHEMATICS_DENIED"])
 
     expected = {
         "schema": SCHEMA,
@@ -172,7 +173,8 @@ def verify_offline_custody_ceremony(
         issues.append("PRECOMMIT_NOT_BEFORE_ROTATION")
 
     if any(not _safe_id(k) or not _hex64(v) for k, v in custodian_pins.items()):
-        issues.append("CUSTODIAN_PIN_FORMAT_INVALID")
+        return outcome("LAB_CUSTODY_CEREMONY_VETO",
+                       ["CUSTODIAN_PIN_FORMAT_INVALID"], 0, transition_math)
     if len(set(custodian_pins.values())) != 2:
         issues.append("CUSTODIAN_PINS_REUSED")
 
@@ -191,9 +193,9 @@ def verify_offline_custody_ceremony(
             if packet.get(k) != v:
                 issues.append("CUSTODIAN_PACKET_PRECOMMIT_MISMATCH")
                 break
-        if packet["recorded_at"] < offline_precommit["recorded_at"]:
+        if packet["witnessed_at"] <= offline_precommit["recorded_at"]:
             issues.append("CUSTODIAN_PACKET_BEFORE_PRECOMMIT")
-        if packet["recorded_at"] >= candidate.get("expires_at", -1):
+        if packet["witnessed_at"] >= candidate["expires_at"]:
             issues.append("CUSTODIAN_PACKET_EXPIRED")
         pin = custodian_pins.get(packet["custodian_id"])
         if pin is None:
