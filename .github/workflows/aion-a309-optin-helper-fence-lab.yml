@@ -26,6 +26,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: A309 opt-in hardening and original A292/A293/A299 regressions
+      - name: A309 opt-in and A246/A247/A292/A293/A299 native regressions
         run: |
-          python -m unittest -v labs.test_a309_optin_private_helper_write_fence_lab labs.test_a292_staged_chat_write_inventory_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab
+          python -m unittest -v labs.test_a309_optin_private_helper_write_fence_lab labs.test_a246_chat_commit_uncertainty labs.test_a247_commit_pending_restart_veto labs.test_a292_staged_chat_write_inventory_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab
