@@ -62,14 +62,15 @@ class A315AtomicSemanticIntentTests(unittest.TestCase):
         (self.folder / MARKER).write_text(MARKER_CONTENT, encoding="utf-8")
         self.path = self.folder / "only-synthetic.sqlite"
         self.store = self.open_store()
-        self.addCleanup(self.store.close)
 
     def open_store(self):
-        return SQLiteChatStore(
+        store = SQLiteChatStore(
             self.path, strict_local_data_version=True,
             strict_private_write_helpers=True, strict_sql_authorizer=True,
             strict_semantic_intent=True,
         )
+        self.addCleanup(store.close)
+        return store
 
     def seed(self, scope=SCOPE):
         return self.store.create_conversation(
@@ -381,14 +382,14 @@ class A315AtomicSemanticIntentTests(unittest.TestCase):
         self.assertFalse(response["independent_custody"])
         self.assert_hard_no_go(response)
 
-    def test_corrupt_local_receipt_with_missing_message_fails_closed(self):
+    def test_corrupt_message_content_diverging_from_receipt_fails_closed(self):
         cid = self.seed()
         self.append(cid)
         self.store.close()
         with closing(sqlite3.connect(str(self.path))) as attacker:
-            attacker.execute("PRAGMA foreign_keys=OFF")
             attacker.execute(
-                "DELETE FROM messages WHERE id=?", ("transport-A",)
+                "UPDATE messages SET content=? WHERE id=?",
+                ("A315 TEST tampered content", "transport-A"),
             )
             attacker.commit()
         self.store = self.open_store()
@@ -398,7 +399,7 @@ class A315AtomicSemanticIntentTests(unittest.TestCase):
         self.assertEqual(
             self.store._health_reason, "A315_LOCAL_INTENT_RECEIPT_DIVERGED"
         )
-        self.assertEqual(sqlite_count(self.path, "messages"), 0)
+        self.assertEqual(sqlite_count(self.path, "messages"), 1)
 
 
 if __name__ == "__main__":
