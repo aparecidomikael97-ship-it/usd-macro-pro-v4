@@ -6,6 +6,7 @@ import errno
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import stat
@@ -101,7 +102,8 @@ _A310_SQL_WRITE_ACTIONS = frozenset(
     ) if hasattr(sqlite3, name)
 )
 _A310_SQL_WRITERS = frozenset((
-    "create_conversation", "append_message", "archive_conversation",
+    "create_conversation", "append_message", "append_message_once",
+    "archive_conversation",
     "add_attachment_metadata", "save_checkpoint", "save_context_summary",
 ))
 _A310_READ_ONLY_PRAGMAS = frozenset((
@@ -267,7 +269,8 @@ class SQLiteChatStore:
     @_local_commit_gate
     def __init__(self, path, *, strict_local_data_version=False,
                  strict_private_write_helpers=False,
-                 strict_sql_authorizer=False):
+                 strict_sql_authorizer=False,
+                 strict_semantic_intent=False):
         """Open local staging. Strict data_version is opt-in single-writer LAB.
 
         A changed SQLite data_version indicates another connection committed.
@@ -285,6 +288,15 @@ class SQLiteChatStore:
             raise ValueError(
                 "A310 strict_sql_authorizer requires strict_private_write_helpers"
             )
+        if type(strict_semantic_intent) is not bool:
+            raise TypeError("strict_semantic_intent must be bool")
+        if strict_semantic_intent and not (
+            strict_private_write_helpers and strict_sql_authorizer
+        ):
+            raise ValueError(
+                "A315 intent guard requires A309/A310 strict mode"
+            )
+        self._strict_semantic_intent = strict_semantic_intent
         self._strict_sql_authorizer = strict_sql_authorizer
         self._sql_authorizer_writer_tid = None
         self._sql_authorizer_denials = 0
@@ -296,6 +308,22 @@ class SQLiteChatStore:
         self._strict_local_data_version = strict_local_data_version
         self._local_data_version_baseline = None
         self.path = Path(path)
+        # A315 is NOT an operational API. Require an explicit disposable
+        # fixture marker; the marker itself is host-controlled, not trust.
+        if strict_semantic_intent:
+            lab_dir = self.path.parent
+            lab_marker = lab_dir / ".a315-synthetic-only"
+            if (
+                not lab_dir.name.startswith("a315-lab-")
+                or lab_dir.is_symlink()
+                or lab_marker.is_symlink()
+                or not lab_marker.is_file()
+                or lab_marker.read_text(encoding="utf-8")
+                != "A315 DISPOSABLE SYNTHETIC LAB ONLY\n"
+            ):
+                raise StorageUnavailableError(
+                    "A315 semantic intent requires disposable LAB fixture"
+                )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         # A247 LAB: local crash/ACK-loss veto only; host-admin can tamper.
         self._message_commit_marker = Path(str(self.path) + ".aion-message-commit-pending")
@@ -357,6 +385,25 @@ class SQLiteChatStore:
                 kind TEXT NOT NULL,seq INTEGER NOT NULL,data TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS record_history ON records(cid,kind,seq,id);
             """)
+            if self._strict_semantic_intent:
+                # Created *before* the A310 authorizer is installed. This
+                # local SQLite table is NOT an independent off-host ledger.
+                self.db.execute("""
+                    CREATE TABLE IF NOT EXISTS a315_local_intent_receipts (
+                      owner TEXT NOT NULL,
+                      tenant TEXT NOT NULL,
+                      workspace TEXT NOT NULL,
+                      intent_id TEXT NOT NULL,
+                      payload_digest TEXT NOT NULL,
+                      cid TEXT NOT NULL,
+                      message_id TEXT NOT NULL UNIQUE,
+                      seq INTEGER NOT NULL CHECK(seq > 0),
+                      PRIMARY KEY(owner, tenant, workspace, intent_id),
+                      FOREIGN KEY(message_id) REFERENCES messages(id)
+                    )
+                """)
+                # CREATE TABLE outside BEGIN is SQLite-autocommitted. No
+                # second raw .commit() sink may bypass the A247 write fence.
             if self._strict_local_data_version:
                 self._local_data_version_baseline = self._read_local_data_version()
                 if self._local_data_version_baseline is None:
@@ -1188,6 +1235,14 @@ class SQLiteChatStore:
 
     @_local_commit_gate
     def append_message(self, scope, message):
+        # A315 opt-in must not leave the old message-ID-only API available.
+        # Existing behavior is unchanged for every default-mode store.
+        if self._strict_semantic_intent:
+            self._health_state = FAILED
+            self._health_reason = "SEMANTIC_INTENT_REQUIRED_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError(
+                "A315 strict mode requires append_message_once(intent_id)"
+            )
         if message.role not in {"user", "assistant", "system", "task"}:
             raise ValueError("invalid role")
         self._require_open()
@@ -1219,6 +1274,137 @@ class SQLiteChatStore:
                 self._record_database_error(exc)
             raise
         return message
+
+    @_local_commit_gate
+    def append_message_once(self, scope, message, *, intent_id):
+        """A315 local atomic intent+message COMMIT. LAB synthetic only.
+
+        Stable intent_id and canonical content are independent of a transport
+        message ID. This closes a *local* duplicate route across restarts,
+        never independent custody, provider effects, or P0 homologation.
+        """
+        if not self._strict_semantic_intent:
+            raise StorageUnavailableError(
+                "A315 intent API is disabled outside explicit LAB opt-in"
+            )
+        self._require_open()
+        if (
+            not isinstance(scope, Scope)
+            or not isinstance(message, Message)
+            or type(intent_id) is not str
+            or re.fullmatch(r"[A-Za-z0-9._-]{1,80}", intent_id) is None
+            or type(message.id) is not str
+            or re.fullmatch(r"[A-Za-z0-9._-]{1,80}", message.id) is None
+            or type(message.conversation_id) is not str
+            or not message.conversation_id
+            or message.role != "user"
+            or type(message.content) is not str
+            or not message.content.startswith("A315 TEST ")
+            or not 10 <= len(message.content) <= 512
+            or message.attachments
+            or message.task_metadata is not None
+            or message.provenance is not None
+            or message.metadata
+        ):
+            raise ValueError("A315 accepts only bounded synthetic user intent")
+        digest = hashlib.sha256(json.dumps(
+            ["ATLASQUANT_A315_LOCAL_INTENT_V1",
+             scope.owner_id, scope.tenant_id, scope.workspace_id,
+             message.conversation_id, message.role, message.content],
+            ensure_ascii=False, separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        def report(status, *, stored_id=None, sequence=None):
+            return {
+                "status": status, "intent_id": intent_id,
+                "local_payload_digest": digest,
+                "message_id": stored_id, "sequence": sequence,
+                "local_sqlite_only": True, "independent_custody": False,
+                "provider_outcome_proven": False,
+                "external_semantic_exactly_once": False,
+                "can_authorize_real_effect": False,
+                "can_resume": False, "can_resend": False,
+                "can_auto_retry": False, "automatic_retries": 0,
+                "zero_auto_resend": True, "hard_no_go": True,
+                "p0_homologated": 0,
+            }
+        try:
+            # BEGIN IMMEDIATE serializes cooperative first-use checks; both
+            # receipt and message are part of ONE real SQLite transaction.
+            self.db.execute("BEGIN IMMEDIATE")
+            row = self.db.execute(
+                "SELECT payload_digest, cid, message_id, seq "
+                "FROM a315_local_intent_receipts "
+                "WHERE owner=? AND tenant=? AND workspace=? AND intent_id=?",
+                (scope.owner_id, scope.tenant_id,
+                 scope.workspace_id, intent_id),
+            ).fetchone()
+            if row is not None:
+                if row["payload_digest"] != digest:
+                    self.db.rollback()
+                    return report("INTENT_PAYLOAD_CONFLICT_DENIED")
+                stored = self.db.execute(
+                    "SELECT cid, content, seq, data FROM messages WHERE id=?",
+                    (row["message_id"],),
+                ).fetchone()
+                if (
+                    stored is None
+                    or stored["cid"] != row["cid"]
+                    or row["cid"] != message.conversation_id
+                    or stored["content"] != message.content
+                    or stored["seq"] != row["seq"]
+                ):
+                    self._health_state = FAILED
+                    self._health_reason = "A315_LOCAL_INTENT_RECEIPT_DIVERGED"
+                    raise StorageUnavailableError(
+                        "intent and message record diverged; NO RETRY"
+                    )
+                self.db.rollback()
+                return report("DUPLICATE_LOCAL_NO_EFFECT",
+                              stored_id=row["message_id"],
+                              sequence=row["seq"])
+            conversation = self.get_conversation(
+                scope, message.conversation_id
+            )
+            recorded = Message(**redact(asdict(message)))
+            recorded.sequence = conversation.message_count + 1
+            self.db.execute(
+                "INSERT INTO messages VALUES (?,?,?,?,?)",
+                (recorded.id, conversation.id,
+                 recorded.sequence, recorded.content, dump(recorded)),
+            )
+            conversation.message_count = recorded.sequence
+            conversation.updated_at = now()
+            with self._private_helper_write_scope():
+                self._update(conversation)
+            self.db.execute(
+                "INSERT INTO a315_local_intent_receipts "
+                "(owner,tenant,workspace,intent_id,payload_digest,"
+                "cid,message_id,seq) VALUES (?,?,?,?,?,?,?,?)",
+                (scope.owner_id, scope.tenant_id, scope.workspace_id,
+                 intent_id, digest, conversation.id,
+                 recorded.id, recorded.sequence),
+            )
+            self._commit_fenced_chat_write()
+            return report("LOCAL_ACKED_ONCE",
+                          stored_id=recorded.id,
+                          sequence=recorded.sequence)
+        except Exception as exc:
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            if isinstance(exc, sqlite3.IntegrityError):
+                self._health_state = FAILED
+                self._health_reason = "A315_SQLITE_CONSTRAINT_DENIED_NO_RETRY"
+                raise StorageUnavailableError(
+                    "A315 unique constraint denied; no blind retry"
+                ) from exc
+            if (
+                isinstance(exc, sqlite3.DatabaseError)
+                and not isinstance(exc, StoreCommitOutcomeUncertainError)
+            ):
+                self._record_database_error(exc)
+            raise
 
     def list_messages(self, scope, conversation_id, cursor=None, page_size=50, *, newest_first=False):
         self.get_conversation(scope, conversation_id)

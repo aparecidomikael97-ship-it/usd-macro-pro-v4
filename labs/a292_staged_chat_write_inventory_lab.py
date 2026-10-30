@@ -30,13 +30,22 @@ WRITE_ENTRYPOINTS = frozenset((
     "create_conversation", "append_message", "archive_conversation",
     "add_attachment_metadata", "save_checkpoint", "save_context_summary",
 ))
-DIRECT_FENCED = frozenset(("create_conversation", "append_message"))
+LAB_ONLY_ENTRYPOINTS = frozenset(("append_message_once",))
+DIRECT_FENCED = frozenset((
+    "create_conversation", "append_message", "append_message_once",
+))
 TRANSACTION_FENCED = WRITE_ENTRYPOINTS - DIRECT_FENCED
 DIRECT_DML = {
+    # A315 creates an opt-in-only local receipt schema on startup; this
+    # maintenance DDL must remain visible to the static inventory.
+    "__init__": ("CREATE",),
     "_update": ("UPDATE",),
     "_save_record": ("INSERT",),
     "create_conversation": ("INSERT",),
     "append_message": ("INSERT",),
+    # A315 opt-in: one real message INSERT and one local intent receipt
+    # INSERT inside the *same* fenced SQLite COMMIT.
+    "append_message_once": ("INSERT", "INSERT"),
 }
 HELPERS_WITH_RAW_DML = frozenset(("_update", "_save_record"))
 SENSITIVE_SQL = frozenset((
@@ -110,6 +119,7 @@ def inspect_store_writers(*, source=None):
     result.update({
         "static_only": True, "source_bytes": len(source.encode("utf-8")),
         "write_entrypoints": sorted(WRITE_ENTRYPOINTS),
+        "lab_only_entrypoints": sorted(LAB_ONLY_ENTRYPOINTS),
         "unguarded_private_helpers": sorted(HELPERS_WITH_RAW_DML),
         "separate_maintenance_scope": [
             "__init__", "backup_to", "restore_from_backup",
@@ -195,7 +205,7 @@ def inspect_store_writers(*, source=None):
         issues.append("UNEXPECTED_SCHEMA_SCRIPT_SINK")
     if sorted(backups) != ["backup_to"]:
         issues.append("UNEXPECTED_BACKUP_SINK")
-    for name in WRITE_ENTRYPOINTS:
+    for name in WRITE_ENTRYPOINTS | LAB_ONLY_ENTRYPOINTS:
         method = methods.get(name)
         if method is None:
             issues.append("MISSING_WRITER:" + name)
@@ -460,7 +470,8 @@ def probe_all_six_normal_writers():
 
 
 __all__ = [
-    "SCHEMA", "SOURCE", "SCOPE", "WRITE_ENTRYPOINTS", "DIRECT_FENCED",
+    "SCHEMA", "SOURCE", "SCOPE", "WRITE_ENTRYPOINTS", "LAB_ONLY_ENTRYPOINTS",
+    "DIRECT_FENCED",
     "TRANSACTION_FENCED", "DIRECT_DML", "HELPERS_WITH_RAW_DML",
     "inspect_store_writers", "probe_one_writer_ack_boundary",
     "probe_real_raw_helper_bypasses", "probe_all_six_normal_writers",
