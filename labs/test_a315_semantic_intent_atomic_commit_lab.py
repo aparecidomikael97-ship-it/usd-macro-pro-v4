@@ -362,8 +362,8 @@ class A315AtomicSemanticIntentTests(unittest.TestCase):
         self.assertEqual(sqlite_count(
             self.path, "a315_local_intent_receipts"), 1)
 
-    def test_deleted_local_receipt_allows_duplicate_after_restart(self):
-        """Counterexample: host rollback defeats local-only intent custody."""
+    def test_deleted_local_receipt_quarantines_orphan_after_restart(self):
+        """A316: receipt-only loss is detected using message-side intent."""
         cid = self.seed()
         self.append(cid, message="message-A")
         self.store.close()
@@ -374,13 +374,16 @@ class A315AtomicSemanticIntentTests(unittest.TestCase):
             )
             attacker.commit()
         self.store = self.open_store()
-        response = self.append(cid, message="message-B")
-        self.assertEqual(response["status"], "LOCAL_ACKED_ONCE")
-        self.assertEqual(sqlite_count(self.path, "messages"), 2)
+        with self.assertRaises(StorageUnavailableError):
+            self.append(cid, message="message-B")
+        self.assertEqual(self.store._health_state, FAILED)
+        self.assertEqual(
+            self.store._health_reason,
+            "A316_LOCAL_INTENT_RECEIPT_MISSING_ZERO_AUTO_RETRY",
+        )
+        self.assertEqual(sqlite_count(self.path, "messages"), 1)
         self.assertEqual(sqlite_count(
-            self.path, "a315_local_intent_receipts"), 1)
-        self.assertFalse(response["independent_custody"])
-        self.assert_hard_no_go(response)
+            self.path, "a315_local_intent_receipts"), 0)
 
     def test_corrupt_message_content_diverging_from_receipt_fails_closed(self):
         cid = self.seed()
