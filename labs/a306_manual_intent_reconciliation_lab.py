@@ -117,6 +117,26 @@ def assess_manual_reconciliation(
         issues.add("FRESH_POST_RESTART_STATUS_NOT_SHOWN")
     if parent.get("after_status_cryptographic") is not True:
         issues.add("POST_RESTART_STATUS_CRYPTO_MISSING")
+    # The observation is *only local LAB evidence*, not a trusted record.
+    # Nonetheless, do not promote an incomplete or self-inconsistent stub
+    # to even the limited "locally observed" category.
+    observation_integrity = (
+        type(observation) is dict
+        and observation.get("schema") == A305_SCHEMA
+        and parent.get("real_sqlite_lab_observed") is True
+        and parent.get("commit_ack_unknown") is True
+        and observation.get("intent_id") == INTENT_ID
+        and observation.get("message_id") == MESSAGE_ID
+        and observation.get("source_pending_marker") is True
+        and observation.get("source_reopen_refused") is True
+        and observation.get("uncertain_error_raised") is True
+        and observation.get("no_retries_performed") is True
+        and observation.get("no_restore_api_invoked") is True
+        and observation.get("host_native_fd_attested") is False
+        and observation.get("off_host_custody_attested") is False
+    )
+    if not observation_integrity:
+        issues.add("OBSERVATION_INTEGRITY_INSUFFICIENT")
     # A305 itself remains locally sourced; no automatic authorization ever.
     if type(last_closed_case_generation) is not int or (
         last_closed_case_generation < 0
@@ -200,8 +220,7 @@ def assess_manual_reconciliation(
     # "observed" without even passing the A305 negative research checks.
     # Passing these checks still does NOT attest an off-host effect.
     if (
-        parent.get("real_sqlite_lab_observed") is True
-        and parent.get("commit_ack_unknown") is True
+        observation_integrity
         and type(observation) is dict
         and type(observation.get("sqlite_effect_count")) is int
         and observation.get("sqlite_effect_count") == 1
@@ -247,7 +266,7 @@ def assess_manual_reconciliation(
     # Neither local validity nor a self-computed digest is authority.
     out["case_file_locally_valid"] = not any(x in issues for x in {
         "A305_NEGATIVE_BARRIER_MISSING", "SQLITE_OBSERVATION_NOT_RECORDED",
-        "ACK_UNKNOWN_NOT_PROVEN",
+        "ACK_UNKNOWN_NOT_PROVEN", "OBSERVATION_INTEGRITY_INSUFFICIENT",
         *evidence_defects,
         "REVIEW_CASE_FIELDS_INVALID", "REVIEW_CASE_SCHEMA_INVALID",
         "CASE_ID_INVALID", "CASE_PREVIOUS_HASH_INVALID",
