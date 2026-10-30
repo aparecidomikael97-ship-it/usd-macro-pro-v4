@@ -131,8 +131,10 @@ class A282ThreeVariantComparisonTests(unittest.TestCase):
             self.assertEqual(row["train"]["summary"]["trades"], 0)
             self.assertEqual(row["train"]["summary"]["sample_status"],
                              "INSUFFICIENT_SAMPLE")
-            self.assertNotEqual(row["train"]["ledger_sha256"],
-                                row["holdout"]["ledger_sha256"])
+            self.assertEqual(row["train"]["plan_rows"], 0)
+            # Both partitions can correctly have empty ledgers and identical
+            # SHA256([]); their candle-count separation is what matters here.
+            self.assertEqual(row["holdout"]["candle_count"], 12)
 
     def test_09_repeated_evaluation_is_deterministic(self):
         self.assertEqual(single(), single())
