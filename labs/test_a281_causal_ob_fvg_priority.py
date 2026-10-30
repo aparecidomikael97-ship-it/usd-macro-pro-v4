@@ -40,8 +40,15 @@ def study(rows=ROWS, opens=None, **overrides):
     return research_ob_fvg_backtest_csv(file_data(rows, opens), **args)
 
 
-def ob_only_rows():
+def base_ob_rows():
     modified = list(ROWS)
+    # A bearish body opening at 16 requires its high >= 16.
+    modified[10] = (15, 16.5, 14.5)
+    return modified
+
+
+def ob_only_rows():
+    modified = base_ob_rows()
     # BOS remains at index 11; no same-close FVG, or gap in index 12.
     modified[11] = (20, 20.5, 16.0)
     modified[12] = (19, 19.5, 16.0)
@@ -66,7 +73,7 @@ def audit_at(result, index):
 
 class A281CausalObFvgTests(unittest.TestCase):
     def test_01_mechanical_ob_is_not_institutional_attestation(self):
-        result = run(opens={10: 16})
+        result = run(base_ob_rows(), opens={10: 16})
         self.assertEqual(result["schema"], SCHEMA)
         self.assertTrue(result["valid"])
         self.assertTrue(result["historical_only"])
@@ -81,7 +88,7 @@ class A281CausalObFvgTests(unittest.TestCase):
         self.assertEqual(result["p0_homologated"], 0)
 
     def test_02_fvg_preferred_when_ob_zone_touches_same_bos_bar_gap(self):
-        result = run(opens={10: 16})
+        result = run(base_ob_rows(), opens={10: 16})
         ob = audit_at(result, 11)
         self.assertEqual(ob["status"], "FVG_PREFERRED_SAME_CLOSE_NEAR_ZONE")
         self.assertFalse(ob["accepted"])
@@ -140,7 +147,7 @@ class A281CausalObFvgTests(unittest.TestCase):
 
     def test_07_bearish_bos_can_derive_ob_from_prior_bullish_body(self):
         rows = down_bos_rows()
-        result = run(rows, opens={21: 12})
+        result = run(rows, opens={21: 12.75})
         self.assertTrue(result["valid"])
         bearish = audit_at(result, 22)
         self.assertTrue(bearish["accepted"])
@@ -172,7 +179,7 @@ class A281CausalObFvgTests(unittest.TestCase):
         self.assertEqual(len(result["ob_audit"]), len(bos))
 
     def test_11_only_one_zone_candidate_at_simultaneous_overlap(self):
-        result = run(opens={10: 16})
+        result = run(base_ob_rows(), opens={10: 16})
         same = [p for p in result["combined_candidate_plans"]
                 if p["signal_time"] == stamp(11)]
         self.assertEqual(len(same), 1)
@@ -240,7 +247,7 @@ class A281CausalObFvgTests(unittest.TestCase):
         self.assertIsNone(other["holdout"])
 
     def test_18_spec_is_fixed_and_fvg_priority_is_not_asserted_superior(self):
-        first, second = run(opens={10: 16}), run(opens={10: 16})
+        first, second = run(base_ob_rows(), opens={10: 16}), run(base_ob_rows(), opens={10: 16})
         self.assertEqual(first["strategy_spec_sha256"],
                          second["strategy_spec_sha256"])
         self.assertEqual(SPEC["opposite_candle_lookback"], 5)
@@ -258,7 +265,7 @@ class A281CausalObFvgTests(unittest.TestCase):
         self.assertFalse(result["ob_is_institutionally_verified"])
 
     def test_20_practical_scope_keeps_no_worker_orders_alerts_or_new_calls(self):
-        result = run(opens={10: 16})
+        result = run(base_ob_rows(), opens={10: 16})
         self.assertTrue(result["no_new_data_calls"])
         self.assertTrue(result["no_orders"])
         self.assertTrue(result["no_alerts"])
