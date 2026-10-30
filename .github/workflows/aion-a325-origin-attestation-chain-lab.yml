@@ -1,0 +1,36 @@
+name: A325 Ed25519 claimed issuer and delivery origins HOLD LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a325_origin_attestation_chain_lab.py'
+      - 'labs/test_a325_origin_attestation_chain_lab.py'
+      - 'docs/lab/aion_a325_origin_attestation_chain_lab.md'
+      - '.github/workflows/aion-a325-origin-attestation-chain-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-issuer-delivery-lab:
+    name: A325 claimed source and receipt signatures still no external custody — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install LAB-only cryptographic dependency
+        run: python -m pip install cryptography==46.0.4
+      - name: A325 origin and delivery Ed25519 HOLD plus A324-A299 regressions
+        env:
+          A313_REQUIRE_DIFFERENT_UID: ${{ runner.os == 'Linux' && '1' || '0' }}
+          A314_REQUIRE_CROSS_UID_SOCKET: ${{ runner.os == 'Linux' && '1' || '0' }}
+        run: |
+          python -m unittest -v labs.test_a325_origin_attestation_chain_lab labs.test_a324_recovery_evidence_triage_lab labs.test_a323_readonly_recovery_reconciliation_lab labs.test_a322_genesis_out_of_band_handoff_lab labs.test_a321_signed_high_water_fork_detection_lab labs.test_a320_offline_custody_ceremony_lab labs.test_a319_offline_root_continuity_lab labs.test_a318_two_witness_root_contract_lab labs.test_a317_detached_signed_intent_anchor_lab labs.test_a316_orphan_intent_crosscheck_lab labs.test_a315_semantic_intent_atomic_commit_lab labs.test_a314_cross_uid_sqlite_socket_lab labs.test_a313_distinct_uid_access_denial_lab labs.test_a312_os_principal_file_boundary_lab labs.test_a311_process_isolated_sqlite_lab labs.test_a310_optin_sqlite_authorizer_composition_lab labs.test_a309_optin_private_helper_write_fence_lab labs.test_a246_chat_commit_uncertainty labs.test_a247_commit_pending_restart_veto labs.test_a292_staged_chat_write_inventory_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab
