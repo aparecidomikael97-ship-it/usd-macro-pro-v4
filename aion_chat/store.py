@@ -87,6 +87,28 @@ class AionChatStore(Protocol):
 # uncoordinated; this is a concurrency guard, not external custodial proof.
 _STAGING_LOCAL_CONNECT_WRITE_GATE = threading.RLock()
 
+# A310 LAB: local SQLite opcode barrier, NOT host-resistant authority.
+# The Python holder of SQLiteChatStore.db can remove/reconfigure it.
+_A310_SQL_WRITE_ACTIONS = frozenset(
+    getattr(sqlite3, name) for name in (
+        "SQLITE_INSERT", "SQLITE_UPDATE", "SQLITE_DELETE",
+        "SQLITE_CREATE_TABLE", "SQLITE_DROP_TABLE",
+        "SQLITE_CREATE_INDEX", "SQLITE_DROP_INDEX",
+        "SQLITE_ALTER_TABLE", "SQLITE_ATTACH", "SQLITE_DETACH",
+        "SQLITE_CREATE_TRIGGER", "SQLITE_DROP_TRIGGER",
+        "SQLITE_CREATE_VIEW", "SQLITE_DROP_VIEW",
+        "SQLITE_REINDEX", "SQLITE_ANALYZE",
+    ) if hasattr(sqlite3, name)
+)
+_A310_SQL_WRITERS = frozenset((
+    "create_conversation", "append_message", "archive_conversation",
+    "add_attachment_metadata", "save_checkpoint", "save_context_summary",
+))
+_A310_READ_ONLY_PRAGMAS = frozenset((
+    "foreign_key_check", "quick_check", "journal_mode", "busy_timeout",
+    "wal_autocheckpoint", "data_version",
+))
+
 
 @contextmanager
 def _cross_process_message_lifecycle_lock(db_path, *, wait_seconds=5.0):
@@ -183,6 +205,11 @@ def _local_commit_gate(method):
         with _STAGING_LOCAL_CONNECT_WRITE_GATE:
             try:
                 with _cross_process_message_lifecycle_lock(path):
+                    store = args[0] if args else None
+                    if (method.__name__ in _A310_SQL_WRITERS
+                            and getattr(store, "_strict_sql_authorizer", False)):
+                        with store._sql_authorized_writer_scope():
+                            return method(*args, **kwargs)
                     return method(*args, **kwargs)
             except MessageLifecycleLockIdentityError as exc:
                 if method.__name__ == "append_message":
@@ -239,7 +266,8 @@ def _validate_database_file(path: Path) -> dict:
 class SQLiteChatStore:
     @_local_commit_gate
     def __init__(self, path, *, strict_local_data_version=False,
-                 strict_private_write_helpers=False):
+                 strict_private_write_helpers=False,
+                 strict_sql_authorizer=False):
         """Open local staging. Strict data_version is opt-in single-writer LAB.
 
         A changed SQLite data_version indicates another connection committed.
@@ -251,6 +279,15 @@ class SQLiteChatStore:
             raise TypeError("strict_local_data_version must be bool")
         if type(strict_private_write_helpers) is not bool:
             raise TypeError("strict_private_write_helpers must be bool")
+        if type(strict_sql_authorizer) is not bool:
+            raise TypeError("strict_sql_authorizer must be bool")
+        if strict_sql_authorizer and not strict_private_write_helpers:
+            raise ValueError(
+                "A310 strict_sql_authorizer requires strict_private_write_helpers"
+            )
+        self._strict_sql_authorizer = strict_sql_authorizer
+        self._sql_authorizer_writer_tid = None
+        self._sql_authorizer_denials = 0
         # A309 LAB opt-in only: this is a cooperative in-process check,
         # not a secure barrier against direct sqlite3 or hostile host code.
         self._strict_private_write_helpers = strict_private_write_helpers
@@ -331,6 +368,15 @@ class SQLiteChatStore:
                 raise StorageUnavailableError(
                     "staging store failed startup integrity gate: " + report["reason"]
                 )
+            # Install only after schema bootstrap. Operational default remains
+            # unchanged, including A246/A247 LostAckConnection proxies.
+            if self._strict_sql_authorizer:
+                try:
+                    self.db.set_authorizer(self._sql_write_authorizer)
+                except (AttributeError, sqlite3.DatabaseError) as exc:
+                    raise StorageUnavailableError(
+                        "A310 SQLite authorizer could not be installed"
+                    ) from exc
         except (sqlite3.DatabaseError, OSError, StorageUnavailableError) as exc:
             self._health_state = FAILED
             self._health_reason = type(exc).__name__
@@ -1006,6 +1052,57 @@ class SQLiteChatStore:
             raise StoreCommitOutcomeUncertainError(
                 "chat COMMIT acknowledged but marker cleanup outcome uncertain"
             ) from exc
+
+    def _sql_write_authorizer(self, action, first, second, db_name, trigger):
+        """Cooperative opcode denial; no native FD or off-host authority."""
+        permitted = self._sql_authorizer_writer_tid == threading.get_ident()
+        if action in _A310_SQL_WRITE_ACTIONS and not permitted:
+            self._sql_authorizer_denials += 1
+            return sqlite3.SQLITE_DENY
+        # PRAGMA can change persistence settings or database schema without
+        # the usual INSERT/UPDATE action; only known read forms are allowed.
+        if action == sqlite3.SQLITE_PRAGMA and not permitted:
+            if (type(first) is not str
+                    or first.lower() not in _A310_READ_ONLY_PRAGMAS
+                    or second is not None):
+                self._sql_authorizer_denials += 1
+                return sqlite3.SQLITE_DENY
+        if action in (sqlite3.SQLITE_TRANSACTION, sqlite3.SQLITE_SAVEPOINT):
+            if not permitted:
+                self._sql_authorizer_denials += 1
+                return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
+
+    @contextmanager
+    def _sql_authorized_writer_scope(self):
+        """A310 opt-in method boundary, rearmed to invalidate cached SQL.
+
+        It only protects cooperating code in this Python process. Anyone
+        holding self.db can remove the authorizer or bypass the public API.
+        """
+        self._require_open()
+        if self._sql_authorizer_writer_tid is not None:
+            self._health_state = FAILED
+            self._health_reason = "A310_SQL_AUTHORIZER_NESTED_WRITE_ZERO_AUTO_RETRY"
+            raise StorageUnavailableError("nested SQLite write grant refused")
+        self._sql_authorizer_writer_tid = threading.get_ident()
+        try:
+            yield
+        finally:
+            self._sql_authorizer_writer_tid = None
+            if self.db is not None:
+                try:
+                    # sqlite3 caches prepared statements; an authorized SQL
+                    # statement must not remain authorized after method return.
+                    self.db.set_authorizer(self._sql_write_authorizer)
+                except (AttributeError, sqlite3.DatabaseError) as exc:
+                    self._health_state = FAILED
+                    self._health_reason = (
+                        "A310_SQL_AUTHORIZER_REARM_UNCERTAIN_ZERO_AUTO_RETRY"
+                    )
+                    raise StorageUnavailableError(
+                        "SQLite opcode authorizer rearm uncertain; no retry"
+                    ) from exc
 
     @contextmanager
     def _private_helper_write_scope(self):
