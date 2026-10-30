@@ -44,6 +44,26 @@ def _mutate_archive(original: bytes, name: str, altered: bytes) -> bytes:
     return stream.getvalue()
 
 
+def _mutate_and_rehash(original: bytes, name: str, altered: bytes) -> bytes:
+    """Recompute the attacker's manifest so the AST, not SHA, must deny."""
+    with zipfile.ZipFile(BytesIO(original)) as old:
+        manifest = json.loads(old.read(MANIFEST_NAME))
+        manifest["files"][name] = sha256(altered).hexdigest()
+        stream = BytesIO()
+        with zipfile.ZipFile(stream, "w") as new:
+            for info in old.infolist():
+                if info.filename == name:
+                    data = altered
+                elif info.filename == MANIFEST_NAME:
+                    data = json.dumps(
+                        manifest, sort_keys=True, separators=(",", ":"),
+                    ).encode("utf-8")
+                else:
+                    data = old.read(info.filename)
+                new.writestr(info, data)
+    return stream.getvalue()
+
+
 class A260OfflineArtifactSeparationTests(unittest.TestCase):
     def test_01_actual_repository_builds_only_allowlisted_files(self):
         tmp, path, created = _bundle()
@@ -275,6 +295,74 @@ with TemporaryDirectory() as work:
         # Desired: release path would invoke the strict A260 preflight and
         # mount only its verified allowlisted output. Today it does not.
         self.assertIn("a260_offline_runtime_bundle", render)
+
+
+    def test_14_rehashed_attack_in_dispatch_still_denied_by_ast(self):
+        tmp, archive, _ = _bundle()
+        try:
+            with zipfile.ZipFile(archive) as zf:
+                outbox = zf.read("atlasquant_aion_execution_outbox.py")
+            newline = b"\\r\\n" if b"\\r\\n" in outbox else b"\\n"
+            needle = b"        key = _clean(idempotency_key, 64)"
+            self.assertGreaterEqual(outbox.count(needle), 2)
+            offset = outbox.find(needle)
+            changed = (
+                outbox[:offset] + b"        adapter.send({})" + newline +
+                outbox[offset:]
+            )
+            with self.assertRaisesRegex(
+                OfflineBundleRejected, "host callback or adapter",
+            ):
+                verify_offline_candidate(_mutate_and_rehash(
+                    archive.read_bytes(), "atlasquant_aion_execution_outbox.py",
+                    changed,
+                ))
+        finally:
+            tmp.cleanup()
+
+    def test_15_rehashed_reconcile_adapter_call_still_denied_by_ast(self):
+        tmp, archive, _ = _bundle()
+        try:
+            with zipfile.ZipFile(archive) as zf:
+                outbox = zf.read("atlasquant_aion_execution_outbox.py")
+            newline = b"\\r\\n" if b"\\r\\n" in outbox else b"\\n"
+            needle = b"        key = _clean(idempotency_key, 64)"
+            self.assertGreaterEqual(outbox.count(needle), 2)
+            offset = outbox.rfind(needle)
+            changed = (
+                outbox[:offset] + b"        adapter.reconcile({})" + newline +
+                outbox[offset:]
+            )
+            with self.assertRaisesRegex(
+                OfflineBundleRejected, "host callback or adapter",
+            ):
+                verify_offline_candidate(_mutate_and_rehash(
+                    archive.read_bytes(), "atlasquant_aion_execution_outbox.py",
+                    changed,
+                ))
+        finally:
+            tmp.cleanup()
+
+    def test_16_rehashed_dynamic_adapter_lookup_denied_by_ast(self):
+        tmp, archive, _ = _bundle()
+        try:
+            with zipfile.ZipFile(archive) as zf:
+                outbox = zf.read("atlasquant_aion_execution_outbox.py")
+            newline = b"\\r\\n" if b"\\r\\n" in outbox else b"\\n"
+            needle = b"        key = _clean(idempotency_key, 64)"
+            offset = outbox.find(needle)
+            self.assertGreaterEqual(offset, 0)
+            changed = (
+                outbox[:offset] + b"        fn = getattr(adapter, 'send')" +
+                newline + outbox[offset:]
+            )
+            with self.assertRaises(OfflineBundleRejected):
+                verify_offline_candidate(_mutate_and_rehash(
+                    archive.read_bytes(), "atlasquant_aion_execution_outbox.py",
+                    changed,
+                ))
+        finally:
+            tmp.cleanup()
 
 
 if __name__ == "__main__":
