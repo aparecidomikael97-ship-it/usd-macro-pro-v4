@@ -152,7 +152,8 @@ def assess_manual_reconciliation(
             issues.add("DISTINCT_HUMAN_ROLES_NOT_CLAIMED")
         if review_case["reviewer_acknowledged"] is not True:
             issues.add("REVIEWER_ACKNOWLEDGEMENT_MISSING")
-        if review_case["review_decision"] not in DECISIONS:
+        if (type(review_case["review_decision"]) is not str or
+                review_case["review_decision"] not in DECISIONS):
             issues.add("UNSAFE_REVIEW_DECISION")
 
     claims = review_case.get("claimed_evidence", [])
@@ -179,7 +180,8 @@ def assess_manual_reconciliation(
         sources.add(item["source_id"])
         if item["intent_id"] != INTENT_ID or item["message_id"] != MESSAGE_ID:
             issues.add("CLAIM_SEMANTIC_INTENT_MISMATCH")
-        if item["observed_outcome"] not in OUTCOMES:
+        if (type(item["observed_outcome"]) is not str or
+                item["observed_outcome"] not in OUTCOMES):
             issues.add("CLAIM_OUTCOME_INVALID")
         else:
             claims_outcomes.add(item["observed_outcome"])
