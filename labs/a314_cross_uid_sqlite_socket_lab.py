@@ -12,7 +12,10 @@ from contextlib import closing
 import json
 import os
 from pathlib import Path
-import pwd
+try:
+    import pwd
+except ImportError:  # Windows cannot provide Unix user databases.
+    pwd = None
 import socket
 import sqlite3
 import stat
@@ -30,6 +33,7 @@ from labs.a312_os_principal_file_boundary_lab import apply_fixture_private_modes
 
 SCHEMA = "ATLASQUANT_AION_A314_CROSS_UID_IPC_WRITER_LAB_V1"
 SOCKET_NAME = "a314-synthetic.sock"
+READY_NAME = ".a314-accept-ready"
 REQUEST = {"schema": SCHEMA, "action": "CREATE_SYNTHETIC_ONLY",
            "request_id": "a314-fixed-test-request"}
 INVALID_REQUEST = {"schema": SCHEMA, "action": "DEPLOY",
@@ -96,7 +100,8 @@ def result_base(status):
 
 
 def _expected_nobody():
-    if os.name != "posix" or not hasattr(socket, "SO_PEERCRED"):
+    if (os.name != "posix" or pwd is None
+            or not hasattr(socket, "SO_PEERCRED")):
         return None
     try:
         uid = pwd.getpwnam("nobody").pw_uid
@@ -132,6 +137,9 @@ def _server_once(root):
         # by the kernel, not by a client-supplied JSON identity claim.
         os.chmod(path, 0o666)
         server.listen(1)
+        # The parent must not connect until the socket can be reached by
+        # the restricted UID; socket pathname existence alone races chmod.
+        (Path(root) / READY_NAME).write_text("ready\\n", encoding="utf-8")
         try:
             conn, _ = server.accept()
         except socket.timeout:
@@ -227,6 +235,8 @@ def _run_one_exchange(root, request, *, other_uid, timeout=15):
     if fixture is None:
         return None
     _, path = fixture
+    ready = Path(root) / READY_NAME
+    ready.unlink(missing_ok=True)
     try:
         server = subprocess.Popen(
             [sys.executable, "-u", "-m",
@@ -238,11 +248,11 @@ def _run_one_exchange(root, request, *, other_uid, timeout=15):
         return None
     try:
         end = time.monotonic() + min(timeout, 10)
-        while not path.exists() and server.poll() is None:
+        while (not ready.exists() or not path.exists()) and server.poll() is None:
             if time.monotonic() >= end:
                 return None
             time.sleep(0.02)
-        if not path.exists() or server.poll() is not None:
+        if not ready.exists() or not path.exists() or server.poll() is not None:
             return None
         client = _client_exchange(root, request, other_uid=other_uid,
                                   timeout=timeout)
@@ -259,6 +269,7 @@ def _run_one_exchange(root, request, *, other_uid, timeout=15):
             server.communicate(timeout=5)
         if path.exists() and not path.is_symlink():
             path.unlink()
+        ready.unlink(missing_ok=True)
 
 
 def probe_cross_uid_ipc_fixture(*, timeout_seconds=15):
@@ -280,13 +291,15 @@ def probe_cross_uid_ipc_fixture(*, timeout_seconds=15):
         create_fixture(private)
         root.chmod(0o711)
         try:
-            wrong = _run_one_exchange(
-                root, REQUEST, other_uid=False, timeout=timeout_seconds)
             invalid = _run_one_exchange(
                 root, INVALID_REQUEST, other_uid=True,
                 timeout=timeout_seconds)
             permitted = _run_one_exchange(
                 root, REQUEST, other_uid=True, timeout=timeout_seconds)
+            # The owner-UID negative probe follows the initial write so
+            # the existing SQLite file can be opened in the client script.
+            wrong = _run_one_exchange(
+                root, REQUEST, other_uid=False, timeout=timeout_seconds)
             # Repeat the *same request_id* in a new process: this should
             # reveal missing off-host semantic-idempotency custody.
             replay = _run_one_exchange(
