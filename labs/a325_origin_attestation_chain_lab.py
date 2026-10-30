@@ -13,8 +13,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from labs.a317_detached_signed_intent_anchor_lab import encode, sha
 from labs.a320_offline_custody_ceremony_lab import _hex64, _nonneg_int, _safe_id
 from labs.a324_recovery_evidence_triage_lab import (
-    RECEIPT_FIELDS, investigate_recovery_evidence,
+    RECEIPT_FIELDS, _receipt_valid, investigate_recovery_evidence,
 )
+from labs.a321_signed_high_water_fork_detection_lab import _report_shape
 
 SCHEMA = "ATLASQUANT_AION_A325_ORIGIN_ATTESTATION_CHAIN_LAB_V1"
 ORIGIN_DOMAIN = b"ATLASQUANT_AION_A325_ORIGIN_ATTESTATION_LAB_V1\x00"
@@ -159,15 +160,14 @@ def verify_claimed_receipt_origins(
     if set(pinned_origin_roots.values()) & set(pins.values()):
         return outcome("LAB_ORIGIN_QUORUM_VETO",
                        ["ORIGIN_ROOT_REUSED_AS_CUSTODIAN_KEY"])
-    if any(type(x) is not dict or not _safe_id(x.get("custodian_id"))
-           for x in last):
+    if any(not _report_shape(x) for x in last):
         return outcome("LAB_ORIGIN_MISSING_HOLD", ["LATEST_CHECKPOINT_INVALID"])
     last_map = {x["custodian_id"]: x for x in last}
     if set(last_map) != set(pins):
         return outcome("LAB_ORIGIN_QUORUM_VETO", ["LATEST_CUSTODIAN_SET_MISMATCH"])
     receipt_map = {}
     for r in witness_receipts:
-        if type(r) is not dict or set(r) != RECEIPT_FIELDS:
+        if not _receipt_valid(r):
             return outcome("LAB_ORIGIN_MISSING_HOLD", ["DELIVERY_RECEIPT_SHAPE_INVALID"])
         who = r.get("custodian_id")
         if not _safe_id(who) or who in receipt_map:
