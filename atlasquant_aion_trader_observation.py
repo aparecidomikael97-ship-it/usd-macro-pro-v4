@@ -135,6 +135,7 @@ def trader_readonly_observation(
     now: datetime | None = None,
     currency_strength: Any = None,
     timeframe_evidence: Any = None,
+    non_fx_evidence: Any = None,
     risk_limits: RiskLimits | None = None,
     risk_state: RiskState | None = None,
 ) -> dict[str, Any]:
@@ -276,5 +277,12 @@ def trader_readonly_observation(
         merge_mtf_readonly(
             board, evidence=timeframe_evidence, now=now,
             resident_rows=raw_items,
+        )
+    # Optional opt-in for the seven already registered non-FX Radar symbols.
+    # It never alters the independent, canonical FX_28 rows or counters.
+    if non_fx_evidence is not None:
+        from atlasquant_aion_trader_nonfx import nonfx_readonly_overlay
+        board["non_fx_observation"] = nonfx_readonly_overlay(
+            non_fx_evidence, now=now,
         )
     return board
