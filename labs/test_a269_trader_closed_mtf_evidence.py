@@ -283,5 +283,28 @@ class A269ClosedTimeframesTests(unittest.TestCase):
             self.assertNotIn(phrase, source)
 
 
+    def test_26_oversized_integer_ohlc_fails_closed_without_raising(self):
+        huge = 10 ** 1000
+        for field in ("open", "high", "low", "close"):
+            with self.subTest(field=field):
+                sample = evidence("M5")
+                sample["bars"][-1][field] = huge
+                self.assertEqual(classify_tf(sample, "M5", now=NOW), (INVALID, None))
+                result = board({"EURUSD": {"M5": sample}})
+                self.assertEqual(_find(result, "EURUSD")["timeframes"]["M5"], INVALID)
+                self.assertEqual(result["mtf_coverage"]["M5"], 0)
+                self.assertTrue(result["no_orders"])
+
+    def test_27_invalid_oversized_m15_cannot_fallback_to_resident(self):
+        sample = evidence("M15")
+        sample["bars"][-1]["close"] = 10 ** 1000
+        result = board(
+            {"EURUSD": {"M15": sample}}, resident=_resident(_row())
+        )
+        self.assertEqual(_find(result, "EURUSD")["market_evidence"], INVALID)
+        self.assertEqual(result["fresh_m15_pairs"], 0)
+        self.assertFalse(result["all_28_fresh_closed_m15"])
+
+
 if __name__ == "__main__":
     unittest.main()
