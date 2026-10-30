@@ -131,10 +131,15 @@ class A282ThreeVariantComparisonTests(unittest.TestCase):
             self.assertEqual(row["train"]["summary"]["trades"], 0)
             self.assertEqual(row["train"]["summary"]["sample_status"],
                              "INSUFFICIENT_SAMPLE")
-            self.assertEqual(row["train"]["plan_rows"], 0)
-            # Both partitions can correctly have empty ledgers and identical
-            # SHA256([]); their candle-count separation is what matters here.
+            # Candidate plans may exist yet never execute, and the two
+            # partitions can independently have empty ledgers. Verify the
+            # split in candle counts instead of assuming plan counts.
+            self.assertEqual(row["train"]["candle_count"], 8)
             self.assertEqual(row["holdout"]["candle_count"], 12)
+            self.assertEqual(
+                row["train"]["candle_count"] +
+                row["holdout"]["candle_count"], 20
+            )
 
     def test_09_repeated_evaluation_is_deterministic(self):
         self.assertEqual(single(), single())
