@@ -35,8 +35,7 @@ def stamp(i):
 def csv_data(rows=ROWS):
     lines = ["closed_at,open,high,low,close"]
     for i, (close, high, low) in enumerate(rows):
-        lines.append(stamp(i) + ",".join((","+str(close), str(high),
-                                                str(low), str(close))))
+        lines.append(f"{stamp(i)},{close},{high},{low},{close}")
     return "\n".join(lines) + "\n"
 
 
