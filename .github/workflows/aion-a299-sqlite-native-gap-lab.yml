@@ -1,0 +1,32 @@
+name: A299 SQLite native read/write gap LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a299_sqlite_native_p0_5_6_gap_lab.py'
+      - 'labs/test_a299_sqlite_native_p0_5_6_gap_lab.py'
+      - 'docs/lab/aion_a299_sqlite_native_p0_5_6_gap_lab.md'
+      - '.github/workflows/aion-a299-sqlite-native-gap-lab.yml'
+      - 'aion_chat/store.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-lab:
+    name: A299 native WAL/main snapshot — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A299 native WAL loss and P0-5/P0-6 negative regressions
+        run: |
+          python -m unittest -v labs.test_a299_sqlite_native_p0_5_6_gap_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a292_staged_chat_write_inventory_lab
