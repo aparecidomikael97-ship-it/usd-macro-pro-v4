@@ -36,6 +36,9 @@ DIRECT_FENCED = frozenset((
 ))
 TRANSACTION_FENCED = WRITE_ENTRYPOINTS - DIRECT_FENCED
 DIRECT_DML = {
+    # A315 creates an opt-in-only local receipt schema on startup; this
+    # maintenance DDL must remain visible to the static inventory.
+    "__init__": ("CREATE",),
     "_update": ("UPDATE",),
     "_save_record": ("INSERT",),
     "create_conversation": ("INSERT",),
