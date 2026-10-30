@@ -1,0 +1,31 @@
+name: A298 canonical six P0 gap register LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a298_six_p0_gap_register_lab.py'
+      - 'labs/test_a298_six_p0_gap_register_lab.py'
+      - 'docs/lab/aion_a298_six_p0_gap_register_lab.md'
+      - '.github/workflows/aion-a298-six-p0-gap-register-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registry-lab:
+    name: A298 six-P0 policy registry — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A298 canonical P0 register safety invariants
+        run: |
+          python -m unittest -v labs.test_a298_six_p0_gap_register_lab
