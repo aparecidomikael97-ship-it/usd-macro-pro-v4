@@ -147,7 +147,11 @@ def verify_plan_journal(journal: Any, *, expected_head: Any) -> dict:
         # To be usable by the existing engine, entry may occur only AFTER
         # the signal candle. The plan must claim capture BEFORE the NEXT
         # candle could close; no user-declared timestamp is external proof.
-        next_close = signal + timedelta(minutes=PERIOD_MINUTES[journal["timeframe"]])
+        try:
+            next_close = signal + timedelta(minutes=PERIOD_MINUTES[journal["timeframe"]])
+        except OverflowError:
+            output["error"] = "INVALID_PLAN_OR_CAPTURE_TIME"
+            return output
         if (captured >= next_close
                 or captured_previous is not None and captured < captured_previous
                 or (plan["signal_time"], plan["setup"], plan["side"]) in seen):
