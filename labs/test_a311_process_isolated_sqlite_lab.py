@@ -2,6 +2,7 @@
 
 All commands use synthetic A311 TEST strings, no resident Worker or network.
 """
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -181,7 +182,7 @@ class A311SubprocessBoundaryTests(unittest.TestCase):
         self.assertEqual(retry["status"], "LOCAL_STORE_QUARANTINED_OR_DENIED")
         self.assert_hard_no_go(uncertain)
         self.assert_hard_no_go(retry)
-        with sqlite3.connect(self.root / DB_NAME) as db:
+        with closing(sqlite3.connect(self.root / DB_NAME)) as db:
             n = db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
         self.assertEqual(n, 1)
 
@@ -210,7 +211,7 @@ class A311SubprocessBoundaryTests(unittest.TestCase):
         second = self.append(cid, "new-unique-message-id",
                              "same-semantic-intent")
         self.assertEqual(second["status"], "LOCAL_ACKED", second)
-        with sqlite3.connect(self.root / DB_NAME) as db:
+        with closing(sqlite3.connect(self.root / DB_NAME)) as db:
             n = db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
         self.assertEqual(n, 2)
         self.assertFalse(second["off_host_intent_ledger_proven"])
@@ -219,13 +220,13 @@ class A311SubprocessBoundaryTests(unittest.TestCase):
     def test_parent_can_open_database_file_by_same_os_account(self):
         """Counterexample: no OS ACL/process sandbox in this laboratory."""
         cid = self.new_conversation()
-        with sqlite3.connect(self.root / DB_NAME) as direct:
+        with closing(sqlite3.connect(self.root / DB_NAME)) as direct:
             direct.execute(
                 "UPDATE conversations SET title=? WHERE id=?",
                 ("same-host-direct-writer", cid),
             )
             direct.commit()
-        with sqlite3.connect(self.root / DB_NAME) as verify:
+        with closing(sqlite3.connect(self.root / DB_NAME)) as verify:
             title = verify.execute(
                 "SELECT title FROM conversations WHERE id=?", (cid,)
             ).fetchone()[0]
