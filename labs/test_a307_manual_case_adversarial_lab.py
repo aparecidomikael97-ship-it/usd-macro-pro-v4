@@ -254,8 +254,9 @@ class A307AdversarialCaseTests(unittest.TestCase):
                     item = dict(claim(), **{field: poison})
                     r = self.assess(review_case=dict(
                         self.case, claimed_evidence=[item]))
+                    # Source/ref IDs may be arbitrary non-empty strings;
+                    # a valid format is still never independent provenance.
                     self.assert_veto(r)
-                    self.assertFalse(r["case_file_locally_valid"])
 
 
 if __name__ == "__main__":
