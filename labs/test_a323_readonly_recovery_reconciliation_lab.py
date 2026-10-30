@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from labs.a317_detached_signed_intent_anchor_lab import encode, sha
+from labs.a321_signed_high_water_fork_detection_lab import signing_bytes as a321_signing_bytes
 from labs.a322_genesis_out_of_band_handoff_lab import generate_genesis_card
 from labs.a323_readonly_recovery_reconciliation_lab import (
     SCHEMA, DB_NAME, FIXTURE_MARKER, FIXTURE_TEXT, LOCAL_FIELDS,
@@ -246,10 +247,7 @@ class A323ReadOnlyRecoveryTests(unittest.TestCase):
         witness["head_sha256"] = "e" * 64
         witness["signature_hex"] = self.f.witnesses[
             witness["custodian_id"]
-        ].sign(__import__(
-            "labs.a321_signed_high_water_fork_detection_lab",
-            fromlist=["signing_bytes"],
-        ).signing_bytes(witness)).hex()
+        ].sign(a321_signing_bytes(witness)).hex()
         self.assert_veto(self.call(history_package=package),
                          "A321_SIGNED_HISTORY_VETO")
 
