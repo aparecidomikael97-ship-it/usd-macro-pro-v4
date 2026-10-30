@@ -373,5 +373,153 @@ class A325OriginAttestationLabTests(unittest.TestCase):
         self.assert_hard_no_go(r)
 
 
+
+    def test_identical_claims_can_be_replayed_locally_but_never_authorize(self):
+        """No external nonce ledger: repeated mathematical checks are not anti-replay."""
+        first = self.verify()
+        second = self.verify()
+        for report in (first, second):
+            self.assertEqual(
+                report["status"],
+                "LAB_ORIGIN_SIGNATURES_MATCH_STILL_NOT_INDEPENDENT",
+            )
+            self.assert_hard_no_go(report)
+            self.assertFalse(report["clock_and_nonce_externally_trusted"])
+            self.assertFalse(report["off_host_immutable_head_verified"])
+
+    def test_malformed_outer_envelopes_fail_closed(self):
+        cases = (
+            ("missing_origins", {"origin_attestations": None}),
+            ("origin_string", {"origin_attestations": "two"}),
+            ("extra_origin", {"origin_attestations": self.attestations * 2}),
+            ("missing_receipts", {"witness_receipts": None}),
+            ("receipt_string", {"witness_receipts": "two"}),
+            ("pinset_list", {"pinned_origin_roots": []}),
+            ("pinset_bad_type", {"pinned_origin_roots": {
+                "claimed-origin-A": self.root_pins["claimed-origin-A"],
+                "claimed-origin-B": b"not-a-public-key",
+            }}),
+            ("delivery_signatures_list", {"signed_delivery_receipts": []}),
+            ("delivery_signatures_wrong_ids", {"signed_delivery_receipts": {
+                "forged-A": "0" * 128, "forged-B": "0" * 128,
+            }}),
+            ("nonce_wrong_type", {"expected_nonce": True}),
+            ("nonce_short", {"expected_nonce": "f" * 63}),
+            ("clock_negative", {"declared_now_epoch": -1}),
+            ("clock_float", {"declared_now_epoch": 10070.0}),
+            ("incident_truthy_string", {"incident_reopened": "false"}),
+            ("invalid_operation", {"operation": "RESTORE"}),
+            ("history_non_dict", {"history_package": []}),
+            ("history_empty_checkpoints", {"history_package": {
+                "ceremony_request": {"custodian_pins": {}},
+                "checkpoints": [],
+            }}),
+            ("genesis_missing", {"genesis_package": None}),
+        )
+        for label, override in cases:
+            with self.subTest(case=label):
+                report = self.verify(**override)
+                self.assertNotEqual(
+                    report["status"],
+                    "LAB_ORIGIN_SIGNATURES_MATCH_STILL_NOT_INDEPENDENT",
+                )
+                self.assert_hard_no_go(report)
+
+    def test_attestation_field_type_mutations_fail_closed(self):
+        cases = (
+            ("schema", "ATLASQUANT_FAKE_GO"),
+            ("issuer_id", []),
+            ("custodian_id", True),
+            ("witness_key_hex", None),
+            ("root_generation", 1.25),
+            ("incident_epoch", -1),
+            ("checkpoint_sha256", "f" * 63),
+            ("delivery_receipt_sha256", b"0" * 64),
+            ("challenge_nonce", "z" * 64),
+            ("issued_at", "10050"),
+            ("expires_at", True),
+            ("decision", "GO"),
+            ("signature_hex", "z" * 128),
+        )
+        for field, bad in cases:
+            with self.subTest(field=field):
+                attempts = copy.deepcopy(self.attestations)
+                attempts[0][field] = bad
+                report = self.verify(origin_attestations=attempts)
+                self.assertNotEqual(
+                    report["status"],
+                    "LAB_ORIGIN_SIGNATURES_MATCH_STILL_NOT_INDEPENDENT",
+                )
+                self.assert_hard_no_go(report)
+
+    def test_receipt_field_type_mutations_fail_closed(self):
+        cases = (
+            ("custodian_id", None),
+            ("claimed_received_at", []),
+            ("claimed_channel_id", True),
+            ("claimed_receipt_digest", 123),
+            ("checkpoint_sha256", "f" * 63),
+            ("root_generation", True),
+            ("incident_epoch", -1),
+            ("sequence", "23"),
+            ("head_sha256", []),
+            ("intent_digest", b"0" * 64),
+            ("decision", "RESEND"),
+        )
+        for field, bad in cases:
+            with self.subTest(field=field):
+                receipts = copy.deepcopy(self.witness_receipts)
+                receipts[0][field] = bad
+                report = self.verify(witness_receipts=receipts)
+                self.assertNotEqual(
+                    report["status"],
+                    "LAB_ORIGIN_SIGNATURES_MATCH_STILL_NOT_INDEPENDENT",
+                )
+                self.assert_hard_no_go(report)
+
+    def test_cross_witness_delivery_signature_swap_is_vetoed(self):
+        keys = list(self.delivered_signatures)
+        swapped = dict(self.delivered_signatures)
+        swapped[keys[0]], swapped[keys[1]] = swapped[keys[1]], swapped[keys[0]]
+        report = self.verify(signed_delivery_receipts=swapped)
+        self.assertIn("CUSTODIAN_DELIVERY_SIGNATURE_INVALID", report["reasons"])
+        self.assert_hard_no_go(report)
+
+    def test_proof_order_is_irrelevant_to_quorum_but_not_to_authority(self):
+        report = self.verify(
+            witness_receipts=list(reversed(self.witness_receipts)),
+            origin_attestations=list(reversed(self.attestations)),
+        )
+        self.assertEqual(
+            report["status"], "LAB_ORIGIN_SIGNATURES_MATCH_STILL_NOT_INDEPENDENT"
+        )
+        self.assert_hard_no_go(report)
+
+    def test_host_resigning_forged_delivery_channel_still_has_no_authority(self):
+        """Counterexample: a locally reminted channel claim can stay coherent."""
+        receipt = self.witness_receipts[0]
+        receipt["claimed_channel_id"] += "-forged-by-host"
+        receipt["claimed_receipt_digest"] = sha(encode({
+            "checkpoint_sha256": receipt["checkpoint_sha256"],
+            "custodian_id": receipt["custodian_id"],
+            "claimed_channel_id": receipt["claimed_channel_id"],
+            "claimed_received_at": receipt["claimed_received_at"],
+        }))
+        who = receipt["custodian_id"]
+        self.delivered_signatures[who] = self.source.source.f.witnesses[
+            who
+        ].sign(receipt_signing_bytes(receipt)).hex()
+        self.attestations[0]["delivery_receipt_sha256"] = sha(encode(receipt))
+        self.resign_attestation(0)
+        report = self.verify()
+        self.assertEqual(
+            report["status"], "LAB_ORIGIN_SIGNATURES_MATCH_STILL_NOT_INDEPENDENT"
+        )
+        self.assertEqual(report["mathematically_verified_delivery_signatures"], 2)
+        self.assertEqual(report["mathematically_verified_issuer_signatures"], 2)
+        self.assertFalse(report["delivery_channel_independently_authenticated"])
+        self.assert_hard_no_go(report)
+
+
 if __name__ == "__main__":
     unittest.main()
