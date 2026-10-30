@@ -1,7 +1,6 @@
 """A279: prefix-causal fixed FVG research and offline A277 regression."""
 from datetime import datetime, timezone, timedelta
 from unittest import mock
-import copy
 import unittest
 
 import atlasquant_aion_causal_fvg_lab as module
@@ -118,10 +117,8 @@ class A279CausalFvgTests(unittest.TestCase):
         old_audit = [a for a in full["candidate_audit"]
                      if a["signal_time"] <= stamp(6)]
         self.assertEqual(prefix["candidate_audit"], old_audit)
-        self.assertEqual(prefix["last_prefix_sha256"],
-                         old_audit[-1]["prefix_sha256"]
-                         if old_audit[-1]["signal_time"] == stamp(6)
-                         else prefix["last_prefix_sha256"])
+        self.assertNotEqual(prefix["last_prefix_sha256"],
+                            full["last_prefix_sha256"])
 
     def test_05_mutating_later_high_low_cannot_repaint_first_candidate(self):
         altered = list(BARS)
@@ -162,8 +159,7 @@ class A279CausalFvgTests(unittest.TestCase):
     def test_09_historical_backtest_only_starts_after_signal_candle(self):
         result = backtest()
         self.assertTrue(result["valid"])
-        self.assertFalse(result["signal_generation"] if "signal_generation" in result
-                         else result["authorizes_send"])
+        self.assertFalse(result["signal_generation"])
         self.assertFalse(result["authorizes_send"])
         self.assertTrue(result["no_orders"])
         self.assertEqual(result["p0_homologated"], 0)
