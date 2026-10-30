@@ -402,7 +402,8 @@ class SQLiteChatStore:
                       FOREIGN KEY(message_id) REFERENCES messages(id)
                     )
                 """)
-                self.db.commit()
+                # CREATE TABLE outside BEGIN is SQLite-autocommitted. No
+                # second raw .commit() sink may bypass the A247 write fence.
             if self._strict_local_data_version:
                 self._local_data_version_baseline = self._read_local_data_version()
                 if self._local_data_version_baseline is None:
