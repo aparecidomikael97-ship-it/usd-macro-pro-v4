@@ -47,7 +47,7 @@ class A313RealDifferentUIDFixtureTests(unittest.TestCase):
             self.assertEqual(
                 self.observation["status"],
                 "DIFFERENT_UID_FIXTURE_DENIAL_OBSERVED",
-                "CI Ubuntu must fail RED if sudo/nobody or Linux UID proof missing",
+                "CI Ubuntu incomplete distinct UID probe: " + repr(self.observation),
             )
             self.assertTrue(self.observation["real_two_uid_fixture_tested"])
             self.assertTrue(self.observation["synthetic_other_uid_denied"])
