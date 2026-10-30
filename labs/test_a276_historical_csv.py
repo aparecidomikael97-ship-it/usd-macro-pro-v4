@@ -190,9 +190,12 @@ class A276HistoricalCsvTests(unittest.TestCase):
         self.assert_rejected("x" * (MAX_CSV_BYTES + 1), reason="CSV_SIZE_LIMIT")
 
     def test_20_row_count_bounded_with_no_partial_success(self):
-        first = "2026-01-01T00:00:00+00:00,1,1,1,1"
-        many = HEADER + "\n" + "\n".join([first] * (MAX_CANDLES + 1))
-        self.assert_rejected(many, reason="NON_MONOTONIC_OR_TOO_CLOSE")
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        many = HEADER + "\n" + "\n".join(
+            (start + timedelta(minutes=15 * i)).isoformat() + ",1,1,1,1"
+            for i in range(MAX_CANDLES + 1)
+        )
+        self.assert_rejected(many, reason="CANDLE_COUNT_LIMIT")
 
     def test_21_truncated_rows_do_not_yield_partial_data(self):
         self.assert_rejected(VALID + "2026-10-30T00:30:00+00:00,1.2,1.3",
