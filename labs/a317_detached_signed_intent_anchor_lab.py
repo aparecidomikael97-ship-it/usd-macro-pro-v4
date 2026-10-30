@@ -72,7 +72,7 @@ def snapshot_from_rows(receipt, message):
 
 def read_fixture_snapshot(db_path, scope, intent_id):
     """Read ONLY a marked synthetic SQLite fixture; never open operational DB."""
-    if (type(db_path) not in (str, Path) or not isinstance(scope, Scope)
+    if (not isinstance(db_path, (str, Path)) or not isinstance(scope, Scope)
             or type(intent_id) is not str or not ID.fullmatch(intent_id)):
         return None, "LAB_FIXTURE_OR_INTENT_INVALID"
     path = Path(db_path)
