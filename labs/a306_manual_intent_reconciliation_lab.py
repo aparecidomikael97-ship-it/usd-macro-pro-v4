@@ -130,6 +130,9 @@ def assess_manual_reconciliation(
         and observation.get("source_pending_marker") is True
         and observation.get("source_reopen_refused") is True
         and observation.get("uncertain_error_raised") is True
+        and observation.get("source_failure_reason")
+            == "COMMIT_OUTCOME_UNKNOWN_ZERO_AUTO_RETRY"
+        and observation.get("ack_state") == "ACK_UNKNOWN"
         and observation.get("no_retries_performed") is True
         and observation.get("no_restore_api_invoked") is True
         and observation.get("host_native_fd_attested") is False
