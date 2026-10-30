@@ -1,0 +1,34 @@
+name: A292 staged-chat write inventory LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a292_staged_chat_write_inventory_lab.py'
+      - 'labs/test_a292_staged_chat_write_inventory_lab.py'
+      - 'docs/lab/aion_a292_staged_chat_write_inventory_lab.md'
+      - '.github/workflows/aion-a292-chat-write-inventory-lab.yml'
+      - 'aion_chat/store.py'
+      - 'aion_chat/models.py'
+      - 'labs/a291_chat_write_gate_commit_fence_lab.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-lab:
+    name: A292 synthetic chat writes — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A292 real SQLite write inventory, ACK loss, and A291-A290 regression
+        run: |
+          python -m unittest -v labs.test_a292_staged_chat_write_inventory_lab labs.test_a291_chat_write_gate_commit_fence_lab labs.test_a290_sqlite_local_write_gate_lab
