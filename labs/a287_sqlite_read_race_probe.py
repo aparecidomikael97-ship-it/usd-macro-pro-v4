@@ -5,7 +5,7 @@ scheduling. This is a negative characterization plus an isolated candidate
 post-read check, NOT a modification of production store behavior. No external
 providers, Worker, orders, network, trusted FD, off-host witness or P0 closure.
 """
-from contextlib import closing
+from contextlib import closing, nullcontext
 import json
 from pathlib import Path
 import sqlite3
@@ -54,7 +54,9 @@ def postcheck_read_candidate(store, read_fn):
     return result
 
 
-def probe_reader_interleaving(*, endpoint="get_conversation", postcheck=False):
+def probe_reader_interleaving(
+    *, endpoint="get_conversation", postcheck=False, integrated_guard=False
+):
     """Inject a second-handle COMMIT after the existing early store check.
 
     For getters that call _scope directly, inject after _scope's check.
@@ -66,6 +68,8 @@ def probe_reader_interleaving(*, endpoint="get_conversation", postcheck=False):
         raise ValueError("unsupported research endpoint")
     if type(postcheck) is not bool:
         raise TypeError("postcheck must be bool")
+    if type(integrated_guard) is not bool:
+        raise TypeError("integrated_guard must be bool")
     with TemporaryDirectory(prefix="a287-read-") as raw:
         path = Path(raw) / "staging.db"
         store = SQLiteChatStore(path, strict_local_data_version=True)
@@ -115,15 +119,28 @@ def probe_reader_interleaving(*, endpoint="get_conversation", postcheck=False):
 
             status = "NOT_RUN"
             result = None
-            with mock.patch.object(store, target, side_effect=interpose):
-                try:
-                    result = (
-                        postcheck_read_candidate(store, actions[endpoint])
-                        if postcheck else actions[endpoint]()
-                    )
-                    status = "RETURNED"
-                except StorageUnavailableError:
-                    status = "DENIED_AFTER_EXTERNAL_COMMIT"
+            # A288: explicitly keep the A287 *historical* pre-only
+            # negative control. It disables just the new post-read method
+            # inside this synthetic LAB harness; NEVER normal runtime.
+            legacy_pre_only = (
+                not integrated_guard and not postcheck
+                and hasattr(store, "_post_read_data_version_guard")
+            )
+            guard_context = (
+                mock.patch.object(store, "_post_read_data_version_guard",
+                                  return_value=None)
+                if legacy_pre_only else nullcontext()
+            )
+            with guard_context:
+                with mock.patch.object(store, target, side_effect=interpose):
+                    try:
+                        result = (
+                            postcheck_read_candidate(store, actions[endpoint])
+                            if postcheck else actions[endpoint]()
+                        )
+                        status = "RETURNED"
+                    except StorageUnavailableError:
+                        status = "DENIED_AFTER_EXTERNAL_COMMIT"
 
             # A no-postcheck read finished while its *store status* was still
             # healthy; this is not proof the returned data is trustworthy.
@@ -136,6 +153,7 @@ def probe_reader_interleaving(*, endpoint="get_conversation", postcheck=False):
                 "schema": SCHEMA,
                 "endpoint": endpoint,
                 "postcheck_lab_candidate": postcheck,
+                "integrated_store_postcheck": integrated_guard,
                 "status": status,
                 "injected_external_commit": injected,
                 "same_path_inode": inode_before == (
@@ -192,10 +210,19 @@ def probe_last_moment_postcheck_gap():
                     _foreign_commit(path, c.id, "after-final-check")
                     injected = True
 
-            with mock.patch.object(store, "_require_open", side_effect=delayed_guard):
-                result = postcheck_read_candidate(
-                    store, lambda: store.get_conversation(SCOPE, c.id)
-                )
+            # Preserve the A287 pre-integration last-moment proof after
+            # A288 adds a separate internal read check.
+            guard_context = (
+                mock.patch.object(store, "_post_read_data_version_guard",
+                                  return_value=None)
+                if hasattr(store, "_post_read_data_version_guard")
+                else nullcontext()
+            )
+            with guard_context:
+                with mock.patch.object(store, "_require_open", side_effect=delayed_guard):
+                    result = postcheck_read_candidate(
+                        store, lambda: store.get_conversation(SCOPE, c.id)
+                    )
             healthy_before_followup = store._health_state == HEALTHY
             followup = store.storage_health(deep=True)
             return {
