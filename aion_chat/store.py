@@ -378,6 +378,17 @@ class SQLiteChatStore:
             return "LOCAL_DATA_VERSION_CHANGED"
         return "OK"
 
+    def _post_read_data_version_guard(self):
+        """A288 LAB: second local check after each staged-chat read.
+
+        Only active in explicit A286 strict single-writer mode. Narrows a
+        read/COMMIT interleaving shown by A287, but is NOT atomic with a
+        returned result, a native VFS/FD attestation, or off-host rollback
+        proof. Default multi-writer behavior remains exactly unchanged.
+        """
+        if self._strict_local_data_version:
+            self._require_open()
+
     def _pending_message_commit_fence(self) -> bool:
         """Bounded grace for an in-flight *normal* COMMIT cleanup.
 
@@ -821,6 +832,7 @@ class SQLiteChatStore:
             "SELECT data FROM conversations WHERE id=? AND owner=? AND tenant=? AND workspace=?",
             (conversation_id, *requested_scope),
         ).fetchone()
+        self._post_read_data_version_guard()
         if row is None:
             raise LookupError("conversation unavailable")
         return Conversation(**json.loads(row[0]))
@@ -903,6 +915,7 @@ class SQLiteChatStore:
             sql += " AND (updated,id)<(?,?)"
             args += [updated, cid]
         rows = self.db.execute(sql + " ORDER BY updated DESC,id DESC LIMIT ?", [*args, size + 1]).fetchall()
+        self._post_read_data_version_guard()
         items = [Conversation(**json.loads(r["data"])) for r in rows[:size]]
         nxt = self._encode(scope, spec, [rows[size - 1]["updated"], rows[size - 1]["id"]]) if len(rows) > size else None
         return Page(items, nxt)
@@ -1054,6 +1067,7 @@ class SQLiteChatStore:
             args.append(self._decode(scope, spec, cursor))
         order = "DESC" if newest_first else "ASC"
         rows = self.db.execute(sql + f" ORDER BY seq {order} LIMIT ?", [*args, size + 1]).fetchall()
+        self._post_read_data_version_guard()
         items = [Message(**json.loads(r["data"])) for r in rows[:size]]
         return Page(items, self._encode(scope, spec, items[-1].sequence) if len(rows) > size else None)
 
@@ -1063,6 +1077,7 @@ class SQLiteChatStore:
             "SELECT data FROM messages WHERE cid=? AND id=?",
             (conversation_id, message_id),
         ).fetchone()
+        self._post_read_data_version_guard()
         if not row:
             raise LookupError("message unavailable")
         return Message(**json.loads(row[0]))
@@ -1091,6 +1106,7 @@ class SQLiteChatStore:
             "SELECT data FROM records WHERE cid=? AND id=? AND kind='attachment'",
             (conversation_id, attachment_id),
         ).fetchone()
+        self._post_read_data_version_guard()
         if not row:
             raise LookupError("attachment unavailable")
         return Attachment(**json.loads(row[0]))
@@ -1101,6 +1117,7 @@ class SQLiteChatStore:
             "SELECT data FROM records WHERE cid=? AND kind=? ORDER BY seq DESC,id DESC LIMIT 1",
             (cid, kind),
         ).fetchone()
+        self._post_read_data_version_guard()
         return model(**json.loads(row[0])) if row else None
 
     def get_latest_checkpoint(self, scope, conversation_id):
@@ -1135,4 +1152,5 @@ class SQLiteChatStore:
             "SELECT data FROM messages WHERE cid=? AND seq<? AND instr(lower(content),lower(?))>0 ORDER BY seq DESC LIMIT ?",
             (conversation_id, before_sequence, query, limit),
         ).fetchall() if query.strip() else []
+        self._post_read_data_version_guard()
         return [Message(**json.loads(r[0])) for r in rows]
