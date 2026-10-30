@@ -311,7 +311,7 @@ with TemporaryDirectory() as work:
                 outbox[offset:]
             )
             with self.assertRaisesRegex(
-                OfflineBundleRejected, "host callback or adapter",
+                OfflineBundleRejected, "send or authorization method called",
             ):
                 verify_offline_candidate(_mutate_and_rehash(
                     archive.read_bytes(), "atlasquant_aion_execution_outbox.py",
@@ -334,7 +334,7 @@ with TemporaryDirectory() as work:
                 outbox[offset:]
             )
             with self.assertRaisesRegex(
-                OfflineBundleRejected, "host callback or adapter",
+                OfflineBundleRejected, "send or authorization method called",
             ):
                 verify_offline_candidate(_mutate_and_rehash(
                     archive.read_bytes(), "atlasquant_aion_execution_outbox.py",
