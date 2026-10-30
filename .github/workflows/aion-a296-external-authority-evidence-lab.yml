@@ -1,0 +1,31 @@
+name: A296 external authority evidence contract LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a296_external_authority_evidence_contract_lab.py'
+      - 'labs/test_a296_external_authority_evidence_contract_lab.py'
+      - 'docs/lab/aion_a296_external_authority_evidence_contract_lab.md'
+      - '.github/workflows/aion-a296-external-authority-evidence-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-lab:
+    name: A296 negative authority evidence — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A296 evidence contract and A295-A290 regressions
+        run: |
+          python -m unittest -v labs.test_a296_external_authority_evidence_contract_lab labs.test_a295_dual_local_authority_contract_lab labs.test_a294_volatile_witness_sim_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a292_staged_chat_write_inventory_lab labs.test_a291_chat_write_gate_commit_fence_lab labs.test_a290_sqlite_local_write_gate_lab
