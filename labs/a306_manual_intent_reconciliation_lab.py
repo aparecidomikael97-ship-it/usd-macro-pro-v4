@@ -49,6 +49,7 @@ def _result():
         "research_only": True,
         "requires_manual_review": True,
         "case_file_locally_valid": False,
+        "claimed_evidence_consistent_locally": False,
         "a305_negative_barrier_present": False,
         "locally_observed_effect": False,
         "effect_category": "UNDETERMINED",
@@ -195,9 +196,16 @@ def assess_manual_reconciliation(
     if not claims:
         issues.add("EXTERNAL_OUTCOME_EVIDENCE_MISSING")
 
-    if type(observation) is dict and type(
-        observation.get("sqlite_effect_count")
-    ) is int and observation.get("sqlite_effect_count") == 1:
+    # A forged/incomplete observation must not promote a local row into
+    # "observed" without even passing the A305 negative research checks.
+    # Passing these checks still does NOT attest an off-host effect.
+    if (
+        parent.get("real_sqlite_lab_observed") is True
+        and parent.get("commit_ack_unknown") is True
+        and type(observation) is dict
+        and type(observation.get("sqlite_effect_count")) is int
+        and observation.get("sqlite_effect_count") == 1
+    ):
         out["locally_observed_effect"] = True
     if out["locally_observed_effect"] and "ABSENT" in claims_outcomes:
         issues.add("CLAIMED_ABSENCE_CONFLICTS_WITH_SQLITE")
@@ -222,9 +230,25 @@ def assess_manual_reconciliation(
         except (TypeError, ValueError, OverflowError):
             issues.add("REVIEW_CASE_NOT_CANONICAL")
     out["case_digest_sha256"] = case_hash
-    # This is structural compliance of a human-review worksheet,
-    # not evidence of a real human approval or independent source.
+    evidence_defects = {
+        "EVIDENCE_COLLECTION_INVALID", "CLAIM_FIELDS_INVALID",
+        "CLAIM_IDENTITY_INVALID", "DUPLICATE_EVIDENCE_REFERENCE",
+        "CLAIMS_FROM_SINGLE_SOURCE", "CLAIM_SEMANTIC_INTENT_MISMATCH",
+        "CLAIM_OUTCOME_INVALID", "CLAIM_DIGEST_INVALID",
+        "CONFLICTING_EFFECT_CLAIMS",
+        "CLAIMED_ABSENCE_CONFLICTS_WITH_SQLITE",
+    }
+    out["claimed_evidence_consistent_locally"] = (
+        bool(claims) and not bool(issues & evidence_defects)
+    )
+    # A local worksheet with missing claims may still be a review stub.
+    # But any malformed, duplicated or contradictory claims must invalidate
+    # its "locally valid" label: previously this gave false reassurance.
+    # Neither local validity nor a self-computed digest is authority.
     out["case_file_locally_valid"] = not any(x in issues for x in {
+        "A305_NEGATIVE_BARRIER_MISSING", "SQLITE_OBSERVATION_NOT_RECORDED",
+        "ACK_UNKNOWN_NOT_PROVEN",
+        *evidence_defects,
         "REVIEW_CASE_FIELDS_INVALID", "REVIEW_CASE_SCHEMA_INVALID",
         "CASE_ID_INVALID", "CASE_PREVIOUS_HASH_INVALID",
         "REPLAYED_OR_INVALID_CASE_GENERATION", "INCIDENT_EPOCH_CHANGED",
