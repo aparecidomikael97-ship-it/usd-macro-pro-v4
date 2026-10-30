@@ -276,12 +276,18 @@ class A317DetachedAnchorTests(unittest.TestCase):
         self.assert_no_go(r)
 
     def test_noncanonical_types_dont_promote_go(self):
-        for value in (None, True, [], "s", 2):
+        for value in (None, True, [], "s", -2):
             with self.subTest(value=repr(value)):
                 fake = dict(self.anchor, sequence=value)
                 r = self.assess(signed_anchor=fake)
                 self.assertIn("ANCHOR_NUMBER_INVALID", r["issues"])
                 self.assert_no_go(r)
+        # A positive integer remains well-typed; the changed signed
+        # value is instead rejected cryptographically, never promoted.
+        tampered = dict(self.anchor, sequence=2)
+        result = self.assess(signed_anchor=tampered)
+        self.assertIn("SIGNATURE_NOT_VALID", result["issues"])
+        self.assert_no_go(result)
 
     def test_non_lab_path_rejected_without_opening_operational_data(self):
         other = Path(self.tmp.name) / "unmarked.sqlite"
