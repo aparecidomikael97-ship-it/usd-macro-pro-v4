@@ -1,0 +1,32 @@
+name: A300 cold restart WAL and marker recovery LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a300_cold_restart_sqlite_recovery_lab.py'
+      - 'labs/test_a300_cold_restart_sqlite_recovery_lab.py'
+      - 'docs/lab/aion_a300_cold_restart_sqlite_recovery_lab.md'
+      - '.github/workflows/aion-a300-cold-restart-recovery-lab.yml'
+      - 'aion_chat/store.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-lab:
+    name: A300 cold restart — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A300 negative probes and A299 A293 A292 regressions
+        run: |
+          python -m unittest -v labs.test_a300_cold_restart_sqlite_recovery_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a292_staged_chat_write_inventory_lab
