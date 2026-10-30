@@ -1,0 +1,30 @@
+name: A327 strict local semantic intent full rollback HOLD LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a327_semantic_intent_rollback_lab.py'
+      - 'labs/test_a327_semantic_intent_rollback_lab.py'
+      - '.github/workflows/aion-a327-strict-intent-rollback-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-rollback-lab:
+    name: A327 closed SQLite rollback P0-5/6 HOLD — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Strict semantic intent rollback and native SQLite negative regressions
+        run: |
+          python -m unittest -v labs.test_a327_semantic_intent_rollback_lab labs.test_a315_semantic_intent_atomic_commit_lab labs.test_a316_orphan_intent_crosscheck_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab
