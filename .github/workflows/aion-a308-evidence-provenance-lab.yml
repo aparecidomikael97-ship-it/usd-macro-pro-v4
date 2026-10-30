@@ -1,0 +1,33 @@
+name: A308 evidence bytes and signed provenance LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a308_evidence_provenance_contract_lab.py'
+      - 'labs/test_a308_evidence_provenance_contract_lab.py'
+      - 'docs/lab/aion_a308_evidence_provenance_contract_lab.md'
+      - '.github/workflows/aion-a308-evidence-provenance-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-provenance-lab:
+    name: A308 evidence receipts — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install free existing LAB crypto dependency
+        run: python -m pip install "cryptography==46.0.4"
+      - name: A308 evidence integrity and A307 through A292 regressions
+        run: |
+          python -m unittest -v labs.test_a308_evidence_provenance_contract_lab labs.test_a307_manual_case_adversarial_lab labs.test_a306_manual_intent_reconciliation_lab labs.test_a305_restart_revocation_no_resend_lab labs.test_a304_custodian_status_lab labs.test_a303_custody_anchor_chain_lab labs.test_a302_witness_receipt_contract_lab labs.test_a301_recovery_evidence_contract_lab labs.test_a300_cold_restart_sqlite_recovery_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a292_staged_chat_write_inventory_lab
