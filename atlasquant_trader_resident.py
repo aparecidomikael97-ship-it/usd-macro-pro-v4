@@ -139,7 +139,7 @@ def resident_trader_state(snapshot, *, now=None, series_state=None, runtime_stat
             "atlasquant_validated_market_items": items}
 
 
-def hydrate_trader_resident_state(session_state, snapshot, runtime_status=None, *, timeframe_evidence=None):
+def hydrate_trader_resident_state(session_state, snapshot, runtime_status=None, *, timeframe_evidence=None, non_fx_evidence=None):
     # Clear previously accepted evidence too: a failed refresh cannot retain it.
     session_state["atlasquant_reference_fx_population"] = {}
     session_state["atlasquant_validated_market_items"] = []
@@ -156,7 +156,8 @@ def hydrate_trader_resident_state(session_state, snapshot, runtime_status=None, 
             # No market data fetch, broker, order, alert or paid provider call.
             from atlasquant_aion_trader_observation import trader_readonly_observation
             session_state["atlasquant_aion_trader_observation"] = trader_readonly_observation(
-                state, timeframe_evidence=timeframe_evidence
+                state, timeframe_evidence=timeframe_evidence,
+                non_fx_evidence=non_fx_evidence,
             )
     except (TypeError, ValueError, KeyError, AttributeError):
         # Malformed resident artifacts stay absent, never repaired by this adapter.
