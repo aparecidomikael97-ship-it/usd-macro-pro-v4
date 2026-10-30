@@ -18,6 +18,23 @@ Nesse modo:
 - As seis operações públicas continuam usando o marcador antes de COMMIT e a semântica de ACK incerto;
 - `strict_private_write_helpers=False` continua sendo o padrão para não modificar silenciosamente fluxos legados enquanto ainda há bloqueios canônicos.
 
+## Regressão real encontrada e corrigida na A309
+
+A primeira execução da PR A309 identificou **6 ERROR no Windows** em testes
+legados A246/A247: os testes usam `LostAckConnection`, um proxy sintético
+que não oferece o atributo `in_transaction`. A implementação inicial
+consultava esse atributo mesmo com `strict_private_write_helpers=False`.
+
+Correção: no **modo padrão desligado**, a região A309 não consulta esse
+atributo nem muda o fluxo antigo. No **modo estrito ligado**, ausência de
+comprovação de transação agora falha explicitamente com
+`PRIVATE_HELPER_TRANSACTION_UNVERIFIED_ZERO_AUTO_RETRY`, antes do COMMIT,
+e marca a conexão como FAILED. Foram adicionados **dois testes próprios** de
+regressão e A246/A247 passaram a compor a bateria direta de CI da A309.
+
+O resultado desses novos testes e da CI integral **permanece pendente**
+até execução real; registrar a correção não basta para dar PASS.
+
 ## Contraprovas obrigatórias
 
 Esta não é uma segurança resistente ao host. A classe ainda expõe a conexão `self.db`, que permite `self.db.execute(...); self.db.commit()` sem passar pelos helpers. Além disso, código Python dentro do mesmo processo pode invocar o gerenciador `_fenced_chat_transaction` diretamente ou alterar atributos privados.
@@ -28,8 +45,8 @@ Até a conclusão das seis P0, o modo opt-in **não deve ser adotado operacional
 
 ## Testes
 
-- 14 casos A309 com bancos SQLite reais temporários, incluindo os seis writers, helpers diretos, transação iniciada manualmente, fechamento da região, regressão do default, ACK perdido depois de COMMIT, recusa de retry e os dois bypasses restantes;
-- Regressões A292/A293/A299, com testes negativos preservados, em Ubuntu/Windows;
+- 16 casos A309 com bancos SQLite reais temporários, incluindo os seis writers, helpers diretos, transação iniciada manualmente, fechamento da região, regressão do default, ACK perdido depois de COMMIT, recusa de retry e os dois bypasses restantes;
+- Regressões A246/A247/A292/A293/A299, com testes negativos preservados, em Ubuntu/Windows;
 - GitHub Actions com biblioteca padrão Python 3.12, sem extensão C, serviço pago ou chamada a provedor.
 
 **Aceitação possível:** melhora local de laboratório, reduz bypass dos dois helpers quando modo estrito estiver ativo.
