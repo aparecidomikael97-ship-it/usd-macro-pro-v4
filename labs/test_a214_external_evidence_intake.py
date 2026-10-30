@@ -373,5 +373,100 @@ class A214ReadOnlyEvidenceIntakeTests(unittest.TestCase):
             self.assert_denied(outbox, key, c, "ORIGINAL_INTENT_OR_ATTEMPT_MISMATCH")
 
 
+    def test_31_hostile_mapping_candidate_never_iterated_or_queried(self):
+        from collections.abc import Mapping
+
+        class HostileMapping(Mapping):
+            def __init__(self):
+                self.calls = 0
+
+            def __iter__(self):
+                self.calls += 1
+                raise AssertionError("host iteration must not run")
+
+            def __len__(self):
+                self.calls += 1
+                raise AssertionError("host length must not run")
+
+            def __getitem__(self, _key):
+                self.calls += 1
+                raise AssertionError("host lookup must not run")
+
+        with self.fixture() as (store, outbox, key, _adapter):
+            hostile = HostileMapping()
+            before = store.db.total_changes
+            self.assert_denied(
+                outbox, key, hostile, "CANDIDATE_ENVELOPE_NOT_EXACT",
+            )
+            self.assertEqual(hostile.calls, 0)
+            self.assertEqual(store.db.total_changes, before)
+            self.assertEqual(outbox.effect_count(), 0)
+
+    def test_32_string_subclass_does_not_run_host_encode_or_replace(self):
+        class HostileText(str):
+            def encode(self, *args, **kwargs):
+                raise AssertionError("host encoding must not run")
+
+            def replace(self, *args, **kwargs):
+                raise AssertionError("host replacement must not run")
+
+        with self.fixture() as (_, outbox, key, _adapter):
+            raw = HostileText(json.dumps(self.candidate(outbox, key)))
+            with self.assertRaises(ValueError):
+                decode_candidate_json(raw)
+            self.assert_denied(
+                outbox, key, raw, "CANDIDATE_ENVELOPE_NOT_EXACT",
+            )
+
+    def test_33_hostile_field_equality_denied_before_comparison(self):
+        class HostileValue:
+            def __eq__(self, other):
+                raise AssertionError("host equality must not run")
+
+            def __ne__(self, other):
+                raise AssertionError("host inequality must not run")
+
+        with self.fixture() as (_, outbox, key, _adapter):
+            for field in ("challenge_digest", "state", "provider_id"):
+                with self.subTest(field=field):
+                    candidate = self.candidate(outbox, key)
+                    candidate[field] = HostileValue()
+                    self.assert_denied(
+                        outbox, key, candidate, "CANDIDATE_NONPRIMITIVE_UNTRUSTED",
+                    )
+            self.assertEqual(outbox.effect_count(), 0)
+
+    def test_34_hostile_local_mapping_and_decision_getter_rejected(self):
+        class HostileDict(dict):
+            def get(self, key, default=None):
+                raise AssertionError("subclass getter must not run")
+
+        with self.fixture() as (_, outbox, key, _adapter):
+            record = outbox.get(key)
+            with self.assertRaises(ValueError):
+                make_local_evidence_challenge(HostileDict(record))
+            altered = dict(record)
+            altered["decision"] = HostileDict(record["decision"])
+            with self.assertRaises(ValueError):
+                make_local_evidence_challenge(altered)
+            self.assertEqual(outbox.get(key)["state"], "UNCERTAIN")
+
+    def test_35_datetime_subclass_cannot_run_host_clock_method(self):
+        from datetime import datetime, timezone
+
+        class HostileDatetime(datetime):
+            def utcoffset(self):
+                raise AssertionError("host clock callback must not run")
+
+        with self.fixture() as (_, outbox, key, _adapter):
+            clock = HostileDatetime(2026, 10, 29, 18, tzinfo=timezone.utc)
+            self.assert_denied(
+                outbox, key, self.candidate(outbox, key),
+                "INVALID_CLAIMED_EVENT_TIME", observed=clock,
+            )
+            self.assertEqual(outbox.get(key)["state"], "UNCERTAIN")
+            self.assertEqual(outbox.effect_count(), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
