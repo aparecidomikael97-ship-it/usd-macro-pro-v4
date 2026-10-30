@@ -611,6 +611,11 @@ class ExecutionOutbox:
         irreversible external side effects. Legacy synthetic dispatch lives
         EXCLUSIVELY in labs/a259_synthetic_outbox_fixture.py.
         """
+        # A272: do not invoke hostile __str__ on identifiers or timestamps
+        # before the NO-SEND boundary. Only plain built-in wire values pass.
+        if (type(idempotency_key) is not str or type(worker_id) is not str
+                or (now is not None and type(now) not in (str, datetime))):
+            raise TypeError("native dispatch inputs required")
         key = _clean(idempotency_key, 64)
         worker = _token(worker_id, "worker_id")
         now_dt = _utc(now)
@@ -673,6 +678,9 @@ class ExecutionOutbox:
         any user-supplied adapter/authorize object while resolving ambiguity.
         Synthetic reconciliation is only reproduced in labs/ fixtures.
         """
+        # A272: an arbitrary Python object must not be stringified here.
+        if type(idempotency_key) is not str:
+            raise TypeError("native idempotency key required")
         key = _clean(idempotency_key, 64)
         intent = self.get(key)
         if intent["state"] not in {"UNCERTAIN", "SENT"}:
