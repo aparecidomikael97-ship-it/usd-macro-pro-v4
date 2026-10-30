@@ -1,0 +1,33 @@
+name: A302 synthetic Ed25519 witness receipts LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a302_witness_receipt_contract_lab.py'
+      - 'labs/test_a302_witness_receipt_contract_lab.py'
+      - 'docs/lab/aion_a302_signed_witness_receipt_contract_lab.md'
+      - '.github/workflows/aion-a302-signed-witness-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  witness-lab:
+    name: A302 signed witness contract — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install free lab-only Ed25519 dependency
+        run: python -m pip install "cryptography==46.0.4"
+      - name: A302 tests plus A301/A300/A299/A293/A292 regressions
+        run: |
+          python -m unittest -v labs.test_a302_witness_receipt_contract_lab labs.test_a301_recovery_evidence_contract_lab labs.test_a300_cold_restart_sqlite_recovery_lab labs.test_a299_sqlite_native_p0_5_6_gap_lab labs.test_a293_host_sqlite_boundary_lab labs.test_a292_staged_chat_write_inventory_lab
