@@ -11,7 +11,6 @@ from pathlib import Path
 import re
 import sqlite3
 from contextlib import closing
-from urllib.parse import quote
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -87,7 +86,7 @@ def read_fixture_snapshot(db_path, scope, intent_id):
                 or marker.read_text(encoding="utf-8") != FIXTURE_CONTENT):
             return None, "LAB_FIXTURE_REFUSED"
         # mode=ro doesn't authorize any restore, DDL or write transaction.
-        uri = "file:" + quote(str(path), safe="/:") + "?mode=ro"
+        uri = path.as_uri() + "?mode=ro"
         with closing(sqlite3.connect(uri, uri=True, timeout=3)) as conn:
             conn.row_factory = sqlite3.Row
             receipt = conn.execute(
