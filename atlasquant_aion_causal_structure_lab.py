@@ -62,6 +62,7 @@ def _base() -> dict:
 def _scan(candles: list[dict]) -> tuple[list[dict], list[dict], list[str]]:
     events = []
     last_high, last_low, last_direction = None, None, None
+    latest_event = None
     latest_event_by_bar = []
     prefix_hashes = []
     prefix = GENESIS
@@ -106,6 +107,7 @@ def _scan(candles: list[dict]) -> tuple[list[dict], list[dict], list[str]]:
             # If two inconsistent swing levels cross simultaneously, do not
             # fabricate a structural direction from ambiguous evidence.
             latest_event_by_bar.append(None)
+            latest_event = None
             last_direction = None
             continue
         if up or down:
@@ -126,8 +128,9 @@ def _scan(candles: list[dict]) -> tuple[list[dict], list[dict], list[str]]:
                 "no_future_confirmation": True,
             }
             events.append(event)
+            latest_event = event
             last_direction = direction
-        latest_event_by_bar.append(events[-1] if events else None)
+        latest_event_by_bar.append(latest_event)
     return events, latest_event_by_bar, prefix_hashes
 
 
@@ -153,6 +156,9 @@ def generate_causal_structure_csv(
         return output
     candles = history["candles"]
     events, last_by_bar, prefixes = _scan(candles)
+    if len(fvg["candidate_plans"]) != len(fvg["candidate_audit"]):
+        output["error"] = "INCONSISTENT_FVG_AUDIT"
+        return output
     by_time = {bar["datetime"]: i for i, bar in enumerate(candles)}
     plans, decisions = [], []
 
