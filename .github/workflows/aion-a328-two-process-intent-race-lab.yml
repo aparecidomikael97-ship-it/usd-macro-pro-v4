@@ -1,0 +1,30 @@
+name: A328 two-process semantic intent race HOLD LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a328_cross_process_intent_race_lab.py'
+      - 'labs/test_a328_cross_process_intent_race_lab.py'
+      - '.github/workflows/aion-a328-two-process-intent-race-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-process-intent-lab:
+    name: A328 same-intent two-PID local SQLite race — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test bounded synthetic race, rollback and A315/A316 regressions
+        run: |
+          python -m unittest -v labs.test_a328_cross_process_intent_race_lab labs.test_a327_semantic_intent_rollback_lab labs.test_a315_semantic_intent_atomic_commit_lab labs.test_a316_orphan_intent_crosscheck_lab
