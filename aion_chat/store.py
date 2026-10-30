@@ -319,7 +319,7 @@ class SQLiteChatStore:
                 or lab_marker.is_symlink()
                 or not lab_marker.is_file()
                 or lab_marker.read_text(encoding="utf-8")
-                != "A315 DISPOSABLE SYNTHETIC LAB ONLY\\n"
+                != "A315 DISPOSABLE SYNTHETIC LAB ONLY\n"
             ):
                 raise StorageUnavailableError(
                     "A315 semantic intent requires disposable LAB fixture"
