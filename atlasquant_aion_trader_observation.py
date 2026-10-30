@@ -65,15 +65,22 @@ def _age_minutes(value: Any, now: datetime) -> float | None:
     return delta
 
 
+def _finite_native_number(value: Any) -> bool:
+    if type(value) not in (int, float):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, ValueError):
+        # Python's isfinite may overflow when converting huge int to float.
+        return False
+
+
 def _closed_series(value: Any) -> bool:
     return (
         type(value) in (tuple, list)
         and len(value) >= 2
         and len(value) <= 1000
-        and all(
-            type(n) in (int, float) and math.isfinite(n) and n > 0
-            for n in value
-        )
+        and all(_finite_native_number(n) and n > 0 for n in value)
     )
 
 
@@ -100,7 +107,7 @@ def _strength_context(raw: Any, *, now: datetime) -> dict[str, float] | None:
     if type(scores) is not dict or set(scores) != set(FX_CURRENCIES):
         return None
     if not all(
-        type(n) in (int, float) and math.isfinite(n) and abs(n) <= 1_000_000
+        _finite_native_number(n) and abs(n) <= 1_000_000
         for n in scores.values()
     ):
         return None
