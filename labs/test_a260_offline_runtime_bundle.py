@@ -302,7 +302,7 @@ with TemporaryDirectory() as work:
         try:
             with zipfile.ZipFile(archive) as zf:
                 outbox = zf.read("atlasquant_aion_execution_outbox.py")
-            newline = b"\\r\\n" if b"\\r\\n" in outbox else b"\\n"
+            newline = b"\r\n" if b"\r\n" in outbox else b"\n"
             needle = b"        key = _clean(idempotency_key, 64)"
             self.assertGreaterEqual(outbox.count(needle), 2)
             offset = outbox.find(needle)
@@ -325,7 +325,7 @@ with TemporaryDirectory() as work:
         try:
             with zipfile.ZipFile(archive) as zf:
                 outbox = zf.read("atlasquant_aion_execution_outbox.py")
-            newline = b"\\r\\n" if b"\\r\\n" in outbox else b"\\n"
+            newline = b"\r\n" if b"\r\n" in outbox else b"\n"
             needle = b"        key = _clean(idempotency_key, 64)"
             self.assertGreaterEqual(outbox.count(needle), 2)
             offset = outbox.rfind(needle)
@@ -348,7 +348,7 @@ with TemporaryDirectory() as work:
         try:
             with zipfile.ZipFile(archive) as zf:
                 outbox = zf.read("atlasquant_aion_execution_outbox.py")
-            newline = b"\\r\\n" if b"\\r\\n" in outbox else b"\\n"
+            newline = b"\r\n" if b"\r\n" in outbox else b"\n"
             needle = b"        key = _clean(idempotency_key, 64)"
             offset = outbox.find(needle)
             self.assertGreaterEqual(offset, 0)
