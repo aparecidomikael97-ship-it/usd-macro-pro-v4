@@ -17,7 +17,9 @@ No runner Ubuntu do GitHub, a A313 verifica a identidade existente
 altera as contas do notebook e não inicia nenhum serviço permanente**.
 
 1. Cria exclusivamente um banco SQLite descartável A311, em diretório
-   temporário marcado, contendo somente a conversa `A311 TEST...`.
+   temporário marcado sob `/tmp` (POSIX), contendo somente a conversa
+   `A311 TEST...`. Usar um caminho pai atravessável evita confundir
+   `TMPDIR` privado do runner com a ACL da pasta do teste.
 2. Aplica modo `0700` à pasta e `0600` ao banco e inspeciona UID, modo,
    `lstat` e tipo de arquivo. A própria conta proprietária consegue ler o
    banco, resultado que **não** representa uma conta de cliente isolada.
@@ -27,9 +29,12 @@ altera as contas do notebook e não inicia nenhum serviço permanente**.
    e listar a pasta. Esperam-se **três negativas do kernel**.
 4. **Controle positivo obrigatório:** na mesma pasta **somente sintética**,
    muda temporariamente a pasta para `0755` e o banco para `0644`.
-   Repete o subprocesso com o mesmo UID restrito e lê uma linha via
-   SQLite `mode=ro`. Assim comprova que a negativa anterior não foi por
-   incapacidade de executar Python, SQLite ou chegar ao diretório.
+   Repete o subprocesso com o mesmo UID restrito e abre o arquivo com
+   `open(..., "rb")`, verificando o cabeçalho canônico
+   `SQLite format 3`. Esse é um controle de **acesso ao arquivo**,
+   independente dos requisitos de WAL/SHM de uma conexão SQLite
+   somente leitura. Assim comprova que a negativa anterior não foi por
+   incapacidade de executar Python ou chegar ao diretório.
 5. Restaura `0700/0600` no `finally`, sem conservar nenhum subprocesso.
    Todos os arquivos temporários são excluídos ao final do teste.
 
@@ -90,3 +95,13 @@ autorização com vínculo à intenção. Testar ao menos cliente sob UID/SID
 distinto, processo escritor, crash/ACK incerto, tentativa de restauração,
 alteração de permissões por host e controles contra rollback externo.
 Não implantar sem nova aprovação operacional e revisão de custo.
+
+## Investigação do primeiro RED de CI
+
+Na primeira execução A313 Ubuntu, a negativa real de `read/write/listdir`
+foi observada sob UIDs distintos, mas a leitura positiva por uma conexão
+SQLite `mode=ro` não concluiu. Isso não anulava a negativa, porém impedia
+classificar o teste como validado. O controle positivo passou a ler o
+cabeçalho do arquivo **sem abrir WAL/SHM**, e o diretório sintético foi
+fixado sob o pai público `/tmp`. A nova execução deve passar antes de
+qualquer declaração de sucesso. 
