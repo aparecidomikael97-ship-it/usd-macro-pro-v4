@@ -34,9 +34,9 @@ class A338DirectBudgetConfirmationTests(unittest.TestCase):
         self.fixture.setUp()
 
     @contextmanager
-    def lab(self):
+    def lab(self, **limits):
         with TemporaryDirectory() as directory:
-            store, budget = self.fixture._components(directory)
+            store, budget = self.fixture._components(directory, **limits)
             try:
                 yield store, budget
             finally:
@@ -158,6 +158,38 @@ class A338DirectBudgetConfirmationTests(unittest.TestCase):
                     confirmed_at=NOW,
                 ),
             )
+            self.assertEqual(self._snapshot(budget)["transaction_effects"], 1)
+
+
+    def test_07_guard_rejects_risk_limit_from_explicitly_synthetic_sqlite_rows(self):
+        with self.lab(max_transaction_risk_points=3) as (_store, budget):
+            decision = fixtures.decision(self.fixture.scope, risk_points=2)
+            # Seed LOCAL accounting only; never invoke productive confirmation.
+            with budget.db:
+                budget.db.execute(
+                    """INSERT INTO aion_authority_spend(
+                         idempotency_key,owner,tenant,workspace,transaction_id,
+                         authority_budget_ref,policy_version,capability_class,action,
+                         risk_points,effect_ref,confirmed_at,decision_digest
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        "synthetic-existing-risk", self.fixture.scope.owner_id,
+                        self.fixture.scope.tenant_id,
+                        self.fixture.scope.workspace_id,
+                        decision["transaction_id"], decision["authority_budget_ref"],
+                        decision["policy_version"], decision["capability_class"],
+                        decision["action"], decision["risk_points"],
+                        "LOCAL_UNTRUSTED_ACCOUNTING", NOW.isoformat(),
+                        budget_module._digest(dict(decision)),
+                    ),
+                )
+            changes = budget.db.total_changes
+            out = budget.guard(decision, now=NOW)
+            self.assertFalse(out["allowed"])
+            self.assertIn("TRANSACTION_RISK_LIMIT", out["blockers"])
+            self.assertFalse(out["grants_authority"])
+            self.assertFalse(out["execution_allowed_by_this_component"])
+            self.assertEqual(budget.db.total_changes, changes)
             self.assertEqual(self._snapshot(budget)["transaction_effects"], 1)
 
 
