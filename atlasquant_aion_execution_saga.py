@@ -892,6 +892,13 @@ class ExecutionSagaCoordinator:
         ).fetchall()
         previous = GENESIS_HASH
         blockers = []
+        # A337 / historical A43: absence of a mutable local chain does
+        # not constitute integrity. A Saga must start at SAGA_CREATED.
+        # This is SQLite consistency only, never an external head witness.
+        if not rows:
+            blockers.append("EVENT_CHAIN_EMPTY")
+        elif rows[0]["event_type"] != "SAGA_CREATED":
+            blockers.append("GENESIS_EVENT_MISSING")
         for expected_sequence, row in enumerate(rows, start=1):
             if int(row["sequence"]) != expected_sequence:
                 blockers.append("EVENT_SEQUENCE_MISMATCH")
@@ -914,6 +921,11 @@ class ExecutionSagaCoordinator:
                 blockers.append("EVENT_HASH_MISMATCH")
                 break
             previous = row["event_hash"]
+        # Catch simple tail deletion and direct Saga-row rewrites. A writer
+        # with control of both SQLite tables can still forge a coherent
+        # chain or replay an older snapshot; no antirollback claim is made.
+        if rows and not blockers and rows[-1]["state"] != saga["state"]:
+            blockers.append("LATEST_EVENT_STATE_MISMATCH")
         return {
             "schema": SCHEMA,
             "saga_id": saga["saga_id"],
@@ -921,6 +933,10 @@ class ExecutionSagaCoordinator:
             "blockers": blockers,
             "events": len(rows),
             "tip_hash": previous,
+            "proof_scope": "LOCAL_SQLITE_CHAIN_ONLY",
+            "independent_witness_verified": False,
+            "producer_effect_verified": False,
+            "authorizes_execution": False,
             "automatic_compensation": False,
             "executes_action": False,
         }
