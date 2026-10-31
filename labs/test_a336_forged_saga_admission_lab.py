@@ -151,10 +151,12 @@ class A336ForgedSagaAdmissionTests(unittest.TestCase):
             )
 
     def test_04_various_claimed_owner_refs_do_not_become_independent_proof(self):
-        with self.lab() as (outbox, budget, saga):
-            self._forge_compensation_required(saga)
-            for owner_ref in ("APPROVED", "HUMAN_OWNER", "external-looking-reference"):
-                with self.subTest(owner_ref=owner_ref):
+        for owner_ref in ("APPROVED", "HUMAN_OWNER", "external-looking-reference"):
+            with self.subTest(owner_ref=owner_ref):
+                # Isolate each claim: even an unsafe implementation that
+                # mutates SQLite must not poison later adversarial cases.
+                with self.lab() as (outbox, budget, saga):
+                    self._forge_compensation_required(saga)
                     self._deny_without_mutation(
                         outbox, budget, saga,
                         lambda owner_ref=owner_ref: saga.prepare_compensation(
