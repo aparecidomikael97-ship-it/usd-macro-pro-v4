@@ -1,0 +1,32 @@
+name: A331 LAB recover direct executor authority fences
+
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_background_executor.py'
+      - 'labs/test_a331_direct_executor_admission_lab.py'
+      - '.github/workflows/aion-a331-direct-executor-admission-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  direct-executor-admission:
+    name: A331 inert A51 A56 regression — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing project requirements
+        run: python -m pip install -r requirements.txt
+      - name: Inert admission regressions and original executor suite, sockets denied
+        run: |
+          python -c "import socket,unittest; socket.socket.connect=lambda *a,**k: (_ for _ in ()).throw(AssertionError('A331_EXTERNAL_NETWORK_DENIED')); tests=unittest.defaultTestLoader.loadTestsFromNames(['labs.test_a331_direct_executor_admission_lab','test_atlasquant_aion_background_executor']); result=unittest.TextTestRunner(verbosity=2).run(tests); raise SystemExit(0 if result.wasSuccessful() else 1)"
