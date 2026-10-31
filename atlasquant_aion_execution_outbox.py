@@ -474,23 +474,14 @@ class ExecutionOutbox:
                    JOIN action_decisions d ON d.decision_id=o.decision_id
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
                      AND o.state IN ('PENDING','RETRY')
-                     AND NOT EXISTS (
-                         SELECT 1
-                         FROM action_decisions earlier
-                         JOIN action_outbox eo ON eo.decision_id=earlier.decision_id
-                         WHERE earlier.owner=d.owner
-                           AND earlier.tenant=d.tenant
-                           AND earlier.workspace=d.workspace
-                           AND earlier.aggregate_key=d.aggregate_key
-                           AND earlier.aggregate_seq<d.aggregate_seq
-                           -- A340 / historical A44: every earlier local
-                           -- Outbox row blocks a later claim in this aggregate.
-                           -- Even CONFIRMED, FAILED, REVOKED and
-                           -- BLOCKED_REAPPROVAL are same-SQLite projections,
-                           -- not independent producer effect/no-effect proof.
-                           -- Other aggregates and the first intent remain
-                           -- locally claimable; provider send stays denied.
-                     )
+                     -- A341 / historical A45: preceding local rows
+                     -- can be deleted from either SQLite table. Before
+                     -- independent producer/owner admission is enrolled,
+                     -- no locally persisted ordinal above one may claim.
+                     -- This blocks missing-predecessor overtakes, but a
+                     -- forged aggregate_seq=1 or database rollback still
+                     -- requires a separate independent head witness.
+                     AND d.aggregate_seq=1
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
                 (owner, tenant, workspace),
