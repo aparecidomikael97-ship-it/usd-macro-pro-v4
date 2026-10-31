@@ -601,7 +601,26 @@ def write_repository_feature_flag_enabled(
     *,
     timeout: float = 10.0,
 ) -> dict[str, Any]:
-    """Enable only the named Global Worker repository variable."""
+    """Refuse ENABLE without independent custodied authority.
+
+    A201 denial happens before any caller-controlled config descriptor is read.
+    A usable GitHub token and a local prior-state string cannot enroll owner
+    custody. The separate DISABLE safety writer is deliberately unaffected.
+    """
+    # A333: no config.repo/token evaluation or transport calls on this path.
+    state = prior_state.upper() if type(prior_state) is str else ""
+    return {
+        "status": "BLOCKED",
+        "modified": False,
+        "reason": "EXTERNAL_ENABLE_CUSTODY_NOT_HOMOLOGATED",
+        "previous_state": state,
+        "target_state": "ENABLED",
+        "raw_value_exposed": False,
+        "feature_flag_modified": False,
+        "independent_witness_verified": False,
+    }
+
+    # Historical pre-A333 code retained for audit, unreachable after denial.
     if not config.repo or not config.token:
         return {
             "status": "UNAVAILABLE",
@@ -738,6 +757,25 @@ def activate_global_worker_feature_flag(
             "feature_flag_modified": False,
             "global_worker_executed": False,
         }
+    # A333: even a locally valid ADMIN ticket or injected callback cannot
+    # confer independent HUMAN_OWNER/source/latest-head activation authority.
+    # Deny before any caller-supplied runtime reader, flag reader or writer.
+    # Do not route through the default writer: that can be replaced by caller.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_ACTIVATION_AUTHORITY_NOT_ENROLLED",
+        "modified": False,
+        "feature_flag_modified": False,
+        "global_worker_executed": False,
+        "runtime_checkpoint_modified": False,
+        "independent_witness_verified": False,
+        "owner_identity_verified": False,
+        "source_authenticity_verified": False,
+        "external_action_executed": False,
+        "real_trading_enabled": False,
+    }
+
     current = utc(now or _now())
     fresh_runtime = dict(
         runtime_reader(config, timeout=min(timeout, 10.0)) or {}
