@@ -603,11 +603,30 @@ def write_repository_feature_flag_enabled(
 ) -> dict[str, Any]:
     """Refuse ENABLE without independent custodied authority.
 
-    A201 denial happens before any caller-controlled config descriptor is read.
-    A usable GitHub token and a local prior-state string cannot enroll owner
-    custody. The separate DISABLE safety writer is deliberately unaffected.
+    Preserve A201's UNAVAILABLE for missing primitive credentials in an exact
+    RuntimeConfig, while rejecting arbitrary objects before evaluating custom
+    properties or truth-value methods. No available credential grants ENABLE.
+    The separate emergency DISABLE writer remains untouched.
     """
-    # A333: no config.repo/token evaluation or transport calls on this path.
+    # A334: this exact dataclass has plain stored fields, not descriptors.
+    # Do not use bool(value) on a caller-supplied non-string token/repo.
+    if type(config) is RuntimeConfig:
+        token_value = object.__getattribute__(config, "token")
+        repo_value = object.__getattribute__(config, "repo")
+        if (
+            (type(token_value) is str and token_value == "")
+            or (type(repo_value) is str and repo_value == "")
+        ):
+            return {
+                "status": "UNAVAILABLE",
+                "modified": False,
+                "reason": "Repository/token required for flag mutation.",
+                "feature_flag_modified": False,
+                "independent_witness_verified": False,
+            }
+
+    # All other cases, including any credential-looking config, are denied
+    # before caller-supplied descriptors, network, or an enable HTTP request.
     state = prior_state.upper() if type(prior_state) is str else ""
     return {
         "status": "BLOCKED",
