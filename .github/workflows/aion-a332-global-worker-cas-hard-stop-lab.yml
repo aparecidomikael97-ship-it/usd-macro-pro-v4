@@ -1,0 +1,32 @@
+name: A332 LAB Global Worker and direct CAS witness hard stop
+
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_global_worker.py'
+      - 'labs/test_a332_global_worker_cas_hard_stop_lab.py'
+      - '.github/workflows/aion-a332-global-worker-cas-hard-stop-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  witness-hard-stop:
+    name: A332 inert Worker and writer — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test source and direct CAS boundaries, socket connections denied
+        run: |
+          python -c "import socket,unittest; socket.socket.connect=lambda *a,**k: (_ for _ in ()).throw(AssertionError('A332_EXTERNAL_NETWORK_DENIED')); names=['labs.test_a332_global_worker_cas_hard_stop_lab','labs.test_a331_direct_executor_admission_lab','test_atlasquant_aion_background_executor']; tests=unittest.defaultTestLoader.loadTestsFromNames(names); result=unittest.TextTestRunner(verbosity=2).run(tests); raise SystemExit(0 if result.wasSuccessful() else 1)"
