@@ -483,7 +483,13 @@ class ExecutionOutbox:
                            AND earlier.workspace=d.workspace
                            AND earlier.aggregate_key=d.aggregate_key
                            AND earlier.aggregate_seq<d.aggregate_seq
-                           AND eo.state NOT IN ('CONFIRMED','REVOKED','BLOCKED_REAPPROVAL','FAILED')
+                           -- A340 / historical A44: every earlier local
+                           -- Outbox row blocks a later claim in this aggregate.
+                           -- Even CONFIRMED, FAILED, REVOKED and
+                           -- BLOCKED_REAPPROVAL are same-SQLite projections,
+                           -- not independent producer effect/no-effect proof.
+                           -- Other aggregates and the first intent remain
+                           -- locally claimable; provider send stays denied.
                      )
                    ORDER BY d.created_at,d.decision_id
                    LIMIT 1""",
