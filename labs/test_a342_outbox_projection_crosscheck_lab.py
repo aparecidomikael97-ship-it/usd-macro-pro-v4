@@ -41,9 +41,9 @@ class A342OutboxProjectionCrosscheckTests(unittest.TestCase):
         self.assertEqual((first["aggregate_seq"], second["aggregate_seq"]), (1, 2))
         return store, outbox, first, second
 
-    def _change_json(self, outbox, decision_id, **overrides):
+    def _change_json(self, outbox, source_decision_id, **overrides):
         row = outbox.db.execute(
-            "SELECT data FROM action_decisions WHERE decision_id=?", (decision_id,)
+            "SELECT data FROM action_decisions WHERE decision_id=?", (source_decision_id,)
         ).fetchone()
         self.assertIsNotNone(row)
         value = json.loads(row["data"])
@@ -51,7 +51,7 @@ class A342OutboxProjectionCrosscheckTests(unittest.TestCase):
         with outbox.db:
             cursor = outbox.db.execute(
                 "UPDATE action_decisions SET data=? WHERE decision_id=?",
-                (json.dumps(value, sort_keys=True), decision_id),
+                (json.dumps(value, sort_keys=True), source_decision_id),
             )
             self.assertEqual(cursor.rowcount, 1)
 
