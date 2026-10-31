@@ -1,0 +1,30 @@
+name: A329 unknown COMMIT and preconnected rival HOLD LAB
+
+on:
+  pull_request:
+    paths:
+      - 'labs/a329_concurrent_unknown_commit_lab.py'
+      - 'labs/test_a329_concurrent_unknown_commit_lab.py'
+      - '.github/workflows/aion-a329-unknown-commit-rival-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-pid-uncertain-commit-lab:
+    name: A329 ACK loss and concurrent same-intent HOLD — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: A329 and previous strict SQLite boundaries
+        run: |
+          python -m unittest -v labs.test_a329_concurrent_unknown_commit_lab labs.test_a328_cross_process_intent_race_lab labs.test_a327_semantic_intent_rollback_lab labs.test_a315_semantic_intent_atomic_commit_lab
