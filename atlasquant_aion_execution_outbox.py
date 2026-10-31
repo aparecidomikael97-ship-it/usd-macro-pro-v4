@@ -469,7 +469,9 @@ class ExecutionOutbox:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.db.execute(
-                """SELECT o.idempotency_key
+                """SELECT o.idempotency_key,d.decision_id,
+                          d.aggregate_key,d.aggregate_seq,
+                          d.data AS decision_data
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
                    WHERE o.owner=? AND o.tenant=? AND o.workspace=?
@@ -490,6 +492,28 @@ class ExecutionOutbox:
                 self.db.commit()
                 return None
             key = row["idempotency_key"]
+            # A342: SQL aggregate_seq=1 alone is only local projection.
+            # Cross-check the separately persisted JSON decision BEFORE any
+            # claim. These two mutable copies cannot attest an independent
+            # current head or producer receipt; this detects partial tamper.
+            try:
+                decision = json.loads(row["decision_data"])
+            except (TypeError, ValueError):
+                raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED") from None
+            expected = (
+                ("idempotency_key", key),
+                ("decision_id", row["decision_id"]),
+                ("aggregate_key", row["aggregate_key"]),
+                ("aggregate_seq", int(row["aggregate_seq"])),
+                ("owner_id", owner),
+                ("tenant_id", tenant),
+                ("workspace_id", workspace),
+            )
+            if type(decision) is not dict or any(
+                type(decision.get(field)) is not type(value) or decision[field] != value
+                for field, value in expected
+            ):
+                raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED")
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CLAIMED',lease_owner=?,lease_until=?,attempts=attempts+1,last_error=''
