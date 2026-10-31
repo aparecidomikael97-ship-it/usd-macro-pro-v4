@@ -536,6 +536,16 @@ class ExecutionOutbox:
                 for field, value in expected
             ):
                 raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED")
+            # A344: staged digest was computed from the redacted payload
+            # at enqueue. Recompute it from the decoded native JSON BEFORE
+            # claiming; otherwise partial JSON-only payload edits bypass
+            # the A342/A343 SQL/metadata projection checks. This comparison
+            # is same-database integrity, NOT independent effect/owner proof.
+            if (
+                type(decision.get("payload")) is not dict
+                or _digest(decision["payload"]) != row["payload_digest"]
+            ):
+                raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED")
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CLAIMED',lease_owner=?,lease_until=?,attempts=attempts+1,last_error=''
