@@ -470,7 +470,13 @@ class ExecutionOutbox:
         try:
             row = self.db.execute(
                 """SELECT o.idempotency_key,d.decision_id,
+                          d.owner AS decision_owner,
+                          d.tenant AS decision_tenant,
+                          d.workspace AS decision_workspace,
+                          d.intent_ref,d.action,
                           d.aggregate_key,d.aggregate_seq,
+                          d.payload_digest,d.policy_version,
+                          d.authorization_ref,d.valid_until,d.created_at,
                           d.data AS decision_data
                    FROM action_outbox o
                    JOIN action_decisions d ON d.decision_id=o.decision_id
@@ -500,6 +506,15 @@ class ExecutionOutbox:
                 decision = json.loads(row["decision_data"])
             except (TypeError, ValueError):
                 raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED") from None
+            # A343: the SQL decision's own scope is mutable independently
+            # of the outbox SQL row and embedded decision JSON. All three
+            # local projections must agree before a local claim can advance.
+            if (
+                row["decision_owner"] != owner
+                or row["decision_tenant"] != tenant
+                or row["decision_workspace"] != workspace
+            ):
+                raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED")
             expected = (
                 ("idempotency_key", key),
                 ("decision_id", row["decision_id"]),
@@ -508,6 +523,13 @@ class ExecutionOutbox:
                 ("owner_id", owner),
                 ("tenant_id", tenant),
                 ("workspace_id", workspace),
+                ("intent_ref", row["intent_ref"]),
+                ("action", row["action"]),
+                ("payload_digest", row["payload_digest"]),
+                ("policy_version", row["policy_version"]),
+                ("authorization_ref", row["authorization_ref"]),
+                ("valid_until", row["valid_until"]),
+                ("created_at", row["created_at"]),
             )
             if type(decision) is not dict or any(
                 type(decision.get(field)) is not type(value) or decision[field] != value
