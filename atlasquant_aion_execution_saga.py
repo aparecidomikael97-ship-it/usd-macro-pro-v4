@@ -541,6 +541,14 @@ class ExecutionSagaCoordinator:
             raise LookupError("saga step/outbox binding unavailable")
         out = self.outbox.get(step["outbox_key"])
         state = out["state"]
+        # A335 / historical A39: SQLite row states and local effect_refs are
+        # not authenticated producer testimony. No independent COMMITTED_EFFECT
+        # or terminal NO_EFFECT_FENCED witness is enrolled in this LAB stack.
+        # Deny before budgeting, Saga state/event writes or compensation.
+        if state == "CONFIRMED":
+            raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
+        if state == "FAILED":
+            raise PermissionError("INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED")
         mapped = {
             "PENDING": "ENQUEUED",
             "CLAIMED": "ENQUEUED",
@@ -784,6 +792,13 @@ class ExecutionSagaCoordinator:
         out = self.outbox.get(step["compensation_outbox_key"])
         now_iso = _iso(_utc(now))
         out_state = out["state"]
+        # Compensation is also an external effect. A local positive or final
+        # failure cannot prove independent producer causality or a no-effect
+        # fence, even if a synthetic action_effects row was inserted.
+        if out_state == "CONFIRMED":
+            raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
+        if out_state == "FAILED":
+            raise PermissionError("INDEPENDENT_PRODUCER_NO_EFFECT_FENCE_NOT_ENROLLED")
         if out_state in {"UNCERTAIN", "SENT"}:
             mapped = "UNCERTAIN"
             saga_state = "RECONCILIATION_REQUIRED"
