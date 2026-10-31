@@ -474,6 +474,11 @@ class ExecutionSagaCoordinator:
         earlier = [row for row in saga["steps"] if row["ordinal"] < pending["ordinal"]]
         if any(row["state"] != "CONFIRMED" for row in earlier):
             raise ValueError("saga order requires earlier confirmation")
+        # A336 / historical A41: prior SQLite CONFIRMED is a projection,
+        # not independent producer testimony. Do not stage a later intent.
+        # First-step staging remains possible; real Outbox send stays denied.
+        if earlier:
+            raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
 
         item = self.outbox.enqueue(
             intent_ref=f"{saga['saga_id']}:{pending['step_key']}:forward",
@@ -659,6 +664,10 @@ class ExecutionSagaCoordinator:
             raise ValueError("no confirmed effects to compensate")
         if any(not row["reversible"] for row in confirmed):
             raise ValueError("irreversible confirmed effect requires manual intervention")
+        # A336 / historical A42: local effect refs and caller-provided owner
+        # booleans/refs do not prove a producer effect or HUMAN_OWNER approval.
+        # Deny before Saga state/event mutation or any compensation planning.
+        raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
         now_iso = _iso(_utc(now))
         self.db.execute("BEGIN IMMEDIATE")
         try:
@@ -723,6 +732,9 @@ class ExecutionSagaCoordinator:
         if not pending:
             raise ValueError("no pending compensation")
         step = pending[0]
+        # A336 / historical A42: forged local COMPENSATION_PENDING, effect_ref
+        # and compensation approval/reauth refs cannot stage a reversal.
+        raise PermissionError("INDEPENDENT_PRODUCER_COMPENSATION_NOT_ENROLLED")
         item = self.outbox.enqueue(
             intent_ref=f"{saga['saga_id']}:{step['step_key']}:compensation",
             action=step["compensation_action"],
