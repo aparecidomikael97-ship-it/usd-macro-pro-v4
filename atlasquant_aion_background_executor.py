@@ -47,6 +47,9 @@ RECEIPT_STATES = frozenset({"SUCCEEDED", "FAILED", "BLOCKED"})
 MAX_RECEIPTS = 1000
 MAX_JOBS_PER_RUN = 20
 MAX_ATTEMPTS = 3
+# This distinguishes the local manual frontdoor from a direct internal call.
+# Not a secret or independent HUMAN_OWNER/physical-presence attestation.
+_MANUAL_ENTRY_ROUTE_SENTINEL = object()
 RETRY_BACKOFF_SECONDS = (60, 300, 900)
 
 
@@ -355,6 +358,42 @@ def executor_snapshot(
     }
 
 
+def _deny_unverified_executor_entry(
+    checkpoint: Mapping[str, Any],
+    *,
+    authorization_mode: str,
+    reason: str,
+) -> dict[str, Any]:
+    """Inert denial before scheduler, handler, local receipt or provider."""
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": reason,
+        "checkpoint": deepcopy(dict(checkpoint or {})),
+        "due_count": 0,
+        "processed": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "blocked": 0,
+        "outcomes": [],
+        "action_receipts": [],
+        "action_receipts_are_authority": False,
+        "requires_checkpoint_save": False,
+        "external_persisted": False,
+        "manual_invocation_only": False,
+        "authorization_mode": authorization_mode,
+        "autonomous_worker_started": False,
+        "background_worker_connected": False,
+        "provider_called": False,
+        "external_action_executed": False,
+        "real_trading_enabled": False,
+        "payment_executed": False,
+        "publication_executed": False,
+        "deploy_executed": False,
+        "independent_witness_verified": False,
+    }
+
+
 def _execute_due_local_work_authorized(
     access: Mapping[str, Any] | None,
     checkpoint: Mapping[str, Any],
@@ -367,10 +406,28 @@ def _execute_due_local_work_authorized(
     capability_allowlist: frozenset[str] | set[str] | tuple[str, ...] | list[str] | None = None,
     max_jobs: int = 5,
     now: datetime | None = None,
+    _manual_entry_route_sentinel: object | None = None,
 ) -> dict[str, Any]:
-    """Internal kernel after an authenticated authorization boundary."""
+    """Local executor kernel, never an independent HUMAN_OWNER authority."""
     if authorization_mode not in {"HUMAN_CLICK", "ARMED_WORKER", "GLOBAL_WORKER"}:
         raise ValueError("invalid executor authorization mode")
+    # A51 recovery: direct unattended modes cannot self-enroll authority
+    # with a caller digest, ADMIN fixture or checkpoint witness. Always deny.
+    if authorization_mode in {"ARMED_WORKER", "GLOBAL_WORKER"}:
+        return _deny_unverified_executor_entry(
+            checkpoint,
+            authorization_mode=authorization_mode,
+            reason="INDEPENDENT_AUTONOMOUS_AUTHORITY_NOT_ENROLLED",
+        )
+    # A56 recovery: an importable internal HUMAN_CLICK cannot assert a click
+    # merely by supplying a digest. This sentinel is only a local route marker:
+    # code in this process can still call the public boolean frontdoor.
+    if _manual_entry_route_sentinel is not _MANUAL_ENTRY_ROUTE_SENTINEL:
+        return _deny_unverified_executor_entry(
+            checkpoint,
+            authorization_mode=authorization_mode,
+            reason="MANUAL_ENTRY_BOUNDARY_NOT_ESTABLISHED",
+        )
     if not isinstance(authorization_digest, str) or not authorization_digest.strip():
         raise ValueError("executor authorization digest required")
     if type(max_jobs) is not int or not 1 <= max_jobs <= MAX_JOBS_PER_RUN:
@@ -612,6 +669,7 @@ def execute_due_local_work(
         authorization_digest=approval_digest,
         max_jobs=max_jobs,
         now=current,
+        _manual_entry_route_sentinel=_MANUAL_ENTRY_ROUTE_SENTINEL,
     )
 
 
