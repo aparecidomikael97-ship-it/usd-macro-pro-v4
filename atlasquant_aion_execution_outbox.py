@@ -546,6 +546,35 @@ class ExecutionOutbox:
                 or _digest(decision["payload"]) != row["payload_digest"]
             ):
                 raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED")
+            # A345: the original deterministic idempotency preimage also
+            # contains transaction/budget/risk labels. Local JSON-only edits,
+            # or jointly edited SQL+JSON columns with an unchanged key, must
+            # never enter CLAIMED. Both key and preimage remain same-DB data:
+            # this check cannot authenticate a coherent full rewrite.
+            if (
+                type(decision.get("transaction_id")) is not str
+                or type(decision.get("authority_budget_ref")) is not str
+                or type(decision.get("risk_points")) is not int
+                or not 0 <= decision["risk_points"] <= 100
+                or type(decision.get("capability_class")) is not str
+            ):
+                raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED")
+            key_material = {
+                "scope": [owner, tenant, workspace],
+                "intent_ref": row["intent_ref"],
+                "action": row["action"],
+                "aggregate_key": row["aggregate_key"],
+                "payload_digest": row["payload_digest"],
+                "transaction_id": decision["transaction_id"],
+                "authority_budget_ref": decision["authority_budget_ref"],
+                "risk_points": decision["risk_points"],
+                "capability_class": decision["capability_class"],
+            }
+            if (
+                _digest(key_material) != key
+                or row["decision_id"] != "DEC-" + key[:24].upper()
+            ):
+                raise PermissionError("OUTBOX_DECISION_LOCAL_PROJECTION_UNTRUSTED")
             cursor = self.db.execute(
                 """UPDATE action_outbox
                    SET state='CLAIMED',lease_owner=?,lease_until=?,attempts=attempts+1,last_error=''
