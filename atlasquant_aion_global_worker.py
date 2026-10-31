@@ -1156,7 +1156,32 @@ def _persist_runtime_checkpoint_cas(
     operation: str,
     timeout: float = 15.0,
 ) -> dict[str, Any]:
-    """Narrow automatic writer used only by an already-authorized global tick."""
+    """Global Worker CAS boundary: no independent source trust is enrolled.
+
+    A caller-held SHA, local digest, ADMIN role or forged checkpoint marker is
+    not a signed owner/resource/tenant binding or monotonic latest-head witness.
+    Deny before reading any caller-controlled config property or opening I/O.
+    """
+    # A48 containment recovered from the separate historical LAB lineage.
+    # No token, test marker, feature flag or locally fabricated witness bypass.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
+        "saved": False,
+        "verified": False,
+        "write_accepted": False,
+        "write_outcome": "NOT_ATTEMPTED",
+        "reconciliation_required": False,
+        "automatic_retry_allowed": False,
+        "automatic_runtime_checkpoint_persistence": False,
+        "independent_witness_verified": False,
+        "source_authenticity_verified": False,
+        "owner_identity_verified": False,
+        "network_called": False,
+        "external_action_executed": False,
+    }
+
     require_runtime_branch(config.branch)
     if not config.write_ready or not str(expected_sha or "").strip():
         return {
@@ -1522,6 +1547,32 @@ def run_global_worker_once(
             "external_action_executed": False,
             "real_trading_enabled": False,
         }
+
+    # A47 containment recovered at the true entry boundary. Even an enabled
+    # local flag, valid-looking RuntimeConfig or GitHub CAS SHA cannot establish
+    # independently witnessed source/owner/latest-head authority. Zero runtime
+    # reads, lease writes or executor calls until external enrollment exists.
+    # This is stronger than historic A47's safe-read-only preflight; no owner
+    # trust anchor has been enrolled in this LAB stack.
+    return {
+        "schema": SCHEMA,
+        "status": "BLOCKED",
+        "reason": "INDEPENDENT_SOURCE_WITNESS_NOT_ENROLLED",
+        "processed": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "blocked": 0,
+        "network_called": False,
+        "executor_called": False,
+        "automatic_runtime_checkpoint_persistence": False,
+        "automatic_retry_allowed": False,
+        "reconciliation_required": False,
+        "source_authenticity_verified": False,
+        "independent_witness_verified": False,
+        "owner_identity_verified": False,
+        "external_action_executed": False,
+        "real_trading_enabled": False,
+    }
 
     cfg = config or config_from_mapping()
     runtime = _runtime_id(runtime_id)
