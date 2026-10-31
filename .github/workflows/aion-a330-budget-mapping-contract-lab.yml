@@ -1,0 +1,30 @@
+name: A330 Budget Mapping only fail closed RED GREEN LAB
+
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_cumulative_authority_budget.py'
+      - 'labs/test_a330_budget_mapping_contract_lab.py'
+      - '.github/workflows/aion-a330-budget-mapping-contract-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  budget-mapping-contract-lab:
+    name: A330 guard invalid Mapping input denial — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Normative input contract plus original Budget tests
+        run: |
+          python -m unittest -v labs.test_a330_budget_mapping_contract_lab test_atlasquant_aion_cumulative_authority_budget

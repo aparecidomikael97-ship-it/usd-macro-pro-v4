@@ -144,7 +144,9 @@ class CumulativeAuthorityBudget:
         return _scope(self.scope)
 
     def _validate_decision(self, decision: Mapping[str, Any]) -> dict[str, Any]:
-        row = dict(decision or {})
+        if not isinstance(decision, Mapping):
+            raise TypeError("decision must be a Mapping")
+        row = dict(decision)
         transaction = _token(row.get("transaction_id"), "transaction_id")
         budget_ref = _token(row.get("authority_budget_ref"), "authority_budget_ref")
         capability = _clean(row.get("capability_class"), 80).upper()
@@ -205,18 +207,23 @@ class CumulativeAuthorityBudget:
         try:
             bound = self._validate_decision(decision)
         except Exception as exc:
+            # Only a plain dict may provide diagnostic data on a denied path.
+            # Never evaluate truthiness, .get, or __str__ on hostile objects.
+            raw_tx = decision.get("transaction_id") if type(decision) is dict else ""
+            safe_tx = _clean(raw_tx, 128) if type(raw_tx) is str else ""
             return {
                 "schema": SCHEMA,
                 "allowed": False,
                 "reason": "AUTHORITY_BUDGET_BINDING_INVALID:" + type(exc).__name__,
                 "authority_budget_ref": self.authority_budget_ref,
-                "transaction_id": _clean((decision or {}).get("transaction_id"), 128),
+                "transaction_id": safe_tx,
                 "scope": {
                     "owner_id": self.scope.owner_id,
                     "tenant_id": self.scope.tenant_id,
                     "workspace_id": self.scope.workspace_id,
                 },
                 "grants_authority": False,
+                "execution_allowed_by_this_component": False,
                 "executes_action": False,
             }
         before = self._snapshot(transaction_id=bound["transaction_id"], now=current)
