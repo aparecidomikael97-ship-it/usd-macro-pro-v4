@@ -11,16 +11,12 @@ from atlasquant_aion_global_worker import (
     run_global_worker_once,
 )
 from atlasquant_aion_memory import ensure_operating_checkpoint
-from test_atlasquant_aion_global_worker import (
-    AionGlobalDurableWorkerTests,
-    TICK,
-    _config,
-)
+import test_atlasquant_aion_global_worker as worker_fixtures
 
 
 class A332GlobalWorkerCasHardStopTests(unittest.TestCase):
     def setUp(self):
-        self.fixture = AionGlobalDurableWorkerTests()
+        self.fixture = worker_fixtures.AionGlobalDurableWorkerTests()
         self.fixture.setUp()
 
     def assert_denied(self, result):
@@ -39,8 +35,8 @@ class A332GlobalWorkerCasHardStopTests(unittest.TestCase):
             "atlasquant_aion_global_worker._execute_due_local_work_authorized",
         ) as execute:
             result = run_global_worker_once(
-                config=_config(), runtime_id="a332-flag-off",
-                feature_enabled=False, now=TICK,
+                config=worker_fixtures._config(), runtime_id="a332-flag-off",
+                feature_enabled=False, now=worker_fixtures.TICK,
             )
         load.assert_not_called()
         persist.assert_not_called()
@@ -57,8 +53,8 @@ class A332GlobalWorkerCasHardStopTests(unittest.TestCase):
             "atlasquant_aion_global_worker._execute_due_local_work_authorized",
         ) as execute:
             result = run_global_worker_once(
-                config=_config(), runtime_id="a332-true-flag",
-                feature_enabled=True, now=TICK,
+                config=worker_fixtures._config(), runtime_id="a332-true-flag",
+                feature_enabled=True, now=worker_fixtures.TICK,
             )
         load.assert_not_called()
         persist.assert_not_called()
@@ -78,7 +74,7 @@ class A332GlobalWorkerCasHardStopTests(unittest.TestCase):
             "atlasquant_aion_global_worker._persist_runtime_checkpoint_cas",
         ) as persist:
             result = run_global_worker_once(
-                config=_config(), runtime_id="a332-env-on", now=TICK,
+                config=worker_fixtures._config(), runtime_id="a332-env-on", now=worker_fixtures.TICK,
             )
         load.assert_not_called()
         persist.assert_not_called()
@@ -94,7 +90,7 @@ class A332GlobalWorkerCasHardStopTests(unittest.TestCase):
         ) as load:
             result = run_global_worker_once(
                 config=HostileConfig(), runtime_id="a332-hostile",
-                feature_enabled=True, now=TICK,
+                feature_enabled=True, now=worker_fixtures.TICK,
             )
         load.assert_not_called()
         self.assert_denied(result)
@@ -112,7 +108,7 @@ class A332GlobalWorkerCasHardStopTests(unittest.TestCase):
             "atlasquant_aion_global_worker.load_runtime_checkpoint",
         ) as readback:
             result = _persist_runtime_checkpoint_cas(
-                checkpoint, _config(), expected_sha="caller-sha",
+                checkpoint, worker_fixtures._config(), expected_sha="caller-sha",
                 operation="claim global lease",
             )
         put.assert_not_called()
@@ -144,7 +140,7 @@ class A332GlobalWorkerCasHardStopTests(unittest.TestCase):
             "atlasquant_aion_global_worker.requests.put",
         ) as put:
             result = _persist_runtime_checkpoint_cas(
-                {}, _config(), expected_sha="", operation="claim global lease",
+                {}, worker_fixtures._config(), expected_sha="", operation="claim global lease",
             )
         put.assert_not_called()
         self.assert_denied(result)
