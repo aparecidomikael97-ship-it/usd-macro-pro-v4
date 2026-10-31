@@ -1,0 +1,37 @@
+name: A340 LAB Outbox forged terminal aggregate FIFO fence
+
+on:
+  pull_request:
+    paths:
+      - 'atlasquant_aion_execution_outbox.py'
+      - 'labs/test_a340_outbox_local_terminal_fifo_lab.py'
+      - 'labs/test_a339_budget_pure_reference_lab.py'
+      - 'labs/test_a338_direct_budget_confirmation_lab.py'
+      - 'labs/test_a337_saga_local_integrity_honesty_lab.py'
+      - 'labs/test_a336_forged_saga_admission_lab.py'
+      - 'labs/test_a335_saga_untrusted_terminals_lab.py'
+      - '.github/workflows/aion-a340-outbox-fifo-local-terminal-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  outbox-fifo-fence:
+    name: A340 Outbox forged FIFO terminal denial — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing pinned project dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test A340 FIFO, A339 to A331 and safe original Outbox controls; sockets denied
+        run: |
+          python -c "import socket,unittest; socket.socket.connect=lambda *a,**k: (_ for _ in ()).throw(AssertionError('A340_EXTERNAL_NETWORK_DENIED')); act='test_atlasquant_aion_global_worker_activation.GlobalWorkerActivationCeremonyTests.'; saga='test_atlasquant_aion_execution_saga.ExecutionSagaTests.'; names=['labs.test_a340_outbox_local_terminal_fifo_lab','labs.test_a339_budget_pure_reference_lab','labs.test_a338_direct_budget_confirmation_lab','labs.test_a337_saga_local_integrity_honesty_lab','labs.test_a336_forged_saga_admission_lab','labs.test_a335_saga_untrusted_terminals_lab','labs.test_a334_a201_missing_config_contract_lab','labs.test_a333_activation_injected_writer_denial_lab','labs.test_a332_global_worker_cas_hard_stop_lab','labs.test_a331_direct_executor_admission_lab','test_atlasquant_aion_background_executor','labs.test_a201_global_worker_enable_egress_deny.A201WorkerEnableContainmentTests.test_05_lack_of_token_cannot_enable_worker']+[act+n for n in ['test_worker_enable_writer_denies_unset_and_disabled_without_any_http_mutation','test_safety_disabler_falls_back_to_create_disabled_when_missing','test_activation_requires_final_confirmation_before_any_reads_or_writes','test_deactivation_requires_exact_phrase_and_confirms_disabled_state']]+[saga+n for n in ['test_saga_plan_rejects_critical_capability_and_over_budget_shape','test_event_chain_detects_tamper']]+[ 'test_atlasquant_aion_cumulative_authority_budget.CumulativeAuthorityBudgetTests.'+n for n in ['test_empty_budget_allows_bound_low_risk_candidate_but_grants_no_authority','test_invalid_candidate_still_reports_budget_scope_without_authorizing','test_critical_capability_never_passes_budget_guard'] ]+[ 'test_atlasquant_aion_execution_outbox.ExecutionOutboxTests.'+n for n in ['test_same_aggregate_stays_blocked_until_independent_confirmation','test_cross_scope_cannot_read_or_claim_foreign_intent','test_authority_ttl_is_bounded_and_reauth_ref_required','test_module_has_no_built_in_external_execution_capability'] ]; tests=unittest.defaultTestLoader.loadTestsFromNames(names); result=unittest.TextTestRunner(verbosity=2).run(tests); raise SystemExit(0 if result.wasSuccessful() else 1)"
