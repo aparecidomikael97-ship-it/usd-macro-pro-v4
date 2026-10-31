@@ -285,6 +285,13 @@ class CumulativeAuthorityBudget:
         effect_ref: Any,
         confirmed_at: Any | None = None,
     ) -> dict[str, Any]:
+        # A338: caller-supplied decision, idempotency_key, effect_ref and time
+        # are local assertions, not an enrolled independent producer receipt.
+        # This productive ledger claims RECORDED/IDEMPOTENT effects; neither
+        # claim is safe before external COMMITTED_EFFECT proof is available.
+        # Deny BEFORE inspecting caller arguments or touching SQLite. Keep
+        # guard()/snapshot() read-only and existing historical rows intact.
+        raise PermissionError("INDEPENDENT_PRODUCER_RECEIPT_NOT_ENROLLED")
         bound = self._validate_decision(decision)
         key = _token(idempotency_key, "idempotency_key")
         effect = _token(effect_ref, "effect_ref")
