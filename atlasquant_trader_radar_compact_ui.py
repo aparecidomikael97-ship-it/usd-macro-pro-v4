@@ -538,6 +538,7 @@ def _master(calendar_data: Any = None, news_data: Any = None,
     from atlasquant_trader_master_legacy_news import build_legacy_news_read_model
     from atlasquant_trader_master_news_ui import master_news_html
     from atlasquant_trader_master_official_ui import official_macro_html
+    from atlasquant_trader_master_refresh_ui import master_refresh_plan_html
     news_model = build_legacy_news_read_model(news_data)
     highlights = master_overview_cards(calendar_data, news_model=news_model)
     dimensions = (
@@ -568,6 +569,7 @@ def _master(calendar_data: Any = None, news_data: Any = None,
                  "Contexto e risco") +
         '<div class="aqr-grid">' + highlights + '</div></section>' +
         master_briefing_html(calendar_data) + official_macro_html(official_data) +
+        master_refresh_plan_html() +
         '<section class="aqr-section">' +
         _heading("Quatro dimensões", "As informações poderão ser combinadas, mas suas fontes ficarão identificadas.") +
         '<div class="aqr-grid">' + panels + '</div></section>'
