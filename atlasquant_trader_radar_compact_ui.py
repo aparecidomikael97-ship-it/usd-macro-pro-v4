@@ -100,6 +100,48 @@ _CSS = r"""
 @media(max-width:1050px){.aqr-app{grid-template-columns:195px minmax(0,1fr)}.aqr-main{padding:22px 20px}.aqr-card.aqr-fourth{grid-column:span 6}.aqr-indices{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.aqr-shell{max-width:100%;overflow-x:hidden!important}.aqr-app{display:block;min-width:0;width:100%}.aqr-aside,.aqr-main{min-width:0;width:100%;max-width:100%}.aqr-nav{width:100%}.aqr-nav button{min-width:0;white-space:normal;overflow-wrap:anywhere}.aqr-hero h1{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.15}.aqr-hero p{max-width:100%;overflow-wrap:anywhere}.aqr-main{overflow-wrap:anywhere}.aqr-app{display:block}.aqr-aside-inner{position:static;min-height:0;height:auto;padding:12px;gap:9px}.aqr-aside-note{display:none}.aqr-side-label{margin:2px 4px}.aqr-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.aqr-nav button{min-height:40px;padding:8px;font-size:11px}.aqr-main{padding:14px}.aqr-topline{margin-bottom:14px}.aqr-hero{padding:22px 18px;min-height:190px}.aqr-hero h1{font-size:26px}.aqr-hero:before{right:-14px;opacity:.28}.aqr-hero:after{opacity:.4}.aqr-warning{margin-bottom:17px}.aqr-card,.aqr-card.aqr-fourth,.aqr-card.aqr-third{grid-column:1/-1}.aqr-currency{grid-column:span 6}.aqr-indices{grid-template-columns:1fr}.aqr-controls{gap:5px}.aqr-chip{font-size:9px;padding:6px}.aqr-crumb{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.aqr-shell *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+/* Visual v2: densidade da prévia aprovada, sem alterar contrato de dados. */
+.aqr-shell{min-height:670px}
+.aqr-app{grid-template-columns:190px minmax(0,1fr);min-height:670px}
+.aqr-aside-inner{min-height:670px;height:auto;gap:20px;padding:20px 12px 18px}
+.aqr-brand{gap:8px;padding:0 6px}
+.aqr-brand strong{font-size:13px;letter-spacing:.02em}
+.aqr-brand small{font-size:8px;letter-spacing:.14em}
+.aqr-nav button{font-size:12px;padding:11px 10px;min-height:42px;white-space:nowrap;gap:9px}
+.aqr-nav-icon{flex:0 0 15px}
+.aqr-main{padding:18px clamp(14px,2vw,32px) 22px}
+.aqr-topline{margin-bottom:15px}
+.aqr-hero{min-height:178px;padding:22px 25px 18px;margin-bottom:15px}
+.aqr-hero h1{font-size:clamp(24px,2.7vw,34px)}
+.aqr-hero p{font-size:12px;line-height:1.55}
+.aqr-hero:after{right:-14px;width:225px;height:225px}
+.aqr-hero:before{right:9%;width:67px;height:67px}
+.aqr-badges span{padding:6px 8px;font-size:9px}
+.aqr-warning{margin:12px 0 16px;padding:10px 12px}
+.aqr-section{margin:20px 0 23px}
+.aqr-heading{margin-bottom:11px}
+.aqr-grid{gap:11px}
+.aqr-currency{min-height:111px;padding:12px}
+.aqr-currency-value{margin:10px 0 8px;font-size:17px}
+.aqr-tag{padding:4px 7px;font-size:9px}
+.aqr-aside-note{padding:12px 10px}
+.aqr-aside-note p{font-size:10px;margin-bottom:9px}
+.aqr-empty-area{padding:19px 13px;line-height:1.6}
+/* Preserve four cards per row until the layout is genuinely narrow. */
+@media(max-width:1050px) and (min-width:701px){
+  .aqr-app{grid-template-columns:175px minmax(0,1fr)}
+  .aqr-main{padding:18px 17px 21px}
+}
+@media(max-width:700px){
+  .aqr-shell,.aqr-app{min-height:0}
+  .aqr-aside-inner{height:auto;min-height:0;gap:9px;padding:12px}
+  .aqr-nav button{white-space:normal;min-height:42px}
+  .aqr-main{padding:15px}
+  .aqr-hero{min-height:170px;padding:21px 18px}
+  .aqr-hero h1{font-size:26px}
+  .aqr-currency{grid-column:span 6;min-height:102px}
+}
+
 </style>
 """
 def _num(value: Any) -> float | None:
@@ -288,13 +330,10 @@ def _top_approved(data: Mapping[str, Any]) -> str:
     rows = data["pairs"]
     complete = len(rows) == len(OFFICIAL_PAIRS)
     if not complete:
-        return ('<div class="aqr-empty-area"><strong>Top 10 aguardando</strong>'
-                'Variações diárias dos 28 pares ainda não verificadas. '
-                'Um ranking técnico não equivale à valorização diária.</div>'
-                '<div class="aqr-grid">' + ''.join(
-                    '<article class="aqr-card aqr-fourth"><h3>Posição ' + str(i) +
-                    ' · Sem par validado</h3><div class="aqr-value">—</div>'
-                    '<span class="aqr-tag">AGUARDANDO</span></article>' for i in range(1, 11)) + '</div>')
+        return ('<div class="aqr-empty-area" data-state="top10-unavailable">'
+                '<strong>Top 10 aguardando</strong>'
+                'Sem ranking até a validação das variações diárias dos 28 pares. '
+                'Nenhum par recebe posição ou sinal sem dados confiáveis.</div>')
     ranked = sorted(rows.items(), key=lambda item: item[1]["change_pct"], reverse=True)[:10]
     return '<div class="aqr-grid">' + "".join(
         '<article class="aqr-card aqr-fourth"><h3>#' + str(i) + ' ' + escape(pair) +
@@ -662,13 +701,15 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
               if data["stamp"] else "● DADOS NÃO CONECTADOS")
     return (
         _CSS +
-        '<section class="ref-workspace aqr-shell" data-workspace="trader_radar" '
+        '<section class="ref-workspace aqr-shell notranslate" lang="pt-BR" translate="no" '
+        'data-workspace="trader_radar" '
         'data-visual-reference="approved-20261102-v1">'
         '<div class="aqr-app"><aside class="aqr-aside"><div class="aqr-aside-inner">'
         '<div class="aqr-brand"><span class="aqr-logo">A</span><span><strong>ATLASQUANT'
         '</strong><small>TRADER RADAR</small></span></div>'
         '<div><div class="aqr-side-label">PAINEL DE CONTROLE</div>'
-        '<nav class="aqr-nav" aria-label="Navegação AtlasQuant Trader">' + nav +
+        '<nav class="aqr-nav notranslate" lang="pt-BR" translate="no" '
+        'aria-label="Navegação AtlasQuant Trader">' + nav +
         '</nav></div><div class="aqr-aside-note"><strong>◦ PRÉVIA PRIVADA</strong>'
         '<p>Interface para aprovação visual.<br>Não conectada a preços, notícias '
         'ou operações.</p><small>Versão conceitual • v0.1</small></div>' + back + '</div></aside>'
