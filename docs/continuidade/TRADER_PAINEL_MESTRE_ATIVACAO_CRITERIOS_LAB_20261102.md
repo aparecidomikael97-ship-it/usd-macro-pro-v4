@@ -136,7 +136,7 @@ a durabilidade após reinícios.
   `provider_meter_verified=False`,
   `global_multi_host_quota_proven=False`, `scheduler_enabled=False`.
 
-`test_atlasquant_trader_master_quota_units_lab.py` cobre 15 cenários,
+`test_atlasquant_trader_master_quota_units_lab.py` cobre 16 cenários,
 incluindo peso maior que 1, concorrência simulada por clientes independentes,
 falha, crash, reinício, duplicidade, política imutável, virada UTC, reserva
 sob demanda e ausência de ações externas. Resultado de CI precisa ser
@@ -146,3 +146,31 @@ conferido depois do commit.
 central realmente compartilhado por hosts e comparar os créditos da
 conta real mediante autorização específica do proprietário. Esta simulação
 não realiza nem comprova esses dois passos; não ativa cron/Worker/deploy.
+
+
+## Prova de contrato — resultado de commit incerto (LAB)
+
+Novo backend in-memory `atlasquant_trader_master_shared_quota_fake.py`
+simula um coordenador único entre clientes lógicos, **sem conexão SQL,
+sem rede e sem integração com a aplicação publicada**.
+
+- Duas instâncias de cliente compartilham orçamento ponderado e chave
+  idempotente; lock do backend falso serializa concorrência no teste.
+- Se a gravação é confirmada no backend mas a resposta se perde, o cliente
+  retorna `COMMIT_OUTCOME_UNKNOWN_RECONCILE` e **não refaz a chamada**.
+  A recuperação consulta a **mesma chave**. Falta de registro visível ou
+  indisponibilidade não é prova suficiente para tentar com uma nova chave.
+- Falha da fonte e finalização não devolvem créditos reservados; política
+  de orçamento não é ampliada silenciosamente.
+- O snapshot permanece `multi_host_verified=False`,
+  `provider_counter_verified=False` e `scheduler_enabled=False`.
+
+`test_atlasquant_trader_master_shared_quota_fake.py` adiciona 12 testes
+de corrida entre clientes, idempotência, commit incerto, reconciliação,
+falha, reserva sob demanda, ausência de política e ausência de ativação.
+
+**Gates pendentes:** uma implementação real precisará validar transações,
+isolamento, commit incerto e recuperação em PostgreSQL (ou equivalente)
+**efetivamente compartilhado entre hosts**, com credenciais e segurança
+previamente aprovadas, antes de ser considerada apta. Este fake não altera
+o status HARD NO-GO e não substitui prova com banco real.
