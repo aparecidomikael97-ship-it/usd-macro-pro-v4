@@ -255,15 +255,50 @@ def explanation(event: Mapping[str, Any]) -> dict[str, str]:
         expected = "O mercado prevê um número MENOR que o anterior: " + f"{previous:g} → {consensus:g}. Uma queda esperada já pode estar precificada."
     else:
         expected = "O mercado prevê um número IGUAL ao anterior: " + f"{consensus:g}."
-    dollar = (
-        "Para eventos dos EUA: observe DXY e rendimentos dos Treasuries; "
-        "um USD mais forte tende a pressionar EUR/USD, mas a direção dos pares depende da moeda-base."
-        if event.get("currency") == "USD" else
-        "Para pares com USD, a reação depende de qual moeda é a base: "
-        "fortalecimento local pode fazer USD/BRL cair, enquanto AUD/USD pode subir."
-    )
+    # Apply the audited editorial library AFTER the numeric comparison is
+    # established. A known event gets a specific scenario; an unrecognized
+    # title remains explicitly conditional/unknown. Neither is a trade bias.
+    from atlasquant_trader_master_indicator_guide import indicator_guide
+    guide = indicator_guide(event.get("title"), event.get("country"),
+                            event.get("comparison"))
+    if guide["key"] != "unknown":
+        above = guide["above"] + f" Moeda de referência do evento: {name}."
+        below = guide["below"] + f" Moeda de referência do evento: {name}."
+    else:
+        above = guide["above"] + f" Moeda local: {name}."
+        below = guide["below"] + f" Moeda local: {name}."
+    if actual is None:
+        result = "Resultado ainda não divulgado ou não recebido da fonte."
+    elif consensus is None:
+        result = "Resultado informado, mas sem consenso verificável: surpresa não calculada."
+    elif actual > consensus:
+        result = "Divulgação ACIMA do consenso. " + above
+    elif actual < consensus:
+        result = "Divulgação ABAIXO do consenso. " + below
+    else:
+        result = "Divulgação IGUAL ao consenso: reação depende de detalhes, revisões e precificação."
+    if name == "USD":
+        dollar = (
+            "Para os EUA, observar DXY, Treasury 2Y e 10Y e Fed. "
+            "USD mais forte pode pressionar EUR/USD e apoiar USD/JPY, "
+            "mas risco global, juros japoneses e posicionamento podem inverter a reação."
+        )
+    elif name == "BRL":
+        dollar = (
+            "Para Brasil, acompanhar curva DI, Selic, risco fiscal e USD/BRL: "
+            "BRL mais forte tende a reduzir USD/BRL, mas isso não é garantia."
+        )
+    else:
+        dollar = (
+            f"Para {name}, acompanhar o banco central local e os pares com USD. "
+            "Moeda-base valorizada tende a elevar o par; moeda cotada valorizada "
+            "tende a reduzi-lo, com outras forças atuando simultaneamente."
+        )
     return {"above": above, "below": below, "result": result,
             "expectation": expected, "dollar": dollar,
+            "mechanism": guide["mechanism"], "watch": guide["watch"],
+            "caution": guide["caution"], "guide_key": guide["key"],
+            "certainty": guide["certainty"],
             "risk": "Cenários condicionais, não garantias. Observe revisão, hora, "
                     "composição do indicador, juros, posicionamento e preço."}
 
