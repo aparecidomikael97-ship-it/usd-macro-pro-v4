@@ -67,7 +67,7 @@ class IndicatorSpecificGuideTests(unittest.TestCase):
         for name in ("Unemployment Rate", "Initial Jobless Claims"):
             with self.subTest(name=name):
                 guide = indicator_guide(name)
-                self.assertIn("fraco", guide["above"].lower())
+                self.assertTrue(any(token in guide["above"].lower() for token in ("fraco", "enfraquecimento")))
                 self.assertNotIn("emprego mais forte", guide["above"].lower())
 
     def test_pmi_surprise_is_not_expansion_above_50(self):
