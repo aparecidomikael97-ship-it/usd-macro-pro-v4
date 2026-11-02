@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_radar_compact_ui import (
-    PAGES, _daily, central_entry_html, trader_radar_html,
+    PAGES, INDEX_GROUPS, _daily, central_entry_html, trader_radar_html,
 )
 
 
@@ -24,7 +24,8 @@ def _fixture():
         },
         "indices": {
             "SPX500": {"change_pct": 0.4, "bias": "ALTA"},
-            "IBOV": {"change_pct": -0.2, "bias": "BAIXA"},
+            "WIN": {"change_pct": -0.2, "bias": "BAIXA"},
+            "WDO": {"change_pct": 0.1, "bias": "ALTA"},
         },
     }
 
@@ -69,6 +70,16 @@ class TraderRadarCompactTests(unittest.TestCase):
         data["state"] = "VALIDATED_DAILY"
         data["pairs"][OFFICIAL_PAIRS[0]]["change_pct"] = float("nan")
         self.assertEqual(len(_daily(data)["pairs"]), 27)
+
+    def test_indices_include_win_wdo_and_asia_not_ibovespa(self):
+        groups = {region: {symbol for symbol, _ in assets} for region, assets in INDEX_GROUPS}
+        self.assertEqual(groups["Brasil"], {"WIN", "WDO"})
+        self.assertEqual(groups["Ásia"], {"NIKKEI225", "TOPIX", "HANGSENG", "CSI300", "KOSPI200"})
+        html = trader_radar_html(selected="radar", daily_data=_fixture())
+        self.assertIn("WIN · mini-índice", html)
+        self.assertIn("WDO · minidólar", html)
+        self.assertIn("Nikkei 225", html)
+        self.assertNotIn("Ibovespa", html)
 
     def test_macro_is_global_and_impact_is_conditional(self):
         html = trader_radar_html(selected="master")
