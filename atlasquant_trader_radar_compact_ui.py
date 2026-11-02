@@ -123,7 +123,7 @@ def _daily(data: Any) -> dict[str, Any]:
         return blank
     try:
         stamp = datetime.fromisoformat(raw_stamp.replace("Z", "+00:00"))
-        if stamp.tzinfo is None or (stamp - datetime.now(timezone.utc)).total_seconds() > 300:
+        if stamp.tzinfo is None or not (-20 * 60 <= (stamp - datetime.now(timezone.utc)).total_seconds() <= 60):
             return blank
     except (TypeError, ValueError):
         return blank
@@ -585,10 +585,58 @@ def _master(calendar_data: Any = None) -> str:
         '<section data-tab-panel="news" hidden><div class="aqr-guide">Notícias com fonte e horário verificados; feed ainda não conectado.</div></section></section>' + _economic_catalog())
 
 
+
+def _checkpoint_evidence_panel(model: Mapping[str, Any], page: str) -> str:
+    """Compact evidence status below the approved sections; no invented signals."""
+    titles = {
+        "home": ("Qualidade dos dados", "Resumo do que já pode ser consultado com confiança."),
+        "radar": ("O que está validado?", "28 pares monitorados não significam 28 operações."),
+        "scanner": ("Por que aguardar?", "O gatilho técnico exige D1, H4 e M15 válidos."),
+        "master": ("Auditoria das evidências", "Fonte e frescor são parte da análise, não detalhes."),
+    }
+    caption, explanation = titles[page]
+    forex = model["forex"]
+    calendar = model["calendar"]
+    scanner = model["scanner"]
+    tiles = (
+        ("Radar · Forex",
+         f'{forex["covered"]}/{forex["total"]} pares · '
+         f'{forex["currencies_covered"]}/{forex["currencies_total"]} moedas',
+         forex["state"]),
+        ("Calendário", f'{calendar["events"]} eventos verificados',
+         calendar["state"]),
+        ("Scanner", "D1 · H4 · M15", scanner["state"]),
+    )
+    cards = "".join(
+        '<article class="aqr-card aqr-third"><h3>' + escape(label) +
+        '</h3><div class="aqr-value" style="font-size:16px;margin:16px 0 9px">' +
+        escape(value) + '</div><span class="aqr-tag">' +
+        escape(state) + '</span></article>'
+        for label, value, state in tiles
+    )
+    blockers = "".join(
+        '<li style="margin:8px 0">' + escape(str(text)) + '</li>'
+        for text in model["decision"]["why_not"][:8]
+    )
+    return (
+        '<section class="aqr-section aqr-evidence" aria-label="Qualidade das evidências">' +
+        _heading(caption, explanation, "Somente leitura") +
+        '<div class="aqr-grid">' + cards + '</div>' +
+        '<details class="aqr-detail" style="margin-top:13px"><summary '
+        'style="cursor:pointer;font-weight:800;color:#c4f4f9">Por que não operar? '
+        'Ver motivos e dados pendentes</summary>' +
+        '<ul style="padding-left:20px;font-size:11px;line-height:1.65;color:#bfd4e6">' +
+        blockers + '</ul><p>MACRO = direção · ICT/SMC = onde e quando · '
+        'RISCO = quando não operar. Nenhuma etapa autoriza ordens reais.</p>'
+        '</details></section>'
+    )
+
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                       show_central: bool = True, daily_data: Any = None,
                       calendar_data: Any = None) -> str:
+    from atlasquant_trader_readiness_v1 import build_trader_readiness
     data = _daily(daily_data)
+    evidence = build_trader_readiness(daily_data=daily_data, calendar_data=calendar_data)
     page = selected if selected in {key for key, _ in PAGES} else "home"
     title = dict(PAGES)[page]
     icons = {"home": "⌂", "radar": "◉", "scanner": "⌁", "master": "▦"}
@@ -623,7 +671,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span><span class="aqr-chip">VISUALIZAÇÃO</span>' +
         '<span class="aqr-avatar" aria-label="Sessão do usuário">' +
         escape((name.strip()[:1] or "U").upper()) + '</span></div></header>' +
-        _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + content +
+        _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + content + _checkpoint_evidence_panel(evidence, page) +
         '<footer class="aqr-foot">ATLASQUANT / TRADER RADAR · Poderoso por dentro. '
         'Simples por fora. · Sem ordens reais, sem dados fictícios.</footer></main></div></section>'
     )
