@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from atlasquant_trader_master_indicator_guide import indicator_guide
 from atlasquant_trader_economic_calendar import normalize_events, explanation
-from atlasquant_trader_calendar_ui import calendar_html
+from atlasquant_trader_calendar_ui import calendar_html, calendar_source_status
 from atlasquant_trader_master_briefing_v2 import build_master_briefing
 from atlasquant_trader_master_briefing_ui import master_week_html
 
@@ -123,6 +123,40 @@ class IndicatorSpecificGuideTests(unittest.TestCase):
         self.assertIn("O que mede:", html)
         self.assertIn("O que observar:", html)
         self.assertIn("Acima do consenso:", html)
+
+    def test_safe_calendar_source_diagnostics(self):
+        cases = (
+            ({"state": "UNAVAILABLE", "reason": "NO_EXISTING_TOKEN"}, "FONTE NÃO CONFIGURADA"),
+            ({"state": "UNAVAILABLE", "reason": "HTTP_403"}, "ACESSO NÃO HABILITADO"),
+            ({"state": "UNAVAILABLE", "reason": "HTTP_429"}, "LIMITE DE CONSULTAS"),
+            ({"state": "INCOMPLETE_PROVIDER"}, "RESPOSTA INCOMPLETA"),
+            ({"state": "STALE_PROVIDER"}, "DADOS ATRASADOS"),
+        )
+        for raw, name in cases:
+            with self.subTest(raw=raw):
+                status, _ = calendar_source_status(raw)
+                self.assertEqual(status, name)
+                markup = calendar_html(raw)
+                self.assertIn(name, markup)
+                self.assertIn("Calendário diário aguardando fonte", markup)
+                self.assertNotIn("sk-", markup)
+
+    def test_provider_unknown_response_cannot_render_raw_secret(self):
+        raw = {"state": "UNAVAILABLE",
+               "reason": "<script>secret_token_do_not_show</script>"}
+        markup = calendar_html(raw)
+        self.assertNotIn("secret_token_do_not_show", markup)
+        self.assertNotIn("<script>", markup)
+        self.assertIn("FONTE INDISPONÍVEL", markup)
+
+    def test_ready_without_proven_fetch_time_warns_even_with_event(self):
+        data = _normalize(_row("Consumer Price Index CPI"))
+        data["fetched_at"] = ""
+        self.assertEqual(calendar_source_status(data)[0], "HORÁRIO NÃO COMPROVADO")
+        html = calendar_html(data)
+        self.assertIn("HORÁRIO NÃO COMPROVADO", html)
+        self.assertIn("Consumer Price Index", html)
+        self.assertNotIn("FONTE RECEBIDA", html)
 
     def test_no_live_feed_no_fabricated_market_numbers(self):
         guide = indicator_guide("IPCA")
