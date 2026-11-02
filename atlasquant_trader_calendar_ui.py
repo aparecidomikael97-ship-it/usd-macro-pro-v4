@@ -129,6 +129,12 @@ def calendar_html(data: Any) -> str:
             'Revisões do valor anterior não estão confirmadas separadamente neste registro; '
             'consultar o anúncio oficial.</p>'
             '<h4>O que o mercado pode esperar?</h4>'
+            '<p><strong>Como este indicador funciona:</strong> ' +
+            escape(expl["mechanism"]) + '</p>'
+            '<p><strong>O que acompanhar:</strong> ' +
+            escape(expl["watch"]) + '</p>'
+            '<p><strong>Limite da interpretação:</strong> ' +
+            escape(expl["caution"]) + '</p>'
             '<p><strong>Expectativa antes da divulgação:</strong> ' +
             escape(expl["expectation"]) + '</p>'
             '<p><strong>Se vier acima do consenso:</strong> ' +
