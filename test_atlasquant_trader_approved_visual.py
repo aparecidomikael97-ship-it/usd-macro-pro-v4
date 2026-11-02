@@ -1,7 +1,6 @@
 """Contratos de paridade visual AtlasQuant Trader e segurança do filtro de abertura."""
 import unittest
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from atlasquant_trader_radar_compact_ui import (
     _opening_score, trader_radar_html,
@@ -54,13 +53,13 @@ class TraderApprovedVisualTests(unittest.TestCase):
         self.assertIn("Índice de Volatilidade S&amp;P 500", html)
         self.assertIn("SGX IODEX Iron Ore Futures", html)
         self.assertIn("Futuros de petróleo leve bruto", html)
-        self.assertIn("WDO: ", html)
+        self.assertIn("WDO:</strong>", html)
         self.assertIn("− variação % do VIX", html)
         self.assertNotIn("Ibovespa", html)
         self.assertNotIn("Score: +", html)
 
     def test_opening_score_fails_closed(self):
-        stamp = datetime(2026, 11, 2, 8, 55, tzinfo=ZoneInfo("America/Sao_Paulo"))
+        stamp = datetime(2026, 11, 2, 8, 55, tzinfo=timezone(timedelta(hours=-3)))
         valid = {
             "state": "VALIDATED_OPENING", "source": "Laboratório offline",
             "as_of": stamp.isoformat(), "vix_pct": -0.5,
@@ -77,7 +76,7 @@ class TraderApprovedVisualTests(unittest.TestCase):
         self.assertIsNone(_opening_score({**valid, "as_of": wrong_time.isoformat()}, at=wrong_time))
 
     def test_opening_score_is_exploratory_and_vix_is_inverted(self):
-        stamp = datetime(2026, 11, 2, 8, 55, tzinfo=ZoneInfo("America/Sao_Paulo"))
+        stamp = datetime(2026, 11, 2, 8, 55, tzinfo=timezone(timedelta(hours=-3)))
         valid = {
             "state": "VALIDATED_OPENING", "source": "Laboratório offline",
             "as_of": stamp.isoformat(), "vix_pct": -0.5,
