@@ -165,6 +165,10 @@ def master_week_html(calendar: Any, *, at: datetime | None = None) -> str:
             ' · <strong>Período:</strong> ' + escape(e["period"]) +
             ' · <strong>Base:</strong> ' + escape(e["comparison"] or "nível") +
             '. Sem unidade padronizada: confirmar no anúncio oficial.</p>'
+            '<p><strong>O que mede:</strong> ' + escape(e["mechanism"]) +
+            '</p><p><strong>O que observar:</strong> ' +
+            escape(e["watch"]) + '</p>'
+            '<p><strong>Limite:</strong> ' + escape(e["caution"]) + '</p>'
             '<p><strong>Acima do consenso:</strong> ' +
             escape(e["above"]) + '</p><p><strong>Abaixo do consenso:</strong> ' +
             escape(e["below"]) + '</p>'
