@@ -42,7 +42,7 @@ from atlasquant_ui_v1 import ATLASQUANT_CSS
 from atlasquant_aion_internal_roles import internal_roles_snapshot
 
 
-_PRIVATE_LABELS = ("AION", "Negócios", "Investimentos", "Trader Radar")
+_PRIVATE_LABELS = ("AION", "Negócios", "Investimentos", "AtlasQuant Trader")
 _AION_TITLES = (
     "Orquestrador",
     "Arquiteto / Estrategista",
@@ -66,7 +66,7 @@ class CentralHubUiTests(unittest.TestCase):
         model = central_visibility_model(_access("ADMIN"))
         self.assertEqual(
             [area["label"] for area in model["areas"]],
-            ["Trader", "Negócios", "Investimentos", "AION", "Trader Radar"],
+            ["Trader", "Negócios", "Investimentos", "AION", "AtlasQuant Trader"],
         )
         self.assertEqual(model["area_ids"], ("trader", "negocios", "investimentos", "aion", "trader_radar"))
         self.assertEqual(model["priority_area"], "aion")
@@ -77,7 +77,7 @@ class CentralHubUiTests(unittest.TestCase):
     def test_trader_radar_has_valid_owner_navigation_art(self):
         html = ecosystem_rail_html(_access("ADMIN"), "trader_radar")
         self.assertIn('data-central-area="trader_radar"', html)
-        self.assertIn("Trader Radar", html)
+        self.assertIn("AtlasQuant Trader", html)
 
     def test_non_admin_sees_only_trader(self):
         for role in ("USER", "SALES", "OPEN", "PREVIEW", "ALUNO", "ASSINANTE", ""):
