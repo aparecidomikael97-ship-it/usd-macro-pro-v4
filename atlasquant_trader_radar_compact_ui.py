@@ -5,7 +5,7 @@ O módulo não transforma ranking técnico em valorização de preço.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape
 from math import isfinite
 from typing import Any, Mapping
@@ -281,7 +281,7 @@ def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | 
 
     Não representa edge testado; jamais emite ordem ou sinal de entrada.
     """
-    from zoneinfo import ZoneInfo
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
     if not isinstance(raw, Mapping) or raw.get("state") != "VALIDATED_OPENING":
         return None
     source = str(raw.get("source") or "").strip()
@@ -294,7 +294,13 @@ def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | 
         if stamp.tzinfo is None:
             return None
         delta = (now - stamp.astimezone(timezone.utc)).total_seconds()
-        local = stamp.astimezone(ZoneInfo("America/Sao_Paulo"))
+        try:
+            tz_brasilia = ZoneInfo("America/Sao_Paulo")
+        except ZoneInfoNotFoundError:
+            # Windows local de LAB pode não ter tzdata instalada.
+            # O Brasil não usa horário de verão atualmente; o Render usa IANA.
+            tz_brasilia = timezone(timedelta(hours=-3))
+        local = stamp.astimezone(tz_brasilia)
         # A coleta para abertura do WIN foi combinada entre 8h50 e 9h BRT.
         if not (-300 <= delta <= 6 * 3600) or not (local.hour == 8 and local.minute >= 50 or
                                                    local.hour == 9 and local.minute == 0):
