@@ -42,3 +42,22 @@ O Painel Mestre explica **por que** um mercado pode mover-se, mas não fornece o
 - Validar produção autenticada, desempenho no Render de 512 MiB, teste móvel e aceite humano antes de merge/deploy.
 
 **Não declarar a integração externa pronta apenas porque os testes com fixtures passaram.**
+
+## Continuidade técnica — biblioteca específica e notícias legadas (LAB)
+
+- Biblioteca atlasquant_trader_master_indicator_guide.py: 25 tipos de indicadores com mecanismo, cenário acima/abaixo do consenso, checklist e ressalvas. ADP não é NFP; PMI surpresa positiva abaixo de 50 não significa expansão; balança comercial sem unidade/sinal mantém direção indeterminada. Desconhecidos jamais geram viés.
+- O calendário diário/semanal mostra essas explicações ao expandir o evento. Preserva consenso, anterior, divulgado e surpresa numérica na unidade da fonte, sem inventar porcentagens de ganho.
+- atlasquant_trader_calendar_ui.calendar_source_status() discrimina ausência de credencial, permissão/entitlement, limite de consulta, fonte atrasada e resposta incompleta. Nunca mostra token nem mensagem bruta do provedor.
+- atlasquant_trader_master_legacy_news.py adapta, sem rede e sem custo adicional, snapshot v1061_currency_news do legado currency_news_v1062.py (Currency News Intelligence). Exige carimbo recente, fonte editorial e artigo recente; sanitiza URLs HTTPS, deduplica manchetes entre as oito moedas.
+- atlasquant_trader_master_news_ui.py apresenta manchetes com data/hora Brasília, fonte, link seguro e rótulo OBSERVACIONAL · NÃO É SINAL. Palavras-chave geopolíticas são triagem textual, nunca confirmação de fatos ou influência causal. O score heurístico antigo não autoriza operações.
+- atlasquant_reference_ui.py repassa v1061_currency_news somente após gate de acesso autenticado e quando já existir na sessão. O Painel Mestre não inicia RSS/NewsAPI nem compra créditos.
+- Novos testes test_atlasquant_trader_master_indicator_guide.py, test_atlasquant_trader_master_news.py e test_atlasquant_trader_master_browser.py: reconhecimento editorial, comparação econômica, deduplicação, staleness, atribuição, segurança HTML/URL e clique em desktop/tablet/mobile.
+- 70/70 testes locais PASS no AM12 antes da extensão Playwright, que depende do resultado da CI. Testes sintéticos não homologam feeds de mercado.
+
+### Limites pendentes (não mascarados)
+
+1. EODHD Economic Events depende do direito da conta e disponibilidade do plano. Nenhum teste com credencial de produção foi realizado. Documentação oficial: actual/estimate/previous, comparação, período, máximo de 1.000 eventos por consulta.
+2. Calendário atualiza sob demanda/cache, não com aplicativo fechado. Agendador independente não foi aprovado nem ativado. Nenhum serviço novo contratado.
+3. Consenso ADMIN é temporário em sessão; faltam persistência auditável e política de revisão.
+4. Dados macro oficiais, notícias geopolíticas confirmadas e balanços de empresas exigem contratos de fonte. Manchete observada não equivale a informação factual homologada.
+5. Performance e clique autenticado no Render devem ser validados após aprovação de eventual deploy. Auto-Deploy OFF; PR DRAFT; AION HARD NO-GO.
