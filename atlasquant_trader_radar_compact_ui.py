@@ -242,7 +242,7 @@ def _currencies_approved(data: Mapping[str, Any]) -> str:
     return '<div class="aqr-grid">' + "".join(
         '<article class="aqr-currency"><strong>' + escape(code) +
         '</strong><small>Força relativa</small><div class="aqr-currency-value">' +
-        (_pct(value) if value else '—') + '</div><span class="aqr-tag">AGUARDANDO</span></article>'
+        (_pct(value) if value else '—') + '</div><span class="aqr-tag">' + ('VALIDADO' if value else 'AGUARDANDO') + '</span></article>'
         for code, value in ordered) + '</div>'
 
 
@@ -254,7 +254,7 @@ def _top_approved(data: Mapping[str, Any]) -> str:
                 'Variações diárias dos 28 pares ainda não verificadas. '
                 'Um ranking técnico não equivale à valorização diária.</div>'
                 '<div class="aqr-grid">' + ''.join(
-                    '<article class="aqr-card aqr-fourth"><h3>#' + str(i) +
+                    '<article class="aqr-card aqr-fourth"><h3>Posição ' + str(i) +
                     ' · Sem par validado</h3><div class="aqr-value">—</div>'
                     '<span class="aqr-tag">AGUARDANDO</span></article>' for i in range(1, 11)) + '</div>')
     ranked = sorted(rows.items(), key=lambda item: item[1]["change_pct"], reverse=True)[:10]
@@ -276,7 +276,7 @@ def _forex_table(data: Mapping[str, Any]) -> str:
         '<th>Confirmação</th></tr></thead><tbody>' + rows + '</tbody></table></div>')
 
 
-def _opening_score(raw: Any) -> dict[str, Any] | None:
+def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | None:
     """Viés experimental de pré-abertura: exige contrato, fonte e carimbo temporal.
 
     Não representa edge testado; jamais emite ordem ou sinal de entrada.
@@ -290,7 +290,7 @@ def _opening_score(raw: Any) -> dict[str, Any] | None:
         return None
     try:
         stamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
+        now = at or datetime.now(timezone.utc)
         if stamp.tzinfo is None:
             return None
         delta = (now - stamp.astimezone(timezone.utc)).total_seconds()
@@ -514,7 +514,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                "scanner": _scanner, "master": _master}[page]()
     back = ('<button class="aqr-chip" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
-    status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"])
+    status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"]) + ' · Fonte: ' + escape(data["source"])
               if data["stamp"] else "● DADOS NÃO CONECTADOS")
     return (
         _CSS +
