@@ -422,6 +422,7 @@ _ART = {
     "negocios": _svg_business,
     "trader": _svg_trader,
     "investimentos": _svg_investments,
+    "trader_radar": _svg_trader,
 }
 
 
