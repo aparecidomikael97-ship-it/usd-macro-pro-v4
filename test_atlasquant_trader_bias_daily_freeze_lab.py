@@ -8,7 +8,7 @@ from atlasquant_trader_bias_forecast_bridge_lab import (
     SCHEMA as FORECAST_SCHEMA, FIXED_METHOD,
 )
 from atlasquant_trader_bias_daily_freeze_lab import (
-    PROTOCOL, freeze_daily_bias_observation_lab,
+    PROTOCOL, VETO_POLICY_ID, freeze_daily_bias_observation_lab,
 )
 
 ISSUED = datetime(2026, 11, 2, 11, tzinfo=timezone.utc)  # 07:00 Cuiaba
@@ -46,6 +46,7 @@ def evidence():
         {"state": "LAB_SYNTHETIC_EVIDENCE",
          "evidence_id": "macro-known", "kind": "MACRO_ACTUAL_RELEASED",
          "source": "Laboratorio apenas",
+         "currency": "USD",
          "released_at_utc": "2026-11-02T09:45:00+00:00",
          "data_as_of_utc": "2026-11-02T09:45:00+00:00",
          "captured_at_utc": "2026-11-02T10:15:00+00:00",
@@ -59,11 +60,24 @@ def evidence():
     ]
 
 
-def check(b=None, e=None, *, at=CHECKED):
+def check(b=None, e=None, *, at=CHECKED, vetoes=None):
     return freeze_daily_bias_observation_lab(
         batch() if b is None else b,
         evidence() if e is None else e, checked_at=at,
+        macro_vetoes=vetoes,
     )
+
+
+def macro_plan():
+    return [{
+        "state": "LAB_SYNTHETIC_MACRO_VETO",
+        "policy_id": VETO_POLICY_ID,
+        "forecast_id": "freeze-lab-1-D1-USDJPY",
+        "decided_at_utc": ISSUED.isoformat(),
+        "evidence_ids": ["macro-known"],
+        "rationale": "Hipotese anterior: evidencia macro gera risco de contrario",
+        "trade_authorized": False,
+    }]
 
 
 class DailyFreezeLabTests(unittest.TestCase):
@@ -97,6 +111,79 @@ class DailyFreezeLabTests(unittest.TestCase):
         c[1]["actual"] = 3.0
         self.assertNotEqual(a["frozen_observation_digest"],
                             check(e=c)["frozen_observation_digest"])
+
+    def test_macro_veto_is_in_original_frozen_digest(self):
+        original = check()
+        planned = check(vetoes=macro_plan())
+        self.assertEqual(planned["state"], "LAB_FROZEN_SYNTHETIC_OBSERVATION")
+        self.assertEqual(planned["predeclared_macro_vetoes"], 1)
+        self.assertEqual(planned["macro_veto_policy_lab"], VETO_POLICY_ID)
+        self.assertTrue(planned["macro_plan_included_in_digest"])
+        self.assertNotEqual(original["frozen_observation_digest"],
+                            planned["frozen_observation_digest"])
+        self.assertFalse(planned["digest_is_independent_custody"])
+
+    def test_stable_digest_across_macro_veto_order(self):
+        b = batch()
+        plan = macro_plan()
+        second = dict(plan[0])
+        second["forecast_id"] = "freeze-lab-1-D1-EURUSD"
+        plan.append(second)
+        first = check(b=b, vetoes=plan)
+        reordered = check(b=b, vetoes=list(reversed(plan)))
+        self.assertEqual(first["state"], "LAB_FROZEN_SYNTHETIC_OBSERVATION")
+        self.assertEqual(first["frozen_observation_digest"],
+                         reordered["frozen_observation_digest"])
+
+    def test_rewrite_veto_rationale_changes_predeclared_digest(self):
+        plan = macro_plan()
+        first = check(vetoes=plan)
+        plan[0]["rationale"] = "Hipotese macro diversa antes da emissao"
+        other = check(vetoes=plan)
+        self.assertNotEqual(first["frozen_observation_digest"],
+                            other["frozen_observation_digest"])
+
+    def test_unrelated_currency_cannot_support_macro_veto(self):
+        e = evidence()
+        e[1]["currency"] = "CHF"
+        rejected = check(e=e, vetoes=macro_plan())
+        self.assertEqual(rejected["state"], "LAB_REJECTED_DAILY_OBSERVATION")
+
+    def test_future_event_schedule_cannot_justify_macro_veto(self):
+        plan = macro_plan()
+        plan[0]["evidence_ids"] = ["macro-coming"]
+        self.assertEqual(check(vetoes=plan)["state"],
+                         "LAB_REJECTED_DAILY_OBSERVATION")
+
+    def test_wrong_macro_policy_version_fails_closed(self):
+        plan = macro_plan()
+        plan[0]["policy_id"] = "LATER_SELECTED_POLICY"
+        self.assertEqual(check(vetoes=plan)["state"],
+                         "LAB_REJECTED_DAILY_OBSERVATION")
+
+    def test_macro_veto_for_weekly_horizon_is_forbidden(self):
+        plan = macro_plan()
+        plan[0]["forecast_id"] = "freeze-lab-1-W1-USDJPY"
+        self.assertEqual(check(vetoes=plan)["state"],
+                         "LAB_REJECTED_DAILY_OBSERVATION")
+
+    def test_veto_cannot_append_hindsight_result_fields(self):
+        plan = macro_plan()
+        plan[0]["realized_return"] = -100
+        self.assertEqual(check(vetoes=plan)["state"],
+                         "LAB_REJECTED_DAILY_OBSERVATION")
+
+    def test_duplicate_veto_rejected_before_hashing(self):
+        plan = macro_plan()
+        plan.append(dict(plan[0]))
+        self.assertEqual(check(vetoes=plan)["state"],
+                         "LAB_REJECTED_DAILY_OBSERVATION")
+
+    def test_unsafe_evidence_capture_cannot_be_predeclared(self):
+        e = evidence()
+        e[1]["captured_at_utc"] = "2026-11-02T11:00:01+00:00"
+        self.assertEqual(check(e=e, vetoes=macro_plan())["state"],
+                         "LAB_REJECTED_DAILY_OBSERVATION")
 
     def test_issuance_at_wrong_hour_rejected_not_shifted(self):
         for h in (6, 8, 0, 23):

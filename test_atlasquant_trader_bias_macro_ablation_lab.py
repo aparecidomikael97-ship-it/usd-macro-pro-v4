@@ -5,6 +5,9 @@ from datetime import datetime, timedelta, timezone
 from math import exp
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
+from atlasquant_trader_bias_daily_freeze_lab import (
+    freeze_daily_bias_observation_lab, VETO_POLICY_ID,
+)
 from atlasquant_trader_bias_forecast_bridge_lab import FIXED_METHOD, SCHEMA as BRIDGE
 from atlasquant_trader_bias_macro_ablation_lab import (
     MACRO_METHOD, compare_frozen_macro_veto_lab,
@@ -48,13 +51,14 @@ def observation(day, veto=False):
          "data_as_of_utc": (issued - timedelta(minutes=90)).isoformat(),
          "captured_at_utc": (issued - timedelta(minutes=75)).isoformat()},
     ]
-    return {
+    session = {
         "batch": {"schema": BRIDGE, "state": "LAB_SYNTHETIC_ISSUED",
                   "batch_key": key, "issued_at_utc": issued.isoformat(),
                   "method_id": FIXED_METHOD, "forecasts": forecasts},
         "evidences": evidence,
         "macro_vetoes": [{
             "state": "LAB_SYNTHETIC_MACRO_VETO",
+            "policy_id": VETO_POLICY_ID,
             "forecast_id": f"{key}-D1-USDJPY",
             "decided_at_utc": issued.isoformat(),
             "evidence_ids": ["usd-cpi-release"],
@@ -62,6 +66,20 @@ def observation(day, veto=False):
             "trade_authorized": False,
         }] if veto else [],
     }
+    seal(session)
+    return session
+
+
+def seal(session):
+    issue = datetime.fromisoformat(session["batch"]["issued_at_utc"])
+    output = freeze_daily_bias_observation_lab(
+        session["batch"], session["evidences"], checked_at=issue,
+        macro_vetoes=session["macro_vetoes"],
+    )
+    if output["state"] != "LAB_FROZEN_SYNTHETIC_OBSERVATION":
+        raise AssertionError("Fixture precommit failed: " + output["reason"])
+    session["precommitted_observation_digest"] = output["frozen_observation_digest"]
+    return session
 
 
 def settlement(row, bearish=False):
@@ -126,12 +144,15 @@ class MacroVetoAblationTests(unittest.TestCase):
         self.assertEqual(pair["matched_retained_hit_rate_pct"], 100.0)
         self.assertEqual(pair["baseline_on_exact_retained_sample_pct"], 100.0)
         self.assertFalse(result["accuracy_improvement_proven"])
+        self.assertTrue(result["macro_vetoes_bound_to_frozen_digest"])
+        self.assertFalse(result["independent_custody_verified"])
         self.assertFalse(pair["statistical_uplift_proven"])
 
     def test_no_veto_means_same_forecasts_no_fake_macro_effect(self):
         sessions, outcomes = fixture()
         for session in sessions:
             session["macro_vetoes"] = []
+            seal(session)  # Construct a distinct synthetic precommitted experiment.
         result = evaluate(sessions, outcomes)
         self.assertEqual(result["macro_vetoed_all_periods"], 0)
         self.assertEqual(result["baseline_oos"]["metrics"]["D1"],
@@ -154,6 +175,48 @@ class MacroVetoAblationTests(unittest.TestCase):
             self.assertFalse(result[flag], flag)
         self.assertFalse(result["baseline_oos"]["oos_proven"])
         self.assertFalse(result["macro_gate_oos"]["historical_data_verified"])
+
+    def test_changing_precommitted_veto_after_issue_is_refused(self):
+        sessions, outcomes = fixture()
+        sessions[3]["macro_vetoes"] = []
+        result = evaluate(sessions, outcomes)
+        self.assertEqual(result["state"], "LAB_REJECTED_ABLATION")
+        self.assertIn("predeclared", result["reason"])
+
+    def test_rewriting_macro_release_after_precommit_is_refused(self):
+        sessions, outcomes = fixture()
+        sessions[3]["evidences"][1]["actual"] = 5.0
+        result = evaluate(sessions, outcomes)
+        self.assertEqual(result["state"], "LAB_REJECTED_ABLATION")
+        self.assertIn("predeclared", result["reason"])
+
+    def test_veto_policy_id_must_be_fixed_in_original_frozen_plan(self):
+        sessions, outcomes = fixture()
+        sessions[3]["macro_vetoes"][0]["policy_id"] = "POST_HOC_POLICY_V2"
+        self.assertEqual(evaluate(sessions, outcomes)["state"], "LAB_REJECTED_ABLATION")
+
+    def test_forged_content_hash_does_not_match_frozen_plan(self):
+        sessions, outcomes = fixture()
+        sessions[3]["precommitted_observation_digest"] = "0" * 64
+        result = evaluate(sessions, outcomes)
+        self.assertEqual(result["state"], "LAB_REJECTED_ABLATION")
+        self.assertIn("predeclared", result["reason"])
+
+    def test_missing_precommit_digest_refuses_comparison(self):
+        sessions, outcomes = fixture()
+        del sessions[3]["precommitted_observation_digest"]
+        result = evaluate(sessions, outcomes)
+        self.assertEqual(result["state"], "LAB_REJECTED_ABLATION")
+        self.assertIn("predeclared", result["reason"])
+
+    def test_precommitted_plan_does_not_create_trusted_timestamp(self):
+        sessions, outcomes = fixture()
+        result = evaluate(sessions, outcomes)
+        self.assertEqual(result["predeclared_veto_policy_lab"], VETO_POLICY_ID)
+        self.assertTrue(result["macro_vetoes_bound_to_frozen_digest"])
+        self.assertFalse(result["real_point_in_time_proven"])
+        self.assertFalse(result["independent_custody_verified"])
+        self.assertFalse(result["actual_macro_effect_proven"])
 
     def test_veto_cannot_reference_future_scheduled_actual(self):
         sessions, outcomes = fixture()

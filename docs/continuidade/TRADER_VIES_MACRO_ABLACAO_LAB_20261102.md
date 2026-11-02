@@ -86,3 +86,31 @@ trade_authorized=False e scheduler_enabled=False.
 
 **Nenhum** preço real consumido, API consultada, serviço pago,
 cron, Worker, deploy, merge, backtest real ou ordem autorizada.
+
+
+## Segurança adicional: filtro registrado com a previsão
+
+A primeira proposta exigia que o veto tivesse um horário
+coincidente com a previsão; isso ainda permitia escolher
+o veto retrospectivamente com um timestamp fabricado.
+Agora o plano de vetos (inclusive lista vazia) faz parte
+do MESMO congelamento LAB do viés.
+
+O avaliador compare_frozen_macro_veto_lab exige que cada sessão
+traga precommitted_observation_digest — idêntico ao digest
+de batch + evidências + plano + versão do método. Não aceita
+veto com política divergente, ID desconhecido, evidência
+macroeconômica futura, dados de outra moeda nem campos
+posteriores como realized_return. Se qualquer material
+for alterado, o lote é recusado.
+
+A metodologia macro ainda é MANUAL e EXPERIMENTAL; o teste
+não afirma que CPI, NFP, juros etc. sempre reforçam ou
+enfraquecem determinada moeda. Esses efeitos dependem de
+expectativas, regime e divergência entre bancos centrais.
+Nenhuma regra de operação pode ser promovida neste estágio.
+
+**Observação:** o hash não está sob custódia independente.
+A consistência do conteúdo não equivale a prova de
+disponibilidade antes do resultado. OOS real continua
+não comprovado.

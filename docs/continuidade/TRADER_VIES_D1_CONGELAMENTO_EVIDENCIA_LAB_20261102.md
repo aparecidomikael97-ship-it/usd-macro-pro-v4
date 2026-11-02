@@ -66,3 +66,34 @@ Para provar assertividade de viés no mundo real será preciso:
 
 **HARD NO-GO:** sem merge, deploy, Worker, agendamento, novas
 contratações, consumo de API ou ordens. Interface publicada preservada.
+
+
+## Revisão: compromisso do plano macro na observação original
+
+Um veto macro datado separadamente do viés poderia ser inventado
+depois de conhecer o resultado do preço. Para reduzir esse risco
+de consistência interna, freeze_daily_bias_observation_lab agora
+aceita macro_vetoes=[] (ou lista explícita):
+
+- O método de pesquisa é fixo:
+  MANUAL_PREDECLARED_MACRO_VETO_D1_LAB_V1.
+- Cada veto D1 só altera ALTA/BAIXA para AGUARDAR no comparador.
+  Precisa referenciar um evento MACRO_ACTUAL_RELEASED da moeda
+  base ou cotada já divulgado e capturado antes do horário de emissão.
+- IDs, decisão, justificativa, método e evidências macro entram
+  junto com o lote dos 84 vieses no MESMO SHA-256 de conteúdo.
+- Modificar a justificativa, fonte, evento, ID ou a presença de
+  um veto altera o hash da observação. Eventos futuros
+  MACRO_SCHEDULE_ONLY não podem justificar veto.
+- Uma observação sem veto também registra essa escolha
+  (plano vazio) no conteúdo congelado.
+- O comparador LAB exige que o hash registrado anteriormente
+  pelo próprio experimento coincida com o recalculado.
+  Divergência significa recusa, sem seleção posterior.
+
+**Limite crítico:** hash SHA-256 gerado com dados enviados pelo
+chamador NÃO prova que a previsão existia historicamente, pois
+o usuário pode alterar tanto o plano quanto o hash. Falta
+carimbo confiável de tempo, testemunha independente e
+armazenamento imutável para prova real. Não declarar
+assertividade real por passar os testes.

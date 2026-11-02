@@ -17,7 +17,7 @@ import re
 from typing import Any, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
-from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
+from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_bias_forecast_bridge_lab import (
     SCHEMA as FORECAST_SCHEMA, FIXED_METHOD,
 )
@@ -30,6 +30,7 @@ HORIZONS = ("D1", "W1", "MN1")
 SIDES = ("ALTA", "BAIXA", "NEUTRO", "AGUARDAR")
 ID = re.compile(r"^[A-Za-z0-9:_-]{3,100}$")
 MAX_EVIDENCE = 100
+VETO_POLICY_ID = "MANUAL_PREDECLARED_MACRO_VETO_D1_LAB_V1"
 
 
 def _time(raw: Any) -> datetime | None:
@@ -58,6 +59,7 @@ def _deny(reason: str) -> dict[str, Any]:
 
 def freeze_daily_bias_observation_lab(
     batch: Any, evidences: Any, *, checked_at: datetime,
+    macro_vetoes: Any = None,
 ) -> dict[str, Any]:
     """Check exact clock, G8 coverage, 84 rows and pre-release macro handling.
 
@@ -118,6 +120,8 @@ def freeze_daily_bias_observation_lab(
     release_count = 0
     scheduled_count = 0
     captured_ids = []
+    known_macro = {}
+    predeclared = []
     for item in evidences:
         if not isinstance(item, Mapping) or item.get("state") != "LAB_SYNTHETIC_EVIDENCE":
             return _deny("Evidence is not an explicit synthetic fixture")
@@ -154,6 +158,7 @@ def freeze_daily_bias_observation_lab(
             if not valid_actual:
                 return _deny("Actual macro number is unbounded or invalid")
             release_count += 1
+            known_macro[name] = item
         elif kind == "MACRO_SCHEDULE_ONLY":
             released = _time(item.get("released_at_utc"))
             if (released is None or released <= issued or
@@ -165,11 +170,51 @@ def freeze_daily_bias_observation_lab(
             return _deny("Unknown evidence kind")
     if strength_count != 1:
         return _deny("Exactly one complete synthetic G8 strength source required")
+    # The candidate macro plan MUST be present in the frozen content hash,
+    # not supplied separately at evaluation time after future price labels.
+    if macro_vetoes is None:
+        macro_vetoes = []
+    if not isinstance(macro_vetoes, (list, tuple)) or len(macro_vetoes) > len(OFFICIAL_PAIRS):
+        return _deny("Invalid number of macro policy decisions")
+    forecast_index = {f["forecast_id"]: f for f in batch["forecasts"]}
+    seen_veto_forecasts = set()
+    for veto in macro_vetoes:
+        allowed = {"state", "forecast_id", "decided_at_utc", "evidence_ids",
+                   "rationale", "trade_authorized", "policy_id"}
+        if (not isinstance(veto, Mapping) or set(veto) != allowed
+                or veto.get("state") != "LAB_SYNTHETIC_MACRO_VETO"
+                or veto.get("policy_id") != VETO_POLICY_ID
+                or veto.get("trade_authorized") is not False):
+            return _deny("Veto schema or frozen methodology is invalid")
+        fid = veto.get("forecast_id")
+        row = forecast_index.get(fid) if isinstance(fid, str) else None
+        if (row is None or row["horizon"] != "D1"
+                or row["bias"] not in ("ALTA", "BAIXA")
+                or fid in seen_veto_forecasts or _time(veto.get("decided_at_utc")) != issued):
+            return _deny("Macro decision must be unique and fixed at D1 issue cutoff")
+        rationale, ids = veto.get("rationale"), veto.get("evidence_ids")
+        if (not isinstance(rationale, str) or not 5 <= len(rationale.strip()) <= 300
+                or not isinstance(ids, (list, tuple)) or not 1 <= len(ids) <= 5
+                or any(not isinstance(x, str) for x in ids)
+                or len(set(ids)) != len(ids)):
+            return _deny("Veto requires a bounded rationale and unique macro sources")
+        base, quote = split_pair(row["pair"])
+        for eid in ids:
+            ev = known_macro.get(eid)
+            if ev is None or ev.get("currency") not in (base, quote):
+                return _deny("Veto cites unavailable or unrelated macro event")
+            released, received = _time(ev.get("released_at_utc")), _time(ev.get("captured_at_utc"))
+            if released is None or received is None or released > received or received > issued:
+                return _deny("Macro event was not known by forecast issue cutoff")
+        seen_veto_forecasts.add(fid)
+        predeclared.append(veto)
     # Deterministic digest is only a local content identifier; there is no
     # signature, independent witness, durable storage or trusted time authority.
     try:
         canonical = json.dumps(
             {"batch": batch, "evidences": sorted(evidences, key=lambda e: e["evidence_id"]),
+             "macro_veto_policy": VETO_POLICY_ID,
+             "macro_vetoes": sorted(predeclared, key=lambda v: v["forecast_id"]),
              "protocol": PROTOCOL},
             sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
         )
@@ -188,6 +233,9 @@ def freeze_daily_bias_observation_lab(
         "evidence_ids": sorted(captured_ids),
         "macro_actuals_before_cutoff": release_count,
         "macro_future_schedules_without_actual": scheduled_count,
+        "macro_veto_policy_lab": VETO_POLICY_ID,
+        "predeclared_macro_vetoes": len(predeclared),
+        "macro_plan_included_in_digest": True,
         "frozen_observation_digest": fingerprint,
         "digest_is_independent_custody": False,
         "real_market_sources_verified": False,
@@ -201,4 +249,5 @@ def freeze_daily_bias_observation_lab(
     }
 
 
-__all__ = ["SCHEMA", "PROTOCOL", "freeze_daily_bias_observation_lab"]
+__all__ = ["SCHEMA", "PROTOCOL", "VETO_POLICY_ID",
+           "freeze_daily_bias_observation_lab"]

@@ -16,7 +16,7 @@ from typing import Any, Mapping, Sequence
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_bias_daily_freeze_lab import (
-    freeze_daily_bias_observation_lab,
+    freeze_daily_bias_observation_lab, VETO_POLICY_ID,
 )
 from atlasquant_trader_bias_forecast_bridge_lab import (
     FIXED_METHOD,
@@ -86,11 +86,18 @@ def compare_frozen_macro_veto_lab(
         batch, evidence, vetoes = (
             session.get("batch"), session.get("evidences"), session.get("macro_vetoes")
         )
+        # The veto list is part of the same candidate freeze as the baseline.
+        # Its predeclared content digest is caller supplied, not independently
+        # witnessed; it protects internal consistency, NOT historical custody.
         frozen = freeze_daily_bias_observation_lab(
-            batch, evidence, checked_at=now,
+            batch, evidence, checked_at=now, macro_vetoes=vetoes,
         )
         if frozen["state"] != "LAB_FROZEN_SYNTHETIC_OBSERVATION":
             return _deny("Invalid or post-cutoff frozen observation")
+        declared = session.get("precommitted_observation_digest")
+        if (not isinstance(declared, str) or len(declared) != 64 or
+                declared != frozen["frozen_observation_digest"]):
+            return _deny("Macro plan differs from the predeclared research freeze")
         issue = _utc(frozen["issued_at_utc"])
         day = frozen["session_label_lab"]
         if day in session_days or (previous is not None and issue <= previous):
@@ -108,9 +115,10 @@ def compare_frozen_macro_veto_lab(
         selected = set()
         for veto in vetoes:
             allowed_keys = {"state", "forecast_id", "decided_at_utc",
-                            "trade_authorized", "rationale", "evidence_ids"}
+                            "trade_authorized", "rationale", "evidence_ids", "policy_id"}
             if (not isinstance(veto, Mapping) or
                     set(veto) != allowed_keys or
+                    veto.get("policy_id") != VETO_POLICY_ID or
                     veto.get("state") != "LAB_SYNTHETIC_MACRO_VETO"):
                 return _deny("Invalid synthetic macro veto or future-data field")
             fid = veto.get("forecast_id")
@@ -235,6 +243,9 @@ def compare_frozen_macro_veto_lab(
         "observed_sessions": len(observations),
         "baseline_predictions": len(base),
         "macro_vetoed_all_periods": veto_count,
+        "predeclared_veto_policy_lab": VETO_POLICY_ID,
+        "macro_vetoes_bound_to_frozen_digest": True,
+        "independent_custody_verified": False,
         "macro_released_evidence_ids_used": sorted(veto_event_ids),
         "baseline_oos": baseline,
         "macro_gate_oos": macro,
