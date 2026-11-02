@@ -58,12 +58,39 @@ def _value(value: Any) -> str:
     return f"{n:,.2f}".replace(",", " ").replace(".", ",")
 
 
+def calendar_source_status(data: Any) -> tuple[str, str]:
+    """Public, safe diagnostics only. Do not surface raw provider errors or tokens."""
+    if not isinstance(data, Mapping):
+        return ("SEM INTEGRAÇÃO", "Fonte econômica não consultada ou sem configuração autorizada.")
+    state = str(data.get("state") or "")
+    reason = str(data.get("reason") or "").strip().upper()
+    if state == "READY":
+        if not str(data.get("fetched_at") or "").strip():
+            return ("HORÁRIO NÃO COMPROVADO", "A coleta não trouxe carimbo verificável; leitura não pode ser considerada atual.")
+        return ("FONTE RECEBIDA", "Eventos recebidos da fonte com horário identificável; conteúdo ainda pode sofrer revisões.")
+    if reason == "NO_EXISTING_TOKEN":
+        return ("FONTE NÃO CONFIGURADA", "Nenhuma credencial existente foi encontrada. Nenhum serviço novo foi contratado.")
+    if reason in ("HTTP_401", "HTTP_403", "HTTP_402"):
+        return ("ACESSO NÃO HABILITADO", "A credencial atual não foi autorizada para esta consulta. Confirme permissões e plano sem ativar despesas.")
+    if reason == "HTTP_429":
+        return ("LIMITE DE CONSULTAS", "O provedor restringiu novas consultas; aguarde e verifique a franquia contratada.")
+    if state in ("INCOMPLETE_PROVIDER", "INVALID_PROVIDER") or reason == "INVALID_RESPONSE":
+        return ("RESPOSTA INCOMPLETA", "Formato ou cobertura da resposta não permite garantir calendário completo.")
+    if state == "STALE_PROVIDER" or reason == "CACHE_OUTDATED":
+        return ("DADOS ATRASADOS", "Carimbo de atualização fora da janela permitida; dados não devem gerar viés atual.")
+    if state == "UNAVAILABLE":
+        return ("FONTE INDISPONÍVEL", "Consulta temporariamente indisponível; não exibimos números simulados.")
+    return ("AGUARDANDO VALIDAÇÃO", "Fonte, data ou integridade dos eventos ainda não comprovadas.")
+
+
 def calendar_html(data: Any) -> str:
     """No invented events/consensus: only normalized daily evidence is rendered."""
+    status_label, status_detail = calendar_source_status(data)
     if not isinstance(data, Mapping) or data.get("state") != "READY":
         return STYLE + (
             '<div class="aqr-cal-empty"><strong>Calendário diário aguardando fonte</strong>'
-            'Consulta automática preparada para a fonte existente autorizada. '
+            '<p><strong>' + escape(status_label) + '.</strong> ' +
+            escape(status_detail) + '</p>'
             'Sem feed disponível, não mostramos datas, expectativas ou surpresas fictícias.'
             '</div>'
         )
@@ -74,6 +101,13 @@ def calendar_html(data: Any) -> str:
         stamp = brasilia_clock(datetime.fromisoformat(fetched)).strftime("%d/%m/%Y %H:%M BRT")
     except (TypeError, ValueError):
         stamp = "Horário da coleta não informado"
+    # A READY payload without a fetch timestamp can be displayed as historical
+    # evidence, never as a verified live calendar.
+    freshness = (
+        '<div class="aqr-cal-guide"><strong>' + escape(status_label) +
+        '</strong> · ' + escape(status_detail) + '</div>'
+        if status_label != "FONTE RECEBIDA" else ""
+    )
     header = ('<div class="aqr-cal-guide"><strong>Calendário do dia · ' + label +
               '</strong> · Horário de Brasília · Fonte: ' + source +
               ' · Consulta: ' + escape(stamp) +
@@ -152,7 +186,7 @@ def calendar_html(data: Any) -> str:
         str(int(data.get("total") or 0)) + '. O feed foi limitado por proteção de memória.</p>'
         if data.get("truncated") else ""
     )
-    return STYLE + header + '<div class="aqr-cal-list">' + "".join(cards) + '</div>' + trunc
+    return STYLE + freshness + header + '<div class="aqr-cal-list">' + "".join(cards) + '</div>' + trunc
 
 
-__all__ = ["calendar_html"]
+__all__ = ["calendar_html", "calendar_source_status"]
