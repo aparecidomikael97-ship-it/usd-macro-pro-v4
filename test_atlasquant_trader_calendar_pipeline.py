@@ -2,8 +2,10 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from atlasquant_trader_calendar_ui import calendar_html
+from atlasquant_trader_calendar_service import SESSION_CONSENSUS, read_calendar
 from atlasquant_trader_economic_calendar import (
     event_identity, explanation, normalize_events, request_eodhd_daily,
 )
@@ -155,6 +157,36 @@ class TraderCalendarTests(unittest.TestCase):
         self.assertIsNone(build_opening_snapshot(get_quote, at=NOW.replace(minute=56)))
         self.assertIsNone(build_opening_snapshot(
             lambda symbol: {**get_quote(symbol), "state": "UNVERIFIED"}, at=NOW))
+
+    def test_calendar_fetch_auth_gate_and_manual_identity_scope(self):
+        class FakeStreamlit:
+            secrets = {}
+            session_state = {}
+
+        fake = FakeStreamlit()
+        access = {"allowed": True, "role": "ADMIN",
+                  "session": {"username": "owner"}}
+        raw = _event(estimate=None)
+        key = event_identity("US", raw["type"], "yoy",
+                             RELEASE.astimezone(timezone.utc))
+        fake.session_state[SESSION_CONSENSUS] = {
+            key: {"event_id": key, "value": 3.4, "source": "Pesquisa de banco",
+                  "author": "owner", "entered_at": NOW.isoformat()}
+        }
+        with patch.dict("os.environ", {"CHAVE_EODHD": "LAB_EXAMPLE"}, clear=False):
+            with patch("atlasquant_trader_calendar_service._hourly_feed",
+                       return_value={"ok": True, "data": [raw]}) as fetcher:
+                model = read_calendar(fake, access, at=NOW)
+                self.assertEqual(model["events"][0]["consensus"], 3.4)
+                fetcher.assert_called_once()
+                with self.assertRaises(PermissionError):
+                    read_calendar(fake, {"allowed": False}, at=NOW)
+                other = read_calendar(
+                    fake,
+                    {"allowed": True, "role": "ADMIN",
+                     "session": {"username": "other"}},
+                    at=NOW)
+                self.assertIsNone(other["events"][0]["consensus"])
 
     def test_ui_master_renders_source_and_conditional_events(self):
         model = normalize_events({"ok": True, "data": [_event()]}, at=NOW)
