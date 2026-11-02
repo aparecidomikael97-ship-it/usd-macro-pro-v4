@@ -74,6 +74,11 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertEqual(model["entry"], CENTRAL_ROOT)
         self.assertTrue(model["admin"])
 
+    def test_trader_radar_has_valid_owner_navigation_art(self):
+        html = ecosystem_rail_html(_access("ADMIN"), "trader_radar")
+        self.assertIn('data-central-area="trader_radar"', html)
+        self.assertIn("Trader Radar", html)
+
     def test_non_admin_sees_only_trader(self):
         for role in ("USER", "SALES", "OPEN", "PREVIEW", "ALUNO", "ASSINANTE", ""):
             model = central_visibility_model(_access(role))
