@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from html import escape
 from math import isfinite
+from datetime import datetime
 from typing import Any, Mapping
 
 from atlasquant_trader_master_briefing_v2 import build_master_briefing
@@ -51,8 +52,8 @@ def _number(value: Any) -> str:
     return f"{number:,.2f}".replace(",", " ").replace(".", ",")
 
 
-def master_overview_cards(calendar: Any) -> str:
-    model = build_master_briefing(calendar)
+def master_overview_cards(calendar: Any, *, at: datetime | None = None) -> str:
+    model = build_master_briefing(calendar, at=at)
     ready = model["state"] == "VALIDADO"
     def card(title: str, value: str, description: str, label: str) -> str:
         return ('<article class="aqr-card aqr-fourth"><h3>' + escape(title) +
@@ -77,8 +78,8 @@ def master_overview_cards(calendar: Any) -> str:
     )
 
 
-def master_briefing_html(calendar: Any) -> str:
-    model = build_master_briefing(calendar)
+def master_briefing_html(calendar: Any, *, at: datetime | None = None) -> str:
+    model = build_master_briefing(calendar, at=at)
     if model["state"] != "VALIDADO":
         return (
             '<section class="aqr-section aqr-master-briefing" '
@@ -139,9 +140,9 @@ def master_briefing_html(calendar: Any) -> str:
     )
 
 
-def master_week_html(calendar: Any) -> str:
+def master_week_html(calendar: Any, *, at: datetime | None = None) -> str:
     """Accessible details for six forthcoming days; source driven, not fabricated."""
-    model = build_master_briefing(calendar)
+    model = build_master_briefing(calendar, at=at)
     heading = ('<section class="aqr-section" aria-label="Agenda econômica da semana">'
                '<div class="aqr-heading"><div><h2>Agenda econômica · próximos 6 dias</h2>'
                '<p>Horário de Brasília · previsão e número anterior quando disponíveis.</p>'
