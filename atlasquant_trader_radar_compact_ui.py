@@ -312,8 +312,16 @@ def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | 
                 q = quotes[key]
                 if not isinstance(q, Mapping) or q.get("instrument_id") != instrument or q.get("reference_type") != basis:
                     return None
-                price = _num(q.get("price"))
-                prior = _num(q.get("previous_reference"))
+                def plausible_price(item):
+                    if isinstance(item, bool):
+                        return None
+                    try:
+                        num = float(item)
+                    except (ValueError, TypeError, OverflowError):
+                        return None
+                    return num if isfinite(num) and 0 < num < 1e7 else None
+                price = plausible_price(q.get("price"))
+                prior = plausible_price(q.get("previous_reference"))
                 stored_pct = _num(q.get("pct"))
                 if price is None or prior is None or stored_pct is None or price <= 0 or prior <= 0:
                     return None
