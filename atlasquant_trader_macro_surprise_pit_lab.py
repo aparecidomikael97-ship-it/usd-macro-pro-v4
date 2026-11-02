@@ -19,7 +19,7 @@ from atlasquant_fx_universe import CURRENCIES
 
 SCHEMA = "ATLASQUANT_TRADER_MACRO_SURPRISE_PIT_LAB_V1"
 INDICATORS = frozenset((
-    "CPI", "CORE_CPI", "PCE", "CORE_PCE", "PPI",
+    "CPI", "HICP", "CORE_CPI", "PCE", "CORE_PCE", "PPI",
     "NFP", "ADP", "UNEMPLOYMENT", "WAGES",
     "POLICY_RATE", "GDP", "PMI", "ISM",
 ))

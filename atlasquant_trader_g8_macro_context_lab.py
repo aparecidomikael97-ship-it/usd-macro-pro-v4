@@ -20,7 +20,7 @@ from atlasquant_trader_macro_surprise_pit_lab import (
 SCHEMA = "ATLASQUANT_TRADER_G8_MACRO_COMPARISON_LAB_V1"
 GROUPS = ("INFLATION", "EMPLOYMENT", "POLICY", "ACTIVITY")
 GROUP_BY_INDICATOR = {
-    **{x: "INFLATION" for x in ("CPI", "CORE_CPI", "PCE", "CORE_PCE", "PPI")},
+    **{x: "INFLATION" for x in ("CPI", "HICP", "CORE_CPI", "PCE", "CORE_PCE", "PPI")},
     **{x: "EMPLOYMENT" for x in ("NFP", "ADP", "UNEMPLOYMENT", "WAGES")},
     "POLICY_RATE": "POLICY",
     **{x: "ACTIVITY" for x in ("GDP", "PMI", "ISM")},
