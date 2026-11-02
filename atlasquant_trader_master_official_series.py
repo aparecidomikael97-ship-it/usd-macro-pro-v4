@@ -190,7 +190,8 @@ def read_official_series(st: Any, *, at: datetime | None = None) -> dict[str, An
         "state": "PARCIAL" if any(r["state"] != "VALIDADO" for r in rows) else "VALIDADO",
         "read_at": now.isoformat(), "rows": rows,
         "reason": "Períodos de referência e frequência por série. Não são divulgações novas de hoje.",
-        "requests_by_this_view": 0, # Cache may have been filled by an earlier view.
+        "requests_by_this_view": None, # Could be cache hit or first fetch.
+        "request_policy": "UP_TO_6_PER_UTC_DAY_PER_PROCESS",
         "trade_authorized": False,
     }
 
