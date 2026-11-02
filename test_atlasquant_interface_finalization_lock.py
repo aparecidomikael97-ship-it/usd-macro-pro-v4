@@ -11,7 +11,7 @@ from atlasquant_central_hub_ui import central_selector_html, central_surface_htm
 from atlasquant_reference_ui import NAV, reference_html
 
 ADMIN = {"allowed": True, "role": "ADMIN", "permissions": ("app:read", "aion:admin")}
-EXPECTED = ("Trader", "Negócios", "Investimentos", "AION", "Trader Radar")
+EXPECTED = ("Trader", "Negócios", "Investimentos", "AION", "AtlasQuant Trader")
 ROUTES = ("area:trader", "area:negocios", "area:investimentos", "area:aion", "area:trader_radar")
 GLOBAL_UTILITY_ROUTES = {"home", "central", "profile", "notifications", "settings", "session"}
 AREA_ROUTE_RE = re.compile(r'data-route="(area:[^"]+)"')
