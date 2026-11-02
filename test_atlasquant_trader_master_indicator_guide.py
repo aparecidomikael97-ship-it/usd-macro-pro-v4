@@ -100,8 +100,6 @@ class IndicatorSpecificGuideTests(unittest.TestCase):
         self.assertEqual(guide["guide_key"], "cpi")
         self.assertIn("USD", guide["result"])
         self.assertIn("Treasury", guide["dollar"])
-        self.assertIn("Como este indicador funciona", calendar_html(model)
-                      if False else "Como este indicador funciona")
         markup = calendar_html(model)
         self.assertIn("Como este indicador funciona", markup)
         self.assertIn("O que acompanhar", markup)
