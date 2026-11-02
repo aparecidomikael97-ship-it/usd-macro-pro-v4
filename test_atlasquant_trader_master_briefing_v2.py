@@ -105,7 +105,6 @@ class MasterBriefingV2Tests(unittest.TestCase):
             {**daily, "fetched_at": (NOW + timedelta(minutes=4)).isoformat()},
             {**daily, "date": "2026-11-01"},
             {**daily, "source": ""},
-            {**daily, "week_truncated": True},
             {**daily, "truncated": True},
             {**daily, "week_total": 1},
         ]
@@ -114,6 +113,22 @@ class MasterBriefingV2Tests(unittest.TestCase):
                 model = build_master_briefing(bad, at=NOW)
                 self.assertEqual(model["state"], "INDISPONÍVEL")
                 self.assertFalse(model["trade_authorized"])
+
+    def test_partial_week_does_not_suppress_verified_today(self):
+        data = _model([
+            _event("CPI"),
+            _event("GDP", when=NOW + timedelta(days=1)),
+        ])
+        data["week_total"] = 3
+        data["week_truncated"] = True
+        model = build_master_briefing(data, at=NOW)
+        self.assertEqual(model["state"], "VALIDADO")
+        self.assertTrue(model["week_partial"])
+        self.assertEqual(model["daily_events"], 1)
+        self.assertEqual(model["week_events"], 1)
+        self.assertEqual(model["week_received_total"], 3)
+        self.assertIn("LISTA PARCIAL", master_week_html(data, at=NOW))
+        self.assertFalse(model["trade_authorized"])
 
     def test_unverified_or_misdated_event_refused(self):
         data = _model([_event("CPI")])
