@@ -103,7 +103,7 @@ def calendar_html(data: Any) -> str:
             '<div><small>Divulgado</small><strong>' +
             _value(event.get("actual")) + '</strong></div></div>'
             '<p class="aqr-cal-caption">Consenso: ' + consensus_source +
-            ' · Evento: EODHD Economic Events'
+            ' · Evento: ' + escape(str(event.get("source") or "Fonte indisponível")) +
             ' · Unidade não informada explicitamente pelo feed; confirme a escala na fonte.</p>'
             '<h4>O que o mercado pode esperar?</h4>'
             '<p><strong>Expectativa antes da divulgação:</strong> ' +
