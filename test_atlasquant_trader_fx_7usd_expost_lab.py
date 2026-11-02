@@ -33,9 +33,12 @@ def fixture(factors=None):
     return {"updated_at": "2026-10-30T02:00:00+00:00", "pairs": fx}
 
 
-def describe(data=None, *, start=START, end=END, at=AT):
+_UNSET = object()
+
+
+def describe(data=_UNSET, *, start=START, end=END, at=AT):
     return describe_7usd_legs_expost_lab(
-        fixture() if data is None else data,
+        fixture() if data is _UNSET else data,
         start_utc=start, end_utc=end, at=at)
 
 
