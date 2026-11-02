@@ -138,6 +138,8 @@ def audit_legacy_fx_daily_cache_lab(
     if total_weekend:
         blockers.append("UNVERIFIED_WEEKEND_SESSION_MAPPING")
     blockers.extend(("PROVIDER_ORIGIN_NOT_INDEPENDENTLY_VERIFIED",
+                     "LEGACY_FX_D1_TIMEZONE_CONVERSION_UNATTESTED",
+                     "LEGACY_D1_CLOSE_AVAILABILITY_UNVERIFIED",
                      "HISTORICAL_POINT_IN_TIME_CAPTURE_UNVERIFIED",
                      "MARKET_DATA_LICENSE_UNVERIFIED"))
     return {"schema": SCHEMA, "state": "QUARANTINED_UNVERIFIED_HISTORICAL_CACHE",
@@ -152,6 +154,16 @@ def audit_legacy_fx_daily_cache_lab(
             "age_days": round(age_days, 2) if age_days is not None else None,
             "aligned_candle_dates": not calendar_mismatch and dates_reference is not None,
             "pairs": pairs, "blockers": sorted(set(blockers)),
+            # Autopilot V10.7 used Twelve Data /time_series and converted
+            # datetimes via pd.to_datetime(..., utc=True). The provider documents
+            # that timezone=UTC is IGNORED for D1, unlike intraday. The cache
+            # has lost original provider meta.exchange_timezone and cannot
+            # prove those UTC timestamps are the original candle instants.
+            "probable_software_lineage": "Twelve Data time_series via autopilot_v107",
+            "source_response_attested": False,
+            "d1_requested_utc_timezone_effective": False,
+            "provider_daily_exchange_timezone_attested": False,
+            "bar_label_is_verified_close_time": False,
             "provider_identity_attested": False,
             "license_attested": False,
             "point_in_time_capture_attested": False,
