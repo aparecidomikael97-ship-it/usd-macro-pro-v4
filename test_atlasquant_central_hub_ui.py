@@ -42,7 +42,7 @@ from atlasquant_ui_v1 import ATLASQUANT_CSS
 from atlasquant_aion_internal_roles import internal_roles_snapshot
 
 
-_PRIVATE_LABELS = ("AION", "Negócios", "Investimentos")
+_PRIVATE_LABELS = ("AION", "Negócios", "Investimentos", "Trader Radar")
 _AION_TITLES = (
     "Orquestrador",
     "Arquiteto / Estrategista",
@@ -62,13 +62,13 @@ def _access(role, **extra):
 
 
 class CentralHubUiTests(unittest.TestCase):
-    def test_admin_sees_four_areas_in_canonical_ecosystem_order(self):
+    def test_admin_sees_five_areas_in_canonical_ecosystem_order(self):
         model = central_visibility_model(_access("ADMIN"))
         self.assertEqual(
             [area["label"] for area in model["areas"]],
-            ["Trader", "Negócios", "Investimentos", "AION"],
+            ["Trader", "Negócios", "Investimentos", "AION", "Trader Radar"],
         )
-        self.assertEqual(model["area_ids"], ("trader", "negocios", "investimentos", "aion"))
+        self.assertEqual(model["area_ids"], ("trader", "negocios", "investimentos", "aion", "trader_radar"))
         self.assertEqual(model["priority_area"], "aion")
         self.assertEqual(model["default_area"], CENTRAL_ROOT)
         self.assertEqual(model["entry"], CENTRAL_ROOT)
