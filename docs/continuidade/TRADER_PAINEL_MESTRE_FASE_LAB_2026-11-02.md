@@ -61,3 +61,13 @@ O Painel Mestre explica **por que** um mercado pode mover-se, mas não fornece o
 3. Consenso ADMIN é temporário em sessão; faltam persistência auditável e política de revisão.
 4. Dados macro oficiais, notícias geopolíticas confirmadas e balanços de empresas exigem contratos de fonte. Manchete observada não equivale a informação factual homologada.
 5. Performance e clique autenticado no Render devem ser validados após aprovação de eventual deploy. Auto-Deploy OFF; PR DRAFT; AION HARD NO-GO.
+
+## Segurança financeira adicional — EODHD (LAB, ainda não ativado)
+
+- A EODHD confirma por documentação oficial que o Economic Events Data API requer direito de plano (All-In-One ou Fundamentals), consome 1 API call por consulta, tem parâmetros from/to/country/comparison/limit e limite de 1000 resultados por request. O acesso de produção NÃO foi testado nem contratado por esta PR.
+- atlasquant_trader_calendar_quota_guard.py agora impede chamadas por padrão, mesmo com CHAVE_EODHD configurada. Para ativar futuramente, somente após confirmar com proprietário os direitos do endpoint e possível custo: ATLASQUANT_CALENDAR_EODHD_ENABLED=1.
+- Limite extra por processo/UTC: ATLASQUANT_CALENDAR_MAX_CALLS_PER_DAY=4 (padrão), teto forçado de 8, além de deduplicação por token hash/dia/hora, lock de concorrência e bloqueio de nova tentativa após erro HTTP/timeout no mesmo intervalo.
+- Este limite NÃO é global/durável: réplicas ou reinícios podem zerá-lo; logo não é controle financeiro suficiente para escalonamento e não substitui a franquia do provedor. Enquanto o risco não for encerrado, o gate permanece desativado.
+- Diagnóstico seguro ao proprietário: INTEGRAÇÃO DESATIVADA ou LIMITE INTERNO ATINGIDO. Nenhuma chave ou mensagem bruta de erro é exibida.
+- test_atlasquant_trader_calendar_quota_guard.py cobre padrão desativado, concorrência, falha de fonte, virada de dia UTC, limite, dados de usuário e ausência de vazamento da chave. 78/78 testes locais PASS no AM12 após esta etapa. Nova bateria GitHub Actions aguardada.
+- Para atualização automática com o aplicativo fechado, falta um **agendador aprovado** e uma **persistência compartilhada confiável** (não implementados). Não foi habilitado cron nem Worker do AION e não há nova cobrança.
