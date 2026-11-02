@@ -172,6 +172,9 @@ def build_master_briefing(calendar: Any, *, at: datetime | None = None) -> dict[
         "comparison": str(row.get("comparison") or "")[:12],
         "above": explanation(row)["above"],
         "below": explanation(row)["below"],
+        "mechanism": explanation(row)["mechanism"],
+        "watch": explanation(row)["watch"],
+        "caution": explanation(row)["caution"],
         "source": str(row.get("source") or source)[:160],
     } for stamp, row in confirmed_week]
     briefing = [
