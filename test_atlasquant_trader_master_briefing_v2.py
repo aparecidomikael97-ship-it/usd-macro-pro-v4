@@ -67,7 +67,7 @@ class MasterBriefingV2Tests(unittest.TestCase):
         self.assertEqual(briefing["upcoming_today"], 2)
         self.assertIsNone(briefing["directional_bias"])
         self.assertFalse(briefing["trade_authorized"])
-        week_html = master_week_html(data)
+        week_html = master_week_html(data, at=NOW)
         self.assertIn("Nonfarm Payrolls", week_html)
         self.assertIn("GDP", week_html)
         self.assertIn("Acima do consenso", week_html)
@@ -85,7 +85,7 @@ class MasterBriefingV2Tests(unittest.TestCase):
         self.assertEqual(briefing["surprises_today"], 1)
         self.assertEqual(briefing["upcoming_today"], 1)
         self.assertGreaterEqual(len(briefing["risk_window"]), 1)
-        self.assertIn("DIVULGAÇÃO RECENTE", master_briefing_html(data))
+        self.assertIn("DIVULGAÇÃO RECENTE", master_briefing_html(data, at=after_release))
 
     def test_no_actual_release_count_without_consensus_and_timestamp(self):
         at = NOW.replace(hour=10)
@@ -142,7 +142,7 @@ class MasterBriefingV2Tests(unittest.TestCase):
             _event(malicious),
             _event(malicious, when=NOW + timedelta(days=1)),
         ])
-        raw = master_week_html(data) + master_briefing_html(data)
+        raw = master_week_html(data, at=NOW) + master_briefing_html(data, at=NOW)
         self.assertNotIn(malicious, raw)
         self.assertIn("&lt;img", raw)
 
@@ -155,7 +155,7 @@ class MasterBriefingV2Tests(unittest.TestCase):
         data = _model([_event("CPI"), _event("Unemployment Rate")])
         model = build_master_briefing(data, at=NOW)
         self.assertTrue(all(e["editorial_only"] for e in model["priority_events"]))
-        self.assertIn("prioridade editorial", master_briefing_html(data))
+        self.assertIn("prioridade editorial", master_briefing_html(data, at=NOW))
         self.assertFalse(model["trade_authorized"])
 
 
