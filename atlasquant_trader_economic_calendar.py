@@ -122,7 +122,8 @@ def normalize_events(
     now = local.astimezone(timezone.utc)
     blank = {"schema": SCHEMA, "state": "NOT_CONNECTED", "date": today.isoformat(),
              "source": "", "fetched_at": "", "events": [], "total": 0,
-             "truncated": False, "reason": ""}
+             "truncated": False, "week_events": [], "week_total": 0,
+             "week_truncated": False, "reason": ""}
     if not isinstance(payload, Mapping) or payload.get("ok") is not True:
         return {**blank, "state": "UNAVAILABLE", "reason": str(payload.get("reason") or "SOURCE_UNAVAILABLE")[:70] if isinstance(payload, Mapping) else "SOURCE_UNAVAILABLE"}
     raw = payload.get("data")
@@ -136,6 +137,7 @@ def normalize_events(
         if age > 2 * 3600 or age < -60:
             return {**blank, "state": "STALE_PROVIDER", "reason": "CACHE_OUTDATED"}
     rows: list[dict[str, Any]] = []
+    future_rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in raw:
         if not isinstance(item, Mapping):
@@ -145,7 +147,11 @@ def normalize_events(
         if not 2 <= len(title) <= 150 or country not in COUNTRIES:
             continue
         utc = _timestamp(item.get("date"))
-        if utc is None or brasilia_clock(utc).date() != today:
+        if utc is None:
+            continue
+        event_day = brasilia_clock(utc).date()
+        # Today's calendar + the following six days from one bounded query.
+        if not today <= event_day < today + timedelta(days=7):
             continue
         comparison = str(item.get("comparison") or "").strip().lower()
         if comparison not in ("", "mom", "yoy", "qoq"):
@@ -171,7 +177,7 @@ def normalize_events(
         events = {
             "id": event_id, "country": country, "currency": CURRENCY[country],
             "title": title, "comparison": comparison, "period": period,
-            "release_utc": utc.isoformat(),
+            "release_utc": utc.isoformat(), "date_brt": event_day.isoformat(),
             "time_brt": brasilia_clock(utc).strftime("%H:%M"),
             "previous": previous, "consensus": consensus, "actual": actual,
             "consensus_source": consensus_source, "consensus_author": author,
@@ -179,12 +185,18 @@ def normalize_events(
             "surprise": surprise, "released": now >= utc,
             "source": SOURCE,
         }
-        rows.append(events)
+        if event_day == today:
+            rows.append(events)
+        else:
+            future_rows.append(events)
     rows.sort(key=lambda item: (item["release_utc"], item["country"], item["title"]))
+    future_rows.sort(key=lambda item: (item["release_utc"], item["country"], item["title"]))
     return {"schema": SCHEMA, "state": "READY", "date": today.isoformat(),
             "source": SOURCE, "fetched_at": received_at.isoformat() if received_at else "",
             "events": rows[:max_items], "total": len(rows),
-            "truncated": len(rows) > max_items}
+            "truncated": len(rows) > max_items,
+            "week_events": future_rows[:max_items], "week_total": len(future_rows),
+            "week_truncated": len(future_rows) > max_items}
 
 
 def explanation(event: Mapping[str, Any]) -> dict[str, str]:
@@ -269,7 +281,7 @@ def request_eodhd_daily(
         return {"ok": False, "reason": "NO_EXISTING_TOKEN", "data": []}
     local = brasilia_clock(at)
     date_from = local.date().isoformat()
-    date_to = (local.date() + timedelta(days=1)).isoformat()
+    date_to = (local.date() + timedelta(days=7)).isoformat()
     if request_get is None:
         import requests
         request_get = requests.get
