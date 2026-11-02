@@ -33,6 +33,41 @@ EVENT_GUIDES = (
     ("Vendas e consumo", "Consumo acima do esperado pode apoiar o crescimento, mas também mudar a trajetória projetada de juros."),
 )
 
+
+# Inventário editorial. Exibir sem dados até conectar fonte, frequência e horário
+# de divulgação de cada país. A existência deste catálogo NÃO significa integração.
+MACRO_INDICATORS = (
+    ("Estados Unidos", (
+        "CPI e núcleo · PCE e núcleo · PPI e núcleo",
+        "NFP (Payroll) · ADP · JOLTS · seguro-desemprego · salários · desemprego",
+        "PIB · ISM indústria/serviços · PMI · produção industrial",
+        "Vendas no varejo · renda e gastos pessoais · confiança do consumidor",
+        "FOMC/Fed · Treasury 2Y/10Y · curva de juros · DXY",
+        "Moradias, licenças e vendas de imóveis · bens duráveis")),
+    ("Brasil", (
+        "IPCA · IPCA-15 · IGP-M",
+        "Selic · Copom · boletim Focus · curva DI",
+        "PIB · IBC-Br · produção industrial · PMI",
+        "PNAD/desemprego · Caged/emprego · salários",
+        "Varejo · confiança · contas públicas · balança comercial")),
+    ("Europa e Reino Unido", (
+        "Zona do Euro: HICP e núcleo · PIB · PMI · desemprego · varejo",
+        "BCE: juros, comunicado e falas · sentimento ZEW/IFO",
+        "Reino Unido: CPI · salários · emprego · PIB · PMI",
+        "BoE: Bank Rate, decisões e guidance")),
+    ("Ásia e China", (
+        "China: PMI oficial/Caixin · CPI · PPI · PIB",
+        "China: produção industrial · varejo · crédito · importações/exportações",
+        "Japão: CPI · Tankan · salários · PIB · produção",
+        "BoJ e PBoC: decisões, juros e comunicação")),
+    ("Outras moedas e contexto", (
+        "Canadá: CPI · emprego · PIB · BoC",
+        "Austrália: CPI · emprego · RBA · PIB · China/minério",
+        "Nova Zelândia: CPI · emprego · RBNZ · PIB",
+        "Suíça: CPI · SNB · atividade",
+        "Petróleo: estoques EIA/OPEP · commodities · apetite por risco")),
+)
+
 _CSS = r"""
 <style>
 .aqr-shell{--aqr-cyan:#5be5ec;--aqr-ink:#e7f0fb;--aqr-muted:#91a6be;--aqr-outline:#2b465c;--aqr-panel:#0d1c2c;color:var(--aqr-ink);background:#080e1b!important;border:0!important;border-radius:0!important;padding:0!important;box-shadow:none!important;font-family:Inter,Segoe UI,Arial,sans-serif;width:100%;min-height:850px;overflow:visible!important}
@@ -471,6 +506,25 @@ def _scanner() -> str:
         'O scanner não inventa entrada nem aciona ordens.</div></section>')
 
 
+
+def _economic_catalog() -> str:
+    cards = "".join(
+        '<article class="aqr-card"><h3>' + escape(region) + '</h3>'
+        '<span class="aqr-tag">Fontes por conectar</span>'
+        '<div class="aqr-list">' + "".join(
+            '<div class="aqr-event"><p>' + escape(item) + '</p></div>' for item in items
+        ) + '</div></article>'
+        for region, items in MACRO_INDICATORS)
+    return ('<section class="aqr-section" aria-label="Inventário de indicadores econômicos">'
+            + _heading("Indicadores econômicos por região",
+                       "Cobertura planejada · nenhum dado em tempo real presumido.",
+                       "Fontes em validação")
+            + '<div class="aqr-grid">' + cards + '</div>'
+              '<div class="aqr-guide"><strong>Leitura correta</strong>'
+              'Cada evento terá fonte, data, hora, consenso, valor anterior, '
+              'resultado e revisão quando efetivamente conectado. '
+              'Sem esses campos, não exibimos surpresas nem sugerimos viés.</div></section>')
+
 def _master() -> str:
     highlights = (
         _placeholder_card("Cenário macro", "Sem avaliação atual", "")
@@ -524,7 +578,7 @@ def _master() -> str:
         '<section data-tab-panel="macro"><div class="aqr-grid"><article class="aqr-card aqr-wide">' + guides + '</article></div></section>'
         '<section data-tab-panel="micro" hidden><div class="aqr-guide">Micro: acompanhar setores, empresas e divulgação validada de resultados.</div></section>'
         '<section data-tab-panel="geo" hidden><div class="aqr-guide">Geopolítica: eventos, sanções, cadeias de suprimentos e reação efetiva do mercado.</div></section>'
-        '<section data-tab-panel="news" hidden><div class="aqr-guide">Notícias com fonte e horário verificados; feed ainda não conectado.</div></section></section>')
+        '<section data-tab-panel="news" hidden><div class="aqr-guide">Notícias com fonte e horário verificados; feed ainda não conectado.</div></section></section>' + _economic_catalog())
 
 
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
