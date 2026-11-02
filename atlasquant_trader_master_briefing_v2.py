@@ -6,11 +6,12 @@ Se o feed estiver incompleto, ausente ou velho, o briefing é INDISPONÍVEL.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import isfinite
 from typing import Any, Mapping
 
 from atlasquant_trader_opening_collector import brasilia_clock
+from atlasquant_trader_economic_calendar import explanation
 
 SCHEMA = "ATLASQUANT_MASTER_BRIEFING_EVIDENCE_V2"
 MAX_AGE_SECONDS = 2 * 3600
@@ -113,7 +114,7 @@ def build_master_briefing(calendar: Any, *, at: datetime | None = None) -> dict[
             return _empty("Evento da semana com contrato inválido.", day=date_brt.isoformat())
         stamp = _timestamp(item.get("release_utc"))
         if (stamp is None or not date_brt < brasilia_clock(stamp).date()
-                < date_brt.fromordinal(date_brt.toordinal() + 7)):
+                < date_brt + timedelta(days=7)):
             return _empty("Evento semanal fora da janela validada.", day=date_brt.isoformat())
         confirmed_week.append((stamp, item))
     confirmed_today.sort(key=lambda x: x[0])
@@ -161,6 +162,10 @@ def build_master_briefing(calendar: Any, *, at: datetime | None = None) -> dict[
         "consensus": _number(row.get("consensus")),
         "previous": _number(row.get("previous")),
         "priority": _is_editorial_priority(row),
+        "period": str(row.get("period") or "")[:50],
+        "comparison": str(row.get("comparison") or "")[:12],
+        "above": explanation(row)["above"],
+        "below": explanation(row)["below"],
         "source": str(row.get("source") or source)[:160],
     } for stamp, row in confirmed_week]
     briefing = [
