@@ -1,0 +1,84 @@
+{
+  "schema": "ATLASQUANT_TRADER_BLS_CPI_ALFRED_CASE_LAB_V1",
+  "case_id": "US-CPI-U-DEC2025-JAN2026-RELEASE",
+  "reviewed_on": "2026-11-02",
+  "state": "BLS_DOCUMENTARY_CROSS_CHECK_ONLY_ALFRED_VINTAGES_UNVERIFIED",
+  "sources": [
+    {
+      "provider": "BLS",
+      "id": "USDL-26-0042",
+      "url": "https://www.bls.gov/news.release/archives/cpi_01132026.htm",
+      "topic": "CPI-U December 2025",
+      "embargo": "2026-01-13T08:30:00-05:00",
+      "reference_month": "2025-12",
+      "cpi_u_nsa_index": 324.054,
+      "yoy_nsa_pct": 2.7,
+      "mom_sa_pct": 0.3,
+      "document_read": true,
+      "original_bytes_archived": false,
+      "sha256": null
+    },
+    {
+      "provider": "BLS",
+      "id": "USDL-26-0186",
+      "url": "https://www.bls.gov/news.release/archives/cpi_02132026.htm",
+      "topic": "CPI-U January 2026",
+      "embargo": "2026-02-13T08:30:00-05:00",
+      "table1_dec2025_nsa_index": 324.054,
+      "document_read": true,
+      "original_bytes_archived": false,
+      "sha256": null
+    }
+  ],
+  "cross_release": {
+    "measure": "CPI-U all items December 2025 unadjusted level index 1982-84=100",
+    "match": true,
+    "delta_index_points": 0,
+    "limitations": "Only two BLS archived releases; not all revisions and not CPIAUCSL seasonal adjusted series."
+  },
+  "alfred": {
+    "series": "CPIAUCNS",
+    "series_url": "https://alfred.stlouisfed.org/series?seid=CPIAUCNS",
+    "download_url": "https://alfred.stlouisfed.org/series/downloaddata?seid=CPIAUCNS",
+    "vintage_documentation": "https://fred.stlouisfed.org/docs/api/fred/realtime_period.html",
+    "reject_as_equivalent_series": "CPIAUCSL",
+    "metadata_seen": true,
+    "requested_vintages": [
+      "2026-01-13",
+      "2026-02-13"
+    ],
+    "jan13_dec2025_value": null,
+    "feb13_dec2025_value": null,
+    "vintage_csv_downloaded": false,
+    "alfred_vintage_agreement_verified": false,
+    "intraday_timestamp_proven": false,
+    "commercial_redistribution_reviewed": false
+  },
+  "point_in_time": {
+    "tentative_research_at": "2026-01-13T07:00:00-04:00",
+    "scheduled_release_cuiaba": "2026-01-13T09:30:00-04:00",
+    "timezone": "America/Cuiaba",
+    "official_release_new_york": "2026-01-13T08:30:00-05:00",
+    "forecast_before_release": true,
+    "actual_available_at_research_cutoff": false,
+    "official_release_is_not_historical_receipt": true,
+    "seven_am_candidate_not_approved_for_operation": true
+  },
+  "blockers": {
+    "original_bytes_custodied": false,
+    "fred_vintages_matched": false,
+    "consensus_event_pre_release_verified": false,
+    "exact_historical_receipt_verified": false,
+    "commercial_reuse_rights_verified": false,
+    "independent_28_fx_quote_history_verified": false,
+    "real_oos_results_validated": false
+  },
+  "can_feed_live_bias": false,
+  "can_feed_real_oos": false,
+  "market_direction_inferred": false,
+  "trade_authorized": false,
+  "worker_enabled": false,
+  "scheduler_enabled": false,
+  "paid_api_activated": false,
+  "merge_or_deploy_authorized": false
+}
