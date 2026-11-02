@@ -71,3 +71,19 @@ O Painel Mestre explica **por que** um mercado pode mover-se, mas não fornece o
 - Diagnóstico seguro ao proprietário: INTEGRAÇÃO DESATIVADA ou LIMITE INTERNO ATINGIDO. Nenhuma chave ou mensagem bruta de erro é exibida.
 - test_atlasquant_trader_calendar_quota_guard.py cobre padrão desativado, concorrência, falha de fonte, virada de dia UTC, limite, dados de usuário e ausência de vazamento da chave. 78/78 testes locais PASS no AM12 após esta etapa. Nova bateria GitHub Actions aguardada.
 - Para atualização automática com o aplicativo fechado, falta um **agendador aprovado** e uma **persistência compartilhada confiável** (não implementados). Não foi habilitado cron nem Worker do AION e não há nova cobrança.
+
+## Séries macroeconômicas oficiais — BCB/SGS + FRED, sem consumo não autorizado
+
+- O painel agora contém seis read-models de séries oficiais com valor, período estatístico, unidade e fonte, separados do calendário de consensos: BCB SGS 432 Meta Selic (diário, % a.a.), 433 IPCA mensal (% m/m), 13522 IPCA em 12 meses (% 12m), FRED CPIAUCSL usando transformação pc1 (% em 12 meses), UNRATE (%) e DGS2 Treasury 2Y (% a.a.).
+- O período da observação econômica não é a data/hora de coleta, de publicação ou de negociação. A tela NÃO exibe dado vencido como atual: limites diários e mensais distintos, rejeição de valor NaN, de data futura e de número inválido.
+- atlasquant_trader_master_official_series.py consulta somente quando ATLASQUANT_MASTER_OFFICIAL_DATA_ENABLED=1. POR PADRÃO DESATIVADO, apesar de BCB ser fonte pública e o código legado possuir CHAVE_FRED. Quando autorizado, faz no máximo seis consultas (três BCB, três FRED se chave existente) por UTC day/process via cache in-memory, timeout de sete segundos, paralelismo máximo três. Reinício/réplica podem refazer consultas: isso é limitações explícitas, não garantia de cota global.
+- atlasquant_trader_master_official_ui.py preserva o layout aprovado; mostra apenas observações verificadas com unidades e datas ou traços se faltarem dados. Não afirma consenso ou surpresa de calendário nem abre operações.
+- A rota de referência em atlasquant_reference_ui.py chama a camada oficial somente depois do gate autenticado, dentro de Painel Mestre. Não liga Worker, cron, pagamentos, chaves novas ou planos.
+- Testes novos test_atlasquant_trader_master_official_series.py cobrem série/transformação, observação mais recente, fonte, dados mensais vs diários, datas antigas/futuras, limitações, URL/parâmetros de BCB/FRED e a tela vazia. **89/89 testes locais PASS com PY_EXIT=0 no AM12**.
+- Documentação pública conferida: BCB SGS 432 (Meta Selic), 433 (IPCA mensal), 13522 (IPCA 12 meses), FRED observations API v1 com units=pc1. Acesso FRED exige chave já habilitada; EODHD tem direito de plano separado, não presume assinatura.
+
+### Próximos gates de homologação
+- Avaliar disponibilização de dados oficiais gratuitos na conta real com medição de tempo de resposta e limites (sem ativações automáticas).
+- Validar se horário EODHD sem fuso na resposta corresponde a UTC antes de tratar hora BRT como comprovada; até isso, fonte não deve ser ativada por configuração de produção.
+- Só com autorização explícita: agendamento independente e armazenamento auditável de consenso/versões, respeitando orçamento e HARD NO-GO do núcleo AION.
+- Nenhuma dessas alterações está no Render; PR #1803 continua isolada e em rascunho.
