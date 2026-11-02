@@ -531,12 +531,10 @@ def _economic_catalog() -> str:
 
 def _master(calendar_data: Any = None) -> str:
     from atlasquant_trader_calendar_ui import calendar_html
-    highlights = (
-        _placeholder_card("Cenário macro", "Sem avaliação atual", "")
-        + _placeholder_card("Bancos centrais", "Fed, BCE, BoE, BoJ e outros", "")
-        + _placeholder_card("Risco geopolítico", "Sem monitoramento ativo", "")
-        + _placeholder_card("Notícias relevantes", "Sem feed conectado", "")
+    from atlasquant_trader_master_briefing_ui import (
+        master_overview_cards, master_briefing_html, master_week_html,
     )
+    highlights = master_overview_cards(calendar_data)
     dimensions = (
         ("MACRO", "Economia global",
          "Inflação, juros, atividade, emprego, decisões de bancos centrais, DXY e apetite por risco.",
@@ -563,7 +561,8 @@ def _master(calendar_data: Any = None) -> str:
         '<section class="aqr-section">' +
         _heading("Painel Mestre", "O contexto por trás do movimento do mercado, separado da leitura de preços.",
                  "Contexto e risco") +
-        '<div class="aqr-grid">' + highlights + '</div></section>'
+        '<div class="aqr-grid">' + highlights + '</div></section>' +
+        master_briefing_html(calendar_data) +
         '<section class="aqr-section">' +
         _heading("Quatro dimensões", "As informações poderão ser combinadas, mas suas fontes ficarão identificadas.") +
         '<div class="aqr-grid">' + panels + '</div></section>'
@@ -571,7 +570,8 @@ def _master(calendar_data: Any = None) -> str:
         _heading("Calendário econômico",
                  "Valor divulgado, consenso, anterior, horário e fonte com impacto condicional.",
                  "Fonte identificada" if isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY" else "Aguardando integração") +
-        calendar_html(calendar_data) + '</section>'
+        calendar_html(calendar_data) + '</section>' +
+        master_week_html(calendar_data) +
         '<section class="aqr-section">' +
         _heading("Guia de impacto dos indicadores", "Exemplos educativos, não previsões.") +
         '<nav class="aqr-tabs" aria-label="Dimensões do contexto">'
