@@ -227,11 +227,15 @@ def _hero(page: str) -> str:
             '<span>ÍNDICES + WIN / WDO</span><span>D1 · H4 · M15</span></div></section>')
 
 
-def _disclaimer() -> str:
+def _disclaimer(calendar_connected: bool = False) -> str:
+    source_note = ('O calendário, quando exibido, vem de fonte identificada e pode ter atraso. '
+                   if calendar_connected else
+                   'Calendário e consensos ainda não conectados ou autorizados. ')
     return ('<aside class="aqr-warning" role="note"><span class="aqr-warning-icon">⚠</span>'
-            '<strong>Esta é uma prévia da interface.</strong> Nenhuma cotação, ranking, viés ou calendário '
-            'está conectado ao mercado. Onde aparece “—” ou “Aguardando dados”, não existe leitura real. '
-            'Não usar para decisões de investimento.</aside>')
+            '<strong>Visualização informativa.</strong> Cotações, ranking e vieses só aparecem '
+            'quando verificados. ' + source_note +
+            'Onde aparece “—” ou “Aguardando dados”, não existe leitura real. '
+            'Não usar como ordem ou recomendação de investimento.</aside>')
 
 
 def _home(data: Mapping[str, Any]) -> str:
@@ -566,7 +570,7 @@ def _master(calendar_data: Any = None) -> str:
         '<section class="aqr-section">' +
         _heading("Calendário econômico",
                  "Valor divulgado, consenso, anterior, horário e fonte com impacto condicional.",
-                 "Aguardando integração") +
+                 "Fonte identificada" if isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY" else "Aguardando integração") +
         calendar_html(calendar_data) + '</section>'
         '<section class="aqr-section">' +
         _heading("Guia de impacto dos indicadores", "Exemplos educativos, não previsões.") +
@@ -619,7 +623,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span><span class="aqr-chip">VISUALIZAÇÃO</span>' +
         '<span class="aqr-avatar" aria-label="Sessão do usuário">' +
         escape((name.strip()[:1] or "U").upper()) + '</span></div></header>' +
-        _hero(page) + _disclaimer() + content +
+        _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + content +
         '<footer class="aqr-foot">ATLASQUANT / TRADER RADAR · Poderoso por dentro. '
         'Simples por fora. · Sem ordens reais, sem dados fictícios.</footer></main></div></section>'
     )
