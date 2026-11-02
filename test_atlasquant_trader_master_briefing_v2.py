@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from html import unescape
 
 from atlasquant_trader_economic_calendar import normalize_events, request_eodhd_daily
+from atlasquant_trader_calendar_ui import calendar_html
 from atlasquant_trader_master_briefing_v2 import build_master_briefing
 from atlasquant_trader_master_briefing_ui import (
     master_overview_cards, master_briefing_html, master_week_html,
@@ -160,6 +161,28 @@ class MasterBriefingV2Tests(unittest.TestCase):
         raw = master_week_html(data, at=NOW) + master_briefing_html(data, at=NOW)
         self.assertNotIn(malicious, raw)
         self.assertIn("&lt;img", raw)
+
+    def test_surprise_difference_has_sign_and_not_fake_percentage(self):
+        at = NOW.replace(hour=9, minute=40)
+        increased = _model([
+            _event("CPI", when=NOW.replace(hour=9, minute=30), actual=3.5,
+                   consensus=3.2)
+        ], at=at)
+        text = calendar_html(increased)
+        self.assertIn("Surpresa*", text)
+        self.assertIn("+0,30", text)
+        self.assertIn("unidade original", text)
+        self.assertIn("Revisões", text)
+        decreased = _model([
+            _event("CPI", when=NOW.replace(hour=9, minute=30), actual=3.0,
+                   consensus=3.2)
+        ], at=at)
+        self.assertIn("-0,20", calendar_html(decreased))
+        missing = _model([
+            _event("CPI", when=NOW.replace(hour=9, minute=30), actual=3.5,
+                   consensus=None)
+        ], at=at)
+        self.assertNotIn("+0,30", calendar_html(missing))
 
     def test_week_incomplete_api_page_fails_closed(self):
         data = _model([_event("CPI")]*1000)
