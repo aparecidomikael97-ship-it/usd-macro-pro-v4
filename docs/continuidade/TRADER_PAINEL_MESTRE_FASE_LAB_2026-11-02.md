@@ -105,3 +105,53 @@ O Painel Mestre explica **por que** um mercado pode mover-se, mas não fornece o
 5. Rodar homologação com dados reais e aprovação visual/custos antes de programar ou publicar qualquer cron/deploy.
 
 **Esta etapa conclui a preparação e testes de um plano, NÃO a automação real.**
+
+
+## Continuidade — cota durável e proveniência, somente LAB (02/11/2026)
+
+**Escopo:** prova isolada `atlasquant_trader_master_storage_lab.py` + testes.
+Não está importada pelo aplicativo, não existe banco criado em produção, não
+foram alterados o Painel Mestre publicado, as variáveis da hospedagem ou qualquer
+agendador. O cron e o Worker AION permanecem desativados.
+
+- **Cota transacional:** reserva uma tentativa antes da consulta em um único
+  SQLite explicitamente inicializado; chaves idempotentes e transações
+  `BEGIN IMMEDIATE` impedem exceder o limite por concorrência local. Conta
+  tentativas falhas e interrompidas. Protege simultaneamente o dia civil de
+  Brasília e o dia UTC, como limite conservador enquanto a regra real do
+  provedor não for comprovada.
+- **Persistência:** a mesma base de laboratório sobrevive ao reinício de
+  processos e pode ser testada por conexões independentes. Isso **não comprova
+  cota global em réplicas ou múltiplos servidores**, nem substitui os limites da
+  conta EODHD/FRED/BCB. SQLite em disco efêmero do Render não resolve o
+  requisito operacional; para várias instâncias é necessário um coordenador
+  transacional central aprovado.
+- **Evidências distintas:** tentativa, horário UTC da consulta, período
+  econômico, origem, unidade e valor observado ficam em campos separados.
+  Período visto pela primeira vez não prova divulgação nova; mudança de valor
+  exige outra consulta bem-sucedida e continua sendo revisão **não confirmada**
+  até reconciliação com a fonte oficial.
+- **Falha segura:** sem autorização explícita, a reserva é negada; falha de
+  fonte não grava observação nem cria número. O snapshot expõe
+  `last_known_value` apenas como histórico e mantém
+  `current_display_value=None` e `new_release_confirmed=False`.
+- **Sem custos:** somente Python/SQLite padrão e fixtures locais; nenhum
+  request, token, serviço pago, deploy, Worker, cron ou ordem foi programado.
+  O módulo não é executado automaticamente ao ser importado.
+- **Testes:** `test_atlasquant_trader_master_storage_lab.py` foi incluído no
+  workflow de Quality; cenários de concorrência, reinício, quota, virada de
+  dia, falha, duplicidade, origem e revisão. Resultado do CI deve ser verificado
+  após o commit; não declarar homologado antes de concluir.
+
+### Portões que continuam em aberto
+
+1. Confirmar direito contratual, custo, cota real e horário/fuso do endpoint
+   `economic-events` com a conta existente, sem ativá-lo em produção.
+2. Escolher armazenamento central com controle de acesso, retenção e backup
+   adequados; evitar banco paralelo ao Checkpoint Mestre/AION.
+3. Implementar e testar política de timeout, replay, lease, auditoria e
+   desligamento remoto antes de qualquer executor independente.
+4. Realizar teste real de horário de divulgação/revisão por fonte e aceite
+   humano do proprietário antes de ativar consulta automática.
+
+**Estado:** LAB / HARD NO-GO para automação real, merge e deploy.
