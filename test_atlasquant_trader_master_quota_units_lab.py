@@ -128,6 +128,19 @@ class BillableUnitsLabTests(unittest.TestCase):
                          "RESERVED_LAB_ONLY")
         self.assertEqual(self.ledger.snapshot(NOW.date())["units_reserved_lab"], 0)
 
+    def test_midnight_utc_changes_provider_day_even_before_brt_midnight(self):
+        before = datetime(2026, 11, 2, 23, 59, tzinfo=timezone.utc)
+        after = datetime(2026, 11, 3, 0, 1, tzinfo=timezone.utc)
+        self.assertEqual(self.reserve("utc:before", 8, at=before)["state"],
+                         "RESERVED_LAB_ONLY")
+        self.assertEqual(self.ledger.declare_daily_policy(
+            after.date(), cap_units=10, demand_reserve_units=2,
+            lab_approved=True), "DECLARED_LAB_ONLY")
+        self.assertEqual(self.reserve("utc:after", 8, at=after)["state"],
+                         "RESERVED_LAB_ONLY")
+        self.assertEqual(self.ledger.snapshot(before.date())["units_reserved_lab"], 8)
+        self.assertEqual(self.ledger.snapshot(after.date())["units_reserved_lab"], 8)
+
     def test_unapproved_daily_policy_never_exists(self):
         tomorrow = NOW.date() + timedelta(days=1)
         self.assertEqual(self.ledger.declare_daily_policy(
