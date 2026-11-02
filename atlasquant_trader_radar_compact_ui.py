@@ -529,13 +529,15 @@ def _economic_catalog() -> str:
               'resultado e revisão quando efetivamente conectado. '
               'Sem esses campos, não exibimos surpresas nem sugerimos viés.</div></section>')
 
-def _master(calendar_data: Any = None, news_data: Any = None) -> str:
+def _master(calendar_data: Any = None, news_data: Any = None,
+            official_data: Any = None) -> str:
     from atlasquant_trader_calendar_ui import calendar_html
     from atlasquant_trader_master_briefing_ui import (
         master_overview_cards, master_briefing_html, master_week_html,
     )
     from atlasquant_trader_master_legacy_news import build_legacy_news_read_model
     from atlasquant_trader_master_news_ui import master_news_html
+    from atlasquant_trader_master_official_ui import official_macro_html
     news_model = build_legacy_news_read_model(news_data)
     highlights = master_overview_cards(calendar_data, news_model=news_model)
     dimensions = (
@@ -565,7 +567,7 @@ def _master(calendar_data: Any = None, news_data: Any = None) -> str:
         _heading("Painel Mestre", "O contexto por trás do movimento do mercado, separado da leitura de preços.",
                  "Contexto e risco") +
         '<div class="aqr-grid">' + highlights + '</div></section>' +
-        master_briefing_html(calendar_data) +
+        master_briefing_html(calendar_data) + official_macro_html(official_data) +
         '<section class="aqr-section">' +
         _heading("Quatro dimensões", "As informações poderão ser combinadas, mas suas fontes ficarão identificadas.") +
         '<div class="aqr-grid">' + panels + '</div></section>'
@@ -636,7 +638,8 @@ def _checkpoint_evidence_panel(model: Mapping[str, Any], page: str) -> str:
 
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                       show_central: bool = True, daily_data: Any = None,
-                      calendar_data: Any = None, news_data: Any = None) -> str:
+                      calendar_data: Any = None, news_data: Any = None,
+                      official_data: Any = None) -> str:
     from atlasquant_trader_readiness_v1 import build_trader_readiness
     data = _daily(daily_data)
     evidence = build_trader_readiness(daily_data=daily_data, calendar_data=calendar_data)
@@ -650,7 +653,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span>' + escape(label) + '</button>' for key, label in PAGES)
     content = {"home": lambda: _home(data),
                "radar": lambda: _radar(data, daily_data),
-               "scanner": _scanner, "master": lambda: _master(calendar_data, news_data)}[page]()
+               "scanner": _scanner, "master": lambda: _master(calendar_data, news_data, official_data)}[page]()
     back = ('<button class="aqr-aside-back" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
     status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"]) + ' · Fonte: ' + escape(data["source"])
