@@ -178,8 +178,12 @@ def master_week_html(calendar: Any, *, at: datetime | None = None) -> str:
     return (
         heading + '<div class="aqr-guide"><strong>Agenda recebida da fonte</strong>' +
         str(model["week_events"]) +
-        ' eventos encontrados na janela. Isto não comprova cobertura de todos '
-        'os calendários mundiais; a fonte e sua franquia determinam os resultados.'
+        ' registros visíveis de ' + str(model["week_received_total"]) +
+        ' eventos recebidos. ' +
+        ('LISTA PARCIAL: parte da semana não está exibida. '
+         if model["week_partial"] else '') +
+        'Isto não comprova cobertura de todos os calendários mundiais; '
+        'a fonte e sua franquia determinam os resultados.'
         '</div><div class="aqr-master-week">' +
         (''.join(rows) or
          '<div class="aqr-empty-area">Nenhum evento futuro retornado pela fonte '
