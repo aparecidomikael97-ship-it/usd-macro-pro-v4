@@ -23,7 +23,7 @@ align-items:center;gap:12px;min-height:48px;list-style:none}
 .aqr-cal-item summary small{font-size:10px;display:block;margin-top:5px;color:#95b5c9}
 .aqr-cal-badge{border:1px solid #6b5941;background:#312c24;color:#eac78f;
 font-size:10px;border-radius:6px;padding:6px;flex-shrink:0}
-.aqr-cal-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;
+.aqr-cal-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;
 padding:12px;margin-top:12px;background:#112f3c;border-radius:8px}
 .aqr-cal-values div{display:grid;gap:5px}
 .aqr-cal-values small{font-size:10px;color:#a6c1cf}
@@ -38,7 +38,7 @@ text-align:center;padding:23px;color:#a9bfd3;font-size:12px}
 .aqr-cal-empty strong{display:block;margin-bottom:9px;color:#eaf8ff}
 @media(max-width:700px){
 .aqr-cal-item summary{align-items:start}
-.aqr-cal-values{padding:8px;gap:4px}
+.aqr-cal-values{padding:8px;gap:4px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .aqr-cal-values strong{font-size:13px}
 .aqr-cal-badge{font-size:9px}
 }
@@ -97,6 +97,15 @@ def calendar_html(data: Any) -> str:
         comparison = escape(str(event.get("comparison") or "nível"))
         period = escape(str(event.get("period") or "—"))
         status = "Divulgado" if event.get("actual") is not None else "Aguardando"
+        difference = event.get("surprise")
+        if difference is not None:
+            try:
+                signed = float(difference)
+                surprise = ("+" if signed > 0 else "") + _value(signed)
+            except (TypeError, ValueError, OverflowError):
+                surprise = "—"
+        else:
+            surprise = "—"
         consensus_source = escape(str(event.get("consensus_source") or "Não disponível"))
         event_id = escape(str(event.get("id") or ""))
         cards.append(
@@ -110,10 +119,15 @@ def calendar_html(data: Any) -> str:
             '<div><small>Anterior</small><strong>' +
             _value(event.get("previous")) + '</strong></div>'
             '<div><small>Divulgado</small><strong>' +
-            _value(event.get("actual")) + '</strong></div></div>'
+            _value(event.get("actual")) + '</strong></div>'
+            '<div><small>Surpresa*</small><strong>' + surprise +
+            '</strong></div></div>'
             '<p class="aqr-cal-caption">Consenso: ' + consensus_source +
             ' · Evento: ' + escape(str(event.get("source") or "Fonte indisponível")) +
-            ' · Unidade não informada explicitamente pelo feed; confirme a escala na fonte.</p>'
+            ' · *Surpresa = divulgado menos consenso, na unidade original (não é porcentagem '
+            'de variação nem retorno do dólar). Unidade não padronizada pelo feed. '
+            'Revisões do valor anterior não estão confirmadas separadamente neste registro; '
+            'consultar o anúncio oficial.</p>'
             '<h4>O que o mercado pode esperar?</h4>'
             '<p><strong>Expectativa antes da divulgação:</strong> ' +
             escape(expl["expectation"]) + '</p>'
