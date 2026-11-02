@@ -173,7 +173,7 @@ class CentralHubUiTests(unittest.TestCase):
         self.assertLess(html.index(">Trader<"), html.index(">Negócios<"))
         self.assertLess(html.index(">Negócios<"), html.index(">Investimentos<"))
         self.assertLess(html.index(">Investimentos<"), html.index(">AION<"))
-        self.assertEqual(html.count('<svg class="aq-central-art"'), 4)
+        self.assertEqual(html.count('<svg class="aq-central-art"'), 5)
         self.assertIn(".aq-central-rail .aq-central-art{width:44px;height:30px}", html)
         student = ecosystem_rail_html(_access("USER"))
         self.assertEqual(student.count('<svg class="aq-central-art"'), 1)
