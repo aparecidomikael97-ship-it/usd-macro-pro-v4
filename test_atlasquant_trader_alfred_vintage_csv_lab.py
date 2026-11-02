@@ -102,6 +102,54 @@ class AlfredVintageCsvLabTests(unittest.TestCase):
         self.assertEqual(evaluate(bad)["state"], "LAB_ALFRED_CSV_QUARANTINED")
         self.assertIn("Future", evaluate(bad)["reason"])
 
+    def test_february_observation_leaking_into_january_13_vintage_is_rejected(self):
+        leaky = CSV.replace("2026-01-01,,325.252", "2026-01-01,325.252,325.252")
+        result = evaluate(leaky)
+        self.assertEqual(result["state"], "LAB_ALFRED_CSV_QUARANTINED")
+        self.assertIn("leaks", result["reason"])
+
+    def test_february_release_january_2026_value_must_match_bls_benchmark(self):
+        bad = CSV.replace("2026-01-01,,325.252", "2026-01-01,,325.260")
+        result = evaluate(bad)
+        self.assertEqual(result["state"], "LAB_ALFRED_CSV_QUARANTINED")
+        self.assertIn("conflicts", result["reason"])
+
+    def test_january_2026_cannot_be_missing_in_both_vintages_if_row_exists(self):
+        bad = CSV.replace("2026-01-01,,325.252", "2026-01-01,,")
+        self.assertEqual(evaluate(bad)["state"], "LAB_ALFRED_CSV_QUARANTINED")
+
+    def test_february_2026_observation_is_future_even_in_feb_13_column(self):
+        bad = CSV + "2026-02-01,,326.785\n"
+        result = evaluate(bad)
+        self.assertEqual(result["state"], "LAB_ALFRED_CSV_QUARANTINED")
+        self.assertIn("Future", result["reason"])
+
+    def test_monthly_series_requires_first_day_of_month(self):
+        bad = CSV.replace("2025-11-01", "2025-11-02")
+        result = evaluate(bad)
+        self.assertEqual(result["state"], "LAB_ALFRED_CSV_QUARANTINED")
+        self.assertIn("first-day", result["reason"])
+
+    def test_observation_dates_must_be_strictly_in_ascending_order(self):
+        bad = HEADER + "\n" + ROW + "\n2025-11-01,325.100,325.100\n"
+        result = evaluate(bad)
+        self.assertEqual(result["state"], "LAB_ALFRED_CSV_QUARANTINED")
+        self.assertIn("strictly increase", result["reason"])
+
+    def test_invalid_numeric_value_in_unrelated_month_is_quarantined(self):
+        bad = CSV.replace("2025-11-01,325.100,325.100",
+                          "2025-11-01,NaN,325.100")
+        result = evaluate(bad)
+        self.assertEqual(result["state"], "LAB_ALFRED_CSV_QUARANTINED")
+        self.assertIn("Malformed numeric", result["reason"])
+
+    def test_short_two_vintage_csv_without_january_row_is_a_candidate_not_proof(self):
+        short_csv = HEADER + "\n" + ROW + "\n"
+        result = evaluate(short_csv)
+        self.assertEqual(result["state"], "LAB_ALFRED_TWO_VINTAGE_CANDIDATE_MATCH")
+        self.assertFalse(result["real_oos_authorized"])
+        self.assertFalse(result["source_content_authenticated"])
+
     def test_malformed_csv_and_extra_value_column_rejected(self):
         for bad in (
             CSV.replace(ROW, ROW + ",BULLISH"),

@@ -22,6 +22,10 @@ EXPECTED_HEADER = (
 TARGET_PERIOD = "2025-12-01"
 MAX_CSV_CHARACTERS = 150_000
 MAX_ROWS = 1800
+# First print for Dec 2025 on 2026-01-13; Jan 2026 first print on 2026-02-13.
+LATEST_FIRST_VINTAGE_OBSERVATION = date(2025, 12, 1)
+LATEST_SECOND_VINTAGE_OBSERVATION = date(2026, 1, 1)
+JAN_2026_SECOND_RELEASE_BLS_NSA = Decimal("325.252")
 
 
 def _refused(reason: str) -> dict[str, Any]:
@@ -86,7 +90,7 @@ def inspect_alfred_cpi_vintages_csv_lab(
         if header != list(EXPECTED_HEADER):
             return _refused("Vintage CSV headers are not EXACT requested dates")
         count = 0
-        dates = set()
+        previous_month = None
         selected = None
         for row in reader:
             count += 1
@@ -97,11 +101,26 @@ def inspect_alfred_cpi_vintages_csv_lab(
                 dt = date.fromisoformat(recorded)
             except (ValueError, TypeError):
                 return _refused("Observation date is not ISO yyyy-mm-dd")
-            if dt.isoformat() != recorded or recorded in dates:
-                return _refused("Malformed or repeated observation date")
-            dates.add(recorded)
-            if dt > date(2026, 2, 13):
-                return _refused("Future data exists in historic series export")
+            if dt.isoformat() != recorded or dt.day != 1:
+                return _refused("Observation must have canonical ISO monthly first-day date")
+            if previous_month is not None and dt <= previous_month:
+                return _refused("Observation dates must strictly increase with no duplicates")
+            previous_month = dt
+            if dt > LATEST_SECOND_VINTAGE_OBSERVATION:
+                return _refused("Future observation after last published month")
+            initial_text, second_text = row[1], row[2]
+            if dt > LATEST_FIRST_VINTAGE_OBSERVATION:
+                # January CPI was not public at all on January 13, 2026.
+                # A properly dated January column must be absent in that vintage.
+                if initial_text not in ("", "."):
+                    return _refused("January 2026 data leaks into January 13 vintage")
+                next_month = _level(second_text)
+                if next_month != JAN_2026_SECOND_RELEASE_BLS_NSA:
+                    return _refused("January 2026 second vintage conflicts with February BLS release")
+            else:
+                for field in (initial_text, second_text):
+                    if field not in ("", ".") and _level(field) is None:
+                        return _refused("Malformed numeric value in historical observation")
             if recorded == TARGET_PERIOD:
                 initial, later = _level(row[1]), _level(row[2])
                 if initial is None or later is None:

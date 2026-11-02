@@ -77,7 +77,7 @@ com a fixture usada em um teste.
 ### Tests / estados
 
 \`test_atlasquant_trader_alfred_vintage_csv_lab.py\`:
-17 testes determinísticos de segurança, incluídos no
+25 testes determinísticos de segurança, incluídos no
 Quality CI. Cobrem confronto candidato, alteração da
 série, cabeçalhos trocados/omitidos, valores inválidos,
 duplicatas, linha ausente, divergência entre vintages,
@@ -106,3 +106,38 @@ ALFRED nem a autenticidade de bytes recebidos.
 LAB / HARD NO-GO: nenhum CSV foi baixado, nenhuma API paga
 chamada, nenhuma ordem ou serviço ativado; não houve
 Worker, cron, merge, deploy ou gasto adicional.
+
+
+## Revisão de segurança — corte temporal por observação em cada vintage
+
+Durante a auditoria, foi identificado um risco que o cabeçalho
+correto não detectava: um CSV podia declarar
+\`CPIAUCNS_20260113\` e ainda conter o índice referente a
+**janeiro/2026**, que só saiu na publicação de fevereiro.
+
+O importador agora recusa:
+- qualquer valor de **janeiro/2026** na coluna de 13/01/2026,
+  independentemente do cabeçalho;
+- qualquer observação **de fevereiro/2026 ou posterior**
+  em ambas as vintages, pois nem a divulgação de 13/02
+  podia conhecer o CPI de fevereiro;
+- linha de janeiro/2026 com valor de 13/02 que não corresponda
+  a **325,252**, registrado oficialmente no segundo release BLS
+  e na listagem ALFRED de 13/02;
+- datas mensais fora do primeiro dia do mês, linhas fora da
+  sequência crescente, duplicatas e dados numéricos inválidos
+  até mesmo em meses que não sejam dezembro/2025.
+
+A linha de janeiro/2026 é **opcional** porque um export
+recortado somente em dezembro pode legitimamente omiti-la.
+Se estiver presente, deve obedecer às regras acima.
+
+Essa proteção reduz vazamento de dados futuros apenas
+**dentro do conteúdo declarado no arquivo**. Não verifica
+que a origem do arquivo é o ALFRED, que os headers são
+autênticos ou que a AtlasQuant já o tinha recebido no
+passado. Todos os resultados seguem somente candidatos
+de LAB e \`real_oos_authorized=false\`.
+
+Foram acrescidos **oito testes**, totalizando **25**;
+o arquivo de evidência real de fevereiro permanece ausente.
