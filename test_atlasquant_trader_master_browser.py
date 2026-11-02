@@ -37,8 +37,20 @@ def _markup() -> str:
     for entry in snapshot["events"] + snapshot["week_events"]:
         entry["source"] = "EXEMPLO FICTÍCIO · LAB"
         entry["consensus_source"] = "EXEMPLO SINTÉTICO · NÃO REAL"
+    news_time = now.astimezone(timezone.utc).isoformat()
+    existing_news = {
+        "updated_at": news_time,
+        "currencies": {"USD": {"articles": [{
+            "title": "Trade tariffs discussed in Washington",
+            "source": "LAB Financial Press",
+            "published_at": news_time,
+            "link": "https://example.com/lab-news",
+            "provider": "Google News RSS",
+        }]}}
+    }
     content = trader_radar_html(
-        selected="master", name="M", show_central=False, calendar_data=snapshot
+        selected="master", name="M", show_central=False,
+        calendar_data=snapshot, news_data=existing_news
     )
     return (
         '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
@@ -77,5 +89,13 @@ def test_master_browser_does_not_overflow_and_expands_calendar(width, height):
         daily.locator("summary").click()
         expect(daily).to_have_attribute("open", "")
         expect(daily).to_contain_text("Se vier abaixo do consenso")
+        expect(page.locator(".aqr-news-item")).to_have_count(1)
+        headline = page.locator(".aqr-news-item").first
+        headline.locator("summary").click()
+        expect(headline).to_have_attribute("open", "")
+        expect(headline).to_contain_text("não foi verificado independentemente")
+        expect(page.locator(".aqr-news-item a")).to_have_attribute(
+            "rel", "noopener noreferrer nofollow"
+        )
         assert not errors
         browser.close()
