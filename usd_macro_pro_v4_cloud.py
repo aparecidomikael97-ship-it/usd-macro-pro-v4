@@ -476,7 +476,7 @@ def _central_request_for_render(*, active_index=None) -> str:
             stored_choice = str(st.session_state.get(CENTRAL_CHOICE_KEY) or "").strip()
             if stored_choice == CENTRAL_ROOT:
                 requested = "central"
-            elif stored_choice in {"trader", "negocios", "investimentos", "aion"}:
+            elif stored_choice in {"trader", "negocios", "investimentos", "aion", "trader_radar"}:
                 requested = stored_choice
         except Exception:
             pass
@@ -507,7 +507,7 @@ def _hold_admin_before_trader_shell() -> None:
     if sync_central_choice is None:
         return
     resolved = sync_central_choice(st.session_state, _ATLASQUANT_ACCESS, requested)
-    if not (resolved.get("root") or resolved.get("shell") or resolved.get("area") in {"negocios", "investimentos", "aion"}):
+    if not (resolved.get("root") or resolved.get("shell") or resolved.get("area") in {"negocios", "investimentos", "aion", "trader_radar"}):
         return
     _render_atlasquant_central_hub(stop_for_shell=False)
     st.stop()

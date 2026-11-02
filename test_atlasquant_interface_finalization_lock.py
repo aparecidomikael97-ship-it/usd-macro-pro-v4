@@ -1,8 +1,8 @@
 """Regression lock for the approved AtlasQuant entry flow.
 
-The post-login ADMIN surface must stay simple: exactly four ecosystem doors.
+The post-login ADMIN surface must stay simple: exactly five ecosystem doors.
 Desktop and mobile may render the same door more than once in responsive markup;
-the product contract is four unique ecosystem routes, in canonical order.
+the product contract is five unique ecosystem routes, in canonical order.
 Complexity belongs inside each workspace, never on the Central root.
 """
 import re
@@ -11,8 +11,8 @@ from atlasquant_central_hub_ui import central_selector_html, central_surface_htm
 from atlasquant_reference_ui import NAV, reference_html
 
 ADMIN = {"allowed": True, "role": "ADMIN", "permissions": ("app:read", "aion:admin")}
-EXPECTED = ("Trader", "Negócios", "Investimentos", "AION")
-ROUTES = ("area:trader", "area:negocios", "area:investimentos", "area:aion")
+EXPECTED = ("Trader", "Negócios", "Investimentos", "AION", "AtlasQuant Trader")
+ROUTES = ("area:trader", "area:negocios", "area:investimentos", "area:aion", "area:trader_radar")
 GLOBAL_UTILITY_ROUTES = {"home", "central", "profile", "notifications", "settings", "session"}
 AREA_ROUTE_RE = re.compile(r'data-route="(area:[^"]+)"')
 
@@ -22,7 +22,7 @@ def _unique_area_routes(html: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(AREA_ROUTE_RE.findall(html)))
 
 
-def test_admin_post_login_central_has_exactly_four_primary_doors():
+def test_admin_post_login_central_has_exactly_five_primary_doors():
     html = central_selector_html(ADMIN)
     observed = _unique_area_routes(html)
 
@@ -67,7 +67,7 @@ def test_central_root_preserves_approved_simplicity_message():
 
 
 def test_each_private_workspace_can_return_to_central_without_cross_sector_strip():
-    for area in ("negocios", "investimentos", "aion"):
+    for area in ("negocios", "investimentos", "aion", "trader_radar"):
         html = central_surface_html(ADMIN, area)
         assert f'data-workspace="{area}"' in html
         assert 'data-route="central"' in html
