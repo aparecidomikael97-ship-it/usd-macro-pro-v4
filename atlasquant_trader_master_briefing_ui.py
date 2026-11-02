@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Mapping
 
 from atlasquant_trader_master_briefing_v2 import build_master_briefing
+from atlasquant_trader_calendar_ui import calendar_source_status
 
 STYLE = """
 <style>
@@ -81,6 +82,7 @@ def master_overview_cards(calendar: Any, *, at: datetime | None = None) -> str:
 def master_briefing_html(calendar: Any, *, at: datetime | None = None) -> str:
     model = build_master_briefing(calendar, at=at)
     if model["state"] != "VALIDADO":
+        status_label, status_detail = calendar_source_status(calendar)
         return (
             '<section class="aqr-section aqr-master-briefing" '
             'aria-label="Briefing macro verificável">'
@@ -89,6 +91,8 @@ def master_briefing_html(calendar: Any, *, at: datetime | None = None) -> str:
             '<span class="aqr-status">AGUARDANDO FONTE</span></div>'
             '<div class="aqr-empty-area"><strong>Briefing indisponível</strong>' +
             escape(str(model["why_not"])) +
+            '<p><strong>' + escape(status_label) + ':</strong> ' +
+            escape(status_detail) + '</p>'
             ' Nenhuma direção para USD, WIN ou WDO será inventada.</div></section>'
         )
     lines = "".join(
