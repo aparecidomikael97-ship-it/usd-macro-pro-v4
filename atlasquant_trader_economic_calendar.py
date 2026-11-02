@@ -152,7 +152,7 @@ def normalize_events(
         seen.add(event_id)
         previous = _float(item.get("previous"))
         consensus = _float(item.get("estimate"))
-        actual = _float(item.get("actual"))
+        actual = _float(item.get("actual")) if now >= utc else None
         consensus_source = SOURCE if consensus is not None else ""
         author = ""
         if consensus is None and manual:
