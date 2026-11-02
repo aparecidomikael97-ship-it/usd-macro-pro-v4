@@ -57,7 +57,8 @@ def _empty(reason: str, *, day: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "INDISPONÍVEL", "day": day,
         "source": "", "fetched_at": "", "daily_events": 0,
-        "week_events": 0, "central_bank_events": 0,
+        "week_events": 0, "week_received_total": 0, "week_partial": False,
+        "central_bank_events": 0,
         "upcoming_today": 0, "published_today": 0,
         "surprises_today": 0, "priority_events": [],
         "risk_window": [], "week_preview": [], "briefing": [],
@@ -85,9 +86,10 @@ def build_master_briefing(calendar: Any, *, at: datetime | None = None) -> dict[
         return _empty("Calendário atrasado ou com carimbo de hora futura.", day=date_brt.isoformat())
     if calendar.get("date") != date_brt.isoformat():
         return _empty("O calendário não corresponde ao dia em Brasília.", day=date_brt.isoformat())
-    if calendar.get("truncated") or calendar.get("week_truncated"):
-        return _empty("A fonte retornou uma lista limitada; briefing completo bloqueado.",
+    if calendar.get("truncated"):
+        return _empty("O calendário de hoje foi limitado; resumo diário bloqueado.",
                       day=date_brt.isoformat())
+    week_partial = calendar.get("week_truncated") is True
     today = calendar.get("events")
     week = calendar.get("week_events", [])
     if not isinstance(today, list) or not isinstance(week, list):
@@ -97,7 +99,11 @@ def build_master_briefing(calendar: Any, *, at: datetime | None = None) -> dict[
         return _empty("A fonte excedeu a capacidade de validação.",
                       day=date_brt.isoformat())
     # Missing total counts is not silently promoted to complete coverage.
-    if calendar.get("total") != len(today) or calendar.get("week_total", 0) != len(week):
+    week_total = calendar.get("week_total", 0)
+    if (calendar.get("total") != len(today) or not isinstance(week_total, int)
+            or isinstance(week_total, bool)
+            or (week_partial and week_total <= len(week))
+            or (not week_partial and week_total != len(week))):
         return _empty("Contagens do calendário divergentes ou incompletas.",
                       day=date_brt.isoformat())
     confirmed_today = []
@@ -176,6 +182,11 @@ def build_master_briefing(calendar: Any, *, at: datetime | None = None) -> dict[
         f"Próximos seis dias: {len(confirmed_week)} eventos recebidos. "
         "Uma lista vazia não prova ausência de divulgações no mercado.",
     ]
+    if week_partial:
+        briefing.append(
+            f"Atenção: a lista semanal mostra {len(confirmed_week)} de {week_total} "
+            "eventos recebidos; o restante não está disponível nesta visualização."
+        )
     if risks:
         briefing.append(
             f"{len(risks)} evento(s) editorialmente relevantes estão perto da divulgação "
@@ -185,6 +196,7 @@ def build_master_briefing(calendar: Any, *, at: datetime | None = None) -> dict[
         "schema": SCHEMA, "state": "VALIDADO", "day": date_brt.isoformat(),
         "source": source, "fetched_at": fetched.isoformat(),
         "daily_events": len(confirmed_today), "week_events": len(confirmed_week),
+        "week_received_total": week_total, "week_partial": week_partial,
         "central_bank_events": central,
         "upcoming_today": upcoming, "published_today": published,
         "surprises_today": surprises, "priority_events": prominent[:12],
