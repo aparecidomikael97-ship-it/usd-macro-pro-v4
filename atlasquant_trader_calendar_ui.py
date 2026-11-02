@@ -4,6 +4,9 @@ from __future__ import annotations
 from html import escape
 from math import isfinite
 from typing import Any, Mapping
+from datetime import datetime
+
+from atlasquant_trader_opening_collector import brasilia_clock
 
 from atlasquant_trader_economic_calendar import explanation
 
@@ -66,8 +69,14 @@ def calendar_html(data: Any) -> str:
         )
     label = escape(str(data.get("date") or "—"))
     source = escape(str(data.get("source") or "—"))
+    fetched = str(data.get("fetched_at") or "")
+    try:
+        stamp = brasilia_clock(datetime.fromisoformat(fetched)).strftime("%d/%m/%Y %H:%M BRT")
+    except (TypeError, ValueError):
+        stamp = "Horário da coleta não informado"
     header = ('<div class="aqr-cal-guide"><strong>Calendário do dia · ' + label +
               '</strong> · Horário de Brasília · Fonte: ' + source +
+              ' · Consulta: ' + escape(stamp) +
               '. O consenso automático é preferido; valores manuais são identificados.'
               '</div>')
     rows = data.get("events")
