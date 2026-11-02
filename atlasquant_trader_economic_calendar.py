@@ -229,7 +229,24 @@ def explanation(event: Mapping[str, Any]) -> dict[str, str]:
         result = "Divulgação ABAIXO do consenso. " + below
     else:
         result = "Divulgação IGUAL ao consenso: reação dependerá de detalhes e revisões."
+    previous = event.get("previous")
+    if consensus is None or previous is None:
+        expected = "Consenso e/ou número anterior indisponível; não é possível medir a expectativa contra o último dado."
+    elif consensus > previous:
+        expected = "O mercado prevê um número MAIOR que o anterior: " + f"{previous:g} → {consensus:g}. Uma alta esperada já pode estar precificada."
+    elif consensus < previous:
+        expected = "O mercado prevê um número MENOR que o anterior: " + f"{previous:g} → {consensus:g}. Uma queda esperada já pode estar precificada."
+    else:
+        expected = "O mercado prevê um número IGUAL ao anterior: " + f"{consensus:g}."
+    dollar = (
+        "Para eventos dos EUA: observe DXY e rendimentos dos Treasuries; "
+        "um USD mais forte tende a pressionar EUR/USD, mas a direção dos pares depende da moeda-base."
+        if event.get("currency") == "USD" else
+        "Para pares com USD, a reação depende de qual moeda é a base: "
+        "fortalecimento local pode fazer USD/BRL cair, enquanto AUD/USD pode subir."
+    )
     return {"above": above, "below": below, "result": result,
+            "expectation": expected, "dollar": dollar,
             "risk": "Cenários condicionais, não garantias. Observe revisão, hora, "
                     "composição do indicador, juros, posicionamento e preço."}
 
