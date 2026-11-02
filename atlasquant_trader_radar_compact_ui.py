@@ -525,7 +525,8 @@ def _economic_catalog() -> str:
               'resultado e revisão quando efetivamente conectado. '
               'Sem esses campos, não exibimos surpresas nem sugerimos viés.</div></section>')
 
-def _master() -> str:
+def _master(calendar_data: Any = None) -> str:
+    from atlasquant_trader_calendar_ui import calendar_html
     highlights = (
         _placeholder_card("Cenário macro", "Sem avaliação atual", "")
         + _placeholder_card("Bancos centrais", "Fed, BCE, BoE, BoJ e outros", "")
@@ -566,8 +567,7 @@ def _master() -> str:
         _heading("Calendário econômico",
                  "Valor divulgado, consenso, anterior, horário e fonte com impacto condicional.",
                  "Aguardando integração") +
-        '<div class="aqr-empty-area"><strong>Calendário econômico ainda não conectado</strong>'
-        'Eventos reais dependerão de fonte identificada e horário validado.</div></section>'
+        calendar_html(calendar_data) + '</section>'
         '<section class="aqr-section">' +
         _heading("Guia de impacto dos indicadores", "Exemplos educativos, não previsões.") +
         '<nav class="aqr-tabs" aria-label="Dimensões do contexto">'
@@ -582,7 +582,8 @@ def _master() -> str:
 
 
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
-                      show_central: bool = True, daily_data: Any = None) -> str:
+                      show_central: bool = True, daily_data: Any = None,
+                      calendar_data: Any = None) -> str:
     data = _daily(daily_data)
     page = selected if selected in {key for key, _ in PAGES} else "home"
     title = dict(PAGES)[page]
@@ -594,7 +595,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span>' + escape(label) + '</button>' for key, label in PAGES)
     content = {"home": lambda: _home(data),
                "radar": lambda: _radar(data, daily_data),
-               "scanner": _scanner, "master": _master}[page]()
+               "scanner": _scanner, "master": lambda: _master(calendar_data)}[page]()
     back = ('<button class="aqr-aside-back" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
     status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"]) + ' · Fonte: ' + escape(data["source"])
