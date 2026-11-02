@@ -58,10 +58,13 @@ def archive():
     ]
 
 
-def audit(rows=None, *, pre=None, issued=FIRST, evaluated=EVAL):
+DEFAULT_ARCHIVE = object()
+
+
+def audit(rows=DEFAULT_ARCHIVE, *, pre=None, issued=FIRST, evaluated=EVAL):
     return inspect_macro_vintages_asof_lab(
         preliminary() if pre is None else pre,
-        archive() if rows is None else rows,
+        archive() if rows is DEFAULT_ARCHIVE else rows,
         forecast_issued_at=issued, evaluated_at=evaluated,
     )
 
