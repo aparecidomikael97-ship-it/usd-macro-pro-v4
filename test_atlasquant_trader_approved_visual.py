@@ -57,6 +57,7 @@ class TraderApprovedVisualTests(unittest.TestCase):
         self.assertIn("− variação % do VIX", html)
         self.assertNotIn("Ibovespa", html)
         self.assertNotIn("Score: +", html)
+        self.assertIn("08h40", html)
 
     def test_opening_score_fails_closed(self):
         stamp = datetime(2026, 11, 2, 8, 55, tzinfo=timezone(timedelta(hours=-3)))
@@ -70,7 +71,8 @@ class TraderApprovedVisualTests(unittest.TestCase):
         self.assertIsNone(_opening_score({**valid, "source": ""}, at=stamp))
         self.assertIsNone(_opening_score({**valid, "oil_pct": float("nan")}, at=stamp))
         self.assertIsNone(_opening_score({**valid, "as_of": "sem fuso"}, at=stamp))
-        self.assertIsNone(_opening_score(valid, at=stamp + timedelta(hours=7)))
+        self.assertIsNotNone(_opening_score(valid, at=stamp + timedelta(hours=7)))  # foto da abertura
+        self.assertIsNone(_opening_score(valid, at=stamp + timedelta(days=1)))
         self.assertIsNone(_opening_score(valid, at=stamp - timedelta(minutes=6)))
         wrong_time = stamp.replace(hour=10)
         self.assertIsNone(_opening_score({**valid, "as_of": wrong_time.isoformat()}, at=wrong_time))
@@ -85,12 +87,12 @@ class TraderApprovedVisualTests(unittest.TestCase):
         score = _opening_score(valid, at=stamp)
         self.assertIsNotNone(score)
         self.assertAlmostEqual(score["score"], 3.7)
-        self.assertEqual(score["side"], "Comprador")
+        self.assertEqual(score["side"], "Alta")
         self.assertEqual(score["level"], "Moderado")
         valid["vix_pct"] = 7.0
         negative = _opening_score(valid, at=stamp)
         self.assertAlmostEqual(negative["score"], -3.8)
-        self.assertEqual(negative["side"], "Vendedor")
+        self.assertEqual(negative["side"], "Baixa")
 
     def test_master_keeps_macro_micro_geo_news_and_calendar(self):
         html = trader_radar_html(selected="master")
