@@ -109,3 +109,40 @@ com os sistemas reais e aceite humano são necessários em outra fase.
 **Próximos bloqueios reais:** acesso/entitlement da conta, fuso comprovado,
 valor faturável do endpoint, armazenamento central aprovado e teste de
 duas réplicas. Nenhuma dessas verificações pode ser fingida por fixtures.
+
+
+## Prova adicional — orçamento por unidades consumidas (LAB)
+
+Arquivo de simulação: `atlasquant_trader_master_quota_units_lab.py`.
+Evolui o experimento anterior por número de requisições, **sem substituí-lo
+em produção**. Um único arquivo SQLite explicitamente inicializado é
+usado apenas para simular instâncias concorrentes no mesmo host e testar
+a durabilidade após reinícios.
+
+- O orçamento diário do provedor usa **unidades** com custo explícito por
+  tentativa, não número de HTTP requests. Custo não conhecido ou não inteiro
+  falha fechado; não foi inferido o custo real do plano EODHD.
+- Toda tentativa reserva o custo **antes** da chamada. Falha, timeout ou
+  crash não liberam créditos artificialmente.
+- A chave idempotente impede reserva dupla; várias conexões ao mesmo arquivo
+  disputam a mesma transação. Uma política diária já registrada não pode
+  ser aumentada silenciosamente.
+- O horário de reset nesta simulação é meia-noite UTC, conforme a
+  documentação pública da cota diária principal EODHD. Outros produtos,
+  planos e cobranças podem obedecer a regras distintas.
+- A reserva de demanda protege uma parcela do teto para consultas
+  espontâneas, evitando que três janelas planejadas a consumam integralmente.
+- O snapshot deixa explícito:
+  `provider_meter_verified=False`,
+  `global_multi_host_quota_proven=False`, `scheduler_enabled=False`.
+
+`test_atlasquant_trader_master_quota_units_lab.py` cobre 15 cenários,
+incluindo peso maior que 1, concorrência simulada por clientes independentes,
+falha, crash, reinício, duplicidade, política imutável, virada UTC, reserva
+sob demanda e ausência de ações externas. Resultado de CI precisa ser
+conferido depois do commit.
+
+**Próximo gate ainda ABERTO:** implementar a mesma transação em um banco
+central realmente compartilhado por hosts e comparar os créditos da
+conta real mediante autorização específica do proprietário. Esta simulação
+não realiza nem comprova esses dois passos; não ativa cron/Worker/deploy.
