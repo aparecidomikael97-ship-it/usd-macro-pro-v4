@@ -54,8 +54,12 @@ class TraderCalendarTests(unittest.TestCase):
         self.assertEqual(event["previous"], 3.1)
         self.assertIsNone(event["actual"])
         self.assertEqual(event["source"], "EODHD Economic Events")
+        self.assertIsNone(normalize_events({"ok": True, "data": [_event(actual=3.8)]},
+                                             at=NOW)["events"][0]["actual"])
         self.assertIn("CPI", calendar_html(snapshot))
         self.assertIn("Se vier acima do consenso:", calendar_html(snapshot))
+        self.assertIn("Expectativa antes da divulgação:", calendar_html(snapshot))
+        self.assertIn("número MAIOR", explanation(event)["expectation"])
         self.assertIn("USD", explanation(event)["above"])
 
     def test_higher_lower_us_cpi_and_employment_may_move_usd(self):
