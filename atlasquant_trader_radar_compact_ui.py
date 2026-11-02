@@ -18,9 +18,12 @@ PAGES = (("home", "Início"), ("radar", "Radar"), ("scanner", "Scanner Técnico"
 INDEX_GROUPS = (
     ("Estados Unidos", (("SPX500", "S&P 500"), ("NAS100", "Nasdaq 100"),
                         ("US30", "Dow Jones"), ("RUS2000", "Russell 2000"))),
-    ("Brasil", (("IBOV", "Ibovespa"), ("WIN", "Mini índice B3"))),
+    ("Brasil", (("WIN", "WIN · mini-índice"), ("WDO", "WDO · minidólar"))),
     ("Europa", (("DAX40", "DAX 40"), ("CAC40", "CAC 40"),
                 ("FTSE100", "FTSE 100"), ("STOXX50", "Euro Stoxx 50"))),
+    ("Ásia", (("NIKKEI225", "Nikkei 225"), ("TOPIX", "TOPIX"),
+               ("HANGSENG", "Hang Seng"), ("CSI300", "CSI 300"),
+               ("KOSPI200", "KOSPI 200"))),
 )
 EVENT_GUIDES = (
     ("Inflação · CPI / PCE / IPCA", "Inflação acima do consenso pode elevar a expectativa de juros e favorecer a moeda local; a reação depende do que já estava precificado."),
@@ -141,11 +144,11 @@ def _indices_panel(data: Mapping[str, Any], *, wide: bool = False) -> str:
             f'<div class="aqr-row"><strong>{escape(name)}</strong>{_pct(data["indices"].get(symbol))}'
             f'{_tag(data["indices"].get(symbol, {}).get("bias", ""))}</div>'
             for symbol, name in instruments)
-        parts.append(f'<article class="aqr-card {"aqr-third" if wide else ""}"><h3>{escape(region)}</h3><div class="aqr-list">{items}</div></article>')
+        parts.append(f'<article class="aqr-card"><h3>{escape(region)}</h3><div class="aqr-list">{items}</div></article>')
     if wide:
         return "".join(parts)
-    return '<article class="aqr-card"><h3>Índices globais<small>EUA · Brasil · Europa</small></h3><div class="aqr-list">' + "".join(
-        f'<div class="aqr-row"><strong>{escape(region)}</strong><span class="aqr-muted">{len(instruments)} índices</span>{_tag("")}</div>'
+    return '<article class="aqr-card"><h3>Índices e futuros<small>EUA · Brasil · Europa · Ásia</small></h3><div class="aqr-list">' + "".join(
+        f'<div class="aqr-row"><strong>{escape(region)}</strong><span class="aqr-muted">{len(instruments)} ativos</span>{_tag("")}</div>'
         for region, instruments in INDEX_GROUPS) + "</div></article>"
 
 
@@ -215,20 +218,20 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                "scanner": _scanner, "master": _master}[page]()
     return (_CSS + '<section class="ref-workspace aqr-shell" data-workspace="trader_radar">'
             '<div class="aqr-top"><div class="aqr-brand"><span class="aqr-logo">AQ</span>'
-            '<div><h1>ATLASQUANT · TRADER RADAR</h1>'
+            '<div><h1>ATLASQUANT · TRADER</h1>'
             '<p>Forex · Índices · inteligência de mercado</p></div></div>' + back + '</div>'
             '<div class="aqr-sub"><h2>' + escape(title) + '</h2><span class="aqr-meta">'
             '<i class="aqr-dot"></i>' + escape(status) + '</span></div>'
-            '<nav class="aqr-nav" aria-label="Navegação Trader Radar">' + nav + '</nav>' + content +
+            '<nav class="aqr-nav" aria-label="Navegação AtlasQuant Trader">' + nav + '</nav>' + content +
             '<p class="aqr-foot">Radar informativo · sem ordens reais · não inventa cotações, vieses ou eventos. '
             'Viés diário e variação percentual são medidas diferentes.</p></section>')
 
 
 def central_entry_html() -> str:
     return (_CSS + '<button type="button" class="aqr-entry" data-route="area:trader_radar" '
-            'aria-label="Abrir Trader Radar · Forex e Índices">'
-            '<strong>✦ Trader Radar · Forex & Índices <span class="aqr-tag up">NOVO</span></strong>'
-            '<small>28 pares · Top 10 diário · 8 moedas · índices · Macro e notícias</small></button>')
+            'aria-label="Abrir AtlasQuant Trader · Forex e Índices">'
+            '<strong>✦ AtlasQuant Trader · Forex & Índices <span class="aqr-tag up">NOVO</span></strong>'
+            '<small>28 pares · Top 10 diário · 8 moedas · WIN/WDO · índices globais · Macro</small></button>')
 
 
 __all__ = ["SCHEMA", "PAGES", "INDEX_GROUPS", "_daily",
