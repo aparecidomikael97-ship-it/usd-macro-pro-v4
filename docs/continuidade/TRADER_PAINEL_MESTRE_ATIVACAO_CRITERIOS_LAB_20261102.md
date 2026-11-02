@@ -174,3 +174,32 @@ isolamento, commit incerto e recuperação em PostgreSQL (ou equivalente)
 **efetivamente compartilhado entre hosts**, com credenciais e segurança
 previamente aprovadas, antes de ser considerada apta. Este fake não altera
 o status HARD NO-GO e não substitui prova com banco real.
+
+
+## Fuso do Economic Events — bloqueio de coleta na origem (LAB)
+
+A documentação pública da EODHD apresenta `date` em formato sem offset
+explícito. O normalizador legado interpretava esse campo como UTC para
+compatibilidade de testes sintéticos; isso **não comprova** o fuso real de
+cada divulgação. Fonte: https://eodhd.com/financial-apis/economic-events-data-api
+
+O adaptador autenticado `atlasquant_trader_calendar_service.py` agora exige
+a configuração independente
+`ATLASQUANT_CALENDAR_EODHD_TIMEZONE_ATTESTED=1` **antes de chamar a
+fonte**, mesmo se o opt-in EODHD estiver ligado. O padrão é bloqueado:
+`EODHD_TIMEZONE_UNVERIFIED`, sem gastar requisição. Quando o provedor
+inteiro está desativado, mantém a razão anterior
+`PROVIDER_NOT_AUTHORIZED`.
+
+**A configuração é uma declaração humana, não validação automática.**
+Ela só poderá ser habilitada depois de confrontar amostras reais com
+horários oficiais, resolução de UTC/BRT e atraso/revisões, e registrar
+essa prova no portão de ativação. Não foi habilitada no Render.
+
+O teste existente de calendário adiciona cenário de recusa sem qualquer
+chamada e cenário com atestação fictícia injetada apenas no teste.
+As funções de normalização direta permanecem disponíveis para fixtures
+LAB; seu uso fora do serviço autenticado exige revisão específica
+antes de qualquer coleta real.
+
+**Estado:** bloqueio de segurança no código do PR, sem API/deploy/Worker/cron.

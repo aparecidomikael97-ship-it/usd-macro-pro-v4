@@ -64,7 +64,8 @@ def _timestamp(value: Any) -> datetime | None:
         return None
     try:
         point = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-        # EODHD documents event timestamps in UTC even without a suffix.
+        # Legacy UTC interpretation for existing synthetic fixtures. The live
+        # calendar service blocks EODHD reads until timezone is attested.
         if point.tzinfo is None:
             point = point.replace(tzinfo=timezone.utc)
         return point.astimezone(timezone.utc)
