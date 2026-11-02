@@ -53,9 +53,14 @@ def _number(value: Any) -> str:
     return f"{number:,.2f}".replace(",", " ").replace(".", ",")
 
 
-def master_overview_cards(calendar: Any, *, at: datetime | None = None) -> str:
+def master_overview_cards(calendar: Any, *, at: datetime | None = None,
+                          news_model: Any = None) -> str:
     model = build_master_briefing(calendar, at=at)
     ready = model["state"] == "VALIDADO"
+    observed = (isinstance(news_model, Mapping) and
+                news_model.get("state") == "OBSERVACIONAL")
+    geo_count = int(news_model.get("geo_count") or 0) if observed else 0
+    news_count = int(news_model.get("total") or 0) if observed else 0
     def card(title: str, value: str, description: str, label: str) -> str:
         return ('<article class="aqr-card aqr-fourth"><h3>' + escape(title) +
                 '</h3><div class="aqr-master-value">' + escape(value) +
@@ -70,12 +75,12 @@ def master_overview_cards(calendar: Any, *, at: datetime | None = None) -> str:
         card("Bancos centrais", str(model["central_bank_events"]) if ready else "—",
              "Eventos identificados hoje na agenda, não decisões interpretadas",
              "CONFERIR COMUNICADO" if ready else "SEM LEITURA") +
-        card("Risco geopolítico", "—",
-             "Monitoramento geopolítico exige fatos com fonte e horário",
-             "SEM FEED VERIFICADO") +
-        card("Notícias relevantes", "—",
-             "Notícias e eventos econômicos são fontes diferentes",
-             "SEM FEED VERIFICADO")
+        card("Risco geopolítico", str(geo_count) if observed else "—",
+             "Manchetes com palavras-chave geopolíticas; fatos não confirmados",
+             "OBSERVACIONAL · NÃO VERIFICADO" if observed else "SEM FEED VERIFICADO") +
+        card("Notícias relevantes", str(news_count) if observed else "—",
+             "Manchetes do motor antigo; fonte e horário, sem score de trade",
+             "OBSERVACIONAL · NÃO VERIFICADO" if observed else "SEM FEED VERIFICADO")
     )
 
 
