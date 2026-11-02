@@ -87,3 +87,21 @@ O Painel Mestre explica **por que** um mercado pode mover-se, mas não fornece o
 - Validar se horário EODHD sem fuso na resposta corresponde a UTC antes de tratar hora BRT como comprovada; até isso, fonte não deve ser ativada por configuração de produção.
 - Só com autorização explícita: agendamento independente e armazenamento auditável de consenso/versões, respeitando orçamento e HARD NO-GO do núcleo AION.
 - Nenhuma dessas alterações está no Render; PR #1803 continua isolada e em rascunho.
+
+## Plano diário de atualização — preparação sem executor (LAB)
+
+- `atlasquant_trader_master_refresh_plan.py` entrega **somente** horários propostos em Brasília UTC−03 para a fase atual de 2026. Nenhuma função faz chamadas externas, grava banco, agenda tarefas ou ativa o Worker AION.
+- Três janelas para calendário econômico: **06h35, 10h45 e 17h15 BRT**; uma janela de **06h40 BRT** para séries oficiais. Horários são PROPOSTAS: não afirmam que um dado novo foi publicado. Os eventos reais mantêm carimbo UTC e cada série mantém seu período econômico.
+- A EODHD permanece desativada por padrão; limite por processo padrão 4/dia (3 janelas hipotéticas + 1 sob demanda), **não** garantia financeira global. O agendador não tem execução ativa; nenhum site fechado é atualizado por esse módulo.
+- `atlasquant_trader_master_refresh_ui.py` mostra as janelas no Painel Mestre com aviso forte **AINDA NÃO ATIVADO**, sem botões ou ações de agendamento, preservando o visual aprovado.
+- `test_atlasquant_trader_master_refresh_plan.py` cobre fuso, conversão UTC, virada do dia, horizonte, limites, feature flags, ausência de efeito colateral e UI. **99/99 testes locais PASS** no AM12 com exit code 0.
+
+### Portão de ativação futura — REQUER APROVAÇÃO SEPARADA
+
+1. Validar que a conta existente da EODHD tem `economic-events`, horário UTC confiável, dados reais e cota adequada, sem cobranças inesperadas.
+2. Confirmar se existem limites globais compartilhados em reinícios/réplicas e serviço de armazenamento auditável (não implementar banco paralelo do Core).
+3. Definir agendador independente autorizado, segredos protegidos, autenticação, logs, correlação de tentativa/revisão e desligamento imediato.
+4. Garantir atualização sem usuário logado, de forma segura, com retenção/TTL e política de replay sem operações reais.
+5. Rodar homologação com dados reais e aprovação visual/custos antes de programar ou publicar qualquer cron/deploy.
+
+**Esta etapa conclui a preparação e testes de um plano, NÃO a automação real.**
