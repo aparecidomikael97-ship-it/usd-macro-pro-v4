@@ -128,8 +128,10 @@ class MasterLegacyNewsTests(unittest.TestCase):
         self.assertIn("OBSERVACIONAL · NÃO VERIFICADO", cards)
         self.assertIn("Manchetes", cards)
         self.assertNotIn("COMPRA CERTA", cards)
+        live = datetime.now(timezone.utc)
         html = trader_radar_html(
-            selected="master", news_data=_snapshot(_article()), calendar_data=None)
+            selected="master", news_data=_snapshot(_article(when=live), updated=live),
+            calendar_data=None)
         self.assertIn("US Treasury yields", html)
         self.assertIn("NÃO É SINAL", html)
         self.assertIn('data-visual-reference="approved-20261102-v1"', html)
