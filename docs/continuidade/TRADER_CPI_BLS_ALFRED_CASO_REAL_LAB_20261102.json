@@ -2,7 +2,7 @@
   "schema": "ATLASQUANT_TRADER_BLS_CPI_ALFRED_CASE_LAB_V1",
   "case_id": "US-CPI-U-DEC2025-JAN2026-RELEASE",
   "reviewed_on": "2026-11-02",
-  "state": "BLS_DOCUMENTARY_CROSS_CHECK_ONLY_ALFRED_VINTAGES_UNVERIFIED",
+  "state": "BLS_AND_ALFRED_INITIAL_RELEASE_CORROBORATED_FEB_VINTAGE_EXPORT_PENDING",
   "sources": [
     {
       "provider": "BLS",
@@ -34,7 +34,9 @@
     "measure": "CPI-U all items December 2025 unadjusted level index 1982-84=100",
     "match": true,
     "delta_index_points": 0,
-    "limitations": "Only two BLS archived releases; not all revisions and not CPIAUCSL seasonal adjusted series."
+    "limitations": "Only two BLS archived releases; not all revisions and not CPIAUCSL seasonal adjusted series.",
+    "alfred_feb13_dec2025_indirect_only": true,
+    "alfred_initial_jan13_independently_corroborated": true
   },
   "alfred": {
     "series": "CPIAUCNS",
@@ -47,12 +49,24 @@
       "2026-01-13",
       "2026-02-13"
     ],
-    "jan13_dec2025_value": null,
+    "jan13_dec2025_value": 324.054,
     "feb13_dec2025_value": null,
     "vintage_csv_downloaded": false,
     "alfred_vintage_agreement_verified": false,
     "intraday_timestamp_proven": false,
-    "commercial_redistribution_reviewed": false
+    "commercial_redistribution_reviewed": false,
+    "jan13_release_listing_url": "https://alfred.stlouisfed.org/release?ob=pv&od=desc&rd=2026-01-13&rid=10&rt=used&t=used",
+    "jan13_release_listing_observation_month": "2025-12",
+    "jan13_release_listing_series": "CPIAUCNS",
+    "jan13_release_listing_verified": true,
+    "jan13_bls_agreement_verified": true,
+    "feb13_release_listing_url": "https://alfred.stlouisfed.org/release?ob=pv&od=desc&rd=2026-02-13&rid=10",
+    "feb13_release_listing_new_or_revised_obs_count": 1,
+    "feb13_release_listing_latest_month": "2026-01",
+    "feb13_release_listing_jan2026_value": 325.252,
+    "feb13_dec2025_value_directly_retrieved": false,
+    "feb13_list_shows_no_dec2025_changed_obs": true,
+    "asof_intraday_before_bls_release_not_proven": true
   },
   "point_in_time": {
     "tentative_research_at": "2026-01-13T07:00:00-04:00",
@@ -71,7 +85,9 @@
     "exact_historical_receipt_verified": false,
     "commercial_reuse_rights_verified": false,
     "independent_28_fx_quote_history_verified": false,
-    "real_oos_results_validated": false
+    "real_oos_results_validated": false,
+    "fred_initial_release_match_verified": true,
+    "fred_feb13_dec2025_direct_vintage_observation_matched": false
   },
   "can_feed_live_bias": false,
   "can_feed_real_oos": false,

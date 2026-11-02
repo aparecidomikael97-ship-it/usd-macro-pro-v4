@@ -18,7 +18,7 @@ class RealBlsCpiDocumentCaseLabTests(unittest.TestCase):
     def test_manifest_has_explicit_partial_status(self):
         s = sample()
         self.assertEqual(s["schema"], "ATLASQUANT_TRADER_BLS_CPI_ALFRED_CASE_LAB_V1")
-        self.assertIn("ALFRED_VINTAGES_UNVERIFIED", s["state"])
+        self.assertIn("FEB_VINTAGE_EXPORT_PENDING", s["state"])
 
     def test_original_bls_document_and_release_id(self):
         original = sample()["sources"][0]
@@ -49,13 +49,44 @@ class RealBlsCpiDocumentCaseLabTests(unittest.TestCase):
         self.assertIn("CPIAUCNS", a["series_url"])
         self.assertTrue(a["metadata_seen"])
 
-    def test_alfred_vintage_numbers_are_not_faked_from_bls(self):
+    def test_initial_alfred_release_is_documented_but_feb_vintage_is_not_fabricated(self):
         a = sample()["alfred"]
         self.assertEqual(a["requested_vintages"], ["2026-01-13", "2026-02-13"])
-        self.assertIsNone(a["jan13_dec2025_value"])
+        self.assertEqual(a["jan13_dec2025_value"], 324.054)
+        self.assertTrue(a["jan13_release_listing_verified"])
+        self.assertTrue(a["jan13_bls_agreement_verified"])
         self.assertIsNone(a["feb13_dec2025_value"])
+        self.assertFalse(a["feb13_dec2025_value_directly_retrieved"])
         self.assertFalse(a["vintage_csv_downloaded"])
         self.assertFalse(a["alfred_vintage_agreement_verified"])
+
+    def test_alfred_first_release_source_is_historical_official_listing(self):
+        a = sample()["alfred"]
+        self.assertEqual(a["jan13_release_listing_series"], "CPIAUCNS")
+        self.assertEqual(a["jan13_release_listing_observation_month"], "2025-12")
+        u = urlsplit(a["jan13_release_listing_url"])
+        self.assertEqual(u.scheme, "https")
+        self.assertEqual(u.hostname, "alfred.stlouisfed.org")
+        self.assertIn("rd=2026-01-13", u.query)
+        self.assertEqual(a["jan13_dec2025_value"],
+                         sample()["sources"][0]["cpi_u_nsa_index"])
+
+    def test_feb_alfred_release_lists_only_new_january_observation(self):
+        a = sample()["alfred"]
+        self.assertEqual(a["feb13_release_listing_new_or_revised_obs_count"], 1)
+        self.assertEqual(a["feb13_release_listing_latest_month"], "2026-01")
+        self.assertEqual(a["feb13_release_listing_jan2026_value"], 325.252)
+        self.assertTrue(a["feb13_list_shows_no_dec2025_changed_obs"])
+        self.assertFalse(a["feb13_dec2025_value_directly_retrieved"])
+        self.assertIsNone(a["feb13_dec2025_value"])
+
+    def test_source_independence_does_not_prove_intraday_capture(self):
+        s = sample()
+        self.assertTrue(s["blockers"]["fred_initial_release_match_verified"])
+        self.assertFalse(s["blockers"]["fred_feb13_dec2025_direct_vintage_observation_matched"])
+        self.assertFalse(s["blockers"]["fred_vintages_matched"])
+        self.assertTrue(s["alfred"]["asof_intraday_before_bls_release_not_proven"])
+        self.assertFalse(s["point_in_time"]["actual_available_at_research_cutoff"])
 
     def test_original_and_next_release_urls_are_different_and_official(self):
         s = sample()["sources"]

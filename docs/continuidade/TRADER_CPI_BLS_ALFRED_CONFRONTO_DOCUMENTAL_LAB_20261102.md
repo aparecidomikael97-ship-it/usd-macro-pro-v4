@@ -27,7 +27,7 @@ Isso NÃO prova que toda e qualquer outra revisão tenha sido nula.
 O segundo comunicado também discute revisões dos ajustes sazonais,
 que **não devem ser confundidos com a série não ajustada**.
 
-## Confronto com o ALFRED — PARCIAL, ainda sem valores de vintage
+## Confronto com o ALFRED — primeira divulgação confirmada, export de vintages pendente
 
 A série apropriada do ALFRED para o nível 324,054 é **CPIAUCNS**:
 https://alfred.stlouisfed.org/series?seid=CPIAUCNS
@@ -42,17 +42,38 @@ e o uso dos períodos históricos `realtime_start/realtime_end`:
 - https://alfred.stlouisfed.org/series/downloaddata?seid=CPIAUCNS
 - https://fred.stlouisfed.org/docs/api/fred/realtime_period.html
 
-Tentamos localizar os valores de vintage **13/01/2026** e
-**13/02/2026** de CPIAUCNS para a observação de dezembro/2025.
-**Não foi possível obter o CSV de vintage neste ambiente.**
-Portanto, seus valores estão registrados como `null` no
-manifesto e `alfred_vintage_agreement_verified=false`.
+Encontramos agora uma página de **release histórico do próprio ALFRED**
+para 13/01/2026, que mostra explicitamente:
+- Série **CPIAUCNS**, dado de referência **Dec 2025**, **324,054**;
+- Série distinta, ajustada sazonalmente, **CPIAUCSL**, Dec 2025, **326,030**.
 
-É proibido completar essas duas lacunas copiando 324,054 do BLS,
-de dados atuais da série ou inferindo que a ALFRED concorda.
-O confronto comprovado nesta etapa é **BLS original versus BLS
-comunicado posterior**; a reconciliação *independente* ALFRED
-continua pendente.
+Fonte oficial: https://alfred.stlouisfed.org/release?ob=pv&od=desc&rd=2026-01-13&rid=10&rt=used&t=used
+
+Portanto, para **a primeira publicação de 13/01**, a igualdade
+BLS–ALFRED de **324,054** foi confirmada por duas fontes documentais.
+Esse dado NÃO foi obtido de um CSV de vintages nem de uma cópia
+histórica com hash sob custódia da AtlasQuant.
+
+A página de release de **13/02/2026** no ALFRED informa para
+**CPIAUCNS** apenas **1 observação nova ou revisada**, referente
+a **Jan 2026 = 325,252**. A listagem não apresenta dezembro
+como observação alterada naquele release.
+
+Fonte oficial: https://alfred.stlouisfed.org/release?ob=pv&od=desc&rd=2026-02-13&rid=10
+
+Isso é **evidência indireta** de manutenção do índice de dezembro,
+coerente com o segundo comunicado BLS. Entretanto, a página de
+13/02 não mostra explicitamente o **valor de dezembro sob a
+vintage daquela data**. O campo `feb13_dec2025_value` permanece
+`null`; `alfred_vintage_agreement_verified=false` porque não
+concluímos o confronto de TODAS as datas solicitadas.
+
+**Não preencher o valor de fevereiro a partir da lista de mudanças,
+nem do BLS ou da série atual**. Foi tentada a abertura do CSV
+pela navegação pública, mas esse ambiente não conseguiu ler o
+conteúdo CSV e a conexão direta também esteve indisponível.
+Datas de publicação e releases históricos não equivalem a recibos
+de disponibilidade intradiária sob custódia independente.
 
 ## Corte do viés: 07:00 em Mato Grosso
 
@@ -79,6 +100,9 @@ proposta de LAB, não escolha final do proprietário.
 | HTML oficial do comunicado BLS posterior consultado | Documentalmente verificado |
 | Nível de dezembro sem ajuste sazonal igual nos dois BLS | **Confirmado: 324,054** |
 | ALFRED identifica série CPIAUCNS | **Confirmado (metadados)** |
+| ALFRED release 13/01, dezembro/2025 CPIAUCNS 324,054 | **CONFIRMADO diretamente na página oficial** |
+| ALFRED release 13/02, nova/revisada janeiro/2026 325,252 | **Confirmado (listagem de mudanças)** |
+| ALFRED valor de dezembro/2025 sob vintage 13/02 | **NÃO EXTRAÍDO diretamente** |
 | CSV de vintages ALFRED para as duas datas | **NÃO OBTIDO** |
 | Cópia bruta dos comunicados arquivada com SHA-256 | Não |
 | Consenso exato de mercado antes do evento | Não |
@@ -99,9 +123,12 @@ custódia, os preços dos pares, critérios OOS e autorizações.
 ## Próxima etapa concreta
 
 Obter, sem usar API paga, o export ALFRED **CPIAUCNS**
-nas duas datas de vintage. Conferir o valor específico
-de **dezembro/2025**, registrar fonte bruta, hashes e
-instante de aquisição REAL de hoje (não retrodatado).
+com as duas datas de vintage e confirmar especificamente
+o valor de dezembro/2025 na **segunda vintage (13/02)**.
+O primeiro valor da publicação ALFRED 13/01 já foi conferido
+na listagem oficial e NÃO precisa ser inferido. Registrar
+os bytes de qualquer futuro export, hashes e o instante
+REAL de aquisição (não retrodatado).
 Se o CSV exigir interação ou não estiver acessível, conservar
 `null` e informar a pendência; não fabricar um valor.
 
