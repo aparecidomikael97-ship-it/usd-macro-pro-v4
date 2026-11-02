@@ -57,8 +57,8 @@ _AREAS = {
         "private": True,
     },
     "trader_radar": {
-        "label": "Trader Radar",
-        "sentence": "Radar enxuto de Forex, oito moedas, índices e contexto econômico.",
+        "label": "AtlasQuant Trader",
+        "sentence": "Painel Mestre, Radar, Scanner Técnico e Início para análise de mercado.",
         "private": True,
     },
 }
@@ -219,6 +219,7 @@ def _canon_area(value: Any) -> str:
         "negócios": "negocios",
         "trader": "trader",
         "trader radar": "trader_radar",
+        "atlasquant trader": "trader_radar",
         "radar forex indices": "trader_radar",
         "investimentos": "investimentos",
         "renda fixa": "investimentos",
@@ -823,7 +824,7 @@ def central_selector_html(
     confirmed_status: Mapping[str, Any] | None = None,
     timezone_name: str | None = None,
 ) -> str:
-    """Central do ecossistema: quatro áreas legadas e o Trader Radar compacto."""
+    """Central do ecossistema: quatro áreas legadas e o AtlasQuant Trader."""
     if not central_visibility_model(access)["admin"]:
         return ""
     from atlasquant_reference_ui import CSS, reference_html
