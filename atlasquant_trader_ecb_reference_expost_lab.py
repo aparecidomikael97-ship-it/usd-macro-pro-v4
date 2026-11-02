@@ -82,7 +82,7 @@ def describe_ecb_g8_reference_change_lab(
     # historical publication/receipt must be independently attested.
     publication_clock_hypothesis = datetime.combine(
         curr_date, time(HYPOTHETICAL_NOT_BEFORE_HOUR_LOCAL),
-        tzinfo=ZoneInfo("Europe/Frankfurt")).astimezone(timezone.utc)
+        tzinfo=ZoneInfo("Europe/Berlin")).astimezone(timezone.utc)
     if captured < publication_clock_hypothesis:
         return _reject("Capture precedes conservative ECB publication-time hypothesis")
     text = payload.get("csv_text")

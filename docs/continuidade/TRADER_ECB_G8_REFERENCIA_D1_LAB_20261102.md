@@ -41,7 +41,7 @@ para duas datas de referência. Regras:
   são verificados; dados parciais e taxas zero/NaN recusados.
 - Datas são de dias úteis com intervalo limitado. É somente
   verificação estrutural, **não** confirmação de feriados ou revisão.
-- No horário Europe/Frankfurt, 18:00 do próprio dia foi escolhido
+- No horário Europe/Berlin, 18:00 do próprio dia foi escolhido
   como **fronteira conservadora de pesquisa**, não como horário
   comprovado da publicação. Captura declarada anterior à fronteira
   recusa. Captura não é imutável nem autenticada nesta etapa.
