@@ -24,6 +24,8 @@ TRADER_NAV = (("home", "Início"), ("radar", "Radar"), ("scanner", "Scanner Téc
     ("journal", "Diário"), ("video", "Vídeos / Conteúdo"), ("aion_specialist", "AION Trader"),
     ("profile", "Perfil / Configurações"))
 NAV = {
+ "trader_radar": (("home", "Início"), ("radar", "Radar"),
+                  ("scanner", "Scanner Técnico"), ("master", "Painel Mestre")),
  "trader": TRADER_NAV,
  "negocios": (("home", "Início"), ("overview", "Visão Geral"), ("companies", "Empresas / Clientes"),
     ("b2b", "Automação B2B"), ("leads", "Leads"), ("revenue", "Revenue Ops"), ("crm", "CRM"),
@@ -46,6 +48,7 @@ NAV = {
 }
 # Coordinates use pixels in the approved single-workspace reference.
 REGIONS = {
+ "trader_radar": [],
  "central": [("area:trader", "Trader", (20,147,173,259)), ("area:negocios", "Negócios", (204,149,173,258)),
    ("area:investimentos", "Investimentos", (385,148,175,257)), ("area:aion", "AION", (569,148,177,260)),
    ("profile", "Perfil", (545,8,118,49)), ("notifications", "Notificações", (669,10,25,42)),
@@ -1163,7 +1166,11 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None, daily_data=None):
+    if area == "trader_radar":
+        from atlasquant_trader_radar_compact_ui import trader_radar_html
+        return trader_radar_html(selected=selected, name=name,
+                                 show_central=show_central, daily_data=daily_data)
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -1281,6 +1288,10 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     from atlasquant_compact_cockpit import header_html
     header=header_html(area,name,mode,top,market_items=market_items) if area != "central" else ""
     shortcuts = ""
+    extra_entry = ""
+    if area == "central":
+        from atlasquant_trader_radar_compact_ui import central_entry_html
+        extra_entry = central_entry_html()
     if not detail and area in {"negocios", "investimentos"}:
         from atlasquant_ecosystem_workspace_ui import workspace_modules
         shortcuts = '<section class="final-workspace-shortcuts" aria-label="Capacidades do ambiente">' + ''.join(
@@ -1292,7 +1303,7 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
            f'<div class="ref-canvas" role="group" aria-label="{escape(area)} · cockpit AtlasQuant">{sidebar}{hits}</div>'
            f'<div class="ref-mobile-header ref-mobile-header-{escape(area)}" style="{hero_style}"><span class="ref-mobile-kicker">ECOSSISTEMA ATLASQUANT</span><h1>ATLASQUANT · {escape(area.upper())}</h1><p>{escape({"trader":"Mercado, contexto e risco em uma única leitura.","negocios":"Operação B2B, crescimento e automação com controle.","investimentos":"Estratégia hoje. Patrimônio amanhã.","aion":"Inteligência que integra todo o ecossistema.","central":"Poderoso por dentro. Simples por fora."}[area])}</p></div>'
            f'<div class="ref-mobile-grid">{"".join(mobile)}</div>')
-        + shortcuts + truth + "</section>")
+        + shortcuts + extra_entry + truth + "</section>")
 
 
 JS = r"""
@@ -1517,7 +1528,8 @@ def render_reference_workspace(
         else None
     )
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
-        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft,pilot_planning_read_model=pilot_planning_read_model),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft,pilot_planning_read_model=pilot_planning_read_model,
+        daily_data=st.session_state.get("atlasquant_trader_radar_daily") if area == "trader_radar" else None),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()

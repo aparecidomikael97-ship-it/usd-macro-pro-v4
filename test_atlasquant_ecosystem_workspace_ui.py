@@ -128,7 +128,7 @@ class EcosystemWorkspaceUiTests(unittest.TestCase):
         start=src.index("def _central_request_for_render")
         end=src.index("\ndef _hold_admin_before_trader_shell",start)
         body=src[start:end]
-        self.assertIn('stored_choice in {"trader", "negocios", "investimentos", "aion"}',body)
+        self.assertIn('stored_choice in {"trader", "negocios", "investimentos", "aion", "trader_radar"}',body)
         self.assertIn("requested = stored_choice",body)
 
 
