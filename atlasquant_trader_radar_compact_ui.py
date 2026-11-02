@@ -242,7 +242,7 @@ def _currencies_approved(data: Mapping[str, Any]) -> str:
     return '<div class="aqr-grid">' + "".join(
         '<article class="aqr-currency"><strong>' + escape(code) +
         '</strong><small>Força relativa</small><div class="aqr-currency-value">' +
-        (_pct(value) if value else '—') + '</div><span class="aqr-tag">Aguardando validação</span></article>'
+        (_pct(value) if value else '—') + '</div><span class="aqr-tag">AGUARDANDO</span></article>'
         for code, value in ordered) + '</div>'
 
 
@@ -252,7 +252,11 @@ def _top_approved(data: Mapping[str, Any]) -> str:
     if not complete:
         return ('<div class="aqr-empty-area"><strong>Top 10 aguardando</strong>'
                 'Variações diárias dos 28 pares ainda não verificadas. '
-                'Um ranking técnico não equivale à valorização diária.</div>')
+                'Um ranking técnico não equivale à valorização diária.</div>'
+                '<div class="aqr-grid">' + ''.join(
+                    '<article class="aqr-card aqr-fourth"><h3>#' + str(i) +
+                    ' · Sem par validado</h3><div class="aqr-value">—</div>'
+                    '<span class="aqr-tag">AGUARDANDO</span></article>' for i in range(1, 11)) + '</div>')
     ranked = sorted(rows.items(), key=lambda item: item[1]["change_pct"], reverse=True)[:10]
     return '<div class="aqr-grid">' + "".join(
         '<article class="aqr-card aqr-fourth"><h3>#' + str(i) + ' ' + escape(pair) +
@@ -384,6 +388,7 @@ def _radar(data: Mapping[str, Any], raw_daily: Any = None) -> str:
         '<section class="aqr-section">' +
         _heading("Força relativa das 8 moedas",
                  "Comparação relativa para orientar a leitura; não é cotação nominal.") +
+        ('<p class="aqr-muted">Dados diários ainda não conectados.</p>' if not data["stamp"] else '') +
         _currencies_approved(data) + '</section>'
         '<section class="aqr-section">' +
         _heading("Top 10 do dia",
@@ -395,7 +400,7 @@ def _radar(data: Mapping[str, Any], raw_daily: Any = None) -> str:
         _forex_table(data) + '</section>'
         '<section class="aqr-section">' +
         _heading("Índices e Futuros",
-                 "EUA, Brasil, Europa e Ásia · WIN e WDO sem confundir com Ibovespa.") +
+                 "EUA, Brasil, Europa e Ásia · WIN e WDO sem confundir os contratos.") +
         '<nav class="aqr-tabs" aria-label="Região de índices e futuros">' + buttons +
         '</nav>' + panels + '</section>')
 
@@ -482,8 +487,15 @@ def _master() -> str:
         'Eventos reais dependerão de fonte identificada e horário validado.</div></section>'
         '<section class="aqr-section">' +
         _heading("Guia de impacto dos indicadores", "Exemplos educativos, não previsões.") +
-        '<div class="aqr-grid"><article class="aqr-card aqr-wide">' +
-        guides + '</article></div></section>')
+        '<nav class="aqr-tabs" aria-label="Dimensões do contexto">'
+        '<button data-local-tab="macro" aria-selected="true">Macro</button>'
+        '<button data-local-tab="micro" aria-selected="false">Micro</button>'
+        '<button data-local-tab="geo" aria-selected="false">Geopolítica</button>'
+        '<button data-local-tab="news" aria-selected="false">Notícias</button></nav>'
+        '<section data-tab-panel="macro"><div class="aqr-grid"><article class="aqr-card aqr-wide">' + guides + '</article></div></section>'
+        '<section data-tab-panel="micro" hidden><div class="aqr-guide">Micro: acompanhar setores, empresas e divulgação validada de resultados.</div></section>'
+        '<section data-tab-panel="geo" hidden><div class="aqr-guide">Geopolítica: eventos, sanções, cadeias de suprimentos e reação efetiva do mercado.</div></section>'
+        '<section data-tab-panel="news" hidden><div class="aqr-guide">Notícias com fonte e horário verificados; feed ainda não conectado.</div></section></section>')
 
 
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
@@ -502,7 +514,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                "scanner": _scanner, "master": _master}[page]()
     back = ('<button class="aqr-chip" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
-    status = ('DADOS VALIDADOS · ' + escape(data["stamp"])
+    status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"])
               if data["stamp"] else "● DADOS NÃO CONECTADOS")
     return (
         _CSS +
