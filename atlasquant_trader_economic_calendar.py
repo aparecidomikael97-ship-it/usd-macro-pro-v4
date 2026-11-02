@@ -122,14 +122,19 @@ def normalize_events(
     now = local.astimezone(timezone.utc)
     blank = {"schema": SCHEMA, "state": "NOT_CONNECTED", "date": today.isoformat(),
              "source": "", "fetched_at": "", "events": [], "total": 0,
-             "truncated": False}
+             "truncated": False, "reason": ""}
     if not isinstance(payload, Mapping) or payload.get("ok") is not True:
-        return {**blank, "state": "UNAVAILABLE"}
+        return {**blank, "state": "UNAVAILABLE", "reason": str(payload.get("reason") or "SOURCE_UNAVAILABLE")[:70] if isinstance(payload, Mapping) else "SOURCE_UNAVAILABLE"}
     raw = payload.get("data")
     if not isinstance(raw, list):
         return {**blank, "state": "INVALID_PROVIDER"}
     if len(raw) >= 1000:
         return {**blank, "state": "INCOMPLETE_PROVIDER"}
+    received_at = _timestamp(payload.get("fetched_at"))
+    if received_at is not None:
+        age = (now - received_at).total_seconds()
+        if age > 2 * 3600 or age < -60:
+            return {**blank, "state": "STALE_PROVIDER", "reason": "CACHE_OUTDATED"}
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in raw:
@@ -177,7 +182,7 @@ def normalize_events(
         rows.append(events)
     rows.sort(key=lambda item: (item["release_utc"], item["country"], item["title"]))
     return {"schema": SCHEMA, "state": "READY", "date": today.isoformat(),
-            "source": SOURCE, "fetched_at": now.isoformat(),
+            "source": SOURCE, "fetched_at": received_at.isoformat() if received_at else "",
             "events": rows[:max_items], "total": len(rows),
             "truncated": len(rows) > max_items}
 
@@ -282,7 +287,7 @@ def request_eodhd_daily(
             payload = payload.get("data") if not payload.get("error") else None
         if not isinstance(payload, list):
             return {"ok": False, "reason": "INVALID_RESPONSE", "data": []}
-        return {"ok": True, "data": payload}
+        return {"ok": True, "data": payload, "fetched_at": datetime.now(timezone.utc).isoformat()}
     except Exception:
         return {"ok": False, "reason": "PROVIDER_UNAVAILABLE", "data": []}
 
