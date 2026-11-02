@@ -173,7 +173,8 @@ class TraderCalendarTests(unittest.TestCase):
             key: {"event_id": key, "value": 3.4, "source": "Pesquisa de banco",
                   "author": "owner", "entered_at": NOW.isoformat()}
         }
-        with patch.dict("os.environ", {"CHAVE_EODHD": "LAB_EXAMPLE"}, clear=False):
+        with patch.dict("os.environ", {"CHAVE_EODHD": "LAB_EXAMPLE",
+                                       "ATLASQUANT_CALENDAR_EODHD_ENABLED": "1"}, clear=False):
             with patch("atlasquant_trader_calendar_service._hourly_feed",
                        return_value={"ok": True, "data": [raw]}) as fetcher:
                 model = read_calendar(fake, access, at=NOW)
