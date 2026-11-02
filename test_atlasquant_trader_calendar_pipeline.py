@@ -133,7 +133,7 @@ class TraderCalendarTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][1]["from"], "2026-11-02")
-        self.assertEqual(calls[0][1]["to"], "2026-11-03")
+        self.assertEqual(calls[0][1]["to"], "2026-11-09")
         self.assertEqual(calls[0][1]["limit"], 1000)
         self.assertEqual(calls[0][2], 12)
 
