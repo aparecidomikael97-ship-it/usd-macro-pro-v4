@@ -276,35 +276,52 @@ def _forex_table(data: Mapping[str, Any]) -> str:
 
 
 def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | None:
-    """Viés experimental de pré-abertura: exige contrato, fonte e carimbo temporal.
+    """Filtro exploratório para um registro comprovadamente coletado 08:40–08:55 BRT.
 
-    Não representa edge testado; jamais emite ordem ou sinal de entrada.
+    Após 08:55, exibe a FOTO DA ABERTURA daquele dia, não um sinal atualizado.
+    Nunca executa ordens. Nenhum dado futuro/antigo gera leitura atual.
     """
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    from atlasquant_trader_opening_collector import (
+        MODEL, INSTRUMENTS, brasilia_clock,
+    )
     if not isinstance(raw, Mapping) or raw.get("state") != "VALIDATED_OPENING":
         return None
     source = str(raw.get("source") or "").strip()
-    timestamp = str(raw.get("as_of") or "").strip()
-    if not source or not timestamp:
+    if not source or len(source) > 450:
         return None
     try:
-        stamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        now = at or datetime.now(timezone.utc)
+        stamp = datetime.fromisoformat(str(raw.get("as_of") or "").replace("Z", "+00:00"))
         if stamp.tzinfo is None:
             return None
-        delta = (now - stamp.astimezone(timezone.utc)).total_seconds()
-        try:
-            tz_brasilia = ZoneInfo("America/Sao_Paulo")
-        except ZoneInfoNotFoundError:
-            # Windows local de LAB pode não ter tzdata instalada.
-            # O Brasil não usa horário de verão atualmente; o Render usa IANA.
-            tz_brasilia = timezone(timedelta(hours=-3))
-        local = stamp.astimezone(tz_brasilia)
-        # A coleta para abertura do WIN foi combinada entre 8h50 e 9h BRT.
-        if not (-300 <= delta <= 6 * 3600) or not (local.hour == 8 and local.minute >= 50 or
-                                                   local.hour == 9 and local.minute == 0):
+        now = brasilia_clock(at)
+        local = brasilia_clock(stamp)
+        minutes = local.hour * 60 + local.minute
+        if (not (8 * 60 + 40 <= minutes <= 8 * 60 + 55) or
+                local.weekday() >= 5 or local.date() != now.date() or
+                (stamp - (at or datetime.now(timezone.utc))).total_seconds() > 60):
             return None
-    except (ValueError, TypeError, OverflowError):
+        # Para a leitura posterior no mesmo dia, preservamos o snapshot
+        # da abertura com horário visível e sem descrevê-lo como tempo real.
+        if "quotes" in raw:
+            if raw.get("model") != MODEL or raw.get("session_date") != local.date().isoformat():
+                return None
+            quotes = raw["quotes"]
+            if not isinstance(quotes, Mapping) or set(quotes) != set(INSTRUMENTS):
+                return None
+            for key, (instrument, _, basis) in INSTRUMENTS.items():
+                q = quotes[key]
+                if not isinstance(q, Mapping) or q.get("instrument_id") != instrument or q.get("reference_type") != basis:
+                    return None
+                price = _num(q.get("price"))
+                prior = _num(q.get("previous_reference"))
+                stored_pct = _num(q.get("pct"))
+                if price is None or prior is None or stored_pct is None or price <= 0 or prior <= 0:
+                    return None
+                if abs(100 * (price / prior - 1) - stored_pct) > 0.03:
+                    return None
+                if not q.get("source") or not q.get("as_of"):
+                    return None
+    except (TypeError, ValueError, OverflowError):
         return None
     values = [_num(raw.get(key)) for key in ("vix_pct", "iron_pct", "oil_pct")]
     if any(value is None for value in values):
@@ -314,11 +331,10 @@ def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | 
     magnitude = abs(score)
     level = ("Indefinido" if magnitude < 1.5 else "Fraco" if magnitude < 2.5
              else "Moderado" if magnitude <= 4.5 else "Forte")
-    side = "Comprador" if score > 0 else "Vendedor" if score < 0 else "Neutro"
+    side = "Neutro" if magnitude < 1.5 else "Alta" if score > 0 else "Baixa"
     return {"vix": vix, "iron": iron, "oil": oil, "score": score,
             "level": level, "side": side, "source": source,
             "stamp": local.strftime("%d/%m/%Y %H:%M BRT")}
-
 
 def _opening_strategy(raw: Any) -> str:
     """Abaixo dos contratos WIN/WDO: três fatores exatos, WDO independente."""
@@ -336,20 +352,20 @@ def _opening_strategy(raw: Any) -> str:
         for title, label, key in factors)
     if read:
         result = (
-            f'<strong>WIN: cenário exploratório {read["side"].lower()} ({read["level"].lower()})</strong>'
+            f'<strong>WIN: viés preliminar {read["side"].upper()} ({read["level"].lower()})</strong>'
             f'<p>Score: {read["score"]:+.2f} pontos percentuais · '
             f'Fonte: {escape(read["source"])} · {escape(read["stamp"])}. '
-            'Somente uma inclinação preliminar, sem entrada automática.</p>'
+            'Foto da abertura deste dia; leitura preliminar, sem entrada automática.</p>'
         )
     else:
         result = ('<strong>WIN: aguardando dados válidos para a abertura</strong>'
                   '<p>Score exploratório = variação % do minério + variação % do petróleo '
-                  '− variação % do VIX. Coleta prevista entre 8h50 e 9h (Brasília). '
-                  'Sem fonte, horário e três variações verificadas, não há viés calculado.</p>')
+                  '− variação % do VIX. Coleta automática planejada das 8h40 às 8h55 (Brasília). '
+                  'Sem fonte autorizada, coleta agendada e três variações verificadas, não há viés calculado.</p>')
     return (
         '<section class="aqr-strategy" aria-label="Estratégia de Abertura">'
         '<div class="aqr-heading"><div><h3>Estratégia de Abertura · Brasil</h3>'
-        '<p>WIN · três fatores de contexto pré-abertura; WDO · leitura própria.</p></div>'
+        '<p>WIN · janela 08h40–08h55 BRT; WDO · leitura própria.</p></div>'
         '<span class="aqr-status">Pesquisa / sem ordens</span></div>'
         '<div class="aqr-indices">' + blocks + '</div>'
         '<div class="aqr-strategy-result">' + result + '</div>'
