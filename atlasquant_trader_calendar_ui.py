@@ -68,6 +68,10 @@ def calendar_source_status(data: Any) -> tuple[str, str]:
         if not str(data.get("fetched_at") or "").strip():
             return ("HORÁRIO NÃO COMPROVADO", "A coleta não trouxe carimbo verificável; leitura não pode ser considerada atual.")
         return ("FONTE RECEBIDA", "Eventos recebidos da fonte com horário identificável; conteúdo ainda pode sofrer revisões.")
+    if reason == "PROVIDER_NOT_AUTHORIZED":
+        return ("INTEGRAÇÃO DESATIVADA", "O calendário externo está bloqueado por configuração até confirmar assinatura, franquia e permissão de leitura.")
+    if reason == "ATLASQUANT_DAILY_CAP":
+        return ("LIMITE INTERNO ATINGIDO", "A cota conservadora do AtlasQuant para este processo foi atingida. Não foram iniciadas consultas extras.")
     if reason == "NO_EXISTING_TOKEN":
         return ("FONTE NÃO CONFIGURADA", "Nenhuma credencial existente foi encontrada. Nenhum serviço novo foi contratado.")
     if reason in ("HTTP_401", "HTTP_403", "HTTP_402"):
