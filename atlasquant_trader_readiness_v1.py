@@ -141,14 +141,33 @@ def _scanner(technical_data: Any, now: datetime) -> dict[str, Any]:
             or not isinstance(tf, Mapping)):
         return {**base, "state": "NÃO CONFIRMADO", "reason":
                 "Ativo, fonte, horário ou timeframes técnicos não comprovados."}
-    available = [key for key in _REQUIRED_TF
-                 if isinstance(tf.get(key), Mapping) and
-                 tf[key].get("state") == "VERIFIED"]
+    # A self-declared VERIFIED string is not proof. Every timeframe needs its
+    # own timestamp, source and directional context; the overall snapshot alone
+    # does not establish D1/H4/M15 freshness.
+    max_age = {"D1": 36 * 3600, "H4": 8 * 3600, "M15": 45 * 60}
+    available = []
+    directions = {}
+    for key in _REQUIRED_TF:
+        reading = tf.get(key)
+        if not isinstance(reading, Mapping) or reading.get("state") != "VERIFIED":
+            continue
+        feed = str(reading.get("source") or "").strip()
+        clock, _ = _age(reading.get("as_of"), now, max_seconds=max_age[key])
+        side = str(reading.get("bias") or "").upper()
+        if feed and len(feed) <= 160 and clock == "ATUAL" and side in {"ALTA", "BAIXA", "NEUTRO"}:
+            available.append(key)
+            directions[key] = side
     if len(available) != len(_REQUIRED_TF):
         return {**base, "state": "PARCIAL", "timeframes": available,
-                "reason": "M15 sem gatilho verificado é AGUARDAR, não quase pronto."}
+                "reason": "Falta confirmação atual em D1/H4/M15; M15 sem gatilho = AGUARDAR."}
+    if directions["M15"] in {"ALTA", "BAIXA"} and directions["D1"] in {"ALTA", "BAIXA"} and directions["M15"] != directions["D1"]:
+        return {**base, "state": "CONFLITO", "timeframes": available,
+                "reason": "M15 contra o viés D1: gatilho contrário bloqueado, nunca quase pronto."}
+    if directions["H4"] in {"ALTA", "BAIXA"} and directions["D1"] in {"ALTA", "BAIXA"} and directions["H4"] != directions["D1"]:
+        return {**base, "state": "CONFLITO", "timeframes": available,
+                "reason": "Confirmação H4 diverge de D1; aguardar nova estrutura."}
     return {"state": "EM ESTUDO", "timeframes": available,
-            "reason": "D1/H4/M15 verificados; ainda sem autorização do Risk Guardian."}
+            "reason": "D1/H4/M15 frescos e sem conflito direcional; Risk Guardian ainda não autorizou operação."}
 
 
 def build_trader_readiness(
