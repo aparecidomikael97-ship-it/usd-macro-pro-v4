@@ -203,3 +203,39 @@ LAB; seu uso fora do serviço autenticado exige revisão específica
 antes de qualquer coleta real.
 
 **Estado:** bloqueio de segurança no código do PR, sem API/deploy/Worker/cron.
+
+
+## Auditoria offline de hipótese de fuso EODHD (LAB)
+
+O arquivo `atlasquant_trader_eodhd_clock_audit_lab.py` foi preparado para
+receber amostras **fornecidas por um revisor**: identificador do evento, campo
+`date` bruto da EODHD, horário oficial com offset, URL da instituição,
+momento de consulta da referência e se ela é uma agenda ou divulgação.
+
+A comparação avalia duas hipóteses isoladas (datetime EODHD como UTC ou
+como horário civil de Brasília) com tolerância de cinco minutos. Elas **não
+são as únicas hipóteses possíveis**: conflito significa investigação, não
+conversão automática. A bateria exige no mínimo três eventos, duas datas
+e duas origens institucionais distintas. Referências vencidas, futuras,
+duplicadas, sem HTTPS oficial ou malformadas bloqueiam a amostra.
+
+- Exemplos de locais para **coleta humana futura de evidências**:
+  https://www.bls.gov/schedule/2026/ e
+  https://www.ibge.gov.br/calendario-de-divulgacoes.html.
+- URLs informadas não são abertas nem autenticadas pelo módulo: uma URL com
+  domínio institucional válido não comprova que a página contém aquele
+  horário. Uma agenda não comprova que a divulgação ocorreu.
+- Saída máxima: `UTC_CANDIDATE_REVIEW` ou
+  `BRT_CANDIDATE_REVIEW`, **nunca atestação**.
+  `timezone_attested=False`, `auto_config_allowed=False`,
+  `new_economic_release_confirmed=False`, sem chamadas de provedor.
+- Os 13 testes em `test_atlasquant_trader_eodhd_clock_audit_lab.py`
+  usam **datas fictícias**, não registros reais, e cobrem conflito,
+  referências falsas/vencidas, datas ambíguas, diversidade, duplicidade
+  e ausência de ativação.
+- Nada foi configurado no Render, nem habilitado o novo opt-in de fuso;
+  nenhuma coleta externa/cron/Worker/ordem foi iniciada.
+
+**Próxima prova pendente:** o proprietário deverá autorizar uma leitura
+controlada de sua conta EODHD (entitlement/custo primeiro), seguida da
+comparação com fontes oficiais. Até isso, o bloqueio permanece obrigatório.
