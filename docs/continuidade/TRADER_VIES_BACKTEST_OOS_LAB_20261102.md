@@ -63,3 +63,34 @@ ranking em recomendação de compra/venda.
 
 **Segurança:** sem API nova, cobranças, cron, Worker, deploy, merge
 ou ordens reais. Não declarar resultado de mercado real pelo LAB.
+
+
+## Revisão anti-inflacionamento de amostras (02/11/2026)
+
+O backtest do **viés diário** precisa impedir que múltiplas leituras
+intradiárias do MESMO par e horizonte sejam contabilizadas como
+previsões independentes no mesmo dia. O avaliador LAB agora exige
+unicidade de **(par, horizonte, data UTC da emissão)**:
+
+- Diferença no ID da previsão, minuto, hora ou representação de offset
+  NÃO cria uma nova observação estatística no mesmo dia UTC.
+- Em vez de escolher retrospectivamente a previsão que acertou, o
+  avaliador **rejeita o lote inteiro** com o código
+  DUPLICATE_PAIR_HORIZON_UTC_DAY_EVALUATION_SLOT.
+- Pares e horizontes diferentes podem ocupar slots independentes,
+  mas seus resultados ainda são correlacionados; a contagem não
+  representa ensaios estatísticos independentes e não autoriza
+  intervalos de confiança ou taxas reais de acerto.
+- Diariamente o motor poderá ser atualizado depois de eventos macro;
+  isso NÃO significa que cada atualização possa aumentar o número
+  de amostras do backtest. O horário de observação avaliável precisa
+  ser predefinido e registrado ANTES de conhecer os resultados.
+- A data UTC é convenção transitória de LAB, não substitui
+  comprovação da sessão Forex e do calendário local de mercado.
+- Cinco testes novos/ajustados cobrem duplicação de mesmo dia,
+  alterações de horário/fuso, dias insuficientes e diferentes
+  pares/horizontes. A suíte Quality já executa o arquivo.
+
+**Mantido:** nenhuma previsão imutável real, preço spot licenciado,
+mensuração OOS real ou porcentagem de assertividade demonstrada.
+HARD NO-GO — sem merge/deploy, Worker, cron, ordens ou gasto.

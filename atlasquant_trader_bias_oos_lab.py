@@ -106,6 +106,7 @@ def evaluate_bias_out_of_sample_lab(
         return _rejected("Empty/oversized fixture; no selective scoring.")
 
     f_by_id = {}
+    evaluation_slots = set()
     methods = set()
     for item in forecasts:
         if not isinstance(item, Mapping):
@@ -122,6 +123,14 @@ def evaluate_bias_out_of_sample_lab(
                 or decision is None or evidence is None
                 or not evidence <= decision <= now):
             return _rejected("Invalid/duplicate/future forecast or missing point-in-time evidence.")
+        # A directional accuracy sample is one pre-specified daily
+        # evaluation per pair and horizon, not every intraday revision.
+        # Same UTC date and market identity is one research observation,
+        # even if IDs, local offsets or issuance times differ.
+        slot = (pair, horizon, decision.date())
+        if slot in evaluation_slots:
+            return _rejected("DUPLICATE_PAIR_HORIZON_UTC_DAY_EVALUATION_SLOT")
+        evaluation_slots.add(slot)
         f_by_id[key] = {"key": key, "pair": pair, "horizon": horizon,
                         "bias": bias, "decision": decision, "method": method}
         methods.add(method)
