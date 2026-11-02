@@ -30,7 +30,7 @@ def _tech(at=AT):
     return {
         "state": "VALIDATED_TECHNICAL", "source": "LAB",
         "as_of": at.isoformat(), "symbol": OFFICIAL_PAIRS[0],
-        "timeframes": {tf: {"state": "VERIFIED"} for tf in ("D1", "H4", "M15")},
+        "timeframes": {tf: {"state": "VERIFIED", "source": "LAB", "as_of": at.isoformat(), "bias": "ALTA"} for tf in ("D1", "H4", "M15")},
     }
 
 
@@ -88,6 +88,23 @@ class CheckpointReadinessTests(unittest.TestCase):
         self.assertEqual(m["scanner"]["state"], "PARCIAL")
         self.assertNotIn("M15", m["scanner"]["timeframes"])
         self.assertIn("AGUARDAR", m["scanner"]["reason"])
+
+    def test_countertrend_m15_is_conflict_not_near_ready(self):
+        t = _tech()
+        t["timeframes"]["M15"]["bias"] = "BAIXA"
+        m = build_trader_readiness(technical_data=t, at=AT)
+        self.assertEqual(m["scanner"]["state"], "CONFLITO")
+        self.assertIn("M15", m["scanner"]["reason"])
+        self.assertEqual(m["decision"]["state"], "AGUARDAR")
+
+    def test_missing_per_timeframe_source_or_clock_is_not_verified(self):
+        for key in ("source", "as_of"):
+            t = _tech()
+            t["timeframes"]["M15"][key] = ""
+            with self.subTest(field=key):
+                m = build_trader_readiness(technical_data=t, at=AT)
+                self.assertEqual(m["scanner"]["state"], "PARCIAL")
+                self.assertEqual(m["decision"]["state"], "AGUARDAR")
 
     def test_complete_evidence_still_never_approves_orders(self):
         m = build_trader_readiness(
