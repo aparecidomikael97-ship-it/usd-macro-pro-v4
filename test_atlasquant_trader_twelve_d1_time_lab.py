@@ -6,6 +6,7 @@ from pathlib import Path
 
 from atlasquant_trader_twelve_d1_time_lab import (
     audit_synthetic_twelve_d1_time_labels_lab,
+    assess_synthetic_d1_availability_lab,
 )
 
 NOW = datetime(2026, 11, 2, 16, tzinfo=timezone.utc)
@@ -136,6 +137,83 @@ class TwelveDailyTimeLabTests(unittest.TestCase):
         for raw in (None, {}, {"state": "LAB_SYNTHETIC_TWELVE_D1"}, []):
             self.assertEqual(inspect(raw)["state"],
                              "LAB_REJECTED_UNVERIFIED_D1_TIME_LABEL")
+
+    def test_d1_first_label_alone_never_supplies_a_closed_candle(self):
+        data = fixture()
+        out = assess_synthetic_d1_availability_lab(
+            data, captured_at_utc="2026-01-10T13:10:00+00:00",
+            forecast_issued_at_utc="2026-01-10T13:30:00+00:00", at=NOW)
+        self.assertEqual(out["candidates"], [])
+        self.assertEqual(len(out["pending_or_unproven_labels"]), 1)
+        self.assertFalse(out["can_feed_real_oos"])
+
+    def test_after_following_open_allows_only_noncertified_clock_hypothesis(self):
+        data = fixture()
+        data["values"].append({"datetime": "2026-01-11 00:00:00"})
+        out = assess_synthetic_d1_availability_lab(
+            data, captured_at_utc="2026-01-10T13:01:00+00:00",
+            forecast_issued_at_utc="2026-01-10T13:02:00+00:00", at=NOW)
+        self.assertEqual(out["state"], "LAB_CLOCK_HYPOTHESIS_NOT_ATTESTED")
+        self.assertEqual(len(out["candidates"]), 1)
+        self.assertEqual(len(out["pending_or_unproven_labels"]), 1)
+        self.assertEqual(out["candidates"][0]["next_bar_open_utc"],
+                         "2026-01-10T13:00:00+00:00")
+        self.assertEqual(out["candidates"][0]["earliest_unverified_capture_at_utc"],
+                         "2026-01-10T13:01:00+00:00")
+        self.assertFalse(out["capture_integrity_verified"])
+        self.assertFalse(out["can_feed_real_bias"])
+
+    def test_capture_before_next_bar_open_cannot_assume_prior_close(self):
+        data = fixture()
+        data["values"].append({"datetime": "2026-01-11 00:00:00"})
+        out = assess_synthetic_d1_availability_lab(
+            data, captured_at_utc="2026-01-10T12:59:00+00:00",
+            forecast_issued_at_utc="2026-01-10T13:10:00+00:00", at=NOW)
+        self.assertEqual(out["candidates"], [])
+        self.assertEqual(len(out["pending_or_unproven_labels"]), 2)
+
+    def test_fraudulently_postdated_capture_cannot_backdate_to_open(self):
+        data = fixture()
+        data["values"].append({"datetime": "2026-01-11 00:00:00"})
+        out = assess_synthetic_d1_availability_lab(
+            data, captured_at_utc="2026-01-12T13:01:00+00:00",
+            forecast_issued_at_utc="2026-01-12T13:02:00+00:00", at=NOW)
+        self.assertEqual(out["candidates"][0]["earliest_unverified_capture_at_utc"],
+                         "2026-01-12T13:01:00+00:00")
+        self.assertFalse(out["capture_integrity_verified"])
+        self.assertFalse(out["can_feed_real_oos"])
+
+    def test_capture_later_than_forecast_is_rejected(self):
+        out = assess_synthetic_d1_availability_lab(
+            fixture(), captured_at_utc="2026-01-10T13:00:00+00:00",
+            forecast_issued_at_utc="2026-01-10T12:00:00+00:00", at=NOW)
+        self.assertEqual(out["state"], "LAB_D1_AVAILABILITY_NOT_PROVEN")
+
+    def test_naive_capture_and_future_forecast_are_rejected(self):
+        for cap, forecast in (
+            ("2026-01-10T13:00:00", "2026-01-10T14:00:00+00:00"),
+            ("2026-01-10T13:00:00+00:00", "2026-12-10T14:00:00+00:00"),
+        ):
+            out = assess_synthetic_d1_availability_lab(
+                fixture(), captured_at_utc=cap,
+                forecast_issued_at_utc=forecast, at=NOW)
+            self.assertEqual(out["state"], "LAB_D1_AVAILABILITY_NOT_PROVEN")
+
+    def test_missing_timezone_metadata_fails_before_availability(self):
+        data = fixture()
+        del data["meta"]["exchange_timezone"]
+        out = assess_synthetic_d1_availability_lab(
+            data, captured_at_utc="2026-01-10T13:00:00+00:00",
+            forecast_issued_at_utc="2026-01-10T14:00:00+00:00", at=NOW)
+        self.assertEqual(out["state"], "LAB_D1_AVAILABILITY_NOT_PROVEN")
+
+    def test_legacy_cache_cannot_self_attest_historical_lookahead(self):
+        data = json.loads(LEGACY.read_text(encoding="utf-8"))
+        out = assess_synthetic_d1_availability_lab(
+            data, captured_at_utc="2026-09-17T06:28:10+00:00",
+            forecast_issued_at_utc="2026-09-17T07:00:00+00:00", at=NOW)
+        self.assertEqual(out["state"], "LAB_D1_AVAILABILITY_NOT_PROVEN")
+        self.assertFalse(out["can_feed_real_bias"])
 
     def test_naive_evaluation_instant_is_invalid(self):
         with self.assertRaises(ValueError):

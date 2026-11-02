@@ -115,4 +115,77 @@ def audit_synthetic_twelve_d1_time_labels_lab(
                       " actual availability, market source or licensing."}
 
 
-__all__ = ["SCHEMA", "audit_synthetic_twelve_d1_time_labels_lab"]
+def _aware_utc(value: Any) -> datetime | None:
+    if not isinstance(value, str) or len(value) > 60:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except (ValueError, OverflowError):
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
+
+
+def assess_synthetic_d1_availability_lab(
+    payload: Any, *, captured_at_utc: str,
+    forecast_issued_at_utc: str, at: datetime,
+) -> dict[str, Any]:
+    """Illustrate no-lookahead for D1 labels, with a strict fail-closed gate.
+
+    Even a successfully converted local label is a BAR OPEN, never evidence
+    of the completed OHLC. A following bar opening is a necessary *clock*
+    boundary, not independent proof of provider publication/receipt.
+    The declared capture is *untrusted* and never retrospectively assigned
+    to historical opens. Entire method is LAB_SYNTHETIC, no real bias.
+    """
+    checked = audit_synthetic_twelve_d1_time_labels_lab(payload, at=at)
+    deny = {
+        "state": "LAB_D1_AVAILABILITY_NOT_PROVEN",
+        "reason": "Data availability or clock evidence insufficient",
+        "candidates": [],
+        "pending_or_unproven_labels": [],
+        "real_market_close_verified": False,
+        "capture_integrity_verified": False,
+        "can_feed_real_bias": False,
+        "can_feed_real_oos": False,
+        "trade_authorized": False, "worker_enabled": False,
+        "scheduler_enabled": False,
+    }
+    if checked["state"] != "LAB_LOCAL_LABEL_CONVERSION_ONLY":
+        return {**deny, "reason": "Local provider label rejected or timezone missing"}
+    capture = _aware_utc(captured_at_utc)
+    issue = _aware_utc(forecast_issued_at_utc)
+    current = at.astimezone(timezone.utc)
+    if capture is None or issue is None or not capture <= issue <= current:
+        return {**deny, "reason": "Capture/issue times missing, reversed or from the future"}
+
+    rows = checked["utc_bar_open_labels"]
+    samples = []
+    pending = []
+    for i, row in enumerate(rows):
+        if i + 1 == len(rows):
+            pending.append(row["provider_local_bar_label"])
+            continue
+        next_open = _aware_utc(rows[i + 1]["calculated_utc_bar_open_label"])
+        if next_open is None or next_open > capture:
+            pending.append(row["provider_local_bar_label"])
+            continue
+        samples.append({
+            "local_bar_open_label": row["provider_local_bar_label"],
+            "next_bar_open_utc": next_open.isoformat(),
+            "earliest_unverified_capture_at_utc": capture.isoformat(),
+            "not_available_at_open": True,
+            "price_availability_verified": False,
+            "market_close_verified": False,
+        })
+    return {
+        **deny,
+        "state": "LAB_CLOCK_HYPOTHESIS_NOT_ATTESTED",
+        "reason": "Following open precedes declared capture; publication still unverified",
+        "candidates": samples, "pending_or_unproven_labels": pending,
+        "declared_capture_at_utc": capture.isoformat(),
+        "forecast_issued_at_utc": issue.isoformat(),
+    }
+
+
+__all__ = ["SCHEMA", "audit_synthetic_twelve_d1_time_labels_lab",
+           "assess_synthetic_d1_availability_lab"]

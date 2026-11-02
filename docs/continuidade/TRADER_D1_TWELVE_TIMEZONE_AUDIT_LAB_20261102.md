@@ -82,3 +82,35 @@ disponibilidade temporal de informação para um backtest.
 
 Sem chamadas pagas à Twelve Data, sem agendamento, Worker, deploy,
 merge ou ordens. Nenhuma alteração aplicada ao aplicativo público.
+
+
+## Gate adicional: horário de abertura não é preço conhecido
+
+Ao receber dois labels locais sintéticos sucessivos em que
+meta.exchange_timezone esteja presente, a função
+assess_synthetic_d1_availability_lab exige:
+
+- captured_at_utc e forecast_issued_at_utc com offset explícito;
+  **captura <= emissão <= instante da pesquisa**;
+- um label da barra SEGUINTE para estabelecer, apenas
+  hipoteticamente, que o período anterior já poderia ter terminado;
+- captura não anterior ao label convertido da barra seguinte;
+- nunca usar a última barra da amostra como fechamento confirmado;
+- a única data em que um valor pode ser alegado como recebido
+  é a de captura declarada, **não** a do início histórico da barra.
+
+Mesmo com essas condições, o resultado chama-se
+LAB_CLOCK_HYPOTHESIS_NOT_ATTESTED, pois timestamps de
+amostras sintéticas não comprovam hora oficial de publicação,
+captura imutável ou direito sobre a cotação. As flags
+can_feed_real_bias e can_feed_real_oos continuam falsas.
+
+O teste de continuidade adiciona oito cenários adversos:
+barra única, barra seguinte, captura antecipada, captura
+posterior sem retroagir para o label de abertura, captura após
+previsão, hora sem fuso, metadado de provedor ausente e
+o cache antigo sem histórico de metadados.
+
+Cuidado: um próximo label é uma fronteira de relógio, mas
+**não é prova independente de fechamento**, disponibilidade,
+correção dos preços ou viés. Não há backtest real nesta fase.
