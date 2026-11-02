@@ -29,7 +29,7 @@ from atlasquant_ecosystem_workspace_ui import (
     workspace_cockpit_html,
 )
 
-_AREA_ORDER = ("trader", "negocios", "investimentos", "aion")
+_AREA_ORDER = ("trader", "negocios", "investimentos", "aion", "trader_radar")
 CENTRAL_ROOT = "central_root"
 CENTRAL_CHOICE_KEY = "atlasquant_central_choice"
 LOGIN_GREETING_KEY = "aion_login_greeting_shown"
@@ -54,6 +54,11 @@ _AREAS = {
     "investimentos": {
         "label": "Investimentos",
         "sentence": "Central de investimentos para comparação e leitura, sem execução financeira automática.",
+        "private": True,
+    },
+    "trader_radar": {
+        "label": "Trader Radar",
+        "sentence": "Radar enxuto de Forex, oito moedas, índices e contexto econômico.",
         "private": True,
     },
 }
@@ -213,6 +218,8 @@ def _canon_area(value: Any) -> str:
         "negocios": "negocios",
         "negócios": "negocios",
         "trader": "trader",
+        "trader radar": "trader_radar",
+        "radar forex indices": "trader_radar",
         "investimentos": "investimentos",
         "renda fixa": "investimentos",
         "renda fixa investimentos": "investimentos",
@@ -815,7 +822,7 @@ def central_selector_html(
     confirmed_status: Mapping[str, Any] | None = None,
     timezone_name: str | None = None,
 ) -> str:
-    """Four approved visual cards, each is the access itself."""
+    """Central do ecossistema: quatro áreas legadas e o Trader Radar compacto."""
     if not central_visibility_model(access)["admin"]:
         return ""
     from atlasquant_reference_ui import CSS, reference_html
