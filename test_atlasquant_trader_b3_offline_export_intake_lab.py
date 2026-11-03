@@ -228,7 +228,8 @@ class B3AuthorizedCsvPreparationTests(unittest.TestCase):
             self.assertEqual(check(bad)["state"],DENIED)
 
     def test_invalid_bytes_size_and_missing_rows_refused(self):
-        for d in (None,{},[],b"",b"bad",b"\xff"*100,b"x"*5000,b"\x00"*100):
+        self.assertEqual(inspect(None, manifest(csv_sample()), evaluated_at=ASOF)["state"], DENIED)
+        for d in ({},[],b"",b"bad",b"\xff"*100,b"x"*5000,b"\x00"*100):
             self.assertEqual(check(d)["state"],DENIED)
 
     def test_no_newline_crlf_or_unsafe_control_characters(self):
