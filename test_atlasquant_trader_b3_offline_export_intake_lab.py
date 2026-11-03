@@ -49,7 +49,7 @@ def manifest(data, *, synthetic=True):
 
 def check(data=None, *, synthetic=True, metadata=None, at=ASOF):
     blob = csv_sample(synthetic=synthetic) if data is None else data
-    return inspect(blob, manifest(blob, synthetic=synthetic) if metadata is None else metadata,
+    return inspect(blob, manifest(blob if isinstance(blob, bytes) else b"", synthetic=synthetic) if metadata is None else metadata,
                    evaluated_at=at)
 
 
