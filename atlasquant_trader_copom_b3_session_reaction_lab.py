@@ -31,6 +31,13 @@ B3_SCHEDULE_SOURCE = (
     "https://www.b3.com.br/data/files/99/B7/82/67/8A631A103BBB511AAC094EA8/"
     "OC%20050-2026-VNC%20NOVOS%20HORARIOS%20DE%20NEGOCIACAO_PT.pdf"
 )
+B3_EXPIRY_CALENDAR_URL = ("https://www.b3.com.br/main.jsp?"
+    "lumA=1&lumII=8A80CB81633FBF0B016340EB990C0D5E&lumPageId=8A6882694E91F2D4014E92D6BA5C1593")
+B3_BOLETINS_USAGE_NOTICE_URL = ("https://b3.com.br/pt_br/market-data-e-indices/"
+    "servicos-de-dados/market-data/historico/boletins-diarios/"
+    "pesquisa-por-pregao/pesquisa-por-pregao/")
+B3_UP2DATA_EOD_FAQ_URL = ("https://www.b3.com.br/pt_br/market-data-e-indices/"
+    "servicos-de-dados/up2data/perguntas-frequentes/servico-e-arquivos.htm")
 TZ_BRT = ZoneInfo("America/Sao_Paulo")
 CUT = datetime(2026, 11, 3, 15, tzinfo=timezone.utc)
 SESSION_START = datetime(2026, 11, 4, 9, 0, tzinfo=TZ_BRT)
@@ -40,12 +47,18 @@ SCHEDULE = {
             "pre_window_end": datetime(2026, 11, 4, 18, 25, tzinfo=TZ_BRT),
             "next_window_end": datetime(2026, 11, 5, 18, 25, tzinfo=TZ_BRT),
             "synthetic_symbol": "SIM_WIN",
-            "synthetic_contract": "SIM_WIN_FAKE_SINGLE_EXPIRY"},
+            "synthetic_contract": "SIM_WIN_FAKE_SINGLE_EXPIRY",
+            "real_contract_candidate": "WINZ26",
+            "real_contract_last_trade_candidate": "2026-12-16",
+            "real_contract_maturity_candidate": "2026-12-17"},
     "WDO": {"b3_ticker": "FUT WDO", "brasilia_close": "18:30",
             "pre_window_end": datetime(2026, 11, 4, 18, 30, tzinfo=TZ_BRT),
             "next_window_end": datetime(2026, 11, 5, 18, 30, tzinfo=TZ_BRT),
             "synthetic_symbol": "SIM_WDO",
-            "synthetic_contract": "SIM_WDO_FAKE_SINGLE_EXPIRY"},
+            "synthetic_contract": "SIM_WDO_FAKE_SINGLE_EXPIRY",
+            "real_contract_candidate": "WDOZ26",
+            "real_contract_last_trade_candidate": "2026-11-30",
+            "real_contract_maturity_candidate": "2026-12-01"},
 }
 OBS_FIELDS = frozenset((
     "instrument", "contract_symbol", "fixture_mode", "pre_price_points",
@@ -62,6 +75,15 @@ def _base(status: str, reason: str | None) -> dict[str, Any]:
         "pre_event_blob": PRE_EVENT_BLOB,
         "pre_event_original_bytes_matched": False,
         "b3_schedule_source_url": B3_SCHEDULE_SOURCE,
+        "b3_official_expiry_calendar_url": B3_EXPIRY_CALENDAR_URL,
+        "b3_boletins_usage_notice_url": B3_BOLETINS_USAGE_NOTICE_URL,
+        "b3_up2data_eod_faq_url": B3_UP2DATA_EOD_FAQ_URL,
+        "b3_boletins_automated_or_ai_collection_allowed": False,
+        "b3_boletins_license_for_automated_ai_collection": False,
+        "b3_eod_summary_is_intraday_first_or_last_trade": False,
+        "rights_for_manual_export_or_reuse_verified": False,
+        "commercial_market_data_service_approved": False,
+        "automated_price_ingestion_enabled": False,
         "release_earliest_at_utc": EARLIEST_RELEASE.isoformat(),
         "announcement_actual_timestamp_verified": False,
         "b3_holiday_and_exception_calendar_verified": False,
@@ -156,6 +178,7 @@ def build_copom_b3_session_reaction_lab(
             "VERIFY_TIMESTAMPED_LAST_REAL_TRADE_BEFORE_CLOSE",
             "VERIFY_TIMESTAMPED_FIRST_REAL_TRADE_AFTER_NEXT_OPEN",
             "VERIFY_RELIABLE_B3_SOURCE_AND_DATA_RIGHTS",
+            "DO_NOT_AUTOMATE_B3_BOLETINS_PORTAL_COLLECTION",
             "CHECK_OVERNIGHT_USD_DI_NEWS_AND_OTHER_CONFOUNDERS",
         ],
         "announcement_after_win_close": True,
@@ -180,6 +203,12 @@ def build_copom_b3_session_reaction_lab(
                 info["next_window_end"].astimezone(timezone.utc).isoformat(),
             "event_released_during_regular_trading": False,
             "first_next_session_liquidity_verified": False,
+            "candidate_real_contract": info["real_contract_candidate"],
+            "candidate_contract_last_trade": info["real_contract_last_trade_candidate"],
+            "candidate_contract_maturity": info["real_contract_maturity_candidate"],
+            "candidate_liquidity_verified": False,
+            "candidate_actual_trades_verified": False,
+            "candidate_contract_documentary_only": True,
             "price_reaction_observed": False,
         })
     if synthetic_observations is None:

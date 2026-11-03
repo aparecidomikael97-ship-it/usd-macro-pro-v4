@@ -159,6 +159,48 @@ class B3SessionReactionLabTests(unittest.TestCase):
             x=fixture("WIN");x["instrument"]=value
             self.assertEqual(run([x],at=AFTER)["state"], DENIED)
 
+    def test_official_b3_expiry_calendar_candidates_for_nov_event(self):
+        rows={x["instrument"]:x for x in run()["schedule_rows"]}
+        self.assertEqual(rows["WIN"]["candidate_real_contract"],"WINZ26")
+        self.assertEqual(rows["WIN"]["candidate_contract_last_trade"],"2026-12-16")
+        self.assertEqual(rows["WIN"]["candidate_contract_maturity"],"2026-12-17")
+        self.assertEqual(rows["WDO"]["candidate_real_contract"],"WDOZ26")
+        self.assertEqual(rows["WDO"]["candidate_contract_last_trade"],"2026-11-30")
+        self.assertEqual(rows["WDO"]["candidate_contract_maturity"],"2026-12-01")
+
+    def test_candidates_are_documentary_not_verified_traded_symbols(self):
+        for row in run()["schedule_rows"]:
+            self.assertTrue(row["candidate_contract_documentary_only"])
+            self.assertFalse(row["candidate_liquidity_verified"])
+            self.assertFalse(row["candidate_actual_trades_verified"])
+            self.assertFalse(row["first_next_session_liquidity_verified"])
+
+    def test_b3_public_page_explicitly_denies_ai_scraping(self):
+        r=run()
+        self.assertIn("pesquisa-por-pregao",r["b3_boletins_usage_notice_url"])
+        self.assertFalse(r["b3_boletins_automated_or_ai_collection_allowed"])
+        self.assertFalse(r["b3_boletins_license_for_automated_ai_collection"])
+        self.assertFalse(r["automated_price_ingestion_enabled"])
+
+    def test_market_eod_data_cannot_be_used_as_intraday_tick(self):
+        r=run()
+        self.assertIn("up2data",r["b3_up2data_eod_faq_url"])
+        self.assertFalse(r["b3_eod_summary_is_intraday_first_or_last_trade"])
+        self.assertFalse(r["commercial_market_data_service_approved"])
+
+    def test_no_reuse_rights_or_purchased_data_are_inferred(self):
+        r=run([fixture("WDO")],at=AFTER)
+        self.assertFalse(r["rights_for_manual_export_or_reuse_verified"])
+        self.assertFalse(r["commercial_market_data_service_approved"])
+        self.assertFalse(r["b3_raw_quotes_archived"])
+        self.assertFalse(r["real_market_reaction_measured"])
+
+    def test_scrape_ban_is_explicit_required_gate_for_real_capture(self):
+        requirements=run()["real_quote_eligibility_conditions"]
+        self.assertIn("DO_NOT_AUTOMATE_B3_BOLETINS_PORTAL_COLLECTION",requirements)
+        self.assertIn("VERIFY_RELIABLE_B3_SOURCE_AND_DATA_RIGHTS",requirements)
+        self.assertIn("DOCUMENT_SAME_ACTUAL_CONTRACT_MATURITY_PRE_AND_POST",requirements)
+
     def test_pre_and_post_must_share_the_same_synthetic_maturity(self):
         for instrument in ("WIN", "WDO"):
             x = fixture(instrument)
@@ -197,7 +239,7 @@ class B3SessionReactionLabTests(unittest.TestCase):
 
     def test_b3_real_price_readiness_requirements_remain_unmet(self):
         r=run()
-        self.assertEqual(len(r["real_quote_eligibility_conditions"]),6)
+        self.assertEqual(len(r["real_quote_eligibility_conditions"]),7)
         self.assertIn("CHECK_OVERNIGHT_USD_DI_NEWS_AND_OTHER_CONFOUNDERS",
                       r["real_quote_eligibility_conditions"])
         self.assertFalse(r["overnight_external_events_excluded"])
