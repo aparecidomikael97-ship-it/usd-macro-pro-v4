@@ -231,5 +231,112 @@ class BiasBridgeLabTests(unittest.TestCase):
         self.assertEqual(out["evaluation"]["state"], "INVALID_OR_INCOMPLETE_FIXTURE")
 
 
+class BridgeBatchAuthenticityTests(unittest.TestCase):
+    """Caller-controlled result batches may not claim verified market evidence."""
+
+    def assert_rejected(self, b):
+        with self.assertRaises(ValueError):
+            evaluate_synthetic_bias_batches_lab(
+                [b], [], split_at=SPLIT, at=SCORING_AT,
+                min_train=3, min_test=3, min_test_days=3,
+            )
+
+    def test_normal_issuer_fields_still_accepted(self):
+        out = evaluate_synthetic_bias_batches_lab(
+            [issue()], [], split_at=SPLIT, at=SCORING_AT,
+            min_train=3, min_test=3, min_test_days=3,
+        )
+        self.assertEqual(out["state"], "LAB_SYNTHETIC_EVALUATION_ONLY")
+        self.assertFalse(out["oos_real_proven"])
+
+    def test_forged_batch_market_verified_blocked(self):
+        b = issue()
+        b["market_data_verified"] = True
+        self.assert_rejected(b)
+
+    def test_forged_batch_durable_provenance_blocked(self):
+        b = issue()
+        b["durable_provenance_verified"] = True
+        self.assert_rejected(b)
+
+    def test_forged_batch_worker_blocked(self):
+        b = issue()
+        b["worker_enabled"] = True
+        self.assert_rejected(b)
+
+    def test_forged_batch_scheduler_blocked(self):
+        b = issue()
+        b["scheduler_enabled"] = True
+        self.assert_rejected(b)
+
+    def test_batch_false_no_settlement_flag_blocked(self):
+        b = issue()
+        b["no_settlements_seen_by_issuer"] = False
+        self.assert_rejected(b)
+
+    def test_extra_batch_probability_field_blocked(self):
+        b = issue()
+        b["claimed_accuracy_probability"] = 0.99
+        self.assert_rejected(b)
+
+    def test_missing_batch_counts_blocked(self):
+        b = issue()
+        del b["counts"]
+        self.assert_rejected(b)
+
+    def test_forged_batch_counts_blocked(self):
+        b = issue()
+        b["counts"]["D1"]["ALTA"] += 1
+        self.assert_rejected(b)
+
+    def test_forged_row_market_verified_blocked(self):
+        b = issue()
+        b["forecasts"][0]["market_verified"] = True
+        self.assert_rejected(b)
+
+    def test_extra_row_probability_field_blocked(self):
+        b = issue()
+        b["forecasts"][0]["probability_90_pct"] = 0.9
+        self.assert_rejected(b)
+
+    def test_row_missing_provenance_field_blocked(self):
+        b = issue()
+        del b["forecasts"][0]["market_verified"]
+        self.assert_rejected(b)
+
+    def test_row_fake_evidence_kind_blocked(self):
+        b = issue()
+        b["forecasts"][0]["evidence_kind"] = "LIVE_BROKER_CERTIFIED"
+        self.assert_rejected(b)
+
+    def test_row_future_evidence_time_blocked(self):
+        b = issue()
+        b["forecasts"][0]["evidence_at_utc"] = (
+            AT + timedelta(days=1)).isoformat()
+        self.assert_rejected(b)
+
+    def test_absent_evidence_cannot_have_direction(self):
+        b = issue()
+        b["forecasts"][0]["evidence_kind"] = "ABSENT_POLICY"
+        self.assert_rejected(b)
+
+    def test_absent_evidence_must_be_issue_time_abstention(self):
+        b = issue(data={})
+        b["forecasts"][0]["evidence_at_utc"] = (
+            AT - timedelta(seconds=1)).isoformat()
+        self.assert_rejected(b)
+
+    def test_missing_reason_rejected(self):
+        b = issue()
+        b["forecasts"][0]["reason"] = ""
+        self.assert_rejected(b)
+
+    def test_long_reason_rejected(self):
+        b = issue()
+        b["forecasts"][0]["reason"] = "x" * 401
+        self.assert_rejected(b)
+
+
+
 if __name__ == "__main__":
     unittest.main()

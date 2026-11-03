@@ -22,6 +22,20 @@ FIXED_METHOD = METHOD + "_D1W1_CONFIRM_V1"
 BATCH_RE = re.compile(r"^[A-Za-z0-9_-]{3,32}$")
 HORIZONS = ("D1", "W1", "MN1")
 SIDES = ("ALTA", "BAIXA", "NEUTRO", "AGUARDAR")
+# Caller-provided batches must still have the exact shape issued by this LAB.
+# Otherwise forged "market_verified" or extra probability fields can survive
+# into a synthetic evaluation snapshot and be mistaken for real evidence.
+BATCH_FIELDS = frozenset((
+    "schema", "state", "batch_key", "issued_at_utc", "method_id", "forecasts",
+    "counts", "no_settlements_seen_by_issuer", "durable_provenance_verified",
+    "market_data_verified", "trade_authorized", "worker_enabled",
+    "scheduler_enabled",
+))
+FORECAST_FIELDS = frozenset((
+    "forecast_id", "state", "pair", "horizon", "bias", "method_id",
+    "issued_at_utc", "evidence_at_utc", "evidence_kind", "reason",
+    "market_verified", "trade_authorized",
+))
 
 
 def _datetime(value: Any) -> datetime | None:
@@ -135,10 +149,16 @@ def evaluate_synthetic_bias_batches_lab(
     issued_at = set()
     previous = None
     for batch in batches:
-        if not isinstance(batch, Mapping) or batch.get("schema") != SCHEMA or (
-            batch.get("state") != "LAB_SYNTHETIC_ISSUED"
-        ) or batch.get("method_id") != FIXED_METHOD:
-            raise ValueError("Invalid synthetic forecast batch")
+        if (not isinstance(batch, Mapping) or set(batch) != BATCH_FIELDS
+                or batch.get("schema") != SCHEMA
+                or batch.get("state") != "LAB_SYNTHETIC_ISSUED"
+                or batch.get("method_id") != FIXED_METHOD
+                or batch.get("no_settlements_seen_by_issuer") is not True
+                or any(batch.get(flag) is not False for flag in (
+                    "durable_provenance_verified", "market_data_verified",
+                    "trade_authorized", "worker_enabled", "scheduler_enabled",
+                ))):
+            raise ValueError("Invalid or falsely verified synthetic forecast batch")
         key = batch.get("batch_key")
         clock = _datetime(batch.get("issued_at_utc"))
         records = batch.get("forecasts")
@@ -151,14 +171,31 @@ def evaluate_synthetic_bias_batches_lab(
                 if isinstance(row, Mapping)}
         if len(rows) != 84 or rows != {(pair, h) for pair in OFFICIAL_PAIRS for h in HORIZONS}:
             raise ValueError("Incomplete canonical batch")
+        expected_counts = {
+            h: {side: sum(row.get("horizon") == h and row.get("bias") == side
+                          for row in records) for side in SIDES}
+            for h in HORIZONS
+        }
+        if batch.get("counts") != expected_counts:
+            raise ValueError("Stated category counts differ from issued research rows")
         for row in records:
-            if (row.get("issued_at_utc") != clock.isoformat() or
-                    row.get("method_id") != FIXED_METHOD or
-                    row.get("state") != "LAB_SYNTHETIC_BIAS" or
-                    row.get("forecast_id") != f"{key}-{row['horizon']}-{row['pair'].replace('/', '')}" or
-                    row.get("bias") not in SIDES or
-                    row.get("trade_authorized") is not False):
-                raise ValueError("Forecast batch is internally inconsistent")
+            evidence = _datetime(row.get("evidence_at_utc"))
+            if (set(row) != FORECAST_FIELDS
+                    or row.get("issued_at_utc") != clock.isoformat()
+                    or row.get("method_id") != FIXED_METHOD
+                    or row.get("state") != "LAB_SYNTHETIC_BIAS"
+                    or row.get("forecast_id") !=
+                    f"{key}-{row['horizon']}-{row['pair'].replace('/', '')}"
+                    or row.get("bias") not in SIDES
+                    or row.get("market_verified") is not False
+                    or row.get("trade_authorized") is not False
+                    or row.get("evidence_kind") not in ("SYNTHETIC_INPUT", "ABSENT_POLICY")
+                    or (row.get("evidence_kind") == "ABSENT_POLICY"
+                        and (row.get("bias") != "AGUARDAR" or evidence != clock))
+                    or evidence is None or evidence > clock
+                    or not isinstance(row.get("reason"), str)
+                    or not 8 <= len(row["reason"].strip()) <= 400):
+                raise ValueError("Forecast row has forged provenance, extras or chronology")
         all_forecasts.extend(records)
         previous = clock
         keys.add(key)
