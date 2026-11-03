@@ -1166,11 +1166,12 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
     )
 
 
-def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None, daily_data=None, calendar_data=None):
+def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None, daily_data=None, calendar_data=None, news_data=None, official_data=None):
     if area == "trader_radar":
         from atlasquant_trader_radar_compact_ui import trader_radar_html
         return trader_radar_html(selected=selected, name=name,
-                                 show_central=show_central, daily_data=daily_data, calendar_data=calendar_data)
+                                 show_central=show_central, daily_data=daily_data, calendar_data=calendar_data,
+                                 news_data=news_data, official_data=official_data)
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
@@ -1528,13 +1529,18 @@ def render_reference_workspace(
         else None
     )
     calendar_data = None
+    official_data = None
     if area == "trader_radar" and selected == "master":
         from atlasquant_trader_calendar_service import read_calendar
+        from atlasquant_trader_master_official_series import read_official_series
         calendar_data = read_calendar(st, access)
+        official_data = read_official_series(st)
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
         show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft,pilot_planning_read_model=pilot_planning_read_model,
         daily_data=st.session_state.get("atlasquant_trader_radar_daily") if area == "trader_radar" else None,
-        calendar_data=calendar_data),key="aq_reference_"+area,on_navigate_change=lambda:None)
+        calendar_data=calendar_data,
+        news_data=st.session_state.get("v1061_currency_news") if area == "trader_radar" else None,
+        official_data=official_data),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()
