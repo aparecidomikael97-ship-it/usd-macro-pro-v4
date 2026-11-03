@@ -18,8 +18,8 @@ A página 2 traz categorias/datas adicionais, diferentes das expectativas anuais
 | IPCA, variação mensal | novembro/2026 | 0,35% |
 | IPCA, variação mensal | dezembro/2026 | 0,60% |
 | Inflação 12 meses suavizada | horizonte móvel | 4,96% |
-| Câmbio R$/US$, referência mensal | novembro/2026 | 5,32 |
-| Câmbio R$/US$, referência mensal | dezembro/2026 | 5,34 |
+| Câmbio R$/US$, **média projetada do mês** | novembro/2026 | 5,32 |
+| Câmbio R$/US$, **média projetada do mês** | dezembro/2026 | 5,34 |
 | Selic, taxa de fim de mês | novembro/2026 | 13,50% a.a. |
 | Selic, taxa de fim de mês | dezembro/2026 | 13,50% a.a. |
 
@@ -30,6 +30,8 @@ A página 2 traz categorias/datas adicionais, diferentes das expectativas anuais
 O módulo `atlasquant_trader_bcb_focus_official_review_lab.py` recebe a transcrição versionada em `docs/continuidade/TRADER_BCB_FOCUS_20261030_OFFICIAL_REVIEW_LAB.json`. Os campos e valores são travados contra 12 medianas anuais e oito mensais copiadas do texto da fonte oficial. Compara oito linhas de 2026/27 aos contratos Focus anteriores e à primeira leitura secundária, preservando cronologia e os estados de cada etapa. Rejeita registros extras, datas trocadas, cotação incoerente, mudança de fonte, denominação, tipo, valores falsos, amostras booleanas e alegação indevida de PDF original arquivado.
 
 Para não simular informação pré-existente, a triagem documental usa um **corte conservador 03/11 às 15:00 UTC**: este é um controle de laboratório escolhido após a publicação do dia, **não o horário de publicação ou primeiro recebimento efetivamente atestado**. Nenhuma previsão ponto-no-tempo passa a ser certificada por este corte.
+
+**Precisão da definição BCB:** o Focus apresenta **média da taxa de câmbio no mês** para novembro/dezembro, não cotação do último dia; já a **Selic é meta de fim do mês**. Esta separação vem da explicação oficial em https://www.bcb.gov.br/controleinflacao/relatoriofocus e não altera os valores divulgados.
 
 O resultado possui seis linhas descritivas WIN/WDO × D1/W1/MN1. Em todas: `directional_bias=AGUARDAR`, `probability_calibrated=null`, `actual_copom_decision_known=false`, `point_in_time_forecast_input_attested=false`, `can_feed_live_radar=false`, `can_feed_real_oos=false`, `trade_authorized=false`.
 

@@ -39,8 +39,8 @@ PINNED_MONTHLY=(
  ("IPCA","2026-11","0.35","PCT_MONTHLY"),
  ("IPCA","2026-12","0.60","PCT_MONTHLY"),
  ("IPCA_SMOOTHED_12M","ROLLING_12M","4.96","PCT_12M_FORECAST"),
- ("FX_BRL_PER_USD","2026-11","5.32","BRL_PER_USD_MONTH_END"),
- ("FX_BRL_PER_USD","2026-12","5.34","BRL_PER_USD_MONTH_END"),
+ ("FX_BRL_PER_USD","2026-11","5.32","BRL_PER_USD_MONTH_AVERAGE"),
+ ("FX_BRL_PER_USD","2026-12","5.34","BRL_PER_USD_MONTH_AVERAGE"),
  ("SELIC","2026-11","13.50","PCT_AA_MONTH_END"),
  ("SELIC","2026-12","13.50","PCT_AA_MONTH_END"),
 )
@@ -125,7 +125,7 @@ def review_bcb_focus_official_text_lab(
    return _refused("Malformed monthly Focus row")
   ind,period,value,unit=fixed
   if (raw["indicator"],raw["period"],raw["unit"])!=(ind,period,unit) or _number(raw["now"])!=Decimal(value):
-   return _refused("Official month-end reference mismatch")
+   return _refused("Official monthly reference mismatch")
   month_out.append({"indicator":ind,"target_period":period,"median":value,
     "unit":unit,"source_page":2,"is_meeting_event_actual":False,
     "is_next_copom_consensus":False})
@@ -145,7 +145,7 @@ def review_bcb_focus_official_text_lab(
    "pdf_source_url":OFFICIAL_PDF,
    "source_publication_date_only":"2026-11-03",
    "win_wdo_context":context,
-   "why_no_bias":"BCB text reviewed but original bytes and independent receipt not attested. Month-end and year-end Focus expectations are not the Nov4 Copom decision, market-implied odds or a WIN/WDO directional forecast."}
+   "why_no_bias":"BCB text reviewed but original bytes and independent receipt not attested. Month-average FX and month-end Selic/year-end Focus expectations are not the Nov4 Copom decision, market-implied odds or a WIN/WDO directional forecast."}
 
 __all__=["SCHEMA","STATE","DENIED","PINNED_ANNUAL","PINNED_MONTHLY",
  "OFFICIAL_PDF","OFFICIAL_PAGE","CUTOFF","review_bcb_focus_official_text_lab"]

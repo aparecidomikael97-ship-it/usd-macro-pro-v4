@@ -15,7 +15,7 @@ O validador `atlasquant_trader_bcb_focus_extracted_text_lab.py`:
 - Confere que há as duas marcações de página do PDF e o título de 30/10/2026.
 - Extrai, em cada linha da página 1, tríades "há 4 semanas", "há 1 semana", "hoje" e a contagem de respondentes dos últimos 30 dias, para IPCA, PIB, câmbio R$/US$ e Selic em **2026, 2027 e 2028**.
 - Compara as 12 medianas anuais e respondentes com a transcrição versionada.
-- Extrai da página 2 as **oito** medianas para IPCA outubro/novembro/dezembro/inflação 12m suavizada, câmbio novembro/dezembro e Selic novembro/dezembro.
+- Extrai da página 2 as **oito** medianas para IPCA outubro/novembro/dezembro/inflação 12m suavizada, câmbio em **média de novembro/dezembro** e Selic ao **fim de novembro/dezembro**.
 - Recusa adulteração de texto, mudança da tabela, linha ausente, valor e respondentes incompatíveis, falsa alegação de PDF binário arquivado, consulta retrospectiva antes da janela conservadora 03/11 15h UTC, fuso ingênuo e dados inválidos.
 - Reporta `12 annual_matches` e `8 monthly_matches` somente para texto documental consistente. **Nunca** habilita viés direcional, probabilidade, OOS real, ordens, Render ou Worker.
 

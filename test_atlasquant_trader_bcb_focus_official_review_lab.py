@@ -56,13 +56,13 @@ class BCBFocusOfficialReviewLabTests(unittest.TestCase):
   self.assertTrue(all(not x["is_next_copom_consensus"]
                       for x in r["monthly_forecasts"]))
   self.assertFalse(r["next_copom_meeting_consensus_verified"])
- def test_year_end_fx_is_not_spot_or_month_end_november(self):
+ def test_year_end_fx_is_not_spot_or_monthly_average_november(self):
   r=result()
   self.assertEqual(yearly(r,"FX_BRL_PER_USD","2026")["new_pdf_median"],"5.34")
   self.assertEqual(monthly(r,"FX_BRL_PER_USD","2026-11")["median"],"5.32")
   self.assertEqual(monthly(r,"FX_BRL_PER_USD","2026-12")["median"],"5.34")
   self.assertEqual(monthly(r,"FX_BRL_PER_USD","2026-11")["unit"],
-                   "BRL_PER_USD_MONTH_END")
+                   "BRL_PER_USD_MONTH_AVERAGE")
  def test_pib_2026_and_2027_both_revised_down(self):
   r=result()
   self.assertEqual(yearly(r,"REAL_GDP","2026")["signed_revision"],"-0.04")
