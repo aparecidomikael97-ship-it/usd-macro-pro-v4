@@ -24,7 +24,7 @@ Fontes independentes da imprensa observadas em 03/11:
 - IstoÉ Dinheiro, 03/11: https://istoedinheiro.com.br/boletim-focus-selic-dolar-inflacao-pib-3-novembro-2026
 - Relatório anterior oficial BCB: https://www.bcb.gov.br/content/focus/focus/R20261023.pdf
 
-**LIMITE:** a edição oficial nova `R20261030.pdf`, ou o OData com bytes originais, **não foi obtida/autenticada** nesta execução, apesar de busca pública. Os valores novos são **REPORTADOS PELO JORNALISMO, pendentes de verificação na fonte primária**, não vintage autenticada nem dado habilitado no Radar. A referência 30/10 é a data da pesquisa, não a hora de publicação ou captura; o registro de pesquisa é de 03/11, sem recibo independente do horário exato de disponibilização.
+**LIMITE:** a edição oficial nova `R20261030.pdf`, ou o OData com bytes originais, **não foi obtida/autenticada** nesta execução, apesar de busca pública. Os valores novos são **REPORTADOS PELO JORNALISMO, pendentes de verificação na fonte primária**, não vintage autenticada nem dado habilitado no Radar. A referência 30/10 é a data da pesquisa, não a hora de publicação ou captura. O laboratório adota o corte documental CONSERVADOR 03/11/2026 às 15:00 UTC (após reportagens do dia), recusando retrospectivamente consultas à meia-noite. Este corte é uma regra de triagem **escolhida**, NÃO um recibo independente nem prova do horário de captura; nenhuma evidência entra em uma previsão real ponto-no-tempo.
 
 ### Armadilha muito importante para WIN/WDO
 

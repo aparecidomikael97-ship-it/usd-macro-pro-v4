@@ -18,6 +18,9 @@ SCHEMA = "ATLASQUANT_TRADER_BRAZIL_FOCUS_NEW_SECONDARY_TRIAGE_LAB_V1"
 STATE = "LAB_SECONDARY_FOCUS_REVISION_PRE_COPOM_UNATTESTED"
 DENIED = "LAB_SECONDARY_FOCUS_REVISION_REFUSED"
 RESEARCH_DATE = date(2026, 11, 3)
+# Conservative *research eligibility* boundary after known Nov3 media items.
+# NOT a trusted publication/capture timestamp; REAL as-of use stays disabled.
+RESEARCH_ELIGIBLE_AT_UTC = datetime(2026, 11, 3, 15, tzinfo=timezone.utc)
 PRIOR_REFERENCE_DATE = "2026-10-23"
 REPORTED_REFERENCE_DATE = "2026-10-30"
 SOURCE_REPORTS = (
@@ -93,8 +96,8 @@ def triage_reported_focus_revision_lab(
             or at.utcoffset() is None):
         raise ValueError("Timezone-aware research evaluation instant required")
     now = at.astimezone(timezone.utc)
-    if now.date() < RESEARCH_DATE:
-        return _deny("Cannot backdate November research discovery")
+    if now < RESEARCH_ELIGIBLE_AT_UTC:
+        return _deny("Cannot backdate secondary reports before conservative research boundary")
     new = REPORTED_NEW if new_reports is None else new_reports
     if (not isinstance(new, (list, tuple)) or len(new) != len(REPORTED_NEW)
             or tuple(new) != REPORTED_NEW):

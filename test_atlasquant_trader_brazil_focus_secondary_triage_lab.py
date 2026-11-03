@@ -123,8 +123,13 @@ class BrazilFocusSecondaryTriageLabTests(unittest.TestCase):
         self.assertEqual(r["state"], DENIED)
         self.assertFalse(r["trade_authorized"])
 
-    def test_can_evaluate_on_research_date_without_inventing_precise_capture(self):
+    def test_cannot_assume_nov3_news_was_known_at_midnight(self):
         r = triage(at=datetime(2026,11,3,0,tzinfo=timezone.utc))
+        self.assertEqual(r["state"], DENIED)
+        self.assertFalse(r["can_feed_live_radar"])
+
+    def test_later_documentary_review_is_not_real_pit_provenance(self):
+        r = triage(at=datetime(2026,11,3,15,tzinfo=timezone.utc))
         self.assertEqual(r["state"], STATE)
         self.assertFalse(r["new_source_publication_time_independently_attested"])
         self.assertFalse(r["can_feed_live_radar"])
