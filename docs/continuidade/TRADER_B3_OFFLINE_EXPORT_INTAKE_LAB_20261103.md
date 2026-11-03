@@ -35,10 +35,22 @@ Os valores só produzem **diferenças aritméticas candidatas** entre duas cota�
 
 **Os exemplos de testes são fictícios.** Nenhum valor de WIN/WDO de 04–05/11 foi obtido, e a decisão de juros do Copom permanece pendente até a divulgação oficial.
 
+## Medição de distância até o fechamento e a abertura proposta
+
+Além da variação aritmética entre os **dois pontos declarados**, o importador informa para cada ativo:
+
+- `pre_sample_seconds_before_scheduled_close`: segundos entre a cotação informada e o **limite regular programado de fechamento** em 04/11 (WIN 18h25, WDO 18h30 em Brasília).
+- `post_sample_seconds_after_candidate_open`: segundos entre a **abertura regular apenas candidata** de 05/11 às 09h em Brasília e a cotação posterior declarada.
+- `calendar_elapsed_seconds_between_samples`: intervalo corrido em segundos entre os dois registros, **não horas negociáveis** nem duração causal do evento.
+
+A fixture de WIN às 18h24 (04/11) e 09h03 (05/11) resulta em **60 segundos antes do limite de fechamento** e **180 segundos depois da abertura candidata**. Isso **não comprova** que os preços sejam último negócio ou primeiro negócio real. Mesmo uma amostra declarada exatamente às 09h00 não será marcada como primeiro tick; eventos de abertura, calendário de exceção, origem do feed e ticks intermediários ainda são desconhecidos. O campo `is_verified_opening_gap` fica sempre `false` e o resultado se chama **SAMPLED_POINTS_NOT_VERIFIED_OPENING_GAP**.
+
+Essas distâncias ajudam a identificar **amostras afastadas das bordas da sessão**, impedindo que se chame toda diferença entre dois pontos de *gap de abertura* ou de *reação comprovada ao Copom*. Nenhum filtro de segundos comprova causalidade, liquidez ou direito de uso dos dados.
+
 ## Exigências antes de usar dados reais
 
 Conferir separadamente a licença da origem do arquivo, identidade do contrato completo e vencimento, calendário B3 e exceções da sessão, ticks com horários/negócios verificáveis, custo do spread e slippage, o comunicado oficial e o papel de outras notícias no gap noturno. Não chamar a diferença de causalidade do Copom. Não transformar o estudo de um único evento em taxa de acerto estatística.
 
-`test_atlasquant_trader_b3_offline_export_intake_lab.py`: 32 testes sintéticos de esquema, fonte, direitos pendentes, precisão temporal e proteção contra falsas cotações. A qualidade integrada é verificada pela CI no PR #1803; nenhuma aprovação presumida antes de terminar.
+`test_atlasquant_trader_b3_offline_export_intake_lab.py`: 38 testes sintéticos de esquema, fonte, direitos pendentes, precisão temporal e proteção contra falsas cotações. A qualidade integrada é verificada pela CI no PR #1803; nenhuma aprovação presumida antes de terminar.
 
 **LAB / HARD NO-GO: sem novos custos, Render, Worker, scraping, schedulers, merge, deploy, live Radar, alteração visual ou ordens.**

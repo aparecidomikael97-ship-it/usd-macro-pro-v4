@@ -183,6 +183,15 @@ def inspect_b3_offline_price_export_lab(
         post = data[(instrument, "POST_20261105")]
         if pre["contract"] != post["contract"]:
             return _base(DENIED, "Cross-contract comparison")
+        # Session-boundary distances describe only how the two supplied
+        # samples relate to SCHEDULED boundaries, NOT whether they were
+        # actual last/first exchange trades or a tradable opening gap.
+        schedule = SCHEDULE[instrument]
+        pre_close_utc = schedule["pre_window_end"].astimezone(TZ)
+        post_open_utc = PROPOSED_NEXT_START.astimezone(TZ)
+        pre_seconds_to_close = int((pre_close_utc - pre["clock"]).total_seconds())
+        post_seconds_from_open = int((post["clock"] - post_open_utc).total_seconds())
+        elapsed_seconds = int((post["clock"] - pre["clock"]).total_seconds())
         gap = ((post["price"] / pre["price"] - 1) * Decimal(100))
         output.append({
             "instrument": instrument,
@@ -190,6 +199,13 @@ def inspect_b3_offline_price_export_lab(
             "contract_is_synthetic": fixture,
             "pre_trade_claimed_at_utc": pre["clock"].isoformat(),
             "post_trade_claimed_at_utc": post["clock"].isoformat(),
+            "pre_sample_seconds_before_scheduled_close": pre_seconds_to_close,
+            "post_sample_seconds_after_candidate_open": post_seconds_from_open,
+            "calendar_elapsed_seconds_between_samples": elapsed_seconds,
+            "label": "SAMPLED_POINTS_NOT_VERIFIED_OPENING_GAP",
+            "sample_timestamps_are_exchange_attested": False,
+            "official_session_exception_calendar_checked": False,
+            "is_verified_opening_gap": False,
             "pre_price_claimed": str(pre["price"]),
             "post_price_claimed": str(post["price"]),
             "arithmetical_candidate_gap_percent": str(gap.quantize(Decimal("0.0001"))),
@@ -209,9 +225,10 @@ def inspect_b3_offline_price_export_lab(
         "fixture_mode": fixture,
         "data_is_not_live": True,
         "why_not_validated_market_reaction": (
-            "One caller-supplied pre and post sample is not proof of the "
-            "real last/first B3 trades, license, original source, actual Copom "
-            "publication, fair execution or Copom causality."
+            "Boundary time distances are computed from scheduled session "
+            "hours, not verified exchange ticks. The two declared samples "
+            "cannot prove last/first B3 trades, opening gap, license, source, "
+            "actual Copom publication, execution or Copom causality."
         ),
     }
 

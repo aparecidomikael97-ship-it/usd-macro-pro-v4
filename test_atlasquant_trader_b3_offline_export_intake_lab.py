@@ -90,6 +90,57 @@ class B3AuthorizedCsvPreparationTests(unittest.TestCase):
         self.assertEqual(result["matched_pairs"],2)
         self.assertFalse(result["b3_official_raw_trades_authenticated"])
 
+    def test_win_distances_to_regular_session_boundaries_are_explicit(self):
+        row=check()["pair_rows"][0]
+        self.assertEqual(row["pre_sample_seconds_before_scheduled_close"],60)
+        self.assertEqual(row["post_sample_seconds_after_candidate_open"],180)
+        self.assertEqual(row["calendar_elapsed_seconds_between_samples"],52740)
+        self.assertEqual(row["label"],"SAMPLED_POINTS_NOT_VERIFIED_OPENING_GAP")
+        self.assertFalse(row["is_verified_opening_gap"])
+
+    def test_wdo_boundary_distances_are_not_win_boundaries(self):
+        r=check(csv_sample(instruments=("WDO",)))
+        row=r["pair_rows"][0]
+        self.assertEqual(row["pre_sample_seconds_before_scheduled_close"],60)
+        self.assertEqual(row["post_sample_seconds_after_candidate_open"],180)
+        self.assertEqual(row["calendar_elapsed_seconds_between_samples"],52440)
+        self.assertFalse(row["is_verified_opening_gap"])
+
+    def test_late_next_session_price_is_not_pretended_to_be_opening_tick(self):
+        data=csv_sample().replace(b"2026-11-05T12:03:00Z",
+                                  b"2026-11-05T12:30:00Z")
+        row=check(data)["pair_rows"][0]
+        self.assertEqual(row["post_sample_seconds_after_candidate_open"],1800)
+        self.assertFalse(row["is_verified_opening_gap"])
+        self.assertFalse(row["verified_first_post_event_trade"])
+
+    def test_early_pre_event_price_does_not_become_last_trade(self):
+        data=csv_sample().replace(b"2026-11-04T21:24:00Z",
+                                  b"2026-11-04T21:15:00Z")
+        row=check(data)["pair_rows"][0]
+        self.assertEqual(row["pre_sample_seconds_before_scheduled_close"],600)
+        self.assertFalse(row["verified_last_pre_event_trade"])
+        self.assertFalse(row["is_verified_opening_gap"])
+
+    def test_declared_trade_at_candidate_next_open_still_is_unverified(self):
+        data=csv_sample().replace(b"2026-11-05T12:03:00Z",
+                                  b"2026-11-05T12:00:00Z")
+        row=check(data)["pair_rows"][0]
+        self.assertEqual(row["post_sample_seconds_after_candidate_open"],0)
+        self.assertFalse(row["is_verified_opening_gap"])
+        self.assertFalse(row["sample_timestamps_are_exchange_attested"])
+
+    def test_manual_source_boundary_seconds_do_not_confer_authenticity(self):
+        result=check(csv_sample(synthetic=False),synthetic=False)
+        row=result["pair_rows"][0]
+        self.assertEqual(row["pre_sample_seconds_before_scheduled_close"],60)
+        self.assertEqual(row["post_sample_seconds_after_candidate_open"],180)
+        self.assertFalse(row["sample_timestamps_are_exchange_attested"])
+        self.assertFalse(row["official_session_exception_calendar_checked"])
+        self.assertFalse(row["is_verified_opening_gap"])
+        self.assertFalse(result["market_reaction_real_verified"])
+        self.assertFalse(result["market_data_access_rights_independently_verified"])
+
     def test_cannot_treat_future_rows_as_known_on_nov3(self):
         d=csv_sample()
         result=check(d,at=datetime(2026,11,3,19,tzinfo=timezone.utc))
