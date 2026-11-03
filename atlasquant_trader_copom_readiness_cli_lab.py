@@ -4,7 +4,7 @@ Usage:
  python atlasquant_trader_copom_readiness_cli_lab.py \
    --as-of 2026-11-03T20:30:00Z
  python atlasquant_trader_copom_readiness_cli_lab.py \
-   --as-of 2026-11-05T13:00:00Z --format json
+   --as-of 2026-11-05T13:00:00Z --simulate-future --format json
 
 Optionally supply an authorized, independently reviewed CSV and its
 provenance manifesto (not a source endorsement). Do NOT collect B3 bulletins
@@ -33,6 +33,11 @@ ISO_UTC = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
                      r"[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 MAX_CSV_BYTES = 4000
 MAX_MANIFEST_BYTES = 4096
+
+
+def _wall_clock_utc() -> datetime:
+    """Unattested local machine time, useful only as a basic future guard."""
+    return datetime.now(timezone.utc)
 
 
 def _parse_clock(raw: str) -> datetime:
@@ -64,10 +69,13 @@ def _read_limited(path: Path, *, max_bytes: int) -> bytes:
     return data
 
 
-def _text_report(report: dict[str, Any], declared_clock: str) -> str:
+def _text_report(report: dict[str, Any], declared_clock: str, *,
+                 future_simulation: bool) -> str:
     out = [
         "ATLASQUANT TRADER — COPOM | CONSULTA LAB / HARD NO-GO",
         "Relógio informado pelo operador (NÃO atestado): " + declared_clock,
+        "Modo: " + ("SIMULAÇÃO DE DATA FUTURA, SEM NOTÍCIAS REAIS"
+                    if future_simulation else "CONSULTA LOCAL, NÃO AUDITADA"),
         "Estado: " + report["state"],
         "Checkpoint original de 03/11 preservado: " +
         ("SIM, apenas integridade do conteúdo Git" if report[
@@ -96,12 +104,17 @@ def run_copom_readiness_cli_lab(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--as-of", required=True, metavar="UTC_ISO_Z",
                         help="Horário declarado, sem carimbo independente; AAAA-MM-DDTHH:MM:SSZ")
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument("--simulate-future", action="store_true",
+                        help="Permite pesquisar DATA FUTURA como cenário fictício, nunca como resultado; rejeita CSV não sintético")
     parser.add_argument("--csv", type=Path, help="Exportação local já autorizada, não coletada pelo CLI")
     parser.add_argument("--manifest", type=Path, help="Arquivo JSON local de origem/direitos do CSV")
     args = parser.parse_args(argv)
 
     try:
         when = _parse_clock(args.as_of)
+        future = when > _wall_clock_utc()
+        if future and not args.simulate_future:
+            raise ValueError("Data informada está no futuro do relógio local; use --simulate-future para teste exclusivamente sintético")
         if (args.csv is None) != (args.manifest is None):
             raise ValueError("CSV e manifesto devem ser fornecidos juntos")
         frozen = _read_limited(PRE_EVENT_SNAPSHOT, max_bytes=4096)
@@ -112,6 +125,11 @@ def run_copom_readiness_cli_lab(argv: Sequence[str] | None = None) -> int:
             raw_manifest = _read_limited(args.manifest, max_bytes=MAX_MANIFEST_BYTES)
             manifest = json.loads(raw_manifest.decode("utf-8"),
                                   object_pairs_hook=_no_duplicate_keys)
+            if args.simulate_future and (
+                    not isinstance(manifest, dict) or
+                    manifest.get("fixture_mode") is not True or
+                    manifest.get("declared_collection_method") != "SYNTHETIC_FIXTURE"):
+                raise ValueError("Modo de simulação só aceita CSV e manifesto de fixture sintética")
         report = build_copom_evidence_readiness_lab(
             frozen, evaluated_at=when, price_export_csv=csv_data,
             price_export_manifest=manifest)
@@ -121,13 +139,17 @@ def run_copom_readiness_cli_lab(argv: Sequence[str] | None = None) -> int:
 
     if args.format == "json":
         print(json.dumps({
-            "mode": "LAB_HARD_NO_GO",
+            "mode": "LAB_FUTURE_SIMULATION_ONLY" if args.simulate_future else "LAB_HARD_NO_GO",
+            "future_simulation_mode": args.simulate_future,
+            "declared_clock_is_future_of_local_machine": future,
+            "local_machine_clock_independently_attested": False,
             "declared_clock_utc_unattested": args.as_of,
             "wall_clock_independently_verified": False,
             "report": report,
         }, ensure_ascii=False, indent=2, sort_keys=True))
     else:
-        print(_text_report(report, args.as_of))
+        print(_text_report(report, args.as_of,
+                           future_simulation=args.simulate_future))
     return 2 if report["state"] == DENIED else 0
 
 

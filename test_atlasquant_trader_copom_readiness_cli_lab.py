@@ -5,7 +5,8 @@ All dates in sample CSV files after Nov3 are TEST FIXTURES, not B3 trades.
 from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import datetime
+from datetime import datetime, timezone
+from unittest.mock import patch
 from hashlib import sha256
 from io import StringIO
 import json
@@ -19,6 +20,8 @@ from atlasquant_trader_copom_readiness_cli_lab import (
 
 NOW = "2026-11-03T20:30:00Z"
 POST = "2026-11-05T13:00:00Z"
+CLOCK_NOV3 = datetime(2026, 11, 3, 21, 30, tzinfo=timezone.utc)
+CLOCK_NOV5 = datetime(2026, 11, 5, 14, 0, tzinfo=timezone.utc)
 
 CSV_HEADER = ("instrument,contract_id,session_role,quote_type,"
               "observed_at_utc,price_points\n")
@@ -47,9 +50,11 @@ def synthetic_manifest(content=SYNTHETIC_CSV, *, synthetic=True):
     }
 
 
-def invoke(*args):
+def invoke(*args, wall_now=CLOCK_NOV3):
     stdout, stderr = StringIO(), StringIO()
-    with redirect_stdout(stdout), redirect_stderr(stderr):
+    with (patch("atlasquant_trader_copom_readiness_cli_lab._wall_clock_utc",
+                return_value=wall_now),
+          redirect_stdout(stdout), redirect_stderr(stderr)):
         rc = main(list(args))
     return rc, stdout.getvalue(), stderr.getvalue()
 
@@ -84,7 +89,7 @@ class CopomReadinessCliLabTests(unittest.TestCase):
         self.assertFalse(r["trade_authorized"])
 
     def test_after_decision_calendar_still_pending_without_source(self):
-        rc, out, err = invoke("--as-of", POST, "--format", "json")
+        rc, out, err = invoke("--as-of", POST, "--simulate-future", "--format", "json")
         self.assertEqual(rc, 0, err)
         data = json.loads(out)["report"]
         self.assertEqual(data["decision_status"], "NO_AUTHENTICATED_RESULT")
@@ -110,7 +115,7 @@ class CopomReadinessCliLabTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             p = Path(t) / "sample.csv"
             p.write_bytes(SYNTHETIC_CSV)
-            rc, _, err = invoke("--as-of", POST, "--csv", str(p))
+            rc, _, err = invoke("--as-of", POST, "--simulate-future", "--csv", str(p))
             self.assertEqual(rc, 2)
             self.assertIn("devem ser fornecidos juntos", err)
 
@@ -121,7 +126,7 @@ class CopomReadinessCliLabTests(unittest.TestCase):
             csvfile.write_bytes(SYNTHETIC_CSV)
             info.write_text(json.dumps(synthetic_manifest()), encoding="utf-8")
             rc, out, err = invoke(
-                "--as-of", POST, "--csv", str(csvfile),
+                "--as-of", POST, "--simulate-future", "--csv", str(csvfile),
                 "--manifest", str(info), "--format", "json")
             self.assertEqual(rc, 0, err)
             r = json.loads(out)["report"]
@@ -149,7 +154,7 @@ class CopomReadinessCliLabTests(unittest.TestCase):
             info = Path(t) / "manifest.json"
             info.write_text("{}", encoding="utf-8")
             rc, out, err = invoke(
-                "--as-of", POST, "--csv", str(nonexistent), "--manifest", str(info))
+                "--as-of", POST, "--simulate-future", "--csv", str(nonexistent), "--manifest", str(info))
             self.assertEqual(rc, 2)
             self.assertIn("CONSULTA RECUSADA", err)
             self.assertNotIn("Traceback", err)
@@ -160,7 +165,7 @@ class CopomReadinessCliLabTests(unittest.TestCase):
             manifest = Path(t) / "manifest.json"
             csvfile.write_bytes(SYNTHETIC_CSV)
             manifest.write_text('{"schema":"a","schema":"b"}', encoding="utf-8")
-            rc, out, err = invoke("--as-of", POST,
+            rc, out, err = invoke("--as-of", POST, "--simulate-future",
                                   "--csv", str(csvfile), "--manifest", str(manifest))
             self.assertEqual(rc, 2)
             self.assertIn("Chave repetida", err)
@@ -171,13 +176,13 @@ class CopomReadinessCliLabTests(unittest.TestCase):
             info = Path(t) / "manifest.json"
             csvfile.write_bytes(SYNTHETIC_CSV)
             info.write_text("not json", encoding="utf-8")
-            rc, out, err = invoke("--as-of", POST, "--csv", str(csvfile), "--manifest", str(info))
+            rc, out, err = invoke("--as-of", POST, "--simulate-future", "--csv", str(csvfile), "--manifest", str(info))
             self.assertEqual(rc, 2)
             self.assertIn("CONSULTA RECUSADA", err)
             m = synthetic_manifest()
             m["csv_sha256"] = "0" * 64
             info.write_text(json.dumps(m), encoding="utf-8")
-            rc, out, err = invoke("--as-of", POST, "--csv", str(csvfile),
+            rc, out, err = invoke("--as-of", POST, "--simulate-future", "--csv", str(csvfile),
                                   "--manifest", str(info), "--format", "json")
             self.assertEqual(rc, 2, err)
             self.assertEqual(json.loads(out)["report"]["state"],
@@ -189,12 +194,12 @@ class CopomReadinessCliLabTests(unittest.TestCase):
             info = Path(t) / "manifest.json"
             csvfile.write_bytes(b"x"*5000)
             info.write_text(json.dumps(synthetic_manifest()), encoding="utf-8")
-            rc, out, err = invoke("--as-of", POST, "--csv", str(csvfile), "--manifest", str(info))
+            rc, out, err = invoke("--as-of", POST, "--simulate-future", "--csv", str(csvfile), "--manifest", str(info))
             self.assertEqual(rc, 2)
             self.assertIn("acima do limite", err)
             csvfile.write_bytes(SYNTHETIC_CSV)
             info.write_bytes(b"{" + b"x"*5000 + b"}")
-            rc, out, err = invoke("--as-of", POST, "--csv", str(csvfile), "--manifest", str(info))
+            rc, out, err = invoke("--as-of", POST, "--simulate-future", "--csv", str(csvfile), "--manifest", str(info))
             self.assertEqual(rc, 2)
             self.assertIn("acima do limite", err)
 
@@ -204,7 +209,7 @@ class CopomReadinessCliLabTests(unittest.TestCase):
             info=Path(t)/"manifest.json"
             csvfile.write_bytes(SYNTHETIC_CSV)
             info.write_text(json.dumps(synthetic_manifest()), encoding="utf-8")
-            rc, out, err = invoke("--as-of", POST, "--csv", str(csvfile), "--manifest", str(info))
+            rc, out, err = invoke("--as-of", POST, "--simulate-future", "--csv", str(csvfile), "--manifest", str(info))
             self.assertEqual(rc, 0, err)
             self.assertNotIn("160000", out)
             self.assertNotIn("162000", out)
@@ -224,12 +229,64 @@ class CopomReadinessCliLabTests(unittest.TestCase):
             info.write_text(json.dumps(synthetic_manifest(manual, synthetic=False)),
                             encoding="utf-8")
             rc, out, err=invoke("--as-of", POST, "--csv", str(csvfile),
-                                "--manifest", str(info), "--format", "json")
+                                "--manifest", str(info), "--format", "json",
+                                wall_now=CLOCK_NOV5)
             self.assertEqual(rc, 0, err)
             r=json.loads(out)["report"]
             self.assertEqual(r["quote_status"],"MANUAL_EXPORT_CANDIDATE_UNATTESTED")
             self.assertFalse(r["b3_quotes_and_licensing_independently_verified"])
             self.assertFalse(r["can_feed_real_oos"])
+
+    def test_future_date_refused_without_explicit_simulation(self):
+        rc, out, err = invoke("--as-of", POST, "--format", "json")
+        self.assertEqual(rc, 2)
+        self.assertEqual(out, "")
+        self.assertIn("--simulate-future", err)
+        self.assertIn("CONSULTA RECUSADA", err)
+
+    def test_future_simulation_is_explicit_in_text_and_json(self):
+        rc, out, err = invoke("--as-of", POST, "--simulate-future")
+        self.assertEqual(rc, 0, err)
+        self.assertIn("SIMULAÇÃO DE DATA FUTURA", out)
+        self.assertIn("NO_AUTHENTICATED_RESULT", out)
+        rc, out, err = invoke("--as-of", POST, "--simulate-future",
+                              "--format", "json")
+        self.assertEqual(rc, 0, err)
+        payload = json.loads(out)
+        self.assertEqual(payload["mode"], "LAB_FUTURE_SIMULATION_ONLY")
+        self.assertTrue(payload["future_simulation_mode"])
+        self.assertTrue(payload["declared_clock_is_future_of_local_machine"])
+        self.assertFalse(payload["wall_clock_independently_verified"])
+        self.assertFalse(payload["local_machine_clock_independently_attested"])
+
+    def test_future_simulation_rejects_manual_market_export_claim(self):
+        manual = SYNTHETIC_CSV.replace(
+            b"SIM_WIN_FAKE_SINGLE_EXPIRY", b"WINZ26").replace(
+            b"SIMULATED_REGULAR_TRADE_TICK",
+            b"PROVIDER_DECLARED_EXECUTED_TRADE_UNVERIFIED")
+        with tempfile.TemporaryDirectory() as t:
+            csvfile = Path(t) / "claims.csv"
+            info = Path(t) / "manifest.json"
+            csvfile.write_bytes(manual)
+            info.write_text(json.dumps(synthetic_manifest(manual, synthetic=False)),
+                            encoding="utf-8")
+            rc, out, err = invoke("--as-of", POST, "--simulate-future",
+                                  "--csv", str(csvfile), "--manifest", str(info))
+            self.assertEqual(rc, 2)
+            self.assertEqual(out, "")
+            self.assertIn("simulação só aceita CSV", err)
+
+    def test_local_clock_advance_does_not_authenticate_market_data(self):
+        rc, out, err = invoke("--as-of", POST, "--format", "json",
+                              wall_now=CLOCK_NOV5)
+        self.assertEqual(rc, 0, err)
+        payload = json.loads(out)
+        self.assertEqual(payload["mode"], "LAB_HARD_NO_GO")
+        self.assertFalse(payload["declared_clock_is_future_of_local_machine"])
+        self.assertFalse(payload["local_machine_clock_independently_attested"])
+        self.assertEqual(payload["report"]["quote_status"],
+                         "NO_AUTHENTICATED_PRICE_DATA")
+        self.assertFalse(payload["report"]["outcome_rate_independently_verified"])
 
     def test_cli_with_invalid_date_does_not_create_output_files(self):
         with tempfile.TemporaryDirectory() as t:
