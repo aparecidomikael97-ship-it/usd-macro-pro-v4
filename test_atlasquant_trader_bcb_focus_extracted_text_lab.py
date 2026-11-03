@@ -23,11 +23,14 @@ def evaluate(raw=_UNSET,doc=_UNSET,*,at=NOW):
                    document() if doc is _UNSET else doc,evaluated_at=at)
 
 class BCBFocusTextCrosscheckTests(unittest.TestCase):
- def test_extracted_official_page_has_four_complete_annual_lines(self):
+ def test_four_annual_indicators_and_three_monthly_indicators(self):
   t=TEXT.read_text(encoding="utf-8")
+  annual,monthly=t.split("Focus - Relatório de Mercado Pág. 1/2",1)
   for beginning in ("IPCA (variação %)","PIB Total (variação % sobre ano anterior)",
                     "Câmbio (R$/US$)","Selic (% a.a)"):
-   self.assertEqual(sum(x.startswith(beginning+" ") for x in t.splitlines()),2)
+   self.assertEqual(sum(x.startswith(beginning+" ") for x in annual.splitlines()),1)
+   self.assertEqual(sum(x.startswith(beginning+" ") for x in monthly.splitlines()),
+                    0 if beginning.startswith("PIB Total") else 1)
  def test_real_extracted_text_matches_all_pinned_selected_values(self):
   r=evaluate()
   self.assertEqual((r["schema"],r["state"]),(SCHEMA,STATE))
