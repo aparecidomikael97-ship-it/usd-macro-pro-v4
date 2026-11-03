@@ -27,8 +27,16 @@ O fechamento regular **não é sinônimo** do preço de ajuste, liquidação ou 
 - Calcula a diferença percentual SOMENTE entre preços fictícios e exibe `LAB_COPOM_B3_SYNTHETIC_REACTION_ONLY`; não é lucro, sinal, probabilidade de acerto, previsão prospectiva ou preço/volatilidade real.
 - Para casos reais futuros serão necessários: calendário B3 e exceções, contrato/vencimento idêntico antes/depois (ou série contínua com ajuste explícito sem vazamento temporal), fonte, horário e direitos de uso de dados B3, escolha de spread/último negócio/preço de abertura e metodologia de deslizamento. Também é necessário comprovar a divulgação e decidir se outros acontecimentos externos afetaram o movimento.
 
+## Blindagem adicional de contrato e preço (03/11/2026)
+
+O protótipo agora exige **identidade explícita do mesmo contrato fictício** em duas referências: `pre_contract_id` e `post_contract_id`. Apenas `SIM_WIN_FAKE_SINGLE_EXPIRY` ou `SIM_WDO_FAKE_SINGLE_EXPIRY` são admitidos conforme o instrumento. Troca de identificador, vencimento, WIN por WDO, código real de contrato ou valores não textuais são recusados. Esses nomes são **inventados exclusivamente para os testes**, não representam um vencimento real da B3. A igualdade nos exemplos **não certifica** identidade do contrato verdadeiro.
+
+Também exige que as duas cotações fictícias tenham o tipo `SIMULATED_REGULAR_TRADE_TICK`, recusando dados declarados como **preço de ajuste, liquidação ou candle**. Na futura coleta real, não basta rotular um dado: será necessário conferir o negócio, código completo e mês/ano de vencimento no arquivo original de uma fonte autorizada e guardar a evidência de origem e horário.
+
+O retorno de LAB registra seis requisitos ainda sem prova: calendário de negociação e exceções B3, contrato idêntico, último negócio regular pré-evento, primeiro negócio regular pós-evento, direitos/origem de preços e **outros acontecimentos no intervalo noturno** (juros DI, USD e notícias). Nenhum requisito pode ser dado por concluído a partir de uma fixture, e `gap_causally_attributable_to_copom=false` permanece obrigatório. O estudo é de **gap de sessões**, não prova causal exclusiva.
+
 **Observação de desenho:** se o dado de reação vier da sessão seguinte, não será correto chamar o estudo de negociação de notícia em segundos. É um **gap entre sessões** com múltiplos fatores potencialmente envolvidos; não pode atribuir causalidade exclusiva ao Copom.
 
-`test_atlasquant_trader_copom_b3_session_reaction_lab.py`: 25 testes unitários sintéticos, incluindo limite de sessão WIN/WDO, conversão BRT-UTC, bloqueio de futuro, recusa de contratos reais não auditados e de snapshots pré-evento alterados. Registrado na suíte Quality CI, a confirmar no GitHub do commit.
+`test_atlasquant_trader_copom_b3_session_reaction_lab.py`: 32 testes unitários sintéticos, incluindo limite de sessão WIN/WDO, conversão BRT-UTC, bloqueio de futuro, recusa de contratos reais não auditados e de snapshots pré-evento alterados. Registrado na suíte Quality CI, a confirmar no GitHub do commit.
 
 **PR #1803 DRAFT / LAB / HARD NO-GO, sem custo adicional, Render, Worker, cron, feed, produção, merge, deploy, alteração visual ou operação real.**

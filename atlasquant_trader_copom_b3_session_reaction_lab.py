@@ -39,15 +39,18 @@ SCHEDULE = {
     "WIN": {"b3_ticker": "FUT WIN", "brasilia_close": "18:25",
             "pre_window_end": datetime(2026, 11, 4, 18, 25, tzinfo=TZ_BRT),
             "next_window_end": datetime(2026, 11, 5, 18, 25, tzinfo=TZ_BRT),
-            "synthetic_symbol": "SIM_WIN"},
+            "synthetic_symbol": "SIM_WIN",
+            "synthetic_contract": "SIM_WIN_FAKE_SINGLE_EXPIRY"},
     "WDO": {"b3_ticker": "FUT WDO", "brasilia_close": "18:30",
             "pre_window_end": datetime(2026, 11, 4, 18, 30, tzinfo=TZ_BRT),
             "next_window_end": datetime(2026, 11, 5, 18, 30, tzinfo=TZ_BRT),
-            "synthetic_symbol": "SIM_WDO"},
+            "synthetic_symbol": "SIM_WDO",
+            "synthetic_contract": "SIM_WDO_FAKE_SINGLE_EXPIRY"},
 }
 OBS_FIELDS = frozenset((
     "instrument", "contract_symbol", "fixture_mode", "pre_price_points",
     "post_price_points", "pre_trade_at_utc", "post_trade_at_utc",
+    "pre_contract_id", "post_contract_id", "pre_quote_kind", "post_quote_kind",
     "original_b3_quotes_verified", "market_data_use_rights_verified",
 ))
 
@@ -65,6 +68,12 @@ def _base(status: str, reason: str | None) -> dict[str, Any]:
         "next_business_session_guaranteed": False,
         "b3_raw_quotes_archived": False,
         "b3_quotes_origins_verified": False,
+        "same_real_contract_verified": False,
+        "real_contract_maturity_verified": False,
+        "pre_quote_is_last_regular_trade_verified": False,
+        "post_quote_is_first_regular_trade_verified": False,
+        "overnight_external_events_excluded": False,
+        "gap_causally_attributable_to_copom": False,
         "real_market_reaction_measured": False,
         "pre_event_directional_forecast_found": False,
         "trade_pnl_measured": False,
@@ -141,6 +150,14 @@ def build_copom_b3_session_reaction_lab(
         "first_regular_next_session_open_candidate_utc":
             PROPOSED_NEXT_START.astimezone(timezone.utc).isoformat(),
         "prices_source_category_required": "AUTHENTICATED_B3_INSTRUMENT_SPECIFIC_HISTORY",
+        "real_quote_eligibility_conditions": [
+            "CHECK_B3_CALENDAR_AND_EXCEPTION_SESSIONS",
+            "DOCUMENT_SAME_ACTUAL_CONTRACT_MATURITY_PRE_AND_POST",
+            "VERIFY_TIMESTAMPED_LAST_REAL_TRADE_BEFORE_CLOSE",
+            "VERIFY_TIMESTAMPED_FIRST_REAL_TRADE_AFTER_NEXT_OPEN",
+            "VERIFY_RELIABLE_B3_SOURCE_AND_DATA_RIGHTS",
+            "CHECK_OVERNIGHT_USD_DI_NEWS_AND_OTHER_CONFOUNDERS",
+        ],
         "announcement_after_win_close": True,
         "announcement_at_or_after_wdo_close": True,
         "market_effect_not_observed": True,
@@ -183,6 +200,12 @@ def build_copom_b3_session_reaction_lab(
         info = SCHEDULE[instrument]
         if (entry["fixture_mode"] != "SYNTHETIC_TEST_ONLY"
                 or entry["contract_symbol"] != info["synthetic_symbol"]
+                or type(entry["pre_contract_id"]) is not str
+                or type(entry["post_contract_id"]) is not str
+                or entry["pre_contract_id"] != info["synthetic_contract"]
+                or entry["post_contract_id"] != info["synthetic_contract"]
+                or entry["pre_quote_kind"] != "SIMULATED_REGULAR_TRADE_TICK"
+                or entry["post_quote_kind"] != "SIMULATED_REGULAR_TRADE_TICK"
                 or entry["original_b3_quotes_verified"] is not False
                 or entry["market_data_use_rights_verified"] is not False):
             return _base(DENIED, "Real source attribution or contract identity is not allowed")
@@ -202,6 +225,9 @@ def build_copom_b3_session_reaction_lab(
         prices.append({
             "instrument": instrument,
             "contract_symbol": info["synthetic_symbol"],
+            "synthetic_contract_identity_pre_post_equal": True,
+            "same_actual_b3_contract_proven": False,
+            "pre_post_observations_are_settlement_prices": False,
             "pre_time_utc": pre.isoformat(), "post_time_utc": post.isoformat(),
             "pre_price_points_synthetic": str(old),
             "post_price_points_synthetic": str(new),

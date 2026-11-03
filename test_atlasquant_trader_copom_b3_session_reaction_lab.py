@@ -32,6 +32,10 @@ def fixture(instrument="WIN"):
         "post_price_points": "162000" if instrument == "WIN" else "5540",
         "pre_trade_at_utc": pre,
         "post_trade_at_utc": "2026-11-05T12:03:00Z",
+        "pre_contract_id": "SIM_" + instrument + "_FAKE_SINGLE_EXPIRY",
+        "post_contract_id": "SIM_" + instrument + "_FAKE_SINGLE_EXPIRY",
+        "pre_quote_kind": "SIMULATED_REGULAR_TRADE_TICK",
+        "post_quote_kind": "SIMULATED_REGULAR_TRADE_TICK",
         "original_b3_quotes_verified": False,
         "market_data_use_rights_verified": False,
     }
@@ -155,6 +159,50 @@ class B3SessionReactionLabTests(unittest.TestCase):
             x=fixture("WIN");x["instrument"]=value
             self.assertEqual(run([x],at=AFTER)["state"], DENIED)
 
+    def test_pre_and_post_must_share_the_same_synthetic_maturity(self):
+        for instrument in ("WIN", "WDO"):
+            x = fixture(instrument)
+            self.assertEqual(run([x], at=AFTER)["state"], SYNTHETIC)
+            x["post_contract_id"] = "SIM_" + instrument + "_FAKE_OTHER_EXPIRY"
+            self.assertEqual(run([x], at=AFTER)["state"], DENIED)
+
+    def test_pre_contract_id_cannot_use_a_real_futures_symbol(self):
+        for value in ("WINZ26", "WDOX26", "SIM_WINZ26", None, 123, [], {}):
+            x = fixture("WIN")
+            x["pre_contract_id"] = value
+            self.assertEqual(run([x], at=AFTER)["state"], DENIED)
+
+    def test_post_contract_id_cannot_substitute_other_instrument(self):
+        x=fixture("WIN")
+        x["post_contract_id"] = "SIM_WDO_FAKE_SINGLE_EXPIRY"
+        self.assertEqual(run([x],at=AFTER)["state"],DENIED)
+
+    def test_settlement_or_adjustment_value_cannot_masquerade_as_trade_tick(self):
+        for field in ("pre_quote_kind","post_quote_kind"):
+            for kind in ("B3_SETTLEMENT", "SYNTHETIC_ADJUSTMENT", "REAL_LAST_TRADE", None):
+                x = fixture("WIN")
+                x[field] = kind
+                self.assertEqual(run([x],at=AFTER)["state"], DENIED)
+
+    def test_fake_same_maturity_never_proves_actual_contract_or_liquidity(self):
+        x=run([fixture("WIN")],at=AFTER)
+        row=x["price_rows"][0]
+        self.assertTrue(row["synthetic_contract_identity_pre_post_equal"])
+        self.assertFalse(row["same_actual_b3_contract_proven"])
+        self.assertFalse(row["pre_post_observations_are_settlement_prices"])
+        self.assertFalse(x["same_real_contract_verified"])
+        self.assertFalse(x["real_contract_maturity_verified"])
+        self.assertFalse(x["pre_quote_is_last_regular_trade_verified"])
+        self.assertFalse(x["post_quote_is_first_regular_trade_verified"])
+
+    def test_b3_real_price_readiness_requirements_remain_unmet(self):
+        r=run()
+        self.assertEqual(len(r["real_quote_eligibility_conditions"]),6)
+        self.assertIn("CHECK_OVERNIGHT_USD_DI_NEWS_AND_OTHER_CONFOUNDERS",
+                      r["real_quote_eligibility_conditions"])
+        self.assertFalse(r["overnight_external_events_excluded"])
+        self.assertFalse(r["gap_causally_attributable_to_copom"])
+
     def test_no_duplicate_instrument_or_extra_fields(self):
         self.assertEqual(run([fixture("WIN"),fixture("WIN")],at=AFTER)["state"], DENIED)
         x=fixture("WDO");x["live_quote"]=True
@@ -193,6 +241,9 @@ class B3SessionReactionLabTests(unittest.TestCase):
             self.assertFalse(r["trade_pnl_measured"])
             self.assertFalse(r["predictive_accuracy_proven"])
             self.assertFalse(r["pre_event_directional_forecast_found"])
+            self.assertFalse(r["same_real_contract_verified"])
+            self.assertFalse(r["real_contract_maturity_verified"])
+            self.assertFalse(r["gap_causally_attributable_to_copom"])
             self.assertIsNone(r["probability_calibrated"])
             for flag in ("b3_raw_quotes_archived","b3_quotes_origins_verified",
                          "announcement_actual_timestamp_verified","can_feed_live_radar",
