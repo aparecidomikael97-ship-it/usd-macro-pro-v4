@@ -105,6 +105,60 @@ GROUP_AGENCY_KEYS = {
     "POLICY": "policy_publisher", "ACTIVITY": "activity_publisher",
 }
 
+# Public OFFICIAL LANDING PAGES only. Research references do not demonstrate
+# point-in-time publication, consensus availability, a usable API, license or
+# comparability of unemployment/GDP definitions across currencies.
+SOURCE_INFO_URLS = {
+    "USD": {
+        "INFLATION": "https://www.bls.gov/schedule/2026/",
+        "EMPLOYMENT": "https://www.bls.gov/news.release/empsit.toc.htm",
+        "POLICY": "https://www.federalreserve.gov/newsevents/pressreleases/2026-press-fomc.htm",
+        "ACTIVITY": "https://www.bea.gov/data/gdp/gross-domestic-product",
+    },
+    "EUR": {
+        "INFLATION": "https://ec.europa.eu/eurostat/web/hicp/information-data",
+        "EMPLOYMENT": "https://ec.europa.eu/eurostat/web/lfs",
+        "POLICY": "https://www.ecb.europa.eu/press/govcdec/mopo/html/index.en.html",
+        "ACTIVITY": "https://ec.europa.eu/eurostat/web/national-accounts/overview",
+    },
+    "GBP": {
+        "INFLATION": "https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/consumerpriceinflation/latest",
+        "EMPLOYMENT": "https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/bulletins/uklabourmarket/latest",
+        "POLICY": "https://www.bankofengland.co.uk/monetary-policy/the-interest-rate-bank-rate",
+        "ACTIVITY": "https://www.ons.gov.uk/economy/grossdomesticproductgdp/bulletins/gdpfirstquarterlyestimateuk/latest",
+    },
+    "JPY": {
+        "INFLATION": "https://www.stat.go.jp/data/cpi/1.htm",
+        "EMPLOYMENT": "https://www.stat.go.jp/english/data/roudou/",
+        "POLICY": "https://www.boj.or.jp/en/mopo/mpmsche_minu/",
+        "ACTIVITY": "https://www.esri.cao.go.jp/en/sna/sokuhou/sokuhou_top",
+    },
+    "CHF": {
+        "INFLATION": "https://www.bfs.admin.ch/en/press-releases",
+        "EMPLOYMENT": "https://www.seco.admin.ch/en/labour-market-statistics",
+        "POLICY": "https://www.snb.ch/en/the-snb/mandates-goals/monetary-policy/decisions",
+        "ACTIVITY": "https://www.seco.admin.ch/en/gross-domestic-product",
+    },
+    "CAD": {
+        "INFLATION": "https://www.statcan.gc.ca/en/subjects-start/prices_and_price_indexes/consumer_price_indexes",
+        "EMPLOYMENT": "https://www.statcan.gc.ca/en/survey/household/3701",
+        "POLICY": "https://www.bankofcanada.ca/core-functions/monetary-policy/key-interest-rate/",
+        "ACTIVITY": "https://www.statcan.gc.ca/en/subjects-start/economic_accounts",
+    },
+    "AUD": {
+        "INFLATION": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/latest-release",
+        "EMPLOYMENT": "https://www.abs.gov.au/statistics/labour/employment-and-unemployment/labour-force-australia/latest-release",
+        "POLICY": "https://www.rba.gov.au/monetary-policy/int-rate-decisions/",
+        "ACTIVITY": "https://www.abs.gov.au/statistics/economy/national-accounts/australian-national-accounts-national-income-expenditure-and-product",
+    },
+    "NZD": {
+        "INFLATION": "https://www.stats.govt.nz/indicators/consumers-price-index-cpi/",
+        "EMPLOYMENT": "https://www.stats.govt.nz/indicators/unemployment-rate/",
+        "POLICY": "https://www.rbnz.govt.nz/monetary-policy/monetary-policy-decisions",
+        "ACTIVITY": "https://www.stats.govt.nz/indicators/gross-domestic-product-gdp/",
+    },
+}
+
 
 def build_g8_country_macro_candidate_catalog_lab() -> dict:
     """Produce 32 non-approved indicator suggestions, no external data access."""
@@ -129,6 +183,13 @@ def build_g8_country_macro_candidate_catalog_lab() -> dict:
             publisher = config[GROUP_AGENCY_KEYS[group]]
             if group == "POLICY":
                 definition = config["policy_name"]
+            elif group == "EMPLOYMENT" and currency == "CHF":
+                definition = ("SECO registered unemployment is not necessarily "
+                              "equivalent to an ILO LFS unemployment rate; "
+                              "comparability/vintage unverified")
+            elif group == "ACTIVITY" and currency == "USD":
+                definition = ("BEA GDP release uses annualised QoQ convention; "
+                              "cannot compare directly with nonannualised GDP QoQ")
             elif group == "ACTIVITY":
                 definition = "GDP: calendar, seasonality and country QoQ method need review"
             elif group == "INFLATION" and currency == "EUR":
@@ -144,9 +205,8 @@ def build_g8_country_macro_candidate_catalog_lab() -> dict:
                 "cadence_candidate": cadence,
                 "measure_definition": measure,
                 "release_definition_note": definition,
-                "source_info_url": (
-                    config["inflation_url"] if group == "INFLATION" else ""
-                ),
+                "source_info_url": SOURCE_INFO_URLS[currency][group],
+                "source_page_is_live_feed": False,
                 "research_status": CANDIDATE_STATUS,
                 "vintage_and_consensus_verified": False,
                 "publisher_response_attested": False,
@@ -161,6 +221,8 @@ def build_g8_country_macro_candidate_catalog_lab() -> dict:
         "schema": SCHEMA, "state": "LAB_COUNTRY_MACRO_CANDIDATES_UNAPPROVED",
         "currency_count": len(CURRENCIES), "pair_count": len(OFFICIAL_PAIRS),
         "candidate_slots": len(rows),
+        "official_documentation_leads": len(SOURCE_INFO_URLS) * len(GROUPS),
+        "landing_pages_are_historical_receipts": False,
         "candidates": rows,
         "research_selection_approved": False,
         "real_macro_records_verified": False,

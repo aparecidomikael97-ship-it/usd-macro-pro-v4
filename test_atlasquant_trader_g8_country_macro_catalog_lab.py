@@ -152,6 +152,43 @@ class G8CountryCandidateCatalogTests(unittest.TestCase):
                 self.assertTrue(r["source_info_url"].startswith("https://"))
         self.assertFalse(c["research_selection_approved"])
 
+    def test_all_32_official_landing_leads_present_but_not_live(self):
+        c = catalog()
+        self.assertEqual(c["official_documentation_leads"], 32)
+        self.assertFalse(c["landing_pages_are_historical_receipts"])
+        expected_hosts = {
+            "USD": {"bls.gov", "bea.gov", "federalreserve.gov"},
+            "EUR": {"ec.europa.eu", "ecb.europa.eu"},
+            "GBP": {"ons.gov.uk", "bankofengland.co.uk"},
+            "JPY": {"stat.go.jp", "boj.or.jp", "esri.cao.go.jp"},
+            "CHF": {"bfs.admin.ch", "seco.admin.ch", "snb.ch"},
+            "CAD": {"statcan.gc.ca", "bankofcanada.ca"},
+            "AUD": {"abs.gov.au", "rba.gov.au"},
+            "NZD": {"stats.govt.nz", "rbnz.govt.nz"},
+        }
+        from urllib.parse import urlsplit
+        for r in c["candidates"]:
+            with self.subTest(pair=(r["currency"], r["group"])):
+                u = urlsplit(r["source_info_url"])
+                self.assertEqual(u.scheme, "https")
+                self.assertTrue(any(u.hostname == domain or u.hostname.endswith("." + domain)
+                                    for domain in expected_hosts[r["currency"]]))
+                self.assertFalse(r["source_page_is_live_feed"])
+                self.assertFalse(r["license_for_automated_reuse_verified"])
+                self.assertFalse(r["vintage_and_consensus_verified"])
+                self.assertFalse(r["allowed_for_live_bias"])
+
+    def test_source_cadences_and_statistical_definitions_are_not_conflated(self):
+        chf = by("CHF", "EMPLOYMENT")
+        self.assertIn("registered unemployment", chf["release_definition_note"])
+        self.assertIn("ILO", chf["release_definition_note"])
+        usd = by("USD", "ACTIVITY")
+        self.assertIn("annualised QoQ", usd["release_definition_note"])
+        nzd = by("NZD", "EMPLOYMENT")
+        self.assertEqual(nzd["cadence_candidate"], "QUARTERLY")
+        eur = by("EUR", "INFLATION")
+        self.assertEqual(eur["indicator_id"], "HICP")
+
     def test_g8_specific_proposed_rate_institutions(self):
         expected = {
             "USD": "Federal Reserve", "EUR": "European Central Bank",
