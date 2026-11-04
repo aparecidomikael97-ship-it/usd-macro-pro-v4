@@ -331,6 +331,84 @@ class ECBMacroTimingBridgeLabTests(unittest.TestCase):
         self.assertEqual(out["distinct_unattested_macro_events"], 2)
         self.assertFalse(out["trade_authorized"])
 
+    def test_no_macro_claims_is_unknown_not_neutral(self):
+        out = build()
+        self.assertEqual(out["state"], "LAB_TEMPORAL_CONTEXT_ONLY")
+        self.assertEqual(out["pair_horizons_with_relative_documentary_visibility_gaps"], 0)
+        self.assertFalse(out["full_economic_calendar_coverage_verified"])
+        self.assertFalse(out["two_sided_economic_explanation_proven"])
+        for row in out["rows"]:
+            for frame in row["horizons"].values():
+                c = frame["macro_documentary_coverage"]
+                self.assertEqual(c["state"], "SEM_ALEGACOES_DOCUMENTAIS_NO_DOSSIE")
+                self.assertTrue(c["absence_of_claims_does_not_mean_no_real_release"])
+                self.assertFalse(c["basis_for_operational_bias"])
+
+    def test_only_usd_macro_evidence_is_not_a_two_currency_explanation(self):
+        report = mock_dossier()
+        pair_frame(report, "EUR/USD", "W1")["macro_surprise_claims"] = [claim()]
+        out = build(report)
+        coverage = pair_frame(out, "EUR/USD", "W1")["macro_documentary_coverage"]
+        self.assertEqual(coverage["state"], "ALEGACOES_DOCUMENTAIS_APENAS_DE_UMA_MOEDA")
+        self.assertEqual(coverage["base_unattested_event_count"], 0)
+        self.assertEqual(coverage["quote_unattested_event_count"], 1)
+        self.assertFalse(coverage["two_currencies_with_claims"])
+        self.assertFalse(out["cause_verified"])
+        self.assertEqual(out["operational_bias"], "AGUARDAR")
+
+    def test_both_currency_claims_are_still_unattested(self):
+        report = mock_dossier()
+        eur = claim(event="EU_CPI_X")
+        eur["currency"] = "EUR"
+        report_row = pair_frame(report, "EUR/USD", "W1")
+        report_row["macro_surprise_claims"] = [claim(), eur]
+        out = build(report)
+        coverage = pair_frame(out, "EUR/USD", "W1")["macro_documentary_coverage"]
+        self.assertEqual(coverage["state"],
+                         "ALEGACOES_DOCUMENTAIS_DAS_DUAS_MOEDAS_NAO_AUTENTICADAS")
+        self.assertTrue(coverage["two_currencies_with_claims"])
+        self.assertFalse(coverage["macro_fundamentals_authenticated"])
+        self.assertFalse(coverage["counterevidence_verified"])
+        self.assertFalse(coverage["basis_for_operational_bias"])
+        self.assertEqual(out["distinct_unattested_macro_events"], 2)
+
+    def test_cross_pair_missing_usd_event_is_reported_not_hidden(self):
+        report = mock_dossier()
+        pair_frame(report, "EUR/USD", "W1")["macro_surprise_claims"] = [claim()]
+        out = build(report)
+        self.assertGreater(out["pair_horizons_with_relative_documentary_visibility_gaps"], 0)
+        missing = pair_frame(out, "GBP/USD", "W1")["macro_documentary_coverage"]
+        self.assertTrue(missing["incomplete_relative_to_supplied_pair_dossier"])
+        self.assertEqual(missing["documentary_visibility_gaps"]["USD"]
+                         ["missing_count_from_other_pairs_same_horizon"], 1)
+        self.assertEqual(missing["documentary_visibility_gaps"]["USD"]
+                         ["first_missing_event_ids"], ["US_CPI_X"])
+        self.assertFalse(missing["basis_for_operational_bias"])
+        self.assertEqual(out["operational_bias"], "AGUARDAR")
+
+    def test_repeated_event_in_two_pairs_does_not_become_two_independent_events(self):
+        report = mock_dossier()
+        pair_frame(report, "EUR/USD", "D1")["macro_surprise_claims"] = [claim()]
+        pair_frame(report, "GBP/USD", "D1")["macro_surprise_claims"] = [claim()]
+        out = build(report)
+        self.assertEqual(out["state"], "LAB_TEMPORAL_CONTEXT_ONLY")
+        self.assertEqual(out["supplied_macro_events_by_currency_and_horizon"]
+                         ["D1"]["USD"], 1)
+        self.assertEqual(out["distinct_unattested_macro_events"], 1)
+        self.assertTrue(out["repeated_claims_are_not_independent_evidence"])
+        self.assertEqual(out["operational_bias"], "AGUARDAR")
+
+    def test_missing_ecb_reference_has_no_fabricated_documentary_coverage(self):
+        raw = xml_history([
+            ("2026-10-27", FIXES), ("2026-11-02", FIXES),
+            ("2026-11-03", {**FIXES, "USD": 1.11}),
+        ])
+        out = build(raw=raw)
+        missing = pair_frame(out, "EUR/USD", "MN1")["macro_documentary_coverage"]
+        self.assertEqual(missing["state"], "SEM_ALEGACOES_DOCUMENTAIS_NO_DOSSIE")
+        self.assertFalse(missing["basis_for_operational_bias"])
+        self.assertFalse(missing["incomplete_relative_to_supplied_pair_dossier"])
+
     def test_no_network_cost_cron_worker_or_deploy(self):
         with patch("urllib.request.urlopen", side_effect=AssertionError("network")):
             out = build()

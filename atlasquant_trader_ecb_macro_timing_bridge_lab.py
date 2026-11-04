@@ -98,6 +98,30 @@ def _claim(value: Any, *, currencies: set[str], now: datetime) -> dict | None:
     }
 
 
+def _documentary_coverage(base: str, quote: str, per_currency: dict) -> dict[str, Any]:
+    """Describe only the supplied claims, never all real economic events."""
+    a = sorted(per_currency[base])
+    b = sorted(per_currency[quote])
+    if a and b:
+        state = "ALEGACOES_DOCUMENTAIS_DAS_DUAS_MOEDAS_NAO_AUTENTICADAS"
+    elif a or b:
+        state = "ALEGACOES_DOCUMENTAIS_APENAS_DE_UMA_MOEDA"
+    else:
+        state = "SEM_ALEGACOES_DOCUMENTAIS_NO_DOSSIE"
+    return {
+        "state": state,
+        "base_currency": base, "quote_currency": quote,
+        "base_unattested_event_ids": a, "quote_unattested_event_ids": b,
+        "base_unattested_event_count": len(a),
+        "quote_unattested_event_count": len(b),
+        "two_currencies_with_claims": bool(a and b),
+        "absence_of_claims_does_not_mean_no_real_release": True,
+        "macro_fundamentals_authenticated": False,
+        "counterevidence_verified": False,
+        "basis_for_operational_bias": False,
+    }
+
+
 def _calendar_classification(timestamp: datetime, start: date, end: date) -> str:
     # The ECB fixing is labeled by a European calendar date. A late UTC
     # release can already belong to the NEXT European business date.
@@ -155,6 +179,12 @@ def build_ecb_macro_timing_bridge_lab(
     if set(mr) != set(OFFICIAL_PAIRS):
         return _refuse("COBERTURA_28_PARES_INCOMPLETA")
     event_ledger: dict[str, tuple[Any, ...]] = {}
+    # Collect only claims present in the supplied dossier, not a supposed
+    # exhaustive economic calendar. Each event is counted once per currency,
+    # per horizon, even if repeated in seven FX pairs.
+    universe_claims = {
+        h: {currency: set() for currency in CURRENCIES} for h in HORIZONS
+    }
     compared = []
     for row in ecb["pair_explanations"]:
         pair, base, quote = row["pair"], row["base"], row["quote"]
@@ -180,10 +210,13 @@ def build_ecb_macro_timing_bridge_lab(
                     "relation": "HISTORICO_INSUFICIENTE",
                     "calendar_alignments": [], "conclusion": "AGUARDAR",
                     "matched_as_market_cause": False,
+                    "macro_documentary_coverage": _documentary_coverage(
+                        base, quote, {base: set(), quote: set()}),
                 }
                 continue
             start, end = date.fromisoformat(start_raw), date.fromisoformat(end_raw)
             alignments, event_ids = [], set()
+            per_currency = {base: set(), quote: set()}
             for claim in f["macro_surprise_claims"]:
                 c = _claim(claim, currencies={base, quote}, now=now)
                 if c is None or c["event_id"] in event_ids:
@@ -195,6 +228,8 @@ def build_ecb_macro_timing_bridge_lab(
                         event_ledger[identity] != fingerprint):
                     return _refuse("EVENTO_MACRO_CONTRADITORIO_ENTRE_PARES_OU_HORIZONTES")
                 event_ledger[identity] = fingerprint
+                per_currency[c["currency"]].add(identity)
+                universe_claims[horizon][c["currency"]].add(identity)
                 alignments.append({
                     "currency": c["currency"], "event_id": c["event_id"],
                     "surprise_class_unattested": c["surprise_class"],
@@ -209,6 +244,8 @@ def build_ecb_macro_timing_bridge_lab(
                 "reference_from_date": start_raw,
                 "reference_to_date": end_raw,
                 "calendar_alignments": alignments,
+                "macro_documentary_coverage": _documentary_coverage(
+                    base, quote, per_currency),
                 "news_documentary_count_not_attested": f.get("news_documentary_count"),
                 "calendar_risk_status_not_live": f.get("calendar_risk_status_documentary"),
                 "conclusion": "AGUARDAR", "matched_as_market_cause": False,
@@ -219,6 +256,32 @@ def build_ecb_macro_timing_bridge_lab(
             "horizons": frames, "strength_cause": "NAO_VERIFICADA",
             "operational_bias": "AGUARDAR", "trade_authorized": False,
         })
+
+    # A release about USD supplied for EUR/USD should not silently disappear
+    # from GBP/USD's *same-horizon* dossier. This is a documentary propagation
+    # warning only: missing records do NOT establish zero actual releases.
+    pair_frames_with_gaps = 0
+    for row in compared:
+        for horizon in HORIZONS:
+            coverage = row["horizons"][horizon]["macro_documentary_coverage"]
+            gaps = {}
+            for currency in (row["base"], row["quote"]):
+                seen_here = set(coverage[
+                    "base_unattested_event_ids" if currency == row["base"]
+                    else "quote_unattested_event_ids"])
+                missing = sorted(universe_claims[horizon][currency] - seen_here)
+                gaps[currency] = {
+                    "missing_count_from_other_pairs_same_horizon": len(missing),
+                    "first_missing_event_ids": missing[:8],
+                    "truncated_example_list": len(missing) > 8,
+                }
+            has_gap = any(x["missing_count_from_other_pairs_same_horizon"] > 0
+                          for x in gaps.values())
+            if has_gap:
+                pair_frames_with_gaps += 1
+            coverage["documentary_visibility_gaps"] = gaps
+            coverage["not_same_as_real_event_calendar_completeness"] = True
+            coverage["incomplete_relative_to_supplied_pair_dossier"] = has_gap
 
     out = _refuse("REFERENCIAS_BCE_E_SURPRESAS_SINTETICAS_NAO_PROVAM_CAUSA")
     out.update({
@@ -232,6 +295,14 @@ def build_ecb_macro_timing_bridge_lab(
         "cross_pair_macro_event_consistency_checked": True,
         "distinct_unattested_macro_events": len(event_ledger),
         "repeated_claims_are_not_independent_evidence": True,
+        "supplied_macro_events_by_currency_and_horizon": {
+            h: {c: len(universe_claims[h][c]) for c in CURRENCIES}
+            for h in HORIZONS
+        },
+        "pair_horizons_with_relative_documentary_visibility_gaps":
+            pair_frames_with_gaps,
+        "full_economic_calendar_coverage_verified": False,
+        "two_sided_economic_explanation_proven": False,
         "explanation": ("Coincidência temporal entre resultado econômico e mudança "
                         "de referência não comprova causa. Publicação após a "
                         "referência não pode explicar o movimento anterior."),
