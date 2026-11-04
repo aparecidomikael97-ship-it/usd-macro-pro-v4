@@ -94,7 +94,7 @@ _CSS = r"""
 .aqr-guide{background:#102c3b;border-left:3px solid #4cdbdd;border-radius:8px;padding:13px;margin:12px 0;color:#c6e1ec;font-size:11px;line-height:1.6}.aqr-guide strong{display:block;margin-bottom:4px;color:#e4f7f9}.aqr-detail{border:1px solid #2d445b;background:#0f1d2c;border-radius:12px;padding:16px}.aqr-detail h3{margin:0 0 8px;font-size:13px}.aqr-detail p{font-size:11px;color:#b3c6d6;line-height:1.65}
 .aqr-event{padding:12px 4px;border-bottom:1px solid #23394b}.aqr-event:last-child{border:0}.aqr-event strong{font-size:12px;color:#d9edf8;display:block}.aqr-event p{font-size:11px;line-height:1.6;color:#a5b9ca}
 .aqr-entry{margin:14px auto 7px;max-width:700px;display:block;width:calc(100% - 26px);text-align:left;padding:16px 20px;border:1px solid rgba(80,209,246,.65);border-radius:18px;color:#f0fbff;background:linear-gradient(115deg,rgba(0,88,138,.96),rgba(7,21,59,.98));box-shadow:0 0 27px rgba(24,154,226,.17);cursor:pointer}.aqr-entry strong{font-size:1rem;display:block}.aqr-entry small{display:block;margin-top:4px;color:#b7d9eb;font-size:.75rem}.aqr-entry:hover{border-color:#a6f5ff}
-.aqr-shell button:focus-visible,.aqr-entry:focus-visible{outline:3px solid #8cefff;outline-offset:2px}.aqr-shell [hidden]{display:none!important}
+.aqr-shell button:focus-visible,.aqr-entry:focus-visible,.aqr-matrix summary:focus-visible{outline:3px solid #8cefff;outline-offset:2px}.aqr-matrix{border:1px solid #31566c;border-radius:12px;padding:13px;background:#0d2031}.aqr-matrix-summary{cursor:pointer;color:#d3eff7;font-size:13px;font-weight:850;padding:4px}.aqr-matrix-summary small{display:block;color:#9ab4c9;font-size:10px;font-weight:500;margin-top:7px}.aqr-matrix[open] .aqr-tablewrap{margin-top:12px}.aqr-shell [hidden]{display:none!important}
 @media(min-width:1300px){.aqr-main{padding-left:46px;padding-right:46px}}
 @media(max-width:1050px){.aqr-app{grid-template-columns:195px minmax(0,1fr)}.aqr-main{padding:22px 20px}.aqr-card.aqr-fourth{grid-column:span 6}.aqr-indices{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.aqr-app{display:block}.aqr-aside-inner{position:static;min-height:0;height:auto;padding:12px;gap:9px}.aqr-aside-note{display:none}.aqr-side-label{margin:2px 4px}.aqr-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.aqr-nav button{min-height:40px;padding:8px;font-size:11px}.aqr-main{padding:14px}.aqr-topline{margin-bottom:14px}.aqr-hero{padding:22px 18px;min-height:190px}.aqr-hero h1{font-size:26px}.aqr-hero:before{right:-14px;opacity:.28}.aqr-hero:after{opacity:.4}.aqr-warning{margin-bottom:17px}.aqr-card,.aqr-card.aqr-fourth,.aqr-card.aqr-third{grid-column:1/-1}.aqr-currency{grid-column:span 6}.aqr-indices{grid-template-columns:1fr}.aqr-controls{gap:5px}.aqr-chip{font-size:9px;padding:6px}.aqr-crumb{font-size:10px}}
@@ -122,8 +122,12 @@ def _daily(data: Any) -> dict[str, Any]:
         return blank
     try:
         stamp = datetime.fromisoformat(raw_stamp.replace("Z", "+00:00"))
-        if stamp.tzinfo is None or (stamp - datetime.now(timezone.utc)).total_seconds() > 300:
+        if stamp.tzinfo is None:
             return blank
+        age = datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)
+        if age < timedelta(minutes=-1) or age > timedelta(hours=36):
+            return blank
+        stamp = stamp.astimezone(timezone.utc)
     except (TypeError, ValueError):
         return blank
     result = {"source": source, "stamp": stamp.strftime("%d/%m/%Y %H:%M UTC"),
@@ -310,6 +314,51 @@ def _forex_table(data: Mapping[str, Any]) -> str:
         '<th>Confirmação</th></tr></thead><tbody>' + rows + '</tbody></table></div>')
 
 
+def _bias_matrix_html(payload: Any) -> str:
+    """28 pares: filtro direcional W1/D1/H4/M15, nunca gatilho ou previsão."""
+    from atlasquant_trader_bias_matrix import TIMEFRAMES, read_bias_matrix
+
+    model = read_bias_matrix(payload)
+    labels = {
+        "SEM_DADOS": "Aguardando dados",
+        "SEM_DIREÇÃO": "Sem direção",
+        "CONFLITO_W1_D1": "Conflito semanal/diário",
+        "H4_CONTRÁRIO": "H4 contrário",
+        "M15_SEM_CONFIRMAÇÃO": "M15 sem confirmação",
+        "ALINHADO": "Horizontes alinhados",
+    }
+    body = ""
+    for pair, row in model["rows"].items():
+        cells = "".join(
+            '<td>' + _tag(row["timeframes"][tf]) + '</td>'
+            if row["timeframes"][tf] else '<td><span class="aqr-muted">—</span></td>'
+            for tf in TIMEFRAMES
+        )
+        body += ('<tr><td>' + escape(pair) + '</td>' + cells +
+                 '<td>' + _tag(row["bias"] if row["bias"] != "AGUARDAR" else "") +
+                 '</td><td>' + escape(labels[row["status"]]) + '</td></tr>')
+    note = (
+        "Ainda não recebemos leituras válidas com horário e fonte para os quatro horizontes."
+        if model["state"] == "NO_DATA" else
+        "Fonte: " + escape(model["source"]) + " · Snapshot UTC: " + escape(model["as_of"])
+    )
+    return (
+        '<details class="aqr-section aqr-matrix" aria-label="Matriz de viés multitempo">' +
+        '<summary class="aqr-matrix-summary">Matriz de viés · Semanal / Diário / H4 / M15' +
+        '<small>' + str(model["validated_pairs"]) +
+        ' de 28 pares com quatro leituras válidas · Clique para detalhar</small></summary>' +
+        '<div class="aqr-guide"><strong>Filtro, não sinal</strong>' +
+        'ALTA ou BAIXA só aparece quando os quatro horizontes concordam. ' +
+        'Dados ausentes, antigos, neutros ou contraditórios resultam em AGUARDAR. ' +
+        'O alinhamento não é probabilidade de acerto nem substitui o seu script de OB/FVG.</div>' +
+        '<p class="aqr-muted">' + note + '</p>' +
+        '<div class="aqr-tablewrap"><table class="aqr-table">' +
+        '<thead><tr><th>Par</th><th>Semanal</th><th>Diário</th>' +
+        '<th>H4</th><th>M15</th><th>Viés</th><th>Condição</th></tr></thead>' +
+        '<tbody>' + body + '</tbody></table></div></details>'
+    )
+
+
 def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | None:
     """Filtro exploratório para um registro comprovadamente coletado 08:40–08:55 BRT.
 
@@ -433,7 +482,7 @@ def _region_html(region: str, instruments: Any, data: Mapping[str, Any],
             '<div class="aqr-indices">' + items + '</div>' + strategy + '</section>')
 
 
-def _radar(data: Mapping[str, Any], raw_daily: Any = None) -> str:
+def _radar(data: Mapping[str, Any], raw_daily: Any = None, bias_evidence: Any = None) -> str:
     filters = (("all", "Todos"), ("us", "EUA"), ("br", "Brasil"),
                ("eu", "Europa"), ("asia", "Ásia"))
     keys = ("us", "br", "eu", "asia")
@@ -461,7 +510,8 @@ def _radar(data: Mapping[str, Any], raw_daily: Any = None) -> str:
         '<section class="aqr-section">' +
         _heading("Os 28 pares Forex",
                  "Variação diária, viés e confirmação técnica por par.") +
-        _forex_table(data) + '</section>'
+        _forex_table(data) + '</section>' +
+        _bias_matrix_html(bias_evidence) +
         '<section class="aqr-section">' +
         _heading("Índices e Futuros",
                  "EUA, Brasil, Europa e Ásia · WIN e WDO sem confundir os contratos.") +
@@ -583,7 +633,7 @@ def _master(calendar_data: Any = None) -> str:
 
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                       show_central: bool = True, daily_data: Any = None,
-                      calendar_data: Any = None) -> str:
+                      calendar_data: Any = None, bias_evidence: Any = None) -> str:
     data = _daily(daily_data)
     page = selected if selected in {key for key, _ in PAGES} else "home"
     title = dict(PAGES)[page]
@@ -594,7 +644,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '"><span class="aqr-nav-icon" aria-hidden="true">' + icons[key] +
         '</span>' + escape(label) + '</button>' for key, label in PAGES)
     content = {"home": lambda: _home(data),
-               "radar": lambda: _radar(data, daily_data),
+               "radar": lambda: _radar(data, daily_data, bias_evidence),
                "master": lambda: _master(calendar_data)}[page]()
     back = ('<button class="aqr-aside-back" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
