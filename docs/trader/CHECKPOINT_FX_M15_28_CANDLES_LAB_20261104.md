@@ -14,6 +14,20 @@ Implementação: `atlasquant_fx_m15_candle_lab.py`,
 corretoras, chaves, variáveis de ambiente, sistemas de ordens ou AION**.
 Recebe apenas um objeto já fornecido pelo chamador em `OFFLINE_RESEARCH`.
 
+Adaptador adicional `atlasquant_oanda_m15_export_lab.py`,
+`analyze_oanda_m15_export(responses, captured_at=..., now=...)`:
+- Recebe **28 respostas já fornecidas** no formato v20 de candles por instrumento
+  (`instrument`, `granularity`, `candles`). Não cria sessões nem faz GET.
+- Exige os símbolos na orientação canônica (`EUR_USD`, etc.) e rejeita
+  duplicidade, falta de instrumento, período diferente de M15 ou bid/ask ausentes.
+- Seleciona as duas últimas velas fechadas; descarta no máximo um candle ainda
+  aberto quando ele vier no final da resposta, sem fingir que está fechado.
+- Rejeita campos de credenciais e remove volume, ponto médio e quaisquer campos
+  extras antes de delegar à validação M15. Nenhum dado bruto é publicado.
+- A origem é identificada permanentemente como
+  `OANDA_V20_FORMAT_UNVERIFIED_OFFLINE`; mesmo quando a estrutura passa,
+  `provider_authenticated` e `publishable` continuam falsos.
+
 ## Contrato de entrada
 
 - `schema=ATLASQUANT_FX_28_M15_CANDLE_IMPORT_LAB_V1`
