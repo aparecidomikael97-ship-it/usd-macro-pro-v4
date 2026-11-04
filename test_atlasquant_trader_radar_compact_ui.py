@@ -31,11 +31,13 @@ def _fixture():
 
 
 class TraderRadarCompactTests(unittest.TestCase):
-    def test_menu_has_only_four_primary_sections(self):
+    def test_menu_has_only_three_primary_sections(self):
         self.assertEqual(
             [label for _, label in PAGES],
-            ["Início", "Radar", "Scanner Técnico", "Painel Mestre"],
+            ["Início", "Radar", "Painel Mestre"],
         )
+        for page in ("home", "radar", "master"):
+            self.assertNotIn("Scanner Técnico", trader_radar_html(selected=page))
         self.assertIn('data-route="area:trader_radar"', central_entry_html())
 
     def test_no_data_is_never_presented_as_daily_quote_or_bias(self):

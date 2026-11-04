@@ -13,8 +13,7 @@ from typing import Any, Mapping
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 
 SCHEMA = "ATLASQUANT_TRADER_RADAR_COMPACT_V1"
-PAGES = (("home", "Início"), ("radar", "Radar"), ("scanner", "Scanner Técnico"),
-         ("master", "Painel Mestre"))
+PAGES = (("home", "Início"), ("radar", "Radar"), ("master", "Painel Mestre"))
 INDEX_GROUPS = (
     ("Estados Unidos", (("SPX500", "S&P 500"), ("NAS100", "Nasdaq 100"),
                         ("US30", "Dow Jones"), ("RUS2000", "Russell 2000"))),
@@ -81,7 +80,7 @@ _CSS = r"""
 .aqr-aside-note{margin-top:auto;background:linear-gradient(145deg,#0f3045,#102339);border:1px solid #36536b;border-radius:13px;padding:14px 12px}.aqr-aside-note strong{display:block;color:#6af4ed;font-size:10px;letter-spacing:.12em}.aqr-aside-note p{font-size:11px;color:#a6b8cc;line-height:1.55;margin:7px 0 12px}.aqr-aside-back{margin-top:9px;border:1px solid #315066;border-radius:7px;background:#122b3b;padding:6px 9px;color:#bde8f3;font-size:10px;font-weight:750;align-self:flex-start}.aqr-aside-note small{display:block;padding-top:11px;border-top:1px solid #2c455a;font-size:10px;color:#96acc4}
 .aqr-main{min-width:0;padding:23px clamp(16px,2.8vw,46px) 26px;background:radial-gradient(ellipse at 83% 0,rgba(20,78,110,.28),transparent 32%),linear-gradient(#0c1827,#090f1c 55%)}
 .aqr-topline{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;margin:0 0 21px}.aqr-crumb{color:#9caec6;font-size:11px;letter-spacing:.03em}.aqr-crumb strong{color:#e6f5ff}.aqr-controls{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.aqr-chip{border:1px solid #3b5369;color:#b8cce0;background:rgba(16,34,52,.8);border-radius:999px;padding:8px 11px;font-size:10px;font-weight:850;white-space:nowrap}.aqr-chip-warn{background:#31291f;border-color:#805a37;color:#f3c99f}.aqr-avatar{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;color:#83edf2;background:#163244;border:1px solid #426478;font-size:11px;font-weight:850}
+.aqr-chip{border:1px solid #3b5369;color:#b8cce0;background:rgba(16,34,52,.8);border-radius:999px;padding:8px 11px;font-size:10px;font-weight:850;white-space:nowrap}.aqr-chip-warn{background:#31291f;border-color:#805a37;color:#f3c99f}.aqr-avatar{position:relative;overflow:hidden;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;color:#83edf2;background:#163244;border:1px solid #426478;font-size:11px;font-weight:850}.aqr-avatar img{position:absolute;width:100%;height:100%;object-fit:cover;inset:0}
 .aqr-hero{position:relative;overflow:hidden;border-radius:17px;background:linear-gradient(110deg,#10273a 0%,#122e42 66%,#173a50 100%);border:1px solid #2e5d75;min-height:212px;padding:27px 32px 22px;margin-bottom:20px}.aqr-hero:after{content:"";position:absolute;width:280px;height:280px;border:28px solid rgba(58,162,191,.10);border-radius:50%;right:25px;top:-75px;box-shadow:0 0 0 42px rgba(62,158,193,.04)}
 .aqr-hero:before{content:"";position:absolute;width:84px;height:84px;border:1.5px solid #3a9bba;border-radius:20px;right:9%;top:61px;transform:rotate(45deg);z-index:1}.aqr-hero>*{position:relative;z-index:2}.aqr-kicker{font-size:10px;letter-spacing:.13em;font-weight:950;color:#82f0f4}.aqr-hero h1{font-size:clamp(24px,3vw,38px);line-height:1.12;letter-spacing:-.045em;margin:12px 0 6px;font-weight:850;color:#eaf4ff}.aqr-hero p{font-size:13px;color:#b4cbdd;max-width:620px;line-height:1.65;margin:0 0 16px}.aqr-badges{display:flex;gap:7px;flex-wrap:wrap}.aqr-badges span{font-size:10px;border:1px solid #42687c;background:#112b3b;border-radius:5px;padding:7px 10px;color:#c7e2ed}
 .aqr-warning{border:1px solid #745a36;background:linear-gradient(95deg,#242323,#1c2128);color:#dec5a4;padding:12px 14px;border-radius:11px;margin:19px 0 24px;font-size:11px;line-height:1.6}.aqr-warning strong{color:#f8d8a4}.aqr-warning-icon{margin-right:8px}
@@ -247,15 +246,12 @@ def _home(data: Mapping[str, Any]) -> str:
         ("◎", "01 / Radar",
          "Qual moeda está mais forte? Quais pares lideram a valorização? Qual o viés?",
          "Abrir Radar →", "radar"),
-        ("⌁", "02 / Scanner Técnico",
-         "Onde existem tendência, zonas válidas, estrutura e possíveis reversões?",
-         "Abrir Scanner →", "scanner"),
-        ("▦", "03 / Painel Mestre",
+        ("▦", "02 / Painel Mestre",
          "O que explica o movimento? Quais indicadores e eventos podem impactá-lo?",
          "Abrir Painel →", "master"),
     )
     cards = "".join(
-        f'<article class="aqr-card aqr-third aqr-flow"><div class="aqr-icon">{escape(icon)}</div>'
+        f'<article class="aqr-card aqr-flow"><div class="aqr-icon">{escape(icon)}</div>'
         f'<h3>{escape(title)}</h3><p>{escape(desc)}</p>'
         f'<button data-route="{route}">{escape(button)}</button></article>'
         for icon, title, desc, button, route in flow)
@@ -591,7 +587,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
     data = _daily(daily_data)
     page = selected if selected in {key for key, _ in PAGES} else "home"
     title = dict(PAGES)[page]
-    icons = {"home": "⌂", "radar": "◉", "scanner": "⌁", "master": "▦"}
+    icons = {"home": "⌂", "radar": "◉", "master": "▦"}
     nav = "".join(
         '<button data-route="' + key + '" aria-current="' +
         ("page" if key == page else "false") +
@@ -599,14 +595,14 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span>' + escape(label) + '</button>' for key, label in PAGES)
     content = {"home": lambda: _home(data),
                "radar": lambda: _radar(data, daily_data),
-               "scanner": _scanner, "master": lambda: _master(calendar_data)}[page]()
+               "master": lambda: _master(calendar_data)}[page]()
     back = ('<button class="aqr-aside-back" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
     status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"]) + ' · Fonte: ' + escape(data["source"])
               if data["stamp"] else "● DADOS NÃO CONECTADOS")
     return (
         _CSS +
-        '<section class="ref-workspace aqr-shell" data-workspace="trader_radar" '
+        '<section class="ref-workspace aqr-shell" data-workspace="trader_radar" data-avatar-key="' + escape(name[:100], quote=True) + '" '
         'data-visual-reference="approved-20261102-v1">'
         '<div class="aqr-app"><aside class="aqr-aside"><div class="aqr-aside-inner">'
         '<div class="aqr-brand"><span class="aqr-logo">A</span><span><strong>ATLASQUANT'
@@ -621,8 +617,8 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         escape(title.upper()) + '</strong></div>'
         '<div class="aqr-controls"><span class="aqr-chip aqr-chip-warn">' + status +
         '</span><span class="aqr-chip">VISUALIZAÇÃO</span>' +
-        '<span class="aqr-avatar" aria-label="Sessão do usuário">' +
-        escape((name.strip()[:1] or "U").upper()) + '</span></div></header>' +
+        '<span class="aqr-avatar" aria-label="Sessão do usuário"><span data-avatar-initial>' +
+        escape((name.strip()[:1] or "U").upper()) + '</span><img data-profile-avatar alt="Foto do perfil" hidden></span></div></header>' +
         _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + content +
         '<footer class="aqr-foot">ATLASQUANT / TRADER RADAR · Poderoso por dentro. '
         'Simples por fora. · Sem ordens reais, sem dados fictícios.</footer></main></div></section>'
