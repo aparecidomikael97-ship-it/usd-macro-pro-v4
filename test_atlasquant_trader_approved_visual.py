@@ -8,11 +8,10 @@ from atlasquant_trader_radar_compact_ui import (
 
 
 class TraderApprovedVisualTests(unittest.TestCase):
-    def test_all_four_pages_use_approved_sidebar_and_hero(self):
+    def test_all_three_pages_use_approved_sidebar_and_hero(self):
         expected = {
             "home": "Seu mercado. Uma visão clara.",
             "radar": "Onde o mercado está se movendo.",
-            "scanner": "Do contexto à oportunidade.",
             "master": "Entenda o porquê do movimento.",
         }
         for page, title in expected.items():
@@ -27,8 +26,10 @@ class TraderApprovedVisualTests(unittest.TestCase):
                 self.assertIn("28 PARES FOREX", html)
                 self.assertIn("8 MOEDAS", html)
                 self.assertIn(title, html)
-                for route in ("home", "radar", "scanner", "master"):
+                for route in ("home", "radar", "master"):
                     self.assertIn('data-route="' + route + '"', html)
+                self.assertNotIn('data-route="scanner"', html)
+                self.assertNotIn("Scanner Técnico", html)
                 self.assertNotIn("Execução automática habilitada", html)
 
     def test_home_has_reference_panorama_and_flow(self):

@@ -78,6 +78,9 @@ def test_every_rendered_route_opens_only_its_workspace(area):
             assert session["atlasquant_central_choice"]==route[5:]
         elif route=="central":
             assert session["atlasquant_central_choice"]=="central_root"
+        elif area == "central" and route.startswith("open:"):
+            assert session["atlasquant_central_choice"] == "trader_radar"
+            assert session["aq_reference_module"] == ("trader_radar", route.split(":", 1)[1])
         elif route in {"mode","home"}:
             pass
         else:

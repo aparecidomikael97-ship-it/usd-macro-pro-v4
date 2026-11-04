@@ -131,7 +131,7 @@ def test_real_browser_persists_remounts_and_continues(staged_preview):
             page.locator('[data-workspace="central"]')
         ).to_be_visible(timeout=30000)
         page.locator(
-            '.ref-canvas [data-route="area:aion"]'
+            '.aqc-aside [data-route="area:aion"]'
         ).click()
         expect(page.locator(".aq-chat-root")).to_be_visible(timeout=30000)
         expect(page.locator(".aq-chat-id")).to_have_text(conversation_id)

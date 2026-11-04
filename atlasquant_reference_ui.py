@@ -1167,6 +1167,9 @@ def business_reference_home_html(*, mode="Avançado", name="Usuário", show_cent
 
 
 def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show_central=True, market_items=None, fx_population=None, business_read_model=None, revops_read_model=None, proposal_draft=None, pilot_planning_read_model=None, pilot_activation_status_read_model=None, pilot_value_read_model=None, multi_company_read_model=None, demo_sandbox_read_model=None, terminal_certificate_panel_view_model=None, daily_data=None, calendar_data=None):
+    if area == "central" and not selected:
+        from atlasquant_central_focus_ui import focused_central_html
+        return focused_central_html(name)
     if area == "trader_radar":
         from atlasquant_trader_radar_compact_ui import trader_radar_html
         return trader_radar_html(selected=selected, name=name,
@@ -1174,9 +1177,12 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
+        # Preserve the original 24-module workspace behind the small legacy card.
         from atlasquant_compact_cockpit import trader_html
-        return trader_html(mode=mode,selected=selected,name=name,show_central=show_central,
-            nav_html=nav_html,module_panel=lambda area,selected: module_panel(area,selected,resident=fx_population),uri=asset_uri,market_items=market_items,fx_population=fx_population)
+        return trader_html(mode=mode, selected=selected, name=name,
+            show_central=show_central, nav_html=nav_html,
+            module_panel=lambda area, selected: module_panel(area, selected, resident=fx_population),
+            uri=asset_uri, market_items=market_items, fx_population=fx_population)
     if area == "aion" and not selected:
         from atlasquant_interface_final import aion_workspace_html
         return aion_workspace_html(mode=mode,name=name,show_central=show_central,nav_html=nav_html,uri=asset_uri)
@@ -1334,6 +1340,55 @@ export default function(component) {
    const term=search.value.toLocaleLowerCase();
    root.querySelectorAll('.ref-search-results button').forEach(b=>{b.hidden=!b.textContent.toLocaleLowerCase().includes(term);});
  };}
+ // Browser-only profile picture. Never uploads to AtlasQuant or any provider.
+ const profile=root.querySelector('[data-avatar-key]');
+ if(profile){
+   const storageKey='atlasquant.profile.avatar.v1.'+profile.dataset.avatarKey;
+   const photoNodes=()=>[...root.querySelectorAll('[data-profile-avatar]')];
+   const setPhoto=(src)=>{
+     for(const img of photoNodes()){img.hidden=!src; if(src){img.src=src;} else {img.removeAttribute('src');}}
+     root.querySelectorAll('[data-avatar-initial]').forEach(el=>el.hidden=!!src);
+   };
+   const validPhoto=(value)=>typeof value==='string' && value.length<200000 &&
+     /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(value);
+   const status=root.querySelector('[data-avatar-status]');
+   const inform=(message)=>{if(status)status.textContent=message;};
+   try {const stored=localStorage.getItem(storageKey); if(validPhoto(stored))setPhoto(stored);}
+   catch (_) {inform('Foto disponível apenas nesta sessão do navegador.');}
+   const input=root.querySelector('[data-avatar-input]');
+   root.querySelectorAll('[data-avatar-editor]').forEach(b=>b.onclick=()=>{if(input)input.click();});
+   if(input)input.onchange=()=>{
+     const file=input.files && input.files[0];
+     if(!file)return;
+     if(!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>8*1024*1024){
+       inform('Use JPG, PNG ou WebP de até 8 MB.'); input.value=''; return;
+     }
+     const url=URL.createObjectURL(file);
+     const photo=new Image();
+     photo.onload=()=>{
+       try{
+         const side=128,canvas=document.createElement('canvas');canvas.width=side;canvas.height=side;
+         const context=canvas.getContext('2d');
+         const crop=Math.min(photo.width,photo.height);
+         context.drawImage(photo,(photo.width-crop)/2,(photo.height-crop)/2,crop,crop,0,0,side,side);
+         const encoded=canvas.toDataURL('image/jpeg',0.8);
+         if(!validPhoto(encoded))throw Error('Imagem inválida');
+         setPhoto(encoded);
+         try{localStorage.setItem(storageKey,encoded);inform('Foto salva neste navegador.');}
+         catch(_){inform('Foto aplicada, mas o navegador não permitiu salvar.');}
+       }catch(_){inform('Não foi possível processar esta imagem.');}
+       URL.revokeObjectURL(url);
+       input.value='';
+     };
+     photo.onerror=()=>{URL.revokeObjectURL(url);inform('Não foi possível abrir a imagem.');input.value='';};
+     photo.src=url;
+   };
+   const clear=root.querySelector('[data-avatar-clear]');
+   if(clear)clear.onclick=()=>{
+     try{localStorage.removeItem(storageKey);}catch(_){}
+     setPhoto('');inform('Foto removida neste navegador.');
+   };
+ }
  root.querySelectorAll('[data-route]').forEach(button=>{
    button.onclick=()=>{button.setAttribute('aria-busy','true');setTriggerValue('navigate',button.dataset.route);};
  });
@@ -1376,6 +1431,10 @@ def apply_event(session, access, area, event):
     if event.startswith("area:") and area == "central":
         request_central_destination(session,access,event[5:])
         session.pop("aq_reference_module",None)
+        session["aq_reference_connected"] = False
+    elif area == "central" and event in {"open:home", "open:radar", "open:master"}:
+        request_central_destination(session,access,"trader_radar")
+        session["aq_reference_module"] = ("trader_radar", event.split(":", 1)[1])
         session["aq_reference_connected"] = False
     elif event == "central":
         request_central_destination(session,access,"central")
