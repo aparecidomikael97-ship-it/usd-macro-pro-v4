@@ -44,8 +44,10 @@ class TraderRadarCompactTests(unittest.TestCase):
         html = trader_radar_html(selected="radar")
         self.assertIn("Dados diários ainda não conectados", html)
         self.assertIn("Top 10 aguardando", html)
-        self.assertEqual(len(re.findall(r"<tr><td>", html)), 56)  # 28 preços + 28 vieses
-        self.assertGreaterEqual(html.count("AGUARDANDO"), 28 + 8 + 10)
+        self.assertEqual(len(re.findall(r"<tr><td>", html)), 28)  # apenas 28 linhas na matriz recolhível
+        self.assertIn('<details class="aqr-section aqr-matrix"', html)
+        self.assertNotIn("Os 28 pares Forex", html)
+        self.assertGreaterEqual(html.count("AGUARDANDO"), 8 + 10)
         self.assertNotIn("Fixture offline", html)
 
     def test_complete_validated_universe_enables_real_ordering(self):

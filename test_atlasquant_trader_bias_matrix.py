@@ -39,7 +39,8 @@ def test_empty_returns_28_explicit_waits_without_inventing_direction():
     assert "MATRIZ DE VIÉS · Semanal / Diário / H4 / M15" in html
     assert "Clique aqui para abrir as 28 linhas" in html
     assert html.index("MATRIZ DE VIÉS") < html.index("Força relativa das 8 moedas")
-    assert html.index("MATRIZ DE VIÉS") < html.index("Os 28 pares Forex")
+    assert "Os 28 pares Forex" not in html
+    assert '<details class="aqr-section aqr-matrix"' in html
     assert "Ainda não recebemos leituras válidas" in html
     assert "0 de 28" in html
     assert "Scanner Técnico" not in html
