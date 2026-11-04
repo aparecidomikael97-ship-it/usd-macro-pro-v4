@@ -55,20 +55,33 @@ def _claim(value: Any, *, currencies: set[str], now: datetime) -> dict | None:
     if not isinstance(value, Mapping):
         return None
     timestamp = _utc(value.get("released_at_utc"))
+    consensus_at = _utc(value.get("consensus_captured_at_utc"))
     surprise = value.get("actual_minus_consensus")
+    actual = value.get("actual_synthetic")
+    consensus = value.get("consensus_synthetic")
+    cls = value.get("surprise_class")
+    # Never accept a post-release "consensus" as if it were an ex-ante
+    # benchmark. Independently recompute the numerical surprise instead
+    # of trusting a label or delta copied from a separate PR/dossier.
     if (timestamp is None or timestamp > now
+            or consensus_at is None or consensus_at >= timestamp
             or value.get("currency") not in currencies
             or not isinstance(value.get("event_id"), str)
             or not 3 <= len(value["event_id"]) <= 90
-            or value.get("surprise_class") not in SURPRISE_CLASSES
+            or cls not in SURPRISE_CLASSES
             or value.get("release_verified") is not False
             or value.get("strength_direction") != "AGUARDAR"
-            or isinstance(surprise, bool)
-            or not isinstance(surprise, (int, float))
-            or not isfinite(surprise)):
+            or any(isinstance(x, bool) or not isinstance(x, (int, float))
+                   or not isfinite(x) for x in (surprise, actual, consensus))
+            or abs((actual - consensus) - surprise) > 1e-8 * max(1.0, abs(surprise))
+            or (cls == "ABOVE_CONSENSUS" and surprise <= 0)
+            or (cls == "BELOW_CONSENSUS" and surprise >= 0)):
         return None
-    return {"timestamp": timestamp, "currency": value["currency"],
-            "event_id": value["event_id"], "surprise_class": value["surprise_class"]}
+    # IN_LINE_WITH_CONSENSUS may legitimately have a nonzero delta:
+    # the parent dossier's predeclared deadband is not in this contract.
+    return {"timestamp": timestamp, "consensus_at": consensus_at,
+            "currency": value["currency"], "event_id": value["event_id"],
+            "surprise_class": cls}
 
 
 def _calendar_classification(timestamp: datetime, start: date, end: date) -> str:
@@ -164,6 +177,8 @@ def build_ecb_macro_timing_bridge_lab(
                 alignments.append({
                     "currency": c["currency"], "event_id": c["event_id"],
                     "surprise_class_unattested": c["surprise_class"],
+                    "consensus_snapshot_declared_at_utc": c["consensus_at"].isoformat(),
+                    "consensus_snapshot_origin_authenticated": False,
                     "calendar_relation": _calendar_classification(
                         c["timestamp"], start, end),
                     "can_explain_ecb_move": False,

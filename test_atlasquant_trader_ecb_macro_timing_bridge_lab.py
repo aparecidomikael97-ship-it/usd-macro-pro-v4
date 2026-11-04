@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import timedelta
+from datetime import datetime, timedelta
 import unittest
 from unittest.mock import patch
 
@@ -54,7 +54,11 @@ def claim(date="2026-11-02T12:00:00+00:00", event="US_CPI_X"):
     return {
         "currency": "USD", "event_id": event, "indicator": "CPI",
         "surprise_class": "ABOVE_CONSENSUS", "actual_minus_consensus": 0.3,
-        "released_at_utc": date, "release_verified": False,
+        "actual_synthetic": 3.3, "consensus_synthetic": 3.0,
+        "released_at_utc": date,
+        "consensus_captured_at_utc": (datetime.fromisoformat(date)
+                                      - timedelta(days=1)).isoformat(),
+        "release_verified": False,
         "strength_direction": "AGUARDAR",
     }
 
@@ -183,6 +187,75 @@ class ECBMacroTimingBridgeLabTests(unittest.TestCase):
                 items = [event, deepcopy(event)] if kind == "duplicate" else [event]
                 pair_frame(report)["macro_surprise_claims"] = items
                 self.assertEqual(build(report)["state"], "LAB_BLOCKED")
+
+    def test_post_release_consensus_or_unknown_snapshot_is_refused(self):
+        for kind in ("missing", "same_time", "later", "naive", "invalid"):
+            with self.subTest(kind=kind):
+                report = mock_dossier()
+                c = claim()
+                if kind == "missing":
+                    del c["consensus_captured_at_utc"]
+                elif kind == "same_time":
+                    c["consensus_captured_at_utc"] = c["released_at_utc"]
+                elif kind == "later":
+                    c["consensus_captured_at_utc"] = "2026-11-03T00:00:00+00:00"
+                elif kind == "naive":
+                    c["consensus_captured_at_utc"] = "2026-11-01T00:00:00"
+                else:
+                    c["consensus_captured_at_utc"] = "not-a-time"
+                pair_frame(report)["macro_surprise_claims"] = [c]
+                out = build(report)
+                self.assertEqual(out["state"], "LAB_BLOCKED")
+                self.assertEqual(out["reason"], "CLAIM_MACRO_INVALIDA_DUPLICADA_OU_FUTURA")
+
+    def test_numeric_difference_and_sign_label_are_not_blindly_trusted(self):
+        for kind in ("actual_changed", "consensus_changed", "missing_actual",
+                     "missing_consensus", "wrong_above", "wrong_below",
+                     "infinite_actual", "boolean_actual"):
+            with self.subTest(kind=kind):
+                report = mock_dossier()
+                c = claim()
+                if kind == "actual_changed":
+                    c["actual_synthetic"] = 2.8
+                elif kind == "consensus_changed":
+                    c["consensus_synthetic"] = 4.0
+                elif kind == "missing_actual":
+                    del c["actual_synthetic"]
+                elif kind == "missing_consensus":
+                    del c["consensus_synthetic"]
+                elif kind == "wrong_above":
+                    c["actual_minus_consensus"] = -0.3
+                    c["actual_synthetic"] = 2.7
+                elif kind == "wrong_below":
+                    c["surprise_class"] = "BELOW_CONSENSUS"
+                elif kind == "infinite_actual":
+                    c["actual_synthetic"] = float("inf")
+                else:
+                    c["actual_synthetic"] = True
+                pair_frame(report)["macro_surprise_claims"] = [c]
+                out = build(report)
+                self.assertEqual(out["state"], "LAB_BLOCKED")
+                self.assertFalse(out["trade_authorized"])
+
+    def test_declared_consensus_date_visible_and_still_unattested(self):
+        report = mock_dossier()
+        c = claim()
+        pair_frame(report)["macro_surprise_claims"] = [c]
+        out = build(report)
+        alignment = pair_frame(out)["calendar_alignments"][0]
+        self.assertEqual(alignment["consensus_snapshot_declared_at_utc"],
+                         "2026-11-01T12:00:00+00:00")
+        self.assertFalse(alignment["consensus_snapshot_origin_authenticated"])
+        self.assertFalse(alignment["can_explain_ecb_move"])
+
+    def test_inline_surprise_can_be_nonzero_with_predeclared_deadband(self):
+        report = mock_dossier()
+        c = claim()
+        c["surprise_class"] = "IN_LINE_WITH_CONSENSUS"
+        c["actual_synthetic"] = 3.02
+        c["actual_minus_consensus"] = 0.02
+        pair_frame(report)["macro_surprise_claims"] = [c]
+        self.assertEqual(build(report)["state"], "LAB_TEMPORAL_CONTEXT_ONLY")
 
     def test_no_network_cost_cron_worker_or_deploy(self):
         with patch("urllib.request.urlopen", side_effect=AssertionError("network")):
