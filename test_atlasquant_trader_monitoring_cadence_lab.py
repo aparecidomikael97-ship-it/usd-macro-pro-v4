@@ -1,4 +1,4 @@
-"""Three full daily updates plus faster event watch are only targets, no jobs."""
+"""Three daily reviews now, paid hourly proposal later, no active jobs."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -15,7 +15,7 @@ class MonitoringCadenceLabTests(unittest.TestCase):
     def test_three_full_slots_per_day_and_no_scheduler(self):
         report = build_monitoring_cadence_lab(at=AT)
         self.assertEqual(report["schema"], SCHEMA)
-        self.assertEqual(report["state"], "LAB_POLICY_ONLY_NOT_RUNNING")
+        self.assertEqual(report["state"], "LAB_THREE_DAILY_ONLY_NOT_RUNNING")
         self.assertEqual(len(report["daily_full_refresh_slots_next_two_days"]), 6)
         self.assertEqual(report["daily_full_refresh_target"], 3)
         self.assertEqual([x.strftime("%H:%M") for x in DAILY_FULL_REFRESH],
@@ -33,14 +33,23 @@ class MonitoringCadenceLabTests(unittest.TestCase):
                     "can_feed_live_radar"):
             self.assertFalse(report[key], key)
         self.assertEqual(report["new_external_requests"], 0)
-        self.assertEqual(report["target_poll_minutes_now"], 15)
+        self.assertEqual(report["current_update_mode"], "THREE_DAILY_REVIEWS_ONLY")
+        self.assertFalse(report["extra_intraday_polls_planned_now"])
+        self.assertFalse(report["active_high_frequency_refresh"])
+        self.assertFalse(report["active_hourly_refresh"])
+        self.assertIsNone(report["current_extra_poll_target_minutes"])
+        self.assertEqual(report["future_optional_hourly_target_minutes"], 60)
+        self.assertTrue(report["future_hourly_requires_owner_approval"])
+        self.assertFalse(report["future_hourly_budget_approved"])
 
-    def test_around_official_event_target_can_be_faster_not_live_claim(self):
+    def test_around_critical_event_no_extra_poll_without_new_approval(self):
         at = datetime(2026, 11, 5, 11, 30, tzinfo=timezone.utc)
         report = build_monitoring_cadence_lab(at=at)
         self.assertTrue(report["in_curated_critical_window"])
         self.assertIn("BOE_MPC_20261105", report["curated_critical_event_ids"])
-        self.assertEqual(report["target_poll_minutes_now"], 5)
+        self.assertIsNone(report["current_extra_poll_target_minutes"])
+        self.assertFalse(report["extra_intraday_polls_planned_now"])
+        self.assertTrue(report["critical_events_prioritized_in_next_full_review_only"])
         self.assertFalse(report["realtime_delivery_verified"])
 
     def test_before_v2_review_no_anachronistic_event_promoted(self):

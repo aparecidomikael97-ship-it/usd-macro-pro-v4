@@ -1,8 +1,9 @@
-"""NO-RUN monitoring cadence proposal for AtlasQuant Trader macro/news.
+"""NO-RUN three-daily-update cadence for AtlasQuant Trader macro/news.
 
 Preserves the three Brasilia calendar slots already proposed in the Master
-refresh plan, and adds a non-executable faster *target* around critical events.
-No source can be called 'realtime' before its actual delivery delay is proven.
+refresh plan. As explicitly decided by the owner, intraday polling and future
+hourly paid updates are DEFERRED, not enabled by default or implicitly.
+No source can be called 'realtime' before its delivery delay is proven.
 This module does not schedule, fetch, store, bill or notify anything.
 """
 from __future__ import annotations
@@ -15,13 +16,13 @@ from atlasquant_trader_macro_event_exposure_v2_lab import (
     CALENDAR, REVIEW_DATE,
 )
 
-SCHEMA = "ATLASQUANT_TRADER_MONITORING_CADENCE_LAB_V1"
+SCHEMA = "ATLASQUANT_TRADER_MONITORING_CADENCE_LAB_V2"
 BRT = timezone(timedelta(hours=-3), "BRT")
 MT = ZoneInfo("America/Cuiaba")
 # Keep aligned with atlasquant_trader_master_refresh_plan.SLOTS calendar rows.
 DAILY_FULL_REFRESH = (time(6, 35), time(10, 45), time(17, 15))
-GENERAL_POLL_TARGET_MINUTES = 15
-CRITICAL_POLL_TARGET_MINUTES = 5
+# Owner decision: current free phase = 3 updates/day; hourly is future-only.
+FUTURE_HOURLY_MINUTES = 60
 CRITICAL_WINDOW_MINUTES = 120
 
 
@@ -54,18 +55,23 @@ def build_monitoring_cadence_lab(*, at: datetime) -> dict[str, Any]:
                                  "currency": event["currency"],
                                  "scheduled_at_utc": when.isoformat()})
     return {
-        "schema": SCHEMA, "state": "LAB_POLICY_ONLY_NOT_RUNNING",
+        "schema": SCHEMA, "state": "LAB_THREE_DAILY_ONLY_NOT_RUNNING",
         "as_of_utc": now.isoformat(),
         "three_full_refreshes_per_day": True,
         "daily_full_refresh_target": 3,
         "daily_full_refresh_slots_next_two_days": slots,
-        "general_source_check_target_minutes": GENERAL_POLL_TARGET_MINUTES,
-        "near_critical_release_check_target_minutes": CRITICAL_POLL_TARGET_MINUTES,
+        "current_update_mode": "THREE_DAILY_REVIEWS_ONLY",
+        "extra_intraday_polls_planned_now": False,
+        "active_hourly_refresh": False,
+        "active_high_frequency_refresh": False,
+        "current_extra_poll_target_minutes": None,
+        "future_optional_hourly_target_minutes": FUTURE_HOURLY_MINUTES,
+        "future_hourly_requires_owner_approval": True,
+        "future_hourly_budget_approved": False,
         "critical_window_before_and_after_minutes": CRITICAL_WINDOW_MINUTES,
         "in_curated_critical_window": bool(critical),
         "curated_critical_event_ids": [e["event_id"] for e in critical],
-        "target_poll_minutes_now": (CRITICAL_POLL_TARGET_MINUTES if critical
-                                    else GENERAL_POLL_TARGET_MINUTES),
+        "critical_events_prioritized_in_next_full_review_only": True,
         "source_rate_limits_reviewed": False,
         "source_terms_and_commercial_license_checked": False,
         "full_g8_calendar_coverage": False,
@@ -80,9 +86,10 @@ def build_monitoring_cadence_lab(*, at: datetime) -> dict[str, Any]:
         "paid_api_enabled": False, "paid_provider_charged": False,
         "new_external_requests": 0, "trade_authorized": False,
         "can_feed_live_radar": False,
-        "why_not": ("Alvos de verificacao e horarios nao provam execucao nem "
-                    "latencia. Ativacao requer permissao das fontes, agendador "
-                    "duravel, cota, log de mudancas, custos e auditoria."),
+        "why_not": ("Decisao do proprietario: apenas 3 atualizacoes diarias "
+                    "na fase gratuita. 1/h e qualquer monitoramento extra "
+                    "precisam de nova autorizacao; horários nao provam "
+                    "execucao, custodia ou latencia de noticia."),
     }
 
 

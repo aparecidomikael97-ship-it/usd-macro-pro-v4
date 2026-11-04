@@ -1,5 +1,11 @@
 # AtlasQuant Trader — atualizacao automatica e contexto causal G8 (LAB, 04/11/2026)
 
+> **DECISÃO POSTERIOR DO PROPRIETÁRIO (04/11):** esta proposta histórica
+> de verificações extras a cada 15/5 minutos **foi adiada**. A política vigente
+> é somente três atualizações por dia, sem nova contratação. Frequência de
+> uma hora fica como possibilidade futura, sujeita a aprovação e custo.
+> Ver `TRADER_PRIORIDADE_3X_G8_CONTEXT_READINESS_LAB_20261104.md`.
+
 ## Requisito do proprietário
 
 Mikael exige no mínimo **três atualizações completas por dia**, detecção de
