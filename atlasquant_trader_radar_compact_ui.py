@@ -107,7 +107,7 @@ _CSS = r"""
 .aqr-win-buttons{display:flex;gap:8px;flex-wrap:wrap}.aqr-win-buttons button{border:1px solid #3d7592;border-radius:8px;padding:10px 13px;color:#e7f4fb;background:#122c42;font-size:11px;font-weight:750}.aqr-win-buttons .aqr-win-submit{background:#078b8a;border-color:#63e9e0;color:white}
 .aqr-win-hint{color:#92adbd!important;font-size:10px!important}.aqr-win-result{border:1px solid #3b6f76;border-radius:11px;background:#09252e;padding:18px;display:flex;flex-direction:column;justify-content:center;gap:7px;min-width:0}.aqr-win-result small{font-size:10px;color:#9dc5ce;font-weight:850;letter-spacing:.09em}.aqr-win-result strong{font-size:25px;color:#d6e3ed}.aqr-win-result[data-win-side-state=up]{border-color:#24be97;background:#092d2a}.aqr-win-result[data-win-side-state=up] strong{color:#77efbe}.aqr-win-result[data-win-side-state=down]{border-color:#d27f89;background:#2a1720}.aqr-win-result[data-win-side-state=down] strong{color:#ffabb5}.aqr-win-result[data-win-side-state=neutral] strong{color:#f2d19a}
 .aqr-win-score{font-size:18px;font-weight:900;color:#e7f5fb}.aqr-win-message{font-size:10px!important;color:#a5c3d0!important}
-.aqr-checkpoint{margin:16px 0 22px;padding:15px 17px;border:1px solid #365b6c;border-radius:12px;background:#0e2534;color:#d5e8f3}.aqr-checkpoint-heading{display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap}.aqr-checkpoint-heading strong{font-size:14px;color:#e8f9fa}.aqr-checkpoint-heading span{font-size:10px;color:#f0c69d;border:1px solid #7a6348;padding:5px 8px;border-radius:5px}.aqr-checkpoint p{font-size:11px;line-height:1.65;color:#a9c1d3;margin:8px 0}.aqr-checkpoint-counts{display:flex;gap:8px;flex-wrap:wrap}.aqr-checkpoint-counts span{border:1px solid #305568;border-radius:7px;padding:8px 10px;font-size:10px;color:#c7e0ed}.aqr-why-more{padding:9px 0}.aqr-why-more summary{cursor:pointer;font-size:12px;font-weight:800;color:#b7eef2}.aqr-why-more summary:focus-visible{outline:3px solid #79e9ed;outline-offset:3px}.aqr-why-more li{margin:8px 0;font-size:11px;line-height:1.55}.aqr-matrix .aqr-table td:last-child{min-width:230px;line-height:1.55}
+.aqr-checkpoint{margin:16px 0 22px;padding:15px 17px;border:1px solid #365b6c;border-radius:12px;background:#0e2534;color:#d5e8f3}.aqr-checkpoint-heading{display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap}.aqr-checkpoint-heading strong{font-size:14px;color:#e8f9fa}.aqr-checkpoint-heading span{font-size:10px;color:#f0c69d;border:1px solid #7a6348;padding:5px 8px;border-radius:5px}.aqr-checkpoint p{font-size:11px;line-height:1.65;color:#a9c1d3;margin:8px 0}.aqr-checkpoint-counts{display:flex;gap:8px;flex-wrap:wrap}.aqr-checkpoint-counts span{border:1px solid #305568;border-radius:7px;padding:8px 10px;font-size:10px;color:#c7e0ed}.aqr-why-more{padding:9px 0}.aqr-why-more summary{cursor:pointer;font-size:12px;font-weight:800;color:#b7eef2}.aqr-why-more summary:focus-visible{outline:3px solid #79e9ed;outline-offset:3px}.aqr-why-more li{margin:8px 0;font-size:11px;line-height:1.55}.aqr-matrix .aqr-table td:last-child{min-width:230px;line-height:1.55}.aqr-guide summary{cursor:pointer;font-weight:800;min-height:26px}.aqr-guide summary:focus-visible{outline:3px solid #79ebf1;outline-offset:2px}
 @media(max-width:850px){.aqr-win-layout{grid-template-columns:1fr}}@media(max-width:440px){.aqr-win-field{display:block}.aqr-win-field input{display:block;max-width:100%;width:100%;margin-top:6px}.aqr-win-buttons button{flex:1}}
 @media(prefers-reduced-motion:reduce){.aqr-shell *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 </style>
@@ -327,8 +327,10 @@ def _home(data: Mapping[str, Any], bias_evidence: Any = None) -> str:
 
 def _currencies_approved(data: Mapping[str, Any]) -> str:
     rows = data["currencies"]
+    # Never display a complete G8 strength panel beside an incomplete 28-pair universe.
     ordered = (sorted(rows.items(), key=lambda x: x[1]["change_pct"], reverse=True)
-               if len(rows) == len(CURRENCIES) else [(c, None) for c in CURRENCIES])
+               if len(rows) == len(CURRENCIES) and len(data["pairs"]) == len(OFFICIAL_PAIRS)
+               else [(c, None) for c in CURRENCIES])
     return '<div class="aqr-grid">' + "".join(
         '<article class="aqr-currency"><strong>' + escape(code) +
         '</strong><small>Força relativa</small><div class="aqr-currency-value">' +
@@ -599,6 +601,13 @@ def _radar(data: Mapping[str, Any], raw_daily: Any = None, bias_evidence: Any = 
         '<section class="aqr-section">' +
         _heading("Força relativa das 8 moedas",
                  "Comparação relativa para orientar a leitura; não é cotação nominal.") +
+        '<details class="aqr-guide" aria-label="Metodologia da força das moedas">'
+        '<summary>Como será calculada a força das moedas?</summary>'
+        '<p>Somente com 28 pares completos do mesmo período, fechamento de referência, '
+        'spread controlado, horários próximos e coerência entre cruzamentos. '
+        'O método em laboratório usa retornos logarítmicos com sinal de base e cotação. '
+        'O Top 10 ordena variação diária, não chance de lucro. '
+        'Metodologia em laboratório; fonte real ainda sem validação.</p></details>' +
         ('<p class="aqr-muted">Dados diários ainda não conectados.</p>' if not data["stamp"] else '') +
         _currencies_approved(data) + '</section>'
         '<section class="aqr-section">' +
