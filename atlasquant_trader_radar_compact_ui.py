@@ -344,9 +344,9 @@ def _bias_matrix_html(payload: Any) -> str:
     )
     return (
         '<details class="aqr-section aqr-matrix" aria-label="Matriz de viés multitempo">' +
-        '<summary class="aqr-matrix-summary">Matriz de viés · Semanal / Diário / H4 / M15' +
+        '<summary class="aqr-matrix-summary">◉ MATRIZ DE VIÉS · Semanal / Diário / H4 / M15' +
         '<small>' + str(model["validated_pairs"]) +
-        ' de 28 pares com quatro leituras válidas · Clique para detalhar</small></summary>' +
+        ' de 28 pares com quatro leituras válidas · Clique aqui para abrir as 28 linhas</small></summary>' +
         '<div class="aqr-guide"><strong>Filtro, não sinal</strong>' +
         'ALTA ou BAIXA só aparece quando os quatro horizontes concordam. ' +
         'Dados ausentes, antigos, neutros ou contraditórios resultam em AGUARDAR. ' +
@@ -498,6 +498,7 @@ def _radar(data: Mapping[str, Any], raw_daily: Any = None, bias_evidence: Any = 
         _region_html(region, assets, data, raw_daily) + '</section>'
         for key, (region, assets) in zip(keys, INDEX_GROUPS))
     return (
+        _bias_matrix_html(bias_evidence) +
         '<section class="aqr-section">' +
         _heading("Força relativa das 8 moedas",
                  "Comparação relativa para orientar a leitura; não é cotação nominal.") +
@@ -511,7 +512,6 @@ def _radar(data: Mapping[str, Any], raw_daily: Any = None, bias_evidence: Any = 
         _heading("Os 28 pares Forex",
                  "Variação diária, viés e confirmação técnica por par.") +
         _forex_table(data) + '</section>' +
-        _bias_matrix_html(bias_evidence) +
         '<section class="aqr-section">' +
         _heading("Índices e Futuros",
                  "EUA, Brasil, Europa e Ásia · WIN e WDO sem confundir os contratos.") +

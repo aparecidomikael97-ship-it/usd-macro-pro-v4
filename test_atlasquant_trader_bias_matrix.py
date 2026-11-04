@@ -36,7 +36,10 @@ def test_empty_returns_28_explicit_waits_without_inventing_direction():
         assert len(model["rows"]) == 28
         assert all(r["bias"] == "AGUARDAR" for r in model["rows"].values())
     html = trader_radar_html(selected="radar")
-    assert "Matriz de viés · Semanal / Diário / H4 / M15" in html
+    assert "MATRIZ DE VIÉS · Semanal / Diário / H4 / M15" in html
+    assert "Clique aqui para abrir as 28 linhas" in html
+    assert html.index("MATRIZ DE VIÉS") < html.index("Força relativa das 8 moedas")
+    assert html.index("MATRIZ DE VIÉS") < html.index("Os 28 pares Forex")
     assert "Ainda não recebemos leituras válidas" in html
     assert "0 de 28" in html
     assert "Scanner Técnico" not in html
