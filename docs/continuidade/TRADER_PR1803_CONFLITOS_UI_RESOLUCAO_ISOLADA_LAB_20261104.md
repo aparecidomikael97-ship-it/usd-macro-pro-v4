@@ -27,14 +27,14 @@ Data: 04/11/2026. **Apenas LAB**, sem alterar `main`, PR #1803 ou o aplicativo p
 
 ## Verificações executadas no AM12
 - Integração por worktree isolada; nenhum commit sobre `main`.
-- `python -m unittest -q` em 12 módulos relevantes:
-  **168 testes aprovados** (incluindo o gate de 20 minutos; venv Python local com `tzdata`).
+- `python -m unittest -q` em 13 módulos relevantes:
+  **170 testes aprovados** (gate de 20 minutos e passagem das quatro entradas de evidência até o Painel Mestre; venv Python local com `tzdata`).
 - `python -m pytest -q test_atlasquant_trader_bias_matrix.py`:
   **10 aprovados** (Python local com `pytest`).
 - Os testes atualizados verificam ausência da rota de navegação
   `data-route="scanner"`, e não ausência da palavra Scanner em textos
   explicativos de auditoria.
-- Suite remota CI da integração total: **ainda pendente**.
+- CI do commit anterior `a32c9e4`: **20 de 20 verificações aprovadas**, incluindo Quality e navegador. Os testes novos exigem nova execução de CI no próximo SHA.
 
 ## Restrições
 O conjunto da PR #1803 inclui muitos módulos e contratos de pesquisa.
