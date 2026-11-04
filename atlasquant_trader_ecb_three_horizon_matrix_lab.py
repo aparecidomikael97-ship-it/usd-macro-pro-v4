@@ -76,11 +76,16 @@ def build_ecb_three_horizon_reference_matrix_lab(
                     or set(scores) != set(CURRENCIES)
                     or set(returns) != set(OFFICIAL_PAIRS)):
                 return _blocked("INCOMPLETE_REFERENCE_STRENGTH_WINDOW")
+            # Equal observed reference strength must not look like distinct
+            # stronger/weaker currencies. Use competition ranking (1, 1, 3),
+            # computed from the same six-decimal scores shown to the user.
             ranks[horizon] = [{
-                "currency": currency, "rank": i + 1,
+                "currency": currency,
+                "rank": 1 + sum(value > scores[currency] for value in scores.values()),
+                "rank_tied": sum(value == scores[currency] for value in scores.values()) > 1,
                 "relative_log_change_percentage_points": scores[currency],
                 "observed_only_not_macro_cause": True,
-            } for i, currency in enumerate(order)]
+            } for currency in order]
             top10[horizon] = list(window["top10"])
         else:
             ranks[horizon] = []

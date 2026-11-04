@@ -88,11 +88,54 @@ class ECBThreeHorizonMatrixLabTests(unittest.TestCase):
         for frame in HORIZONS:
             ranking = result["currency_ranking_by_horizon"][frame]
             self.assertEqual(set(entry["currency"] for entry in ranking), set(CURRENCIES))
-            self.assertEqual([x["rank"] for x in ranking], list(range(1, 9)))
+            for entry in ranking:
+                score = entry["relative_log_change_percentage_points"]
+                same_score = sum(
+                    other["relative_log_change_percentage_points"] == score
+                    for other in ranking
+                )
+                stronger = sum(
+                    other["relative_log_change_percentage_points"] > score
+                    for other in ranking
+                )
+                self.assertEqual(entry["rank"], stronger + 1)
+                self.assertEqual(entry["rank_tied"], same_score > 1)
             self.assertEqual(len(result["horizon_top10_reference_only"][frame]), 10)
             self.assertTrue(all(x["observed_only_not_macro_cause"] for x in ranking))
         self.assertEqual(result["derived_non_eur_crosses"], 21)
         self.assertEqual(result["direct_eur_reference_legs_per_day"], 7)
+
+    def test_all_eight_currencies_tied_when_reference_rates_unchanged(self):
+        raw = xml_history([
+            ("2026-10-01", FIXES),
+            ("2026-10-27", FIXES),
+            ("2026-11-02", FIXES),
+            ("2026-11-03", FIXES),
+        ])
+        result = build(raw)
+        self.assertEqual(result["state"], "LAB_EXPOST_REFERENCE_MATRIX_ONLY")
+        for frame in HORIZONS:
+            ranking = result["currency_ranking_by_horizon"][frame]
+            self.assertEqual(len(ranking), 8)
+            self.assertEqual({entry["rank"] for entry in ranking}, {1})
+            self.assertTrue(all(entry["rank_tied"] for entry in ranking))
+            self.assertEqual({entry["relative_log_change_percentage_points"]
+                              for entry in ranking}, {0.0})
+            self.assertEqual(horizon(result, frame=frame)["historical_reference_relation"],
+                             "UNCHANGED_IN_REFERENCE")
+            self.assertEqual(horizon(result, frame=frame)["operational_bias"], "AGUARDAR")
+
+    def test_partial_ties_have_shared_ranks_not_arbitrary_positions(self):
+        result = build()
+        for frame in HORIZONS:
+            ranking = result["currency_ranking_by_horizon"][frame]
+            tied = [entry for entry in ranking if entry["rank_tied"]]
+            self.assertGreaterEqual(len(tied), 2)
+            for a in tied:
+                for b in tied:
+                    if a["relative_log_change_percentage_points"] == b["relative_log_change_percentage_points"]:
+                        self.assertEqual(a["rank"], b["rank"])
+            self.assertNotEqual(len({entry["rank"] for entry in ranking}), 8)
 
     def test_insufficient_month_history_does_not_invent_reference_anchors(self):
         raw = xml_history([
