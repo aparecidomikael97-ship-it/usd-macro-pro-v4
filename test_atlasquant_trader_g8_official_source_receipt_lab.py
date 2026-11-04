@@ -116,6 +116,46 @@ class OfficialSourceReceiptLabTests(unittest.TestCase):
         item["document_url"] = "https://www.bls.gov.evil.example/schedule/2026/"
         self.assertEqual(inspect(item)["state"], "LAB_OFFICIAL_RECEIPT_REFUSED")
 
+    def test_same_official_host_arbitrary_unreviewed_path_is_rejected(self):
+        item = sample()
+        for url in (
+            "https://www.bls.gov/news.release/cpi.t01.htm",
+            "https://www.bls.gov/schedule/2025/",
+            "https://www.bls.gov/schedule/2026/unreviewed",
+            "https://www.bls.gov/schedule/2026//",
+        ):
+            with self.subTest(url=url):
+                item["document_url"] = url
+                result = inspect(item)
+                self.assertEqual(result["state"], "LAB_OFFICIAL_RECEIPT_REFUSED")
+                self.assertFalse(result["official_document_authenticity_verified"])
+
+    def test_catalogue_lead_query_and_encoded_url_variants_rejected(self):
+        item = sample()
+        for url in (
+            "https://www.bls.gov/schedule/2026/?ref=claimed",
+            "https://www.bls.gov/schedule/%32%30%32%36/",
+            "https://www.bls.gov/schedule/2026/#release",
+            "https://www.bls.gov:443/schedule/2026/",
+        ):
+            with self.subTest(url=url):
+                item["document_url"] = url
+                self.assertEqual(inspect(item)["state"],
+                                 "LAB_OFFICIAL_RECEIPT_REFUSED")
+
+    def test_approved_catalog_url_is_structural_only_not_attestation(self):
+        for source_id, source in SOURCES.items():
+            with self.subTest(source_id=source_id):
+                item = sample()
+                item["source_id"] = source_id
+                item["document_url"] = source["documentation_url"]
+                r = inspect(item)
+                self.assertEqual(r["state"],
+                                 "LAB_OFFICIAL_RECEIPT_QUARANTINED_UNATTESTED")
+                self.assertTrue(r["receipt"]["url_matches_curated_documentation_lead_only"])
+                self.assertFalse(r["receipt"]["page_content_or_release_authenticated"])
+                self.assertFalse(r["historical_capture_attested"])
+
     def test_official_different_host_rejected(self):
         item = sample()
         item["document_url"] = "https://www.federalreserve.gov/newsevents/pressreleases/2026-press-fomc.htm"

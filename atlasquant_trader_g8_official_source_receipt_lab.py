@@ -102,16 +102,26 @@ def _utc(raw: Any) -> datetime | None:
     return x.astimezone(timezone.utc)
 
 
-def _document_url(raw: Any, expected_host: str) -> bool:
+def _document_url(raw: Any, expected_url: str) -> bool:
+    """Allow only a catalogued DOCUMENTATION lead, not any same-host URL.
+
+    This is a strict offline allowlist; it cannot prove that a publisher
+    actually served the document, nor does it validate redirects or TLS.
+    New official release URLs need review before adding separate leads.
+    """
     if not isinstance(raw, str) or not 10 <= len(raw) <= 1024:
+        return False
+    if raw != expected_url:
         return False
     try:
         parsed = urlsplit(raw)
+        expected = urlsplit(expected_url)
         return (
-            parsed.scheme == "https" and parsed.hostname == expected_host
+            parsed.scheme == "https" and parsed.hostname == expected.hostname
             and parsed.username is None and parsed.password is None
             and parsed.port in (None, 443) and not parsed.fragment
-            and parsed.path not in ("", "/") and not any(c.isspace() for c in raw)
+            and not parsed.query and parsed.path not in ("", "/")
+            and not any(c.isspace() for c in raw)
         )
     except ValueError:
         return False
@@ -157,8 +167,8 @@ def inspect_claimed_macro_receipt_lab(
     event_id = receipt["event_id"]
     if not isinstance(event_id, str) or not IDENTITY.fullmatch(event_id):
         return _refused("Missing bounded unique event identifier")
-    if not _document_url(receipt["document_url"], source["hostname"]):
-        return _refused("Document URL host or scheme differs from official lead")
+    if not _document_url(receipt["document_url"], source["documentation_url"]):
+        return _refused("Document URL not the catalogued official documentation lead")
     kind = receipt["kind"]
     if kind not in ("SCHEDULED", "RELEASED_CONTEXT"):
         return _refused("Unknown event type")
@@ -190,6 +200,8 @@ def inspect_claimed_macro_receipt_lab(
         "captured_at_utc": captured.isoformat(), "forecast_issued_at_utc": issued.isoformat(),
         "document_url": receipt["document_url"], "content_sha256": digest,
         "content_bytes": len(raw),
+        "url_matches_curated_documentation_lead_only": True,
+        "page_content_or_release_authenticated": False,
     }
     record_digest = sha256(
         json.dumps(metadata, sort_keys=True, ensure_ascii=True, separators=(",", ":")).encode()
