@@ -67,6 +67,15 @@ class TraderRadarCompactTests(unittest.TestCase):
         self.assertIn("Top 10 aguardando", html)
         self.assertNotIn("#1 ", html)
 
+    def test_partial_28_universe_blocks_complete_g8_strength_display(self):
+        from atlasquant_trader_radar_compact_ui import _currencies_approved
+        data = _fixture()
+        data["pairs"].pop(OFFICIAL_PAIRS[0])
+        panel = _currencies_approved(_daily(data))
+        self.assertEqual(panel.count("AGUARDANDO"), 8)
+        self.assertNotIn("VALIDADO", panel)
+        self.assertNotIn("+0,70%", panel)
+
     def test_unvalidated_data_and_bad_numbers_fail_closed(self):
         data = _fixture()
         data["state"] = "UNVERIFIED"

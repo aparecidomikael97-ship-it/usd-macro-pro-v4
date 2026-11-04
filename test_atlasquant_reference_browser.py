@@ -631,3 +631,25 @@ def test_trader_checkpoint_why_not_is_readable_without_enabling_orders(preview_u
         expect(page.locator(".aqr-why-more")).to_contain_text("Gatilho técnico")
         assert not errors
         browser.close()
+
+
+def test_trader_fx_method_disclosure_keeps_live_values_blocked(preview_url):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(preview_url)
+        expect(page.locator(".aqc-focus")).to_be_visible(timeout=30000)
+        page.locator('.aqc-shortcuts [data-route="open:radar"]').click()
+        expect(page.locator('.ref-workspace[data-workspace="trader_radar"]')).to_be_visible(timeout=20000)
+        details=page.locator('details[aria-label="Metodologia da força das moedas"]')
+        expect(details).to_be_visible()
+        expect(details).not_to_have_attribute("open", "")
+        details.locator("summary").click()
+        expect(details).to_have_attribute("open", "")
+        expect(details).to_contain_text("coerência entre cruzamentos")
+        expect(page.locator(".aqr-main")).to_contain_text("Dados diários ainda não conectados.")
+        expect(page.locator(".aqr-main")).to_contain_text("Top 10 aguardando")
+        assert not errors
+        browser.close()
