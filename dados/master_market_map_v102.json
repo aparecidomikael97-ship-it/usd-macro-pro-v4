@@ -1,23 +1,23 @@
 {
   "version": "V11.0_INSTITUTIONAL_AUTOPILOT",
   "cursor": 2,
-  "last_batch_ts": 1793754955.8455148,
+  "last_batch_ts": 1793779237.5595415,
   "contexts": {
     "USD/CHF": {
       "pair": "USD/CHF",
-      "updated_at": "2026-11-03T20:57:36.662163+00:00",
-      "candle_m15": "2026-11-03T20:30:00+00:00",
-      "price": 0.8209,
+      "updated_at": "2026-11-04T07:59:21.537181+00:00",
+      "candle_m15": "2026-11-04T07:30:00+00:00",
+      "price": 0.81639,
       "macro_direction": "🟢 COMPRA USD/CHF",
-      "macro_score": 87.0,
-      "quality": 88.0,
-      "rank_index": 87.5,
+      "macro_score": 91.0,
+      "quality": 91.0,
+      "rank_index": 91.2,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
-        "ema20": 0.8152668568489524,
-        "ema50": 0.8049885674244442,
-        "last": 0.81834,
+        "ema20": 0.8155163806584762,
+        "ema50": 0.8050913125224834,
+        "last": 0.82096,
         "ema_bias": "ALTISTA",
         "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
         "structure": {
@@ -74,16 +74,16 @@
               0.795
             ]
           ],
-          "atr": 0.011539999999999995
+          "atr": 0.011755714285714283
         },
         "reason": "preço acima da EMA20 · EMA20 acima da EMA50 · EMA20 inclinando para cima · estrutura HH/LL · EXPANSÃO DOS DOIS LADOS"
       },
       "d1": {
         "bias": "NEUTRO",
         "score": 40.0,
-        "ema20": 0.8255046807891726,
-        "ema50": 0.824328137360976,
-        "last": 0.81834,
+        "ema20": 0.8250718540473466,
+        "ema50": 0.8241960555795733,
+        "last": 0.82096,
         "ema_bias": "NEUTRO",
         "confirmation": "NEUTRA",
         "structure": {
@@ -259,10 +259,6 @@
             ]
           ],
           "lows": [
-            [
-              "2025-12-18 00:00:00+00:00",
-              0.79307
-            ],
             [
               "2025-12-24 00:00:00+00:00",
               0.78624
@@ -452,76 +448,61 @@
               0.81937
             ]
           ],
-          "atr": 0.00435214285714286
+          "atr": 0.004495000000000003
         },
         "reason": "preço abaixo da EMA20 · EMA20 acima da EMA50 · EMA20 inclinando para baixo · estrutura HH/EQL · EQUILÍBRIO / LIQUIDEZ"
       },
       "levels": {
-        "PDH": 0.82534,
-        "PDL": 0.81791,
+        "PDH": 0.82171,
+        "PDL": 0.81489,
         "PWH": 0.83132,
         "PWL": 0.81937,
         "PMH": 0.83953,
         "PML": 0.81906,
         "EQH": 0.8273,
         "EQL": 0.819215,
-        "Asia High": 0.82003,
-        "Asia Low": 0.81801
+        "Asia High": 0.8187,
+        "Asia Low": 0.81288
       },
       "premium_discount": {
-        "zone": "DESCONTO",
-        "position": 12.803347280334162,
+        "zone": "ABAIXO DO RANGE",
+        "position": -24.93723849372483,
         "equilibrium": 0.825345,
-        "inside_range": true,
-        "expansion_pct": 0.0
+        "inside_range": false,
+        "expansion_pct": 24.93723849372483
       },
       "bsl": [
-        "PDH",
-        0.82534
+        "Asia High",
+        0.8187
       ],
       "ssl": [
-        "PWL",
-        0.81937
+        "PDL",
+        0.81489
       ],
-      "latest_sweep": null,
+      "latest_sweep": {
+        "level": "PDL",
+        "type": "SWEEP SSL",
+        "datetime": "2026-11-04 04:45:00+00:00",
+        "price": 0.81489,
+        "high": 0.81617,
+        "low": 0.81413,
+        "close": 0.81614,
+        "excess_abs": 0.0007599999999999829,
+        "rejection": "fechou de volta acima do nível"
+      },
       "killzone": {
-        "now_ny": "2026-11-03 15:57:46.947787-05:00",
+        "now_ny": "2026-11-04 03:00:37.171196-05:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-11-03 13:30:00-05:00",
-          "end": "2026-11-03 16:00:00-05:00"
+          "name": "London Killzone",
+          "start": "2026-11-04 02:00:00-05:00",
+          "end": "2026-11-04 05:00:00-05:00"
         },
         "next": {
-          "name": "Asian Range",
-          "start": "2026-11-03 20:00:00-05:00",
-          "end": "2026-11-04 00:00:00-05:00"
+          "name": "New York AM",
+          "start": "2026-11-04 07:00:00-05:00",
+          "end": "2026-11-04 10:00:00-05:00"
         },
         "windows": [
-          {
-            "name": "London Killzone",
-            "start": "2026-11-02 02:00:00-05:00",
-            "end": "2026-11-02 05:00:00-05:00"
-          },
-          {
-            "name": "New York AM",
-            "start": "2026-11-02 07:00:00-05:00",
-            "end": "2026-11-02 10:00:00-05:00"
-          },
-          {
-            "name": "London Close",
-            "start": "2026-11-02 10:00:00-05:00",
-            "end": "2026-11-02 12:00:00-05:00"
-          },
-          {
-            "name": "New York PM",
-            "start": "2026-11-02 13:30:00-05:00",
-            "end": "2026-11-02 16:00:00-05:00"
-          },
-          {
-            "name": "Asian Range",
-            "start": "2026-11-02 20:00:00-05:00",
-            "end": "2026-11-03 00:00:00-05:00"
-          },
           {
             "name": "London Killzone",
             "start": "2026-11-03 02:00:00-05:00",
@@ -571,30 +552,55 @@
             "name": "Asian Range",
             "start": "2026-11-04 20:00:00-05:00",
             "end": "2026-11-05 00:00:00-05:00"
+          },
+          {
+            "name": "London Killzone",
+            "start": "2026-11-05 02:00:00-05:00",
+            "end": "2026-11-05 05:00:00-05:00"
+          },
+          {
+            "name": "New York AM",
+            "start": "2026-11-05 07:00:00-05:00",
+            "end": "2026-11-05 10:00:00-05:00"
+          },
+          {
+            "name": "London Close",
+            "start": "2026-11-05 10:00:00-05:00",
+            "end": "2026-11-05 12:00:00-05:00"
+          },
+          {
+            "name": "New York PM",
+            "start": "2026-11-05 13:30:00-05:00",
+            "end": "2026-11-05 16:00:00-05:00"
+          },
+          {
+            "name": "Asian Range",
+            "start": "2026-11-05 20:00:00-05:00",
+            "end": "2026-11-06 00:00:00-05:00"
           }
         ]
       },
       "macro_regime": {
         "side": "ALTISTA",
         "weekly_label": "MODERADO",
-        "consistency": 55.55555555555556,
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ELEVADO",
-          "score": 0.55,
-          "text": "ISM Serviços é amanhã; reduzir agressividade e evitar carregar risco sem plano."
+          "level": "ALTO",
+          "score": 0.2,
+          "text": "ISM Serviços é hoje; conferir o horário antes de nova entrada."
         },
         "components": [
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 58/100",
+            "detail": "USD 59/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
-            "detail": "Neutro",
+            "ok": true,
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
@@ -610,11 +616,11 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 87.0,
-        "quality": 88.0
+        "macro_score": 91.0,
+        "quality": 91.0
       },
       "readiness": {
-        "score": 62.0,
+        "score": 60.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -622,13 +628,13 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 87/100"
+            "detail": "Score 91/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "88%"
+            "detail": "91%"
           },
           {
             "name": "W1 alinhado",
@@ -650,15 +656,15 @@
           },
           {
             "name": "Localização eficiente",
-            "ok": true,
+            "ok": false,
             "weight": 10.0,
-            "detail": "DESCONTO"
+            "detail": "ABAIXO DO RANGE"
           },
           {
             "name": "Sweep coerente",
-            "ok": false,
+            "ok": true,
             "weight": 8.0,
-            "detail": "Sem sweep recente"
+            "detail": "SWEEP SSL"
           },
           {
             "name": "Killzone ativa",
@@ -670,27 +676,27 @@
             "name": "Risco de evento",
             "ok": false,
             "weight": 5.0,
-            "detail": "ELEVADO"
+            "detail": "ALTO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 62.0,
-      "event_risk": "ELEVADO",
+      "readiness_score": 60.0,
+      "event_risk": "ALTO",
       "adr": {
         "available": true,
-        "adr": 0.00435214285714286,
-        "today_range": 0.006820000000000048,
-        "used_pct": 156.70441490234796,
-        "state": "🔴 RANGE EXTREMO",
+        "adr": 0.004495000000000003,
+        "today_range": 0.0021200000000000108,
+        "used_pct": 47.16351501668541,
+        "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 156.70441490234796,
+      "adr_used_pct": 47.16351501668541,
       "intraday_opens": {
         "available": true,
-        "current": 0.8209,
-        "day_open": 0.81845,
+        "current": 0.81639,
+        "day_open": 0.81608,
         "week_open": 0.8241,
         "above_day_open": true,
         "above_week_open": false
@@ -699,19 +705,19 @@
     },
     "NZD/USD": {
       "pair": "NZD/USD",
-      "updated_at": "2026-11-03T20:56:40.904836+00:00",
-      "candle_m15": "2026-11-03T20:30:00+00:00",
-      "price": 0.56105,
+      "updated_at": "2026-11-04T07:58:26.853282+00:00",
+      "candle_m15": "2026-11-04T07:30:00+00:00",
+      "price": 0.56228,
       "macro_direction": "🔴 VENDA NZD/USD",
-      "macro_score": 82.0,
-      "quality": 88.0,
-      "rank_index": 84.6,
+      "macro_score": 87.0,
+      "quality": 91.0,
+      "rank_index": 88.4,
       "w1": {
         "bias": "BAIXISTA",
         "score": 0.0,
-        "ema20": 0.57404530193237,
-        "ema50": 0.5783744016398664,
-        "last": 0.56221,
+        "ema20": 0.57392530193237,
+        "ema50": 0.5783249898751606,
+        "last": 0.56095,
         "ema_bias": "BAIXISTA",
         "confirmation": "CONFIRMADA",
         "structure": {
@@ -760,16 +766,16 @@
               0.5566
             ]
           ],
-          "atr": 0.009520714285714318
+          "atr": 0.00956500000000003
         },
         "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura LH/LL · TENDÊNCIA BAIXISTA"
       },
       "d1": {
         "bias": "BAIXISTA",
         "score": 20.0,
-        "ema20": 0.5650302770334429,
-        "ema50": 0.5680505972534753,
-        "last": 0.56221,
+        "ema20": 0.564641679220734,
+        "ema50": 0.5677721391890675,
+        "last": 0.56095,
         "ema_bias": "BAIXISTA",
         "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
         "structure": {
@@ -1142,86 +1148,61 @@
               0.55839
             ]
           ],
-          "atr": 0.003489285714285711
+          "atr": 0.0034314285714285614
         },
         "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura LH/HL · COMPRESSÃO"
       },
       "levels": {
-        "PDH": 0.56458,
-        "PDL": 0.56089,
+        "PDH": 0.56316,
+        "PDL": 0.56027,
         "PWH": 0.57077,
         "PWL": 0.55839,
         "PMH": 0.57111,
         "PML": 0.5566,
         "EQH": 0.57094,
         "EQL": 0.558305,
-        "Asia High": 0.56248,
-        "Asia Low": 0.56027
+        "Asia High": 0.56124,
+        "Asia Low": 0.55897
       },
       "premium_discount": {
         "zone": "DESCONTO",
-        "position": 21.48626817447502,
+        "position": 31.42164781906273,
         "equilibrium": 0.5645800000000001,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "Asia High",
-        0.56248
+        "PDH",
+        0.56316
       ],
       "ssl": [
         "PDL",
-        0.56089
+        0.56027
       ],
       "latest_sweep": {
         "level": "PDL",
         "type": "SWEEP SSL",
-        "datetime": "2026-11-03 20:00:00+00:00",
-        "price": 0.56089,
-        "high": 0.56102,
-        "low": 0.56081,
-        "close": 0.56098,
-        "excess_abs": 7.999999999996898e-05,
+        "datetime": "2026-11-04 06:30:00+00:00",
+        "price": 0.56027,
+        "high": 0.56086,
+        "low": 0.56006,
+        "close": 0.56082,
+        "excess_abs": 0.00021000000000004349,
         "rejection": "fechou de volta acima do nível"
       },
       "killzone": {
-        "now_ny": "2026-11-03 15:57:46.602380-05:00",
+        "now_ny": "2026-11-04 03:00:36.776093-05:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-11-03 13:30:00-05:00",
-          "end": "2026-11-03 16:00:00-05:00"
+          "name": "London Killzone",
+          "start": "2026-11-04 02:00:00-05:00",
+          "end": "2026-11-04 05:00:00-05:00"
         },
         "next": {
-          "name": "Asian Range",
-          "start": "2026-11-03 20:00:00-05:00",
-          "end": "2026-11-04 00:00:00-05:00"
+          "name": "New York AM",
+          "start": "2026-11-04 07:00:00-05:00",
+          "end": "2026-11-04 10:00:00-05:00"
         },
         "windows": [
-          {
-            "name": "London Killzone",
-            "start": "2026-11-02 02:00:00-05:00",
-            "end": "2026-11-02 05:00:00-05:00"
-          },
-          {
-            "name": "New York AM",
-            "start": "2026-11-02 07:00:00-05:00",
-            "end": "2026-11-02 10:00:00-05:00"
-          },
-          {
-            "name": "London Close",
-            "start": "2026-11-02 10:00:00-05:00",
-            "end": "2026-11-02 12:00:00-05:00"
-          },
-          {
-            "name": "New York PM",
-            "start": "2026-11-02 13:30:00-05:00",
-            "end": "2026-11-02 16:00:00-05:00"
-          },
-          {
-            "name": "Asian Range",
-            "start": "2026-11-02 20:00:00-05:00",
-            "end": "2026-11-03 00:00:00-05:00"
-          },
           {
             "name": "London Killzone",
             "start": "2026-11-03 02:00:00-05:00",
@@ -1271,30 +1252,55 @@
             "name": "Asian Range",
             "start": "2026-11-04 20:00:00-05:00",
             "end": "2026-11-05 00:00:00-05:00"
+          },
+          {
+            "name": "London Killzone",
+            "start": "2026-11-05 02:00:00-05:00",
+            "end": "2026-11-05 05:00:00-05:00"
+          },
+          {
+            "name": "New York AM",
+            "start": "2026-11-05 07:00:00-05:00",
+            "end": "2026-11-05 10:00:00-05:00"
+          },
+          {
+            "name": "London Close",
+            "start": "2026-11-05 10:00:00-05:00",
+            "end": "2026-11-05 12:00:00-05:00"
+          },
+          {
+            "name": "New York PM",
+            "start": "2026-11-05 13:30:00-05:00",
+            "end": "2026-11-05 16:00:00-05:00"
+          },
+          {
+            "name": "Asian Range",
+            "start": "2026-11-05 20:00:00-05:00",
+            "end": "2026-11-06 00:00:00-05:00"
           }
         ]
       },
       "macro_regime": {
         "side": "BAIXISTA",
         "weekly_label": "MODERADO",
-        "consistency": 55.55555555555556,
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ELEVADO",
-          "score": 0.55,
-          "text": "ISM Serviços é amanhã; reduzir agressividade e evitar carregar risco sem plano."
+          "level": "ALTO",
+          "score": 0.2,
+          "text": "ISM Serviços é hoje; conferir o horário antes de nova entrada."
         },
         "components": [
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 58/100",
+            "detail": "USD 59/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
-            "detail": "Neutro",
+            "ok": true,
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
@@ -1310,8 +1316,8 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 82.0,
-        "quality": 88.0
+        "macro_score": 87.0,
+        "quality": 91.0
       },
       "readiness": {
         "score": 67.0,
@@ -1322,13 +1328,13 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 82/100"
+            "detail": "Score 87/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "88%"
+            "detail": "91%"
           },
           {
             "name": "W1 alinhado",
@@ -1370,50 +1376,50 @@
             "name": "Risco de evento",
             "ok": false,
             "weight": 5.0,
-            "detail": "ELEVADO"
+            "detail": "ALTO"
           }
         ],
-        "hard_conflict": false
+        "hard_conflict": true
       },
       "readiness_grade": "B",
       "readiness_score": 67.0,
-      "event_risk": "ELEVADO",
+      "event_risk": "ALTO",
       "adr": {
         "available": true,
-        "adr": 0.003489285714285711,
-        "today_range": 0.0023499999999999632,
-        "used_pct": 67.34902763561826,
+        "adr": 0.0034314285714285614,
+        "today_range": 0.0030600000000000627,
+        "used_pct": 89.17568692756245,
         "state": "🟡 RANGE MODERADO",
         "length": 14
       },
-      "adr_used_pct": 67.34902763561826,
+      "adr_used_pct": 89.17568692756245,
       "intraday_opens": {
         "available": true,
-        "current": 0.56105,
-        "day_open": 0.56232,
+        "current": 0.56228,
+        "day_open": 0.55949,
         "week_open": 0.56153,
-        "above_day_open": false,
-        "above_week_open": false
+        "above_day_open": true,
+        "above_week_open": true
       },
       "autopilot_v107": true
     },
     "USD/JPY": {
       "pair": "USD/JPY",
-      "updated_at": "2026-11-03T20:56:39.381917+00:00",
-      "candle_m15": "2026-11-03T20:30:00+00:00",
-      "price": 158.7423,
+      "updated_at": "2026-11-04T07:58:24.893395+00:00",
+      "candle_m15": "2026-11-04T07:30:00+00:00",
+      "price": 158.11038,
       "macro_direction": "🟢 COMPRA USD/JPY",
-      "macro_score": 82.0,
-      "quality": 81.0,
-      "rank_index": 81.5,
+      "macro_score": 87.0,
+      "quality": 84.0,
+      "rank_index": 85.6,
       "w1": {
-        "bias": "BAIXISTA",
-        "score": 20.0,
-        "ema20": 158.13587588052673,
-        "ema50": 158.26736806612874,
-        "last": 157.91717,
-        "ema_bias": "BAIXISTA",
-        "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
+        "bias": "NEUTRO",
+        "score": 40.0,
+        "ema20": 158.21429588052672,
+        "ema50": 158.29965865436404,
+        "last": 158.74058,
+        "ema_bias": "NEUTRO",
+        "confirmation": "NEUTRA",
         "structure": {
           "bias": "NEUTRO",
           "high_state": "EQH",
@@ -1476,18 +1482,18 @@
               156.06874
             ]
           ],
-          "atr": 2.6005671428571424
+          "atr": 2.647312142857144
         },
-        "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura EQH/HL · EQUILÍBRIO / LIQUIDEZ"
+        "reason": "preço acima da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura EQH/HL · EQUILÍBRIO / LIQUIDEZ"
       },
       "d1": {
-        "bias": "NEUTRO",
-        "score": 60.0,
-        "ema20": 157.7088751109912,
-        "ema50": 157.74442576985558,
-        "last": 157.91717,
-        "ema_bias": "NEUTRO",
-        "confirmation": "NEUTRA",
+        "bias": "ALTISTA",
+        "score": 80.0,
+        "ema20": 157.80713271946826,
+        "ema50": 157.78349343287454,
+        "last": 158.74058,
+        "ema_bias": "ALTISTA",
+        "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
         "structure": {
           "bias": "NEUTRO",
           "high_state": "LH",
@@ -1886,76 +1892,61 @@
               156.9716
             ]
           ],
-          "atr": 0.7390342857142846
+          "atr": 0.7591878571428562
         },
-        "reason": "preço acima da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para cima · estrutura LH/HL · COMPRESSÃO"
+        "reason": "preço acima da EMA20 · EMA20 acima da EMA50 · EMA20 inclinando para cima · estrutura LH/HL · COMPRESSÃO"
       },
       "levels": {
-        "PDH": 158.00845,
-        "PDL": 157.44351,
+        "PDH": 158.76356,
+        "PDL": 157.75012,
         "PWH": 158.33594,
         "PWL": 156.66118,
         "PMH": 158.96242,
         "PML": 156.06874,
         "EQH": 158.55273,
         "EQL": 156.98379,
-        "Asia High": 157.95914,
-        "Asia Low": 157.83434
+        "Asia High": 158.49622,
+        "Asia Low": 157.42053
       },
       "premium_discount": {
-        "zone": "ACIMA DO RANGE",
-        "position": 124.26377510807569,
+        "zone": "PRÊMIO",
+        "position": 86.53180157156831,
         "equilibrium": 157.49856,
-        "inside_range": false,
-        "expansion_pct": 24.26377510807569
+        "inside_range": true,
+        "expansion_pct": 0.0
       },
       "bsl": [
-        "PMH",
-        158.96242
+        "PWH",
+        158.33594
       ],
       "ssl": [
-        "Asia Low",
-        157.83434
+        "PDL",
+        157.75012
       ],
-      "latest_sweep": null,
+      "latest_sweep": {
+        "level": "PDL",
+        "type": "SWEEP SSL",
+        "datetime": "2026-11-04 04:45:00+00:00",
+        "price": 157.75012,
+        "high": 157.82593,
+        "low": 157.50925,
+        "close": 157.82334,
+        "excess_abs": 0.24087000000000103,
+        "rejection": "fechou de volta acima do nível"
+      },
       "killzone": {
-        "now_ny": "2026-11-03 15:57:46.810679-05:00",
+        "now_ny": "2026-11-04 03:00:36.974038-05:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-11-03 13:30:00-05:00",
-          "end": "2026-11-03 16:00:00-05:00"
+          "name": "London Killzone",
+          "start": "2026-11-04 02:00:00-05:00",
+          "end": "2026-11-04 05:00:00-05:00"
         },
         "next": {
-          "name": "Asian Range",
-          "start": "2026-11-03 20:00:00-05:00",
-          "end": "2026-11-04 00:00:00-05:00"
+          "name": "New York AM",
+          "start": "2026-11-04 07:00:00-05:00",
+          "end": "2026-11-04 10:00:00-05:00"
         },
         "windows": [
-          {
-            "name": "London Killzone",
-            "start": "2026-11-02 02:00:00-05:00",
-            "end": "2026-11-02 05:00:00-05:00"
-          },
-          {
-            "name": "New York AM",
-            "start": "2026-11-02 07:00:00-05:00",
-            "end": "2026-11-02 10:00:00-05:00"
-          },
-          {
-            "name": "London Close",
-            "start": "2026-11-02 10:00:00-05:00",
-            "end": "2026-11-02 12:00:00-05:00"
-          },
-          {
-            "name": "New York PM",
-            "start": "2026-11-02 13:30:00-05:00",
-            "end": "2026-11-02 16:00:00-05:00"
-          },
-          {
-            "name": "Asian Range",
-            "start": "2026-11-02 20:00:00-05:00",
-            "end": "2026-11-03 00:00:00-05:00"
-          },
           {
             "name": "London Killzone",
             "start": "2026-11-03 02:00:00-05:00",
@@ -2005,30 +1996,55 @@
             "name": "Asian Range",
             "start": "2026-11-04 20:00:00-05:00",
             "end": "2026-11-05 00:00:00-05:00"
+          },
+          {
+            "name": "London Killzone",
+            "start": "2026-11-05 02:00:00-05:00",
+            "end": "2026-11-05 05:00:00-05:00"
+          },
+          {
+            "name": "New York AM",
+            "start": "2026-11-05 07:00:00-05:00",
+            "end": "2026-11-05 10:00:00-05:00"
+          },
+          {
+            "name": "London Close",
+            "start": "2026-11-05 10:00:00-05:00",
+            "end": "2026-11-05 12:00:00-05:00"
+          },
+          {
+            "name": "New York PM",
+            "start": "2026-11-05 13:30:00-05:00",
+            "end": "2026-11-05 16:00:00-05:00"
+          },
+          {
+            "name": "Asian Range",
+            "start": "2026-11-05 20:00:00-05:00",
+            "end": "2026-11-06 00:00:00-05:00"
           }
         ]
       },
       "macro_regime": {
         "side": "ALTISTA",
         "weekly_label": "MODERADO",
-        "consistency": 55.55555555555556,
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ELEVADO",
-          "score": 0.55,
-          "text": "ISM Serviços é amanhã; reduzir agressividade e evitar carregar risco sem plano."
+          "level": "ALTO",
+          "score": 0.2,
+          "text": "ISM Serviços é hoje; conferir o horário antes de nova entrada."
         },
         "components": [
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 58/100",
+            "detail": "USD 59/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
-            "detail": "Neutro",
+            "ok": true,
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
@@ -2044,11 +2060,11 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 82.0,
-        "quality": 81.0
+        "macro_score": 87.0,
+        "quality": 84.0
       },
       "readiness": {
-        "score": 37.0,
+        "score": 60.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
@@ -2056,25 +2072,25 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 82/100"
+            "detail": "Score 87/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "81%"
+            "detail": "84%"
           },
           {
             "name": "W1 alinhado",
             "ok": false,
             "weight": 15.0,
-            "detail": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
+            "detail": "NEUTRA"
           },
           {
             "name": "D1 alinhado",
-            "ok": false,
+            "ok": true,
             "weight": 15.0,
-            "detail": "NEUTRA"
+            "detail": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
           },
           {
             "name": "Estrutura W1+D1 limpa",
@@ -2086,13 +2102,13 @@
             "name": "Localização eficiente",
             "ok": false,
             "weight": 10.0,
-            "detail": "ACIMA DO RANGE"
+            "detail": "PRÊMIO"
           },
           {
             "name": "Sweep coerente",
-            "ok": false,
+            "ok": true,
             "weight": 8.0,
-            "detail": "Sem sweep recente"
+            "detail": "SWEEP SSL"
           },
           {
             "name": "Killzone ativa",
@@ -2104,27 +2120,27 @@
             "name": "Risco de evento",
             "ok": false,
             "weight": 5.0,
-            "detail": "ELEVADO"
+            "detail": "ALTO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 37.0,
-      "event_risk": "ELEVADO",
+      "readiness_score": 60.0,
+      "event_risk": "ALTO",
       "adr": {
         "available": true,
-        "adr": 0.7390071428571413,
-        "today_range": 1.0134400000000028,
-        "used_pct": 137.13534568581466,
-        "state": "🔴 RANGE EXTREMO",
+        "adr": 0.7591607142857129,
+        "today_range": 0.3970300000000009,
+        "used_pct": 52.2985439747844,
+        "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 137.13534568581466,
+      "adr_used_pct": 52.2985439747844,
       "intraday_opens": {
         "available": true,
-        "current": 158.7423,
-        "day_open": 157.90016,
+        "current": 158.11038,
+        "day_open": 157.81534,
         "week_open": 157.87091,
         "above_day_open": true,
         "above_week_open": true
@@ -2133,19 +2149,19 @@
     },
     "EUR/USD": {
       "pair": "EUR/USD",
-      "updated_at": "2026-11-03T20:56:36.056715+00:00",
-      "candle_m15": "2026-11-03T20:30:00+00:00",
-      "price": 1.11928,
+      "updated_at": "2026-11-04T07:58:21.173826+00:00",
+      "candle_m15": "2026-11-04T07:30:00+00:00",
+      "price": 1.12427,
       "macro_direction": "🔴 VENDA EUR/USD",
-      "macro_score": 83.0,
-      "quality": 67.0,
-      "rank_index": 76.6,
+      "macro_score": 89.0,
+      "quality": 70.0,
+      "rank_index": 81.3,
       "w1": {
         "bias": "BAIXISTA",
         "score": 20.0,
-        "ema20": 1.139244734546787,
-        "ema50": 1.1521652729258995,
-        "last": 1.11948,
+        "ema20": 1.1391990202610727,
+        "ema50": 1.1521464493964877,
+        "last": 1.119,
         "ema_bias": "BAIXISTA",
         "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
         "structure": {
@@ -2200,18 +2216,18 @@
       },
       "d1": {
         "bias": "BAIXISTA",
-        "score": 0.0,
-        "ema20": 1.119522982603026,
-        "ema50": 1.1277411903374432,
-        "last": 1.11948,
+        "score": 20.0,
+        "ema20": 1.119473174736071,
+        "ema50": 1.1273983947443245,
+        "last": 1.119,
         "ema_bias": "BAIXISTA",
-        "confirmation": "CONFIRMADA",
+        "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
         "structure": {
-          "bias": "BAIXISTA",
-          "high_state": "LH",
+          "bias": "NEUTRO",
+          "high_state": "HH",
           "low_state": "LL",
-          "regime": "TENDÊNCIA BAIXISTA",
-          "quality": "CONFIRMADA",
+          "regime": "EXPANSÃO DOS DOIS LADOS",
+          "quality": "MISTA",
           "highs": [
             [
               "2025-12-24 00:00:00+00:00",
@@ -2392,6 +2408,10 @@
             [
               "2026-10-26 00:00:00+00:00",
               1.12308
+            ],
+            [
+              "2026-11-01 00:00:00+00:00",
+              1.12474
             ]
           ],
           "lows": [
@@ -2584,86 +2604,61 @@
               1.11068
             ]
           ],
-          "atr": 0.00600500000000007
+          "atr": 0.005835714285714356
         },
-        "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura LH/LL · TENDÊNCIA BAIXISTA"
+        "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura HH/LL · EXPANSÃO DOS DOIS LADOS"
       },
       "levels": {
-        "PDH": 1.12397,
-        "PDL": 1.11543,
+        "PDH": 1.12064,
+        "PDL": 1.1175,
         "PWH": 1.12308,
         "PWL": 1.11068,
         "PMH": 1.1337,
         "PML": 1.11068,
-        "EQH": 1.125565,
+        "EQH": 1.124955,
         "EQL": 1.11104,
-        "Asia High": 1.11933,
-        "Asia Low": 1.11774
+        "Asia High": 1.12636,
+        "Asia Low": 1.1215
       },
       "premium_discount": {
-        "zone": "PRÊMIO",
-        "position": 69.35483870967768,
+        "zone": "ACIMA DO RANGE",
+        "position": 109.59677419354843,
         "equilibrium": 1.11688,
-        "inside_range": true,
-        "expansion_pct": 0.0
+        "inside_range": false,
+        "expansion_pct": 9.596774193548427
       },
       "bsl": [
-        "Asia High",
-        1.11933
+        "EQH",
+        1.124955
       ],
       "ssl": [
         "Asia Low",
-        1.11774
+        1.1215
       ],
       "latest_sweep": {
-        "level": "Asia High",
+        "level": "PWH",
         "type": "SWEEP BSL",
-        "datetime": "2026-11-03 20:30:00+00:00",
-        "price": 1.11933,
-        "high": 1.11935,
-        "low": 1.11913,
-        "close": 1.11928,
-        "excess_abs": 2.0000000000131024e-05,
+        "datetime": "2026-11-04 07:00:00+00:00",
+        "price": 1.12308,
+        "high": 1.1231,
+        "low": 1.12238,
+        "close": 1.1224,
+        "excess_abs": 1.999999999990898e-05,
         "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-11-03 15:57:46.190559-05:00",
+        "now_ny": "2026-11-04 03:00:36.139067-05:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-11-03 13:30:00-05:00",
-          "end": "2026-11-03 16:00:00-05:00"
+          "name": "London Killzone",
+          "start": "2026-11-04 02:00:00-05:00",
+          "end": "2026-11-04 05:00:00-05:00"
         },
         "next": {
-          "name": "Asian Range",
-          "start": "2026-11-03 20:00:00-05:00",
-          "end": "2026-11-04 00:00:00-05:00"
+          "name": "New York AM",
+          "start": "2026-11-04 07:00:00-05:00",
+          "end": "2026-11-04 10:00:00-05:00"
         },
         "windows": [
-          {
-            "name": "London Killzone",
-            "start": "2026-11-02 02:00:00-05:00",
-            "end": "2026-11-02 05:00:00-05:00"
-          },
-          {
-            "name": "New York AM",
-            "start": "2026-11-02 07:00:00-05:00",
-            "end": "2026-11-02 10:00:00-05:00"
-          },
-          {
-            "name": "London Close",
-            "start": "2026-11-02 10:00:00-05:00",
-            "end": "2026-11-02 12:00:00-05:00"
-          },
-          {
-            "name": "New York PM",
-            "start": "2026-11-02 13:30:00-05:00",
-            "end": "2026-11-02 16:00:00-05:00"
-          },
-          {
-            "name": "Asian Range",
-            "start": "2026-11-02 20:00:00-05:00",
-            "end": "2026-11-03 00:00:00-05:00"
-          },
           {
             "name": "London Killzone",
             "start": "2026-11-03 02:00:00-05:00",
@@ -2713,30 +2708,55 @@
             "name": "Asian Range",
             "start": "2026-11-04 20:00:00-05:00",
             "end": "2026-11-05 00:00:00-05:00"
+          },
+          {
+            "name": "London Killzone",
+            "start": "2026-11-05 02:00:00-05:00",
+            "end": "2026-11-05 05:00:00-05:00"
+          },
+          {
+            "name": "New York AM",
+            "start": "2026-11-05 07:00:00-05:00",
+            "end": "2026-11-05 10:00:00-05:00"
+          },
+          {
+            "name": "London Close",
+            "start": "2026-11-05 10:00:00-05:00",
+            "end": "2026-11-05 12:00:00-05:00"
+          },
+          {
+            "name": "New York PM",
+            "start": "2026-11-05 13:30:00-05:00",
+            "end": "2026-11-05 16:00:00-05:00"
+          },
+          {
+            "name": "Asian Range",
+            "start": "2026-11-05 20:00:00-05:00",
+            "end": "2026-11-06 00:00:00-05:00"
           }
         ]
       },
       "macro_regime": {
         "side": "BAIXISTA",
         "weekly_label": "MODERADO",
-        "consistency": 55.55555555555556,
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ELEVADO",
-          "score": 0.55,
-          "text": "ISM Serviços é amanhã; reduzir agressividade e evitar carregar risco sem plano."
+          "level": "ALTO",
+          "score": 0.2,
+          "text": "ISM Serviços é hoje; conferir o horário antes de nova entrada."
         },
         "components": [
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 58/100",
+            "detail": "USD 59/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
-            "detail": "Neutro",
+            "ok": true,
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
@@ -2752,25 +2772,25 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 83.0,
-        "quality": 67.0
+        "macro_score": 89.0,
+        "quality": 70.0
       },
       "readiness": {
-        "score": 70.0,
-        "grade": "B",
-        "action": "🟡 AGUARDAR MELHOR TIMING / CONFIRMAÇÃO",
+        "score": 60.0,
+        "grade": "WAIT",
+        "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 83/100"
+            "detail": "Score 89/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": false,
             "weight": 15.0,
-            "detail": "67%"
+            "detail": "70%"
           },
           {
             "name": "W1 alinhado",
@@ -2782,19 +2802,19 @@
             "name": "D1 alinhado",
             "ok": true,
             "weight": 15.0,
-            "detail": "CONFIRMADA"
+            "detail": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
           },
           {
             "name": "Estrutura W1+D1 limpa",
             "ok": false,
             "weight": 10.0,
-            "detail": "W1 COMPRESSÃO · D1 TENDÊNCIA BAIXISTA"
+            "detail": "W1 COMPRESSÃO · D1 EXPANSÃO DOS DOIS LADOS"
           },
           {
             "name": "Localização eficiente",
-            "ok": true,
+            "ok": false,
             "weight": 10.0,
-            "detail": "PRÊMIO"
+            "detail": "ACIMA DO RANGE"
           },
           {
             "name": "Sweep coerente",
@@ -2812,27 +2832,27 @@
             "name": "Risco de evento",
             "ok": false,
             "weight": 5.0,
-            "detail": "ELEVADO"
+            "detail": "ALTO"
           }
         ],
-        "hard_conflict": false
+        "hard_conflict": true
       },
-      "readiness_grade": "B",
-      "readiness_score": 70.0,
-      "event_risk": "ELEVADO",
+      "readiness_grade": "WAIT",
+      "readiness_score": 60.0,
+      "event_risk": "ALTO",
       "adr": {
         "available": true,
-        "adr": 0.00600500000000007,
-        "today_range": 0.0031400000000001427,
-        "used_pct": 52.289758534556306,
+        "adr": 0.005835714285714356,
+        "today_range": 0.0019400000000000528,
+        "used_pct": 33.24357405140809,
         "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 52.289758534556306,
+      "adr_used_pct": 33.24357405140809,
       "intraday_opens": {
         "available": true,
-        "current": 1.11928,
-        "day_open": 1.11893,
+        "current": 1.12427,
+        "day_open": 1.12337,
         "week_open": 1.11752,
         "above_day_open": true,
         "above_week_open": true
@@ -2841,19 +2861,19 @@
     },
     "USD/CAD": {
       "pair": "USD/CAD",
-      "updated_at": "2026-11-03T20:56:42.507218+00:00",
-      "candle_m15": "2026-11-03T20:30:00+00:00",
-      "price": 1.4007,
+      "updated_at": "2026-11-04T07:58:28.879534+00:00",
+      "candle_m15": "2026-11-04T07:30:00+00:00",
+      "price": 1.39572,
       "macro_direction": "🟢 COMPRA USD/CAD",
-      "macro_score": 87.0,
-      "quality": 88.0,
-      "rank_index": 87.5,
+      "macro_score": 91.0,
+      "quality": 91.0,
+      "rank_index": 91.2,
       "w1": {
         "bias": "ALTISTA",
         "score": 80.0,
-        "ema20": 1.400397074087645,
-        "ema50": 1.3920616134228299,
-        "last": 1.39859,
+        "ema20": 1.4005704074209784,
+        "ema50": 1.3921329859718494,
+        "last": 1.40041,
         "ema_bias": "NEUTRO",
         "confirmation": "CONFIRMADA",
         "structure": {
@@ -2905,9 +2925,9 @@
       "d1": {
         "bias": "BAIXISTA",
         "score": 0.0,
-        "ema20": 1.4043198148429188,
-        "ema50": 1.4063341422998392,
-        "last": 1.39859,
+        "ema20": 1.403947451524546,
+        "ema50": 1.406101835185327,
+        "last": 1.40041,
         "ema_bias": "BAIXISTA",
         "confirmation": "CONFIRMADA",
         "structure": {
@@ -3076,6 +3096,10 @@
             [
               "2026-10-28 00:00:00+00:00",
               1.40706
+            ],
+            [
+              "2026-11-01 00:00:00+00:00",
+              1.40457
             ]
           ],
           "lows": [
@@ -3236,86 +3260,51 @@
               1.39157
             ]
           ],
-          "atr": 0.005937857142857154
+          "atr": 0.005768571428571441
         },
         "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura LH/LL · TENDÊNCIA BAIXISTA"
       },
       "levels": {
-        "PDH": 1.39996,
-        "PDL": 1.39512,
+        "PDH": 1.40059,
+        "PDL": 1.39501,
         "PWH": 1.40706,
         "PWL": 1.39418,
         "PMH": 1.43015,
         "PML": 1.39157,
         "EQH": 1.430045,
         "EQL": 1.375725,
-        "Asia High": 1.39971,
-        "Asia Low": 1.3979
+        "Asia High": 1.39962,
+        "Asia Low": 1.39575
       },
       "premium_discount": {
-        "zone": "EQUILÍBRIO",
-        "position": 50.62111801242298,
+        "zone": "DESCONTO",
+        "position": 11.956521739131185,
         "equilibrium": 1.40062,
         "inside_range": true,
         "expansion_pct": 0.0
       },
       "bsl": [
-        "PWH",
-        1.40706
+        "Asia High",
+        1.39962
       ],
       "ssl": [
-        "Asia Low",
-        1.3979
+        "PDL",
+        1.39501
       ],
-      "latest_sweep": {
-        "level": "Asia High",
-        "type": "SWEEP BSL",
-        "datetime": "2026-11-03 17:15:00+00:00",
-        "price": 1.39971,
-        "high": 1.39978,
-        "low": 1.39936,
-        "close": 1.39943,
-        "excess_abs": 7.00000000000145e-05,
-        "rejection": "fechou de volta abaixo do nível"
-      },
+      "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-11-03 15:57:47.085004-05:00",
+        "now_ny": "2026-11-04 03:00:37.367072-05:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-11-03 13:30:00-05:00",
-          "end": "2026-11-03 16:00:00-05:00"
+          "name": "London Killzone",
+          "start": "2026-11-04 02:00:00-05:00",
+          "end": "2026-11-04 05:00:00-05:00"
         },
         "next": {
-          "name": "Asian Range",
-          "start": "2026-11-03 20:00:00-05:00",
-          "end": "2026-11-04 00:00:00-05:00"
+          "name": "New York AM",
+          "start": "2026-11-04 07:00:00-05:00",
+          "end": "2026-11-04 10:00:00-05:00"
         },
         "windows": [
-          {
-            "name": "London Killzone",
-            "start": "2026-11-02 02:00:00-05:00",
-            "end": "2026-11-02 05:00:00-05:00"
-          },
-          {
-            "name": "New York AM",
-            "start": "2026-11-02 07:00:00-05:00",
-            "end": "2026-11-02 10:00:00-05:00"
-          },
-          {
-            "name": "London Close",
-            "start": "2026-11-02 10:00:00-05:00",
-            "end": "2026-11-02 12:00:00-05:00"
-          },
-          {
-            "name": "New York PM",
-            "start": "2026-11-02 13:30:00-05:00",
-            "end": "2026-11-02 16:00:00-05:00"
-          },
-          {
-            "name": "Asian Range",
-            "start": "2026-11-02 20:00:00-05:00",
-            "end": "2026-11-03 00:00:00-05:00"
-          },
           {
             "name": "London Killzone",
             "start": "2026-11-03 02:00:00-05:00",
@@ -3365,30 +3354,55 @@
             "name": "Asian Range",
             "start": "2026-11-04 20:00:00-05:00",
             "end": "2026-11-05 00:00:00-05:00"
+          },
+          {
+            "name": "London Killzone",
+            "start": "2026-11-05 02:00:00-05:00",
+            "end": "2026-11-05 05:00:00-05:00"
+          },
+          {
+            "name": "New York AM",
+            "start": "2026-11-05 07:00:00-05:00",
+            "end": "2026-11-05 10:00:00-05:00"
+          },
+          {
+            "name": "London Close",
+            "start": "2026-11-05 10:00:00-05:00",
+            "end": "2026-11-05 12:00:00-05:00"
+          },
+          {
+            "name": "New York PM",
+            "start": "2026-11-05 13:30:00-05:00",
+            "end": "2026-11-05 16:00:00-05:00"
+          },
+          {
+            "name": "Asian Range",
+            "start": "2026-11-05 20:00:00-05:00",
+            "end": "2026-11-06 00:00:00-05:00"
           }
         ]
       },
       "macro_regime": {
         "side": "ALTISTA",
         "weekly_label": "MODERADO",
-        "consistency": 55.55555555555556,
+        "consistency": 69.23076923076923,
         "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ELEVADO",
-          "score": 0.55,
-          "text": "ISM Serviços é amanhã; reduzir agressividade e evitar carregar risco sem plano."
+          "level": "ALTO",
+          "score": 0.2,
+          "text": "ISM Serviços é hoje; conferir o horário antes de nova entrada."
         },
         "components": [
           {
             "name": "Regime macro USD",
             "ok": true,
-            "detail": "USD 58/100",
+            "detail": "USD 59/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
-            "detail": "Neutro",
+            "ok": true,
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
@@ -3404,8 +3418,8 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 87.0,
-        "quality": 88.0
+        "macro_score": 91.0,
+        "quality": 91.0
       },
       "readiness": {
         "score": 62.0,
@@ -3416,13 +3430,13 @@
             "name": "Macro forte",
             "ok": true,
             "weight": 15.0,
-            "detail": "Score 87/100"
+            "detail": "Score 91/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "88%"
+            "detail": "91%"
           },
           {
             "name": "W1 alinhado",
@@ -3446,13 +3460,13 @@
             "name": "Localização eficiente",
             "ok": true,
             "weight": 10.0,
-            "detail": "EQUILÍBRIO"
+            "detail": "DESCONTO"
           },
           {
             "name": "Sweep coerente",
             "ok": false,
             "weight": 8.0,
-            "detail": "SWEEP BSL"
+            "detail": "Sem sweep recente"
           },
           {
             "name": "Killzone ativa",
@@ -3464,48 +3478,48 @@
             "name": "Risco de evento",
             "ok": false,
             "weight": 5.0,
-            "detail": "ELEVADO"
+            "detail": "ALTO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
       "readiness_score": 62.0,
-      "event_risk": "ELEVADO",
+      "event_risk": "ALTO",
       "adr": {
         "available": true,
-        "adr": 0.005937857142857154,
-        "today_range": 0.005819999999999936,
-        "used_pct": 98.01515698303737,
-        "state": "🟠 DIA ESTICADO",
+        "adr": 0.005768571428571441,
+        "today_range": 0.0019700000000000273,
+        "used_pct": 34.1505695889058,
+        "state": "🟢 ESPAÇO DISPONÍVEL",
         "length": 14
       },
-      "adr_used_pct": 98.01515698303737,
+      "adr_used_pct": 34.1505695889058,
       "intraday_opens": {
         "available": true,
-        "current": 1.4007,
-        "day_open": 1.39808,
+        "current": 1.39572,
+        "day_open": 1.39702,
         "week_open": 1.39843,
-        "above_day_open": true,
-        "above_week_open": true
+        "above_day_open": false,
+        "above_week_open": false
       },
       "autopilot_v107": true
     },
     "GBP/USD": {
       "pair": "GBP/USD",
-      "updated_at": "2026-11-03T20:56:34.348376+00:00",
-      "candle_m15": "2026-11-03T20:30:00+00:00",
-      "price": 1.34172,
-      "macro_direction": "⚪ AGUARDAR CONFIRMAÇÃO",
-      "macro_score": 72.0,
-      "quality": 67.0,
-      "rank_index": 70.3,
+      "updated_at": "2026-11-04T07:58:19.311714+00:00",
+      "candle_m15": "2026-11-04T07:30:00+00:00",
+      "price": 1.34833,
+      "macro_direction": "🔴 VENDA GBP/USD",
+      "macro_score": 78.0,
+      "quality": 70.0,
+      "rank_index": 75.2,
       "w1": {
         "bias": "NEUTRO",
         "score": 40.0,
-        "ema20": 1.3394207971498786,
-        "ema50": 1.3408481923693043,
-        "last": 1.34111,
+        "ema20": 1.3394569876260691,
+        "ema50": 1.3408630943300888,
+        "last": 1.34149,
         "ema_bias": "NEUTRO",
         "confirmation": "NEUTRA",
         "structure": {
@@ -3569,9 +3583,9 @@
       "d1": {
         "bias": "ALTISTA",
         "score": 80.0,
-        "ema20": 1.335179060197629,
-        "ema50": 1.3349020800676583,
-        "last": 1.34111,
+        "ema20": 1.3357801020835691,
+        "ema50": 1.3351604156982593,
+        "last": 1.34149,
         "ema_bias": "ALTISTA",
         "confirmation": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA",
         "structure": {
@@ -3968,76 +3982,51 @@
               1.3272
             ]
           ],
-          "atr": 0.006011428571428541
+          "atr": 0.005501428571428546
         },
         "reason": "preço acima da EMA20 · EMA20 acima da EMA50 · EMA20 inclinando para cima · estrutura HH/LL · EXPANSÃO DOS DOIS LADOS"
       },
       "levels": {
-        "PDH": 1.34483,
-        "PDL": 1.33792,
+        "PDH": 1.34337,
+        "PDL": 1.33964,
         "PWH": 1.34344,
         "PWL": 1.3272,
         "PMH": 1.34344,
         "PML": 1.31382,
         "EQH": 1.3566699999999998,
         "EQL": 1.318825,
-        "Asia High": 1.34128,
-        "Asia Low": 1.33964
+        "Asia High": 1.34793,
+        "Asia Low": 1.34358
       },
       "premium_discount": {
-        "zone": "PRÊMIO",
-        "position": 89.40886699507425,
+        "zone": "ACIMA DO RANGE",
+        "position": 130.11083743842394,
         "equilibrium": 1.3353199999999998,
-        "inside_range": true,
-        "expansion_pct": 0.0
+        "inside_range": false,
+        "expansion_pct": 30.110837438423943
       },
       "bsl": [
-        "PWH",
-        1.34344
+        "EQH",
+        1.3566699999999998
       ],
       "ssl": [
         "Asia Low",
-        1.33964
+        1.34358
       ],
       "latest_sweep": null,
       "killzone": {
-        "now_ny": "2026-11-03 15:57:46.325122-05:00",
+        "now_ny": "2026-11-04 03:00:36.333357-05:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-11-03 13:30:00-05:00",
-          "end": "2026-11-03 16:00:00-05:00"
+          "name": "London Killzone",
+          "start": "2026-11-04 02:00:00-05:00",
+          "end": "2026-11-04 05:00:00-05:00"
         },
         "next": {
-          "name": "Asian Range",
-          "start": "2026-11-03 20:00:00-05:00",
-          "end": "2026-11-04 00:00:00-05:00"
+          "name": "New York AM",
+          "start": "2026-11-04 07:00:00-05:00",
+          "end": "2026-11-04 10:00:00-05:00"
         },
         "windows": [
-          {
-            "name": "London Killzone",
-            "start": "2026-11-02 02:00:00-05:00",
-            "end": "2026-11-02 05:00:00-05:00"
-          },
-          {
-            "name": "New York AM",
-            "start": "2026-11-02 07:00:00-05:00",
-            "end": "2026-11-02 10:00:00-05:00"
-          },
-          {
-            "name": "London Close",
-            "start": "2026-11-02 10:00:00-05:00",
-            "end": "2026-11-02 12:00:00-05:00"
-          },
-          {
-            "name": "New York PM",
-            "start": "2026-11-02 13:30:00-05:00",
-            "end": "2026-11-02 16:00:00-05:00"
-          },
-          {
-            "name": "Asian Range",
-            "start": "2026-11-02 20:00:00-05:00",
-            "end": "2026-11-03 00:00:00-05:00"
-          },
           {
             "name": "London Killzone",
             "start": "2026-11-03 02:00:00-05:00",
@@ -4087,35 +4076,60 @@
             "name": "Asian Range",
             "start": "2026-11-04 20:00:00-05:00",
             "end": "2026-11-05 00:00:00-05:00"
+          },
+          {
+            "name": "London Killzone",
+            "start": "2026-11-05 02:00:00-05:00",
+            "end": "2026-11-05 05:00:00-05:00"
+          },
+          {
+            "name": "New York AM",
+            "start": "2026-11-05 07:00:00-05:00",
+            "end": "2026-11-05 10:00:00-05:00"
+          },
+          {
+            "name": "London Close",
+            "start": "2026-11-05 10:00:00-05:00",
+            "end": "2026-11-05 12:00:00-05:00"
+          },
+          {
+            "name": "New York PM",
+            "start": "2026-11-05 13:30:00-05:00",
+            "end": "2026-11-05 16:00:00-05:00"
+          },
+          {
+            "name": "Asian Range",
+            "start": "2026-11-05 20:00:00-05:00",
+            "end": "2026-11-06 00:00:00-05:00"
           }
         ]
       },
       "macro_regime": {
-        "side": "NEUTRO",
-        "weekly_label": "SEM LADO",
-        "consistency": 50.0,
-        "recent_label": "NEUTRO / SEM DADO",
+        "side": "BAIXISTA",
+        "weekly_label": "MODERADO",
+        "consistency": 69.23076923076923,
+        "recent_label": "CONTRA",
         "event_risk": {
-          "level": "ELEVADO",
-          "score": 0.55,
-          "text": "ISM Serviços é amanhã; reduzir agressividade e evitar carregar risco sem plano."
+          "level": "ALTO",
+          "score": 0.2,
+          "text": "ISM Serviços é hoje; conferir o horário antes de nova entrada."
         },
         "components": [
           {
             "name": "Regime macro USD",
-            "ok": null,
-            "detail": "USD 58/100",
+            "ok": true,
+            "detail": "USD 59/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
-            "ok": null,
-            "detail": "Neutro",
+            "ok": true,
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
             "name": "Tendência macro recente",
-            "ok": null,
+            "ok": false,
             "detail": "38/100",
             "weight": 20.0
           },
@@ -4126,53 +4140,53 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 72.0,
-        "quality": 67.0
+        "macro_score": 78.0,
+        "quality": 70.0
       },
       "readiness": {
-        "score": 25.925925925925927,
+        "score": 22.0,
         "grade": "WAIT",
         "action": "🔴 NÃO FORÇAR ENTRADA",
         "checks": [
           {
             "name": "Macro forte",
-            "ok": null,
+            "ok": true,
             "weight": 15.0,
-            "detail": "Score 72/100"
+            "detail": "Score 78/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": false,
             "weight": 15.0,
-            "detail": "67%"
+            "detail": "70%"
           },
           {
             "name": "W1 alinhado",
-            "ok": null,
+            "ok": false,
             "weight": 15.0,
             "detail": "NEUTRA"
           },
           {
             "name": "D1 alinhado",
-            "ok": null,
+            "ok": false,
             "weight": 15.0,
             "detail": "PARCIAL · MÉDIAS SEM ESTRUTURA LIMPA"
           },
           {
             "name": "Estrutura W1+D1 limpa",
-            "ok": null,
+            "ok": false,
             "weight": 10.0,
             "detail": "W1 EXPANSÃO DOS DOIS LADOS · D1 EXPANSÃO DOS DOIS LADOS"
           },
           {
             "name": "Localização eficiente",
-            "ok": null,
+            "ok": false,
             "weight": 10.0,
-            "detail": "PRÊMIO"
+            "detail": "ACIMA DO RANGE"
           },
           {
             "name": "Sweep coerente",
-            "ok": null,
+            "ok": false,
             "weight": 8.0,
             "detail": "Sem sweep recente"
           },
@@ -4186,27 +4200,27 @@
             "name": "Risco de evento",
             "ok": false,
             "weight": 5.0,
-            "detail": "ELEVADO"
+            "detail": "ALTO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "WAIT",
-      "readiness_score": 25.925925925925927,
-      "event_risk": "ELEVADO",
+      "readiness_score": 22.0,
+      "event_risk": "ALTO",
       "adr": {
         "available": true,
-        "adr": 0.006010714285714266,
-        "today_range": 0.003049999999999997,
-        "used_pct": 50.74272133095675,
-        "state": "🟢 ESPAÇO DISPONÍVEL",
+        "adr": 0.005500714285714271,
+        "today_range": 0.003550000000000164,
+        "used_pct": 64.5370731073918,
+        "state": "🟡 RANGE MODERADO",
         "length": 14
       },
-      "adr_used_pct": 50.74272133095675,
+      "adr_used_pct": 64.5370731073918,
       "intraday_opens": {
         "available": true,
-        "current": 1.34172,
-        "day_open": 1.34072,
+        "current": 1.34833,
+        "day_open": 1.34594,
         "week_open": 1.33927,
         "above_day_open": true,
         "above_week_open": true
@@ -4215,19 +4229,19 @@
     },
     "AUD/USD": {
       "pair": "AUD/USD",
-      "updated_at": "2026-11-03T20:56:37.785281+00:00",
-      "candle_m15": "2026-11-03T20:30:00+00:00",
-      "price": 0.6966,
-      "macro_direction": "⚪ AGUARDAR",
-      "macro_score": 53.0,
-      "quality": 81.0,
-      "rank_index": 64.3,
+      "updated_at": "2026-11-04T07:58:23.036781+00:00",
+      "candle_m15": "2026-11-04T07:30:00+00:00",
+      "price": 0.69971,
+      "macro_direction": "⚪ AGUARDAR CONFIRMAÇÃO",
+      "macro_score": 59.0,
+      "quality": 84.0,
+      "rank_index": 69.0,
       "w1": {
         "bias": "NEUTRO",
         "score": 40.0,
-        "ema20": 0.7037574578909243,
-        "ema50": 0.697156510462184,
-        "last": 0.70011,
+        "ema20": 0.7034041245575909,
+        "ema50": 0.6970110202661056,
+        "last": 0.6964,
         "ema_bias": "NEUTRO",
         "confirmation": "NEUTRA",
         "structure": {
@@ -4272,17 +4286,17 @@
               0.68956
             ]
           ],
-          "atr": 0.009230714285714274
+          "atr": 0.009472142857142842
         },
         "reason": "preço abaixo da EMA20 · EMA20 acima da EMA50 · EMA20 inclinando para baixo · estrutura LH/HL · COMPRESSÃO"
       },
       "d1": {
         "bias": "NEUTRO",
-        "score": 60.0,
-        "ema20": 0.701565350272904,
-        "ema50": 0.7025375255264188,
-        "last": 0.70011,
-        "ema_bias": "NEUTRO",
+        "score": 40.0,
+        "ema20": 0.701073412151675,
+        "ema50": 0.7022968292149212,
+        "last": 0.6964,
+        "ema_bias": "BAIXISTA",
         "confirmation": "NEUTRA",
         "structure": {
           "bias": "ALTISTA",
@@ -4477,10 +4491,6 @@
             ]
           ],
           "lows": [
-            [
-              "2025-12-18 00:00:00+00:00",
-              0.65926
-            ],
             [
               "2026-01-01 00:00:00+00:00",
               0.66556
@@ -4690,85 +4700,60 @@
               0.70101
             ]
           ],
-          "atr": 0.0035535714285714337
+          "atr": 0.0035364285714285753
         },
-        "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para cima · estrutura HH/HL · TENDÊNCIA ALTISTA"
+        "reason": "preço abaixo da EMA20 · EMA20 abaixo da EMA50 · EMA20 inclinando para baixo · estrutura HH/HL · TENDÊNCIA ALTISTA"
       },
       "levels": {
-        "PDH": 0.70348,
-        "PDL": 0.69963,
+        "PDH": 0.70055,
+        "PDL": 0.69625,
         "PWH": 0.70678,
         "PWL": 0.70101,
         "PMH": 0.70678,
         "PML": 0.68956,
         "EQL": 0.69332,
-        "Asia High": 0.70012,
-        "Asia Low": 0.69715
+        "Asia High": 0.69805,
+        "Asia Low": 0.69548
       },
       "premium_discount": {
         "zone": "ABAIXO DO RANGE",
-        "position": -76.42980935875337,
+        "position": -22.530329289427748,
         "equilibrium": 0.7038949999999999,
         "inside_range": false,
-        "expansion_pct": 76.42980935875337
+        "expansion_pct": 22.530329289427748
       },
       "bsl": [
-        "Asia High",
-        0.70012
+        "PDH",
+        0.70055
       ],
       "ssl": [
-        "EQL",
-        0.69332
+        "PDL",
+        0.69625
       ],
       "latest_sweep": {
-        "level": "Asia Low",
-        "type": "SWEEP SSL",
-        "datetime": "2026-11-03 18:30:00+00:00",
-        "price": 0.69715,
-        "high": 0.69751,
-        "low": 0.69708,
-        "close": 0.6972,
-        "excess_abs": 7.00000000000145e-05,
-        "rejection": "fechou de volta acima do nível"
+        "level": "Asia High",
+        "type": "SWEEP BSL",
+        "datetime": "2026-11-04 06:15:00+00:00",
+        "price": 0.69805,
+        "high": 0.69829,
+        "low": 0.69785,
+        "close": 0.698,
+        "excess_abs": 0.00024000000000001798,
+        "rejection": "fechou de volta abaixo do nível"
       },
       "killzone": {
-        "now_ny": "2026-11-03 15:57:46.463206-05:00",
+        "now_ny": "2026-11-04 03:00:36.527406-05:00",
         "active": {
-          "name": "New York PM",
-          "start": "2026-11-03 13:30:00-05:00",
-          "end": "2026-11-03 16:00:00-05:00"
+          "name": "London Killzone",
+          "start": "2026-11-04 02:00:00-05:00",
+          "end": "2026-11-04 05:00:00-05:00"
         },
         "next": {
-          "name": "Asian Range",
-          "start": "2026-11-03 20:00:00-05:00",
-          "end": "2026-11-04 00:00:00-05:00"
+          "name": "New York AM",
+          "start": "2026-11-04 07:00:00-05:00",
+          "end": "2026-11-04 10:00:00-05:00"
         },
         "windows": [
-          {
-            "name": "London Killzone",
-            "start": "2026-11-02 02:00:00-05:00",
-            "end": "2026-11-02 05:00:00-05:00"
-          },
-          {
-            "name": "New York AM",
-            "start": "2026-11-02 07:00:00-05:00",
-            "end": "2026-11-02 10:00:00-05:00"
-          },
-          {
-            "name": "London Close",
-            "start": "2026-11-02 10:00:00-05:00",
-            "end": "2026-11-02 12:00:00-05:00"
-          },
-          {
-            "name": "New York PM",
-            "start": "2026-11-02 13:30:00-05:00",
-            "end": "2026-11-02 16:00:00-05:00"
-          },
-          {
-            "name": "Asian Range",
-            "start": "2026-11-02 20:00:00-05:00",
-            "end": "2026-11-03 00:00:00-05:00"
-          },
           {
             "name": "London Killzone",
             "start": "2026-11-03 02:00:00-05:00",
@@ -4818,6 +4803,31 @@
             "name": "Asian Range",
             "start": "2026-11-04 20:00:00-05:00",
             "end": "2026-11-05 00:00:00-05:00"
+          },
+          {
+            "name": "London Killzone",
+            "start": "2026-11-05 02:00:00-05:00",
+            "end": "2026-11-05 05:00:00-05:00"
+          },
+          {
+            "name": "New York AM",
+            "start": "2026-11-05 07:00:00-05:00",
+            "end": "2026-11-05 10:00:00-05:00"
+          },
+          {
+            "name": "London Close",
+            "start": "2026-11-05 10:00:00-05:00",
+            "end": "2026-11-05 12:00:00-05:00"
+          },
+          {
+            "name": "New York PM",
+            "start": "2026-11-05 13:30:00-05:00",
+            "end": "2026-11-05 16:00:00-05:00"
+          },
+          {
+            "name": "Asian Range",
+            "start": "2026-11-05 20:00:00-05:00",
+            "end": "2026-11-06 00:00:00-05:00"
           }
         ]
       },
@@ -4827,21 +4837,21 @@
         "consistency": 50.0,
         "recent_label": "NEUTRO / SEM DADO",
         "event_risk": {
-          "level": "ELEVADO",
-          "score": 0.55,
-          "text": "ISM Serviços é amanhã; reduzir agressividade e evitar carregar risco sem plano."
+          "level": "ALTO",
+          "score": 0.2,
+          "text": "ISM Serviços é hoje; conferir o horário antes de nova entrada."
         },
         "components": [
           {
             "name": "Regime macro USD",
             "ok": null,
-            "detail": "USD 58/100",
+            "detail": "USD 59/100",
             "weight": 25.0
           },
           {
             "name": "Federal Reserve",
             "ok": null,
-            "detail": "Neutro",
+            "detail": "Restritivo",
             "weight": 20.0
           },
           {
@@ -4857,8 +4867,8 @@
             "weight": 15.0
           }
         ],
-        "macro_score": 53.0,
-        "quality": 81.0
+        "macro_score": 59.0,
+        "quality": 84.0
       },
       "readiness": {
         "score": 69.0,
@@ -4869,13 +4879,13 @@
             "name": "Macro forte",
             "ok": null,
             "weight": 15.0,
-            "detail": "Score 53/100"
+            "detail": "Score 59/100"
           },
           {
             "name": "Qualidade dos dados",
             "ok": true,
             "weight": 15.0,
-            "detail": "81%"
+            "detail": "84%"
           },
           {
             "name": "W1 alinhado",
@@ -4905,7 +4915,7 @@
             "name": "Sweep coerente",
             "ok": null,
             "weight": 8.0,
-            "detail": "SWEEP SSL"
+            "detail": "SWEEP BSL"
           },
           {
             "name": "Killzone ativa",
@@ -4917,33 +4927,33 @@
             "name": "Risco de evento",
             "ok": false,
             "weight": 5.0,
-            "detail": "ELEVADO"
+            "detail": "ALTO"
           }
         ],
         "hard_conflict": true
       },
       "readiness_grade": "B",
       "readiness_score": 69.0,
-      "event_risk": "ELEVADO",
+      "event_risk": "ALTO",
       "adr": {
         "available": true,
-        "adr": 0.0035535714285714337,
-        "today_range": 0.003409999999999913,
-        "used_pct": 95.95979899497229,
-        "state": "🟠 DIA ESTICADO",
+        "adr": 0.0035364285714285753,
+        "today_range": 0.0025999999999999357,
+        "used_pct": 73.52050090890539,
+        "state": "🟡 RANGE MODERADO",
         "length": 14
       },
-      "adr_used_pct": 95.95979899497229,
+      "adr_used_pct": 73.52050090890539,
       "intraday_opens": {
         "available": true,
-        "current": 0.6966,
-        "day_open": 0.69773,
+        "current": 0.69971,
+        "day_open": 0.69732,
         "week_open": 0.70229,
-        "above_day_open": false,
+        "above_day_open": true,
         "above_week_open": false
       },
       "autopilot_v107": true
     }
   },
-  "autopilot_updated_at": "2026-11-04T01:15:55.845526+00:00"
+  "autopilot_updated_at": "2026-11-04T08:00:37.559543+00:00"
 }
