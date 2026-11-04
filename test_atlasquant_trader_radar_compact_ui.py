@@ -44,7 +44,7 @@ class TraderRadarCompactTests(unittest.TestCase):
         html = trader_radar_html(selected="radar")
         self.assertIn("Dados diários ainda não conectados", html)
         self.assertIn("Top 10 aguardando", html)
-        self.assertEqual(len(re.findall(r"<tr><td>", html)), 28)
+        self.assertEqual(len(re.findall(r"<tr><td>", html)), 56)  # 28 preços + 28 vieses
         self.assertGreaterEqual(html.count("AGUARDANDO"), 28 + 8 + 10)
         self.assertNotIn("Fixture offline", html)
 
