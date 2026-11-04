@@ -19,6 +19,14 @@ Radar enxuto com 28 pares Forex e filtro direcional de quatro horizontes, sem mi
 - Daily percentual expira em 36 horas; fonte/horário obrigatórios; horário exibido em UTC correto
 - Nenhuma cotação, viés ou resultado de mercado é sintetizado; status de LAB não autoriza operação
 
+## Etapa adicional (LAB): tendência a partir de candles fechados
+- Módulo `atlasquant_trader_bias_candle_research.py`: cálculo exploratório com EMA20/EMA50, inclinação e faixa de volatilidade ATR
+- Exige 60 candles OHLC válidos por horizonte, fechamento explícito (`closed_at`), timestamps com fuso e janela de validade
+- Recusa candle ainda aberto, data futura, série duplicada/sobreposta, OHLC incoerente, dados vencidos ou histórico insuficiente
+- Produz exclusivamente `RESEARCH_ONLY` com `publishable=False`; NÃO satisfaz `VALIDATED_BIAS_EVIDENCE` sem validação externa de origem
+- Cobertura potencial para os 28 pares, mas nenhuma evidência atual do fornecedor foi conectada; sem rede, custo ou operação
+- Auditado cache local: somente 7 pares diários; última atualização gravada em 2026-09-17, inadequada para uso como dado atual
+
 ## O que **não** está pronto
 - Alimentador real validado para W1/D1/H4/M15; nenhum cálculo de tendência a partir de séries OHLC conectado
 - Prova de origem autêntica do fornecedor/validador: o contrato de entrada não substitui assinatura ou auditoria do produtor
