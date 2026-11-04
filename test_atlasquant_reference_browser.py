@@ -601,3 +601,33 @@ def test_win_manual_opening_calculator_correct_signed_math_in_brazil(preview_url
         expect(calculator.locator('[data-win-score]')).to_have_text("Score: —")
         assert not errors
         browser.close()
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_trader_checkpoint_why_not_is_readable_without_enabling_orders(preview_url, width):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": width, "height": 850})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(preview_url)
+        expect(page.locator(".aqc-focus")).to_be_visible(timeout=30000)
+        page.locator('.aqc-shortcuts [data-route="open:home"]').click()
+        expect(page.locator('.aqr-checkpoint')).to_be_visible(timeout=20000)
+        expect(page.locator('.aqr-checkpoint')).to_contain_text("NÃO OPERAR")
+        page.locator('.aqr-nav [data-route="radar"]').click()
+        matrix=page.locator('details.aqr-matrix')
+        expect(matrix).to_be_visible(timeout=20000)
+        expect(matrix).not_to_have_attribute("open", "")
+        matrix.locator('summary').click()
+        expect(matrix).to_have_attribute("open", "")
+        expect(matrix.locator("tbody tr")).to_have_count(28)
+        expect(matrix.locator("thead")).to_contain_text("Por que não?")
+        expect(matrix.locator("tbody")).to_contain_text("Faltam leituras")
+        page.locator('.aqr-nav [data-route="master"]').click()
+        expect(page.locator(".aqr-checkpoint")).to_be_visible(timeout=20000)
+        page.locator(".aqr-why-more summary").click()
+        expect(page.locator(".aqr-why-more")).to_have_attribute("open", "")
+        expect(page.locator(".aqr-why-more")).to_contain_text("Gatilho técnico")
+        assert not errors
+        browser.close()

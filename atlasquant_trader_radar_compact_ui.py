@@ -107,6 +107,7 @@ _CSS = r"""
 .aqr-win-buttons{display:flex;gap:8px;flex-wrap:wrap}.aqr-win-buttons button{border:1px solid #3d7592;border-radius:8px;padding:10px 13px;color:#e7f4fb;background:#122c42;font-size:11px;font-weight:750}.aqr-win-buttons .aqr-win-submit{background:#078b8a;border-color:#63e9e0;color:white}
 .aqr-win-hint{color:#92adbd!important;font-size:10px!important}.aqr-win-result{border:1px solid #3b6f76;border-radius:11px;background:#09252e;padding:18px;display:flex;flex-direction:column;justify-content:center;gap:7px;min-width:0}.aqr-win-result small{font-size:10px;color:#9dc5ce;font-weight:850;letter-spacing:.09em}.aqr-win-result strong{font-size:25px;color:#d6e3ed}.aqr-win-result[data-win-side-state=up]{border-color:#24be97;background:#092d2a}.aqr-win-result[data-win-side-state=up] strong{color:#77efbe}.aqr-win-result[data-win-side-state=down]{border-color:#d27f89;background:#2a1720}.aqr-win-result[data-win-side-state=down] strong{color:#ffabb5}.aqr-win-result[data-win-side-state=neutral] strong{color:#f2d19a}
 .aqr-win-score{font-size:18px;font-weight:900;color:#e7f5fb}.aqr-win-message{font-size:10px!important;color:#a5c3d0!important}
+.aqr-checkpoint{margin:16px 0 22px;padding:15px 17px;border:1px solid #365b6c;border-radius:12px;background:#0e2534;color:#d5e8f3}.aqr-checkpoint-heading{display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap}.aqr-checkpoint-heading strong{font-size:14px;color:#e8f9fa}.aqr-checkpoint-heading span{font-size:10px;color:#f0c69d;border:1px solid #7a6348;padding:5px 8px;border-radius:5px}.aqr-checkpoint p{font-size:11px;line-height:1.65;color:#a9c1d3;margin:8px 0}.aqr-checkpoint-counts{display:flex;gap:8px;flex-wrap:wrap}.aqr-checkpoint-counts span{border:1px solid #305568;border-radius:7px;padding:8px 10px;font-size:10px;color:#c7e0ed}.aqr-why-more{padding:9px 0}.aqr-why-more summary{cursor:pointer;font-size:12px;font-weight:800;color:#b7eef2}.aqr-why-more summary:focus-visible{outline:3px solid #79e9ed;outline-offset:3px}.aqr-why-more li{margin:8px 0;font-size:11px;line-height:1.55}.aqr-matrix .aqr-table td:last-child{min-width:230px;line-height:1.55}
 @media(max-width:850px){.aqr-win-layout{grid-template-columns:1fr}}@media(max-width:440px){.aqr-win-field{display:block}.aqr-win-field input{display:block;max-width:100%;width:100%;margin-top:6px}.aqr-win-buttons button{flex:1}}
 @media(prefers-reduced-motion:reduce){.aqr-shell *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 </style>
@@ -251,7 +252,47 @@ def _disclaimer(calendar_connected: bool = False) -> str:
             'Não usar como ordem ou recomendação de investimento.</aside>')
 
 
-def _home(data: Mapping[str, Any]) -> str:
+def _why_not_status(payload: Any, *, full: bool = False) -> str:
+    """Checkpoint Mestre: state/coverage/why-not, not an entry recommendation."""
+    from atlasquant_trader_why_not import diagnose_trader_bias
+
+    diagnosis = diagnose_trader_bias(payload)
+    covered = diagnosis["complete_pairs"]
+    aligned = diagnosis["aligned_pairs"]
+    checks = "".join(
+        '<li>' + escape(item) + '</li>'
+        for item in diagnosis["checks_outstanding"]
+    )
+    details = (
+        '<details class="aqr-why-more"><summary>Por que ainda não operar?</summary>'
+        '<ul>' + checks + '</ul>'
+        '<p>Alinhamento W1/D1/H4/M15 não valida notícia, macro, OB/FVG, '
+        'liquidez, gatilho ou risco.</p></details>'
+        if full else
+        '<p>Fonte macro, gatilho técnico e autorização de risco '
+        'ainda não comprovados. Veja os motivos na matriz do Radar.</p>'
+    )
+    source = (
+        '<p>Origem declarada: ' + escape(diagnosis["reported_source"]) +
+        ' · Snapshot UTC: ' + escape(diagnosis["snapshot_utc"]) +
+        ' · Autenticidade do produtor não verificada nesta tela.</p>'
+        if diagnosis["reported_source"] else
+        '<p>Sem snapshot multitemporal com origem e horário aceitos.</p>'
+    )
+    return (
+        '<section class="aqr-checkpoint" aria-label="Diagnóstico da leitura Trader">'
+        '<div class="aqr-checkpoint-heading"><strong>Checkpoint do viés · '
+        'Por que não?</strong><span>NÃO OPERAR · ESTUDO</span></div>'
+        '<p>' + escape(diagnosis["summary"]) + '</p>'
+        '<div class="aqr-checkpoint-counts">'
+        '<span>' + str(covered) + '/28 com quatro tempos</span>'
+        '<span>' + str(aligned) + ' alinhados para estudo</span>'
+        '<span>28/28 sem autorização de entrada</span></div>'
+        + source + details + '</section>'
+    )
+
+
+def _home(data: Mapping[str, Any], bias_evidence: Any = None) -> str:
     summary = (_placeholder_card("Moeda mais forte", "Força relativa entre 8 moedas")
                + _placeholder_card("Melhor par do dia", "Variação % diária entre 28 pares", "↗")
                + _placeholder_card("Viés de índices / futuros", "Inclui WIN e WDO · D1 + H4", "▥")
@@ -270,6 +311,7 @@ def _home(data: Mapping[str, Any]) -> str:
         f'<button data-route="{route}">{escape(button)}</button></article>'
         for icon, title, desc, button, route in flow)
     return (
+        _why_not_status(bias_evidence) +
         '<section class="aqr-section">' +
         _heading("Panorama do mercado", "Os quatro blocos principais do dia, sem excesso de informação.",
                  "Aguardando integração") +
@@ -327,8 +369,11 @@ def _forex_table(data: Mapping[str, Any]) -> str:
 def _bias_matrix_html(payload: Any) -> str:
     """28 pares: filtro direcional W1/D1/H4/M15, nunca gatilho ou previsão."""
     from atlasquant_trader_bias_matrix import TIMEFRAMES, read_bias_matrix
+    from atlasquant_trader_why_not import diagnose_trader_bias
 
-    model = read_bias_matrix(payload)
+    current = datetime.now(timezone.utc)
+    model = read_bias_matrix(payload, now=current)
+    diagnosis = diagnose_trader_bias(payload, now=current)
     labels = {
         "SEM_DADOS": "Aguardando dados",
         "SEM_DIREÇÃO": "Sem direção",
@@ -346,7 +391,8 @@ def _bias_matrix_html(payload: Any) -> str:
         )
         body += ('<tr><td>' + escape(pair) + '</td>' + cells +
                  '<td>' + _tag(row["bias"] if row["bias"] != "AGUARDAR" else "") +
-                 '</td><td>' + escape(labels[row["status"]]) + '</td></tr>')
+                 '</td><td>' + escape(labels[row["status"]]) + '</td>' +
+                 '<td>' + escape(diagnosis["rows"][pair]["why_not"]) + '</td></tr>')
     note = (
         "Ainda não recebemos leituras válidas com horário e fonte para os quatro horizontes."
         if model["state"] == "NO_DATA" else
@@ -364,7 +410,7 @@ def _bias_matrix_html(payload: Any) -> str:
         '<p class="aqr-muted">' + note + '</p>' +
         '<div class="aqr-tablewrap"><table class="aqr-table">' +
         '<thead><tr><th>Par</th><th>Semanal</th><th>Diário</th>' +
-        '<th>H4</th><th>M15</th><th>Viés</th><th>Condição</th></tr></thead>' +
+        '<th>H4</th><th>M15</th><th>Viés</th><th>Condição</th><th>Por que não?</th></tr></thead>' +
         '<tbody>' + body + '</tbody></table></div></details>'
     )
 
@@ -622,7 +668,7 @@ def _economic_catalog() -> str:
               'resultado e revisão quando efetivamente conectado. '
               'Sem esses campos, não exibimos surpresas nem sugerimos viés.</div></section>')
 
-def _master(calendar_data: Any = None) -> str:
+def _master(calendar_data: Any = None, bias_evidence: Any = None) -> str:
     from atlasquant_trader_calendar_ui import calendar_html
     highlights = (
         _placeholder_card("Cenário macro", "Sem avaliação atual", "")
@@ -653,6 +699,7 @@ def _master(calendar_data: Any = None) -> str:
         '<div class="aqr-event"><strong>' + escape(title) +
         '</strong><p>' + escape(impact) + '</p></div>' for title, impact in EVENT_GUIDES)
     return (
+        _why_not_status(bias_evidence, full=True) +
         '<section class="aqr-section">' +
         _heading("Painel Mestre", "O contexto por trás do movimento do mercado, separado da leitura de preços.",
                  "Contexto e risco") +
@@ -690,9 +737,9 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         ("page" if key == page else "false") +
         '"><span class="aqr-nav-icon" aria-hidden="true">' + icons[key] +
         '</span>' + escape(label) + '</button>' for key, label in PAGES)
-    content = {"home": lambda: _home(data),
+    content = {"home": lambda: _home(data, bias_evidence),
                "radar": lambda: _radar(data, daily_data, bias_evidence),
-               "master": lambda: _master(calendar_data)}[page]()
+               "master": lambda: _master(calendar_data, bias_evidence)}[page]()
     back = ('<button class="aqr-aside-back" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
     status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"]) + ' · Fonte: ' + escape(data["source"])
