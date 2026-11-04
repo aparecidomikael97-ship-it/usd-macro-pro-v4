@@ -509,10 +509,6 @@ def _radar(data: Mapping[str, Any], raw_daily: Any = None, bias_evidence: Any = 
                  "Pares ordenados por variação diária quando o universo completo for validado.") +
         _top_approved(data) + '</section>'
         '<section class="aqr-section">' +
-        _heading("Os 28 pares Forex",
-                 "Variação diária, viés e confirmação técnica por par.") +
-        _forex_table(data) + '</section>' +
-        '<section class="aqr-section">' +
         _heading("Índices e Futuros",
                  "EUA, Brasil, Europa e Ásia · WIN e WDO sem confundir os contratos.") +
         '<nav class="aqr-tabs" aria-label="Região de índices e futuros">' + buttons +
