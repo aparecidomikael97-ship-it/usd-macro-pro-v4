@@ -1,7 +1,7 @@
 """Explanatory join of synthetic FX bias and partial documentary event risk.
 
 The result is never an operational bias. Neither the synthetic strength matrix
-nor the three manually curated event dates has authenticated market custody.
+nor either manually curated calendar vintage has authenticated market custody.
 Rolling event windows are not chart candles or D1/W1/MN1 return forecasts.
 """
 from __future__ import annotations
@@ -14,6 +14,9 @@ from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_bias_priority_bridge_lab import SCHEMA as BIAS_SCHEMA
 from atlasquant_trader_macro_event_exposure_lab import (
     SCHEMA as CALENDAR_SCHEMA, build_macro_event_exposure_lab,
+)
+from atlasquant_trader_macro_event_exposure_v2_lab import (
+    SCHEMA as CALENDAR_V2_SCHEMA, build_macro_event_exposure_v2_lab,
 )
 
 SCHEMA = "ATLASQUANT_TRADER_BIAS_CALENDAR_EXPOSURE_LINK_LAB_V1"
@@ -57,7 +60,7 @@ def build_bias_calendar_exposure_link_lab(
 ) -> dict[str, Any]:
     """Produce 28 x D1/W1/MN1 context cards, preserving an unconditional wait.
 
-    The partial canonical calendar is reproduced at ``at`` to reject synthetic
+    The selected partial calendar vintage is reproduced at ``at`` to reject
     event injection, missing events and forged claims of complete coverage.
     """
     if (not isinstance(at, datetime) or at.tzinfo is None
@@ -68,7 +71,7 @@ def build_bias_calendar_exposure_link_lab(
         return _blocked("REQUIRED_REPORTS_MISSING")
     if (bias_report.get("schema") != BIAS_SCHEMA
             or bias_report.get("state") != "LAB_EXPLANATION_ONLY"
-            or calendar_report.get("schema") != CALENDAR_SCHEMA
+            or calendar_report.get("schema") not in (CALENDAR_SCHEMA, CALENDAR_V2_SCHEMA)
             or calendar_report.get("state") != "LAB_CALENDAR_RISK_EXPOSURE_ONLY"):
         return _blocked("ONLY_UNPROMOTED_LAB_REPORTS_SUPPORTED")
     # Never accept reports advertising operational or independently verified
@@ -108,7 +111,11 @@ def build_bias_calendar_exposure_link_lab(
     # This is a canonical, documentary schedule. Equality also rejects
     # omissions, reordered records, added events and fabricated release times.
     try:
-        expected_calendar = build_macro_event_exposure_lab(at=now)
+        expected_calendar = (
+            build_macro_event_exposure_v2_lab(at=now)
+            if calendar_report["schema"] == CALENDAR_V2_SCHEMA
+            else build_macro_event_exposure_lab(at=now)
+        )
     except ValueError:
         return _blocked("CALENDAR_RESEARCH_NOT_AVAILABLE_AS_OF_TIME")
     if dict(calendar_report) != expected_calendar:
@@ -168,7 +175,7 @@ def build_bias_calendar_exposure_link_lab(
                 "event_exposure_is_not_direction": True,
                 "no_event_from_partial_calendar_is_not_no_risk": True,
                 "windows_are_rolling_not_price_candles": True,
-                "why_wait": ("Forca e macro sao hipoteses sinteticas; os tres "
+                "why_wait": ("Forca e macro sao hipoteses sinteticas; os "
                              "eventos catalogados nao esgotam o calendario "
                              "nem provam direcao, reacao ou preco de mercado."),
             }
@@ -180,12 +187,13 @@ def build_bias_calendar_exposure_link_lab(
         "rows": joined, "pair_count": len(joined),
         "relative_currency_rankings": deepcopy(rankings),
         "curated_event_count": expected_calendar["curated_event_count"],
+        "calendar_version": expected_calendar.get("calendar_version", "V1_20261103"),
         "event_exposure_windows_seconds": deepcopy(
             expected_calendar["rolling_windows"]),
         "bias_horizons": list(HORIZONS),
         "note": ("D1/W1/MN1 de vies e risco de eventos nas proximas "
                  "24h/7d/30d sao conceitos diferentes. "
-                 "Tres eventos documentais nao significam calendario completo."),
+                 "Eventos documentais nao significam calendario completo."),
     })
     return out
 

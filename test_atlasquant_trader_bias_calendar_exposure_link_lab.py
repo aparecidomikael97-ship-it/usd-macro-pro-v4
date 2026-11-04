@@ -11,6 +11,7 @@ from atlasquant_trader_bias_calendar_exposure_link_lab import (
 )
 from atlasquant_trader_bias_priority_bridge_lab import build_bias_priority_bridge_lab
 from atlasquant_trader_macro_event_exposure_lab import build_macro_event_exposure_lab
+from atlasquant_trader_macro_event_exposure_v2_lab import build_macro_event_exposure_v2_lab
 from test_atlasquant_trader_bias_priority_bridge_lab import AT, books
 
 
@@ -29,6 +30,36 @@ def row(report: dict, pair: str, horizon: str) -> dict:
 
 
 class BiasCalendarExposureLabTests(unittest.TestCase):
+    def test_second_vintage_links_10_events_without_rewriting_first(self) -> None:
+        b, old = reports()
+        new = build_macro_event_exposure_v2_lab(at=AT)
+        report = link(b, new)
+        self.assertEqual(report["state"], "LAB_EXPLANATION_ONLY")
+        self.assertEqual(report["curated_event_count"], 10)
+        self.assertEqual(report["calendar_version"], "V2_OFFICIAL_PAGE_REVIEW")
+        self.assertIn("STATCAN_CA_LFS_20261106",
+                      [x["event_id"] for x in row(report, "USD/CAD", "W1")
+                       ["event_exposures"]])
+        self.assertIn("ABS_AU_LABOR_20261119",
+                      [x["event_id"] for x in row(report, "EUR/AUD", "MN1")
+                       ["event_exposures"]])
+        self.assertEqual(link(b, old)["curated_event_count"], 3)
+        self.assertEqual(report["rows"][0]["horizons"]["D1"]["operational_bias"],
+                         "AGUARDAR")
+
+    def test_v2_modified_event_or_forged_authority_fails_closed(self) -> None:
+        b, _ = reports()
+        for kind in ("reschedule", "remove_event", "claim_attested"):
+            with self.subTest(kind=kind):
+                c = build_macro_event_exposure_v2_lab(at=AT)
+                if kind == "reschedule":
+                    c["events"][7]["earliest_at_utc"] = "2026-11-10T20:00:00Z"
+                elif kind == "remove_event":
+                    c["events"].pop(7)
+                else:
+                    c["independent_source_receipt_verified"] = True
+                self.assertEqual(link(b, c)["state"], "LAB_BLOCKED")
+
     def test_all_28_pairs_3_horizons_are_wait_only_and_partial(self) -> None:
         b, c = reports()
         pristine = deepcopy((b, c))
