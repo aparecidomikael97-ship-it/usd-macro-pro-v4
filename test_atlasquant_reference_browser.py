@@ -47,14 +47,14 @@ def test_all_screens_real_clicks_desktop_mobile(preview_url):
         page.on("pageerror",lambda e:errors.append(str(e)))
         start=time.perf_counter()
         page.goto(preview_url)
-        expect(page.locator(".ref-canvas")).to_be_visible(timeout=30000)
+        expect(page.locator(".aqc-focus")).to_be_visible(timeout=30000)
         expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible(timeout=30000)
         timings["central_cold_ms"]=round((time.perf_counter()-start)*1000)
         page.mouse.move(0,0)
         page.screenshot(path=str(artifacts/"central-desktop.png"),full_page=True)
         for area in ("trader","negocios","investimentos","aion"):
             start=time.perf_counter()
-            page.locator(f'.ref-canvas [data-route="area:{area}"]').click()
+            page.locator(f'.aqc-focus [data-route="area:{area}"]').first.click()
             expect(page.locator(f'.ref-workspace[data-workspace="{area}"]')).to_be_visible(timeout=20000)
             expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible(timeout=30000)
             timings[area+"_open_ms"]=round((time.perf_counter()-start)*1000)
@@ -198,13 +198,13 @@ def test_central_and_legacy_cards_keep_exact_hover_and_keyboard_geometry(preview
         page=browser.new_page(viewport={'width':1280,'height':720})
         page.goto(preview_url)
         expect(page.locator('.ref-component-root[data-art-ready="true"]')).to_be_visible(timeout=30000)
-        for button in page.locator('.ref-hit[data-route^="area:"]').all():
+        for button in page.locator('.aqc-hero button,.aqc-other button').all():
             button.scroll_into_view_if_needed()
             before=button.bounding_box();button.hover()
             after=button.bounding_box()
             assert all(abs(before[k]-after[k]) < .1 for k in ('x','y','width','height'))
             page.keyboard.press('Tab');button.focus()
-            assert button.evaluate('(e)=>getComputedStyle(e).outlineStyle')=='none'
+            assert button.evaluate('(e)=>getComputedStyle(e).outlineStyle')!='none'
             focused=button.bounding_box()
             assert all(abs(before[k]-focused[k]) < .1 for k in ('x','y','width','height'))
         page.screenshot(path=str(artifacts/'central-focus.png'),full_page=True)
@@ -231,7 +231,7 @@ def test_trader_24_functions_discoverable_and_clickable_in_both_modes(preview_ur
         page = browser.new_page(viewport={'width':1280, 'height':720}, reduced_motion='reduce')
         errors = []; page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(preview_url)
-        page.locator('.ref-canvas [data-route="area:trader"]').click(timeout=30000)
+        page.locator('.aqc-other [data-route="area:trader"]').click(timeout=30000)
         expect(page.locator('.cq-main')).to_be_visible(timeout=30000)
         for width, height in ((1280,720), (1024,768), (768,1024), (390,844)):
             page.set_viewport_size({'width':width, 'height':height})
@@ -512,4 +512,50 @@ def test_legacy_master_is_read_only_without_provider_buttons_at_four_sizes(runti
             page.screenshot(path=str(artifacts/f'consistency-legacy-master-{width}.png'),full_page=True)
         page.get_by_role('button',name='Voltar à home Trader',exact=True).click()
         expect(page.locator('.cq-hero')).to_be_visible(timeout=20000)
+        browser.close()
+
+
+@pytest.mark.parametrize("destination", ["home", "radar", "master"])
+def test_focused_trader_shortcuts_open_real_three_page_workspace(preview_url, destination):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(preview_url)
+        expect(page.locator(".aqc-focus")).to_be_visible(timeout=30000)
+        page.locator(f'.aqc-shortcuts [data-route="open:{destination}"]').click()
+        expect(page.locator('.ref-workspace[data-workspace="trader_radar"]')).to_be_visible(timeout=20000)
+        expect(page.locator(f'.aqr-nav [data-route="{destination}"]')).to_have_attribute("aria-current", "page")
+        expect(page.locator('.aqr-nav [data-route="scanner"]')).to_have_count(0)
+        expect(page.locator(".aqr-aside-back")).to_be_visible()
+        page.locator(".aqr-aside-back").click()
+        expect(page.locator(".aqc-focus")).to_be_visible(timeout=20000)
+        assert not errors
+        browser.close()
+
+
+def test_central_profile_photo_is_editable_and_browser_local(preview_url):
+    from io import BytesIO
+    from PIL import Image
+    image = Image.new("RGB", (48, 48), (50, 120, 180))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1280, "height": 850})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(preview_url)
+        expect(page.locator(".aqc-focus")).to_be_visible(timeout=30000)
+        page.locator('[data-avatar-input]').set_input_files({
+            "name": "foto-perfil.png", "mimeType": "image/png", "buffer": buffer.getvalue()
+        })
+        expect(page.locator('.aqc-avatar-button img[data-profile-avatar]')).to_be_visible(timeout=10000)
+        assert page.locator('.aqc-avatar-button img').get_attribute('src').startswith("data:image/jpeg;base64,")
+        page.reload()
+        expect(page.locator('.aqc-avatar-button img[data-profile-avatar]')).to_be_visible(timeout=20000)
+        page.locator('[data-avatar-clear]').click()
+        expect(page.locator('.aqc-avatar-button img[data-profile-avatar]')).to_be_hidden()
+        assert not errors
         browser.close()
