@@ -1390,6 +1390,71 @@ export default function(component) {
      setPhoto('');inform('Foto removida neste navegador.');
    };
  }
+ // WIN opening manual calculator: local arithmetic only, no requests or provider calls.
+ root.querySelectorAll('[data-win-calculator]').forEach(winCalc=>{
+   const fields={};
+   winCalc.querySelectorAll('[data-win-input]').forEach(el=>{fields[el.dataset.winInput]=el;});
+   const result=winCalc.querySelector('.aqr-win-result');
+   const sideNode=winCalc.querySelector('[data-win-side]');
+   const scoreNode=winCalc.querySelector('[data-win-score]');
+   const levelNode=winCalc.querySelector('[data-win-level]');
+   const equationNode=winCalc.querySelector('[data-win-equation]');
+   const messageNode=winCalc.querySelector('[data-win-message]');
+   const format=x=>x.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+   const signed=x=>(x<0?'-':'+')+format(Math.abs(x));
+   const parsePct=raw=>{
+     if(typeof raw!=='string')return null;
+     const value=raw.trim().replace(/%/g,'').replace(/\s/g,'').replace(',','.');
+     if(!/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value))return null;
+     const n=Number(value);
+     return Number.isFinite(n)&&Math.abs(n)<=100?n:null;
+   };
+   const waiting=(msg='Preencha os três campos para calcular.')=>{
+     result.dataset.winSideState='';
+     sideNode.textContent='AGUARDAR VALORES';
+     scoreNode.textContent='Score: —';
+     levelNode.textContent='Intensidade: —';
+     equationNode.textContent=msg;
+     messageNode.textContent='Somente filtro exploratório. Nenhuma ordem é executada.';
+   };
+   Object.values(fields).forEach(input=>{
+     input.oninput=()=>{input.removeAttribute('aria-invalid');waiting('Valores alterados. Clique em Calcular para atualizar.');};
+   });
+   const submit=winCalc.querySelector('[data-win-submit]');
+   const calculate=()=>{
+     const iron=parsePct(fields.iron.value);
+     const oil=parsePct(fields.oil.value);
+     const vix=parsePct(fields.vix.value);
+     for(const [key,value] of Object.entries({iron,oil,vix})){
+       if(value===null)fields[key].setAttribute('aria-invalid','true');
+       else fields[key].removeAttribute('aria-invalid');
+     }
+     if(iron===null||oil===null||vix===null){
+       waiting('Informe três variações válidas entre −100% e +100%.');
+       messageNode.textContent='Confira os campos destacados. Use vírgula ou ponto decimal.';
+       return;
+     }
+     const score=Math.round((iron+oil-vix)*10000)/10000;
+     const magnitude=Math.abs(score);
+     const intensity=magnitude<1.5?'Indefinida':magnitude<2.5?'Fraca':magnitude<=4.5?'Moderada':'Forte';
+     const side=magnitude<1.5?'NEUTRO':score>0?'ALTA':'BAIXA';
+     result.dataset.winSideState=side==='ALTA'?'up':side==='BAIXA'?'down':'neutral';
+     sideNode.textContent='VIÉS PRELIMINAR: '+side;
+     scoreNode.textContent='Score: '+signed(score);
+     levelNode.textContent='Intensidade: '+intensity;
+     equationNode.textContent=signed(iron)+' + ('+signed(oil)+') − ('+signed(vix)+') = '+signed(score);
+     messageNode.textContent='Cálculo manual não validado por fonte ou horário. Sem sinal de entrada.';
+   };
+   if(submit)submit.onclick=calculate;
+   const clear=winCalc.querySelector('[data-win-clear]');
+   if(clear)clear.onclick=()=>{Object.values(fields).forEach(el=>{el.value='';el.removeAttribute('aria-invalid');});waiting();};
+   const example=winCalc.querySelector('[data-win-example]');
+   if(example)example.onclick=()=>{
+     fields.iron.value='+1,47';fields.oil.value='+0,95';fields.vix.value='-0,62';
+     calculate();
+     messageNode.textContent='EXEMPLO FICTÍCIO: não são cotações do mercado.';
+   };
+ });
  root.querySelectorAll('[data-route]').forEach(button=>{
    button.onclick=()=>{button.setAttribute('aria-busy','true');setTriggerValue('navigate',button.dataset.route);};
  });

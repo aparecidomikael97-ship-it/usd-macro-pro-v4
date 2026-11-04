@@ -98,6 +98,16 @@ _CSS = r"""
 @media(min-width:1300px){.aqr-main{padding-left:46px;padding-right:46px}}
 @media(max-width:1050px){.aqr-app{grid-template-columns:195px minmax(0,1fr)}.aqr-main{padding:22px 20px}.aqr-card.aqr-fourth{grid-column:span 6}.aqr-indices{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.aqr-app{display:block}.aqr-aside-inner{position:static;min-height:0;height:auto;padding:12px;gap:9px}.aqr-aside-note{display:none}.aqr-side-label{margin:2px 4px}.aqr-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.aqr-nav button{min-height:40px;padding:8px;font-size:11px}.aqr-main{padding:14px}.aqr-topline{margin-bottom:14px}.aqr-hero{padding:22px 18px;min-height:190px}.aqr-hero h1{font-size:26px}.aqr-hero:before{right:-14px;opacity:.28}.aqr-hero:after{opacity:.4}.aqr-warning{margin-bottom:17px}.aqr-card,.aqr-card.aqr-fourth,.aqr-card.aqr-third{grid-column:1/-1}.aqr-currency{grid-column:span 6}.aqr-indices{grid-template-columns:1fr}.aqr-controls{gap:5px}.aqr-chip{font-size:9px;padding:6px}.aqr-crumb{font-size:10px}}
+.aqr-win-calc{margin:18px 0;border:1px solid #4abac2;border-radius:13px;background:linear-gradient(125deg,#0c2635,#0e1b2e);padding:18px}
+.aqr-win-head{display:flex;justify-content:space-between;align-items:start;gap:9px;flex-wrap:wrap;margin-bottom:12px}.aqr-win-head h4{font-size:16px;color:#e7f8fb;margin:0 0 5px}.aqr-win-head p{margin:0}.aqr-win-pill{border:1px solid #3c9b9f;border-radius:7px;padding:6px 8px;color:#83f0ee;font-size:10px;font-weight:800}
+.aqr-win-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.85fr);gap:17px}.aqr-win-inputs{min-width:0}.aqr-win-field{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #294657;font-size:12px;color:#d0e7f0}.aqr-win-field span{flex:1}
+.aqr-win-field input{width:155px;max-width:50%;padding:9px 11px;border:1px solid #3e657e;background:#0c1b2c;border-radius:7px;color:#eefaff;font-size:13px;font-weight:750;min-height:39px}
+.aqr-win-field input:focus-visible,.aqr-win-buttons button:focus-visible{outline:3px solid #79ebf1;outline-offset:2px}.aqr-win-field input[aria-invalid=true]{border-color:#e5a870}
+.aqr-win-formula{border:1px solid #35677e;border-radius:7px;background:#102f3f;padding:9px 11px;font-weight:750;color:#bdeff0}
+.aqr-win-buttons{display:flex;gap:8px;flex-wrap:wrap}.aqr-win-buttons button{border:1px solid #3d7592;border-radius:8px;padding:10px 13px;color:#e7f4fb;background:#122c42;font-size:11px;font-weight:750}.aqr-win-buttons .aqr-win-submit{background:#078b8a;border-color:#63e9e0;color:white}
+.aqr-win-hint{color:#92adbd!important;font-size:10px!important}.aqr-win-result{border:1px solid #3b6f76;border-radius:11px;background:#09252e;padding:18px;display:flex;flex-direction:column;justify-content:center;gap:7px;min-width:0}.aqr-win-result small{font-size:10px;color:#9dc5ce;font-weight:850;letter-spacing:.09em}.aqr-win-result strong{font-size:25px;color:#d6e3ed}.aqr-win-result[data-win-side-state=up]{border-color:#24be97;background:#092d2a}.aqr-win-result[data-win-side-state=up] strong{color:#77efbe}.aqr-win-result[data-win-side-state=down]{border-color:#d27f89;background:#2a1720}.aqr-win-result[data-win-side-state=down] strong{color:#ffabb5}.aqr-win-result[data-win-side-state=neutral] strong{color:#f2d19a}
+.aqr-win-score{font-size:18px;font-weight:900;color:#e7f5fb}.aqr-win-message{font-size:10px!important;color:#a5c3d0!important}
+@media(max-width:850px){.aqr-win-layout{grid-template-columns:1fr}}@media(max-width:440px){.aqr-win-field{display:block}.aqr-win-field input{display:block;max-width:100%;width:100%;margin-top:6px}.aqr-win-buttons button{flex:1}}
 @media(prefers-reduced-motion:reduce){.aqr-shell *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 </style>
 """
@@ -418,15 +428,55 @@ def _opening_score(raw: Any, *, at: datetime | None = None) -> dict[str, Any] | 
     values = [_num(raw.get(key)) for key in ("vix_pct", "iron_pct", "oil_pct")]
     if any(value is None for value in values):
         return None
+    from atlasquant_win_opening_calculator import calculate_win_opening
     vix, iron, oil = values
-    score = round(iron + oil - vix, 4)
-    magnitude = abs(score)
-    level = ("Indefinido" if magnitude < 1.5 else "Fraco" if magnitude < 2.5
-             else "Moderado" if magnitude <= 4.5 else "Forte")
-    side = "Neutro" if magnitude < 1.5 else "Alta" if score > 0 else "Baixa"
-    return {"vix": vix, "iron": iron, "oil": oil, "score": score,
-            "level": level, "side": side, "source": source,
+    calculated = calculate_win_opening(vix_pct=vix, iron_pct=iron, oil_pct=oil)
+    if calculated is None:
+        return None
+    return {**calculated, "source": source,
             "stamp": local.strftime("%d/%m/%Y %H:%M BRT")}
+
+def _manual_win_calculator_html() -> str:
+    """Client-side-only manual calculator. Inputs are not sent to the server."""
+    inputs = (
+        ("iron", "Minério · variação (%)", "+1,47 ou -1,47"),
+        ("oil", "Petróleo · variação (%)", "+0,95 ou -0,95"),
+        ("vix", "VIX · variação (%)", "-0,62 ou +0,62"),
+    )
+    rows = "".join(
+        '<label class="aqr-win-field"><span>' + label + '</span>'
+        '<input type="text" data-win-input="' + key + '" '
+        'inputmode="decimal" maxlength="12" autocomplete="off" spellcheck="false" '
+        'placeholder="' + hint + '" aria-required="true"></label>'
+        for key, label, hint in inputs
+    )
+    return (
+        '<section class="aqr-win-calc" data-win-calculator aria-label="Calculadora manual do WIN">'
+        '<div class="aqr-win-head"><div><h4>Calculadora do Viés do WIN</h4>'
+        '<p>Digite as variações percentuais com sinal positivo ou negativo. '
+        'Cálculo local, sem envio dos valores.</p></div>'
+        '<span class="aqr-win-pill">MANUAL · SIMULAÇÃO</span></div>'
+        '<div class="aqr-win-layout"><div class="aqr-win-inputs">' + rows +
+        '<p class="aqr-win-formula">Score = Minério + Petróleo − VIX</p>'
+        '<div class="aqr-win-buttons">'
+        '<button type="button" class="aqr-win-submit" data-win-submit>Calcular viés preliminar</button>'
+        '<button type="button" class="aqr-win-secondary" data-win-clear>Limpar</button>'
+        '<button type="button" class="aqr-win-secondary" data-win-example>Preencher exemplo</button>'
+        '</div><p class="aqr-win-hint">Exemplo é fictício. Não é cotação de mercado.</p></div>'
+        '<div class="aqr-win-result" aria-live="polite" aria-atomic="true">'
+        '<small>RESULTADO MANUAL · NÃO É SINAL</small>'
+        '<strong data-win-side>AGUARDAR VALORES</strong>'
+        '<div class="aqr-win-score" data-win-score>Score: —</div>'
+        '<p data-win-level>Intensidade: —</p>'
+        '<p data-win-equation>Preencha os três campos para calcular.</p>'
+        '<p class="aqr-win-message" data-win-message>Somente filtro exploratório.</p>'
+        '</div></div>'
+        '<div class="aqr-strategy-caution">A leitura manual não verifica fonte, horário '
+        'ou preço de mercado. Os limites de intensidade não têm backtest comprovado. '
+        'Confirme com VWAP, preço, estrutura, liquidez, zonas e risco antes de qualquer decisão.</div>'
+        '</section>'
+    )
+
 
 def _opening_strategy(raw: Any) -> str:
     """Abaixo dos contratos WIN/WDO: três fatores exatos, WDO independente."""
@@ -460,6 +510,7 @@ def _opening_strategy(raw: Any) -> str:
         '<p>WIN · janela 08h40–08h55 BRT; WDO · leitura própria.</p></div>'
         '<span class="aqr-status">Pesquisa / sem ordens</span></div>'
         '<div class="aqr-indices">' + blocks + '</div>'
+        + _manual_win_calculator_html() +
         '<div class="aqr-strategy-result">' + result + '</div>'
         '<div class="aqr-strategy-caution"><strong>Confirmação obrigatória:</strong> '
         'O score isolado não é gatilho. Conferir VWAP, preço, estrutura, liquidez, '

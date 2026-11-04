@@ -559,3 +559,45 @@ def test_central_profile_photo_is_editable_and_browser_local(preview_url):
         expect(page.locator('.aqc-avatar-button img[data-profile-avatar]')).to_be_hidden()
         assert not errors
         browser.close()
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_win_manual_opening_calculator_correct_signed_math_in_brazil(preview_url, width):
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": width, "height": 870})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(preview_url)
+        expect(page.locator(".aqc-focus")).to_be_visible(timeout=30000)
+        page.locator('.aqc-shortcuts [data-route="open:radar"]').click()
+        expect(page.locator('.ref-workspace[data-workspace="trader_radar"]')).to_be_visible(timeout=20000)
+        # Both "Todos" and "Brasil" contain strategy HTML; both must work.
+        page.locator('.aqr-tabs [data-local-tab="br"]').click()
+        calculator=page.locator('[data-tab-panel="br"] [data-win-calculator]')
+        expect(calculator).to_be_visible()
+        inputs=lambda name: calculator.locator(f'[data-win-input="{name}"]')
+        assert not inputs("iron").input_value()
+        assert not inputs("oil").input_value()
+        assert not inputs("vix").input_value()
+        expect(calculator.locator('[data-win-side]')).to_have_text("AGUARDAR VALORES")
+        calculator.locator('[data-win-example]').click()
+        expect(calculator.locator('[data-win-score]')).to_have_text("Score: +3,04")
+        expect(calculator.locator('[data-win-side]')).to_have_text("VIÉS PRELIMINAR: ALTA")
+        expect(calculator.locator('[data-win-level]')).to_have_text("Intensidade: Moderada")
+        expect(calculator.locator('[data-win-message]')).to_contain_text("EXEMPLO FICTÍCIO")
+        inputs("iron").fill("-1,47")
+        inputs("oil").fill("-0,95")
+        inputs("vix").fill("+0,62")
+        calculator.locator('[data-win-submit]').click()
+        expect(calculator.locator('[data-win-score]')).to_have_text("Score: -3,04")
+        expect(calculator.locator('[data-win-side]')).to_have_text("VIÉS PRELIMINAR: BAIXA")
+        inputs("vix").fill("invalid")
+        calculator.locator('[data-win-submit]').click()
+        expect(calculator.locator('[data-win-side]')).to_have_text("AGUARDAR VALORES")
+        expect(inputs("vix")).to_have_attribute("aria-invalid", "true")
+        calculator.locator('[data-win-clear]').click()
+        assert not inputs("iron").input_value()
+        expect(calculator.locator('[data-win-score]')).to_have_text("Score: —")
+        assert not errors
+        browser.close()
