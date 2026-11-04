@@ -5,7 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from atlasquant_trader_calendar_ui import calendar_html
-from atlasquant_trader_calendar_service import SESSION_CONSENSUS, read_calendar
+from atlasquant_trader_calendar_service import (SESSION_CONSENSUS, read_calendar,
+    TIMEZONE_ATTESTATION_FLAG, timezone_attested)
 from atlasquant_trader_economic_calendar import (
     event_identity, explanation, normalize_events, request_eodhd_daily,
 )
@@ -133,7 +134,7 @@ class TraderCalendarTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][1]["from"], "2026-11-02")
-        self.assertEqual(calls[0][1]["to"], "2026-11-03")
+        self.assertEqual(calls[0][1]["to"], "2026-11-09")
         self.assertEqual(calls[0][1]["limit"], 1000)
         self.assertEqual(calls[0][2], 12)
 
@@ -158,6 +159,35 @@ class TraderCalendarTests(unittest.TestCase):
         self.assertIsNone(build_opening_snapshot(
             lambda symbol: {**get_quote(symbol), "state": "UNVERIFIED"}, at=NOW))
 
+    def test_live_calendar_timezone_requires_explicit_attestation(self):
+        self.assertFalse(timezone_attested({}))
+        self.assertFalse(timezone_attested({TIMEZONE_ATTESTATION_FLAG: "unknown"}))
+        self.assertTrue(timezone_attested({TIMEZONE_ATTESTATION_FLAG: "1"}))
+
+        class FakeStreamlit:
+            secrets = {}
+            session_state = {}
+
+        fake = FakeStreamlit()
+        access = {"allowed": True, "role": "ADMIN", "username": "owner"}
+        env = {"CHAVE_EODHD": "LAB_TZ_EXAMPLE",
+               "ATLASQUANT_CALENDAR_EODHD_ENABLED": "1",
+               TIMEZONE_ATTESTATION_FLAG: "0"}
+        with patch.dict("os.environ", env, clear=False):
+            with patch("atlasquant_trader_calendar_service.guarded_read") as guarded:
+                model = read_calendar(fake, access, at=NOW)
+                self.assertEqual(model["state"], "UNAVAILABLE")
+                self.assertEqual(model["reason"], "EODHD_TIMEZONE_UNVERIFIED")
+                guarded.assert_not_called()
+        env[TIMEZONE_ATTESTATION_FLAG] = "1"
+        with patch.dict("os.environ", env, clear=False):
+            with patch("atlasquant_trader_calendar_service.guarded_read",
+                       return_value={"ok": True, "data": [_event()],
+                                     "fetched_at": NOW.isoformat()}) as guarded:
+                model = read_calendar(fake, access, at=NOW)
+                self.assertEqual(model["state"], "READY")
+                guarded.assert_called_once()
+
     def test_calendar_fetch_auth_gate_and_manual_identity_scope(self):
         class FakeStreamlit:
             secrets = {}
@@ -173,7 +203,9 @@ class TraderCalendarTests(unittest.TestCase):
             key: {"event_id": key, "value": 3.4, "source": "Pesquisa de banco",
                   "author": "owner", "entered_at": NOW.isoformat()}
         }
-        with patch.dict("os.environ", {"CHAVE_EODHD": "LAB_EXAMPLE"}, clear=False):
+        with patch.dict("os.environ", {"CHAVE_EODHD": "LAB_EXAMPLE",
+                                       "ATLASQUANT_CALENDAR_EODHD_ENABLED": "1",
+                                       TIMEZONE_ATTESTATION_FLAG: "1"}, clear=False):
             with patch("atlasquant_trader_calendar_service._hourly_feed",
                        return_value={"ok": True, "data": [raw]}) as fetcher:
                 model = read_calendar(fake, access, at=NOW)

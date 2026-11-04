@@ -29,7 +29,7 @@ class TraderApprovedVisualTests(unittest.TestCase):
                 for route in ("home", "radar", "master"):
                     self.assertIn('data-route="' + route + '"', html)
                 self.assertNotIn('data-route="scanner"', html)
-                self.assertNotIn("Scanner Técnico", html)
+                self.assertIn('aria-label="Qualidade das evidências"', html)
                 self.assertNotIn("Execução automática habilitada", html)
 
     def test_home_has_reference_panorama_and_flow(self):

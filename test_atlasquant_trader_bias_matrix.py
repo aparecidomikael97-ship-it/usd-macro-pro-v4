@@ -43,7 +43,7 @@ def test_empty_returns_28_explicit_waits_without_inventing_direction():
     assert '<details class="aqr-section aqr-matrix"' in html
     assert "Ainda não recebemos leituras válidas" in html
     assert "0 de 28" in html
-    assert "Scanner Técnico" not in html
+    assert 'data-route="scanner"' not in html
 
 
 def test_all_28_valid_readings_align_only_as_a_filter_not_probability():

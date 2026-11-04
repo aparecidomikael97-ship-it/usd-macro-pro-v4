@@ -97,7 +97,7 @@ _CSS = r"""
 .aqr-shell button:focus-visible,.aqr-entry:focus-visible,.aqr-matrix summary:focus-visible{outline:3px solid #8cefff;outline-offset:2px}.aqr-matrix{border:1px solid #31566c;border-radius:12px;padding:13px;background:#0d2031}.aqr-matrix-summary{cursor:pointer;color:#d3eff7;font-size:13px;font-weight:850;padding:4px}.aqr-matrix-summary small{display:block;color:#9ab4c9;font-size:10px;font-weight:500;margin-top:7px}.aqr-matrix[open] .aqr-tablewrap{margin-top:12px}.aqr-shell [hidden]{display:none!important}
 @media(min-width:1300px){.aqr-main{padding-left:46px;padding-right:46px}}
 @media(max-width:1050px){.aqr-app{grid-template-columns:195px minmax(0,1fr)}.aqr-main{padding:22px 20px}.aqr-card.aqr-fourth{grid-column:span 6}.aqr-indices{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:700px){.aqr-app{display:block}.aqr-aside-inner{position:static;min-height:0;height:auto;padding:12px;gap:9px}.aqr-aside-note{display:none}.aqr-side-label{margin:2px 4px}.aqr-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.aqr-nav button{min-height:40px;padding:8px;font-size:11px}.aqr-main{padding:14px}.aqr-topline{margin-bottom:14px}.aqr-hero{padding:22px 18px;min-height:190px}.aqr-hero h1{font-size:26px}.aqr-hero:before{right:-14px;opacity:.28}.aqr-hero:after{opacity:.4}.aqr-warning{margin-bottom:17px}.aqr-card,.aqr-card.aqr-fourth,.aqr-card.aqr-third{grid-column:1/-1}.aqr-currency{grid-column:span 6}.aqr-indices{grid-template-columns:1fr}.aqr-controls{gap:5px}.aqr-chip{font-size:9px;padding:6px}.aqr-crumb{font-size:10px}}
+@media(max-width:700px){.aqr-shell{max-width:100%;overflow-x:hidden!important}.aqr-app{display:block;min-width:0;width:100%}.aqr-aside,.aqr-main{min-width:0;width:100%;max-width:100%}.aqr-nav{width:100%}.aqr-nav button{min-width:0;white-space:normal;overflow-wrap:anywhere}.aqr-hero h1{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.15}.aqr-hero p{max-width:100%;overflow-wrap:anywhere}.aqr-main{overflow-wrap:anywhere}.aqr-app{display:block}.aqr-aside-inner{position:static;min-height:0;height:auto;padding:12px;gap:9px}.aqr-aside-note{display:none}.aqr-side-label{margin:2px 4px}.aqr-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.aqr-nav button{min-height:40px;padding:8px;font-size:11px}.aqr-main{padding:14px}.aqr-topline{margin-bottom:14px}.aqr-hero{padding:22px 18px;min-height:190px}.aqr-hero h1{font-size:26px}.aqr-hero:before{right:-14px;opacity:.28}.aqr-hero:after{opacity:.4}.aqr-warning{margin-bottom:17px}.aqr-card,.aqr-card.aqr-fourth,.aqr-card.aqr-third{grid-column:1/-1}.aqr-currency{grid-column:span 6}.aqr-indices{grid-template-columns:1fr}.aqr-controls{gap:5px}.aqr-chip{font-size:9px;padding:6px}.aqr-crumb{font-size:10px}}
 .aqr-win-calc{margin:18px 0;border:1px solid #4abac2;border-radius:13px;background:linear-gradient(125deg,#0c2635,#0e1b2e);padding:18px}
 .aqr-win-head{display:flex;justify-content:space-between;align-items:start;gap:9px;flex-wrap:wrap;margin-bottom:12px}.aqr-win-head h4{font-size:16px;color:#e7f8fb;margin:0 0 5px}.aqr-win-head p{margin:0}.aqr-win-pill{border:1px solid #3c9b9f;border-radius:7px;padding:6px 8px;color:#83f0ee;font-size:10px;font-weight:800}
 .aqr-win-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.85fr);gap:17px}.aqr-win-inputs{min-width:0}.aqr-win-field{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #294657;font-size:12px;color:#d0e7f0}.aqr-win-field span{flex:1}
@@ -110,6 +110,48 @@ _CSS = r"""
 .aqr-checkpoint{margin:16px 0 22px;padding:15px 17px;border:1px solid #365b6c;border-radius:12px;background:#0e2534;color:#d5e8f3}.aqr-checkpoint-heading{display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap}.aqr-checkpoint-heading strong{font-size:14px;color:#e8f9fa}.aqr-checkpoint-heading span{font-size:10px;color:#f0c69d;border:1px solid #7a6348;padding:5px 8px;border-radius:5px}.aqr-checkpoint p{font-size:11px;line-height:1.65;color:#a9c1d3;margin:8px 0}.aqr-checkpoint-counts{display:flex;gap:8px;flex-wrap:wrap}.aqr-checkpoint-counts span{border:1px solid #305568;border-radius:7px;padding:8px 10px;font-size:10px;color:#c7e0ed}.aqr-why-more{padding:9px 0}.aqr-why-more summary{cursor:pointer;font-size:12px;font-weight:800;color:#b7eef2}.aqr-why-more summary:focus-visible{outline:3px solid #79e9ed;outline-offset:3px}.aqr-why-more li{margin:8px 0;font-size:11px;line-height:1.55}.aqr-matrix .aqr-table td:last-child{min-width:230px;line-height:1.55}.aqr-guide summary{cursor:pointer;font-weight:800;min-height:26px}.aqr-guide summary:focus-visible{outline:3px solid #79ebf1;outline-offset:2px}
 @media(max-width:850px){.aqr-win-layout{grid-template-columns:1fr}}@media(max-width:440px){.aqr-win-field{display:block}.aqr-win-field input{display:block;max-width:100%;width:100%;margin-top:6px}.aqr-win-buttons button{flex:1}}
 @media(prefers-reduced-motion:reduce){.aqr-shell *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+/* Visual v2: densidade da prévia aprovada, sem alterar contrato de dados. */
+.aqr-shell{min-height:670px}
+.aqr-app{grid-template-columns:190px minmax(0,1fr);min-height:670px}
+.aqr-aside-inner{min-height:670px;height:auto;gap:20px;padding:20px 12px 18px}
+.aqr-brand{gap:8px;padding:0 6px}
+.aqr-brand strong{font-size:13px;letter-spacing:.02em}
+.aqr-brand small{font-size:8px;letter-spacing:.14em}
+.aqr-nav button{font-size:12px;padding:11px 10px;min-height:42px;white-space:nowrap;gap:9px}
+.aqr-nav-icon{flex:0 0 15px}
+.aqr-main{padding:18px clamp(14px,2vw,32px) 22px}
+.aqr-topline{margin-bottom:15px}
+.aqr-hero{min-height:178px;padding:22px 25px 18px;margin-bottom:15px}
+.aqr-hero h1{font-size:clamp(24px,2.7vw,34px)}
+.aqr-hero p{font-size:12px;line-height:1.55}
+.aqr-hero:after{right:-14px;width:225px;height:225px}
+.aqr-hero:before{right:9%;width:67px;height:67px}
+.aqr-badges span{padding:6px 8px;font-size:9px}
+.aqr-warning{margin:12px 0 16px;padding:10px 12px}
+.aqr-section{margin:20px 0 23px}
+.aqr-heading{margin-bottom:11px}
+.aqr-grid{gap:11px}
+.aqr-currency{min-height:111px;padding:12px}
+.aqr-currency-value{margin:10px 0 8px;font-size:17px}
+.aqr-tag{padding:4px 7px;font-size:9px}
+.aqr-aside-note{padding:12px 10px}
+.aqr-aside-note p{font-size:10px;margin-bottom:9px}
+.aqr-empty-area{padding:19px 13px;line-height:1.6}
+/* Preserve four cards per row until the layout is genuinely narrow. */
+@media(max-width:1050px) and (min-width:701px){
+  .aqr-app{grid-template-columns:175px minmax(0,1fr)}
+  .aqr-main{padding:18px 17px 21px}
+}
+@media(max-width:700px){
+  .aqr-shell,.aqr-app{min-height:0}
+  .aqr-aside-inner{height:auto;min-height:0;gap:9px;padding:12px}
+  .aqr-nav button{white-space:normal;min-height:42px}
+  .aqr-main{padding:15px}
+  .aqr-hero{min-height:170px;padding:21px 18px}
+  .aqr-hero h1{font-size:26px}
+  .aqr-currency{grid-column:span 6;min-height:102px}
+}
+
 </style>
 """
 def _num(value: Any) -> float | None:
@@ -136,7 +178,7 @@ def _daily(data: Any) -> dict[str, Any]:
         if stamp.tzinfo is None:
             return blank
         age = datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)
-        if age < timedelta(minutes=-1) or age > timedelta(hours=36):
+        if age < timedelta(minutes=-1) or age > timedelta(minutes=20):
             return blank
         stamp = stamp.astimezone(timezone.utc)
     except (TypeError, ValueError):
@@ -342,13 +384,10 @@ def _top_approved(data: Mapping[str, Any]) -> str:
     rows = data["pairs"]
     complete = len(rows) == len(OFFICIAL_PAIRS)
     if not complete:
-        return ('<div class="aqr-empty-area"><strong>Top 10 aguardando</strong>'
-                'Variações diárias dos 28 pares ainda não verificadas. '
-                'Um ranking técnico não equivale à valorização diária.</div>'
-                '<div class="aqr-grid">' + ''.join(
-                    '<article class="aqr-card aqr-fourth"><h3>Posição ' + str(i) +
-                    ' · Sem par validado</h3><div class="aqr-value">—</div>'
-                    '<span class="aqr-tag">AGUARDANDO</span></article>' for i in range(1, 11)) + '</div>')
+        return ('<div class="aqr-empty-area" data-state="top10-unavailable">'
+                '<strong>Top 10 aguardando</strong>'
+                'Sem ranking até a validação das variações diárias dos 28 pares. '
+                'Nenhum par recebe posição ou sinal sem dados confiáveis.</div>')
     ranked = sorted(rows.items(), key=lambda item: item[1]["change_pct"], reverse=True)[:10]
     return '<div class="aqr-grid">' + "".join(
         '<article class="aqr-card aqr-fourth"><h3>#' + str(i) + ' ' + escape(pair) +
@@ -677,14 +716,18 @@ def _economic_catalog() -> str:
               'resultado e revisão quando efetivamente conectado. '
               'Sem esses campos, não exibimos surpresas nem sugerimos viés.</div></section>')
 
-def _master(calendar_data: Any = None, bias_evidence: Any = None) -> str:
+def _master(calendar_data: Any = None, bias_evidence: Any = None,
+            news_data: Any = None, official_data: Any = None) -> str:
     from atlasquant_trader_calendar_ui import calendar_html
-    highlights = (
-        _placeholder_card("Cenário macro", "Sem avaliação atual", "")
-        + _placeholder_card("Bancos centrais", "Fed, BCE, BoE, BoJ e outros", "")
-        + _placeholder_card("Risco geopolítico", "Sem monitoramento ativo", "")
-        + _placeholder_card("Notícias relevantes", "Sem feed conectado", "")
+    from atlasquant_trader_master_briefing_ui import (
+        master_overview_cards, master_briefing_html, master_week_html,
     )
+    from atlasquant_trader_master_legacy_news import build_legacy_news_read_model
+    from atlasquant_trader_master_news_ui import master_news_html
+    from atlasquant_trader_master_official_ui import official_macro_html
+    from atlasquant_trader_master_refresh_ui import master_refresh_plan_html
+    news_model = build_legacy_news_read_model(news_data)
+    highlights = master_overview_cards(calendar_data, news_model=news_model)
     dimensions = (
         ("MACRO", "Economia global",
          "Inflação, juros, atividade, emprego, decisões de bancos centrais, DXY e apetite por risco.",
@@ -712,7 +755,9 @@ def _master(calendar_data: Any = None, bias_evidence: Any = None) -> str:
         '<section class="aqr-section">' +
         _heading("Painel Mestre", "O contexto por trás do movimento do mercado, separado da leitura de preços.",
                  "Contexto e risco") +
-        '<div class="aqr-grid">' + highlights + '</div></section>'
+        '<div class="aqr-grid">' + highlights + '</div></section>' +
+        master_briefing_html(calendar_data) + official_macro_html(official_data) +
+        master_refresh_plan_html() +
         '<section class="aqr-section">' +
         _heading("Quatro dimensões", "As informações poderão ser combinadas, mas suas fontes ficarão identificadas.") +
         '<div class="aqr-grid">' + panels + '</div></section>'
@@ -720,7 +765,8 @@ def _master(calendar_data: Any = None, bias_evidence: Any = None) -> str:
         _heading("Calendário econômico",
                  "Valor divulgado, consenso, anterior, horário e fonte com impacto condicional.",
                  "Fonte identificada" if isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY" else "Aguardando integração") +
-        calendar_html(calendar_data) + '</section>'
+        calendar_html(calendar_data) + '</section>' +
+        master_week_html(calendar_data) + master_news_html(news_model) +
         '<section class="aqr-section">' +
         _heading("Guia de impacto dos indicadores", "Exemplos educativos, não previsões.") +
         '<nav class="aqr-tabs" aria-label="Dimensões do contexto">'
@@ -734,10 +780,59 @@ def _master(calendar_data: Any = None, bias_evidence: Any = None) -> str:
         '<section data-tab-panel="news" hidden><div class="aqr-guide">Notícias com fonte e horário verificados; feed ainda não conectado.</div></section></section>' + _economic_catalog())
 
 
+
+def _checkpoint_evidence_panel(model: Mapping[str, Any], page: str) -> str:
+    """Compact evidence status below the approved sections; no invented signals."""
+    titles = {
+        "home": ("Qualidade dos dados", "Resumo do que já pode ser consultado com confiança."),
+        "radar": ("O que está validado?", "28 pares monitorados não significam 28 operações."),
+        "scanner": ("Por que aguardar?", "O gatilho técnico exige D1, H4 e M15 válidos."),
+        "master": ("Auditoria das evidências", "Fonte e frescor são parte da análise, não detalhes."),
+    }
+    caption, explanation = titles[page]
+    forex = model["forex"]
+    calendar = model["calendar"]
+    scanner = model["scanner"]
+    tiles = (
+        ("Radar · Forex",
+         f'{forex["covered"]}/{forex["total"]} pares · '
+         f'{forex["currencies_covered"]}/{forex["currencies_total"]} moedas',
+         forex["state"]),
+        ("Calendário", f'{calendar["events"]} eventos verificados',
+         calendar["state"]),
+        ("Scanner", "D1 · H4 · M15", scanner["state"]),
+    )
+    cards = "".join(
+        '<article class="aqr-card aqr-third"><h3>' + escape(label) +
+        '</h3><div class="aqr-value" style="font-size:16px;margin:16px 0 9px">' +
+        escape(value) + '</div><span class="aqr-tag">' +
+        escape(state) + '</span></article>'
+        for label, value, state in tiles
+    )
+    blockers = "".join(
+        '<li style="margin:8px 0">' + escape(str(text)) + '</li>'
+        for text in model["decision"]["why_not"][:8]
+    )
+    return (
+        '<section class="aqr-section aqr-evidence" aria-label="Qualidade das evidências">' +
+        _heading(caption, explanation, "Somente leitura") +
+        '<div class="aqr-grid">' + cards + '</div>' +
+        '<details class="aqr-detail" style="margin-top:13px"><summary '
+        'style="cursor:pointer;font-weight:800;color:#c4f4f9">Por que não operar? '
+        'Ver motivos e dados pendentes</summary>' +
+        '<ul style="padding-left:20px;font-size:11px;line-height:1.65;color:#bfd4e6">' +
+        blockers + '</ul><p>MACRO = direção · ICT/SMC = onde e quando · '
+        'RISCO = quando não operar. Nenhuma etapa autoriza ordens reais.</p>'
+        '</details></section>'
+    )
+
 def trader_radar_html(*, selected: str = "", name: str = "Usuário",
                       show_central: bool = True, daily_data: Any = None,
-                      calendar_data: Any = None, bias_evidence: Any = None) -> str:
+                      calendar_data: Any = None, bias_evidence: Any = None,
+                      news_data: Any = None, official_data: Any = None) -> str:
+    from atlasquant_trader_readiness_v1 import build_trader_readiness
     data = _daily(daily_data)
+    evidence = build_trader_readiness(daily_data=daily_data, calendar_data=calendar_data)
     page = selected if selected in {key for key, _ in PAGES} else "home"
     title = dict(PAGES)[page]
     icons = {"home": "⌂", "radar": "◉", "master": "▦"}
@@ -748,20 +843,22 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span>' + escape(label) + '</button>' for key, label in PAGES)
     content = {"home": lambda: _home(data, bias_evidence),
                "radar": lambda: _radar(data, daily_data, bias_evidence),
-               "master": lambda: _master(calendar_data, bias_evidence)}[page]()
+               "master": lambda: _master(calendar_data, bias_evidence, news_data, official_data)}[page]()
     back = ('<button class="aqr-aside-back" data-route="central">← Central AtlasQuant</button>'
             if show_central else "")
     status = ('DADOS VALIDADOS · Última atualização: ' + escape(data["stamp"]) + ' · Fonte: ' + escape(data["source"])
               if data["stamp"] else "● DADOS NÃO CONECTADOS")
     return (
         _CSS +
-        '<section class="ref-workspace aqr-shell" data-workspace="trader_radar" data-avatar-key="' + escape(name[:100], quote=True) + '" '
+        '<section class="ref-workspace aqr-shell notranslate" lang="pt-BR" translate="no" ' +
+        'data-workspace="trader_radar" data-avatar-key="' + escape(name[:100], quote=True) + '" ' +
         'data-visual-reference="approved-20261102-v1">'
         '<div class="aqr-app"><aside class="aqr-aside"><div class="aqr-aside-inner">'
         '<div class="aqr-brand"><span class="aqr-logo">A</span><span><strong>ATLASQUANT'
         '</strong><small>TRADER RADAR</small></span></div>'
         '<div><div class="aqr-side-label">PAINEL DE CONTROLE</div>'
-        '<nav class="aqr-nav" aria-label="Navegação AtlasQuant Trader">' + nav +
+        '<nav class="aqr-nav notranslate" lang="pt-BR" translate="no" '
+        'aria-label="Navegação AtlasQuant Trader">' + nav +
         '</nav></div><div class="aqr-aside-note"><strong>◦ PRÉVIA PRIVADA</strong>'
         '<p>Interface para aprovação visual.<br>Não conectada a preços, notícias '
         'ou operações.</p><small>Versão conceitual • v0.1</small></div>' + back + '</div></aside>'
@@ -772,7 +869,7 @@ def trader_radar_html(*, selected: str = "", name: str = "Usuário",
         '</span><span class="aqr-chip">VISUALIZAÇÃO</span>' +
         '<span class="aqr-avatar" aria-label="Sessão do usuário"><span data-avatar-initial>' +
         escape((name.strip()[:1] or "U").upper()) + '</span><img data-profile-avatar alt="Foto do perfil" hidden></span></div></header>' +
-        _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + content +
+        _hero(page) + _disclaimer(isinstance(calendar_data, Mapping) and calendar_data.get("state") == "READY") + content + _checkpoint_evidence_panel(evidence, page) +
         '<footer class="aqr-foot">ATLASQUANT / TRADER RADAR · Poderoso por dentro. '
         'Simples por fora. · Sem ordens reais, sem dados fictícios.</footer></main></div></section>'
     )

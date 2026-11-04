@@ -64,7 +64,8 @@ def _timestamp(value: Any) -> datetime | None:
         return None
     try:
         point = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-        # EODHD documents event timestamps in UTC even without a suffix.
+        # Legacy UTC interpretation for existing synthetic fixtures. The live
+        # calendar service blocks EODHD reads until timezone is attested.
         if point.tzinfo is None:
             point = point.replace(tzinfo=timezone.utc)
         return point.astimezone(timezone.utc)
@@ -122,7 +123,8 @@ def normalize_events(
     now = local.astimezone(timezone.utc)
     blank = {"schema": SCHEMA, "state": "NOT_CONNECTED", "date": today.isoformat(),
              "source": "", "fetched_at": "", "events": [], "total": 0,
-             "truncated": False, "reason": ""}
+             "truncated": False, "week_events": [], "week_total": 0,
+             "week_truncated": False, "reason": ""}
     if not isinstance(payload, Mapping) or payload.get("ok") is not True:
         return {**blank, "state": "UNAVAILABLE", "reason": str(payload.get("reason") or "SOURCE_UNAVAILABLE")[:70] if isinstance(payload, Mapping) else "SOURCE_UNAVAILABLE"}
     raw = payload.get("data")
@@ -136,6 +138,7 @@ def normalize_events(
         if age > 2 * 3600 or age < -60:
             return {**blank, "state": "STALE_PROVIDER", "reason": "CACHE_OUTDATED"}
     rows: list[dict[str, Any]] = []
+    future_rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in raw:
         if not isinstance(item, Mapping):
@@ -145,7 +148,11 @@ def normalize_events(
         if not 2 <= len(title) <= 150 or country not in COUNTRIES:
             continue
         utc = _timestamp(item.get("date"))
-        if utc is None or brasilia_clock(utc).date() != today:
+        if utc is None:
+            continue
+        event_day = brasilia_clock(utc).date()
+        # Today's calendar + the following six days from one bounded query.
+        if not today <= event_day < today + timedelta(days=7):
             continue
         comparison = str(item.get("comparison") or "").strip().lower()
         if comparison not in ("", "mom", "yoy", "qoq"):
@@ -171,7 +178,7 @@ def normalize_events(
         events = {
             "id": event_id, "country": country, "currency": CURRENCY[country],
             "title": title, "comparison": comparison, "period": period,
-            "release_utc": utc.isoformat(),
+            "release_utc": utc.isoformat(), "date_brt": event_day.isoformat(),
             "time_brt": brasilia_clock(utc).strftime("%H:%M"),
             "previous": previous, "consensus": consensus, "actual": actual,
             "consensus_source": consensus_source, "consensus_author": author,
@@ -179,12 +186,18 @@ def normalize_events(
             "surprise": surprise, "released": now >= utc,
             "source": SOURCE,
         }
-        rows.append(events)
+        if event_day == today:
+            rows.append(events)
+        else:
+            future_rows.append(events)
     rows.sort(key=lambda item: (item["release_utc"], item["country"], item["title"]))
+    future_rows.sort(key=lambda item: (item["release_utc"], item["country"], item["title"]))
     return {"schema": SCHEMA, "state": "READY", "date": today.isoformat(),
             "source": SOURCE, "fetched_at": received_at.isoformat() if received_at else "",
             "events": rows[:max_items], "total": len(rows),
-            "truncated": len(rows) > max_items}
+            "truncated": len(rows) > max_items,
+            "week_events": future_rows[:max_items], "week_total": len(future_rows),
+            "week_truncated": len(future_rows) > max_items}
 
 
 def explanation(event: Mapping[str, Any]) -> dict[str, str]:
@@ -243,15 +256,50 @@ def explanation(event: Mapping[str, Any]) -> dict[str, str]:
         expected = "O mercado prevê um número MENOR que o anterior: " + f"{previous:g} → {consensus:g}. Uma queda esperada já pode estar precificada."
     else:
         expected = "O mercado prevê um número IGUAL ao anterior: " + f"{consensus:g}."
-    dollar = (
-        "Para eventos dos EUA: observe DXY e rendimentos dos Treasuries; "
-        "um USD mais forte tende a pressionar EUR/USD, mas a direção dos pares depende da moeda-base."
-        if event.get("currency") == "USD" else
-        "Para pares com USD, a reação depende de qual moeda é a base: "
-        "fortalecimento local pode fazer USD/BRL cair, enquanto AUD/USD pode subir."
-    )
+    # Apply the audited editorial library AFTER the numeric comparison is
+    # established. A known event gets a specific scenario; an unrecognized
+    # title remains explicitly conditional/unknown. Neither is a trade bias.
+    from atlasquant_trader_master_indicator_guide import indicator_guide
+    guide = indicator_guide(event.get("title"), event.get("country"),
+                            event.get("comparison"))
+    if guide["key"] != "unknown":
+        above = guide["above"] + f" Moeda de referência do evento: {name}."
+        below = guide["below"] + f" Moeda de referência do evento: {name}."
+    else:
+        above = guide["above"] + f" Moeda local: {name}."
+        below = guide["below"] + f" Moeda local: {name}."
+    if actual is None:
+        result = "Resultado ainda não divulgado ou não recebido da fonte."
+    elif consensus is None:
+        result = "Resultado informado, mas sem consenso verificável: surpresa não calculada."
+    elif actual > consensus:
+        result = "Divulgação ACIMA do consenso. " + above
+    elif actual < consensus:
+        result = "Divulgação ABAIXO do consenso. " + below
+    else:
+        result = "Divulgação IGUAL ao consenso: reação depende de detalhes, revisões e precificação."
+    if name == "USD":
+        dollar = (
+            "Para os EUA, observar DXY, Treasury 2Y e 10Y e Fed. "
+            "USD mais forte pode pressionar EUR/USD e apoiar USD/JPY, "
+            "mas risco global, juros japoneses e posicionamento podem inverter a reação."
+        )
+    elif name == "BRL":
+        dollar = (
+            "Para Brasil, acompanhar curva DI, Selic, risco fiscal e USD/BRL: "
+            "BRL mais forte tende a reduzir USD/BRL, mas isso não é garantia."
+        )
+    else:
+        dollar = (
+            f"Para {name}, acompanhar o banco central local e os pares com USD. "
+            "Moeda-base valorizada tende a elevar o par; moeda cotada valorizada "
+            "tende a reduzi-lo, com outras forças atuando simultaneamente."
+        )
     return {"above": above, "below": below, "result": result,
             "expectation": expected, "dollar": dollar,
+            "mechanism": guide["mechanism"], "watch": guide["watch"],
+            "caution": guide["caution"], "guide_key": guide["key"],
+            "certainty": guide["certainty"],
             "risk": "Cenários condicionais, não garantias. Observe revisão, hora, "
                     "composição do indicador, juros, posicionamento e preço."}
 
@@ -269,7 +317,7 @@ def request_eodhd_daily(
         return {"ok": False, "reason": "NO_EXISTING_TOKEN", "data": []}
     local = brasilia_clock(at)
     date_from = local.date().isoformat()
-    date_to = (local.date() + timedelta(days=1)).isoformat()
+    date_to = (local.date() + timedelta(days=7)).isoformat()
     if request_get is None:
         import requests
         request_get = requests.get

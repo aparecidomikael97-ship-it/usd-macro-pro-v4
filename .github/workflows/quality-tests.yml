@@ -108,6 +108,92 @@ jobs:
             test_atlasquant_fx_daily_integrity_research.py \
             test_atlasquant_central_focus_ui.py \
             test_atlasquant_trader_calendar_pipeline.py \
+            test_atlasquant_trader_readiness_v1.py \
+            test_atlasquant_trader_checkpoint_presentation.py \
+            test_atlasquant_trader_master_briefing_v2.py \
+            test_atlasquant_trader_master_indicator_guide.py \
+            test_atlasquant_trader_master_news.py \
+            test_atlasquant_trader_calendar_quota_guard.py \
+            test_atlasquant_trader_master_official_series.py \
+            test_atlasquant_trader_master_refresh_plan.py \
+            test_atlasquant_trader_master_storage_lab.py \
+            test_atlasquant_trader_master_activation_gate.py \
+            test_atlasquant_trader_master_quota_units_lab.py \
+            test_atlasquant_trader_master_shared_quota_fake.py \
+            test_atlasquant_trader_eodhd_clock_audit_lab.py \
+            test_atlasquant_trader_bias_horizons_lab.py \
+            test_atlasquant_trader_bias_priority_bridge_lab.py \
+            test_atlasquant_trader_bias_calendar_exposure_link_lab.py \
+            test_atlasquant_trader_fx_strength_from_quotes_lab.py \
+            test_atlasquant_trader_fx_quote_intake_lab.py \
+            test_atlasquant_trader_bias_oos_lab.py \
+            test_atlasquant_trader_bias_daily_freeze_lab.py \
+            test_atlasquant_trader_bias_macro_ablation_lab.py \
+            test_atlasquant_trader_macro_surprise_pit_lab.py \
+            test_atlasquant_trader_macro_pit_documentation_link_lab.py \
+            test_atlasquant_trader_g8_macro_context_lab.py \
+            test_atlasquant_trader_g8_macro_selection_lab.py \
+            test_atlasquant_trader_g8_country_macro_catalog_lab.py \
+            test_atlasquant_trader_macro_vintages_asof_lab.py \
+            test_atlasquant_trader_macro_source_audit_lab.py \
+            test_atlasquant_trader_cpi_bls_alfred_case_lab.py \
+            test_atlasquant_trader_alfred_vintage_csv_lab.py \
+            test_atlasquant_trader_bias_forecast_bridge_lab.py \
+            test_atlasquant_trader_exante_macro_scenarios_lab.py \
+            test_atlasquant_trader_g8_official_source_receipt_lab.py \
+            test_atlasquant_trader_documented_macro_casebook_lab.py \
+            test_atlasquant_trader_us_cpi_cleveland_nowcast_lab.py \
+            test_atlasquant_trader_cpi_prospective_freeze_lab.py \
+            test_atlasquant_trader_us_cpi_conditionals_lab.py \
+            test_atlasquant_trader_policy_survey_asof_lab.py \
+            test_atlasquant_trader_rate_source_suitability_lab.py \
+            test_atlasquant_trader_boe_mpc_prospective_lab.py \
+            test_atlasquant_trader_gbpusd_dec_policy_surveys_lab.py \
+            test_atlasquant_trader_macro_event_exposure_lab.py \
+            test_atlasquant_trader_macro_event_exposure_v2_lab.py \
+            test_atlasquant_trader_official_change_detection_lab.py \
+            test_atlasquant_trader_monitoring_cadence_lab.py \
+            test_atlasquant_trader_g8_context_completeness_3x_lab.py \
+            test_atlasquant_trader_official_rss_capture_lab.py \
+            test_atlasquant_trader_official_http_collection_contract_lab.py \
+            test_atlasquant_trader_news_pair_context_lab.py \
+            test_atlasquant_trader_g8_official_feed_registry_lab.py \
+            test_atlasquant_trader_macro_causal_dossier_lab.py \
+            test_atlasquant_trader_explanation_release_gate_lab.py \
+            test_atlasquant_trader_calendar_three_daily_review_lab.py \
+            test_atlasquant_trader_calendar_document_bytes_gate_lab.py \
+            test_atlasquant_trader_calendar_witness_signatures_lab.py \
+            test_atlasquant_trader_pre_event_fundamentals_lab.py \
+            test_atlasquant_trader_g8_policy_documentary_lab.py \
+            test_atlasquant_trader_g8_inflation_documentary_lab.py \
+            test_atlasquant_trader_macro_joint_dossier_lab.py \
+            test_atlasquant_trader_win_wdo_brazil_context_lab.py \
+            test_atlasquant_trader_brazil_focus_documentary_lab.py \
+            test_atlasquant_trader_relative_policy_repricing_lab.py \
+            test_atlasquant_trader_g8_policy_survey_leads_lab.py \
+            test_atlasquant_trader_fx_legacy_cache_audit_lab.py \
+            test_atlasquant_trader_fx_7usd_expost_lab.py \
+            test_atlasquant_trader_twelve_d1_time_lab.py \
+            test_atlasquant_trader_ecb_reference_expost_lab.py \
+            test_atlasquant_trader_ecb_documentary_reference_lab.py \
+            test_atlasquant_trader_ecb_sdmx_archive_lab.py \
+            test_atlasquant_trader_ecb_reference_forward_outcomes_lab.py \
+            test_atlasquant_trader_ecb_g8_history_window_lab.py \
+            test_atlasquant_trader_ecb_mn1_documentary_lab.py \
+            test_atlasquant_trader_primary_news_routes_lab.py \
+            test_atlasquant_trader_official_news_latency_lab.py \
+            test_atlasquant_trader_official_rss_item_lab.py \
+            test_atlasquant_trader_brazil_focus_secondary_triage_lab.py \
+            test_atlasquant_trader_bcb_focus_official_review_lab.py \
+            test_atlasquant_trader_copom_pre_event_lock_lab.py \
+            test_atlasquant_trader_copom_post_event_compare_lab.py \
+            test_atlasquant_trader_copom_b3_session_reaction_lab.py \
+            test_atlasquant_trader_b3_offline_export_intake_lab.py \
+            test_atlasquant_trader_copom_evidence_readiness_lab.py \
+            test_atlasquant_trader_copom_readiness_cli_lab.py \
+            test_atlasquant_trader_bcb_focus_extracted_text_lab.py \
+            test_atlasquant_trader_m15_broker_export_lab.py \
+            test_atlasquant_trader_fvg_closed_tf_lab.py \
             test_atlasquant_ecosystem_workspace_ui.py \
             test_atlasquant_premium_shell.py \
             test_atlasquant_navigation_stability.py \
@@ -135,6 +221,7 @@ jobs:
             test_atlasquant_runtime_consistency.py \
             test_atlasquant_reference_population.py \
             test_atlasquant_reference_browser.py \
+            test_atlasquant_trader_master_browser.py \
             test_atlasquant_aion_workspaces.py \
             test_atlasquant_aion_ecosystem.py \
             test_atlasquant_aion_persona_memory.py \
