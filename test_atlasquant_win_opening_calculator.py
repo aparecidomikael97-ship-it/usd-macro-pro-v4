@@ -33,7 +33,7 @@ def test_signed_vix_and_symmetric_score_thresholds(iron, oil, vix, wanted, side,
     assert result["accuracy_verified"] is False
 
 
-@pytest.mark.parametrize("bad", [None, True, False, "", "   ", "NaN", "Inf", 
+@pytest.mark.parametrize("bad", [None, True, False, "", "   ", "NaN", "Inf",
     "1,2,3", "a1", "1.2.3", "-101", 100.01, float("nan"), math.inf])
 def test_invalid_inputs_never_generate_a_bias(bad):
     for field in ("iron_pct", "oil_pct", "vix_pct"):
