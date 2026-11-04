@@ -48,9 +48,7 @@ def test_reference_pixels_are_preserved_losslessly():
 @pytest.mark.parametrize("area",SURFACES)
 def test_reference_has_accessible_routes_and_no_duplicate_strip(area):
     html=reference_html(area,mode="Avançado",name="<script>steal()</script>")
-    assert "<script>" not in html
-    if area != "trader":
-        assert "&lt;script&gt;" in html
+    assert "<script>" not in html and "&lt;script&gt;" in html
     assert "Acessar ambiente" not in html
     assert "data-route=" in html and "aria-label=" in html
     if area != "central":
@@ -139,15 +137,13 @@ def test_return_home_resets_legacy_selection_without_changing_auth():
     assert state["atlasquant_access_session"]=={"username":"same"}
 
 
-def test_trader_modes_show_only_three_approved_sections():
+def test_mode_preserves_all_functions_and_changes_only_visible_depth():
     advanced=reference_html("trader",mode="Avançado")
     beginner=reference_html("trader",mode="Iniciante")
-    for html in (advanced, beginner):
-        for route in ("home", "radar", "master"):
-            assert f'data-route="{route}"' in html
-        assert 'data-route="scanner"' not in html
-        assert "Funções do Trader · 24" not in html
-        assert "Scanner Técnico" not in html
+    assert "Funções do Trader · 24" in beginner
+    assert "inclusive avançadas, continuam disponíveis" in beginner
+    for route,_ in NAV["trader"]:
+        assert f'data-route="{route}"' in advanced and f'data-route="{route}"' in beginner
 
 
 @pytest.mark.parametrize("mode", ["Iniciante", "Avançado"])
@@ -171,19 +167,18 @@ def test_exact_trader_navigation_contract_without_nested_hidden_modules(mode):
     assert parser.details == 0
 
 
-def test_master_consolidates_context_without_fabricating_market_data():
+def test_master_first_fold_and_radar_truth():
     html=reference_html("trader",selected="master")
-    assert 'class="ref-workspace aqr-shell"' in html
-    assert 'class="ref-canvas"' not in html
-    for item in ("Cenário macro", "Setores e empresas", "Risco geopolítico",
-                 "Notícias relevantes", "Calendário econômico"):
-        assert item in html
-    assert "Dados validados" not in html
-    assert "DADOS NÃO CONECTADOS" in html
-    assert 'data-route="scanner"' not in html
-
-
-def test_legacy_pair_reason_route_respects_symbols():
+    assert "ref-detail-layout" in html
+    assert "ref-canvas" not in html
+    assert html.count('class="ref-pair final-fx-card')==28
+    assert html.count('data-ranked="false"')==28
+    assert "TOP 10" not in html
+    assert "Ranking aguardando dados validados" in html
+    assert "Sem leitura elegível para ranking" in html
+    assert "Compra" not in html and "Venda" not in html
+    assert "connected:master" in html
+    assert html.index("<h1>") < html.index('class="final-fx-board')
     state={}
     apply_event(state,USER,"trader","why:EUR/USD")
     assert state["aq_reference_module"][1]=="why:EUR/USD"
@@ -314,14 +309,14 @@ def test_business_reference_home_uses_current_b2b_contract_and_no_legacy_market_
     assert 'data-route="sla"' in html
 
 
-def test_compact_trader_uses_three_routes_and_preserves_market_overview():
+def test_compact_trader_preserves_routes_and_uses_readable_native_labels():
     html=reference_html("trader")
-    for route in ("home", "radar", "master"):
+    for route,label in NAV["trader"]:
         assert f'data-route="{route}"' in html
-    for route in ("scanner", "ict", "macro", "micro", "geo"):
-        assert f'data-route="{route}"' not in html
-    assert "Panorama do mercado" in html and "Moeda mais forte" in html
-    assert "02 / Painel Mestre" in html and "01 / Radar" in html
+    assert 'cq-cards' in html and 'cq-tools' in html
+    assert 'Fechamento do Dia' in html and 'Fechamento da Semana' in html
+    assert 'Notícias em Tempo Real' in html and 'Calendário Econômico' in html
+    assert 'Eventos Geopolíticos' in html and 'Mapa de Risco Global' in html
     assert 'data-mobile-crop=' not in html
 
 

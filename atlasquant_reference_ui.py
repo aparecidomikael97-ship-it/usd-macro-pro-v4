@@ -1177,12 +1177,12 @@ def reference_html(area, *, mode="Avançado", selected="", name="Usuário", show
     if area not in SURFACES:
         raise ValueError("unknown reference workspace")
     if area == "trader":
-        # The Trader opens the approved three-area cockpit. Legacy analysis
-        # routes stay available internally, but are no longer the navigation.
-        from atlasquant_trader_radar_compact_ui import trader_radar_html
-        return trader_radar_html(selected=selected, name=name,
-                                 show_central=show_central, daily_data=daily_data,
-                                 calendar_data=calendar_data)
+        # Preserve the original 24-module workspace behind the small legacy card.
+        from atlasquant_compact_cockpit import trader_html
+        return trader_html(mode=mode, selected=selected, name=name,
+            show_central=show_central, nav_html=nav_html,
+            module_panel=lambda area, selected: module_panel(area, selected, resident=fx_population),
+            uri=asset_uri, market_items=market_items, fx_population=fx_population)
     if area == "aion" and not selected:
         from atlasquant_interface_final import aion_workspace_html
         return aion_workspace_html(mode=mode,name=name,show_central=show_central,nav_html=nav_html,uri=asset_uri)
@@ -1587,17 +1587,17 @@ def render_reference_workspace(
         else None
     )
     calendar_data = None
-    if area in {"trader", "trader_radar"} and selected == "master":
+    if area == "trader_radar" and selected == "master":
         from atlasquant_trader_calendar_service import read_calendar
         calendar_data = read_calendar(st, access)
     result = _component()(data=reference_html(area,mode=mode,selected=selected,name=name,
         show_central=str(access.get("role") or "").upper()=="ADMIN",market_items=st.session_state.get("atlasquant_validated_market_items"),fx_population=st.session_state.get("atlasquant_reference_fx_population"),business_read_model=business_read_model,revops_read_model=revops_read_model,proposal_draft=proposal_draft,pilot_planning_read_model=pilot_planning_read_model,
-        daily_data=st.session_state.get("atlasquant_trader_radar_daily") if area in {"trader", "trader_radar"} else None,
+        daily_data=st.session_state.get("atlasquant_trader_radar_daily") if area == "trader_radar" else None,
         calendar_data=calendar_data),key="aq_reference_"+area,on_navigate_change=lambda:None)
     if result.navigate:
         apply_event(st.session_state,access,area,result.navigate)
         st.rerun()
-    if area in {"trader", "trader_radar"} and selected == "master":
+    if area == "trader_radar" and selected == "master":
         from atlasquant_trader_calendar_service import manual_consensus_controls
         manual_consensus_controls(st, access)
     return True
