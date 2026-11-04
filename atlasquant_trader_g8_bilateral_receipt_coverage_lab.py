@@ -93,10 +93,15 @@ def audit_g8_bilateral_macro_receipts_lab(
         for family in FAMILIES:
             items = found[(currency, family)]
             items.sort(key=lambda x: (x["published_at_utc"], x["event_id"]))
+            # A recently edited landing page or reissued bulletin can describe
+            # a VERY OLD economic event. Both the event date and the alleged
+            # publication date must be recent for DOCUMENTARY recency.
+            # Neither timestamp authenticates origin or capture custody.
+            max_age = timedelta(days=MAX_AGE_DAYS_LABEL_ONLY)
             fresh = [
                 x for x in items
-                if issued - datetime.fromisoformat(x["published_at_utc"])
-                <= timedelta(days=MAX_AGE_DAYS_LABEL_ONLY)
+                if (issued - datetime.fromisoformat(x["published_at_utc"]) <= max_age
+                    and issued - datetime.fromisoformat(x["event_at_utc"]) <= max_age)
             ]
             if fresh:
                 state = "RECENT_RELEASE_DOCUMENT_CLAIM_ONLY"
@@ -113,6 +118,9 @@ def audit_g8_bilateral_macro_receipts_lab(
                 "not_older_than_90_days_claim_count": len(fresh),
                 "newest_claimed_publication_utc": (
                     items[-1]["published_at_utc"] if items else None),
+                "newest_claimed_event_utc": (
+                    max(x["event_at_utc"] for x in items) if items else None),
+                "recency_requires_event_and_publication_within_90_days": True,
                 "claimed_event_ids": [x["event_id"] for x in items],
                 "source_original_authenticated": False,
                 "historical_timestamp_attested": False,

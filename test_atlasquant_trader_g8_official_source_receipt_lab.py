@@ -294,6 +294,44 @@ class G8BilateralReceiptCoverageLabTests(unittest.TestCase):
         self.assertEqual(usd["not_older_than_90_days_claim_count"], 0)
         self.assertFalse(report["all_eight_currencies_have_two_recent_claims"])
 
+    def test_recent_publication_of_old_event_stays_old(self):
+        item = released()
+        item["event_at_utc"] = "2026-04-01T10:00:00Z"
+        item["published_at_utc"] = "2026-10-20T10:05:00Z"
+        item["captured_at_utc"] = "2026-10-20T11:00:00Z"
+        report = audit_receipts([item])
+        self.assertEqual(report["state"],
+                         "LAB_G8_BILATERAL_DOCUMENTARY_COVERAGE_ONLY")
+        usd = report["currencies"]["USD"]["families"]["INFLATION"]
+        self.assertEqual(usd["state"], "OLDER_RELEASE_DOCUMENT_CLAIM_ONLY")
+        self.assertEqual(usd["not_older_than_90_days_claim_count"], 0)
+        self.assertTrue(usd["recency_requires_event_and_publication_within_90_days"])
+        self.assertEqual(usd["newest_claimed_event_utc"],
+                         "2026-04-01T10:00:00+00:00")
+        self.assertFalse(report["macro_explanation_verified"])
+
+    def test_recent_event_and_publication_are_documentary_recent_not_authentic(self):
+        report = audit_receipts([released()])
+        usd = report["currencies"]["USD"]["families"]["INFLATION"]
+        self.assertEqual(usd["state"], "RECENT_RELEASE_DOCUMENT_CLAIM_ONLY")
+        self.assertEqual(usd["not_older_than_90_days_claim_count"], 1)
+        self.assertEqual(usd["newest_claimed_event_utc"],
+                         "2026-10-20T10:00:00+00:00")
+        self.assertFalse(usd["source_original_authenticated"])
+
+    def test_one_old_event_cannot_upgrade_recent_one_to_two_documents(self):
+        new_item = released()
+        old_item = released(event_id="CPI_OLD_REPRINT")
+        old_item["event_at_utc"] = "2026-01-05T10:00:00Z"
+        old_item["published_at_utc"] = "2026-10-21T10:05:00Z"
+        old_item["captured_at_utc"] = "2026-10-21T11:00:00Z"
+        result = audit_receipts([new_item, old_item])
+        usd = result["currencies"]["USD"]["families"]["INFLATION"]
+        self.assertEqual(usd["received_release_context_claim_count"], 2)
+        self.assertEqual(usd["not_older_than_90_days_claim_count"], 1)
+        self.assertEqual(usd["state"], "RECENT_RELEASE_DOCUMENT_CLAIM_ONLY")
+        self.assertFalse(result["source_original_authenticated"])
+
     def test_invalid_domain_hash_or_claimed_authority_fail_closed(self):
         for kind in ("domain", "hash", "authority", "extra", "time"):
             with self.subTest(kind=kind):
