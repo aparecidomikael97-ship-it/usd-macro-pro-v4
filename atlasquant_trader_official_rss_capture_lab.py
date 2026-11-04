@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 import xml.etree.ElementTree as ET
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_g8_official_feed_registry_lab import DIRECTORY_LINKED_LEADS
 
 SCHEMA = "ATLASQUANT_TRADER_OFFICIAL_RSS_CAPTURE_LAB_V1"
 DIFF_SCHEMA = "ATLASQUANT_TRADER_OFFICIAL_RSS_REVISION_DIFF_LAB_V1"
@@ -54,6 +55,15 @@ SOURCES = {
         "hostname": "www.ecb.europa.eu",
     },
 }
+
+# Research-only additions backed by first-party RSS directories. Admission to
+# this OFFLINE parser does not validate network access, licences or freshness.
+# NZD's unconfirmed RSS lead is intentionally NOT allowed here.
+SOURCES.update({
+    source_id: {key: details[key] for key in (
+        "currency", "publisher", "topic", "feed_url", "hostname")}
+    for source_id, details in DIRECTORY_LINKED_LEADS.items()
+})
 
 
 def _base(reason: str, *, diff: bool = False) -> dict[str, Any]:

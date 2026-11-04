@@ -9,7 +9,7 @@ nem a proibição de sinal operacional antes de custódia/OOS.
 
 `atlasquant_trader_official_rss_capture_lab.py` normaliza **bytes RSS/Atom
 fornecidos pelo chamador**, com leitura limitada a 256 KiB e até 100 itens.
-Os cinco leads oficialmente documentados são:
+Os cinco leads iniciais oficialmente documentados eram:
 
 | Fonte documental oficial | Moeda | Tema | Feed |
 |---|---|---|---|
@@ -18,6 +18,15 @@ Os cinco leads oficialmente documentados são:
 | Federal Reserve Monetary Policy | USD | Política monetária | [Fed](https://www.federalreserve.gov/feeds/press_monetary.xml) |
 | BCE Press | EUR | Comunicados | [BCE](https://www.ecb.europa.eu/rss/press.html) |
 | BCE Statistical Press | EUR | Estatísticas | [BCE](https://www.ecb.europa.eu/rss/statpress.html) |
+
+**Complemento documental de 04/11/2026 (LAB):** nove novos endereços
+localizados nas páginas oficiais de RSS de BoE (GBP), BoJ (JPY, 2), SNB
+(CHF, 2), RBA (AUD), BoC (CAD) e Statistics Canada (CAD, 2) foram admitidos
+**somente no parser de XML fornecido pelo chamador**. O cadastro inclui agora
+14 URLs e cobre sete moedas como leads. O endpoint XML observado no domínio
+do RBNZ (NZD) está **pendente**, fora do parser até revisão de documentação
+primária, termos e formato. Ver
+`TRADER_FONTES_OFICIAIS_G8_EXPANSAO_LAB_20261104.md`.
 
 O leitor verifica a sintaxe, exige timestamp com fuso, URL de artigo em
 host oficial correspondente ao canal e identificador estável. Guarda
@@ -45,8 +54,10 @@ Os URLs vêm das páginas oficiais de RSS do [BLS](https://www.bls.gov/feed/),
 verificação operacional, tratamento de redirecionamentos, cache condicional,
 termos comerciais e versões originais antes de implementação em servidor.
 
-Só USD e EUR têm leads deste piloto. **GBP, JPY, CHF, AUD, CAD e NZD ficam
-pendentes** para canais próprios; nenhum deles é declarado sem notícias.
+O piloto original tinha apenas USD e EUR. A ampliação documental adiciona
+GBP, JPY, CHF, AUD e CAD. **NZD segue pendente no parser**; todas as moedas
+continuam sem validação operacional de feeds, origem, latência e licença.
+Não se declara nenhuma delas sem notícias.
 Esses RSS também não são fontes completas de geopolítica ou dados negociáveis.
 
 O sistema deve manter o modo atual de **três revisões diárias**; não abrir

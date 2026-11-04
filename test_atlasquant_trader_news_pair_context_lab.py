@@ -59,7 +59,8 @@ class NewsPairContextLabTests(unittest.TestCase):
         self.assertEqual({r["pair"] for r in out["rows"]}, set(OFFICIAL_PAIRS))
         self.assertEqual(out["currency_news_coverage"]["USD"]["pilot_source_count"], 3)
         self.assertEqual(out["currency_news_coverage"]["EUR"]["pilot_source_count"], 2)
-        self.assertEqual(out["currency_news_coverage"]["JPY"]["pilot_source_count"], 0)
+        self.assertEqual(out["currency_news_coverage"]["JPY"]["pilot_source_count"], 2)
+        self.assertEqual(out["currency_news_coverage"]["NZD"]["pilot_source_count"], 0)
         self.assertFalse(out["g8_official_news_coverage_complete"])
         for p in out["rows"]:
             self.assertFalse(p["trade_authorized"])
@@ -92,7 +93,8 @@ class NewsPairContextLabTests(unittest.TestCase):
         self.assertEqual(at_pair(out, "EUR/USD")["news_article_count"], 2)
         self.assertEqual(at_pair(out, "EUR/JPY")["news_article_count"], 1)
         self.assertEqual(out["currency_news_coverage"]["EUR"]["supplied_source_count"], 1)
-        self.assertTrue(out["currency_news_coverage"]["GBP"]["missing_pilot_sources"] == [])
+        self.assertIn("UK_BOE_NEWS",
+                      out["currency_news_coverage"]["GBP"]["missing_pilot_sources"])
         self.assertFalse(out["currency_news_coverage"]["GBP"]["news_coverage_complete"])
         self.assertFalse(out["cause_of_currency_strength_verified"])
 

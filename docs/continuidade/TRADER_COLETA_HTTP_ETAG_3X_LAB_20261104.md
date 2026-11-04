@@ -16,8 +16,10 @@ autorizada nesta revisão. AION/Worker seguem HARD NO-GO.
 
 O módulo `atlasquant_trader_official_http_collection_contract_lab.py` é
 **totalmente offline**. Ele prepara uma descrição não executável de GET para
-uma das cinco fontes oficiais de RSS já pesquisadas (BLS/Fed/BCE, apenas USD e
-EUR). Inclui URL fixa, cabeçalhos `Accept`, `If-None-Match` (ETag) e
+uma das fontes RSS pesquisadas. O escopo inicial (BLS/Fed/BCE, USD/EUR)
+foi ampliado documentalmente para nove links BoE/BoJ/SNB/RBA/BoC/StatCan:
+**14 leads em sete moedas**, com NZD pendente. Inclui URL fixa, cabeçalhos
+`Accept`, `If-None-Match` (ETag) e
 `If-Modified-Since` (Last-Modified) **somente se** houver cache anterior
 compatível; limite de oito segundos **para futura implementação**, teto de
 256 KiB e política de **nenhum redirecionamento automático**.
@@ -47,8 +49,9 @@ arquivo, banco ou notícia real é gravado.
    proveniência TLS, condições de redirecionamento, conteúdo e datas.
 2. Implementar transporte de leitura com guarda de credenciais, custódia do
    payload original, monitoramento de falhas e persistência verificável.
-3. Homologar fontes oficiais também de GBP, JPY, CHF, AUD, CAD e NZD; cruzar
-   notícias com calendário e condições macro/micro/geopolíticas.
+3. Homologar os XMLs reais, licença e custódia dos novos links de GBP, JPY,
+   CHF, AUD e CAD; resolver o lead NZD ainda pendente, cruzando notícias com
+   calendário e condições macro/micro/geopolíticas.
 4. Medir o atraso e o comportamento de cada fonte nas **três janelas
    gratuitas**, sem prometer atualização a cada evento; calibrar o impacto no
    viés D1/W1/MN1 em teste fora da amostra.

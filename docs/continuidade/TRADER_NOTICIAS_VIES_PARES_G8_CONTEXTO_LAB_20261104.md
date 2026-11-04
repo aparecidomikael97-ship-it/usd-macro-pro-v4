@@ -10,8 +10,10 @@ não altera esse foco e não promove FVG/OB, candles ou sinais de M15.
 ## Entrega deste bloco
 
 `atlasquant_trader_news_pair_context_lab.py` cruza os 28 pares/3 horizontes
-da matriz de hipótese + calendário documental com até cinco **respostas HTTP
-sintéticas** já normalizadas pelo contrato offline. O cruzamento só aceita:
+da matriz de hipótese + calendário documental com até 14 **respostas HTTP
+sintéticas** já normalizadas pelo contrato offline. O número anterior era
+cinco (USD/EUR); links documentados de GBP, JPY, CHF, AUD e CAD foram
+incluídos em 04/11. O cruzamento só aceita:
 
 - Cronologia coerente: hora de avaliação, do recebimento e alegação de
   publicação do artigo sem uso de informação posterior à captura.
@@ -44,9 +46,11 @@ expectativas, curva de juros, mercado e outros fatores.
 
 ## Cobertura exata e o que não foi feito
 
-O piloto de canais segue limitado a **USD (3 leads)** e **EUR (2 leads)**.
-GBP, JPY, CHF, AUD, CAD e NZD ainda não têm leads RSS homologados nesse
-conector; isso **não** significa ausência de acontecimentos nessas moedas.
+O piloto original tinha **USD (3 leads)** e **EUR (2 leads)**. Com a expansão
+documental, GBP, JPY, CHF, AUD e CAD também têm leads de RSS nas páginas
+oficiais, totalizando 14. **NZD continua pendente**, fora do parser. Nenhuma
+das 14 fontes foi validada como conexão real ou custódia operacional.
+Isso **não** significa ausência de acontecimentos nas moedas.
 Uma lista vazia também não prova que o dia não teve notícias. O sistema
 exibe os vazios em vez de inventar cobertura G8.
 

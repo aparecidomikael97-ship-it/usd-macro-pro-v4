@@ -9,6 +9,7 @@ from atlasquant_trader_official_rss_capture_lab import (
     DIFF_SCHEMA, SCHEMA, SOURCES, diff_official_rss_captures_lab,
     normalize_official_rss_lab,
 )
+from atlasquant_trader_g8_official_feed_registry_lab import DIRECTORY_LINKED_LEADS
 
 AT = datetime(2026, 11, 4, 12, tzinfo=timezone.utc)
 PUB = "Wed, 04 Nov 2026 11:00:00 +0000"
@@ -39,12 +40,28 @@ def read(xml=None, at=AT, source="US_BLS_EMPLOYMENT"):
 
 class OfflineOfficialRssLabTests(unittest.TestCase):
     def test_official_leads_are_exact_and_not_an_active_connection(self):
-        self.assertEqual(len(SOURCES), 5)
-        self.assertEqual({s["currency"] for s in SOURCES.values()}, {"USD", "EUR"})
+        self.assertEqual(len(SOURCES), 14)
+        self.assertEqual({s["currency"] for s in SOURCES.values()},
+                         {"USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD"})
         self.assertEqual(SOURCES["US_BLS_EMPLOYMENT"]["feed_url"],
                          "https://www.bls.gov/feed/empsit.rss")
         self.assertEqual(SOURCES["US_FED_MONETARY"]["feed_url"],
                          "https://www.federalreserve.gov/feeds/press_monetary.xml")
+        self.assertNotIn("NZ_RBNZ_NEWS_PENDING", SOURCES)
+        self.assertEqual(set(DIRECTORY_LINKED_LEADS), set(SOURCES) - {
+            "US_BLS_EMPLOYMENT", "US_BLS_CPI", "US_FED_MONETARY",
+            "EU_ECB_PRESS", "EU_ECB_STATPRESS"})
+
+    def test_new_directory_leads_parse_synthetic_articles_only(self):
+        for key, source in DIRECTORY_LINKED_LEADS.items():
+            with self.subTest(source=key):
+                link = f'https://{source["hostname"]}/news/test-20261104.html'
+                xml = rss(link=link)
+                report = read(xml, source=key)
+                self.assertEqual(report["state"], "LAB_DOCUMENTARY_NEWS_ITEMS_ONLY")
+                self.assertEqual(report["currency"], source["currency"])
+                self.assertFalse(report["source_bytes_authenticity_verified"])
+                self.assertFalse(report["live_news"])
 
     def test_rss_item_has_source_timestamp_revision_and_no_live_approval(self):
         original = rss()
