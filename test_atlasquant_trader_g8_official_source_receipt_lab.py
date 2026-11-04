@@ -5,10 +5,13 @@ from hashlib import sha256
 from urllib.parse import urlsplit
 import unittest
 
-from atlasquant_fx_universe import CURRENCIES
+from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_g8_official_source_receipt_lab import (
     SCHEMA, SOURCES, FAMILIES, MAX_TEXT_BYTES,
     official_g8_source_catalog_lab, inspect_claimed_macro_receipt_lab,
+)
+from atlasquant_trader_g8_bilateral_receipt_coverage_lab import (
+    audit_g8_bilateral_macro_receipts_lab,
 )
 
 CUTOFF = datetime(2026, 11, 2, 12, 0, tzinfo=timezone.utc)
@@ -188,6 +191,152 @@ class OfficialSourceReceiptLabTests(unittest.TestCase):
         modified["claimed_sha256"] = sha256(modified["excerpt_utf8"].encode()).hexdigest()
         changed = inspect(modified)["receipt"]
         self.assertNotEqual(original["record_sha256"], changed["record_sha256"])
+
+
+def released(source_id="US_BLS_CPI", event_id=None, *, stale=False):
+    row = sample()
+    row["source_id"] = source_id
+    row["event_id"] = event_id or (source_id + "_EVENT")
+    row["document_url"] = SOURCES[source_id]["documentation_url"]
+    row["kind"] = "RELEASED_CONTEXT"
+    if stale:
+        row["event_at_utc"] = "2026-05-20T10:00:00Z"
+        row["published_at_utc"] = "2026-05-20T10:05:00Z"
+        row["captured_at_utc"] = "2026-05-20T11:00:00Z"
+    else:
+        row["event_at_utc"] = "2026-10-20T10:00:00Z"
+        row["published_at_utc"] = "2026-10-20T10:05:00Z"
+        row["captured_at_utc"] = "2026-10-20T11:00:00Z"
+    return row
+
+
+def audit_receipts(items, *, issued=CUTOFF, at=AFTER):
+    return audit_g8_bilateral_macro_receipts_lab(
+        items, forecast_issued_at=issued, evaluated_at=at)
+
+
+def coverage_pair(report, pair="EUR/USD"):
+    return next(x for x in report["pairs"] if x["pair"] == pair)
+
+
+class G8BilateralReceiptCoverageLabTests(unittest.TestCase):
+    def test_empty_document_batch_reports_all_28_pairs_and_required_gaps(self):
+        report = audit_receipts([])
+        self.assertEqual(report["state"],
+                         "LAB_G8_BILATERAL_DOCUMENTARY_COVERAGE_ONLY")
+        self.assertEqual((report["currency_count"], report["pair_count"]), (8, 28))
+        self.assertEqual({p["pair"] for p in report["pairs"]}, set(OFFICIAL_PAIRS))
+        self.assertEqual(report["released_context_claims_received"], 0)
+        for currency in CURRENCIES:
+            context = report["currencies"][currency]
+            self.assertEqual(context["recent_release_family_claim_count"], 0)
+            self.assertTrue(context["missing_claims_do_not_mean_no_real_event"])
+            self.assertEqual(set(context["families"]), set(FAMILIES))
+        for pair in report["pairs"]:
+            self.assertEqual([pair[h] for h in ("D1", "W1", "MN1")],
+                             ["AGUARDAR"] * 3)
+            self.assertFalse(pair["explanation_causality_verified"])
+            self.assertFalse(pair["trade_authorized"])
+
+    def test_future_schedule_cannot_be_published_historical_macro_context(self):
+        report = audit_receipts([sample()])
+        self.assertEqual(report["state"],
+                         "LAB_G8_BILATERAL_DOCUMENTARY_COVERAGE_ONLY")
+        self.assertEqual(report["scheduled_claims_not_counted_as_releases"], 1)
+        self.assertEqual(report["released_context_claims_received"], 0)
+        self.assertEqual(report["currencies"]["USD"]["families"]["INFLATION"]["state"],
+                         "NO_RELEASE_DOCUMENT_CLAIM_SUPPLIED")
+
+    def test_one_us_inflation_document_only_covers_usd_inflation(self):
+        report = audit_receipts([released()])
+        self.assertEqual(report["released_context_claims_received"], 1)
+        self.assertEqual(report["currencies"]["USD"]["recent_release_family_claim_count"], 1)
+        pair = coverage_pair(report)
+        self.assertFalse(pair["documentary_families"]["INFLATION"]
+                         ["both_currencies_have_recent_document_claims"])
+        self.assertEqual(pair["documented_family_count_claim_only"], 0)
+        self.assertEqual(report["currencies"]["EUR"]["recent_release_family_claim_count"], 0)
+        self.assertFalse(report["macro_explanation_verified"])
+
+    def test_both_currencies_two_families_still_have_only_claimed_documents(self):
+        sources = ("US_BLS_CPI", "US_FED_FOMC", "EU_EUROSTAT_HICP", "EU_ECB_POLICY")
+        report = audit_receipts([released(x) for x in sources])
+        pair = coverage_pair(report)
+        self.assertEqual(pair["documented_family_count_claim_only"], 2)
+        self.assertEqual(report["currencies"]["USD"]["recent_release_family_claim_count"], 2)
+        self.assertEqual(report["currencies"]["EUR"]["recent_release_family_claim_count"], 2)
+        self.assertEqual(report["currencies"]["JPY"]["recent_release_family_claim_count"], 0)
+        self.assertFalse(report["source_original_authenticated"])
+        self.assertEqual(report["operational_bias"], "AGUARDAR")
+
+    def test_all_sixteen_releases_still_do_not_attest_eight_currencies(self):
+        all_items = [released(k) for k in SOURCES]
+        original = copy.deepcopy(all_items)
+        report = audit_receipts(all_items)
+        self.assertEqual(all_items, original)
+        self.assertEqual(report["released_context_claims_received"], 16)
+        self.assertTrue(report["all_eight_currencies_have_two_recent_claims"])
+        self.assertEqual({p["documented_family_count_claim_only"]
+                          for p in report["pairs"]}, {2})
+        for key in ("source_original_authenticated", "all_economic_events_verified",
+                    "macro_explanation_verified", "spot_fx_price_verified",
+                    "counterevidence_verified", "trade_authorized", "publishable",
+                    "can_feed_live_radar", "worker_enabled", "scheduler_enabled",
+                    "complete_actual_calendar_coverage_proven"):
+            self.assertFalse(report[key], key)
+        self.assertEqual((report["external_http_requests"], report["new_cost_brl"]), (0, 0))
+
+    def test_old_publication_is_visible_as_old_not_recent_research(self):
+        report = audit_receipts([released(stale=True)])
+        usd = report["currencies"]["USD"]["families"]["INFLATION"]
+        self.assertEqual(usd["state"], "OLDER_RELEASE_DOCUMENT_CLAIM_ONLY")
+        self.assertEqual(usd["received_release_context_claim_count"], 1)
+        self.assertEqual(usd["not_older_than_90_days_claim_count"], 0)
+        self.assertFalse(report["all_eight_currencies_have_two_recent_claims"])
+
+    def test_invalid_domain_hash_or_claimed_authority_fail_closed(self):
+        for kind in ("domain", "hash", "authority", "extra", "time"):
+            with self.subTest(kind=kind):
+                item = released()
+                if kind == "domain":
+                    item["document_url"] = "https://www.bls.gov.attacker.test/else"
+                elif kind == "hash":
+                    item["claimed_sha256"] = "0" * 64
+                elif kind == "authority":
+                    item["state"] = "REAL_AUTHENTICATED_SOURCE"
+                elif kind == "extra":
+                    item["actual"] = 4.9
+                else:
+                    item["captured_at_utc"] = "2026-11-03T10:00:00Z"
+                out = audit_receipts([item])
+                self.assertEqual(out["state"], "LAB_BLOCKED")
+                self.assertFalse(out["trade_authorized"])
+
+    def test_duplicate_source_event_or_invalid_batch_is_rejected(self):
+        item = released()
+        self.assertEqual(audit_receipts([item, copy.deepcopy(item)])["reason"],
+                         "DUPLICATE_SOURCE_EVENT_RECEIPT")
+        for bad in (None, {}, "source", [item] * 65):
+            self.assertEqual(audit_receipts(bad)["state"], "LAB_BLOCKED")
+
+    def test_forecast_clock_or_naive_timestamp_is_rejected(self):
+        self.assertEqual(audit_receipts(
+            [], issued=AFTER, at=CUTOFF)["reason"], "FORECAST_AFTER_EVALUATION")
+        with self.assertRaises(ValueError):
+            audit_receipts([], issued=CUTOFF.replace(tzinfo=None))
+        with self.assertRaises(ValueError):
+            audit_receipts([], at=AFTER.replace(tzinfo=None))
+
+    def test_no_transport_or_live_bias_from_manually_supplied_documents(self):
+        from unittest.mock import patch
+        with patch("urllib.request.urlopen", side_effect=AssertionError("HTTP forbidden")):
+            out = audit_receipts([released()])
+        self.assertEqual(out["state"],
+                         "LAB_G8_BILATERAL_DOCUMENTARY_COVERAGE_ONLY")
+        self.assertFalse(out["source_original_authenticated"])
+        self.assertFalse(out["all_economic_events_verified"])
+        self.assertFalse(out["three_daily_refreshes_running"])
+        self.assertEqual(out["operational_bias"], "AGUARDAR")
 
 
 if __name__ == "__main__":

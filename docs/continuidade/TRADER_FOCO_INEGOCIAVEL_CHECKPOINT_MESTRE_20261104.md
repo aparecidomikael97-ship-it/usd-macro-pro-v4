@@ -103,3 +103,19 @@ Uma nova rodada de CI **não foi confirmada** para este último bloco. Os
 coletores contínuos e três jobs diários **não estão ativados**. Não foi
 feito merge, deploy, atualização de aplicação publicada, uso de Worker
 nem cobrança. O conflito atual da PR com `main` segue sem resolução.
+
+## Continuidade da cobertura de fontes G8 — 04/11/2026
+
+A auditoria de cobertura documental bilateral das **8 moedas G8 × 2
+famílias (inflação e política) × 28 pares Forex** reutiliza o gate de
+recibos da própria PR #1803. Distingue agenda futura, recibos de
+publicação declarados, fonte ausente e documento antigo. Não aceita
+link oficial como autenticação e mantém **D1/W1/MN1 em AGUARDAR**.
+Testes incluídos na bateria Quality; a aprovação remota do novo SHA
+deve ser verificada separadamente. Não é nova fonte real integrada.
+
+A PR #1811 segue separada, destinada ao histórico BCE e comparações
+retrospectivas de força: nenhum valor do BCE vira previsão de compra
+ou venda por si só. Permanecem as seis prioridades do checkpoint
+(macro/micro/geopolítica/notícias/calendário/força independente).
+**HARD NO-GO** para automação, custo, merge, Render e uso real.
