@@ -1,0 +1,82 @@
+{
+  "schema": "ATLASQUANT_TRADER_ECB_TWO_DATES_DOCUMENTARY_CASE_LAB_V1",
+  "review_date": "2026-11-02",
+  "state": "OFFICIAL_PUBLIC_REFERENCES_MANUALLY_READ_NOT_CUSTODIED",
+  "description": "ECB 30 Oct and 2 Nov 2026 EUR quotes for G8 currency study. Documentation, not backtest, pricing feed or independently witnessed historical receipt.",
+  "sources": [
+    {
+      "date": "2026-10-30",
+      "name": "ECB eurofxref PDF dated 30 October 2026",
+      "url": "https://www.ecb.europa.eu/stats/shared/pdf/eurofxref.pdf",
+      "web_search_snapshot_examined": true,
+      "raw_download_saved": false,
+      "source_hash": null,
+      "dynamic_pdf_caution": "This latest-reference PDF URL can change; the content read in the search snapshot was labeled 30 October. Its current bytes are not certified as archival."
+    },
+    {
+      "date": "2026-11-02",
+      "name": "ECB euro foreign exchange reference page labeled 2 November 2026",
+      "url": "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html",
+      "web_search_snapshot_examined": true,
+      "raw_download_saved": false,
+      "source_hash": null,
+      "dynamic_page_caution": "Latest rate page changes with future publication and is not a stable historic archive."
+    }
+  ],
+  "documents": [
+    {
+      "state": "LAB_PUBLIC_ECB_REFERENCE_DOCUMENT_REVIEW_CANDIDATE",
+      "date": "2026-10-30",
+      "source_name": "European Central Bank (ECB)",
+      "source_page": "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html",
+      "eur_quotes": {
+        "USD": "1.1172",
+        "JPY": "175.68",
+        "GBP": "0.83380",
+        "CHF": "0.9194",
+        "AUD": "1.5904",
+        "CAD": "1.5606",
+        "NZD": "1.9823"
+      }
+    },
+    {
+      "state": "LAB_PUBLIC_ECB_REFERENCE_DOCUMENT_REVIEW_CANDIDATE",
+      "date": "2026-11-02",
+      "source_name": "European Central Bank (ECB)",
+      "source_page": "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html",
+      "eur_quotes": {
+        "USD": "1.1216",
+        "JPY": "177.10",
+        "GBP": "0.83580",
+        "CHF": "0.9193",
+        "AUD": "1.6004",
+        "CAD": "1.5673",
+        "NZD": "1.9934"
+      }
+    }
+  ],
+  "rights_review": {
+    "source_url": "https://www.ecb.europa.eu/stats/ecb_statistics/governance_and_quality_framework/html/usage_policy.en.html",
+    "official_source_attribution_required": true,
+    "third_party_data_exception": true,
+    "reused_original_series_unmodified": true,
+    "derived_crosses_distinctly_labeled": true,
+    "commercial_product_legal_review_completed": false
+  },
+  "limitations": {
+    "prices_are_ecb_daily_reference_not_independent_spot": true,
+    "not_transaction_quotes": true,
+    "no_intraday_spot": true,
+    "strict_real_capture_unproven": true,
+    "publication_time_exact_unverified": true,
+    "crosses_21_derived_not_21_observed": true,
+    "real_oos_unproven": true,
+    "not_a_directed_trading_signal": true
+  },
+  "can_feed_live_radar": false,
+  "can_feed_real_oos": false,
+  "trade_authorized": false,
+  "worker_enabled": false,
+  "scheduler_enabled": false,
+  "paid_api_invoked": false
+}

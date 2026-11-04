@@ -23,7 +23,7 @@ align-items:center;gap:12px;min-height:48px;list-style:none}
 .aqr-cal-item summary small{font-size:10px;display:block;margin-top:5px;color:#95b5c9}
 .aqr-cal-badge{border:1px solid #6b5941;background:#312c24;color:#eac78f;
 font-size:10px;border-radius:6px;padding:6px;flex-shrink:0}
-.aqr-cal-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;
+.aqr-cal-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;
 padding:12px;margin-top:12px;background:#112f3c;border-radius:8px}
 .aqr-cal-values div{display:grid;gap:5px}
 .aqr-cal-values small{font-size:10px;color:#a6c1cf}
@@ -38,7 +38,7 @@ text-align:center;padding:23px;color:#a9bfd3;font-size:12px}
 .aqr-cal-empty strong{display:block;margin-bottom:9px;color:#eaf8ff}
 @media(max-width:700px){
 .aqr-cal-item summary{align-items:start}
-.aqr-cal-values{padding:8px;gap:4px}
+.aqr-cal-values{padding:8px;gap:4px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .aqr-cal-values strong{font-size:13px}
 .aqr-cal-badge{font-size:9px}
 }
@@ -58,12 +58,43 @@ def _value(value: Any) -> str:
     return f"{n:,.2f}".replace(",", " ").replace(".", ",")
 
 
+def calendar_source_status(data: Any) -> tuple[str, str]:
+    """Public, safe diagnostics only. Do not surface raw provider errors or tokens."""
+    if not isinstance(data, Mapping):
+        return ("SEM INTEGRAÇÃO", "Fonte econômica não consultada ou sem configuração autorizada.")
+    state = str(data.get("state") or "")
+    reason = str(data.get("reason") or "").strip().upper()
+    if state == "READY":
+        if not str(data.get("fetched_at") or "").strip():
+            return ("HORÁRIO NÃO COMPROVADO", "A coleta não trouxe carimbo verificável; leitura não pode ser considerada atual.")
+        return ("FONTE RECEBIDA", "Eventos recebidos da fonte com horário identificável; conteúdo ainda pode sofrer revisões.")
+    if reason == "PROVIDER_NOT_AUTHORIZED":
+        return ("INTEGRAÇÃO DESATIVADA", "O calendário externo está bloqueado por configuração até confirmar assinatura, franquia e permissão de leitura.")
+    if reason == "ATLASQUANT_DAILY_CAP":
+        return ("LIMITE INTERNO ATINGIDO", "A cota conservadora do AtlasQuant para este processo foi atingida. Não foram iniciadas consultas extras.")
+    if reason == "NO_EXISTING_TOKEN":
+        return ("FONTE NÃO CONFIGURADA", "Nenhuma credencial existente foi encontrada. Nenhum serviço novo foi contratado.")
+    if reason in ("HTTP_401", "HTTP_403", "HTTP_402"):
+        return ("ACESSO NÃO HABILITADO", "A credencial atual não foi autorizada para esta consulta. Confirme permissões e plano sem ativar despesas.")
+    if reason == "HTTP_429":
+        return ("LIMITE DE CONSULTAS", "O provedor restringiu novas consultas; aguarde e verifique a franquia contratada.")
+    if state in ("INCOMPLETE_PROVIDER", "INVALID_PROVIDER") or reason == "INVALID_RESPONSE":
+        return ("RESPOSTA INCOMPLETA", "Formato ou cobertura da resposta não permite garantir calendário completo.")
+    if state == "STALE_PROVIDER" or reason == "CACHE_OUTDATED":
+        return ("DADOS ATRASADOS", "Carimbo de atualização fora da janela permitida; dados não devem gerar viés atual.")
+    if state == "UNAVAILABLE":
+        return ("FONTE INDISPONÍVEL", "Consulta temporariamente indisponível; não exibimos números simulados.")
+    return ("AGUARDANDO VALIDAÇÃO", "Fonte, data ou integridade dos eventos ainda não comprovadas.")
+
+
 def calendar_html(data: Any) -> str:
     """No invented events/consensus: only normalized daily evidence is rendered."""
+    status_label, status_detail = calendar_source_status(data)
     if not isinstance(data, Mapping) or data.get("state") != "READY":
         return STYLE + (
             '<div class="aqr-cal-empty"><strong>Calendário diário aguardando fonte</strong>'
-            'Consulta automática preparada para a fonte existente autorizada. '
+            '<p><strong>' + escape(status_label) + '.</strong> ' +
+            escape(status_detail) + '</p>'
             'Sem feed disponível, não mostramos datas, expectativas ou surpresas fictícias.'
             '</div>'
         )
@@ -74,6 +105,13 @@ def calendar_html(data: Any) -> str:
         stamp = brasilia_clock(datetime.fromisoformat(fetched)).strftime("%d/%m/%Y %H:%M BRT")
     except (TypeError, ValueError):
         stamp = "Horário da coleta não informado"
+    # A READY payload without a fetch timestamp can be displayed as historical
+    # evidence, never as a verified live calendar.
+    freshness = (
+        '<div class="aqr-cal-guide"><strong>' + escape(status_label) +
+        '</strong> · ' + escape(status_detail) + '</div>'
+        if status_label != "FONTE RECEBIDA" else ""
+    )
     header = ('<div class="aqr-cal-guide"><strong>Calendário do dia · ' + label +
               '</strong> · Horário de Brasília · Fonte: ' + source +
               ' · Consulta: ' + escape(stamp) +
@@ -97,6 +135,15 @@ def calendar_html(data: Any) -> str:
         comparison = escape(str(event.get("comparison") or "nível"))
         period = escape(str(event.get("period") or "—"))
         status = "Divulgado" if event.get("actual") is not None else "Aguardando"
+        difference = event.get("surprise")
+        if difference is not None:
+            try:
+                signed = float(difference)
+                surprise = ("+" if signed > 0 else "") + _value(signed)
+            except (TypeError, ValueError, OverflowError):
+                surprise = "—"
+        else:
+            surprise = "—"
         consensus_source = escape(str(event.get("consensus_source") or "Não disponível"))
         event_id = escape(str(event.get("id") or ""))
         cards.append(
@@ -110,11 +157,22 @@ def calendar_html(data: Any) -> str:
             '<div><small>Anterior</small><strong>' +
             _value(event.get("previous")) + '</strong></div>'
             '<div><small>Divulgado</small><strong>' +
-            _value(event.get("actual")) + '</strong></div></div>'
+            _value(event.get("actual")) + '</strong></div>'
+            '<div><small>Surpresa*</small><strong>' + surprise +
+            '</strong></div></div>'
             '<p class="aqr-cal-caption">Consenso: ' + consensus_source +
             ' · Evento: ' + escape(str(event.get("source") or "Fonte indisponível")) +
-            ' · Unidade não informada explicitamente pelo feed; confirme a escala na fonte.</p>'
+            ' · *Surpresa = divulgado menos consenso, na unidade original (não é porcentagem '
+            'de variação nem retorno do dólar). Unidade não padronizada pelo feed. '
+            'Revisões do valor anterior não estão confirmadas separadamente neste registro; '
+            'consultar o anúncio oficial.</p>'
             '<h4>O que o mercado pode esperar?</h4>'
+            '<p><strong>Como este indicador funciona:</strong> ' +
+            escape(expl["mechanism"]) + '</p>'
+            '<p><strong>O que acompanhar:</strong> ' +
+            escape(expl["watch"]) + '</p>'
+            '<p><strong>Limite da interpretação:</strong> ' +
+            escape(expl["caution"]) + '</p>'
             '<p><strong>Expectativa antes da divulgação:</strong> ' +
             escape(expl["expectation"]) + '</p>'
             '<p><strong>Se vier acima do consenso:</strong> ' +
@@ -132,7 +190,7 @@ def calendar_html(data: Any) -> str:
         str(int(data.get("total") or 0)) + '. O feed foi limitado por proteção de memória.</p>'
         if data.get("truncated") else ""
     )
-    return STYLE + header + '<div class="aqr-cal-list">' + "".join(cards) + '</div>' + trunc
+    return STYLE + freshness + header + '<div class="aqr-cal-list">' + "".join(cards) + '</div>' + trunc
 
 
-__all__ = ["calendar_html"]
+__all__ = ["calendar_html", "calendar_source_status"]

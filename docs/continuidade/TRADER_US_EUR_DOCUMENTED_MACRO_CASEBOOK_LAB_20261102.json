@@ -1,0 +1,94 @@
+{
+  "schema": "ATLASQUANT_TRADER_DOCUMENTED_MACRO_EVENTS_CASEBOOK_LAB_V1",
+  "state": "PUBLIC_OFFICIAL_DOCUMENT_RESEARCH_NO_HISTORICAL_CUSTODY",
+  "research_day_utc": "2026-11-02",
+  "usable_from_utc": "2026-11-03T00:00:00Z",
+  "real_historical_capture_attested": false,
+  "event_specific_consensus_verified": false,
+  "prices_to_measure_reaction_verified": false,
+  "source_redistribution_rights_verified": false,
+  "events": [
+    {
+      "event_id": "USD_CPI_SEP2026_RELEASE_20261014",
+      "currency": "USD",
+      "topic": "INFLATION",
+      "phase": "RELEASED_CONTEXT",
+      "reference_period": "2026-09",
+      "official_url": "https://www.bls.gov/news.release/archives/cpi_10142026.htm",
+      "official_release_at_utc": "2026-10-14T12:30:00Z",
+      "scheduled_at_utc": "2026-10-14T12:30:00Z",
+      "timing_note": "BLS 08:30 ET embargo notice; no independently attested capture",
+      "facts": {
+        "cpi_all_items_yoy_nsa_pct": 3.7,
+        "cpi_all_items_mom_sa_pct": 0.6
+      },
+      "consensus_before_release": null,
+      "published_at_utc_attested": false
+    },
+    {
+      "event_id": "USD_FOMC_20261028",
+      "currency": "USD",
+      "topic": "POLICY",
+      "phase": "RELEASED_CONTEXT",
+      "reference_period": "2026-10",
+      "official_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+      "official_release_at_utc": "2026-10-28T18:00:00Z",
+      "scheduled_at_utc": "2026-10-28T18:00:00Z",
+      "timing_note": "Fed document specifies release at 14:00 EDT, not observed HTTP receipt",
+      "facts": {
+        "decision": "HOLD",
+        "target_range_lower_pct": 3.75,
+        "target_range_upper_pct": 4
+      },
+      "consensus_before_release": null,
+      "published_at_utc_attested": false
+    },
+    {
+      "event_id": "EUR_ECB_POLICY_20261029",
+      "currency": "EUR",
+      "topic": "POLICY",
+      "phase": "RELEASED_CONTEXT",
+      "reference_period": "2026-10",
+      "official_url": "https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.mp261029~9a493adf17.en.html",
+      "official_release_at_utc": null,
+      "scheduled_at_utc": null,
+      "timing_note": "ECB official statement date is known; exact publication/capture instant not attested; 14:45 CET press conference is NOT release clock",
+      "facts": {
+        "decision": "HOLD",
+        "deposit_facility_pct": 2.5,
+        "main_refinancing_pct": 2.65,
+        "marginal_lending_pct": 2.9
+      },
+      "consensus_before_release": null,
+      "published_at_utc_attested": false
+    },
+    {
+      "event_id": "USD_EMPLOYMENT_OCT2026_20261106",
+      "currency": "USD",
+      "topic": "EMPLOYMENT",
+      "phase": "SCHEDULED",
+      "reference_period": "2026-10",
+      "official_url": "https://www.bls.gov/schedule/2026/11_sched_list.htm",
+      "official_release_at_utc": null,
+      "scheduled_at_utc": "2026-11-06T13:30:00Z",
+      "timing_note": "BLS future calendar 08:30 ET on 06 Nov (EST UTC-05); actual and consensus not loaded",
+      "facts": {},
+      "consensus_before_release": null,
+      "published_at_utc_attested": false
+    },
+    {
+      "event_id": "USD_CPI_OCT2026_20261110",
+      "currency": "USD",
+      "topic": "INFLATION",
+      "phase": "SCHEDULED",
+      "reference_period": "2026-10",
+      "official_url": "https://www.bls.gov/schedule/news_release/cpi.htm",
+      "official_release_at_utc": null,
+      "scheduled_at_utc": "2026-11-10T13:30:00Z",
+      "timing_note": "BLS future calendar 08:30 ET on 10 Nov (EST UTC-05); actual and consensus not loaded",
+      "facts": {},
+      "consensus_before_release": null,
+      "published_at_utc_attested": false
+    }
+  ]
+}

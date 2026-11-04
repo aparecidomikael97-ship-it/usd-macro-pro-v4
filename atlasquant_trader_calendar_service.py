@@ -1,13 +1,12 @@
 """Authenticated, quota-conscious calendar adapter for AtlasQuant Trader.
 
-Only performs one read request per UTC hour key while the Painel Mestre
-is visited, using the existing EODHD entitlement if configured.
+Only performs an explicitly enabled, budget-guarded read when Painel Mestre
+is visited. The existing EODHD entitlement must be validated before enabling.
 No AION Worker, cron, payment, order, or unsupervised external action.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from functools import lru_cache
 import os
 from typing import Any, Mapping
 
@@ -15,9 +14,25 @@ from atlasquant_trader_economic_calendar import (
     normalize_events, request_eodhd_daily,
 )
 from atlasquant_trader_opening_collector import brasilia_clock
+from atlasquant_trader_calendar_quota_guard import guarded_read, permission_enabled
 
 SESSION_CONSENSUS = "atlasquant_calendar_manual_consensus"
 SESSION_MODEL = "atlasquant_calendar_latest_read_model"
+TIMEZONE_ATTESTATION_FLAG = "ATLASQUANT_CALENDAR_EODHD_TIMEZONE_ATTESTED"
+
+
+def timezone_attested(env: Mapping[str, str] | None = None) -> bool:
+    """Manual source-timezone attestation; unknown/absent means NO live fetch.
+
+    The EODHD economic-events documentation shows a naive datetime format.
+    Before setting this flag, an independent reviewer must verify real event
+    timestamps against authoritative release times. This flag is not proof.
+    """
+    values = env if env is not None else os.environ
+    return str(values.get(TIMEZONE_ATTESTATION_FLAG) or "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
 
 
 def _token(st: Any) -> str:
@@ -32,10 +47,9 @@ def _token(st: Any) -> str:
         return ""
 
 
-@lru_cache(maxsize=12)
 def _hourly_feed(token: str, date_brt: str, hour_utc: int) -> dict[str, Any]:
-    # Date and hourly keys force the cache to refresh when the app is open.
-    # The token is never exposed; only this process holds it in memory.
+    # The central quota guard owns process-only caching and rate limiting.
+    # A task runner outside the web app is NOT enabled by this function.
     return request_eodhd_daily(token)
 
 
@@ -61,9 +75,16 @@ def read_calendar(st: Any, access: Mapping[str, Any],
         if identity and isinstance(item, Mapping) and item.get("author") == identity
     } if isinstance(stored, dict) else {}
     token = _token(st)
-    if token:
+    # Keep the already-disabled-provider reason stable. If EODHD has been
+    # explicitly enabled, require separate timezone attestation BEFORE HTTP.
+    if token and permission_enabled() and not timezone_attested():
+        response = {"ok": False, "reason": "EODHD_TIMEZONE_UNVERIFIED", "data": []}
+    elif token:
         hour_key = int(now.timestamp()) // 3600
-        response = _hourly_feed(token, local.date().isoformat(), hour_key)
+        response = guarded_read(
+            token, local.date().isoformat(), hour_key,
+            fetch=_hourly_feed, at=now,
+        )
     else:
         response = {"ok": False, "reason": "NO_EXISTING_TOKEN", "data": []}
     model = normalize_events(response, at=now, manual=manual)
@@ -146,4 +167,5 @@ def manual_consensus_controls(st: Any, access: Mapping[str, Any]) -> None:
             st.rerun()
 
 
-__all__ = ["read_calendar", "manual_consensus_controls", "SESSION_CONSENSUS"]
+__all__ = ["read_calendar", "manual_consensus_controls", "SESSION_CONSENSUS",
+           "TIMEZONE_ATTESTATION_FLAG", "timezone_attested"]
