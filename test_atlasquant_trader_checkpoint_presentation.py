@@ -45,5 +45,22 @@ class TraderCheckpointPresentationTests(unittest.TestCase):
         self.assertNotIn("#1 ", html)
 
 
+    def test_daily_reading_freshness_window_is_at_most_twenty_minutes(self):
+        pair = OFFICIAL_PAIRS[0]
+
+        def document(age_minutes):
+            return {
+                "state": "VALIDATED_DAILY",
+                "source": "Fixture LAB de teste",
+                "as_of": (datetime.now(timezone.utc)
+                          - timedelta(minutes=age_minutes)).isoformat(),
+                "pairs": {pair: {"change_pct": 0.8, "bias": "ALTA"}},
+                "currencies": {},
+            }
+
+        self.assertIn(pair, _daily(document(19))["pairs"])
+        self.assertEqual(_daily(document(21))["pairs"], {})
+
+
 if __name__ == "__main__":
     unittest.main()

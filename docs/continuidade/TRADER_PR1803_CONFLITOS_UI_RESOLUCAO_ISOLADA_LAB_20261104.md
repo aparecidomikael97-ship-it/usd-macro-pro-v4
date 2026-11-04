@@ -21,13 +21,14 @@ Data: 04/11/2026. **Apenas LAB**, sem alterar `main`, PR #1803 ou o aplicativo p
   `official_data` e `calendar_data` conjuntamente, sem inferir
   valores ausentes.
 - Mantém CSS responsivo de ambas as propostas e `notranslate` PT-BR.
-- Mantém a janela de frescor de 36 horas do contrato diário presente
-  na `main`; **não confundir com preço negociável em tempo real**.
+- Aplica a janela mais rigorosa de **20 minutos** para leituras diárias
+  na interface, recusando dados vencidos. Um resultado histórico BCE
+  não é cotação negociável nem pode virar leitura em tempo real.
 
 ## Verificações executadas no AM12
 - Integração por worktree isolada; nenhum commit sobre `main`.
 - `python -m unittest -q` em 12 módulos relevantes:
-  **164 testes aprovados** (venv Python local com `tzdata` disponível).
+  **168 testes aprovados** (incluindo o gate de 20 minutos; venv Python local com `tzdata`).
 - `python -m pytest -q test_atlasquant_trader_bias_matrix.py`:
   **10 aprovados** (Python local com `pytest`).
 - Os testes atualizados verificam ausência da rota de navegação

@@ -178,7 +178,7 @@ def _daily(data: Any) -> dict[str, Any]:
         if stamp.tzinfo is None:
             return blank
         age = datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)
-        if age < timedelta(minutes=-1) or age > timedelta(hours=36):
+        if age < timedelta(minutes=-1) or age > timedelta(minutes=20):
             return blank
         stamp = stamp.astimezone(timezone.utc)
     except (TypeError, ValueError):
