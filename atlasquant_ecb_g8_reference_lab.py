@@ -6,8 +6,8 @@ ECB fixes are daily informational references, not executable bid/ask prices.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from math import isfinite, log
+from datetime import date, datetime, timedelta, timezone
+from math import expm1, isfinite, log
 from typing import Any
 from xml.etree import ElementTree as ET
 
@@ -76,6 +76,51 @@ def _parse_history(xml_data: bytes) -> dict[date, dict[str, float]] | None:
     return records if len(records) >= 2 else None
 
 
+def _reference_window(old: dict[str, float], new: dict[str, float],
+                      start: date, end: date) -> dict[str, Any] | None:
+    """Relative G8 changes; log arithmetic avoids unsafe rate division.
+
+    Every quoted pair is still only algebraically derived from EUR fixes.
+    """
+    log_change = {c: log(new[c]) - log(old[c]) for c in CURRENCIES}
+    mean_change = sum(log_change.values()) / len(CURRENCIES)
+    strength = {c: (mean_change - log_change[c]) * 100 for c in CURRENCIES}
+    pairs: dict[str, float] = {}
+    logret: dict[str, float] = {}
+    for symbol in OFFICIAL_PAIRS:
+        base, quote = split_pair(symbol)
+        pair_log = log_change[quote] - log_change[base]
+        try:
+            pct = expm1(pair_log) * 100
+        except OverflowError:
+            return None
+        if not isfinite(pct):
+            return None
+        pairs[symbol] = pct
+        logret[symbol] = pair_log * 100
+    max_residual = max(
+        abs(logret[s] - (strength[split_pair(s)[0]] - strength[split_pair(s)[1]]))
+        for s in OFFICIAL_PAIRS
+    )
+    if not isfinite(max_residual) or max_residual > 1e-7:
+        return None
+    top = sorted(pairs.items(), key=lambda p: (-p[1], p[0]))
+    return {
+        "state": "RESEARCH_ONLY",
+        "start_reference_date": start.isoformat(),
+        "end_reference_date": end.isoformat(),
+        "calendar_days_between_fixes": (end - start).days,
+        "currency_strength_log_pp": {k: round(v, 6) for k, v in strength.items()},
+        "currency_order": sorted(CURRENCIES, key=lambda c: (-strength[c], c)),
+        "pair_returns_pct": {k: round(v, 6) for k, v in pairs.items()},
+        "top10": [{"pair": k, "change_pct": round(v, 6)} for k, v in top[:10]],
+        "max_algebraic_residual_log_pp": round(max_residual, 9),
+        "has_executable_bid_ask": False,
+        "publishable": False,
+        "trade_authorized": False,
+    }
+
+
 def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -> dict[str, Any]:
     """Compare latest two complete ECB working-day reference observations.
 
@@ -95,33 +140,31 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
         return _blocked("FUTURE_OR_INVALID_REFERENCE_DATE")
     old = rows[previous]
     new = rows[latest]
-    pairs: dict[str, float] = {}
-    logret: dict[str, float] = {}
-    for symbol in OFFICIAL_PAIRS:
-        base, quote = split_pair(symbol)
-        current_rate = new[quote] / new[base]
-        previous_rate = old[quote] / old[base]
-        percent = (current_rate / previous_rate - 1.0) * 100
-        logarithmic = log(current_rate / previous_rate) * 100
-        if not isfinite(percent) or not isfinite(logarithmic):
+    daily = _reference_window(old, new, previous, latest)
+    if daily is None:
+        return _blocked("NUMERIC_RANGE_INVALID")
+    # W1 uses the most recent published reference on or before D1 minus
+    # seven calendar days, so weekends/ECB holidays never invent a fixing.
+    cutoff = latest - timedelta(days=7)
+    weekly_dates = [d for d in days if d <= cutoff]
+    if weekly_dates:
+        week_start = weekly_dates[-1]
+        weekly = _reference_window(rows[week_start], new, week_start, latest)
+        if weekly is None:
             return _blocked("NUMERIC_RANGE_INVALID")
-        pairs[symbol] = percent
-        logret[symbol] = logarithmic
-    # Fully connected G8 graph: signed log returns imply relative strengths.
-    net = dict.fromkeys(CURRENCIES, 0.0)
-    for symbol, value in logret.items():
-        base, quote = split_pair(symbol)
-        net[base] += value
-        net[quote] -= value
-    strength = {c: net[c] / 8 for c in CURRENCIES}
-    max_residual = max(
-        abs(logret[s] - (strength[split_pair(s)[0]] - strength[split_pair(s)[1]]))
-        for s in OFFICIAL_PAIRS
-    )
-    # Algebraic cross-consistency is automatic from the same seven EUR fixes.
-    if max_residual > 1e-7:
-        return _blocked("DERIVATION_INCONSISTENT")
-    top = sorted(pairs.items(), key=lambda p: (-p[1], p[0]))
+    else:
+        weekly = {
+            "state": "INSUFFICIENT_REFERENCE_HISTORY",
+            "reason": "NO_REFERENCE_ON_OR_BEFORE_WEEK_START",
+            "end_reference_date": latest.isoformat(),
+            "currency_strength_log_pp": {},
+            "currency_order": [],
+            "pair_returns_pct": {},
+            "top10": [],
+            "has_executable_bid_ask": False,
+            "publishable": False,
+            "trade_authorized": False,
+        }
     result = _blocked("REFERENCE_ONLY_NOT_TRADEABLE")
     result.update({
         "state": "RESEARCH_ONLY", "complete_pairs": 28,
@@ -136,14 +179,16 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
         "all_pairs_are_derived_reference_rates": True,
         "has_executable_bid_ask": False,
         "rates": dict(new),
-        "pair_returns_pct": {k: round(v, 6) for k, v in pairs.items()},
-        "currency_strength_log_pp": {k: round(v, 6) for k, v in strength.items()},
-        "currency_order": sorted(CURRENCIES, key=lambda c: (-strength[c], c)),
-        "top10": [{"pair": k, "change_pct": round(v, 6)} for k, v in top[:10]],
-        "max_algebraic_residual_log_pp": round(max_residual, 9),
+        "pair_returns_pct": daily["pair_returns_pct"],
+        "currency_strength_log_pp": daily["currency_strength_log_pp"],
+        "currency_order": daily["currency_order"],
+        "top10": daily["top10"],
+        "max_algebraic_residual_log_pp": daily["max_algebraic_residual_log_pp"],
+        "research_windows": {"D1": daily, "W1": weekly},
         "notice": "Historical ECB daily reference, not Forex live, spread, signal, or accuracy.",
     })
     return result
 
 
 __all__ = ["SCHEMA", "OFFICIAL_REFERENCE_URL", "analyze_ecb_reference_xml"]
+

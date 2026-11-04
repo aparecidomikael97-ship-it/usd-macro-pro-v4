@@ -24,6 +24,16 @@ Comparar duas datas **reais de publicação**:
 A ordem do Top 10 é variação **diária entre referências** (não "melhores entradas").
 A força relativa G8 é construída dos retornos logarítmicos dos 28 cruzamentos, com sinal positivo para a moeda base e negativo para a moeda cotação. É **relativa e centrada**; não corresponde à probabilidade de lucro.
 
+## Extensão LAB: comparação D1 e W1 de referências (sem viés operacional)
+- `research_windows.D1`: compara as duas observações mais recentes do BCE. O intervalo pode ter mais de 24 horas por fins de semana e feriados; são exibidas ambas as datas.
+- `research_windows.W1`: compara a observação mais recente com a última observação existente **na data sete dias antes ou anterior a ela**. Não inventa fixings durante períodos sem publicação. Exibe data inicial/final e número de dias corridos entre referências.
+- Se o XML não contiver histórico suficiente para W1, essa janela retorna `INSUFFICIENT_REFERENCE_HISTORY`, com rankings vazios. D1 ainda pode ser pesquisado, sempre `RESEARCH_ONLY`.
+- Força calculada em pontos percentuais logarítmicos, relativa à média igualmente ponderada das oito moedas. A ordem é comparativa, não contém direção BUY/SELL, nota de confiança ou probabilidade.
+- Uma moeda pode se fortalecer em D1 e se enfraquecer em W1: o resultado não consolida janelas divergentes em um sinal.
+- Os cálculos usam diferenças de logaritmos e recusam retornos fora do alcance numérico em vez de lançar exceções.
+- O arquivo XML continua sendo **fornecido externamente ao adaptador**, sem verificação criptográfica de origem ou transporte. Sua consistência matemática **não valida sua autenticidade**.
+- Nem D1 nem W1 das referências do BCE equivalem ao viés de preço W1/D1/H4/M15 negociável do Radar.
+
 Contratos de segurança:
 - XML inválido, data duplicada/futura, menos de duas datas, moeda faltante, taxa zero/negativa/NaN ou ausência de timezone no relógio informado => `BLOCKED`.
 - Datas históricas são permitidas somente como pesquisa, com `reference_age_days` explícito.
@@ -40,3 +50,4 @@ Contratos de segurança:
 
 ## Critério de conclusão deste bloco
 Teste de sete taxas EUR, 28 cruzamentos, orientação base/quote, datas inválidas, valores inválidos e recusa explícita de produção. GitHub CI obrigatório. Nenhuma publicação de números de mercado nesta entrega.
+

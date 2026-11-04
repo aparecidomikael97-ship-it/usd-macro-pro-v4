@@ -20,6 +20,18 @@ def fixture(old=None, new=None, latest="2026-11-03", previous="2026-11-02"):
             + '</Cube></Envelope>').encode()
 
 
+def fixture_history(rows):
+    body = "".join(
+        '<Cube time="' + day + '">' + "".join(
+            '<Cube currency="' + c + '" rate="' + str(rate) + '"/>'
+            for c, rate in values.items()
+        ) + "</Cube>"
+        for day, values in rows
+    )
+    return ('<Envelope xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">'
+            '<Cube>' + body + '</Cube></Envelope>').encode()
+
+
 def test_7_eur_fixes_derive_28_only_research():
     r=analyze_ecb_reference_xml(fixture(),now=NOW)
     assert r["schema"]==SCHEMA and r["state"]=="RESEARCH_ONLY"
@@ -32,6 +44,8 @@ def test_7_eur_fixes_derive_28_only_research():
     assert not r["publishable"] and not r["trade_authorized"]
     assert not r["provider_authenticated"] and not r["accuracy_verified"]
     assert not r["has_executable_bid_ask"]
+    assert r["research_windows"]["D1"]["state"]=="RESEARCH_ONLY"
+    assert r["research_windows"]["W1"]["state"]=="INSUFFICIENT_REFERENCE_HISTORY"
 
 
 def test_cross_orientation_and_strength():
@@ -72,3 +86,47 @@ def test_not_a_live_daily_ui_contract():
     r=analyze_ecb_reference_xml(fixture(),now=NOW)
     assert _daily(r)["pairs"]=={}
     assert r["reason"]=="REFERENCE_ONLY_NOT_TRADEABLE"
+
+
+def test_d1_and_w1_strength_can_disagree_without_becoming_trade_signals():
+    baseline = dict(NEW)
+    payload = fixture_history([
+        ("2026-10-27", {**baseline, "USD": 1.09}),
+        ("2026-11-02", {**baseline, "USD": 1.12}),
+        ("2026-11-03", {**baseline, "USD": 1.11}),
+    ])
+    result = analyze_ecb_reference_xml(payload, now=NOW)
+    daily, weekly = result["research_windows"]["D1"], result["research_windows"]["W1"]
+    assert daily["start_reference_date"]=="2026-11-02"
+    assert weekly["start_reference_date"]=="2026-10-27"
+    assert weekly["calendar_days_between_fixes"]==7
+    assert daily["currency_strength_log_pp"]["USD"] > daily["currency_strength_log_pp"]["EUR"]
+    assert weekly["currency_strength_log_pp"]["USD"] < weekly["currency_strength_log_pp"]["EUR"]
+    assert daily["pair_returns_pct"]["EUR/USD"] < 0
+    assert weekly["pair_returns_pct"]["EUR/USD"] > 0
+    for window in (daily, weekly):
+        assert len(window["pair_returns_pct"])==28
+        assert not window["publishable"] and not window["trade_authorized"]
+        assert not window["has_executable_bid_ask"]
+    assert not result["publishable"]
+
+
+def test_w1_uses_previous_actual_reference_day_if_target_day_missing():
+    result = analyze_ecb_reference_xml(fixture_history([
+        ("2026-10-26", OLD), ("2026-11-02", OLD), ("2026-11-03", NEW),
+    ]), now=NOW)
+    w1 = result["research_windows"]["W1"]
+    assert w1["state"]=="RESEARCH_ONLY"
+    assert w1["start_reference_date"]=="2026-10-26"
+    assert w1["calendar_days_between_fixes"]==8
+
+
+def test_extreme_finite_rates_fail_closed_without_numeric_exception():
+    result = analyze_ecb_reference_xml(
+        fixture(old={**OLD, "USD": 1e308}, new={**NEW, "USD": 5e-324}),
+        now=NOW,
+    )
+    assert result["state"]=="BLOCKED"
+    assert result["reason"]=="NUMERIC_RANGE_INVALID"
+    assert not result["publishable"]
+
