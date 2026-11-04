@@ -23,6 +23,10 @@ ECB_PUBLICATION_ZONE = ZoneInfo("Europe/Brussels")
 # days. This lower-bound guard prevents using an allegedly same-day fixing
 # *before* that window. Passing it does not attest the feed's real origin.
 EARLIEST_SAME_DAY_PUBLICATION_LOCAL = time(16, 0)
+# Conservative research tolerances, not rules issued by the ECB. A weekly
+# comparison cannot silently span 14 days because a fixing was missing.
+W1_MAX_ANCHOR_SLIPPAGE_DAYS = 4
+MN1_MAX_ANCHOR_SLIPPAGE_DAYS = 7
 
 
 def _blocked(reason: str) -> dict[str, Any]:
@@ -161,11 +165,22 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
     # before the target date, never interpolate missing weekends/holidays.
     def historical_window(calendar_days: int) -> dict[str, Any] | None:
         cutoff = latest - timedelta(days=calendar_days)
+        allowed_slippage = (W1_MAX_ANCHOR_SLIPPAGE_DAYS if calendar_days == 7
+                            else MN1_MAX_ANCHOR_SLIPPAGE_DAYS)
         candidates = [d for d in days if d <= cutoff]
         if candidates:
             start = candidates[-1]
-            if (latest - start).days <= calendar_days + 7:
-                return _reference_window(rows[start], new, start, latest)
+            actual_days = (latest - start).days
+            if actual_days <= calendar_days + allowed_slippage:
+                window = _reference_window(rows[start], new, start, latest)
+                if window is None:
+                    return None
+                return {
+                    **window,
+                    "target_calendar_days": calendar_days,
+                    "anchor_slippage_calendar_days": actual_days - calendar_days,
+                    "max_accepted_anchor_slippage_days": allowed_slippage,
+                }
             # Do not relabel a 60-day comparison as a 30-day period merely
             # because it is the nearest available older reference in XML.
             candidates = []
@@ -174,6 +189,7 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
             "reason": ("NO_REFERENCE_ON_OR_BEFORE_WEEK_START" if calendar_days == 7
                        else "NO_REFERENCE_ON_OR_BEFORE_MONTH_START"),
             "target_calendar_days": calendar_days,
+            "max_accepted_anchor_slippage_days": allowed_slippage,
             "end_reference_date": latest.isoformat(),
             "currency_strength_log_pp": {},
             "currency_order": [],

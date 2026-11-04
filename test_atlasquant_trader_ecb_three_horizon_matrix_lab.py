@@ -117,6 +117,35 @@ class ECBThreeHorizonMatrixLabTests(unittest.TestCase):
         self.assertEqual(horizon(result, frame="MN1")["research_state"],
                          "INSUFFICIENT_REFERENCE_HISTORY")
 
+    def test_weekly_anchor_14_days_old_is_not_mislabeled_as_one_week(self):
+        raw = xml_history([
+            ("2026-10-01", FIXES),
+            ("2026-10-20", {**FIXES, "USD": 1.09}),
+            ("2026-11-02", FIXES),
+            ("2026-11-03", {**FIXES, "USD": 1.11}),
+        ])
+        result = build(raw)
+        self.assertEqual(result["state"], "LAB_EXPOST_REFERENCE_MATRIX_ONLY")
+        self.assertEqual(horizon(result, frame="W1")["research_state"],
+                         "INSUFFICIENT_REFERENCE_HISTORY")
+        self.assertIsNone(horizon(result, frame="W1")["observed_reference_change_pct"])
+        self.assertEqual(result["currency_ranking_by_horizon"]["W1"], [])
+        self.assertEqual(horizon(result, frame="MN1")["research_state"],
+                         "EXPOST_REFERENCE_ONLY")
+        self.assertEqual(horizon(result, frame="W1")["operational_bias"], "AGUARDAR")
+
+    def test_weekly_actual_eight_day_reference_window_is_transparent(self):
+        raw = xml_history([
+            ("2026-10-26", FIXES),
+            ("2026-11-02", FIXES),
+            ("2026-11-03", {**FIXES, "USD": 1.11}),
+        ])
+        adapter = analyze_ecb_reference_xml(raw, now=NOW)
+        self.assertEqual(adapter["research_windows"]["W1"]["state"], "RESEARCH_ONLY")
+        self.assertEqual(adapter["research_windows"]["W1"]["target_calendar_days"], 7)
+        self.assertEqual(adapter["research_windows"]["W1"]["anchor_slippage_calendar_days"], 1)
+        self.assertEqual(adapter["research_windows"]["W1"]["calendar_days_between_fixes"], 8)
+
     def test_last_two_reference_days_cannot_be_fourteen_day_daily_return(self):
         raw = xml_history([
             ("2026-10-15", FIXES), ("2026-11-03", {**FIXES, "USD": 1.11}),
