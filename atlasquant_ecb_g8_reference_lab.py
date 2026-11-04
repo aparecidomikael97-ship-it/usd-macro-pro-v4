@@ -140,22 +140,28 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
         return _blocked("FUTURE_OR_INVALID_REFERENCE_DATE")
     old = rows[previous]
     new = rows[latest]
+    if (latest - previous).days > 7:
+        return _blocked("LAST_TWO_REFERENCE_DATES_TOO_FAR_APART_FOR_D1")
     daily = _reference_window(old, new, previous, latest)
     if daily is None:
         return _blocked("NUMERIC_RANGE_INVALID")
-    # W1 uses the most recent published reference on or before D1 minus
-    # seven calendar days, so weekends/ECB holidays never invent a fixing.
-    cutoff = latest - timedelta(days=7)
-    weekly_dates = [d for d in days if d <= cutoff]
-    if weekly_dates:
-        week_start = weekly_dates[-1]
-        weekly = _reference_window(rows[week_start], new, week_start, latest)
-        if weekly is None:
-            return _blocked("NUMERIC_RANGE_INVALID")
-    else:
-        weekly = {
+    # Research windows always use an actual historical ECB fixing on or
+    # before the target date, never interpolate missing weekends/holidays.
+    def historical_window(calendar_days: int) -> dict[str, Any] | None:
+        cutoff = latest - timedelta(days=calendar_days)
+        candidates = [d for d in days if d <= cutoff]
+        if candidates:
+            start = candidates[-1]
+            if (latest - start).days <= calendar_days + 7:
+                return _reference_window(rows[start], new, start, latest)
+            # Do not relabel a 60-day comparison as a 30-day period merely
+            # because it is the nearest available older reference in XML.
+            candidates = []
+        return {
             "state": "INSUFFICIENT_REFERENCE_HISTORY",
-            "reason": "NO_REFERENCE_ON_OR_BEFORE_WEEK_START",
+            "reason": ("NO_REFERENCE_ON_OR_BEFORE_WEEK_START" if calendar_days == 7
+                       else "NO_REFERENCE_ON_OR_BEFORE_MONTH_START"),
+            "target_calendar_days": calendar_days,
             "end_reference_date": latest.isoformat(),
             "currency_strength_log_pp": {},
             "currency_order": [],
@@ -165,6 +171,10 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
             "publishable": False,
             "trade_authorized": False,
         }
+    weekly = historical_window(7)
+    monthly = historical_window(30)
+    if weekly is None or monthly is None:
+        return _blocked("NUMERIC_RANGE_INVALID")
     result = _blocked("REFERENCE_ONLY_NOT_TRADEABLE")
     result.update({
         "state": "RESEARCH_ONLY", "complete_pairs": 28,
@@ -184,8 +194,9 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
         "currency_order": daily["currency_order"],
         "top10": daily["top10"],
         "max_algebraic_residual_log_pp": daily["max_algebraic_residual_log_pp"],
-        "research_windows": {"D1": daily, "W1": weekly},
-        "notice": "Historical ECB daily reference, not Forex live, spread, signal, or accuracy.",
+        "research_windows": {"D1": daily, "W1": weekly, "MN1": monthly},
+        "monthly_window_is_rolling_30_calendar_days": True,
+        "notice": "Historical ECB reference only: D1/W1/MN1 are ex-post, not Forex live, spread, signal or accuracy.",
     })
     return result
 
