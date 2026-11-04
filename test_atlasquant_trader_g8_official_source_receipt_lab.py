@@ -350,6 +350,59 @@ class G8BilateralReceiptCoverageLabTests(unittest.TestCase):
                 self.assertEqual(out["state"], "LAB_BLOCKED")
                 self.assertFalse(out["trade_authorized"])
 
+    def test_same_source_event_time_cannot_be_counted_twice_under_new_id(self):
+        first = released(event_id="CPI_FIRST_NAME")
+        second = released(event_id="CPI_SECOND_NAME")
+        second["excerpt_utf8"] += " Different claimed content."
+        second["claimed_sha256"] = sha256(
+            second["excerpt_utf8"].encode()).hexdigest()
+        result = audit_receipts([first, second])
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+        self.assertEqual(result["reason"],
+                         "DUPLICATE_SOURCE_EVENT_TIME_WITH_DIFFERENT_ID")
+        self.assertFalse(result["trade_authorized"])
+
+    def test_same_source_instant_z_and_utc_offset_are_one_event(self):
+        first = released(event_id="CPI_EVENT_A")
+        second = released(event_id="CPI_EVENT_B")
+        second["event_at_utc"] = "2026-10-20T10:00:00+00:00"
+        result = audit_receipts([first, second])
+        self.assertEqual(result["reason"],
+                         "DUPLICATE_SOURCE_EVENT_TIME_WITH_DIFFERENT_ID")
+
+    def test_scheduled_receipts_cannot_duplicate_same_event_with_new_id(self):
+        first = sample()
+        second = sample()
+        second["event_id"] = "CPI_SCHEDULE_B"
+        result = audit_receipts([first, second])
+        self.assertEqual(result["reason"],
+                         "DUPLICATE_SOURCE_EVENT_TIME_WITH_DIFFERENT_ID")
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+
+    def test_two_distinct_instant_claims_from_one_source_not_conflated(self):
+        first = released(event_id="CPI_OLD")
+        second = released(event_id="CPI_NEW")
+        second["event_at_utc"] = "2026-10-21T10:00:00Z"
+        second["published_at_utc"] = "2026-10-21T10:05:00Z"
+        second["captured_at_utc"] = "2026-10-21T11:00:00Z"
+        report = audit_receipts([first, second])
+        self.assertEqual(report["state"],
+                         "LAB_G8_BILATERAL_DOCUMENTARY_COVERAGE_ONLY")
+        self.assertEqual(report["released_context_claims_received"], 2)
+        self.assertTrue(report["same_source_event_instant_dedup_checked"])
+        self.assertTrue(report["declared_event_ids_are_not_independent_evidence"])
+        self.assertFalse(report["source_original_authenticated"])
+
+    def test_different_source_leads_may_report_same_event_time_unattested(self):
+        report = audit_receipts([
+            released("US_BLS_CPI", event_id="USD_CPI"),
+            released("EU_EUROSTAT_HICP", event_id="EUR_HICP"),
+        ])
+        self.assertEqual(report["state"],
+                         "LAB_G8_BILATERAL_DOCUMENTARY_COVERAGE_ONLY")
+        self.assertEqual(report["released_context_claims_received"], 2)
+        self.assertFalse(report["macro_explanation_verified"])
+
     def test_duplicate_source_event_or_invalid_batch_is_rejected(self):
         item = released()
         self.assertEqual(audit_receipts([item, copy.deepcopy(item)])["reason"],

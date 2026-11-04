@@ -65,6 +65,9 @@ def audit_g8_bilateral_macro_receipts_lab(
         (c, f): [] for c in CURRENCIES for f in FAMILIES
     }
     event_keys: set[tuple[str, str]] = set()
+    # Different caller-chosen IDs cannot turn the exact same source,
+    # event kind and event instant into two documentary observations.
+    source_event_instants: set[tuple[str, str, str]] = set()
     scheduled_claims = 0
     for item in raw_receipts:
         result = inspect_claimed_macro_receipt_lab(
@@ -79,7 +82,11 @@ def audit_g8_bilateral_macro_receipts_lab(
         key = (source_id, event_id)
         if key in event_keys:
             return _blocked("DUPLICATE_SOURCE_EVENT_RECEIPT")
+        instant_key = (source_id, meta["kind"], meta["event_at_utc"])
+        if instant_key in source_event_instants:
+            return _blocked("DUPLICATE_SOURCE_EVENT_TIME_WITH_DIFFERENT_ID")
         event_keys.add(key)
+        source_event_instants.add(instant_key)
         if meta["kind"] == "SCHEDULED":
             scheduled_claims += 1
             continue
@@ -172,6 +179,8 @@ def audit_g8_bilateral_macro_receipts_lab(
         "currency_count": len(contexts), "pair_count": len(pairs),
         "currencies": contexts, "pairs": pairs,
         "claimed_receipts_received": len(event_keys),
+        "same_source_event_instant_dedup_checked": True,
+        "declared_event_ids_are_not_independent_evidence": True,
         "released_context_claims_received": sum(
             len(values) for values in found.values()),
         "scheduled_claims_not_counted_as_releases": scheduled_claims,
