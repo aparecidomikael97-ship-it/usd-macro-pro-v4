@@ -469,6 +469,193 @@ class G8BilateralReceiptCoverageLabTests(unittest.TestCase):
         self.assertFalse(out["three_daily_refreshes_running"])
         self.assertEqual(out["operational_bias"], "AGUARDAR")
 
+class ManualSingleHttpsObservationLabTests(unittest.TestCase):
+    """Mocked HTTP. THESE TESTS NEVER CONTACT AN OFFICIAL WEBSITE."""
+
+    def _fake_opener(self, *, body=b"<html>fictional LAB fixture</html>",
+                     url=None, status=200, headers=None, error=None):
+        from atlasquant_trader_g8_official_source_receipt_lab import SOURCES
+        url = url or SOURCES["US_BLS_CPI"]["documentation_url"]
+
+        class Response:
+            def __init__(self):
+                self.status = status
+                self.headers = headers if headers is not None else {
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Content-Length": str(len(body)),
+                    "Date": "Tue, 03 Nov 2026 08:00:00 GMT",
+                }
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def geturl(self):
+                return url
+
+            def read(self, size=-1):
+                return body if size < 0 else body[:size]
+
+        class Opener:
+            def open(self, request, timeout):
+                self.request = request
+                self.timeout = timeout
+                if error is not None:
+                    raise error
+                return Response()
+
+        return Opener()
+
+    def test_manual_probe_disabled_by_default_does_not_touch_network(self):
+        from unittest.mock import patch
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            probe_g8_documentation_lead_once_lab,
+        )
+        with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                   side_effect=AssertionError("no HTTP without opt-in")):
+            out = probe_g8_documentation_lead_once_lab("US_BLS_CPI")
+        self.assertEqual(out["state"], "LAB_HTTP_OBSERVATION_BLOCKED")
+        self.assertEqual(out["reason"], "MANUAL_HTTP_OPT_IN_REQUIRED")
+        self.assertEqual(out["external_http_requests"], 0)
+        self.assertFalse(out["trade_authorized"])
+
+    def test_unknown_source_and_invalid_timeout_fail_before_http(self):
+        from unittest.mock import patch
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            probe_g8_documentation_lead_once_lab as probe,
+        )
+        with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                   side_effect=AssertionError("must not call network")):
+            for name in ("UNKNOWN", "US_BLS_CPI_EVIL", None):
+                self.assertEqual(probe(name, manually_authorized=True)
+                                 ["external_http_requests"], 0)
+            for t in (-1, 0, 16, True, 3.5, None):
+                self.assertEqual(probe("US_BLS_CPI", manually_authorized=True,
+                                       timeout_seconds=t)["reason"],
+                                 "UNBOUNDED_HTTP_TIMEOUT")
+
+    def test_manual_one_response_is_observation_not_economic_release(self):
+        from unittest.mock import patch
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            probe_g8_documentation_lead_once_lab as probe,
+        )
+        data = b"<html>LAB dummy page; not a CPI release</html>"
+        fake = self._fake_opener(body=data)
+        started = datetime.now(timezone.utc)
+        with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                   return_value=fake) as opened:
+            out = probe("US_BLS_CPI", manually_authorized=True, timeout_seconds=4)
+        self.assertEqual(out["state"],
+                         "LAB_CURRENT_OFFICIAL_HOST_HTTP_RESPONSE_OBSERVED")
+        self.assertEqual(out["external_http_requests"], 1)
+        self.assertEqual(out["http_response_content_sha256"], sha256(data).hexdigest())
+        self.assertEqual(out["http_response_bytes"], len(data))
+        self.assertEqual(fake.request.get_method(), "GET")
+        self.assertEqual(fake.request.full_url, SOURCES["US_BLS_CPI"]["documentation_url"])
+        self.assertEqual(fake.timeout, 4)
+        self.assertEqual(opened.call_count, 1)
+        self.assertLess((datetime.fromisoformat(out["observed_at_local_system_utc"])
+                         - started).total_seconds(), 10)
+        for key in ("original_publisher_payload_authenticated",
+                    "historical_point_in_time_availability_verified",
+                    "economic_indicator_value_extracted", "trade_authorized",
+                    "publishable", "can_feed_live_radar", "worker_enabled",
+                    "scheduler_enabled"):
+            self.assertFalse(out[key], key)
+        self.assertTrue(out["tls_standard_ca_validation_requested"])
+        self.assertFalse(out["http_redirects_followed"])
+        self.assertEqual(out["new_cost_brl"], 0)
+
+    def test_each_catalogued_documentation_url_can_be_requested_once(self):
+        from unittest.mock import patch
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            probe_g8_documentation_lead_once_lab as probe,
+        )
+        for source_id, lead in SOURCES.items():
+            with self.subTest(source_id=source_id):
+                fake = self._fake_opener(url=lead["documentation_url"])
+                with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                           return_value=fake):
+                    out = probe(source_id, manually_authorized=True)
+                self.assertEqual(out["state"],
+                                 "LAB_CURRENT_OFFICIAL_HOST_HTTP_RESPONSE_OBSERVED")
+                self.assertEqual(fake.request.full_url, lead["documentation_url"])
+                self.assertFalse(out["original_publisher_payload_authenticated"])
+
+    def test_redirects_are_not_followed_and_final_url_is_pinned(self):
+        from unittest.mock import patch
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            _RejectRedirect, probe_g8_documentation_lead_once_lab as probe,
+        )
+        self.assertIsNone(_RejectRedirect().redirect_request(
+            None, None, 302, "Found", {}, "https://example.org/outside"))
+        fake = self._fake_opener(url="https://www.bls.gov/unreviewed")
+        with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                   return_value=fake):
+            out = probe("US_BLS_CPI", manually_authorized=True)
+        self.assertEqual(out["reason"], "HTTP_FINAL_URL_DIFFERS_FROM_ALLOWLIST")
+        self.assertEqual(out["external_http_requests"], 1)
+        self.assertFalse(out["http_endpoint_observed_this_session"])
+
+    def test_http_status_and_malformed_media_are_refused(self):
+        from unittest.mock import patch
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            probe_g8_documentation_lead_once_lab as probe,
+        )
+        for kind, opts, reason in (
+            ("status", {"status": 503}, "HTTP_STATUS_NOT_200"),
+            ("media", {"headers": {"Content-Type": "image/svg+xml"}},
+             "UNSUPPORTED_RESPONSE_MEDIA_TYPE"),
+            ("gzip", {"headers": {
+                "Content-Type": "text/html", "Content-Encoding": "gzip"}},
+             "ENCODED_HTTP_BODY_NOT_SUPPORTED"),
+        ):
+            with self.subTest(kind=kind):
+                with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                           return_value=self._fake_opener(**opts)):
+                    out = probe("US_BLS_CPI", manually_authorized=True)
+                self.assertEqual(out["reason"], reason)
+                self.assertEqual(out["external_http_requests"], 1)
+
+    def test_body_size_and_declared_content_length_fail_closed(self):
+        from unittest.mock import patch
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            MAX_BODY_BYTES, probe_g8_documentation_lead_once_lab as probe,
+        )
+        for kind, opts, reason in (
+            ("empty", {"body": b""}, "HTTP_BODY_TOO_LARGE_OR_EMPTY"),
+            ("huge", {"body": b"Z" * (MAX_BODY_BYTES + 2)},
+             "HTTP_BODY_TOO_LARGE_OR_EMPTY"),
+            ("lying", {"body": b"abc", "headers": {
+                "Content-Type": "text/html", "Content-Length": "8"}},
+             "HTTP_CONTENT_LENGTH_MISMATCH"),
+            ("invalid", {"headers": {
+                "Content-Type": "text/html", "Content-Length": "fake"}},
+             "INVALID_HTTP_CONTENT_LENGTH"),
+        ):
+            with self.subTest(kind=kind):
+                with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                           return_value=self._fake_opener(**opts)):
+                    out = probe("US_BLS_CPI", manually_authorized=True)
+                self.assertEqual(out["reason"], reason)
+                self.assertEqual(out["external_http_requests"], 1)
+
+    def test_transport_failure_is_not_misreported_as_valid_response(self):
+        from unittest.mock import patch
+        from urllib.error import URLError
+        from atlasquant_trader_g8_single_https_probe_lab import (
+            probe_g8_documentation_lead_once_lab as probe,
+        )
+        with patch("atlasquant_trader_g8_single_https_probe_lab.build_opener",
+                   return_value=self._fake_opener(error=URLError("no connection"))):
+            out = probe("US_BLS_CPI", manually_authorized=True)
+        self.assertEqual(out["state"], "LAB_HTTP_OBSERVATION_BLOCKED")
+        self.assertEqual(out["reason"], "HTTPS_REQUEST_FAILED_URLError")
+        self.assertEqual(out["external_http_requests"], 1)
+        self.assertFalse(out["http_endpoint_observed_this_session"])
+
 
 if __name__ == "__main__":
     unittest.main()
