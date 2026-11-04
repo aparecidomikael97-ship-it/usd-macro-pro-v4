@@ -59,6 +59,7 @@ def _claim(value: Any, *, currencies: set[str], now: datetime) -> dict | None:
     surprise = value.get("actual_minus_consensus")
     actual = value.get("actual_synthetic")
     consensus = value.get("consensus_synthetic")
+    previous = value.get("previous_synthetic")
     cls = value.get("surprise_class")
     # Never accept a post-release "consensus" as if it were an ex-ante
     # benchmark. Independently recompute the numerical surprise instead
@@ -73,15 +74,28 @@ def _claim(value: Any, *, currencies: set[str], now: datetime) -> dict | None:
             or value.get("strength_direction") != "AGUARDAR"
             or any(isinstance(x, bool) or not isinstance(x, (int, float))
                    or not isfinite(x) for x in (surprise, actual, consensus))
+            or (previous is not None and
+                (isinstance(previous, bool) or not isinstance(previous, (int, float))
+                 or not isfinite(previous)))
             or abs((actual - consensus) - surprise) > 1e-8 * max(1.0, abs(surprise))
             or (cls == "ABOVE_CONSENSUS" and surprise <= 0)
             or (cls == "BELOW_CONSENSUS" and surprise >= 0)):
         return None
     # IN_LINE_WITH_CONSENSUS may legitimately have a nonzero delta:
     # the parent dossier's predeclared deadband is not in this contract.
-    return {"timestamp": timestamp, "consensus_at": consensus_at,
-            "currency": value["currency"], "event_id": value["event_id"],
-            "surprise_class": cls}
+    return {
+        "timestamp": timestamp, "consensus_at": consensus_at,
+        "currency": value["currency"], "event_id": value["event_id"],
+        "surprise_class": cls,
+        # A single macro event can appear in up to seven FX pairs and in
+        # overlapping D1/W1/MN1 windows. It must have the SAME documentary
+        # values everywhere; repetition is not independent corroboration.
+        "documentary_fingerprint": (
+            value["currency"], timestamp, consensus_at,
+            value.get("indicator"), value.get("unit"), previous,
+            consensus, actual, surprise, cls,
+        ),
+    }
 
 
 def _calendar_classification(timestamp: datetime, start: date, end: date) -> str:
@@ -140,6 +154,7 @@ def build_ecb_macro_timing_bridge_lab(
 
     if set(mr) != set(OFFICIAL_PAIRS):
         return _refuse("COBERTURA_28_PARES_INCOMPLETA")
+    event_ledger: dict[str, tuple[Any, ...]] = {}
     compared = []
     for row in ecb["pair_explanations"]:
         pair, base, quote = row["pair"], row["base"], row["quote"]
@@ -174,6 +189,12 @@ def build_ecb_macro_timing_bridge_lab(
                 if c is None or c["event_id"] in event_ids:
                     return _refuse("CLAIM_MACRO_INVALIDA_DUPLICADA_OU_FUTURA")
                 event_ids.add(c["event_id"])
+                identity = c["event_id"]
+                fingerprint = c["documentary_fingerprint"]
+                if (identity in event_ledger and
+                        event_ledger[identity] != fingerprint):
+                    return _refuse("EVENTO_MACRO_CONTRADITORIO_ENTRE_PARES_OU_HORIZONTES")
+                event_ledger[identity] = fingerprint
                 alignments.append({
                     "currency": c["currency"], "event_id": c["event_id"],
                     "surprise_class_unattested": c["surprise_class"],
@@ -208,6 +229,9 @@ def build_ecb_macro_timing_bridge_lab(
         "same_day_release_order_is_unverified": True,
         "macro_window_is_as_of_clock_not_exact_ecb_fix_window": True,
         "context_is_caller_supplied_unattested": True,
+        "cross_pair_macro_event_consistency_checked": True,
+        "distinct_unattested_macro_events": len(event_ledger),
+        "repeated_claims_are_not_independent_evidence": True,
         "explanation": ("Coincidência temporal entre resultado econômico e mudança "
                         "de referência não comprova causa. Publicação após a "
                         "referência não pode explicar o movimento anterior."),

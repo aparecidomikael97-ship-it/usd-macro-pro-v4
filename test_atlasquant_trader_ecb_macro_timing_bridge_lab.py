@@ -257,6 +257,80 @@ class ECBMacroTimingBridgeLabTests(unittest.TestCase):
         pair_frame(report)["macro_surprise_claims"] = [c]
         self.assertEqual(build(report)["state"], "LAB_TEMPORAL_CONTEXT_ONLY")
 
+    def test_same_macro_event_repeated_in_two_pairs_and_horizons_is_consistent(self):
+        report = mock_dossier()
+        c = claim()
+        pair_frame(report, "EUR/USD", "D1")["macro_surprise_claims"] = [deepcopy(c)]
+        pair_frame(report, "GBP/USD", "W1")["macro_surprise_claims"] = [deepcopy(c)]
+        out = build(report)
+        self.assertEqual(out["state"], "LAB_TEMPORAL_CONTEXT_ONLY")
+        self.assertEqual(out["distinct_unattested_macro_events"], 1)
+        self.assertTrue(out["cross_pair_macro_event_consistency_checked"])
+        self.assertTrue(out["repeated_claims_are_not_independent_evidence"])
+        self.assertFalse(out["cause_verified"])
+        self.assertEqual(out["operational_bias"], "AGUARDAR")
+
+    def test_conflicting_values_of_same_event_are_refused_between_pairs(self):
+        report = mock_dossier()
+        first, second = claim(), claim()
+        second["actual_synthetic"] = 3.5
+        second["actual_minus_consensus"] = 0.5
+        pair_frame(report, "EUR/USD", "W1")["macro_surprise_claims"] = [first]
+        pair_frame(report, "GBP/USD", "W1")["macro_surprise_claims"] = [second]
+        out = build(report)
+        self.assertEqual(out["state"], "LAB_BLOCKED")
+        self.assertEqual(out["reason"],
+                         "EVENTO_MACRO_CONTRADITORIO_ENTRE_PARES_OU_HORIZONTES")
+        self.assertFalse(out["trade_authorized"])
+
+    def test_same_event_cannot_change_currency_metadata_or_release_time(self):
+        for kind in ("currency", "indicator", "unit", "previous", "release",
+                     "consensus_time", "surprise_class"):
+            with self.subTest(kind=kind):
+                report = mock_dossier()
+                first, second = claim(), claim()
+                if kind == "currency":
+                    second["currency"] = "GBP"
+                elif kind == "indicator":
+                    second["indicator"] = "NFP"
+                elif kind == "unit":
+                    second["unit"] = "PERCENT"
+                elif kind == "previous":
+                    second["previous_synthetic"] = 2.0
+                elif kind == "release":
+                    second["released_at_utc"] = "2026-11-02T13:00:00+00:00"
+                elif kind == "consensus_time":
+                    second["consensus_captured_at_utc"] = "2026-11-01T11:00:00+00:00"
+                else:
+                    second["surprise_class"] = "IN_LINE_WITH_CONSENSUS"
+                pair_frame(report, "EUR/USD", "W1")["macro_surprise_claims"] = [first]
+                pair_frame(report, "GBP/USD", "MN1")["macro_surprise_claims"] = [second]
+                out = build(report)
+                self.assertEqual(out["state"], "LAB_BLOCKED")
+                self.assertEqual(out["reason"],
+                                 "EVENTO_MACRO_CONTRADITORIO_ENTRE_PARES_OU_HORIZONTES")
+                self.assertFalse(out["publishable"])
+
+    def test_same_event_repeated_with_equivalent_timezone_clock_is_allowed(self):
+        report = mock_dossier()
+        first, second = claim(), claim()
+        second["released_at_utc"] = "2026-11-02T09:00:00-03:00"
+        second["consensus_captured_at_utc"] = "2026-11-01T09:00:00-03:00"
+        pair_frame(report, "EUR/USD", "W1")["macro_surprise_claims"] = [first]
+        pair_frame(report, "GBP/USD", "MN1")["macro_surprise_claims"] = [second]
+        out = build(report)
+        self.assertEqual(out["state"], "LAB_TEMPORAL_CONTEXT_ONLY")
+        self.assertEqual(out["distinct_unattested_macro_events"], 1)
+
+    def test_different_event_ids_not_mistaken_for_documentary_conflicts(self):
+        report = mock_dossier()
+        pair_frame(report, "EUR/USD", "W1")["macro_surprise_claims"] = [claim(event="US_CPI_X")]
+        pair_frame(report, "GBP/USD", "W1")["macro_surprise_claims"] = [claim(event="US_CPI_Y")]
+        out = build(report)
+        self.assertEqual(out["state"], "LAB_TEMPORAL_CONTEXT_ONLY")
+        self.assertEqual(out["distinct_unattested_macro_events"], 2)
+        self.assertFalse(out["trade_authorized"])
+
     def test_no_network_cost_cron_worker_or_deploy(self):
         with patch("urllib.request.urlopen", side_effect=AssertionError("network")):
             out = build()
