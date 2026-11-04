@@ -112,6 +112,17 @@ class ECBMacroTimingBridgeLabTests(unittest.TestCase):
         self.assertEqual({x["calendar_relation"] for x in align},
                          {"MESMO_DIA_DA_FIXACAO_ORDEM_INTRADIA_DESCONHECIDA"})
 
+    def test_late_utc_news_belongs_to_next_european_calendar_date(self):
+        report = mock_dossier()
+        # 23:30 UTC on 3 Nov is already 00:30 CET on 4 Nov; the ECB
+        # historical fixing ended on 3 Nov and cannot react to this news.
+        pair_frame(report)["macro_surprise_claims"] = [
+            claim("2026-11-03T23:30:00+00:00")
+        ]
+        align = pair_frame(build(report))["calendar_alignments"][0]
+        self.assertEqual(align["calendar_relation"],
+                         "DIVULGADO_DEPOIS_DA_REFERENCIA_BCE")
+
     def test_before_window_is_not_same_as_inside(self):
         report = mock_dossier()
         pair_frame(report)["macro_surprise_claims"] = [claim("2026-10-26T10:00:00+00:00")]

@@ -109,7 +109,7 @@ class ECBThreeHorizonMatrixLabTests(unittest.TestCase):
 
     def test_monthly_anchor_more_than_seven_days_past_target_is_rejected(self):
         raw = xml_history([
-            ("2026-09-20", FIXES), ("2026-11-02", FIXES),
+            ("2026-09-21", FIXES), ("2026-11-02", FIXES),
             ("2026-11-03", {**FIXES, "USD": 1.11}),
         ])
         result = build(raw)
@@ -150,6 +150,54 @@ class ECBThreeHorizonMatrixLabTests(unittest.TestCase):
         self.assertFalse(out["calendar_and_news_realtime_verified"])
         self.assertFalse(out["three_daily_updates_verified"])
         self.assertEqual(out["operational_bias"], "AGUARDAR")
+
+    def test_same_day_reference_not_available_before_european_publication(self):
+        raw = xml_history([
+            ("2026-11-03", FIXES),
+            ("2026-11-04", {**FIXES, "USD": 1.11}),
+        ])
+        before = datetime(2026, 11, 4, 14, 59, tzinfo=timezone.utc)
+        after = datetime(2026, 11, 4, 15, 1, tzinfo=timezone.utc)
+        early = build(raw, at=before)
+        self.assertEqual(early["state"], "LAB_BLOCKED")
+        self.assertIn("SAME_DAY_FIX_BEFORE_USUAL_ECB_PUBLICATION", early["reason"])
+        allowed = build(raw, at=after)
+        self.assertEqual(allowed["state"], "LAB_EXPOST_REFERENCE_MATRIX_ONLY")
+        self.assertEqual(allowed["reference_age_days"], 0)
+        self.assertFalse(allowed["ecb_original_bytes_authenticated"])
+        self.assertEqual(allowed["operational_bias"], "AGUARDAR")
+
+    def test_summer_daylight_saving_shifts_publication_guard_in_utc(self):
+        raw = xml_history([
+            ("2026-06-30", FIXES),
+            ("2026-07-01", {**FIXES, "USD": 1.11}),
+        ])
+        early = build(raw, at=datetime(2026, 7, 1, 13, 59, tzinfo=timezone.utc))
+        late = build(raw, at=datetime(2026, 7, 1, 14, 1, tzinfo=timezone.utc))
+        self.assertEqual(early["state"], "LAB_BLOCKED")
+        self.assertIn("SAME_DAY_FIX_BEFORE_USUAL_ECB_PUBLICATION", early["reason"])
+        self.assertEqual(late["state"], "LAB_EXPOST_REFERENCE_MATRIX_ONLY")
+        self.assertEqual(late["reference_age_days"], 0)
+        self.assertFalse(late["publishable"])
+
+    def test_forged_weekend_fix_is_rejected_not_used_as_daily_strength(self):
+        raw = xml_history([
+            ("2026-11-06", FIXES),
+            ("2026-11-07", {**FIXES, "USD": 1.11}),
+        ])
+        result = build(raw, at=datetime(2026, 11, 9, 18, tzinfo=timezone.utc))
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+        self.assertIn("NON_WORKING_WEEKEND_REFERENCE_DATE", result["reason"])
+
+    def test_forged_older_weekend_anchor_cannot_distort_month_strength(self):
+        raw = xml_history([
+            ("2026-10-03", FIXES),  # historical Saturday, not just latest
+            ("2026-11-02", FIXES),
+            ("2026-11-03", {**FIXES, "USD": 1.11}),
+        ])
+        result = build(raw)
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+        self.assertIn("NON_WORKING_WEEKEND_REFERENCE_DATE", result["reason"])
 
     def test_adapter_mn1_and_matrix_use_same_window_values(self):
         raw = sample()

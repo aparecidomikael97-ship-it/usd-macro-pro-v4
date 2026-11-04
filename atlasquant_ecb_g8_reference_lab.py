@@ -6,10 +6,11 @@ ECB fixes are daily informational references, not executable bid/ask prices.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from math import expm1, isfinite, log
 from typing import Any
 from xml.etree import ElementTree as ET
+from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 
@@ -17,6 +18,11 @@ SCHEMA = "ATLASQUANT_ECB_G8_REFERENCE_LAB_V1"
 EUR_CROSSES = frozenset(CURRENCIES) - {"EUR"}
 OFFICIAL_REFERENCE_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 MAX_XML_BYTES = 600_000
+ECB_PUBLICATION_ZONE = ZoneInfo("Europe/Brussels")
+# The ECB normally publishes around 16:00 European local time on working
+# days. This lower-bound guard prevents using an allegedly same-day fixing
+# *before* that window. Passing it does not attest the feed's real origin.
+EARLIEST_SAME_DAY_PUBLICATION_LOCAL = time(16, 0)
 
 
 def _blocked(reason: str) -> dict[str, Any]:
@@ -136,8 +142,14 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
         return _blocked("XML_INVALID_OR_INCOMPLETE_G8")
     days = sorted(rows)
     latest, previous = days[-1], days[-2]
-    if latest > current.date() or previous >= latest:
+    ecb_local_clock = current.astimezone(ECB_PUBLICATION_ZONE)
+    if latest > ecb_local_clock.date() or previous >= latest:
         return _blocked("FUTURE_OR_INVALID_REFERENCE_DATE")
+    if any(observation.weekday() >= 5 for observation in days):
+        return _blocked("NON_WORKING_WEEKEND_REFERENCE_DATE")
+    if (latest == ecb_local_clock.date()
+            and ecb_local_clock.time() < EARLIEST_SAME_DAY_PUBLICATION_LOCAL):
+        return _blocked("SAME_DAY_FIX_BEFORE_USUAL_ECB_PUBLICATION")
     old = rows[previous]
     new = rows[latest]
     if (latest - previous).days > 7:
@@ -180,8 +192,10 @@ def analyze_ecb_reference_xml(xml_data: bytes, *, now: datetime | None = None) -
         "state": "RESEARCH_ONLY", "complete_pairs": 28,
         "reference_date": latest.isoformat(),
         "previous_reference_date": previous.isoformat(),
-        "reference_age_days": (current.date() - latest).days,
-        "same_day_reference": current.date() == latest,
+        "reference_age_days": (ecb_local_clock.date() - latest).days,
+        "same_day_reference": ecb_local_clock.date() == latest,
+        "same_day_publication_time_only_a_lower_bound": True,
+        "ecb_original_publication_timestamp_verified": False,
         "source_claim": "ECB_EURO_REFERENCE_XML_OFFLINE",
         "official_documentation_url": OFFICIAL_REFERENCE_URL,
         "direct_eur_fixes": 7,

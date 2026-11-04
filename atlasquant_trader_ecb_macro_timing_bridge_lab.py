@@ -10,6 +10,7 @@ from datetime import date, datetime, timezone
 from math import isfinite
 from typing import Any, Mapping
 
+from atlasquant_ecb_g8_reference_lab import ECB_PUBLICATION_ZONE
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_ecb_horizon_context_lab import build_ecb_horizon_context_lab
 
@@ -71,7 +72,9 @@ def _claim(value: Any, *, currencies: set[str], now: datetime) -> dict | None:
 
 
 def _calendar_classification(timestamp: datetime, start: date, end: date) -> str:
-    day = timestamp.date()
+    # The ECB fixing is labeled by a European calendar date. A late UTC
+    # release can already belong to the NEXT European business date.
+    day = timestamp.astimezone(ECB_PUBLICATION_ZONE).date()
     if day < start:
         return "DIVULGADO_ANTES_DA_JANELA_BCE"
     if day > end:
