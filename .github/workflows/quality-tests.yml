@@ -627,5 +627,7 @@ jobs:
             test_atlasquant_aion_v224_owner_signature_ceremony.py \
             test_atlasquant_aion_v225_explicit_owner_decision_record.py \
             test_atlasquant_aion_v226_owner_decision_persistence_attestation.py
+          python -m pytest -q \
+            test_atlasquant_m15_execution_replay_lab.py
           python -m pytest -q -s \
             test_atlasquant_aion_chat_browser.py
