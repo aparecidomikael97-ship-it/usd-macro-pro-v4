@@ -96,8 +96,9 @@ continuam abertas. Na ausência de vínculo direto, **pausar e perguntar**.
 ## Situação do checkpoint
 
 Em 04/11/2026, PR #1803 é a revisão canônica de **laboratório**. A rodada
-mais recente de testes de módulos Trader `*lab.py` alcançou **208 testes
-locais aprovados** (incluindo os 13 novos de revisão do calendário 3×/dia).
+mais recente de testes de módulos Trader `*lab.py` alcançou **220 testes
+locais aprovados** (incluindo 12 novos sobre a coerência dos bytes
+documentais e os hashes declarados pelo calendário).
 Uma nova rodada de CI **não foi confirmada** para este último bloco. Os
 coletores contínuos e três jobs diários **não estão ativados**. Não foi
 feito merge, deploy, atualização de aplicação publicada, uso de Worker
