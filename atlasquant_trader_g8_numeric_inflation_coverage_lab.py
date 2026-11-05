@@ -26,6 +26,9 @@ from atlasquant_trader_statcan_cad_cpi_table_text_lab import (
 from atlasquant_trader_statsnz_nzd_cpi_quarter_text_lab import (
     parse_statsnz_nzd_cpi_sep2026_quarter_text_lab,
 )
+from atlasquant_trader_abs_aud_cpi_monthly_text_lab import (
+    parse_abs_aud_cpi_sep2026_monthly_text_lab,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_G8_NUMERIC_INFLATION_COVERAGE_LAB_V1"
 MISSING = "NO_NUMERIC_INFLATION_CAPTURE_SUPPLIED"
@@ -83,8 +86,10 @@ def _capture(
             parsed = parse_jp_national_cpi_summary_text_lab(raw, observed_at_utc=stamp)
         elif currency == "CAD":
             parsed = parse_statcan_cad_all_items_table_text_lab(raw, observed_at_utc=stamp)
-        else:
+        elif currency == "NZD":
             parsed = parse_statsnz_nzd_cpi_sep2026_quarter_text_lab(raw, observed_at_utc=stamp)
+        else:
+            parsed = parse_abs_aud_cpi_sep2026_monthly_text_lab(raw, observed_at_utc=stamp)
     except (TypeError, ValueError, OverflowError):
         return None
     if currency == "EUR":
@@ -148,7 +153,7 @@ def _capture(
         estimated = None
         kind = "STATCAN_CAD_CPI_ALL_ITEMS_NSA_2002_BASE_YOY_TRANSCRIBED_TEXT"
         prior_year = None
-    else:
+    elif currency == "NZD":
         if (parsed.get("state") != "LAB_NZD_QUARTERLY_CPI_TEXT_QUARANTINED"
                 or parsed.get("currency") != "NZD"
                 or parsed.get("observation_frequency") != "QUARTERLY"):
@@ -158,10 +163,21 @@ def _capture(
         estimated = None
         kind = "STATS_NZ_CPI_ALL_GROUPS_QUARTERLY_YOY_TRANSCRIBED_TEXT"
         prior_year = None
+    else:
+        if (parsed.get("state") != "LAB_AUD_ABS_MONTHLY_CPI_SUPPLIED_TEXT_QUARANTINED"
+                or parsed.get("currency") != "AUD"
+                or parsed.get("observation_frequency") != "MONTHLY"
+                or parsed.get("seasonally_adjusted") is not False):
+            return None
+        month = parsed.get("observation_period")
+        rate = parsed.get("headline_cpi_all_groups_annual_change_percent_claim")
+        estimated = None
+        kind = "ABS_AUD_CPI_ALL_GROUPS_ORIGINAL_MONTHLY_YOY_TRANSCRIBED_TEXT"
+        prior_year = None
     frequency = "QUARTERLY" if currency == "NZD" else "MONTHLY"
     period = parsed.get("observation_period") if currency == "NZD" else month
     return {
-        "status": SUPPLIED_TEXT if currency in ("JPY", "CAD", "NZD") else OBSERVED,
+        "status": SUPPLIED_TEXT if currency in ("JPY", "CAD", "NZD", "AUD") else OBSERVED,
         "observation_month": month,
         "observation_period": period,
         "observation_frequency": frequency,
@@ -181,6 +197,7 @@ def build_g8_numeric_inflation_coverage_lab(
     jpy_national_page_text_raw: Any = None, jpy_capture_utc: Any = None,
     cad_nsa_table_text_raw: Any = None, cad_capture_utc: Any = None,
     nzd_quarter_page_text_raw: Any = None, nzd_capture_utc: Any = None,
+    aud_monthly_page_text_raw: Any = None, aud_capture_utc: Any = None,
 ) -> dict[str, Any]:
     """Inventory source coverage for all canonical 28 crosses, no FX bias."""
     as_of = _utc(as_of_utc)
@@ -192,7 +209,8 @@ def build_g8_numeric_inflation_coverage_lab(
     jpy = _capture(jpy_national_page_text_raw, jpy_capture_utc, as_of, "JPY")
     cad = _capture(cad_nsa_table_text_raw, cad_capture_utc, as_of, "CAD")
     nzd = _capture(nzd_quarter_page_text_raw, nzd_capture_utc, as_of, "NZD")
-    if any(x is None for x in (eur, usd, gbp, jpy, cad, nzd)):
+    aud = _capture(aud_monthly_page_text_raw, aud_capture_utc, as_of, "AUD")
+    if any(x is None for x in (eur, usd, gbp, jpy, cad, nzd, aud)):
         return _blocked("MALFORMED_OR_FUTURE_SOURCE_CAPTURE")
 
     source_leads = {
@@ -205,7 +223,8 @@ def build_g8_numeric_inflation_coverage_lab(
     for currency in CURRENCIES:
         row = (eur if currency == "EUR" else usd if currency == "USD"
                else gbp if currency == "GBP" else jpy if currency == "JPY"
-               else cad if currency == "CAD" else nzd if currency == "NZD" else {
+               else cad if currency == "CAD" else nzd if currency == "NZD"
+               else aud if currency == "AUD" else {
             "status": MISSING, "observation_month": None,
             "observation_period": None, "observation_frequency": None,
             "rate_yoy_percent_claim": None, "estimated_observation": None,

@@ -22,6 +22,9 @@ from test_atlasquant_trader_statcan_cad_cpi_table_text_lab import (
 from test_atlasquant_trader_statsnz_nzd_cpi_quarter_text_lab import (
     TEXT as NZD_QUARTER_TEXT,
 )
+from test_atlasquant_trader_abs_aud_cpi_monthly_text_lab import (
+    TEXT as AUD_MONTHLY_TEXT,
+)
 
 AS_OF = datetime(2026, 11, 5, 2, tzinfo=timezone.utc)
 
@@ -428,6 +431,91 @@ class NumericCoverageTests(unittest.TestCase):
                 nzd_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
         self.assertEqual(r["currencies"]["NZD"]["rate_yoy_percent_claim"], "3.7")
         self.assertIsNone(r["currencies"]["NZD"]["observation_month"])
+        self.assert_no_trading(r)
+
+    def test_optional_aud_monthly_source_is_explicitly_unattested(self):
+        r = run(aud_monthly_page_text_raw=AUD_MONTHLY_TEXT.encode(),
+                aud_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 10, "1": 15, "2": 3})
+        aud = r["currencies"]["AUD"]
+        self.assertEqual(aud["status"], SUPPLIED_TEXT)
+        self.assertEqual(aud["rate_yoy_percent_claim"], "4.3")
+        self.assertEqual(aud["observation_frequency"], "MONTHLY")
+        self.assertEqual(aud["observation_month"], "2026-09")
+        self.assertEqual(aud["observation_period"], "2026-09")
+        self.assertEqual(aud["series_kind"],
+                         "ABS_AUD_CPI_ALL_GROUPS_ORIGINAL_MONTHLY_YOY_TRANSCRIBED_TEXT")
+        self.assertFalse(aud["original_source_authenticity_independently_verified"])
+        self.assert_no_trading(r)
+
+    def test_aud_usd_same_month_still_not_methodologically_harmonized(self):
+        r = run(aud_monthly_page_text_raw=AUD_MONTHLY_TEXT.encode(),
+                aud_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        x = pair(r, "AUD/USD")
+        self.assertEqual(x["numeric_observation_sides"], 2)
+        self.assertEqual((x["base_frequency"], x["quote_frequency"]),
+                         ("MONTHLY", "MONTHLY"))
+        self.assertTrue(x["observation_frequencies_aligned_if_both"])
+        self.assertTrue(x["observation_months_aligned_if_both"])
+        self.assertIn("CROSS_COUNTRY_INFLATION_METHODS_NOT_HARMONIZED",
+                      x["comparison_blockers"])
+        self.assertIsNone(x["inflation_difference_percentage_points"])
+        self.assertIsNone(x["currency_strength_rank"])
+        self.assert_no_trading(r)
+
+    def test_aud_nzd_must_keep_monthly_quarterly_separation(self):
+        stamp = datetime(2026, 11, 5, 1, tzinfo=timezone.utc)
+        r = run(aud_monthly_page_text_raw=AUD_MONTHLY_TEXT.encode(), aud_capture_utc=stamp,
+                nzd_quarter_page_text_raw=NZD_QUARTER_TEXT.encode(), nzd_capture_utc=stamp)
+        x = pair(r, "AUD/NZD")
+        self.assertEqual(x["numeric_observation_sides"], 2)
+        self.assertEqual((x["base_frequency"], x["quote_frequency"]),
+                         ("MONTHLY", "QUARTERLY"))
+        self.assertEqual((x["base_latest_month"], x["quote_latest_month"]),
+                         ("2026-09", None))
+        self.assertFalse(x["observation_frequencies_aligned_if_both"])
+        self.assertFalse(x["observation_months_aligned_if_both"])
+        self.assertIn("OBSERVATION_FREQUENCIES_DIFFER", x["comparison_blockers"])
+        self.assertIn("QUARTERLY_CPI_MUST_NOT_MASQUERADE_AS_MONTHLY",
+                      x["comparison_blockers"])
+        self.assert_no_trading(r)
+
+    def test_seven_synthetic_currency_sources_cover_twenty_one_two_sided_pairs(self):
+        stamp = datetime(2026, 11, 5, 1, tzinfo=timezone.utc)
+        r = run(gbp_ons_raw=gbp_raw(), gbp_capture_utc=stamp,
+                jpy_national_page_text_raw=JPY_TEXT.encode(), jpy_capture_utc=stamp,
+                cad_nsa_table_text_raw=CAD_TEXT.encode(), cad_capture_utc=stamp,
+                nzd_quarter_page_text_raw=NZD_QUARTER_TEXT.encode(), nzd_capture_utc=stamp,
+                aud_monthly_page_text_raw=AUD_MONTHLY_TEXT.encode(), aud_capture_utc=stamp)
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 0, "1": 7, "2": 21})
+        self.assertEqual(r["currencies"]["CHF"]["status"], MISSING)
+        for symbol in ("AUD/NZD", "AUD/USD", "EUR/AUD", "GBP/AUD", "AUD/JPY",
+                       "AUD/CAD"):
+            x = pair(r, symbol)
+            self.assertEqual(x["numeric_observation_sides"], 2)
+            self.assertIsNone(x["fx_bias"])
+            self.assertIsNone(x["currency_strength_rank"])
+        self.assert_no_trading(r)
+
+    def test_invalid_aud_original_vs_adjusted_blocks_entire_matrix(self):
+        for bad in (b"not ABS", AUD_MONTHLY_TEXT.replace("Sep-26 | 0.8 | 4.3",
+                                                          "Sep-26 | 0.6 | 4.4").encode()):
+            r = run(aud_monthly_page_text_raw=bad,
+                    aud_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+            self.assert_no_trading(r)
+
+    def test_aud_missing_future_or_naive_clock_blocks(self):
+        for stamp in (None, AS_OF + timedelta(minutes=1), datetime(2026, 11, 5, 1)):
+            r = run(aud_monthly_page_text_raw=AUD_MONTHLY_TEXT.encode(),
+                    aud_capture_utc=stamp)
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+            self.assert_no_trading(r)
+
+    def test_aud_default_missing_preserves_old_pair_contract(self):
+        r = run()
+        self.assertEqual(r["currencies"]["AUD"]["status"], MISSING)
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 15, "1": 12, "2": 1})
         self.assert_no_trading(r)
 
 
