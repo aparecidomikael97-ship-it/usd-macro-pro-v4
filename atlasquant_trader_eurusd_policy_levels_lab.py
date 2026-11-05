@@ -1,7 +1,7 @@
 """Fail-closed, offline ECB/Fed policy *level* readers for Trader LAB.
 
 The input bytes are provided by the caller, not authenticated by this module.
-ECB DFR change-effective dates and Fed target-range daily effective levels are
+ECB DFR and Fed target-range series contain daily observed policy levels,
 NOT monetary-policy decision announcement times or pre-meeting expectations.
 Neither a rate difference nor a policy level can authorize an FX direction.
 No HTTP, filesystem writes, scheduler, API key, or broker access.
@@ -96,18 +96,21 @@ def _rate(value: str) -> Decimal | None:
     return parsed if Decimal("-5") <= parsed <= Decimal("30") else None
 
 
-def parse_ecb_dfr_effective_csv_lab(
+def parse_ecb_dfr_daily_csv_lab(
     raw: Any, *, observed_at_utc: datetime,
 ) -> dict[str, Any]:
-    """Read an exact ECB FM DFR series; changes' effective dates only."""
+    """Read daily ECB FM DFR levels; repeats are NOT new policy decisions."""
     today = _clock(observed_at_utc)
     out = _blocked("ECB_CSV_REJECTED", "EUR")
     rows = _rows(raw, {"KEY", "FREQ", "REF_AREA", "CURRENCY",
-                       "TIME_PERIOD", "OBS_VALUE"}, 250)
+                       "TIME_PERIOD", "OBS_VALUE"}, 1600)
     if rows is None:
         return out
-    effective: dict[date, str] = {}
+    observed_levels: dict[date, str] = {}
     last: date | None = None
+    previous_rate: Decimal | None = None
+    first_observed_new_levels: list[dict[str, Any]] = []
+    missing_calendar_days = 0
     dimensions = {"FREQ": "D", "REF_AREA": "U2", "CURRENCY": "EUR",
                   "PROVIDER_FM": "4F", "INSTRUMENT_FM": "KR",
                   "PROVIDER_FM_ID": "DFR", "DATA_TYPE_FM": "LEV"}
@@ -120,21 +123,41 @@ def parse_ecb_dfr_effective_csv_lab(
                        for key, expected in dimensions.items())
                 or row.get("OBS_STATUS", "") not in ("", "A")):
             return out
+        if last is not None:
+            missing_calendar_days += (day - last).days - 1
+        if previous_rate is not None and val != previous_rate:
+            first_observed_new_levels.append({
+                "first_observed_date": day.isoformat(),
+                "level_percent": str(val),
+                "not_proof_of_decision_or_effective_instant": True,
+            })
         last = day
-        effective[day] = str(val)
-    latest = max(effective)
+        previous_rate = val
+        observed_levels[day] = str(val)
+    latest = max(observed_levels)
     out.update({
-        "state": "LAB_ECB_DFR_EFFECTIVE_LEVEL_QUARANTINED", "reason": None,
+        "state": "LAB_ECB_DFR_DAILY_LEVEL_QUARANTINED", "reason": None,
+        "parser_semantics_version": "ECB_DFR_DAILY_LEVEL_V2",
         "series_id": ECB_SERIES, "source_url": ECB_SOURCE_URL,
         "measure": "DEPOSIT_FACILITY_RATE_PERCENT_PER_ANNUM",
-        "effective_date_not_decision_announcement": True,
-        "latest_effective_date": latest.isoformat(),
-        "rate_percent": effective[latest],
-        "effective_changes_count": len(effective),
+        "daily_observation_not_decision_announcement": True,
+        "latest_observation_date": latest.isoformat(),
+        "latest_effective_date": None,
+        "first_observation_date": min(observed_levels).isoformat(),
+        "rate_percent": observed_levels[latest],
+        "daily_observations_count": len(observed_levels),
+        "missing_calendar_days_within_response": missing_calendar_days,
+        "first_observed_new_level_events": first_observed_new_levels,
+        "first_observed_new_level_not_decision_time": True,
         "raw_response_sha256": sha256(raw).hexdigest(),
         "collection_clock_utc": observed_at_utc.astimezone(timezone.utc).isoformat(),
     })
     return out
+
+
+# Kept only for old callers: its old "effective" wording is NOT a claim that
+# the daily observation date was the policy decision or its effective date.
+parse_ecb_dfr_effective_csv_lab = parse_ecb_dfr_daily_csv_lab
 
 
 def parse_fed_target_range_csv_lab(
@@ -197,7 +220,7 @@ def parse_fed_target_range_csv_lab(
 
 def compare_eurusd_policy_levels_lab(eur: Any, usd: Any) -> dict[str, Any]:
     """Expose labels safely; NEVER infer a directional policy spread."""
-    expected = ("LAB_ECB_DFR_EFFECTIVE_LEVEL_QUARANTINED",
+    expected = ("LAB_ECB_DFR_DAILY_LEVEL_QUARANTINED",
                 "LAB_FED_TARGET_RANGE_DAILY_QUARANTINED")
     correct = (isinstance(eur, dict) and isinstance(usd, dict)
                and eur.get("schema") == SCHEMA and usd.get("schema") == SCHEMA
@@ -210,8 +233,10 @@ def compare_eurusd_policy_levels_lab(eur: Any, usd: Any) -> dict[str, Any]:
         "eur_deposit_facility_percent": eur.get("rate_percent") if correct else None,
         "fed_target_range_lower_percent": usd.get("lower_bound_percent") if correct else None,
         "fed_target_range_upper_percent": usd.get("upper_bound_percent") if correct else None,
-        "different_effective_dates": (eur["latest_effective_date"] !=
-                                      usd["latest_effective_date"]) if correct else None,
+        "different_latest_observation_dates": (
+            eur["latest_observation_date"] != usd["latest_effective_date"]
+        ) if correct else None,
+        "different_effective_dates": None,
         "different_policy_instruments": True,
         "policy_rate_spread_bps": None,
         "prior_meeting_expectation_bps": None,
@@ -225,5 +250,6 @@ def compare_eurusd_policy_levels_lab(eur: Any, usd: Any) -> dict[str, Any]:
 
 
 __all__ = ["ECB_SERIES", "ECB_SOURCE_URL", "FED_SOURCE_URL",
-           "parse_ecb_dfr_effective_csv_lab", "parse_fed_target_range_csv_lab",
+           "parse_ecb_dfr_daily_csv_lab", "parse_ecb_dfr_effective_csv_lab",
+           "parse_fed_target_range_csv_lab",
            "compare_eurusd_policy_levels_lab"]

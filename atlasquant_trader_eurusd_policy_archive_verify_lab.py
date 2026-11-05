@@ -138,6 +138,13 @@ def verify_policy_capture_zip_offline_lab(
             "text/csv", "application/csv", "text/plain",
             "application/vnd.ecb.data+csv", "application/octet-stream")):
         return _blocked("ZIP_MEDIA_TYPE_INVALID")
+    # A V1 ECB capture could contain valid raw daily rows yet have been
+    # refused by the older 250-row, effective-date interpretation. Never
+    # rewrite that historical receipt using new semantics: replay it against
+    # its pinned original code version instead.
+    if source_id == "ECB_EUR_DFR_EFFECTIVE":
+        if receipt.get("parser_semantics_version") != "ECB_DFR_DAILY_LEVEL_V2":
+            return _blocked("ECB_LEGACY_ARCHIVE_REQUIRES_PINNED_PARSER_REPLAY")
     replay = parser(raw, observed_at_utc=observed)
     accepted = replay["state"] != "LAB_BLOCKED"
     expected_state = ("LAB_CAPTURE_PARSER_ACCEPTED_QUARANTINED" if accepted

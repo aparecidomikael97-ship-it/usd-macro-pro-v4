@@ -1,5 +1,10 @@
 # AtlasQuant Trader — coleta manual dos níveis de juros BCE/Fed (LAB)
 
+> Este é o checkpoint **anterior à captura real**. A consulta foi realizada
+> posteriormente no AM12 para ambas as fontes. A série BCE retornou níveis
+> **diários**, não apenas datas de mudança. Ver
+> `TRADER_EURUSD_JUROS_CAPTURAS_REAIS_AM12_LAB_20261105.md`.
+
 Continuação técnica de 05/11/2026, branch da PR #1815 (DRAFT). Nenhuma
 alteração em `main`, PR #1816, produção, AION Worker ou integrações de ordens.
 
@@ -13,7 +18,7 @@ estrutura CSV às respostas atuais ainda precisa ser comprovada no AM12.
 
 As fontes são:
 
-- [BCE: série FM.D.U2.EUR.4F.KR.DFR.LEV](https://data.ecb.europa.eu/data/datasets/FM/FM.D.U2.EUR.4F.KR.DFR.LEV): **taxa de depósito**, observação na **data efetiva** da mudança, não anúncio.
+- [BCE: série FM.D.U2.EUR.4F.KR.DFR.LEV](https://data.ecb.europa.eu/data/datasets/FM/FM.D.U2.EUR.4F.KR.DFR.LEV): **taxa de depósito observada diariamente**; uma linha não prova nova decisão, anúncio ou mudança de nível.
 - [FRED: DFEDTARL](https://fred.stlouisfed.org/series/DFEDTARL) e [DFEDTARU](https://fred.stlouisfed.org/series/DFEDTARU): limites da faixa-alvo dos Fed Funds **vigentes por dia**, não consenso pré-FOMC. A fonte original é o Federal Reserve Board; FRED é operado pelo Fed de St. Louis.
 
 Os dois endpoints candidatos estão fixos no código, não podem ser substituídos

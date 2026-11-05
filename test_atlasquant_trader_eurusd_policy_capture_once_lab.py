@@ -113,7 +113,7 @@ class ManualPolicyCaptureTests(unittest.TestCase):
                 content_type="application/vnd.ecb.data+csv;version=1.0.0")
             self.assertEqual(out["state"], "LAB_CAPTURE_PARSER_ACCEPTED_QUARANTINED")
             self.assertEqual(out["parser_state"],
-                             "LAB_ECB_DFR_EFFECTIVE_LEVEL_QUARANTINED")
+                             "LAB_ECB_DFR_DAILY_LEVEL_QUARANTINED")
             self.assertEqual(out["raw_response_sha256"], sha256(ECB_RAW).hexdigest())
             self.assertEqual(out["external_http_requests"], 1)
             self.assertEqual(len(opener.calls), 1)

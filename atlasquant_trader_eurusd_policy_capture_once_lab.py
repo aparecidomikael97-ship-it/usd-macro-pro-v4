@@ -21,13 +21,17 @@ from zipfile import ZipFile, ZIP_STORED, BadZipFile
 from atlasquant_trader_g8_single_https_probe_lab import _RejectRedirect
 from atlasquant_trader_eurusd_policy_levels_lab import (
     ECB_SOURCE_URL, FED_SOURCE_URL, MAX_BYTES,
-    parse_ecb_dfr_effective_csv_lab, parse_fed_target_range_csv_lab,
+    parse_ecb_dfr_daily_csv_lab, parse_fed_target_range_csv_lab,
 )
 
 SCHEMA = "ATLASQUANT_TRADER_EURUSD_POLICY_MANUAL_HTTP_RECEIPT_LAB_V1"
 SOURCES = {
-    "ECB_EUR_DFR_EFFECTIVE": (ECB_SOURCE_URL, parse_ecb_dfr_effective_csv_lab),
+    "ECB_EUR_DFR_EFFECTIVE": (ECB_SOURCE_URL, parse_ecb_dfr_daily_csv_lab),
     "FED_USD_TARGET_RANGE_EFFECTIVE": (FED_SOURCE_URL, parse_fed_target_range_csv_lab),
+}
+PARSER_SEMANTICS = {
+    "ECB_EUR_DFR_EFFECTIVE": "ECB_DFR_DAILY_LEVEL_V2",
+    "FED_USD_TARGET_RANGE_EFFECTIVE": "FED_TARGET_RANGE_DAILY_V1",
 }
 CSV_TYPES = frozenset({
     "text/csv", "application/csv", "text/plain",
@@ -123,6 +127,7 @@ def capture_policy_csv_once_lab(
         "raw_response_bytes": len(raw),
         "raw_response_sha256": sha256(raw).hexdigest(),
         "parser_state": parsed["state"],
+        "parser_semantics_version": PARSER_SEMANTICS[source_id],
         "parser_reason": parsed.get("reason"),
         "parser_receipt": parsed,
     }

@@ -104,6 +104,17 @@ class ArchiveReplayTests(unittest.TestCase):
             self.assertIsNone(out["fx_bias"])
             self.assertFalse(out["can_feed_live_radar"])
 
+    def test_old_ecb_receipt_requires_its_original_pinned_parser(self):
+        with TemporaryDirectory() as d:
+            path, _ = create_zip(d)
+            repacked, digest = mutate_zip(
+                d, path, mutate_receipt=lambda x: x.pop(
+                    "parser_semantics_version"))
+            out = verify(repacked, expected_zip_sha256=digest, evaluated_at_utc=NOW)
+            self.assertEqual(out["reason"],
+                             "ECB_LEGACY_ARCHIVE_REQUIRES_PINNED_PARSER_REPLAY")
+            self.assertFalse(out["trade_authorized"])
+
     def test_invalid_source_csv_replays_as_invalid_not_approved(self):
         with TemporaryDirectory() as d:
             path, digest = create_zip(d, raw=b"not,a,policy,rate\n")

@@ -1,12 +1,12 @@
 """Offline synthetic tests only: no current-rate or pre-event proof."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import unittest
 
 from atlasquant_trader_eurusd_policy_levels_lab import (
     compare_eurusd_policy_levels_lab,
-    parse_ecb_dfr_effective_csv_lab as ecb,
+    parse_ecb_dfr_daily_csv_lab as ecb,
     parse_fed_target_range_csv_lab as fed,
 )
 
@@ -35,11 +35,13 @@ def fed_raw(rows: str = FED_ROWS, header: str = FED_HEADER) -> bytes:
 class PolicyLevelTests(unittest.TestCase):
     def test_ecb_valid_level_is_not_announcement_or_signal(self):
         r = ecb(ecb_raw(), observed_at_utc=NOW)
-        self.assertEqual(r["state"], "LAB_ECB_DFR_EFFECTIVE_LEVEL_QUARANTINED")
-        self.assertEqual(r["latest_effective_date"], "2026-09-16")
+        self.assertEqual(r["state"], "LAB_ECB_DFR_DAILY_LEVEL_QUARANTINED")
+        self.assertEqual(r["latest_observation_date"], "2026-09-16")
+        self.assertIsNone(r["latest_effective_date"])
         self.assertEqual(r["rate_percent"], "2.5000000")
-        self.assertEqual(r["effective_changes_count"], 2)
-        self.assertTrue(r["effective_date_not_decision_announcement"])
+        self.assertEqual(r["daily_observations_count"], 2)
+        self.assertEqual(len(r["first_observed_new_level_events"]), 1)
+        self.assertTrue(r["daily_observation_not_decision_announcement"])
         self.assertFalse(r["source_origin_independently_authenticated"])
         self.assertFalse(r["decision_announcement_instant_verified"])
         self.assertFalse(r["pre_event_consensus_verified"])
@@ -61,7 +63,8 @@ class PolicyLevelTests(unittest.TestCase):
             fed(fed_raw(), observed_at_utc=NOW))
         self.assertEqual(result["state"],
                          "LAB_POLICY_LEVELS_DIFFERENT_MEASURES_QUARANTINED")
-        self.assertTrue(result["different_effective_dates"])
+        self.assertTrue(result["different_latest_observation_dates"])
+        self.assertIsNone(result["different_effective_dates"])
         for field in ("policy_rate_spread_bps", "prior_meeting_expectation_bps",
                       "market_surprise_bps", "fx_bias"):
             self.assertIsNone(result[field])
@@ -95,6 +98,37 @@ class PolicyLevelTests(unittest.TestCase):
             with self.subTest(rows=rows[-45:]):
                 self.assertEqual(ecb(ecb_raw(rows), observed_at_utc=NOW)["state"],
                                  "LAB_BLOCKED")
+
+    def test_ecb_large_daily_repetitions_are_not_new_decisions(self):
+        start = date(2025, 1, 1)
+        rows = []
+        for i in range(674):
+            day = start + timedelta(days=i)
+            level = "3" if day < date(2025, 6, 11) else "2.5"
+            rows.append(f"FM.D.U2.EUR.4F.KR.DFR.LEV,D,U2,EUR,{day},{level},A\n")
+        result = ecb(ecb_raw("".join(rows)), observed_at_utc=NOW)
+        self.assertEqual(result["state"], "LAB_ECB_DFR_DAILY_LEVEL_QUARANTINED")
+        self.assertEqual(result["daily_observations_count"], 674)
+        self.assertEqual(result["rate_percent"], "2.5")
+        self.assertEqual(result["missing_calendar_days_within_response"], 0)
+        self.assertEqual(len(result["first_observed_new_level_events"]), 1)
+        self.assertTrue(result["first_observed_new_level_not_decision_time"])
+
+    def test_ecb_gaps_and_metadata_do_not_become_false_effective_dates(self):
+        head = ("KEY,FREQ,REF_AREA,CURRENCY,PROVIDER_FM,INSTRUMENT_FM,"
+                "PROVIDER_FM_ID,DATA_TYPE_FM,TIME_PERIOD,OBS_VALUE,OBS_STATUS,"
+                "TITLE_COMPL,UNIT\n")
+        rows = (
+            'FM.D.U2.EUR.4F.KR.DFR.LEV,D,U2,EUR,4F,KR,DFR,LEV,2026-11-01,2,A,"Daily, not decision",PCPA\n'
+            'FM.D.U2.EUR.4F.KR.DFR.LEV,D,U2,EUR,4F,KR,DFR,LEV,2026-11-03,2.5,A,"Daily, not decision",PCPA\n'
+        )
+        result = ecb(ecb_raw(rows, header=head), observed_at_utc=NOW)
+        self.assertEqual(result["state"], "LAB_ECB_DFR_DAILY_LEVEL_QUARANTINED")
+        self.assertEqual(result["missing_calendar_days_within_response"], 1)
+        self.assertEqual(result["latest_observation_date"], "2026-11-03")
+        self.assertIsNone(result["latest_effective_date"])
+        self.assertEqual(result["first_observed_new_level_events"][0]["first_observed_date"],
+                         "2026-11-03")
 
     def test_fed_missing_historical_date_is_not_zero_or_interpolated(self):
         rows = FED_ROWS.replace("2026-11-02,3.75,4.00", "2026-11-02,.,.")

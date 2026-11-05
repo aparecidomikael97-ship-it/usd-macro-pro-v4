@@ -1,5 +1,11 @@
 # AtlasQuant Trader — reabertura independente de evidências BCE/Fed (LAB)
 
+> Atualização após captura real: recibos BCE passam a registrar
+> `parser_semantics_version=ECB_DFR_DAILY_LEVEL_V2`. O primeiro ZIP BCE,
+> recusado pelo parser antigo, deve ser reaberto com seu código original
+> fixado no commit `9b58ccb8`; jamais mudar o resultado histórico em silêncio.
+> Ver `TRADER_EURUSD_JUROS_CAPTURAS_REAIS_AM12_LAB_20261105.md`.
+
 Checkpoint 05/11/2026, PR #1815 DRAFT. Complementa o coletor manual
 `atlasquant_trader_eurusd_policy_capture_once_lab.py` e os parsers offline
 de níveis vigentes; **não é captura real nem liberação de trading**.
@@ -49,10 +55,11 @@ aceitação parcial.
 python -m unittest -q test_atlasquant_trader_eurusd_policy_archive_verify_lab.py
 ```
 
-Onze testes diretos cobrem sucesso de replay ECB/Fed, arquivo adulterado com
+Doze testes diretos cobrem sucesso de replay ECB/Fed, arquivo adulterado com
 hash anterior, CSV e recibo adulterados com novo hash, sinal operacional
 falsificado, URL/identidade alterada, relógio futuro, extração indevida,
 compressão inesperada, arquivo grande e CLI read-only.
+Incluem rejeição explícita de recibo BCE com semântica legada não fixada.
 
 As séries seguem **instrumentos diferentes**: facilidade de depósito BCE
 versus faixa-alvo do Fed. Próximo gate: coletar respostas reais, comparar

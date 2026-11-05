@@ -1,5 +1,11 @@
 # AtlasQuant Trader — níveis de juros BCE/Fed, sem viés automático (LAB)
 
+> **Retificação posterior da leitura BCE:** a captura real do AM12 revelou
+> **674 observações DIÁRIAS**, não 674 decisões ou datas de mudança. O parser
+> foi corrigido para `parse_ecb_dfr_daily_csv_lab`, versão semântica V2.
+> Este documento preserva o planejamento inicial; resultados e hashes reais
+> estão em `TRADER_EURUSD_JUROS_CAPTURAS_REAIS_AM12_LAB_20261105.md`.
+
 Checkpoint de desenvolvimento em 05/11/2026; continuação da PR #1815, sem
 alterar a PR #1816 nem a `main`. **HARD NO-GO** permanece.
 
@@ -7,7 +13,7 @@ alterar a PR #1816 nem a `main`. **HARD NO-GO** permanece.
 
 | Moeda | Referência documental | Medida correta | O que NÃO comprova |
 | --- | --- | --- | --- |
-| EUR | [BCE, FM.D.U2.EUR.4F.KR.DFR.LEV](https://data.ecb.europa.eu/data/datasets/FM/FM.D.U2.EUR.4F.KR.DFR.LEV) | Taxa da facilidade permanente de depósito, `% ao ano`, na **data de entrada em vigor da mudança** | Instante do anúncio da decisão, expectativa pré-reunião ou revisão histórica |
+| EUR | [BCE, FM.D.U2.EUR.4F.KR.DFR.LEV](https://data.ecb.europa.eu/data/datasets/FM/FM.D.U2.EUR.4F.KR.DFR.LEV) | Taxa da facilidade permanente de depósito, `% ao ano`, em **observações diárias de nível**; repetição não significa nova decisão | Instante do anúncio, data exata da mudança inferida apenas de observações, expectativa pré-reunião ou revisão histórica |
 | USD | [FRED, DFEDTARL](https://fred.stlouisfed.org/series/DFEDTARL) e [DFEDTARU](https://fred.stlouisfed.org/series/DFEDTARU), Federal Reserve Bank of St. Louis, origem Board of Governors | Limites inferior e superior da **faixa-alvo vigente** dos Fed Funds, `%`, em observações diárias | Texto ou instante de divulgação do FOMC, surpresa perante consenso ou probabilidade futura |
 
 Pontos de coleta candidatos, **não capturados nesta etapa**:
@@ -26,7 +32,7 @@ funcional. Verificar também condições de reutilização dos dados.
 
 `atlasquant_trader_eurusd_policy_levels_lab.py` contém:
 
-1. `parse_ecb_dfr_effective_csv_lab`: valida chave exata, dimensões, data,
+1. `parse_ecb_dfr_daily_csv_lab` (atual): valida chave exata, dimensões, data,
    unidade, percentual Decimal, status, duplicidade e ordenação do BCE.
 2. `parse_fed_target_range_csv_lab`: valida duas séries da mesma data, limite
    inferior não maior que superior, faltas explícitas `.` sem interpolação,
