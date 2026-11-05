@@ -4,7 +4,11 @@ import unittest
 from atlasquant_trader_fx_ny_rollover_lab import inspect_fx_ny_close_window_lab as inspect
 
 def stamp(s):
-    return datetime.fromisoformat(s.replace("Z","+00:00"))
+    try:
+        return datetime.fromisoformat(s.replace("Z","+00:00"))
+    except ValueError:
+        # Invalid strings must reach the lab validator and be blocked there.
+        return s
 
 def run(horizon,start,end):
     return inspect(horizon=horizon,start_at_utc=stamp(start) if isinstance(start,str) else start,
