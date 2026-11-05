@@ -98,6 +98,41 @@ class ConsensusPitTests(unittest.TestCase):
                 self.assertFalse(r["pre_event_consensus_verified"])
                 self.assertIsNone(r["fx_bias"])
 
+    def test_eurex_fst3_price_is_quarter_accrual_not_one_ecb_meeting_consensus(self):
+        r = candidate(source_id="EUREX_FST3_DAILY_SETTLEMENT")
+        self.assertEqual(
+            r["reason"],
+            "ESTR_FUTURES_ACCRUAL_NOT_SINGLE_MEETING_DFR_CONSENSUS",
+        )
+        for key in ("futures_contract_expiry_and_accrual_verified",
+                    "historical_price_publication_instant_verified",
+                    "market_data_product_license_verified", "trade_authorized"):
+            self.assertFalse(r[key])
+        self.assertIsNone(r["market_surprise_bps"])
+
+    def test_eurex_public_daily_volume_does_not_substitute_a_settlement_price(self):
+        r = candidate(source_id="EUREX_FST3_DAILY_TRADING_STATISTICS")
+        self.assertEqual(r["reason"], "FST3_VOLUME_AND_OPEN_INTEREST_NOT_PRICE")
+        self.assertFalse(r["source_measure_is_event_consensus_verified"])
+        self.assertIsNone(r["fx_bias"])
+
+    def test_ice_report_center_cannot_be_used_as_product_feed_without_permission(self):
+        r = candidate(source_id="ICE_REPORT_CENTER_ESTR_FUTURES_SETTLEMENT")
+        self.assertEqual(r["reason"], "ICE_MARKET_DATA_PRODUCT_PERMISSION_NOT_VERIFIED")
+        self.assertFalse(r["market_data_product_license_verified"])
+        self.assertFalse(r["can_feed_live_radar"])
+        self.assertIsNone(r["fx_bias"])
+
+    def test_futures_report_after_meeting_fails_chronology_before_semantics(self):
+        r = candidate(source_id="EUREX_FST3_DAILY_SETTLEMENT",
+                      published_at_utc=dt(30), captured_at_utc=dt(31))
+        self.assertEqual(r["reason"], "DOCUMENT_NOT_PUBLIC_BEFORE_EVENT_DATE")
+
+    def test_futures_same_day_ecb_decision_still_needs_witnessed_release_instant(self):
+        r = candidate(source_id="EUREX_FST3_DAILY_SETTLEMENT",
+                      published_at_utc=dt(29, 8), captured_at_utc=dt(29, 9))
+        self.assertEqual(r["reason"], "SAME_DAY_ORDER_NEEDS_WITNESSED_EVENT_TIME")
+
     def test_questions_published_early_are_not_claimed_consensus_aggregate(self):
         r = candidate(source_id="NYFED_SME_QUESTIONNAIRE", currency="USD")
         self.assertEqual(r["state"], "LAB_BLOCKED")

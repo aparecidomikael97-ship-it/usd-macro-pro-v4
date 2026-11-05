@@ -20,6 +20,9 @@ SOURCES = {
     "ECB_EMMS_OIS_ANNUAL_HISTORY": "EUR",
     "ECB_ESTR_REALIZED_OVERNIGHT": "EUR",
     "ECB_YC_SOVEREIGN_BOND_FORWARD": "EUR",
+    "EUREX_FST3_DAILY_TRADING_STATISTICS": "EUR",
+    "EUREX_FST3_DAILY_SETTLEMENT": "EUR",
+    "ICE_REPORT_CENTER_ESTR_FUTURES_SETTLEMENT": "EUR",
     "NYFED_SME_AGGREGATE": "USD",  # 2025 onwards
     "NYFED_SPD_AGGREGATE_LEGACY": "USD",  # through 2024
     "INDEPENDENT_PRE_EVENT_CANDIDATE_EUR": "EUR",
@@ -43,6 +46,16 @@ EUR_MEASURE_GATES = {
     "ECB_EMMS_OIS_ANNUAL_HISTORY": "OIS_ANNUAL_HISTORICAL_UPDATE_NOT_EVENT_CONSENSUS",
     "ECB_ESTR_REALIZED_OVERNIGHT": "REALIZED_ESTR_NOT_POLICY_EXPECTATION",
     "ECB_YC_SOVEREIGN_BOND_FORWARD": "GOVERNMENT_BOND_FORWARD_NOT_OIS_POLICY_EXPECTATION",
+    # The public Eurex Daily Statistics .xls contains trading volume and
+    # previous-day open interest for FST3, not a contract settlement price.
+    "EUREX_FST3_DAILY_TRADING_STATISTICS": "FST3_VOLUME_AND_OPEN_INTEREST_NOT_PRICE",
+    # Futures settle on a compounded overnight accrual interval. The price
+    # (100 - implied rate) is not the expected *single meeting* ECB DFR level;
+    # public daily reports also require actual availability/license evidence.
+    "EUREX_FST3_DAILY_SETTLEMENT": "ESTR_FUTURES_ACCRUAL_NOT_SINGLE_MEETING_DFR_CONSENSUS",
+    # ICE Report Center market data may not be incorporated into a product
+    # without approval. Never turn an apparent public price into a feed.
+    "ICE_REPORT_CENTER_ESTR_FUTURES_SETTLEMENT": "ICE_MARKET_DATA_PRODUCT_PERMISSION_NOT_VERIFIED",
 }
 
 
@@ -77,6 +90,9 @@ def _result(reason: str, currency: Any, source_id: Any) -> dict[str, Any]:
         "public_availability_independently_verified": False,
         "pre_event_consensus_verified": False,
         "source_measure_is_event_consensus_verified": False,
+        "futures_contract_expiry_and_accrual_verified": False,
+        "historical_price_publication_instant_verified": False,
+        "market_data_product_license_verified": False,
         "historical_point_in_time_eligible": False,
         "market_surprise_bps": None, "fx_bias": None,
         "operational_bias": "AGUARDAR", "trade_authorized": False,
