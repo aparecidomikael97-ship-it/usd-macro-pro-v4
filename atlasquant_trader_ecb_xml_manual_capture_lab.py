@@ -94,7 +94,10 @@ def capture_ecb_xml_manual_lab(
         out["reason"] = "INVALID_DESTINATION_DIRECTORY"
         return out
     root = Path(output_dir)
-    if root.is_symlink() or not root.is_dir():
+    # On Windows, directory junctions can redirect output without being symlinks.
+    # Python 3.11 lacks is_junction(), so use a guarded, platform-safe check.
+    is_junction = getattr(root, "is_junction", lambda: False)()
+    if root.is_symlink() or is_junction or not root.is_dir():
         out["reason"] = "DESTINATION_MUST_BE_EXISTING_REAL_DIRECTORY"
         return out
     # No cookies, bearer credentials, HTTP upgrade, redirect or retry.

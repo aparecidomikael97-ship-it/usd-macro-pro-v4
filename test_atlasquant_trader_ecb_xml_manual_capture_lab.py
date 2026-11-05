@@ -207,11 +207,41 @@ class ManualXmlCaptureTests(unittest.TestCase):
             real = Path(d)/"real"
             real.mkdir()
             symlink = Path(d)/"link"
-            symlink.symlink_to(real, target_is_directory=True)
+            try:
+                symlink.symlink_to(real, target_is_directory=True)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows account cannot create symbolic links")
+                raise
             opener = FakeOpener()
             out = capture(output_dir=symlink, manual_one_shot=True, opener=opener)
             self.assertEqual(out["state"], "LAB_BLOCKED")
             self.assertEqual(opener.calls, [])
+
+    @unittest.skipUnless(__import__("sys").platform == "win32", "Windows junction only")
+    def test_windows_junction_directory_denied_before_network(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            real = Path(d) / "real"
+            real.mkdir()
+            junction = Path(d) / "junction"
+            res = subprocess.run(
+                ["cmd.exe", "/c", "mklink", "/J", str(junction), str(real)],
+                capture_output=True, text=True, check=False,
+            )
+            if res.returncode != 0:
+                self.skipTest("Windows junction creation unavailable")
+            try:
+                self.assertTrue(junction.is_junction())
+                opener = FakeOpener()
+                out = capture(output_dir=junction, manual_one_shot=True, opener=opener)
+                self.assertEqual(out["state"], "LAB_BLOCKED")
+                self.assertEqual(out["reason"], "DESTINATION_MUST_BE_EXISTING_REAL_DIRECTORY")
+                self.assertEqual(opener.calls, [])
+                self.assertEqual(list(real.iterdir()), [])
+                self.assert_no_go(out)
+            finally:
+                junction.rmdir()
 
     def test_network_error_keeps_no_partial_snapshot(self):
         with tempfile.TemporaryDirectory() as d:
