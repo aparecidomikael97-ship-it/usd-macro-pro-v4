@@ -16,6 +16,9 @@ from test_atlasquant_trader_bls_us_cpiu_once_lab import (
 )
 from test_atlasquant_trader_ons_gbp_cpi_current_lab import raw as gbp_raw
 from test_atlasquant_trader_jp_national_cpi_summary_text_lab import TEXT as JPY_TEXT
+from test_atlasquant_trader_statcan_cad_cpi_table_text_lab import (
+    TEXT as CAD_TEXT, ROW as CAD_ROW,
+)
 
 AS_OF = datetime(2026, 11, 5, 2, tzinfo=timezone.utc)
 
@@ -272,6 +275,66 @@ class NumericCoverageTests(unittest.TestCase):
                 jpy_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
         self.assertEqual(r["currencies"]["JPY"]["rate_yoy_percent_claim"], "1.7")
         self.assert_no_trading(r)
+
+    def test_optional_cad_table_text_stays_explicitly_unattested(self):
+        r = run(cad_nsa_table_text_raw=CAD_TEXT.encode(),
+                cad_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["currencies"]["CAD"]["status"], SUPPLIED_TEXT)
+        self.assertEqual(r["currencies"]["CAD"]["observation_month"], "2026-09")
+        self.assertEqual(r["currencies"]["CAD"]["rate_yoy_percent_claim"], "3.1")
+        self.assertEqual(r["currencies"]["CAD"]["series_kind"],
+                         "STATCAN_CAD_CPI_ALL_ITEMS_NSA_2002_BASE_YOY_TRANSCRIBED_TEXT")
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 10, "1": 15, "2": 3})
+        self.assertFalse(r["currencies"]["CAD"][
+            "original_source_authenticity_independently_verified"])
+        self.assert_no_trading(r)
+
+    def test_five_currencies_are_ten_two_sided_pairs_synthetic_only(self):
+        r = run(gbp_ons_raw=gbp_raw(),
+                gbp_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc),
+                jpy_national_page_text_raw=JPY_TEXT.encode(),
+                jpy_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc),
+                cad_nsa_table_text_raw=CAD_TEXT.encode(),
+                cad_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 3, "1": 15, "2": 10})
+        for symbol in ("EUR/USD", "EUR/GBP", "GBP/USD", "EUR/JPY",
+                       "USD/JPY", "GBP/JPY", "EUR/CAD", "USD/CAD",
+                       "GBP/CAD", "CAD/JPY"):
+            x = pair(r, symbol)
+            self.assertEqual(x["numeric_observation_sides"], 2)
+            self.assertFalse(x["methods_comparable"])
+            self.assertIsNone(x["currency_strength_rank"])
+            self.assertIsNone(x["inflation_difference_percentage_points"])
+        self.assert_no_trading(r)
+
+    def test_usdcad_equal_month_does_not_allow_a_currency_rank(self):
+        r = run(cad_nsa_table_text_raw=CAD_TEXT.encode(),
+                cad_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        x = pair(r, "USD/CAD")
+        self.assertTrue(x["observation_months_aligned_if_both"])
+        self.assertIn("CROSS_COUNTRY_INFLATION_METHODS_NOT_HARMONIZED",
+                      x["comparison_blockers"])
+        self.assertIsNone(x["fx_bias"])
+
+    def test_invalid_or_wrongly_adjusted_cad_text_blocks_matrix(self):
+        for content in (b"not official", "pretend text",
+                        CAD_TEXT.replace("Not seasonally adjusted", "Seasonally adjusted").encode()):
+            x = run(cad_nsa_table_text_raw=content,
+                    cad_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+            self.assertEqual(x["state"], "LAB_BLOCKED")
+
+    def test_cad_missing_future_or_naive_capture_clock_blocks(self):
+        for stamp in (None, AS_OF + timedelta(minutes=1), datetime(2026, 11, 5, 1)):
+            x = run(cad_nsa_table_text_raw=CAD_TEXT.encode(), cad_capture_utc=stamp)
+            self.assertEqual(x["state"], "LAB_BLOCKED")
+
+    def test_cad_annual_headline_is_not_its_monthly_rate(self):
+        altered = CAD_TEXT.replace(CAD_ROW,
+                                   "All-items | 164.9 | 169.8 | 170.0 | 0.5 | 3.1")
+        x = run(cad_nsa_table_text_raw=altered.encode(),
+                cad_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(x["currencies"]["CAD"]["rate_yoy_percent_claim"], "3.1")
+        self.assert_no_trading(x)
 
 
 if __name__ == "__main__":
