@@ -19,6 +19,9 @@ from test_atlasquant_trader_jp_national_cpi_summary_text_lab import TEXT as JPY_
 from test_atlasquant_trader_statcan_cad_cpi_table_text_lab import (
     TEXT as CAD_TEXT, ROW as CAD_ROW,
 )
+from test_atlasquant_trader_statsnz_nzd_cpi_quarter_text_lab import (
+    TEXT as NZD_QUARTER_TEXT,
+)
 
 AS_OF = datetime(2026, 11, 5, 2, tzinfo=timezone.utc)
 
@@ -335,6 +338,97 @@ class NumericCoverageTests(unittest.TestCase):
                 cad_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
         self.assertEqual(x["currencies"]["CAD"]["rate_yoy_percent_claim"], "3.1")
         self.assert_no_trading(x)
+
+    def test_optional_nzd_quarterly_text_adds_three_pairs_without_monthly_invention(self):
+        r = run(nzd_quarter_page_text_raw=NZD_QUARTER_TEXT.encode(),
+                nzd_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 10, "1": 15, "2": 3})
+        nzd = r["currencies"]["NZD"]
+        self.assertEqual(nzd["status"], SUPPLIED_TEXT)
+        self.assertEqual(nzd["rate_yoy_percent_claim"], "3.7")
+        self.assertEqual(nzd["observation_frequency"], "QUARTERLY")
+        self.assertEqual(nzd["observation_period"], "2026-Q3")
+        self.assertIsNone(nzd["observation_month"])
+        self.assertEqual(nzd["series_kind"],
+                         "STATS_NZ_CPI_ALL_GROUPS_QUARTERLY_YOY_TRANSCRIBED_TEXT")
+        self.assertFalse(nzd["original_source_authenticity_independently_verified"])
+        self.assert_no_trading(r)
+
+    def test_nzd_usd_quarterly_vs_monthly_is_not_same_september_observation(self):
+        r = run(nzd_quarter_page_text_raw=NZD_QUARTER_TEXT.encode(),
+                nzd_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        x = pair(r, "NZD/USD")
+        self.assertEqual(x["numeric_observation_sides"], 2)
+        self.assertEqual((x["base_latest_month"], x["quote_latest_month"]),
+                         (None, "2026-09"))
+        self.assertEqual((x["base_latest_period"], x["quote_latest_period"]),
+                         ("2026-Q3", "2026-09"))
+        self.assertEqual((x["base_frequency"], x["quote_frequency"]),
+                         ("QUARTERLY", "MONTHLY"))
+        self.assertFalse(x["observation_frequencies_aligned_if_both"])
+        self.assertFalse(x["observation_periods_aligned_if_both"])
+        self.assertFalse(x["observation_months_aligned_if_both"])
+        self.assertIn("OBSERVATION_FREQUENCIES_DIFFER", x["comparison_blockers"])
+        self.assertIn("QUARTERLY_CPI_MUST_NOT_MASQUERADE_AS_MONTHLY",
+                      x["comparison_blockers"])
+        self.assertIsNone(x["inflation_difference_percentage_points"])
+        self.assertIsNone(x["currency_strength_rank"])
+        self.assert_no_trading(r)
+
+    def test_six_synthetic_currency_sources_cover_fifteen_two_sided_pairs(self):
+        stamp = datetime(2026, 11, 5, 1, tzinfo=timezone.utc)
+        r = run(gbp_ons_raw=gbp_raw(), gbp_capture_utc=stamp,
+                jpy_national_page_text_raw=JPY_TEXT.encode(), jpy_capture_utc=stamp,
+                cad_nsa_table_text_raw=CAD_TEXT.encode(), cad_capture_utc=stamp,
+                nzd_quarter_page_text_raw=NZD_QUARTER_TEXT.encode(), nzd_capture_utc=stamp)
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 1, "1": 12, "2": 15})
+        for symbol in ("EUR/NZD", "GBP/NZD", "NZD/USD", "NZD/JPY", "NZD/CAD"):
+            x = pair(r, symbol)
+            self.assertEqual(x["numeric_observation_sides"], 2)
+            self.assertIn("OBSERVATION_FREQUENCIES_DIFFER", x["comparison_blockers"])
+            self.assertIn("QUARTERLY_CPI_MUST_NOT_MASQUERADE_AS_MONTHLY",
+                          x["comparison_blockers"])
+            self.assertIsNone(x["fx_bias"])
+            self.assertIsNone(x["currency_strength_rank"])
+        self.assert_no_trading(r)
+
+    def test_missing_nzd_does_not_change_monthly_eur_usd_contract(self):
+        r = run()
+        self.assertEqual(r["currencies"]["NZD"]["status"], MISSING)
+        self.assertIsNone(r["currencies"]["NZD"]["observation_frequency"])
+        x = pair(r)
+        self.assertEqual((x["base_frequency"], x["quote_frequency"]),
+                         ("MONTHLY", "MONTHLY"))
+        self.assertTrue(x["observation_frequencies_aligned_if_both"])
+        self.assertFalse(x["observation_months_aligned_if_both"])
+
+    def test_wrongly_monthly_nzd_or_wrong_quarter_refuses_entire_matrix(self):
+        for bad in (NZD_QUARTER_TEXT.replace("Quarterly percentage change",
+                                               "Monthly percentage change"),
+                    NZD_QUARTER_TEXT.replace("September 2026 quarter",
+                                             "June 2026 quarter", 1),
+                    NZD_QUARTER_TEXT.replace("CPI all groups | 0.7 | 3.7",
+                                             "CPI all groups | 0.7 | N/A")):
+            r = run(nzd_quarter_page_text_raw=bad.encode(),
+                    nzd_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+            self.assert_no_trading(r)
+
+    def test_nzd_future_missing_or_naive_capture_clock_blocks(self):
+        for stamp in (None, AS_OF + timedelta(minutes=1), datetime(2026, 11, 5, 1)):
+            r = run(nzd_quarter_page_text_raw=NZD_QUARTER_TEXT.encode(),
+                    nzd_capture_utc=stamp)
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+            self.assert_no_trading(r)
+
+    def test_nzd_annual_rate_is_not_quarterly_change(self):
+        changed = NZD_QUARTER_TEXT.replace("CPI all groups | 0.7 | 3.7",
+                                           "CPI all groups | 0.2 | 3.7")
+        r = run(nzd_quarter_page_text_raw=changed.encode(),
+                nzd_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["currencies"]["NZD"]["rate_yoy_percent_claim"], "3.7")
+        self.assertIsNone(r["currencies"]["NZD"]["observation_month"])
+        self.assert_no_trading(r)
 
 
 if __name__ == "__main__":

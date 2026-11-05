@@ -23,6 +23,9 @@ from atlasquant_trader_jp_national_cpi_summary_text_lab import (
 from atlasquant_trader_statcan_cad_cpi_table_text_lab import (
     parse_statcan_cad_all_items_table_text_lab,
 )
+from atlasquant_trader_statsnz_nzd_cpi_quarter_text_lab import (
+    parse_statsnz_nzd_cpi_sep2026_quarter_text_lab,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_G8_NUMERIC_INFLATION_COVERAGE_LAB_V1"
 MISSING = "NO_NUMERIC_INFLATION_CAPTURE_SUPPLIED"
@@ -61,6 +64,7 @@ def _capture(
     """None denotes invalid; an absent raw+clock is a legitimate missing input."""
     if raw is None and captured is None:
         return {"status": MISSING, "observation_month": None,
+                "observation_period": None, "observation_frequency": None,
                 "rate_yoy_percent_claim": None, "estimated_observation": None,
                 "series_kind": None, "source_raw_sha256": None,
                 "captured_at_local_system_utc": None,
@@ -77,8 +81,10 @@ def _capture(
             parsed = parse_current_ons_gbp_d7g7_lab(raw, observed_at_utc=stamp)
         elif currency == "JPY":
             parsed = parse_jp_national_cpi_summary_text_lab(raw, observed_at_utc=stamp)
-        else:
+        elif currency == "CAD":
             parsed = parse_statcan_cad_all_items_table_text_lab(raw, observed_at_utc=stamp)
+        else:
+            parsed = parse_statsnz_nzd_cpi_sep2026_quarter_text_lab(raw, observed_at_utc=stamp)
     except (TypeError, ValueError, OverflowError):
         return None
     if currency == "EUR":
@@ -131,7 +137,7 @@ def _capture(
         estimated = None
         kind = "JP_NATIONAL_CPI_ALL_ITEMS_2025_BASE_YOY_TRANSCRIBED_TEXT"
         prior_year = None
-    else:
+    elif currency == "CAD":
         if (parsed.get("state") != "LAB_CANADA_CPI_SUPPLIED_TABLE_TEXT_QUARANTINED"
                 or parsed.get("currency") != "CAD"
                 or parsed.get("base_year") != 2002
@@ -142,9 +148,23 @@ def _capture(
         estimated = None
         kind = "STATCAN_CAD_CPI_ALL_ITEMS_NSA_2002_BASE_YOY_TRANSCRIBED_TEXT"
         prior_year = None
+    else:
+        if (parsed.get("state") != "LAB_NZD_QUARTERLY_CPI_TEXT_QUARANTINED"
+                or parsed.get("currency") != "NZD"
+                or parsed.get("observation_frequency") != "QUARTERLY"):
+            return None
+        month = None  # Quarter ending Sep is NOT a September monthly observation.
+        rate = parsed.get("headline_cpi_all_groups_annual_change_percent_claim")
+        estimated = None
+        kind = "STATS_NZ_CPI_ALL_GROUPS_QUARTERLY_YOY_TRANSCRIBED_TEXT"
+        prior_year = None
+    frequency = "QUARTERLY" if currency == "NZD" else "MONTHLY"
+    period = parsed.get("observation_period") if currency == "NZD" else month
     return {
-        "status": SUPPLIED_TEXT if currency in ("JPY", "CAD") else OBSERVED,
+        "status": SUPPLIED_TEXT if currency in ("JPY", "CAD", "NZD") else OBSERVED,
         "observation_month": month,
+        "observation_period": period,
+        "observation_frequency": frequency,
         "rate_yoy_percent_claim": rate,
         "estimated_observation": estimated,
         "series_kind": kind,
@@ -160,6 +180,7 @@ def build_g8_numeric_inflation_coverage_lab(
     gbp_ons_raw: Any = None, gbp_capture_utc: Any = None,
     jpy_national_page_text_raw: Any = None, jpy_capture_utc: Any = None,
     cad_nsa_table_text_raw: Any = None, cad_capture_utc: Any = None,
+    nzd_quarter_page_text_raw: Any = None, nzd_capture_utc: Any = None,
 ) -> dict[str, Any]:
     """Inventory source coverage for all canonical 28 crosses, no FX bias."""
     as_of = _utc(as_of_utc)
@@ -170,7 +191,8 @@ def build_g8_numeric_inflation_coverage_lab(
     gbp = _capture(gbp_ons_raw, gbp_capture_utc, as_of, "GBP")
     jpy = _capture(jpy_national_page_text_raw, jpy_capture_utc, as_of, "JPY")
     cad = _capture(cad_nsa_table_text_raw, cad_capture_utc, as_of, "CAD")
-    if eur is None or usd is None or gbp is None or jpy is None or cad is None:
+    nzd = _capture(nzd_quarter_page_text_raw, nzd_capture_utc, as_of, "NZD")
+    if any(x is None for x in (eur, usd, gbp, jpy, cad, nzd)):
         return _blocked("MALFORMED_OR_FUTURE_SOURCE_CAPTURE")
 
     source_leads = {
@@ -183,8 +205,9 @@ def build_g8_numeric_inflation_coverage_lab(
     for currency in CURRENCIES:
         row = (eur if currency == "EUR" else usd if currency == "USD"
                else gbp if currency == "GBP" else jpy if currency == "JPY"
-               else cad if currency == "CAD" else {
+               else cad if currency == "CAD" else nzd if currency == "NZD" else {
             "status": MISSING, "observation_month": None,
+            "observation_period": None, "observation_frequency": None,
             "rate_yoy_percent_claim": None, "estimated_observation": None,
             "series_kind": None, "source_raw_sha256": None,
             "captured_at_local_system_utc": None,
@@ -214,10 +237,21 @@ def build_g8_numeric_inflation_coverage_lab(
         if q["status"] not in (OBSERVED, SUPPLIED_TEXT):
             blockers.append("QUOTE_INFLATION_DATA_MISSING")
         same_month = None
+        same_period = None
+        frequencies_aligned = None
         if numeric_sides == 2:
-            same_month = b["observation_month"] == q["observation_month"]
+            frequencies_aligned = b["observation_frequency"] == q["observation_frequency"]
+            if not frequencies_aligned:
+                blockers.append("OBSERVATION_FREQUENCIES_DIFFER")
+            same_period = (frequencies_aligned
+                           and b["observation_period"] == q["observation_period"])
+            same_month = (frequencies_aligned
+                          and b["observation_frequency"] == "MONTHLY"
+                          and b["observation_month"] == q["observation_month"])
             if not same_month:
                 blockers.append("OBSERVATION_MONTHS_DIFFER")
+            if "QUARTERLY" in (b["observation_frequency"], q["observation_frequency"]):
+                blockers.append("QUARTERLY_CPI_MUST_NOT_MASQUERADE_AS_MONTHLY")
             if (b["rate_yoy_percent_claim"] is None
                     or q["rate_yoy_percent_claim"] is None):
                 blockers.append("ANNUAL_RATE_DENOMINATOR_MISSING")
@@ -232,6 +266,12 @@ def build_g8_numeric_inflation_coverage_lab(
             "numeric_observation_sides": numeric_sides,
             "base_latest_month": b["observation_month"],
             "quote_latest_month": q["observation_month"],
+            "base_latest_period": b["observation_period"],
+            "quote_latest_period": q["observation_period"],
+            "base_frequency": b["observation_frequency"],
+            "quote_frequency": q["observation_frequency"],
+            "observation_frequencies_aligned_if_both": frequencies_aligned,
+            "observation_periods_aligned_if_both": same_period,
             "observation_months_aligned_if_both": same_month,
             "methods_comparable": False,
             "inflation_difference_percentage_points": None,
