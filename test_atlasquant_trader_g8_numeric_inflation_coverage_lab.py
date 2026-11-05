@@ -519,5 +519,81 @@ class NumericCoverageTests(unittest.TestCase):
         self.assert_no_trading(r)
 
 
+from test_atlasquant_trader_fso_chf_cpi_oct2026_text_lab import TEXT as CHF_TEXT
+
+
+class SwissCoverageTests(unittest.TestCase):
+    def test_chf_only_adds_seven_one_sided_pairs_without_ranking(self):
+        r = run(chf_national_page_text_raw=CHF_TEXT.encode(),
+                chf_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 10, "1": 15, "2": 3})
+        self.assertEqual(r["currencies"]["CHF"]["status"], SUPPLIED_TEXT)
+        self.assertEqual(r["currencies"]["CHF"]["rate_yoy_percent_claim"], "1.5")
+        self.assertEqual(r["currencies"]["CHF"]["observation_month"], "2026-10")
+        self.assertEqual(r["currencies"]["CHF"]["observation_frequency"], "MONTHLY")
+        self.assertFalse(r["currencies"]["CHF"]["release_instant_attested"])
+        self.assertFalse(r["currencies"]["CHF"]["original_source_authenticity_independently_verified"])
+        self.assertIsNone(r["fx_bias"])
+        self.assertEqual(r["operational_bias"], "AGUARDAR")
+
+    def test_all_eight_synthetic_sources_cover_28_both_sides_but_not_bias(self):
+        stamp = datetime(2026, 11, 5, 1, tzinfo=timezone.utc)
+        r = run(gbp_ons_raw=gbp_raw(), gbp_capture_utc=stamp,
+                jpy_national_page_text_raw=JPY_TEXT.encode(), jpy_capture_utc=stamp,
+                cad_nsa_table_text_raw=CAD_TEXT.encode(), cad_capture_utc=stamp,
+                nzd_quarter_page_text_raw=NZD_QUARTER_TEXT.encode(), nzd_capture_utc=stamp,
+                aud_monthly_page_text_raw=AUD_MONTHLY_TEXT.encode(), aud_capture_utc=stamp,
+                chf_national_page_text_raw=CHF_TEXT.encode(), chf_capture_utc=stamp)
+        self.assertEqual((r["currency_count"], r["pair_count"]), (8, 28))
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 0, "1": 0, "2": 28})
+        self.assertEqual(r["currencies"]["CHF"]["series_kind"],
+                         "FSO_CHF_NATIONAL_CPI_2025DEC_BASE_YOY_TRANSCRIBED_TEXT")
+        for row in r["pairs"]:
+            self.assertEqual(row["numeric_observation_sides"], 2)
+            self.assertFalse(row["methods_comparable"])
+            self.assertIsNone(row["inflation_difference_percentage_points"])
+            self.assertIsNone(row["currency_strength_rank"])
+            self.assertEqual((row["D1"], row["W1"], row["MN1"]),
+                             ("AGUARDAR", "AGUARDAR", "AGUARDAR"))
+            self.assertFalse(row["trade_authorized"])
+
+    def test_chf_october_euro_october_same_month_not_equivalent(self):
+        r = run(chf_national_page_text_raw=CHF_TEXT.encode(),
+                chf_capture_utc=datetime(2026,11,5,1,tzinfo=timezone.utc))
+        row = pair(r, "EUR/CHF")
+        self.assertTrue(row["observation_months_aligned_if_both"])
+        self.assertIn("CROSS_COUNTRY_INFLATION_METHODS_NOT_HARMONIZED",
+                      row["comparison_blockers"])
+        self.assertIsNone(row["fx_bias"])
+
+    def test_chf_usd_different_month_blocked(self):
+        r = run(chf_national_page_text_raw=CHF_TEXT.encode(),
+                chf_capture_utc=datetime(2026,11,5,1,tzinfo=timezone.utc))
+        row = pair(r, "USD/CHF")
+        self.assertFalse(row["observation_months_aligned_if_both"])
+        self.assertIn("OBSERVATION_MONTHS_DIFFER", row["comparison_blockers"])
+
+    def test_chf_bad_source_denies_entire_matrix(self):
+        for bad in (b"not official", CHF_TEXT.replace("+1.5%", "+1.9%").encode()):
+            r = run(chf_national_page_text_raw=bad,
+                    chf_capture_utc=datetime(2026,11,5,1,tzinfo=timezone.utc))
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+
+    def test_chf_missing_or_future_or_naive_clock_denied(self):
+        for stamp in (None, AS_OF + timedelta(minutes=1), datetime(2026,11,5,1)):
+            r = run(chf_national_page_text_raw=CHF_TEXT.encode(), chf_capture_utc=stamp)
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+
+    def test_chf_default_missing_preserves_existing_contract(self):
+        r = run()
+        self.assertEqual(r["currencies"]["CHF"]["status"], MISSING)
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 15, "1": 12, "2": 1})
+
+    def test_chf_both_bytes_and_timestamp_required(self):
+        r = run(chf_national_page_text_raw=None,
+                chf_capture_utc=datetime(2026,11,5,1,tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+
+
 if __name__ == "__main__":
     unittest.main()

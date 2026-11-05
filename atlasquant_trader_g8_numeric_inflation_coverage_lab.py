@@ -29,6 +29,9 @@ from atlasquant_trader_statsnz_nzd_cpi_quarter_text_lab import (
 from atlasquant_trader_abs_aud_cpi_monthly_text_lab import (
     parse_abs_aud_cpi_sep2026_monthly_text_lab,
 )
+from atlasquant_trader_fso_chf_cpi_oct2026_text_lab import (
+    parse_fso_chf_cpi_oct2026_text_lab,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_G8_NUMERIC_INFLATION_COVERAGE_LAB_V1"
 MISSING = "NO_NUMERIC_INFLATION_CAPTURE_SUPPLIED"
@@ -88,6 +91,8 @@ def _capture(
             parsed = parse_statcan_cad_all_items_table_text_lab(raw, observed_at_utc=stamp)
         elif currency == "NZD":
             parsed = parse_statsnz_nzd_cpi_sep2026_quarter_text_lab(raw, observed_at_utc=stamp)
+        elif currency == "CHF":
+            parsed = parse_fso_chf_cpi_oct2026_text_lab(raw, observed_at_utc=stamp)
         else:
             parsed = parse_abs_aud_cpi_sep2026_monthly_text_lab(raw, observed_at_utc=stamp)
     except (TypeError, ValueError, OverflowError):
@@ -163,6 +168,17 @@ def _capture(
         estimated = None
         kind = "STATS_NZ_CPI_ALL_GROUPS_QUARTERLY_YOY_TRANSCRIBED_TEXT"
         prior_year = None
+    elif currency == "CHF":
+        if (parsed.get("state") != "LAB_CHF_FSO_NATIONAL_CPI_SUPPLIED_TEXT_QUARANTINED"
+                or parsed.get("currency") != "CHF"
+                or parsed.get("observation_frequency") != "MONTHLY"
+                or parsed.get("index_base") != "DECEMBER_2025_100"):
+            return None
+        month = parsed.get("reference_period")
+        rate = parsed.get("published_yoy_percent_claim")
+        estimated = None
+        kind = "FSO_CHF_NATIONAL_CPI_2025DEC_BASE_YOY_TRANSCRIBED_TEXT"
+        prior_year = None
     else:
         if (parsed.get("state") != "LAB_AUD_ABS_MONTHLY_CPI_SUPPLIED_TEXT_QUARANTINED"
                 or parsed.get("currency") != "AUD"
@@ -177,7 +193,7 @@ def _capture(
     frequency = "QUARTERLY" if currency == "NZD" else "MONTHLY"
     period = parsed.get("observation_period") if currency == "NZD" else month
     return {
-        "status": SUPPLIED_TEXT if currency in ("JPY", "CAD", "NZD", "AUD") else OBSERVED,
+        "status": SUPPLIED_TEXT if currency in ("JPY", "CAD", "NZD", "AUD", "CHF") else OBSERVED,
         "observation_month": month,
         "observation_period": period,
         "observation_frequency": frequency,
@@ -198,6 +214,7 @@ def build_g8_numeric_inflation_coverage_lab(
     cad_nsa_table_text_raw: Any = None, cad_capture_utc: Any = None,
     nzd_quarter_page_text_raw: Any = None, nzd_capture_utc: Any = None,
     aud_monthly_page_text_raw: Any = None, aud_capture_utc: Any = None,
+    chf_national_page_text_raw: Any = None, chf_capture_utc: Any = None,
 ) -> dict[str, Any]:
     """Inventory source coverage for all canonical 28 crosses, no FX bias."""
     as_of = _utc(as_of_utc)
@@ -210,7 +227,8 @@ def build_g8_numeric_inflation_coverage_lab(
     cad = _capture(cad_nsa_table_text_raw, cad_capture_utc, as_of, "CAD")
     nzd = _capture(nzd_quarter_page_text_raw, nzd_capture_utc, as_of, "NZD")
     aud = _capture(aud_monthly_page_text_raw, aud_capture_utc, as_of, "AUD")
-    if any(x is None for x in (eur, usd, gbp, jpy, cad, nzd, aud)):
+    chf = _capture(chf_national_page_text_raw, chf_capture_utc, as_of, "CHF")
+    if any(x is None for x in (eur, usd, gbp, jpy, cad, nzd, aud, chf)):
         return _blocked("MALFORMED_OR_FUTURE_SOURCE_CAPTURE")
 
     source_leads = {
@@ -224,7 +242,7 @@ def build_g8_numeric_inflation_coverage_lab(
         row = (eur if currency == "EUR" else usd if currency == "USD"
                else gbp if currency == "GBP" else jpy if currency == "JPY"
                else cad if currency == "CAD" else nzd if currency == "NZD"
-               else aud if currency == "AUD" else {
+               else aud if currency == "AUD" else chf if currency == "CHF" else {
             "status": MISSING, "observation_month": None,
             "observation_period": None, "observation_frequency": None,
             "rate_yoy_percent_claim": None, "estimated_observation": None,
