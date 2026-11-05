@@ -1,4 +1,4 @@
-"""Offline G8/28-pair inflation coverage from *original* EUR and USD bytes.
+"""Offline G8/28-pair inflation coverage from supplied EUR, USD, GBP bytes.
 
 An observed source response is not a historical release vintage. CPI-U NSA
 derived YoY and HICP YoY do not establish a directional currency signal.
@@ -16,6 +16,7 @@ from atlasquant_trader_eurostat_eur_hicp_once_lab import (
     parse_current_eur_hicp_jsonstat_lab,
 )
 from atlasquant_trader_g8_official_source_receipt_lab import SOURCES
+from atlasquant_trader_ons_gbp_cpi_current_lab import parse_current_ons_gbp_d7g7_lab
 
 SCHEMA = "ATLASQUANT_TRADER_G8_NUMERIC_INFLATION_COVERAGE_LAB_V1"
 MISSING = "NO_NUMERIC_INFLATION_CAPTURE_SUPPLIED"
@@ -61,9 +62,12 @@ def _capture(
     if not isinstance(raw, bytes) or stamp is None or stamp > as_of:
         return None
     try:
-        parsed = (parse_current_eur_hicp_jsonstat_lab(raw, observed_at_utc=stamp)
-                  if currency == "EUR" else
-                  parse_current_bls_cpiu_lab(raw, observed_at_utc=stamp))
+        if currency == "EUR":
+            parsed = parse_current_eur_hicp_jsonstat_lab(raw, observed_at_utc=stamp)
+        elif currency == "USD":
+            parsed = parse_current_bls_cpiu_lab(raw, observed_at_utc=stamp)
+        else:
+            parsed = parse_current_ons_gbp_d7g7_lab(raw, observed_at_utc=stamp)
     except (TypeError, ValueError, OverflowError):
         return None
     if currency == "EUR":
@@ -80,7 +84,7 @@ def _capture(
         estimated = latest.get("status_flag") == "e"
         kind = "EUROSTAT_HICP_YOY_ECOICOP_V2"
         prior_year = None
-    else:
+    elif currency == "USD":
         if (parsed.get("state") != "LAB_CURRENT_US_BLS_CPIU_INDEX_QUARANTINED"
                 or parsed.get("series_id") != "CUUR0000SA0"
                 or parsed.get("currency") != "USD"):
@@ -92,6 +96,17 @@ def _capture(
         prior_year = parsed.get("prior_year_month_observed") is True
         if (rate is not None and not prior_year):
             return None
+    else:
+        if (parsed.get("state") != "LAB_CURRENT_GBP_ONS_D7G7_QUARANTINED"
+                or parsed.get("series_id") != "D7G7"
+                or parsed.get("source_dataset") != "MM23"
+                or parsed.get("currency") != "GBP"):
+            return None
+        month = parsed.get("latest_period")
+        rate = parsed.get("latest_annual_cpi_rate_percent")
+        estimated = None
+        kind = "ONS_D7G7_CPI_ALL_ITEMS_YOY_DIRECT"
+        prior_year = None
     return {
         "status": OBSERVED,
         "observation_month": month,
@@ -107,6 +122,7 @@ def _capture(
 def build_g8_numeric_inflation_coverage_lab(
     *, eur_jsonstat_raw: Any, usd_bls_raw: Any,
     eur_capture_utc: Any, usd_capture_utc: Any, as_of_utc: Any,
+    gbp_ons_raw: Any = None, gbp_capture_utc: Any = None,
 ) -> dict[str, Any]:
     """Inventory source coverage for all canonical 28 crosses, no FX bias."""
     as_of = _utc(as_of_utc)
@@ -114,7 +130,8 @@ def build_g8_numeric_inflation_coverage_lab(
         return _blocked("AS_OF_UTC_REQUIRED")
     eur = _capture(eur_jsonstat_raw, eur_capture_utc, as_of, "EUR")
     usd = _capture(usd_bls_raw, usd_capture_utc, as_of, "USD")
-    if eur is None or usd is None:
+    gbp = _capture(gbp_ons_raw, gbp_capture_utc, as_of, "GBP")
+    if eur is None or usd is None or gbp is None:
         return _blocked("MALFORMED_OR_FUTURE_SOURCE_CAPTURE")
 
     source_leads = {
@@ -125,7 +142,7 @@ def build_g8_numeric_inflation_coverage_lab(
         return _blocked("G8_REGISTRY_OR_SOURCE_LEADS_INCOMPLETE")
     currencies = {}
     for currency in CURRENCIES:
-        row = eur if currency == "EUR" else usd if currency == "USD" else {
+        row = eur if currency == "EUR" else usd if currency == "USD" else gbp if currency == "GBP" else {
             "status": MISSING, "observation_month": None,
             "rate_yoy_percent_claim": None, "estimated_observation": None,
             "series_kind": None, "source_raw_sha256": None,
@@ -162,7 +179,10 @@ def build_g8_numeric_inflation_coverage_lab(
             if (b["rate_yoy_percent_claim"] is None
                     or q["rate_yoy_percent_claim"] is None):
                 blockers.append("ANNUAL_RATE_DENOMINATOR_MISSING")
-            blockers.append("HICP_AND_CPI_U_METHODS_NOT_IDENTICAL")
+            if {base, quote} == {"EUR", "USD"}:
+                blockers.append("HICP_AND_CPI_U_METHODS_NOT_IDENTICAL")
+            else:
+                blockers.append("CROSS_COUNTRY_INFLATION_METHODS_NOT_HARMONIZED")
         blockers.extend(("RELEASE_VINTAGES_AND_CONSENSUS_UNATTESTED",
                          "INDEPENDENT_SPOT_PRICE_AND_OOS_MISSING"))
         pairs.append({

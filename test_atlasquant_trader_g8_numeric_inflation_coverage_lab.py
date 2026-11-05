@@ -13,6 +13,7 @@ from test_atlasquant_trader_eurostat_eur_hicp_once_lab import (
 from test_atlasquant_trader_bls_us_cpiu_once_lab import (
     NOW as USD_CAPTURE, fixture as usd_fixture, raw as usd_raw,
 )
+from test_atlasquant_trader_ons_gbp_cpi_current_lab import raw as gbp_raw
 
 AS_OF = datetime(2026, 11, 5, 2, tzinfo=timezone.utc)
 
@@ -176,6 +177,41 @@ class NumericCoverageTests(unittest.TestCase):
             self.assertFalse(x["trade_authorized"])
             self.assertIsNone(x["fx_bias"])
             self.assertFalse(x["methods_comparable"])
+
+    def test_gbp_source_expands_two_currency_coverage_to_three_pairs(self):
+        r = run(gbp_ons_raw=gbp_raw(),
+                gbp_capture_utc=datetime(2026, 11, 5, 1, 30, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_G8_NUMERIC_INFLATION_COVERAGE_ONLY")
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 10, "1": 15, "2": 3})
+        self.assertEqual(r["currencies"]["GBP"]["observation_month"], "2026-09")
+        self.assertEqual(r["currencies"]["GBP"]["rate_yoy_percent_claim"], "3.5")
+        self.assertEqual(r["currencies"]["GBP"]["series_kind"],
+                         "ONS_D7G7_CPI_ALL_ITEMS_YOY_DIRECT")
+        for symbol in ("EUR/USD", "EUR/GBP", "GBP/USD"):
+            self.assertEqual(pair(r, symbol)["numeric_observation_sides"], 2)
+            self.assertFalse(pair(r, symbol)["methods_comparable"])
+        self.assert_no_trading(r)
+
+    def test_gbp_usd_same_month_still_cannot_be_ranked_or_traded(self):
+        r = run(gbp_ons_raw=gbp_raw(),
+                gbp_capture_utc=datetime(2026, 11, 5, 1, 30, tzinfo=timezone.utc))
+        row = pair(r, "GBP/USD")
+        self.assertTrue(row["observation_months_aligned_if_both"])
+        self.assertIn("CROSS_COUNTRY_INFLATION_METHODS_NOT_HARMONIZED",
+                      row["comparison_blockers"])
+        self.assertIsNone(row["currency_strength_rank"])
+        self.assertIsNone(row["inflation_difference_percentage_points"])
+
+    def test_invalid_gbp_payload_denies_entire_matrix(self):
+        r = run(gbp_ons_raw=b"not an ONS response",
+                gbp_capture_utc=datetime(2026, 11, 5, 1, 30, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+
+    def test_gbp_capture_future_or_missing_clock_blocks(self):
+        for stamp in (None, AS_OF + timedelta(minutes=1),
+                      datetime(2026, 11, 5, 1, 30)):
+            r = run(gbp_ons_raw=gbp_raw(), gbp_capture_utc=stamp)
+            self.assertEqual(r["state"], "LAB_BLOCKED")
 
 
 if __name__ == "__main__":
