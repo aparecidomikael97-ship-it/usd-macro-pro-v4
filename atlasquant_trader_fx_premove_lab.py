@@ -11,6 +11,9 @@ import json
 import re
 from typing import Any
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx_ny_rollover_lab import (
+    CONVENTION, inspect_fx_ny_close_window_lab,
+)
 
 SCHEMA = "ATLASQUANT_FX_PREMOVE_AUDIT_LAB_V1"
 FORECAST = "ATLASQUANT_FX_D1W1_FORECAST_V1"
@@ -22,7 +25,7 @@ FIELDS_FORECAST = frozenset(("schema","pair","horizon","model_version",
 FIELDS_OUTCOME = frozenset(("schema","pair","target_start_utc",
     "target_end_utc","captured_at_utc","source_kind","source_sha256",
     "first_price","last_price"))
-HORIZONS = {"D1":timedelta(days=1), "W1":timedelta(days=7)}
+HORIZONS = frozenset(("D1", "W1"))
 SOURCES = frozenset(("ECB_REFERENCE_INDICATIVE","BROKER_M15_UNVERIFIED"))
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 TAG = re.compile(r"LAB_[A-Z0-9_.-]{3,48}\Z")
@@ -37,6 +40,8 @@ def _result(reason: str) -> dict[str,Any]:
         "outcome_sha256":None,"observed_direction":None,
         "arithmetic_direction_match_unverified":None,
         "all_times_caller_claims":True,"forecast_precommit_independently_verified":False,
+        "fx_ny_rollover_convention":CONVENTION,
+        "broker_calendar_independently_verified":False,
         "pre_decision_data_availability_verified":False,
         "frozen_model_pre_event_verified":False,
         "outcome_original_source_authenticated":False,
@@ -116,9 +121,13 @@ def audit_fx_premove_lab(forecast_raw: Any,*,as_of_utc: Any,
     data,created,start,end=(_utc(f[k]) for k in (
         "data_cutoff_utc","created_at_utc","target_start_utc","target_end_utc"))
     if (None in (data,created,start,end) or not data<=created<start<end
-            or created>now or end-start!=HORIZONS[f["horizon"]]
-            or start-created>timedelta(days=30)):
+            or created>now or start-created>timedelta(days=30)):
         r["reason"]="FORECAST_TIMELINE_OR_HORIZON_INVALID"
+        return r
+    ny_window = inspect_fx_ny_close_window_lab(
+        horizon=f["horizon"], start_at_utc=start, end_at_utc=end)
+    if ny_window["state"] != "LAB_FX_NY_ROLLOVER_WINDOW_STRUCTURALLY_VALID":
+        r["reason"] = "FORECAST_NOT_A_CANONICAL_NY_FX_D1_W1_SESSION"
         return r
     r.update(state="LAB_FORECAST_STRUCTURALLY_ACCEPTED_UNATTESTED",
         reason="CREATION_AND_EVIDENCE_TIMES_SELF_ASSERTED",

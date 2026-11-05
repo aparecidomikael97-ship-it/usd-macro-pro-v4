@@ -11,8 +11,8 @@ F={
     "model_version":"LAB_TEST_01","direction":"ALTA","evidence_sha256":"a"*64,
     "data_cutoff_utc":"2026-11-02T09:00:00Z",
     "created_at_utc":"2026-11-02T09:05:00Z",
-    "target_start_utc":"2026-11-03T00:00:00Z",
-    "target_end_utc":"2026-11-04T00:00:00Z",
+    "target_start_utc":"2026-11-02T22:00:00Z",
+    "target_end_utc":"2026-11-03T22:00:00Z",
 }
 O={
     "schema":OUTCOME,"pair":"EUR/USD","target_start_utc":F["target_start_utc"],
@@ -92,10 +92,15 @@ class ForecastChronologyTests(unittest.TestCase):
             self.assertEqual(r["state"],"LAB_RETROSPECTIVE_DIRECTION_MATCH_UNATTESTED")
             self.assert_still_no_go(r)
 
-    def test_w1_fixed_7_days_recognized(self):
-        f=dict(F,horizon="W1",target_end_utc="2026-11-10T00:00:00Z")
-        o=dict(O,target_end_utc=f["target_end_utc"],
-               captured_at_utc="2026-11-11T00:00:00Z")
+    def test_w1_fx_sunday_open_to_friday_close_recognized(self):
+        f=dict(F,horizon="W1",
+               data_cutoff_utc="2026-10-30T09:00:00Z",
+               created_at_utc="2026-10-30T09:05:00Z",
+               target_start_utc="2026-11-01T22:00:00Z",
+               target_end_utc="2026-11-06T22:00:00Z")
+        o=dict(O,target_start_utc=f["target_start_utc"],
+               target_end_utc=f["target_end_utc"],
+               captured_at_utc="2026-11-07T00:00:00Z")
         r=run(f,o,now=NOW+timedelta(days=10))
         self.assertEqual(r["state"],"LAB_RETROSPECTIVE_DIRECTION_MATCH_UNATTESTED")
         self.assert_still_no_go(r)
@@ -104,7 +109,7 @@ class ForecastChronologyTests(unittest.TestCase):
         self.assertEqual(run(dict(F,horizon="W1"))["state"],"LAB_BLOCKED")
 
     def test_forecast_after_move_start_is_rejected(self):
-        self.assertEqual(run(dict(F,created_at_utc="2026-11-03T01:00:00Z"))["state"],"LAB_BLOCKED")
+        self.assertEqual(run(dict(F,created_at_utc="2026-11-02T23:00:00Z"))["state"],"LAB_BLOCKED")
 
     def test_future_information_claim_rejected(self):
         self.assertEqual(run(dict(F,data_cutoff_utc="2026-11-02T09:06:00Z"))["state"],"LAB_BLOCKED")
@@ -113,7 +118,7 @@ class ForecastChronologyTests(unittest.TestCase):
         self.assertEqual(run(now=datetime(2026,11,2,9,tzinfo=timezone.utc))["state"],"LAB_BLOCKED")
 
     def test_outcome_before_period_end_rejected(self):
-        self.assertEqual(run(o=dict(O,captured_at_utc="2026-11-03T23:59:59Z"))["state"],
+        self.assertEqual(run(o=dict(O,captured_at_utc="2026-11-03T21:59:59Z"))["state"],
                          "LAB_BLOCKED")
 
     def test_outcome_after_asof_rejected(self):
@@ -172,6 +177,36 @@ class ForecastChronologyTests(unittest.TestCase):
         self.assertNotEqual(a["forecast_sha256"],b["forecast_sha256"])
         self.assert_still_no_go(a)
         self.assert_still_no_go(b)
+
+    def test_utc_midnight_fake_daily_window_denied(self):
+        f=dict(F,target_start_utc="2026-11-03T00:00:00Z",
+               target_end_utc="2026-11-04T00:00:00Z")
+        r=run(f)
+        self.assertEqual(r["state"],"LAB_BLOCKED")
+        self.assertEqual(r["reason"],"FORECAST_NOT_A_CANONICAL_NY_FX_D1_W1_SESSION")
+
+    def test_friday_to_sunday_is_not_a_forex_daily_session(self):
+        f=dict(F,created_at_utc="2026-10-29T09:05:00Z",
+               data_cutoff_utc="2026-10-29T09:00:00Z",
+               target_start_utc="2026-10-30T21:00:00Z",
+               target_end_utc="2026-11-01T22:00:00Z")
+        self.assertEqual(run(f)["state"],"LAB_BLOCKED")
+
+    def test_edt_ny_close_session_is_21_utc_not_fixed_est(self):
+        f=dict(F,created_at_utc="2026-10-26T09:05:00Z",
+               data_cutoff_utc="2026-10-26T09:00:00Z",
+               target_start_utc="2026-10-26T21:00:00Z",
+               target_end_utc="2026-10-27T21:00:00Z")
+        self.assertEqual(run(f)["state"],"LAB_FORECAST_STRUCTURALLY_ACCEPTED_UNATTESTED")
+        f["target_start_utc"]="2026-10-26T22:00:00Z"
+        f["target_end_utc"]="2026-10-27T22:00:00Z"
+        self.assertEqual(run(f)["state"],"LAB_BLOCKED")
+
+    def test_broker_market_hours_not_attested_by_timezone_check(self):
+        r=run(o=O)
+        self.assertFalse(r["broker_calendar_independently_verified"])
+        self.assertIn("FX_NY_1700_ROLLOVER",r["fx_ny_rollover_convention"])
+        self.assert_still_no_go(r)
 
 
 if __name__ == "__main__":
