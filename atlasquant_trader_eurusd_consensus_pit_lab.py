@@ -15,6 +15,11 @@ SCHEMA = "ATLASQUANT_TRADER_EURUSD_POLICY_CONSENSUS_PIT_LAB_V1"
 MAX_DOCUMENT_BYTES = 256 * 1024
 SOURCES = {
     "ECB_SMA_AGGREGATE": "EUR",
+    "ECB_MMSR_OIS_SPOT_MP_AGGREGATE": "EUR",
+    "ECB_MMSR_OIS_FORWARD_QUARTER_AGGREGATE": "EUR",
+    "ECB_EMMS_OIS_ANNUAL_HISTORY": "EUR",
+    "ECB_ESTR_REALIZED_OVERNIGHT": "EUR",
+    "ECB_YC_SOVEREIGN_BOND_FORWARD": "EUR",
     "NYFED_SME_AGGREGATE": "USD",  # 2025 onwards
     "NYFED_SPD_AGGREGATE_LEGACY": "USD",  # through 2024
     "INDEPENDENT_PRE_EVENT_CANDIDATE_EUR": "EUR",
@@ -27,6 +32,18 @@ KNOWN_POST_EVENT_AGGREGATES = frozenset({
     "ECB_SMA_AGGREGATE", "NYFED_SME_AGGREGATE",
     "NYFED_SPD_AGGREGATE_LEGACY",
 })
+# These official EUR series contain interesting money-market information but
+# are NOT same-measure, pre-decision DFR consensus. In particular, MMSR OIS
+# businessweek-frequency labels do not mean the aggregate was public that day:
+# spot MP statistics are published after each maintenance period, while
+# forward-dated OIS statistics aggregate a quarter and publish later.
+EUR_MEASURE_GATES = {
+    "ECB_MMSR_OIS_SPOT_MP_AGGREGATE": "OIS_MAINTENANCE_PERIOD_AGGREGATE_RELEASE_LAG",
+    "ECB_MMSR_OIS_FORWARD_QUARTER_AGGREGATE": "OIS_FORWARD_QUARTER_AGGREGATE_RELEASE_LAG",
+    "ECB_EMMS_OIS_ANNUAL_HISTORY": "OIS_ANNUAL_HISTORICAL_UPDATE_NOT_EVENT_CONSENSUS",
+    "ECB_ESTR_REALIZED_OVERNIGHT": "REALIZED_ESTR_NOT_POLICY_EXPECTATION",
+    "ECB_YC_SOVEREIGN_BOND_FORWARD": "GOVERNMENT_BOND_FORWARD_NOT_OIS_POLICY_EXPECTATION",
+}
 
 
 def _utc(value: Any) -> datetime | None:
@@ -59,6 +76,7 @@ def _result(reason: str, currency: Any, source_id: Any) -> dict[str, Any]:
         "event_release_instant_independently_verified": False,
         "public_availability_independently_verified": False,
         "pre_event_consensus_verified": False,
+        "source_measure_is_event_consensus_verified": False,
         "historical_point_in_time_eligible": False,
         "market_surprise_bps": None, "fx_bias": None,
         "operational_bias": "AGUARDAR", "trade_authorized": False,
@@ -119,6 +137,8 @@ def audit_policy_consensus_pit_lab(
         out["reason"] = "SAME_DAY_ORDER_NEEDS_WITNESSED_EVENT_TIME"
     elif source_id in KNOWN_POST_EVENT_AGGREGATES:
         out["reason"] = "OFFICIAL_AGGREGATE_NORMALLY_PUBLISHED_POST_EVENT"
+    elif source_id in EUR_MEASURE_GATES:
+        out["reason"] = EUR_MEASURE_GATES[source_id]
     elif publication_kind == "INDICATIVE_SCHEDULE":
         out["reason"] = "SCHEDULE_IS_NOT_ACTUAL_PUBLICATION"
     else:
@@ -154,4 +174,5 @@ def compare_eurusd_consensus_pit_lab(eur: Any, usd: Any) -> dict[str, Any]:
 
 
 __all__ = ["SCHEMA", "SOURCES", "KNOWN_POST_EVENT_AGGREGATES",
+           "EUR_MEASURE_GATES",
            "audit_policy_consensus_pit_lab", "compare_eurusd_consensus_pit_lab"]

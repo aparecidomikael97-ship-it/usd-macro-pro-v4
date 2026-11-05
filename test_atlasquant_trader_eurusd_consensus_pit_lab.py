@@ -71,6 +71,33 @@ class ConsensusPitTests(unittest.TestCase):
         r = candidate(source_id="ECB_SMA_AGGREGATE")
         self.assertEqual(r["reason"], "OFFICIAL_AGGREGATE_NORMALLY_PUBLISHED_POST_EVENT")
 
+    def test_ecb_public_ois_aggregates_cannot_imply_same_day_market_consensus(self):
+        for source, reason in (
+            ("ECB_MMSR_OIS_SPOT_MP_AGGREGATE",
+             "OIS_MAINTENANCE_PERIOD_AGGREGATE_RELEASE_LAG"),
+            ("ECB_MMSR_OIS_FORWARD_QUARTER_AGGREGATE",
+             "OIS_FORWARD_QUARTER_AGGREGATE_RELEASE_LAG"),
+            ("ECB_EMMS_OIS_ANNUAL_HISTORY",
+             "OIS_ANNUAL_HISTORICAL_UPDATE_NOT_EVENT_CONSENSUS"),
+        ):
+            with self.subTest(source=source):
+                r = candidate(source_id=source)
+                self.assertEqual(r["reason"], reason)
+                self.assertFalse(r["source_measure_is_event_consensus_verified"])
+                self.assertFalse(r["historical_point_in_time_eligible"])
+
+    def test_ecb_realized_estr_and_sovereign_forward_are_not_dfr_expectations(self):
+        for source, reason in (
+            ("ECB_ESTR_REALIZED_OVERNIGHT", "REALIZED_ESTR_NOT_POLICY_EXPECTATION"),
+            ("ECB_YC_SOVEREIGN_BOND_FORWARD",
+             "GOVERNMENT_BOND_FORWARD_NOT_OIS_POLICY_EXPECTATION"),
+        ):
+            with self.subTest(source=source):
+                r = candidate(source_id=source)
+                self.assertEqual(r["reason"], reason)
+                self.assertFalse(r["pre_event_consensus_verified"])
+                self.assertIsNone(r["fx_bias"])
+
     def test_questions_published_early_are_not_claimed_consensus_aggregate(self):
         r = candidate(source_id="NYFED_SME_QUESTIONNAIRE", currency="USD")
         self.assertEqual(r["state"], "LAB_BLOCKED")
