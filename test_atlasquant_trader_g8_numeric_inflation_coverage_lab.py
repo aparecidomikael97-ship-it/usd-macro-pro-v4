@@ -5,7 +5,8 @@ import unittest
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_g8_numeric_inflation_coverage_lab import (
-    MISSING, OBSERVED, build_g8_numeric_inflation_coverage_lab as build,
+    MISSING, OBSERVED, SUPPLIED_TEXT,
+    build_g8_numeric_inflation_coverage_lab as build,
 )
 from test_atlasquant_trader_eurostat_eur_hicp_once_lab import (
     NOW as EUR_CAPTURE, fixture as eur_fixture, raw as eur_raw,
@@ -14,6 +15,7 @@ from test_atlasquant_trader_bls_us_cpiu_once_lab import (
     NOW as USD_CAPTURE, fixture as usd_fixture, raw as usd_raw,
 )
 from test_atlasquant_trader_ons_gbp_cpi_current_lab import raw as gbp_raw
+from test_atlasquant_trader_jp_national_cpi_summary_text_lab import TEXT as JPY_TEXT
 
 AS_OF = datetime(2026, 11, 5, 2, tzinfo=timezone.utc)
 
@@ -212,6 +214,64 @@ class NumericCoverageTests(unittest.TestCase):
                       datetime(2026, 11, 5, 1, 30)):
             r = run(gbp_ons_raw=gbp_raw(), gbp_capture_utc=stamp)
             self.assertEqual(r["state"], "LAB_BLOCKED")
+
+    def test_optional_jpy_text_is_not_misrepresented_as_original_api_response(self):
+        r = run(jpy_national_page_text_raw=JPY_TEXT.encode(),
+                jpy_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["currencies"]["JPY"]["status"], SUPPLIED_TEXT)
+        self.assertEqual(r["currencies"]["JPY"]["rate_yoy_percent_claim"], "2.1")
+        self.assertEqual(r["currencies"]["JPY"]["observation_month"], "2026-09")
+        self.assertEqual(r["currencies"]["JPY"]["series_kind"],
+                         "JP_NATIONAL_CPI_ALL_ITEMS_2025_BASE_YOY_TRANSCRIBED_TEXT")
+        self.assertFalse(r["currencies"]["JPY"][
+            "original_source_authenticity_independently_verified"])
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 10, "1": 15, "2": 3})
+        self.assert_no_trading(r)
+
+    def test_eur_usd_gbp_jpy_synthetic_four_currency_coverage_not_bias(self):
+        r = run(gbp_ons_raw=gbp_raw(),
+                gbp_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc),
+                jpy_national_page_text_raw=JPY_TEXT.encode(),
+                jpy_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["pair_count_by_numeric_sides"], {"0": 6, "1": 16, "2": 6})
+        for symbol in ("EUR/USD", "EUR/GBP", "GBP/USD", "USD/JPY",
+                       "EUR/JPY", "GBP/JPY"):
+            row = pair(r, symbol)
+            self.assertEqual(row["numeric_observation_sides"], 2)
+            self.assertFalse(row["methods_comparable"])
+            self.assertIsNone(row["inflation_difference_percentage_points"])
+            self.assertIsNone(row["fx_bias"])
+        self.assert_no_trading(r)
+
+    def test_usdjpy_equal_month_does_not_justify_cross_country_rank(self):
+        r = run(jpy_national_page_text_raw=JPY_TEXT.encode(),
+                jpy_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        row = pair(r, "USD/JPY")
+        self.assertTrue(row["observation_months_aligned_if_both"])
+        self.assertIn("CROSS_COUNTRY_INFLATION_METHODS_NOT_HARMONIZED",
+                      row["comparison_blockers"])
+        self.assertIsNone(row["currency_strength_rank"])
+        self.assert_no_trading(r)
+
+    def test_invalid_or_tokyo_only_jpy_text_blocks_entire_matrix(self):
+        for content in (b"not official", JPY_TEXT.replace("指数　全国", "指数　東京都区部").encode(),
+                        "transcribed text"):
+            r = run(jpy_national_page_text_raw=content,
+                    jpy_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+
+    def test_jpy_missing_future_or_naive_clock_blocks(self):
+        for clock in (None, AS_OF + timedelta(minutes=1), datetime(2026, 11, 5, 1)):
+            r = run(jpy_national_page_text_raw=JPY_TEXT.encode(),
+                    jpy_capture_utc=clock)
+            self.assertEqual(r["state"], "LAB_BLOCKED")
+
+    def test_jpy_headline_not_inferred_from_fresh_food_exclusion(self):
+        txt = JPY_TEXT.replace("2.1%の上昇", "1.7%の上昇", 1)
+        r = run(jpy_national_page_text_raw=txt.encode(),
+                jpy_capture_utc=datetime(2026, 11, 5, 1, tzinfo=timezone.utc))
+        self.assertEqual(r["currencies"]["JPY"]["rate_yoy_percent_claim"], "1.7")
+        self.assert_no_trading(r)
 
 
 if __name__ == "__main__":

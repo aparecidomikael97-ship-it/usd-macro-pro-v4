@@ -17,10 +17,14 @@ from atlasquant_trader_eurostat_eur_hicp_once_lab import (
 )
 from atlasquant_trader_g8_official_source_receipt_lab import SOURCES
 from atlasquant_trader_ons_gbp_cpi_current_lab import parse_current_ons_gbp_d7g7_lab
+from atlasquant_trader_jp_national_cpi_summary_text_lab import (
+    parse_jp_national_cpi_summary_text_lab,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_G8_NUMERIC_INFLATION_COVERAGE_LAB_V1"
 MISSING = "NO_NUMERIC_INFLATION_CAPTURE_SUPPLIED"
 OBSERVED = "CURRENT_NUMERIC_CAPTURE_STRUCTURALLY_PARSED_UNATTESTED"
+SUPPLIED_TEXT = "SUPPLIED_OFFICIAL_PAGE_TEXT_STRUCTURALLY_PARSED_UNATTESTED"
 
 
 def _blocked(reason: str) -> dict[str, Any]:
@@ -66,8 +70,10 @@ def _capture(
             parsed = parse_current_eur_hicp_jsonstat_lab(raw, observed_at_utc=stamp)
         elif currency == "USD":
             parsed = parse_current_bls_cpiu_lab(raw, observed_at_utc=stamp)
-        else:
+        elif currency == "GBP":
             parsed = parse_current_ons_gbp_d7g7_lab(raw, observed_at_utc=stamp)
+        else:
+            parsed = parse_jp_national_cpi_summary_text_lab(raw, observed_at_utc=stamp)
     except (TypeError, ValueError, OverflowError):
         return None
     if currency == "EUR":
@@ -96,7 +102,7 @@ def _capture(
         prior_year = parsed.get("prior_year_month_observed") is True
         if (rate is not None and not prior_year):
             return None
-    else:
+    elif currency == "GBP":
         if (parsed.get("state") != "LAB_CURRENT_GBP_ONS_D7G7_QUARANTINED"
                 or parsed.get("series_id") != "D7G7"
                 or parsed.get("source_dataset") != "MM23"
@@ -107,8 +113,21 @@ def _capture(
         estimated = None
         kind = "ONS_D7G7_CPI_ALL_ITEMS_YOY_DIRECT"
         prior_year = None
+    else:
+        if (parsed.get("state") != "LAB_JP_NATIONAL_CPI_SUPPLIED_TEXT_QUARANTINED"
+                or parsed.get("currency") != "JPY"
+                or parsed.get("base_year") != 2025):
+            return None
+        row = parsed.get("national_headline_all_items")
+        if not isinstance(row, dict):
+            return None
+        month = parsed.get("reference_period")
+        rate = row.get("reported_yoy_percent_claim")
+        estimated = None
+        kind = "JP_NATIONAL_CPI_ALL_ITEMS_2025_BASE_YOY_TRANSCRIBED_TEXT"
+        prior_year = None
     return {
-        "status": OBSERVED,
+        "status": SUPPLIED_TEXT if currency == "JPY" else OBSERVED,
         "observation_month": month,
         "rate_yoy_percent_claim": rate,
         "estimated_observation": estimated,
@@ -123,6 +142,7 @@ def build_g8_numeric_inflation_coverage_lab(
     *, eur_jsonstat_raw: Any, usd_bls_raw: Any,
     eur_capture_utc: Any, usd_capture_utc: Any, as_of_utc: Any,
     gbp_ons_raw: Any = None, gbp_capture_utc: Any = None,
+    jpy_national_page_text_raw: Any = None, jpy_capture_utc: Any = None,
 ) -> dict[str, Any]:
     """Inventory source coverage for all canonical 28 crosses, no FX bias."""
     as_of = _utc(as_of_utc)
@@ -131,7 +151,8 @@ def build_g8_numeric_inflation_coverage_lab(
     eur = _capture(eur_jsonstat_raw, eur_capture_utc, as_of, "EUR")
     usd = _capture(usd_bls_raw, usd_capture_utc, as_of, "USD")
     gbp = _capture(gbp_ons_raw, gbp_capture_utc, as_of, "GBP")
-    if eur is None or usd is None or gbp is None:
+    jpy = _capture(jpy_national_page_text_raw, jpy_capture_utc, as_of, "JPY")
+    if eur is None or usd is None or gbp is None or jpy is None:
         return _blocked("MALFORMED_OR_FUTURE_SOURCE_CAPTURE")
 
     source_leads = {
@@ -142,13 +163,14 @@ def build_g8_numeric_inflation_coverage_lab(
         return _blocked("G8_REGISTRY_OR_SOURCE_LEADS_INCOMPLETE")
     currencies = {}
     for currency in CURRENCIES:
-        row = eur if currency == "EUR" else usd if currency == "USD" else gbp if currency == "GBP" else {
+        row = (eur if currency == "EUR" else usd if currency == "USD"
+               else gbp if currency == "GBP" else jpy if currency == "JPY" else {
             "status": MISSING, "observation_month": None,
             "rate_yoy_percent_claim": None, "estimated_observation": None,
             "series_kind": None, "source_raw_sha256": None,
             "captured_at_local_system_utc": None,
             "has_valid_same_month_prior_year": None,
-        }
+        })
         currencies[currency] = {
             "currency": currency,
             "official_documentation_lead_only": source_leads[currency],
@@ -164,12 +186,13 @@ def build_g8_numeric_inflation_coverage_lab(
     for symbol in OFFICIAL_PAIRS:
         base, quote = split_pair(symbol)
         b, q = currencies[base], currencies[quote]
-        numeric_sides = int(b["status"] == OBSERVED) + int(q["status"] == OBSERVED)
+        numeric_sides = int(b["status"] in (OBSERVED, SUPPLIED_TEXT)) + int(
+            q["status"] in (OBSERVED, SUPPLIED_TEXT))
         counts[numeric_sides] += 1
         blockers = []
-        if b["status"] != OBSERVED:
+        if b["status"] not in (OBSERVED, SUPPLIED_TEXT):
             blockers.append("BASE_INFLATION_DATA_MISSING")
-        if q["status"] != OBSERVED:
+        if q["status"] not in (OBSERVED, SUPPLIED_TEXT):
             blockers.append("QUOTE_INFLATION_DATA_MISSING")
         same_month = None
         if numeric_sides == 2:
@@ -212,4 +235,5 @@ def build_g8_numeric_inflation_coverage_lab(
     return out
 
 
-__all__ = ["SCHEMA", "MISSING", "OBSERVED", "build_g8_numeric_inflation_coverage_lab"]
+__all__ = ["SCHEMA", "MISSING", "OBSERVED", "SUPPLIED_TEXT",
+           "build_g8_numeric_inflation_coverage_lab"]
