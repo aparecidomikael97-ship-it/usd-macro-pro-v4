@@ -1,0 +1,53 @@
+{
+  "schema": "ATLASQUANT_TRADER_EURUSD_SEP2026_EXPECTATIONS_MISMATCH_LAB_V1",
+  "research_date": "2026-11-06",
+  "kind": "TWO_OFFICIAL_SURVEY_RELEASE_REFERENCES_NOT_SEPTEMBER_CPI_EVENT_CONSENSUS",
+  "source_original_release_bytes_archived": false,
+  "market_consensus_for_exact_september_cpi_release_verified": false,
+  "records": [
+    {
+      "currency": "EUR",
+      "source_id": "ECB_SMA_SEP2026_HICP_Q3_ANALYST_MEDIAN",
+      "agency": "EUROPEAN_CENTRAL_BANK",
+      "source_url": "https://www.ecb.europa.eu/stats/ecb_surveys/sma/shared/pdf/ecb.smar260911_september.en.pdf",
+      "publication_calendar_date": "2026-09-11",
+      "conservative_available_at_utc": "2026-09-12T00:00:00Z",
+      "survey_or_analysis_period": "2026-09_SMA_ROUND",
+      "forecast_target_period": "2026Q3",
+      "forecast_target_granularity": "QUARTERLY",
+      "forecast_measure": "EA_HICP_QUARTERLY_YEAR_OVER_YEAR_MEDIAN",
+      "respondent_population": "SELECTED_MONETARY_ANALYSTS",
+      "median_forecast_percent": 3.2,
+      "survey_response_count": 69,
+      "september_2026_monthly_cpi_or_hicp_release_consensus": false,
+      "september_10_ecb_policy_decision_pre_event_aggregate": false,
+      "reason_not_same_release_consensus": "QUARTERLY_HICP_FORECAST_IS_NOT_EXACT_SEPTEMBER_MONTHLY_HEADLINE_RELEASE"
+    },
+    {
+      "currency": "USD",
+      "source_id": "NYFED_SCE_SEP2026_HOUSEHOLD_ONE_YEAR_AHEAD",
+      "agency": "FEDERAL_RESERVE_BANK_OF_NEW_YORK",
+      "source_url": "https://www.newyorkfed.org/newsevents/news/research/2026/20261007.html",
+      "publication_calendar_date": "2026-10-07",
+      "conservative_available_at_utc": "2026-10-08T00:00:00Z",
+      "survey_or_analysis_period": "2026-09",
+      "forecast_target_period": "ONE_YEAR_AHEAD_FROM_SEPTEMBER_2026",
+      "forecast_target_granularity": "ROLLING_ONE_YEAR_AHEAD",
+      "forecast_measure": "HOUSEHOLD_EXPECTED_OVERALL_INFLATION_MEDIAN",
+      "respondent_population": "HOUSEHOLDS",
+      "median_forecast_percent": 3.9,
+      "survey_response_count": null,
+      "september_2026_monthly_cpi_or_hicp_release_consensus": false,
+      "september_10_ecb_policy_decision_pre_event_aggregate": false,
+      "reason_not_same_release_consensus": "HOUSEHOLD_ONE_YEAR_AHEAD_EXPECTATION_IS_NOT_SEPTEMBER_2026_US_CPI_U_RELEASE_FORECAST"
+    }
+  ],
+  "prohibited_calculations": [
+    "USD_CPI_SEP2026_3_7_MINUS_NYFED_SCE_3_9_AS_EVENT_SURPRISE",
+    "EUR_HICP_SEP2026_3_8_MINUS_ECB_SMA_Q3_3_2_AS_EVENT_SURPRISE",
+    "ECB_SMA_SEP11_AGGREGATE_USED_AS_PRE_SEP10_POLICY_DECISION_CONSENSUS",
+    "MARKET_FX_STRENGTH_INFERRED_FROM_SURVEY_LEVEL_ALONE"
+  ],
+  "usable_as_exact_event_consensus": false,
+  "fx_bias_authorized": false
+}
