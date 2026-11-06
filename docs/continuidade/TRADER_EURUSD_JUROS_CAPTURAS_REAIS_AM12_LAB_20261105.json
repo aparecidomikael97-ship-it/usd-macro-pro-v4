@@ -1,0 +1,62 @@
+{
+  "schema": "ATLASQUANT_TRADER_EURUSD_POLICY_REAL_CAPTURE_SUMMARY_LAB_V1",
+  "date_utc": "2026-11-05",
+  "environment": "AM12_PRIVATE_EVIDENCE",
+  "raw_payloads_committed_to_github": false,
+  "ecb": {
+    "source_id": "ECB_EUR_DFR_EFFECTIVE",
+    "source_series": "FM.D.U2.EUR.4F.KR.DFR.LEV",
+    "parser_semantics_version": "ECB_DFR_DAILY_LEVEL_V2",
+    "first_attempt": {
+      "captured_at_utc": "2026-11-05T00:54:18.965588+00:00",
+      "archive_file": "ecb_eur_dfr_effective_20261105T005418965588Z_4d69d202aae3.zip",
+      "archive_sha256": "5fb8ebf43cdd5e1ca78bb6ecd6b885cba3a511d41bdc5fbc3c862a3a745d92f7",
+      "parser_accepted": false,
+      "original_parser_commit": "9b58ccb8d38c905e92ffacc6048b49a73ebd36f3"
+    },
+    "accepted_capture": {
+      "captured_at_utc": "2026-11-05T01:02:53.342320+00:00",
+      "archive_file": "ecb_eur_dfr_effective_20261105T010253342320Z_4d69d202aae3.zip",
+      "archive_sha256": "c9d9dd4d1d6949fb4f651c45c2f8058c1d04b4f2cba7e303c7da372d98e1ceaa",
+      "raw_response_sha256": "4d69d202aae3ad1552936a3ddef84b5a5eb0c8995647fc5107c65483b61596e4",
+      "raw_response_bytes": 199989,
+      "last_observation_date": "2026-11-05",
+      "deposit_facility_percent": "2.5",
+      "daily_observations": 674,
+      "missing_calendar_days": 0,
+      "observed_new_level_events": 6,
+      "last_first_observed_new_level_date": "2026-09-16",
+      "archive_replay_passed": true
+    }
+  },
+  "fed": {
+    "source_id": "FED_USD_TARGET_RANGE_EFFECTIVE",
+    "source_series": ["DFEDTARL", "DFEDTARU"],
+    "captured_at_utc": "2026-11-05T00:56:14.957761+00:00",
+    "archive_file": "fed_usd_target_range_effective_20261105T005614957761Z_8cd1578ed85f.zip",
+    "archive_sha256": "153d61f424e8b9ff1c3646e9e022dc5811e837607dd6aa58bb081f7366fdc515",
+    "raw_response_sha256": "8cd1578ed85f481a5872ded983bf45559687207d89fb943991b0e6e6ab6d62e8",
+    "raw_response_bytes": 137228,
+    "last_observation_date": "2026-11-04",
+    "lower_target_percent": "3.75",
+    "upper_target_percent": "4.00",
+    "archive_replay_passed": true
+  },
+  "bilateral_eurusd": {
+    "different_latest_observation_dates": true,
+    "different_policy_instruments": true,
+    "policy_rate_spread_bps": null,
+    "market_surprise_bps": null,
+    "fx_bias": null,
+    "operational_bias": "AGUARDAR",
+    "trade_authorized": false
+  },
+  "source_origin_independently_authenticated": false,
+  "decision_release_instants_independently_verified": false,
+  "pre_event_consensus_verified": false,
+  "historical_vintages_verified": false,
+  "independent_forex_spot_verified": false,
+  "can_feed_live_radar": false,
+  "new_cost_brl": 0,
+  "hard_no_go": true
+}
