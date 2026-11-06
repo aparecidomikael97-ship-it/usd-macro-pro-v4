@@ -106,6 +106,11 @@ class G8ExactEventConsensusEligibilityTests(unittest.TestCase):
         self.assertEqual([(m["target_period"], m["forecast_percent_model_documentary_only"])
                           for m in models], [("2026-10", 3.74), ("2026-11", 3.88)])
         self.assertTrue(all(m["source_kind"].endswith("NOT_CONSENSUS") for m in models))
+        self.assertEqual([m["target_metric_officially_publishable"] for m in models],
+                         [False, None])
+        self.assertEqual(models[0]["metric_availability_reason"],
+                         "BLS_OCT2025_HEADLINE_BASELINE_NOT_PUBLISHED")
+        self.assertEqual(models[1]["metric_availability_reason"], None)
         self.assertTrue(all(m["source_url"] ==
                             "https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting"
                             for m in models))
