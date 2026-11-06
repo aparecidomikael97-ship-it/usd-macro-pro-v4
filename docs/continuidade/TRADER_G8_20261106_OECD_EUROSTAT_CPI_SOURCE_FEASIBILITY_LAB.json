@@ -1,0 +1,76 @@
+{
+  "schema": "ATLASQUANT_TRADER_G8_OECD_EUROSTAT_CPI_SOURCE_FEASIBILITY_LAB_V1",
+  "research_date": "2026-11-06",
+  "kind": "OFFICIAL_DOCUMENTATION_REFERENCES_NOT_API_CAPTURED_NOT_PIT_ATTESTED",
+  "source_api_responses_archived": false,
+  "source_dataset_coverage_per_currency_verified": false,
+  "original_historical_release_vintages_attested": false,
+  "source_redistribution_rights_verified": false,
+  "sources": [
+    {
+      "source_id": "OECD_CPI_COICOP_1999",
+      "dataset_id": "OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0",
+      "official_document_url": "https://www.oecd.org/en/data/insights/data-explainers/2024/07/consumer-price-indices-frequently-asked-questions-faqs.html",
+      "api_data_url_documented_not_fetched": "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/",
+      "dataset_family": "NATIONAL_CPI_PLUS_HICP_CATALOG_COICOP1999",
+      "full_g8_monthly_2026_coverage_verified": false,
+      "historical_first_publication_archived_for_all_g8": false
+    },
+    {
+      "source_id": "OECD_CPI_COICOP_2018",
+      "dataset_id": "OECD.SDD.TPS,DSD_PRICES_COICOP2018@DF_PRICES_C2018_ALL,1.0",
+      "official_document_url": "https://www.oecd.org/en/data/insights/data-explainers/2024/07/consumer-price-indices-frequently-asked-questions-faqs.html",
+      "api_data_url_documented_not_fetched": "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES_COICOP2018@DF_PRICES_C2018_ALL,1.0/",
+      "dataset_family": "NATIONAL_CPI_PLUS_HICP_CATALOG_COICOP2018",
+      "full_g8_monthly_2026_coverage_verified": false,
+      "historical_first_publication_archived_for_all_g8": false
+    },
+    {
+      "source_id": "EUROSTAT_HICP_FIRST_PUBLISHED",
+      "dataset_id": "prc_hicp_fpd",
+      "official_document_url": "https://ec.europa.eu/eurostat/cache/metadata/EN/prc_hicp_esms.htm",
+      "api_data_url_documented_not_fetched": null,
+      "dataset_family": "EURO_AREA_HICP_FIRST_PUBLISHED_VALUES_NOT_RELEASE_TIME_WITNESS",
+      "full_g8_monthly_2026_coverage_verified": false,
+      "historical_first_publication_archived_for_all_g8": false
+    },
+    {
+      "source_id": "ABS_COMPLETE_MONTHLY_2025_TRANSITION",
+      "dataset_id": "ABS_CONSUMER_PRICE_INDEX_AUSTRALIA",
+      "official_document_url": "https://www.abs.gov.au/statistics/detailed-methodology-information/concepts-sources-methods/consumer-price-index-concepts-sources-and-methods/2025/historical-background-and-evolution-monthly-cpi",
+      "api_data_url_documented_not_fetched": null,
+      "dataset_family": "AUSTRALIA_COMPLETE_MONTHLY_CPI_FROM_OCT2025_OBSERVATION",
+      "full_g8_monthly_2026_coverage_verified": false,
+      "historical_first_publication_archived_for_all_g8": false
+    },
+    {
+      "source_id": "STATSNZ_QUARTERLY_2026_MONTHLY_PLANNED_2027",
+      "dataset_id": "STATSNZ_CONSUMERS_PRICE_INDEX",
+      "official_document_url": "https://www.stats.govt.nz/indicators/consumers-price-index-cpi/",
+      "api_data_url_documented_not_fetched": null,
+      "dataset_family": "NEW_ZEALAND_QUARTERLY_CPI_2026_MONTHLY_START_FUTURE_2027",
+      "full_g8_monthly_2026_coverage_verified": false,
+      "historical_first_publication_archived_for_all_g8": false
+    }
+  ],
+  "routes": [
+    {"currency": "EUR", "domestic_release_frequency_2026": "MONTHLY", "primary_research_source_id": "EUROSTAT_HICP_FIRST_PUBLISHED", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false},
+    {"currency": "USD", "domestic_release_frequency_2026": "MONTHLY", "primary_research_source_id": "OECD_CPI_COICOP_2018", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false},
+    {"currency": "GBP", "domestic_release_frequency_2026": "MONTHLY", "primary_research_source_id": "OECD_CPI_COICOP_2018", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false},
+    {"currency": "JPY", "domestic_release_frequency_2026": "MONTHLY", "primary_research_source_id": "OECD_CPI_COICOP_2018", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false},
+    {"currency": "CHF", "domestic_release_frequency_2026": "MONTHLY", "primary_research_source_id": "OECD_CPI_COICOP_2018", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false},
+    {"currency": "AUD", "domestic_release_frequency_2026": "MONTHLY", "primary_research_source_id": "ABS_COMPLETE_MONTHLY_2025_TRANSITION", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false},
+    {"currency": "CAD", "domestic_release_frequency_2026": "MONTHLY", "primary_research_source_id": "OECD_CPI_COICOP_2018", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false},
+    {"currency": "NZD", "domestic_release_frequency_2026": "QUARTERLY", "primary_research_source_id": "STATSNZ_QUARTERLY_2026_MONTHLY_PLANNED_2027", "oecd_specific_series_verified": false, "pit_release_clock_independently_attested": false}
+  ],
+  "conflicts_and_limitations": [
+    "OECD_GENERAL_CPI_FAQ_DESCRIBES_AUSTRALIA_QUARTERLY_WHILE_ABS_CONFIRMS_COMPLETE_MONTHLY_FROM_OCT2025",
+    "OECD_COICOP_1999_AND_2018_DATASET_ROUTE_PER_CURRENCY_NOT_VERIFIED",
+    "EUR_IS_EURO_AREA_HICP_NOT_A_SINGLE_NATIONAL_CPI_SERIES",
+    "NEW_ZEALAND_QUARTERLY_2026_NOT_MONTHLY_SEPTEMBER",
+    "OECD_CURRENT_DATA_API_NOT_PROVEN_HISTORICAL_ASOF_SNAPSHOT",
+    "EUROSTAT_FIRST_PUBLISHED_VALUES_NOT_INDEPENDENT_RELEASE_TIMESTAMP_RECEIPT"
+  ],
+  "planned_next_experiment": "EUROSTAT_HICP_FIRST_PUBLISHED_SCHEMA_AND_GEO_EA20_READONLY_CHECK",
+  "future_nzd_monthly_2027_already_published_in_2026": false
+}
