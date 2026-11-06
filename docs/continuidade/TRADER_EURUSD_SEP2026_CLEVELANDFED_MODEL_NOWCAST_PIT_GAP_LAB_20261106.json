@@ -1,0 +1,32 @@
+{
+  "schema": "ATLASQUANT_TRADER_EURUSD_SEP2026_CLEVELANDFED_NOWCAST_PIT_GAP_LAB_V1",
+  "kind": "OFFICIAL_MODEL_DESCRIPTION_WITHOUT_ATTESTED_SEPTEMBER_2026_PRE_RELEASE_DAILY_VINTAGE",
+  "research_date": "2026-11-06",
+  "conservative_research_available_at_utc": "2026-11-07T00:00:00Z",
+  "source_name": "FEDERAL_RESERVE_BANK_OF_CLEVELAND_INFLATION_NOWCASTING",
+  "source_url": "https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting",
+  "forecast_type": "MODEL_NOWCAST_NOT_PROFESSIONAL_FORECASTER_CONSENSUS",
+  "update_cadence": "BUSINESS_DAYS_APPROX_10_AM_EASTERN",
+  "supported_target_currency": "USD",
+  "target_reference_period": "2026-09",
+  "target_measure": "US_HEADLINE_CPI_U_YEAR_OVER_YEAR_NON_SEASONALLY_ADJUSTED_PERCENT",
+  "supported_measure_class_from_official_description": "HEADLINE_CPI_YEAR_OVER_YEAR_USES_NON_SEASONALLY_ADJUSTED_DATA",
+  "requested_historical_vintage_calendar_date": "2026-10-13",
+  "us_september_cpi_release_calendar_date": "2026-10-14",
+  "exact_historical_nowcast_value_from_original_official_oct13_snapshot_verified": false,
+  "exact_historical_publication_instant_independently_attested": false,
+  "original_oct13_snapshot_bytes_archived": false,
+  "oct13_vintage_sha256": null,
+  "oct13_headline_yoy_nowcast_percent": null,
+  "market_consensus_for_sep2026_cpi_release_verified": false,
+  "may_compute_sep2026_cpi_model_error": false,
+  "may_compute_sep2026_cpi_event_surprise": false,
+  "fx_direction_authorized": false,
+  "prohibited_calculations": [
+    "BACKFILL_CURRENT_LIVE_NOWCAST_AS_OCT13_HISTORICAL_VINTAGE",
+    "CONFLATE_CLEVELANDFED_MODEL_NOWCAST_WITH_MARKET_CONSENSUS",
+    "ESTIMATE_SEP_CPI_MODEL_ERROR_WITHOUT_ORIGINAL_PRE_RELEASE_VALUE",
+    "CONVERT_CPI_MODEL_ERROR_INTO_VERIFIED_FX_DIRECTION",
+    "TREAT_NEWS_REPRINT_AS_ATTESTED_OFFICIAL_ORIGINAL_VINTAGE"
+  ]
+}
