@@ -205,13 +205,13 @@ class EvidenceChainTests(unittest.TestCase):
         self.assertIn("MACRO_CAPTURE_AFTER_FORECAST_DATA_CUTOFF", r["blocking_reasons"])
         self.assert_no_go(r)
 
-    def test_older_unselected_macro_capture_after_cutoff_also_denied(self):
+    def test_second_macro_capture_after_cutoff_also_denied(self):
         def change(m):
             m["records"].append(receipt(
                 "EUR", "CPI_YOY",
                 published_at_utc="2026-11-02T08:59:00Z",
                 captured_at_utc="2026-11-02T09:02:00Z",
-                period="2026-10"))
+                observation_period="2026-10"))
         f, m, mt5 = fixtures(macro_changes=change)
         r = run(f, m, mt5)
         self.assertIn("MACRO_CAPTURE_AFTER_FORECAST_DATA_CUTOFF", r["blocking_reasons"])
