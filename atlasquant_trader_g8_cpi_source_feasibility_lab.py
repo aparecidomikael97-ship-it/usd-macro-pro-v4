@@ -15,7 +15,7 @@ from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 
 SCHEMA = "ATLASQUANT_TRADER_G8_OECD_EUROSTAT_CPI_SOURCE_FEASIBILITY_LAB_V1"
 KIND = "OFFICIAL_DOCUMENTATION_REFERENCES_NOT_API_CAPTURED_NOT_PIT_ATTESTED"
-FIXED_CASEBOOK_SHA256 = "0b0d150ab7d61c3ed82e1b5b631dd7594dff5beea146d34e593e069d2a003f16"
+FIXED_CASEBOOK_SHA256 = "3cec59d6a4309b7bbf97ab483df8b7bf1564d5d80f68f2ff169dae359f526029"
 SOURCE_IDS = (
     "OECD_CPI_COICOP_1999", "OECD_CPI_COICOP_2018",
     "EUROSTAT_HICP_FIRST_PUBLISHED", "ABS_COMPLETE_MONTHLY_2025_TRANSITION",
@@ -108,7 +108,7 @@ def inspect_g8_cpi_source_feasibility_lab(raw: Any) -> dict[str, Any]:
                               if r["domestic_release_frequency_2026"] == "QUARTERLY"]
         if (len(domestic_monthly) != 7 or domestic_quarterly != ["NZD"]
                 or case["planned_next_experiment"] !=
-                   "EUROSTAT_HICP_FIRST_PUBLISHED_SCHEMA_AND_GEO_EA20_READONLY_CHECK"):
+                   "EUROSTAT_HICP_FIRST_PUBLISHED_SCHEMA_AND_GEO_EA21_READONLY_CHECK"):
             return out
     except (TypeError, ValueError, KeyError, AttributeError, UnicodeDecodeError,
             RecursionError):
