@@ -15,6 +15,8 @@ Esta etapa conecta o calendário das próximas divulgações, as referências do
 
 Os quatro valores são **transcrições documentais bloqueadas por recibos de hash** já existentes no LAB. Esses recibos verificam apenas que os bytes armazenados no repositório não mudaram; **não** comprovam independentemente os bytes originais das páginas nem o instante de sua captura. Não são observações operacionais em tempo real.
 
+**Correção de disponibilidade do indicador:** o [FAQ oficial do BLS](https://www.bls.gov/cpi/additional-resources/2025-federal-government-shutdown-impact-cpi-faq.htm) documenta a ausência do índice all-items de outubro/2025; por isso a variação **anual** do CPI de outubro/2026 não terá resultado oficial comparável na divulgação seguinte. A projeção de modelo **3,74% anual** não permite uma surpresa ex-post anual. O estudo complementar de alinhamento mensal/anual explica a referência de **0,3% mensal** da Reuters, também ainda não autenticada como consenso ponto-no-tempo.
+
 Fontes públicas de contexto: [Fed de Cleveland, Inflation Nowcasting](https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting); [BLS, calendário de novembro/2026](https://www.bls.gov/schedule/2026/11_sched_list.htm); [BCE, SMA setembro/2026](https://www.ecb.europa.eu/stats/ecb_surveys/sma/shared/pdf/ecb.smar260911_september.en.pdf); [Fed de Nova York, SCE setembro/2026](https://www.newyorkfed.org/newsevents/news/research/2026/20261007.html).
 
 ## Roteamento pelas duas moedas, sem fabricar viés

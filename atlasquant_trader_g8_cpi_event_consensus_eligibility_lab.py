@@ -132,6 +132,12 @@ def inspect_g8_cpi_event_consensus_eligibility_lab(
         "source_url": CLEVELAND_MODEL_SOURCE_URL,
         "target_period": x["forecast_month"],
         "reference_period_type": "MONTH",
+        "target_metric": "CPI_U_ALL_ITEMS_HEADLINE_YEAR_OVER_YEAR_PERCENT_CHANGE",
+        "target_metric_officially_publishable": (
+            False if x["forecast_month"] == "2026-10" else None),
+        "metric_availability_reason": (
+            "BLS_OCT2025_HEADLINE_BASELINE_NOT_PUBLISHED"
+            if x["forecast_month"] == "2026-10" else None),
         "forecast_percent_model_documentary_only": x["model_forecast_yoy_percent"],
         "target_release_scheduled_utc": x["scheduled_first_release_utc"],
         "release_window": x["release_window"],
