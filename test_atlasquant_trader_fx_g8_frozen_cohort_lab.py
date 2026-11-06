@@ -23,8 +23,12 @@ def raw():
     return serialize(planning_reference_utc=PLANNING_REFERENCE)
 
 
-def audit(payload=None, inspected=INSPECTED):
-    return inspect(raw() if payload is None else payload,
+_UNSET = object()
+
+
+def audit(payload=_UNSET, inspected=INSPECTED):
+    # An explicitly supplied None must reach the validator and be rejected.
+    return inspect(raw() if payload is _UNSET else payload,
                    inspected_at_utc=inspected)
 
 
