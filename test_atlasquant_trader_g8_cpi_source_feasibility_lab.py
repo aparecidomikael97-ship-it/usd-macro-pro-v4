@@ -53,7 +53,7 @@ class G8CpiSourceFeasibilityTests(unittest.TestCase):
         self.assertEqual(r["currency_source_routes_are_hypothetical"]["EUR"],
                          "EUROSTAT_HICP_FIRST_PUBLISHED")
         self.assertEqual(r["next_experiment"],
-                         "EUROSTAT_HICP_FIRST_PUBLISHED_SCHEMA_AND_GEO_EA20_READONLY_CHECK")
+                         "EUROSTAT_HICP_FIRST_PUBLISHED_SCHEMA_AND_GEO_EA21_READONLY_CHECK")
         self.assertFalse(r["eurostat_first_published_is_full_historical_release_clock"])
         self.assert_no_operations(r)
 

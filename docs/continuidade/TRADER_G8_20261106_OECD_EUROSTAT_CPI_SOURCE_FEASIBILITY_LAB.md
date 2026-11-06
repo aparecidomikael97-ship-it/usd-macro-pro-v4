@@ -52,7 +52,9 @@ do euro** por um CPI nacional de um único país.
 
 **EUR — primeira publicação do HICP:** inspecionar manualmente o esquema
 oficial `prc_hicp_fpd` e a identificação do agregado geográfico da área do
-euro. Depois, em teste offline, aceitar somente resposta original de fonte
+euro. **Correção descoberta em 06/11: a geografia corrente em 2026 é EA21,
+não EA20 (Bulgária entrou em 01/01/2026).** Depois, em teste offline,
+aceitar somente resposta original de fonte
 verificada, com bytes, timestamp de consulta e registro do que ainda não se
 consegue provar sobre a publicação histórica.
 
