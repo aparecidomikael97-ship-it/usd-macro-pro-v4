@@ -1,0 +1,74 @@
+{
+  "schema": "ATLASQUANT_TRADER_GBPJPY_NOV6_FOUR_OFFICIAL_DOCUMENTS_ASOF_LAB_V1",
+  "kind": "RETROSPECTIVE_OFFICIAL_PAGE_REFERENCES_NOT_HISTORICALLY_WITNESSED",
+  "retrospective_research_date": "2026-11-06",
+  "original_pages_archived_with_server_receipt": false,
+  "historical_page_vintages_independently_witnessed": false,
+  "commercial_redistribution_rights_verified": false,
+  "records": [
+    {
+      "record_id": "GBP_ONS_CPI_SEP2026",
+      "currency": "GBP",
+      "family": "INFLATION",
+      "document_date": "2026-10-21",
+      "reference_period": "2026-09",
+      "admissibility_gate_utc": "2026-10-21T06:00:00Z",
+      "gate_basis": "ONS_RELEASE_0700_BST_UTC_PLUS1",
+      "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/consumerpriceinflation/september2026",
+      "measurement_kind": "UK_CPI_ALL_ITEMS_12_MONTH_RATE_NOT_CPIH",
+      "reported_values_percent": {"annual_cpi_yoy": "3.5"}
+    },
+    {
+      "record_id": "JPY_STAT_CPI_SEP2026",
+      "currency": "JPY",
+      "family": "INFLATION",
+      "document_date": "2026-10-23",
+      "reference_period": "2026-09",
+      "admissibility_gate_utc": "2026-10-24T00:00:00Z",
+      "gate_basis": "CONSERVATIVE_DAY_AFTER_JAPANESE_DOCUMENT_DATE_NOT_EXACT_TIME",
+      "source_url": "https://www.stat.go.jp/data/cpi/sokuhou/tsuki/index-z.htm",
+      "measurement_kind": "JP_NATIONAL_ALL_ITEMS_CPI_2025_BASE_YOY_NOT_TOKYO_PRELIMINARY",
+      "reported_values_percent": {"annual_national_cpi_yoy": "2.1"}
+    },
+    {
+      "record_id": "JPY_BOJ_OCT2026_MONETARY_DECISION",
+      "currency": "JPY",
+      "family": "POLICY",
+      "document_date": "2026-10-30",
+      "reference_period": "2026-10-30",
+      "admissibility_gate_utc": "2026-10-30T03:02:00Z",
+      "gate_basis": "BOJ_STATEMENT_EXPLICIT_1202_JST_UTC_PLUS9",
+      "source_url": "https://www.boj.or.jp/en/mopo/mpmdeci/mpr_2026/k261030a.pdf",
+      "measurement_kind": "BOJ_UNCOLLATERALIZED_OVERNIGHT_CALL_RATE_GUIDELINE_AROUND",
+      "reported_values_percent": {"target_around": "1.25"}
+    },
+    {
+      "record_id": "GBP_BOE_NOV2026_BANK_RATE",
+      "currency": "GBP",
+      "family": "POLICY",
+      "document_date": "2026-11-05",
+      "reference_period": "2026-11-05",
+      "admissibility_gate_utc": "2026-11-06T00:00:00Z",
+      "gate_basis": "CONSERVATIVE_DAY_AFTER_BOE_DOCUMENT_DATE_NOT_EXACT_TIME",
+      "source_url": "https://www.bankofengland.co.uk/monetary-policy-summary-and-minutes/2026/november-2026",
+      "measurement_kind": "BOE_BANK_RATE_AFTER_8_TO_1_DECISION",
+      "reported_values_percent": {"bank_rate": "4.00"}
+    }
+  ],
+  "future_scheduled_events": [
+    {
+      "event_id": "GBP_ONS_CPI_OCT2026_FUTURE",
+      "reference_period": "2026-10",
+      "scheduled_date": "2026-11-18",
+      "schedule_source_url": "https://www.ons.gov.uk/releases/consumerpriceinflationukseptember2026",
+      "released_value_available_in_casebook": false
+    },
+    {
+      "event_id": "JPY_BOJ_OCT2026_SUMMARY_OPINIONS_FUTURE",
+      "reference_period": "2026-10-30",
+      "scheduled_date": "2026-11-10",
+      "schedule_source_url": "https://www.boj.or.jp/en/mopo/mpmdeci/mpr_2026/k261030a.pdf",
+      "released_value_available_in_casebook": false
+    }
+  ]
+}
