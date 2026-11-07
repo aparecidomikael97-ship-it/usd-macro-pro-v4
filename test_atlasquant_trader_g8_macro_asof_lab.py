@@ -168,6 +168,77 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertNotIn("CPI_YOY", r["selected_observations"]["EUR"])
         self.assert_no_go(r)
 
+    def test_old_cpi_new_publication_is_not_a_fresh_economic_period(self):
+        data = sample()
+        data["records"][0] = record(
+            "EUR", "CPI_YOY", period="2026-04",
+            published="2026-11-03T10:00:00Z",
+            captured="2026-11-03T10:01:00Z")
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertIn("EUR:CPI_YOY:REFERENCE_PERIOD_STALE", r["missing_or_stale"])
+        self.assertNotIn("CPI_YOY", r["selected_observations"]["EUR"])
+        self.assert_no_go(r)
+
+    def test_monthly_cpi_september_in_november_has_explicit_period_age(self):
+        r = run(sample())
+        self.assertEqual(r["selected_observations"]["EUR"]["CPI_YOY"]
+                         ["reference_months_behind_decision"], 2)
+        self.assertEqual(r["selected_observations"]["USD"]["CPI_YOY"]
+                         ["source_cadence_claim"], "MONTHLY")
+        self.assert_no_go(r)
+
+    def test_nzd_quarter_september_remains_eligible_late_january_only_in_lab(self):
+        data = sample("AUD/NZD")
+        data["decision_at_utc"] = "2027-01-26T12:00:00Z"
+        # AUD monthly December data is available in this synthetic scenario.
+        data["records"][0] = record(
+            "AUD", "CPI_YOY", period="2026-12",
+            published="2027-01-20T12:00:00Z",
+            captured="2027-01-20T12:01:00Z")
+        r = run(data, as_of=datetime(2027, 1, 27, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        nzd = r["selected_observations"]["NZD"]["CPI_YOY"]
+        self.assertEqual(nzd["reference_months_behind_decision"], 4)
+        self.assertEqual(nzd["source_cadence_claim"], "QUARTERLY")
+        self.assertEqual(r["selected_observations"]["AUD"]["CPI_YOY"]
+                         ["source_cadence_claim"], "MONTHLY")
+        self.assert_no_go(r)
+
+    def test_nzd_old_quarter_reference_is_not_revived_by_new_publication(self):
+        data = sample("AUD/NZD")
+        data["decision_at_utc"] = "2027-02-10T12:00:00Z"
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row["published_at_utc"] = "2027-02-03T12:00:00Z"
+                row["captured_at_utc"] = "2027-02-03T12:01:00Z"
+        r = run(data, as_of=datetime(2027, 2, 11, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertIn("NZD:CPI_YOY:REFERENCE_PERIOD_STALE", r["missing_or_stale"])
+        self.assert_no_go(r)
+
+    def test_nzd_cpi_must_use_quarter_end_month(self):
+        data = sample("AUD/NZD")
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row["observation_period"] = "2026-10"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+        self.assertEqual(r["reason"], "NZD_CPI_QUARTER_END_PERIOD_REQUIRED")
+        self.assert_no_go(r)
+
+    def test_policy_rate_is_not_forced_to_follow_monthly_cpi_reference_age(self):
+        data = sample()
+        for row in data["records"]:
+            if row["currency"] == "EUR" and row["indicator"] == "POLICY_RATE":
+                row["observation_period"] = "2026-01"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertIsNone(r["selected_observations"]["EUR"]["POLICY_RATE"]
+                          ["reference_months_behind_decision"])
+        # No assertion of continuity of the true rate has been established.
+        self.assert_no_go(r)
+
     def test_duplicate_same_indicator_period_revision_is_blocked(self):
         data = sample()
         data["records"].append(dict(data["records"][0], value="2.3"))
