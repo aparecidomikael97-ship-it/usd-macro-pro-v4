@@ -227,6 +227,32 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["reason"], "NZD_CPI_QUARTER_END_PERIOD_REQUIRED")
         self.assert_no_go(r)
 
+    def test_nzd_2027_monthly_cpi_rejected_until_series_id_exists(self):
+        data = sample("AUD/NZD")
+        data["decision_at_utc"] = "2027-04-26T12:00:00Z"
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row["observation_period"] = "2027-02"
+                row["published_at_utc"] = "2027-04-22T12:00:00Z"
+                row["captured_at_utc"] = "2027-04-22T12:01:00Z"
+        r = run(data, as_of=datetime(2027, 4, 27, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+        self.assertEqual(r["reason"], "NZD_CPI_2027_SERIES_CADENCE_NOT_DEFINED")
+        self.assert_no_go(r)
+
+    def test_nzd_2027_quarterly_cpi_also_requires_explicit_series_id(self):
+        data = sample("AUD/NZD")
+        data["decision_at_utc"] = "2027-04-26T12:00:00Z"
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row["observation_period"] = "2027-03"
+                row["published_at_utc"] = "2027-04-22T12:00:00Z"
+                row["captured_at_utc"] = "2027-04-22T12:01:00Z"
+        r = run(data, as_of=datetime(2027, 4, 27, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+        self.assertEqual(r["reason"], "NZD_CPI_2027_SERIES_CADENCE_NOT_DEFINED")
+        self.assert_no_go(r)
+
     def test_policy_rate_is_not_forced_to_follow_monthly_cpi_reference_age(self):
         data = sample()
         for row in data["records"]:
