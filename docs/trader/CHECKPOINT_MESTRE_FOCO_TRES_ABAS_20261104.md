@@ -88,3 +88,41 @@ Esta revisão não alega viés real calibrado, probabilidades, 80% de acerto ou 
 - NBER — risco de overfitting ao combinar sinais: https://www.nber.org/papers/w21329
 
 **Governança:** este adendo no Checkpoint Mestre documenta uma decisão de projeto, não a implantação. A PR rascunho #1844 carrega código apenas das duas primeiras camadas e testes sintéticos; a terceira é planejamento, sem modelo calibrado e sem mudança na interface atual.
+
+
+## Regra confirmada 07/11/2026 — poucos vieses, somente os mais seletivos
+
+**Decisão explícita do proprietário:** AtlasQuant Trader NÃO deve publicar vieses para todo par/consulta. Deve calcular internamente a cobertura G8/28, mas exibir somente hipóteses suficientemente fortes **depois** de comprovadas com dados históricos reais fora da amostra. A prioridade é precisão/expectativa líquida, não quantidade de mensagens; cada viés continua sendo contexto e NÃO ordem de compra/venda. Preservar três abas, W1/D1, M15 como gatilho separado, sem nova despesa.
+
+### Escala editorial aprovada, nunca probabilidade automática
+
+| Nota inteira | Nível editorial | Exposição futura, após homologação |
+| --- | --- | --- |
+| Sem dados ou 0–5 | INSUFICIENTE | NÃO mostrar viés direcional; AGUARDAR |
+| 6 | MODERADO | Candidato selecionado, com todas as provas |
+| 7 | FORTE | Candidato selecionado, com todas as provas |
+| 8 | ALTO | Candidato selecionado, com todas as provas |
+| 9–10 | EXTRA | Candidato selecionado, com todas as provas |
+
+**Nota 8/10 NÃO é 80% de chance de acerto.** A nota representa uma faixa interna a ser definida e empiricamente calibrada; mostrar percentual de acerto apenas se medido, com amostra e intervalo de confiança, estabilidade fora da amostra e sem vazamento. Uma nota de 10 com fontes, regime ou validação incompletos também é **AGUARDAR**.
+
+### Fontes obrigatórias no estudo dos 28 pares
+
+- **Macroeconomia de ambas as moedas:** inflação e sua metodologia/competência; taxa de política e expectativa de mudança; atividade, emprego, surpresas econômicas com consenso *pré-release* verificável; dados oficiais ou provedor licenciado, com vintage e momento de publicação.
+- **Microeconomia e microestrutura:** indicadores setoriais/PMIs/produção e crédito, spreads/liquidez disponíveis, influência de commodities/empresas/exportações quando houver fonte confiável e relação mensurável; não inventar ordens ocultas de bancos. A ausência de choque pode ser documentada como NEUTRO; desconhecimento não vira NEUTRO.
+- **Geopolítica:** conflitos, sanções, tarifas, comércio, riscos de oferta e políticas governamentais relevantes ao par, com fonte e timestamp confiáveis; distinguir fato de hipótese; contexto não observado fica INDETERMINADO e bloqueia promoção.
+- **Regime de mercado:** tendência, lateralização, transição, choque e volatilidade, identificado com informações disponíveis na hora da decisão. Relações e pesos por regime exigem validação histórica independente.
+- **Grandes participantes:** COT/TFF CFTC e proxies públicos com o atraso explícito, nunca supor que COT mostra livro de ordens spot nem que posição de terceiros determina cotação.
+
+### Portões e atualização
+
+1. **P0:** completar fontes/competências/vintages das duas moedas e histórico OHLC M15/D1/W1; alinhar horário e qualidade. Sem fundação não há score confiável.
+2. **P1:** congelar pré-registro de previsão D1/W1 e definição de acerto; medir por caminhada temporal fora da amostra, taxas de cobertura (abstenção), baselines, Brier/calibração, custo em R e risco. Validar se filtragem 6+ melhora ou piora rendimento líquido e oportunidades.
+3. **P2:** experimentar regime + macro relativo; medir ganho incremental ao acrescentar micro e geopolítica sem sinais duplicados por correlação e sem peso inventado; testar COT semanal apenas como contexto.
+4. **P3:** só quando calibrado, gerar score seletivo e tier nas telas Início/Radar/Painel Mestre, com explicações e motivo de não emissão. Sem resultado mínimo sustentado, mostrar AGUARDAR e nenhuma porcentagem.
+5. **Anti-spam pretendido (LAB):** três consultas econômicas diárias NÃO significam três sinais. Repetição do mesmo viés dentro de 24h para D1 e 7d para W1 fica bloqueada na política candidata; revisitar a regra com validação para eventos extraordinários. Sem mensagens reais ou agendamento ativo.
+6. Notícias: manter os dois cálculos já registrados — pré-notícia/nowcast acima/em linha/abaixo do consenso e gestão de posição por evento — como camadas complementares; nunca confundir acerto do CPI com acerto EUR/USD.
+
+**Entrega desta rodada:** `atlasquant_selective_bias_gate_lab.py` e `test_atlasquant_selective_bias_gate_lab.py` na PR rascunho empilhada: a primeira implementa **somente portão de aceitação de um score fornecido pelo chamador**, não calcula score, NÃO testa mercado, e sempre mantém `can_feed_live_radar=False`, `automatic_alert_enabled=False`, `trade_authorized=False`. Os 20 testes sintéticos locais medem contrato do código, NÃO precisão, ganhos nem autenticidade independente. Flags verdadeiras fornecidas pelo chamador não se tornam certificação independente.
+
+**STATUS:** APROVADO COMO REGRA DE PRODUTO; GATE IMPLEMENTADO / EM VALIDAÇÃO SOMENTE LAB; SCORE, FONTES CONFIÁVEIS, CALIBRAÇÃO, BACKTEST OOS E INTEGRAÇÃO PUBLICADA PENDENTES. Sem merge, deploy, Worker, compras, cobrança ou ordens reais.
