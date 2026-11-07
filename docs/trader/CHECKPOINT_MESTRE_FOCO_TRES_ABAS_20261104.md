@@ -43,3 +43,48 @@ As decisões mais recentes do proprietário substituem prioridades antigas de ex
 
 ## Critério de fechamento
 Esta revisão não alega viés real calibrado, probabilidades, 80% de acerto ou integração externa. Validar em CI, conferir acessibilidade e navegação Início/Radar/Painel Mestre, aprovação humana antes de publicar gradualmente. Núcleo AION permanece HARD NO-GO.
+
+
+## Adendo 07/11/2026 — três camadas de inteligência e validação do viés
+
+**Pedido do proprietário:** aumentar assertividade de viés dos 28 pares sem desviar do produto AtlasQuant Trader, sem novas cobranças, sem ordens e sem promessa de 60%, 80% ou 90%. Preservadas três abas Início, Radar, Painel Mestre; W1/D1 prioritários, H4/M15 auxiliares; AION, Negócios e Investimentos congelados.
+
+### Três camadas alinhadas — mesma prioridade central
+
+1. **Pré-notícia / Nowcast do dado** — EXISTENTE EM LAB / NÃO CALIBRADO: `atlasquant_news_nowcast.py`, `atlasquant_news_backtest.py`. Estimar distribuição ABAIXO/EM LINHA/ACIMA do consenso da publicação específica e valor aproximado antes do evento, com anterior, consenso, antecedentes, registros point-in-time, avaliação walk-forward e baseline de consenso. Nunca interpretar probabilidade de classe como probabilidade de subida do par ou ganho.
+2. **Notícia × posição aberta** — EM IMPLEMENTAÇÃO / LAB NÃO VALIDADO: `atlasquant_position_event_manager.py` e proposta `atlasquant_position_news_audit_lab.py` na PR rascunho #1844. Comparar impacto macro hipotético sobre moeda base/cotada e tese LONG/SHORT, sugerindo somente revisão de manutenção/stop/saída conforme evidência e risco, sempre com controle humano; nunca fechar ou manter automaticamente.
+3. **NOVO ADENDO: Motor de Regimes + Probabilidades Calibradas + Contexto Institucional** — APROVADO COMO DIRETRIZ DE PESQUISA / PENDENTE DE IMPLEMENTAÇÃO E VALIDAÇÃO. Objetivo: estimar, para cada par e horizonte D1/W1, sob qual regime e conjunto verificável de fatores existe vantagem estatística sobre baselines simples, com abstenção quando não existir. Não prometer acesso à intenção de bancos ou às ordens ocultas.
+
+### Componentes propostos (não declarar implementados)
+
+- **Regime:** classificar TREND, RANGE, TRANSIÇÃO/CHOQUE e VOLATILIDADE ANORMAL a partir de observações disponíveis *antes* da decisão; usar séries de volatilidade, tendência e risco sem olhar candles futuros. Reavaliar eficácia por regime e por D1/W1.
+- **Macro relativo e expectativa:** separar NÍVEL de juros/inflação de SURPRESA frente ao consenso, revisões, diferencial de expectativas de política monetária, crescimento/emprego e mudanças de prêmio de risco. Moeda base vs cotada, séries/instrumentos/periodicidades compatíveis e governança de vintages.
+- **Institucional / fluxo proxy:** pesquisar CFTC COT/TFF por moeda, categorias (leveraged funds, asset managers, dealers) e mudanças de posicionamento; dado de terça divulgado normalmente sexta e derivado de futuros, NÃO livro completo de ordens do Forex spot. Outros observáveis como curva de juros, spreads, volatilidade implícita e skew de opções somente com fontes/licenças válidas e sob orçamento autorizado; não contratar nesta fase.
+- **Intermercados / risco:** observar juros curtos/longos, risco global, commodities relevantes e correlações, testando se fornecem previsão incremental e não contagem duplicada de sinais correlacionados. DXY/pares USD exigem cuidado contra dupla contagem.
+- **Ensemble auditável e seletivo:** comparar modelos simples (consenso, prevalência, momentum, macro) com modelos combinados ajustados apenas em treino. Só mostrar direção + intervalo/probabilidade se *calibrados fora da amostra*, senão NEUTRO/AGUARDAR. Score interno, confiança estatística e probabilidade de ganho são campos distintos.
+- **Risco e payoff:** acompanhar custo total, spread, slippage, stop, payoff médio em R, expectativa líquida, profit factor, drawdown e concentração/correlação dos sete pares com uma mesma moeda. Acerto direcional >50% não garante lucro; lucro não exige necessariamente >50% de acertos.
+
+### Protocolo obrigatório de prova (antes de qualquer promoção)
+
+0. Primeiro resolver o gargalo atual: fontes oficiais por ambas as moedas, fonte de preços MT5 somente leitura/horários, ponto no tempo independente, consensos originais e política de frescor por competência, não pela data de revisão.
+1. Congelar antes da decisão: horizonte D1/W1, horário, dado disponível, regime, previsão ALTA/BAIXA/NEUTRO/AGUARDAR, probabilidades e versões do modelo; registrar timestamp externo verificável.
+2. Backtest cronológico com walk-forward, validação fora da amostra e embargo entre janelas sobrepostas; sem escolher hiperparâmetros pelo conjunto de teste. Confrontar baseline simples, apurar Brier/log-loss, calibração, taxa de cobertura, matriz de confusão, taxa de acerto **condicional a sinais emitidos**, falso positivo, estabilidade por par/regime/sessão.
+3. Medir reação do preço separadamente da previsão do número da notícia; simular custo/execução e resultado líquido em R, inclusive piores cenários e concentração de posições.
+4. Fazer forward/paper por período suficiente, com análise de drift e decisão de revisão humana; se faltar evidência, manter AGUARDAR e não inventar confiança nem métricas.
+5. **HARD NO-GO:** nenhuma ordem, alteração de risco real, auto-hold/exit, Worker, merge/deploy ou nova cobrança autorizada por este adendo.
+
+### Ordem real da fila
+
+**P0 — preservar foco:** completar comparabilidade macro bilateral G8/28 e histórico de fontes, preços e vintages; revisar as três consultas diárias (consultar ≠ indicador novo).
+**P1 — provar o básico:** definir rótulos de movimento D1/W1, baselines e auditoria walk-forward/pre-registro.
+**P2 — experimentos baratos em paralelo no LAB:** regime a partir de OHLC existente, curva/juros públicos, COT/TFF público semanal (já constava do roadmap como fase futura, não declarar novidade concluída), testes de valor incremental.
+**P3 — depois da prova:** ensemble e probabilidade calibrada/abstenção; continuar notícias pré-release e gestão de posição como camadas auxiliares, nunca substitutos do motor de viés.
+**P4 — opcional futuro:** dados caros de opções/fluxo ou intradiários somente após comprovação de benefício e autorização de orçamento.
+
+**Referências de pesquisa para hipóteses (não prova de desempenho do AtlasQuant):**
+- BIS sobre atividade carry e transmissão de política para câmbio: https://www.bis.org/publications/bulletin-124-monetary-policy-transmission-exchange-rates-role-currency-carry-trades
+- BIS sobre fragmentação e internalização de FX: https://www.bis.org/publications/qr-202512/fx-trade-execution-landscape-through-prism-2025-bis-triennial-survey
+- CFTC COT — dados semanais terça/publicação sexta: https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm
+- NBER — risco de overfitting ao combinar sinais: https://www.nber.org/papers/w21329
+
+**Governança:** este adendo no Checkpoint Mestre documenta uma decisão de projeto, não a implantação. A PR rascunho #1844 carrega código apenas das duas primeiras camadas e testes sintéticos; a terceira é planejamento, sem modelo calibrado e sem mudança na interface atual.
