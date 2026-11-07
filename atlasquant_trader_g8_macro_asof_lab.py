@@ -164,8 +164,11 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
             if not candidates:
                 missing.append(f"{currency}:{indicator}:MISSING")
                 continue
+            # The newest *economic period* must win. An old CPI observation
+            # republished/revised later is not the latest CPI reading and
+            # must not make a stale newer period look fresh.
             latest = max(candidates, key=lambda r: (
-                r["published_at_utc"], r["observation_period"]))
+                r["observation_period"], r["published_at_utc"]))
             published = _time(latest["published_at_utc"])
             age_days = (decision - published).total_seconds() / 86400
             if age_days > FRESH_DAYS[indicator]:
