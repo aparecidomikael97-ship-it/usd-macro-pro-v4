@@ -19,7 +19,13 @@ from atlasquant_fx_universe import OFFICIAL_PAIRS, split_pair
 SCHEMA = "ATLASQUANT_TRADER_G8_MACRO_ASOF_PAIR_LAB_V1"
 ENVELOPE = "ATLASQUANT_TRADER_MACRO_RELEASE_RECEIPTS_LAB_V1"
 EXPECTED = ("CPI_YOY", "POLICY_RATE")
+# Provisional research guardrails, NOT an official release-calendar witness.
+# Monthly CPI snapshots become suspect when the reference month is too old.
+# NZD CPI is quarterly in 2026, so it needs its own reference/release window.
 FRESH_DAYS = {"CPI_YOY": 60, "POLICY_RATE": 120}
+NZD_QUARTERLY_CPI_PUBLICATION_MAX_DAYS = 120
+CPI_MAX_REFERENCE_LAG_MONTHS = {"MONTHLY": 2, "QUARTERLY": 4}
+NZD_QUARTER_END_MONTHS = frozenset({"03", "06", "09", "12"})
 SOURCES = frozenset(("OFFICIAL_STATISTICS_OFFICE", "CENTRAL_BANK"))
 ENVELOPE_FIELDS = frozenset(("schema", "pair", "decision_at_utc", "records"))
 RECORD_FIELDS = frozenset((
@@ -103,6 +109,12 @@ def _value(raw: Any) -> Decimal | None:
         return None
 
 
+def _reference_month_lag(period: str, decision: datetime) -> int:
+    """Elapsed calendar months, never based on a later revision timestamp."""
+    year, month = map(int, period.split("-"))
+    return 12 * (decision.year - year) + decision.month - month
+
+
 def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any]:
     """Check metadata for TWO currency sides; do not infer bias from values.
 
@@ -142,6 +154,10 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 or _value(row["value"]) is None):
             out["reason"] = "RELEASE_SOURCE_VALUE_OR_PAIR_INVALID"
             return out
+        if (cur == "NZD" and indicator == "CPI_YOY"
+                and row["observation_period"][-2:] not in NZD_QUARTER_END_MONTHS):
+            out["reason"] = "NZD_CPI_QUARTER_END_PERIOD_REQUIRED"
+            return out
         pub, captured = _time(row["published_at_utc"]), _time(row["captured_at_utc"])
         if (pub is None or captured is None
                 or not pub <= captured <= decision
@@ -171,13 +187,31 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 r["observation_period"], r["published_at_utc"]))
             published = _time(latest["published_at_utc"])
             age_days = (decision - published).total_seconds() / 86400
-            if age_days > FRESH_DAYS[indicator]:
+            max_pub_days = (NZD_QUARTERLY_CPI_PUBLICATION_MAX_DAYS
+                            if currency == "NZD" and indicator == "CPI_YOY"
+                            else FRESH_DAYS[indicator])
+            if age_days > max_pub_days:
                 missing.append(f"{currency}:{indicator}:STALE")
                 continue
+            # Publication recency alone can be manipulated by late revisions.
+            # The age of the reference period is an independent research gate.
+            if indicator == "CPI_YOY":
+                lag = _reference_month_lag(latest["observation_period"], decision)
+                cadence = "QUARTERLY" if currency == "NZD" else "MONTHLY"
+                if lag > CPI_MAX_REFERENCE_LAG_MONTHS[cadence]:
+                    missing.append(f"{currency}:CPI_YOY:REFERENCE_PERIOD_STALE")
+                    continue
             # Never include unverified numeric readings in the output: this
             # gate is not a scored source of economic strength or direction.
             selections[currency][indicator] = {
                 "observation_period": latest["observation_period"],
+                "reference_months_behind_decision": (
+                    _reference_month_lag(latest["observation_period"], decision)
+                    if indicator == "CPI_YOY" else None
+                ),
+                "source_cadence_claim": (
+                    "QUARTERLY" if currency == "NZD" else "MONTHLY"
+                ) if indicator == "CPI_YOY" else None,
                 "published_at_utc_claim": latest["published_at_utc"],
                 "captured_at_utc_claim": latest["captured_at_utc"],
                 "source_type_claim": latest["source_type"],
