@@ -6,6 +6,8 @@ from dataclasses import replace
 from datetime import datetime, timezone, timedelta
 
 from atlasquant_position_event_manager import EventContext, PositionContext
+from atlasquant_news_nowcast import HistoricalRelease, build_empirical_nowcast_from_score
+from atlasquant_news_backtest import walk_forward_news_backtest
 from atlasquant_position_news_audit_lab import (
     NewsReleaseEvidence,
     audit_news_for_open_position,
@@ -169,6 +171,64 @@ class PositionNewsAuditLabTests(unittest.TestCase):
         self.assert_never_trades(report)
         with self.assertRaisesRegex(ValueError, "não corresponde"):
             self.run_case("SHORT", release=evidence(currency="NZD"))
+
+    @staticmethod
+    def synthetic_cpi_history(n=50):
+        origin = datetime(2022, 1, 1, tzinfo=UTC)
+        diffs = (-0.2, -0.1, 0.0, 0.1, 0.2)
+        return [
+            HistoricalRelease(
+                indicator="CPI_YOY",
+                scheduled_at=origin + timedelta(days=28 * i),
+                captured_at=origin + timedelta(days=28 * i - 1),
+                consensus=4.1,
+                actual=4.1 + diffs[i % 5],
+                signal_score=0.15,
+                tolerance=0.05,
+                unit="percent",
+            ) for i in range(n)
+        ]
+
+    def test_nowcast_uses_historical_surprise_to_estimate_cpi_print(self):
+        # All values are fictional. CPI previous=4.0 is context, NOT
+        # an input to the existing estimator. Consensus=4.1 is the anchor.
+        report = build_empirical_nowcast_from_score(
+            indicator="CPI_YOY", consensus=4.1,
+            captured_at=datetime(2026, 11, 7, tzinfo=UTC),
+            signal_score=0.15, history=self.synthetic_cpi_history(),
+            min_history=40, min_analogs=20,
+        )
+        self.assertEqual(report["state"], "RESEARCH_ESTIMATE")
+        self.assertEqual(report["historical_samples"], 50)
+        self.assertEqual(report["estimate"], 4.1)
+        self.assertAlmostEqual(report["probabilities"]["BELOW"], 0.396226)
+        self.assertAlmostEqual(report["probabilities"]["INLINE"], 0.207547)
+        self.assertAlmostEqual(report["probabilities"]["ABOVE"], 0.396226)
+        self.assertFalse(report["calibrated"])
+        self.assertFalse(report["market_reaction_predicted"])
+        self.assertFalse(report["automatic_execution"])
+        self.assertIsNone(report["profit_probability"])
+
+    def test_nowcast_missing_historical_sample_leaves_probabilities_empty(self):
+        report = build_empirical_nowcast_from_score(
+            indicator="CPI_YOY", consensus=4.1,
+            captured_at=datetime(2026, 11, 7, tzinfo=UTC),
+            signal_score=0.15, history=self.synthetic_cpi_history(10),
+            min_history=40,
+        )
+        self.assertEqual(report["state"], "INSUFFICIENT_HISTORY")
+        self.assertIsNone(report["probabilities"])
+        self.assertIsNone(report["estimate"])
+        self.assertFalse(report["automatic_execution"])
+
+    def test_nowcast_walk_forward_is_not_market_reaction_backtest(self):
+        backtest = walk_forward_news_backtest(
+            self.synthetic_cpi_history(), min_history=40, min_analogs=20)
+        self.assertEqual(backtest["forecast_samples"], 10)
+        self.assertEqual(backtest["overall"]["class_accuracy_pct"], 20.0)
+        self.assertFalse(backtest["market_reaction_scored"])
+        self.assertFalse(backtest["automatic_execution"])
+        self.assertIsNone(backtest["profit_probability"])
 
 
 if __name__ == "__main__":
