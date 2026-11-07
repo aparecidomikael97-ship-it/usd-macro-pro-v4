@@ -31,7 +31,7 @@ def sample():
              "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/sep-2026/6401017.xlsx"},
             {"currency": "NZD", "atlasquant_series_key": "NZD_QUARTERLY_CPI_YOY",
              "frequency": "QUARTERLY", "observation_period": "2026-09",
-             "value": "3.7", "published_at_utc": "2026-10-22T12:00:00Z",
+             "value": "3.7", "published_at_utc": "2026-10-21T22:00:00Z",
              "captured_at_utc": "2026-10-23T10:00:00Z",
              "source_sha256": NZD_SNAPSHOT_SHA256,
              "source_url": "https://www.stats.govt.nz/indicators/consumers-price-index-cpi/"},
@@ -126,7 +126,53 @@ class CPIArchivedSeriesLinkTests(TestCase):
     def test_wrong_released_date_claim_rejected(self):
         p = sample(); p["records"][0]["published_at_utc"] = "2026-10-29T12:00:00Z"
         p["records"][0]["captured_at_utc"] = "2026-10-29T14:00:00Z"
-        self.assertEqual(test_audit(p)["reason"], "AUD:RELEASE_DATE_CLAIM_MISMATCH")
+        self.assertEqual(test_audit(p)["reason"], "AUD:RELEASE_LOCAL_DATE_CLAIM_MISMATCH")
+
+    def test_release_clocks_are_converted_to_utc_with_dst(self):
+        from atlasquant_cpi_archived_series_link_lab import _schedule_utc
+        self.assertEqual(_schedule_utc("AUD").isoformat(),
+                         "2026-10-28T00:30:00+00:00")
+        self.assertEqual(_schedule_utc("NZD").isoformat(),
+                         "2026-10-21T21:45:00+00:00")
+
+    def test_aud_one_second_before_official_release_is_blocked(self):
+        p = sample()
+        p["records"][0]["published_at_utc"] = "2026-10-28T00:29:59Z"
+        p["records"][0]["captured_at_utc"] = "2026-10-28T00:30:00Z"
+        r = test_audit(p)
+        self.assertEqual(r["reason"], "AUD:PRE_OFFICIAL_RELEASE_CLOCK")
+        self.assert_safe(r)
+
+    def test_aud_at_official_release_clock_is_metadata_only(self):
+        p = sample()
+        p["records"][0]["published_at_utc"] = "2026-10-28T00:30:00Z"
+        p["records"][0]["captured_at_utc"] = "2026-10-28T00:31:00Z"
+        r = test_audit(p)
+        self.assertEqual(r["state"], "LAB_ARCHIVED_CPI_VALUES_LINKED_UNATTESTED")
+        self.assert_safe(r)
+
+    def test_nzd_one_second_before_local_release_is_blocked(self):
+        p = sample()
+        p["records"][1]["published_at_utc"] = "2026-10-21T21:44:59Z"
+        p["records"][1]["captured_at_utc"] = "2026-10-21T21:45:00Z"
+        r = test_audit(p)
+        self.assertEqual(r["reason"], "NZD:PRE_OFFICIAL_RELEASE_CLOCK")
+        self.assert_safe(r)
+
+    def test_nzd_true_release_time_previous_utc_date_is_allowed_metadata_only(self):
+        p = sample()
+        p["records"][1]["published_at_utc"] = "2026-10-21T21:45:00Z"
+        p["records"][1]["captured_at_utc"] = "2026-10-21T21:46:00Z"
+        r = test_audit(p)
+        self.assertEqual(r["state"], "LAB_ARCHIVED_CPI_VALUES_LINKED_UNATTESTED")
+        self.assert_safe(r)
+
+    def test_nzd_next_local_day_claim_is_rejected(self):
+        p = sample()
+        p["records"][1]["published_at_utc"] = "2026-10-22T12:00:00Z"
+        r = test_audit(p)
+        self.assertEqual(r["reason"], "NZD:RELEASE_LOCAL_DATE_CLAIM_MISMATCH")
+        self.assert_safe(r)
 
     def test_wrong_capture_chronology_rejected(self):
         p = sample(); p["records"][0]["captured_at_utc"] = "2026-10-28T11:59:59Z"
