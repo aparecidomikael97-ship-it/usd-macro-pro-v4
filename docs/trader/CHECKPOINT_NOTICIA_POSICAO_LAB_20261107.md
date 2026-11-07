@@ -36,3 +36,34 @@ Novo módulo de auditoria read-only `atlasquant_position_news_audit_lab.py`, que
 - Somente após fontes, modelo de reação calibrado, revisão humana e homologação específica avaliar sinal no Painel Mestre. Nada neste Draft autoriza merge, deploy, Worker, contratação, ordem real ou intervenção na posição de Mikael.
 
 **Próximo foco retoma o combinado:** completar evidência macro bilateral G8 (inflação, política monetária, consenso e vintage), depois reagir a notícias com os fatos disponíveis.
+
+## Reafirmação 07/11 — Previsão do próprio resultado da notícia
+
+O proprietário voltou a confirmar a estratégia anterior: **antes da divulgação**
+de CPI/NFP/PCE etc., estimar com séries históricas e sinais antecedentes a
+probabilidade de **ABAIXO / EM LINHA / ACIMA** do consenso, além de uma
+estimativa do número. Exemplo inteiramente hipotético: CPI anterior 4,0%;
+consenso 4,1%; a questão é prever a distribuição do resultado a publicar,
+não confundir 4,0% anterior com o consenso 4,1% e não presumir preço em alta.
+
+**Já existe:** `atlasquant_news_nowcast.py` faz suavização de frequências
+históricas ABOVE/INLINE/BELOW e propõe número `consenso +
+surpresa_média_de_análogos`. `atlasquant_news_backtest.py` mede walk-forward,
+acerto de classe, erro numérico, Brier e calibração aparente por mês e indicador.
+O código atual **não usa o valor anterior diretamente na fórmula**: poderá
+entrar como indicador antecedente apenas após método justificado e calibrado.
+
+**Teste fictício de contrato:** 50 releases com surpresas fabricadas e consenso
+4,1% produziram cerca de 39,62% abaixo, 20,75% em linha, 39,62% acima,
+estimativa 4,1% e `calibrated=False`. Walk-forward sintético gerou 10
+previsões e apenas 20% de acerto de classe; **nenhum desses percentuais
+mede capacidade preditiva real**. São testes de comportamento de software.
+
+**Falta antes de alimentar o viés D1/W1:** obter conjunto licenciado/verificável
+do consenso e suas revisões com carimbo pré-release, valores originalmente
+divulgados, data de efetiva publicação (não só a data agendada), histórico
+substancial por indicador e série, separação treino/teste temporal e walk-forward
+fora da amostra. Calibrar e comparar contra o baseline simples do consenso;
+sem ganho sustentado e cobertura suficiente, mostrar `AGUARDAR` e percentuais
+operacionais indisponíveis. Prever o dado **não** é prever a reação do preço,
+e nenhuma das duas autoriza automaticamente manter/fechar uma posição.
