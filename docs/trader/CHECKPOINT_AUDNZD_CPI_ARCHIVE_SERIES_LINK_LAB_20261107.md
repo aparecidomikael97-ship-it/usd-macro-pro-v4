@@ -38,3 +38,20 @@ O novo vínculo só classifica os registros trimestrais de setembro de 2026 como
 4. Preservar nowcast pré-notícia e notícia × posição como duas camadas distintas, sem ordens automáticas. AION/Negócios/Investimentos seguem congelados; nenhuma cobrança ou deploy.
 
 **Operacional:** nada neste LAB executa ordens, acessa broker, agenda atualização ou muda a interface publicada. Não fazer merge automático.
+
+
+## Adendo — horário local oficial e conversão UTC (07/11/2026)
+
+**Achado crítico:** a regra anterior só comparava `published_at_utc[:10]` com a data local alegada pelo recibo. Na Nova Zelândia, 22/10/2026 10h45 NZDT equivale a **21/10/2026 21h45 UTC**: a mesma divulgação tem datas diferentes nas duas zonas. Na Austrália, 28/10/2026 11h30 AEDT equivale a **28/10/2026 00h30 UTC**. Testar somente o dia UTC podia rejeitar um horário correto do NZD, aceitar um horário pré-divulgação do AUD ou aceitar um horário já pertencente ao dia seguinte no país da fonte.
+
+**Fontes primárias e relógios divulgados (não testemunhos independentes de acesso ao XLSX/PDF):**
+- [ABS — CPI setembro/2026](https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/sep-2026): **28/10/2026 às 11h30 AEDT**, `Australia/Sydney`, equivalente a `2026-10-28T00:30:00Z`.
+- [Stats NZ — CPI trimestre setembro/2026](https://www.stats.govt.nz/information-releases/consumers-price-index-september-2026-quarter/): **22/10/2026 às 10h45 NZDT**, `Pacific/Auckland`, equivalente a `2026-10-21T21:45:00Z`.
+
+**Correção isolada no módulo de ligação:** manter as horas **locais oficiais** como constantes para esses dois eventos conhecidos, usar `zoneinfo.ZoneInfo` para conversão com horário de verão, rejeitar alegações `published_at_utc` anteriores à hora oficial (`PRE_OFFICIAL_RELEASE_CLOCK`) e comparar a data do recibo com a data na zona do **emissor**, nunca no UTC. Uma alegação com horário igual ou posterior ao comunicado apenas passa essa verificação de consistência; **não** prova que aqueles bytes, aquele consenso ou aquela revisão estavam realmente disponíveis nessa hora.
+
+**Regressões:** seis novos testes locais: conversão exata DST; AUD 1 segundo antes/na hora do release; NZD 1 segundo antes/na hora; NZD dia seguinte local; mantendo teste de recusa de data incorreta. Suíte específica completa com arquivos arquivados: **38/38 PASS localmente**, sem testes pulados; `py_compile` OK. O módulo de recibo fixo e o contrato de séries continuam dependências existentes (não modificados).
+
+**Segurança inalterada:** `release_instant_independently_attested=False`, `capture_instant_independently_attested=False`, `historical_point_in_time_verified=False`, `issuer_origin_independently_authenticated=False`, `can_feed_live_radar=False`, `score_0_to_10=None`, `operational_bias=AGUARDAR` e `trade_authorized=False`. A divulgação oficial conhecida **não** pode substituir a prova de primeira captura dos bytes, o registro do consenso pré-evento ou a cadeia de custódia exigida pelos futuros backtests.
+
+**Próximo P0:** criar política explícita de *primeiro visto* (snapshot de coleta com SHA, relógio observado/externamente comprovado e série/vintage do emissor), separar declaração histórica da coleta real e só então estudar cobertura e disponibilidade temporal dos outros pares. Sem mexer no Radar, na produção ou em orçamento.
