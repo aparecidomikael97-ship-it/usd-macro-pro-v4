@@ -136,6 +136,38 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
         self.assertEqual(r["records_seen"], 5)
 
+    def test_late_old_period_revision_does_not_override_newer_cpi_period(self):
+        data = sample()
+        # Aug's late republication on Nov 2 is NOT a more current economic
+        # observation than Sep's reading published on Oct 29.
+        data["records"].append(record(
+            "EUR", "CPI_YOY", period="2026-08",
+            published="2026-11-02T12:00:00Z",
+            captured="2026-11-02T12:01:00Z"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(r["selected_observations"]["EUR"]["CPI_YOY"]
+                         ["observation_period"], "2026-09")
+        self.assert_no_go(r)
+
+    def test_late_old_revision_cannot_disguise_stale_latest_period(self):
+        data = sample()
+        # June is the newest observed CPI month but its publication is stale.
+        # A May observation republished on Nov 2 cannot refresh June.
+        data["records"][0] = record(
+            "EUR", "CPI_YOY", period="2026-06",
+            published="2026-06-30T12:00:00Z",
+            captured="2026-06-30T12:01:00Z")
+        data["records"].append(record(
+            "EUR", "CPI_YOY", period="2026-05",
+            published="2026-11-02T12:00:00Z",
+            captured="2026-11-02T12:01:00Z"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(r["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
+        self.assertNotIn("CPI_YOY", r["selected_observations"]["EUR"])
+        self.assert_no_go(r)
+
     def test_duplicate_same_indicator_period_revision_is_blocked(self):
         data = sample()
         data["records"].append(dict(data["records"][0], value="2.3"))
