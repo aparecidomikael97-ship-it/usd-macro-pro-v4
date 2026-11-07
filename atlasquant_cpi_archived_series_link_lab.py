@@ -6,8 +6,10 @@ All publication and capture instants are asserted by a caller, not attested.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from atlasquant_audnzd_cpi_archive_receipt_lab import inspect_archived_audnzd_cpi_lab
 from atlasquant_cpi_series_contract_lab import audit_cpi_series_lab
@@ -16,6 +18,22 @@ SCHEMA = "ATLASQUANT_AUDNZD_ARCHIVE_TO_SERIES_LINK_LAB_V1"
 ARCHIVE_OK = "LAB_TWO_DOCUMENT_VALUES_MATCH_ARCHIVED_BYTES_UNATTESTED"
 SERIES_OK = "LAB_CPI_SAME_FREQUENCY_UNATTESTED"
 SERIES_KEYS = {"AUD": "AUD_QUARTERLY_CPI_YOY", "NZD": "NZD_QUARTERLY_CPI_YOY"}
+# Issuer-announced *local* release clocks for 2026 Q3. These are public
+# announcements, NOT independent attestations of first downloadable file bytes.
+# Convert with IANA time zones: NZ's Oct 22 release was Oct 21 in UTC.
+RELEASE_SCHEDULE_LOCAL = {
+    "AUD": (datetime(2026, 10, 28, 11, 30), "Australia/Sydney"),
+    "NZD": (datetime(2026, 10, 22, 10, 45), "Pacific/Auckland"),
+}
+RELEASE_SCHEDULE_SOURCES = {
+    "AUD": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/sep-2026",
+    "NZD": "https://www.stats.govt.nz/information-releases/consumers-price-index-september-2026-quarter/",
+}
+
+
+def _schedule_utc(currency: str) -> datetime:
+    local_dt, zone = RELEASE_SCHEDULE_LOCAL[currency]
+    return local_dt.replace(tzinfo=ZoneInfo(zone)).astimezone(timezone.utc)
 
 
 def _blocked(reason: str) -> dict[str, Any]:
@@ -91,10 +109,23 @@ def inspect_archived_cpi_series_link_lab(
         if row["source_sha256"] != receipt[currency]["archive_sha256"]:
             result["reason"] = currency + ":ARCHIVE_HASH_NOT_LINKED"
             return result
-        # The archived document records the release *date* only. Match the
-        # asserted date, but explicitly leave exact timing unverified.
-        if row["published_at_utc"][:10] != receipt[currency]["published_release_date_claim"]:
-            result["reason"] = currency + ":RELEASE_DATE_CLAIM_MISMATCH"
+        # The archive receipt records a publisher-local release calendar date.
+        # Comparing YYYY-MM-DD in UTC is wrong for New Zealand at 10:45 NZDT.
+        # The series contract already enforces strict UTC timestamps.
+        try:
+            published = datetime.fromisoformat(
+                row["published_at_utc"].replace("Z", "+00:00"))
+            earliest_official = _schedule_utc(currency)
+            local_date = published.astimezone(
+                ZoneInfo(RELEASE_SCHEDULE_LOCAL[currency][1])).date().isoformat()
+        except (TypeError, ValueError, KeyError, OverflowError):
+            result["reason"] = currency + ":RELEASE_CLOCK_INVALID"
+            return result
+        if published < earliest_official:
+            result["reason"] = currency + ":PRE_OFFICIAL_RELEASE_CLOCK"
+            return result
+        if local_date != receipt[currency]["published_release_date_claim"]:
+            result["reason"] = currency + ":RELEASE_LOCAL_DATE_CLAIM_MISMATCH"
             return result
         try:
             observed = Decimal(row["value"])
