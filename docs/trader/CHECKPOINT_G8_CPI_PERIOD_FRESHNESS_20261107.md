@@ -42,3 +42,15 @@ Os prazos acima são apenas *tetos experimentais*, não autorização de uso ap�
 4. Só depois avançar a pré-registros W1/D1, backtest fora da amostra e seletividade 0–10, sem substituir o objetivo principal.
 
 Relação com o Checkpoint: `docs/trader/CHECKPOINT_MESTRE_FOCO_TRES_ABAS_20261104.md` e PR rascunho #1845. Os dois cálculos de notícias e o filtro seletivo permanecem isolados e não publicados.
+
+
+
+## Descoberta primária sobre NZD 2027 — inclusão de CPI mensal
+
+A página oficial [Stats NZ — Consumers price index](https://www.stats.govt.nz/indicators/consumers-price-index-cpi/) afirma que **publicará um CPI mensal a partir de 2027, adicional ao CPI trimestral que seguirá existindo**. Logo, codificar NZD como exclusivamente trimestral para todos os anos seria incorreto. A página marca a divulgação de setembro/2026 em 22/10 e o próximo trimestre dezembro/2026 para 27/01/2027; esses metadados não são prova imutável de vintage PIT.
+
+A página [ABS — Changes to forward work program](https://www.abs.gov.au/about/our-organisation/corporate-reporting/abs-corporate-plan/2026-27/changes-forward-work-program) confirma que o CPI completo mensal australiano substituiu a publicação trimestral independente em outubro/2025, mantendo tabelas trimestrais a cada três releases mensais. No modelo futuro, `AUD_MONTHLY_CPI` e `AUD_QUARTERLY_CPI` também precisam de identidade própria para comparações metodologicamente válidas.
+
+**Proteção específica deste LAB:** o envelope `...RECEIPTS_LAB_V1` ainda não possui campo inequívoco de **identificador da série + frequência + calendário de publicação**. Por isso, qualquer CPI do NZD cuja competência seja **2027-01 ou posterior** é colocado em quarentena estrutural (`NZD_CPI_2027_SERIES_CADENCE_NOT_DEFINED`), tanto mensal quanto trimestral, até existir contrato de série e verificação de origem. Este bloqueio é deliberadamente conservador; não é declaração de que o dado futuro é inválido. Para decisão de jan/2027 ainda é permitido usar o CPI trimestral de setembro/2026 sujeito aos limites de frescor LAB, sem emitir viés.
+
+**Dois testes sintéticos adicionais** cobrem futuro CPI de competência 2027-02 (mensal) e 2027-03 (trimestral), ambos recusados pelo motivo correto. A mudança não valida dados, não cria score e não autoriza trade. O CPI mensal NZD em 2027 poderá ser incorporado somente após definição de códigos distintos e relógios point-in-time, com avaliação dos efeitos da nova frequência no backtest.
