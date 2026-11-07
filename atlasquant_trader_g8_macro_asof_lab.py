@@ -154,10 +154,17 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 or _value(row["value"]) is None):
             out["reason"] = "RELEASE_SOURCE_VALUE_OR_PAIR_INVALID"
             return out
-        if (cur == "NZD" and indicator == "CPI_YOY"
-                and row["observation_period"][-2:] not in NZD_QUARTER_END_MONTHS):
-            out["reason"] = "NZD_CPI_QUARTER_END_PERIOD_REQUIRED"
-            return out
+        if cur == "NZD" and indicator == "CPI_YOY":
+            # Stats NZ plans to ADD monthly CPI in 2027 while retaining
+            # quarterly releases. The current envelope has no series/cadence
+            # identifier, so it cannot distinguish the two after 2026.
+            # Fail closed for 2027+ periods until the schema is upgraded.
+            if row["observation_period"] >= "2027-01":
+                out["reason"] = "NZD_CPI_2027_SERIES_CADENCE_NOT_DEFINED"
+                return out
+            if row["observation_period"][-2:] not in NZD_QUARTER_END_MONTHS:
+                out["reason"] = "NZD_CPI_QUARTER_END_PERIOD_REQUIRED"
+                return out
         pub, captured = _time(row["published_at_utc"]), _time(row["captured_at_utc"])
         if (pub is None or captured is None
                 or not pub <= captured <= decision
