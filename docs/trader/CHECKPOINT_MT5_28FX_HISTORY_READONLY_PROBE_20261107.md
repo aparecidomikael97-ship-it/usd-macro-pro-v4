@@ -316,3 +316,22 @@ HTTP Date ficou de 1 a 5 segundos à frente do horário final observado no AM12;
 **Regras:** `source_http_body_captured_now=True` apenas nas três fontes; `issuer_document_semantics_verified=False` no coletor, `independent_timestamp_authority_verified=False`, `historical_vintage_at_original_release_verified=False`, `historical_backtest_authorized=False`, `operational_bias=AGUARDAR`, sem confiança estatística, sem merge/deploy/worker/agendamento/trade ou novo custo. Origem MT5 e lacuna GBPNZD D1 30/09/2025 continuam pendentes.
 
 **Próximo P0:** fechar a quarta fonte por canal oficial autorizado (sem contornar HTTP 403); implementar auditoria dos valores dentro dos arquivos HTML que foram guardados, cruzar releases com calendário de revisões e preservar digests em commit de revisão. O corpus capturado agora só pode contribuir, após verificações adicionais, para decisões **posteriores à sua coleta**, nunca provar vintages retroativos de 2025–2026.
+
+
+## Incremento LAB — verificador semântico offline dos 3 HTMLs oficiais capturados
+
+**Contexto:** Mikael estava apenas pelo celular em 08/11/2026; dispositivo AM12 observado como **OFFLINE** no Desktop Commander (último contato ~6h antes). Portanto, **não** foi lido nenhum dos três HTMLs salvos na máquina nesta etapa, não se fez coleta nova e **não** houve validação de conteúdos reais agora. A auditoria continua pronta para ser executada quando o dispositivo autorizado voltar a ficar disponível.
+
+**Novo verificador somente de leitura:** `atlasquant_trader_gbp_nzd_snapshot_semantics_lab.py`, com testes `test_atlasquant_trader_gbp_nzd_snapshot_semantics_lab.py`. Lê exatamente os nomes de 3 arquivos e seus manifestos JSON listados na seção de captura anterior, fixando **dois SHA-256 por documento** (HTML e manifesto) a partir do checkpoint já registrado no GitHub. Rejeita arquivo ausente, bytes/manifesto divergente, fonte ou período falsificados, URL diferente, metadata incongruente, HTTP inesperado ou UTF-8 inválido.
+
+**Verificação de conteúdo planejada:** usa `HTMLParser` da biblioteca-padrão para verificar **texto visível** (ignora `script/style/noscript/template/svg`). Cruza título, período, texto contextual de inflação ou decisão de juros, e data de divulgação:
+
+- ONS/GBP: CPI 12 meses `3.5%`, setembro/2026, data `21 October 2026`;
+- Stats NZ/NZD: CPI 12 meses `3.7 percent`, trimestre setembro/2026, data `22 October 2026`;
+- BoE/GBP: Bank Rate `4%`, decisão de 4/nov com anúncio em 5/nov/2026.
+
+Os marcadores são **heurísticas de conteúdo textual** apoiadas em páginas oficiais, não uma extração normalizada do indicador, nem prova de primeiro anúncio original ou de ausência de revisão. Se os marcadores estiverem ausentes, resultado será `LAB_SEMANTIC_REVIEW_REQUIRED`, nunca preenchimento automático. Mesmo com todos verdadeiros, resultado é `LAB_VISIBLE_CONTEXT_MATCH_UNATTESTED`, não aptidão a viés. O quarto documento RBNZ **não** está no conjunto de pins (coleta negada por HTTP 403), permanece pendente sem tentativa de contornar o acesso.
+
+**Testes locais (arquivos HTML sintéticos exclusivamente): 104/104 PASS**, sendo **12 novos** para este verificador e **92 anteriores**. Verificam pin das 3 fontes, texto oculto em script, período divergente, alteração de 1 byte no corpo ou manifesto, fonte falsa, UTF-8 inválido, ausência de arquivo e saída `NO-GO`. **Ainda não há resultado de `audit_am12_directory_lab` executado contra os arquivos oficiais reais**. Nenhuma compra, instalação, serviço em background, conexão à conta MT5, merge, publicação ou ordem.
+
+**Próximo P0:** assim que o AM12 estiver online, executar **somente leitura** `python atlasquant_trader_gbp_nzd_snapshot_semantics_lab.py --capture-dir <pasta LAB da captura>` e revisar possíveis diferenças do HTML real, sem afrouxar os hashes. Depois reconciliar release e revisão e, por fim, ampliar fontes às 8 moedas e 28 pares. `historical_backtest_authorized=False` e `operational_bias=AGUARDAR` seguem invariantes.
