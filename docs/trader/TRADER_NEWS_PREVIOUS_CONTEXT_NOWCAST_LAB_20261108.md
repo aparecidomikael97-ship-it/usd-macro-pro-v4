@@ -37,6 +37,17 @@ contextos de valor anterior diferentes, podem selecionar análogos distintos.
 7. `gap_scale` precisa ser escolhido por indicador/métrica/unidade **antes**
    da avaliação fora da amostra. Os pesos, o tratamento de revisões e a escolha
    dos análogos **não estão calibrados**.
+8. O **consenso** também exige `ConsensusEvidence` para o mesmo país,
+   indicador, mês, métrica e unidade. Origem, publicação e captura precisam
+   anteceder a previsão e a divulgação. Um **nowcast de modelo**, uma pesquisa
+   de famílias ou uma pesquisa trimestral **não substitui** o consenso dos
+   analistas para aquele evento exato. Sem ele, `WAIT_EVENT_CONSENSUS_PIT`;
+   sem bytes originais, `WAIT_CONSENSUS_ORIGINAL`; sem prova independente de
+   disponibilidade, `WAIT_CONSENSUS_ASOF_WITNESS`.
+9. Flags e hashes declarados pelo chamador são **alegações**, não prova de
+   autenticidade do documento, da composição da pesquisa, de disponibilidade
+   pública nem de licença comercial. Mesmo com flags favoráveis, o resultado
+   permanece `research_only=True` e jamais é publicado no Radar.
 
 ## Como medir se vale a pena
 
@@ -92,11 +103,14 @@ BLS. Para evitar retrospectiva falsa, o documento só é visível para instantes
 
 Foram adicionados 7 testes específicos ao piloto: pesquisa futura invisível,
 fonte adulterada, fuso, calendário, bloqueio após passar a divulgação e
-zero sinal. A validação local selecionada totalizou **46 testes aprovados**.
+zero sinal. A etapa seguinte acrescentou testes para bloquear consensos sem
+original, sem testemunho de disponibilidade, com métrica diferente, publicados
+após o corte ou que sejam projeções de modelos confundidas com pesquisas.
+A validação local selecionada totalizou **53 testes aprovados**.
 
 ## Verificação local
 
-- 15 testes sintéticos novos, cobrindo elegibilidade temporal, `previous`,
+- 25 testes sintéticos de `previous` e consenso, cobrindo elegibilidade temporal,
   hash, duplicação, segregação de país/unidade, ausência de futuros e comparação
   walk-forward. Executados em 08/11/2026: **15/15 PASS**.
 - A suíte legada `test_calendar` não pôde carregar neste ambiente pela ausência

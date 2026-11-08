@@ -49,6 +49,25 @@ def _previous_month(target: str) -> str:
 
 
 @dataclass(frozen=True)
+class ConsensusEvidence:
+    """Claimed event-specific analyst poll; origin must be audited externally."""
+
+    country: str
+    indicator: str
+    metric: str
+    unit: str
+    target_period: str
+    value: float
+    source_kind: str
+    source_url: str
+    published_at: datetime
+    captured_at: datetime
+    source_sha256: str
+    original_verified: bool
+    public_availability_independently_witnessed: bool
+
+
+@dataclass(frozen=True)
 class PreReleaseSnapshot:
     country: str
     indicator: str
@@ -67,6 +86,7 @@ class PreReleaseSnapshot:
     previous_original_verified: bool
     signal_score: float
     tolerance: float = 0.0
+    consensus_evidence: ConsensusEvidence | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +124,49 @@ def validate_snapshot(snapshot: PreReleaseSnapshot) -> None:
     tolerance = _number("tolerance", snapshot.tolerance)
     if not -1 <= score <= 1 or tolerance < 0:
         raise ValueError("signal_score ou tolerance inválido")
+    evidence = snapshot.consensus_evidence
+    if evidence is not None:
+        if not isinstance(evidence, ConsensusEvidence):
+            raise ValueError("consensus_evidence: tipo inválido")
+        for field in ("country", "indicator", "metric", "unit", "target_period"):
+            if getattr(evidence, field) != getattr(snapshot, field):
+                raise ValueError(f"consensus_evidence: {field} não corresponde ao evento exato")
+        if _number("consensus_evidence.value", evidence.value) != float(snapshot.consensus):
+            raise ValueError("consensus_evidence: valor difere do consenso no snapshot")
+        if evidence.source_kind not in (
+            "EXACT_EVENT_ANALYST_POLL", "MODEL_NOWCAST", "HOUSEHOLD_EXPECTATION",
+            "QUARTERLY_SURVEY", "OTHER",
+        ):
+            raise ValueError("consensus_evidence: source_kind desconhecido")
+        if not str(evidence.source_url).startswith("https://"):
+            raise ValueError("consensus_evidence: fonte HTTPS obrigatória")
+        published = _utc("consensus published_at", evidence.published_at)
+        observed = _utc("consensus captured_at", evidence.captured_at)
+        if not published <= observed <= captured < scheduled:
+            raise ValueError("consensus_evidence: publicação/captura não é pré-evento")
+        if type(evidence.original_verified) is not bool or type(
+            evidence.public_availability_independently_witnessed
+        ) is not bool:
+            raise ValueError("consensus_evidence: testemunhos devem ser booleanos")
+        if (evidence.original_verified or str(evidence.source_sha256 or "")) and not _SHA256.fullmatch(
+            str(evidence.source_sha256)
+        ):
+            raise ValueError("consensus_evidence: source_sha256 original inválido")
+
+
+def consensus_readiness(snapshot: PreReleaseSnapshot) -> str:
+    """Chronology and applicant flags are NOT independent source authentication."""
+    validate_snapshot(snapshot)
+    evidence = snapshot.consensus_evidence
+    if evidence is None:
+        return "WAIT_EVENT_CONSENSUS_PIT"
+    if evidence.source_kind != "EXACT_EVENT_ANALYST_POLL":
+        return "WAIT_EXACT_EVENT_ANALYST_POLL"
+    if not evidence.original_verified:
+        return "WAIT_CONSENSUS_ORIGINAL"
+    if not evidence.public_availability_independently_witnessed:
+        return "WAIT_CONSENSUS_ASOF_WITNESS"
+    return "RESEARCH_CANDIDATE_WITH_CLAIMED_EVIDENCE"
 
 
 def validate_outcome(row: PastOutcome) -> None:
@@ -121,6 +184,9 @@ def validate_outcome(row: PastOutcome) -> None:
 
 
 def _waiting(snapshot: PreReleaseSnapshot, reason: str, *, history_samples: int = 0) -> dict[str, Any]:
+    consensus_ok = snapshot.consensus_evidence is not None and consensus_readiness(snapshot) == (
+        "RESEARCH_CANDIDATE_WITH_CLAIMED_EVIDENCE"
+    )
     return {
         "schema": SCHEMA,
         "state": reason,
@@ -131,8 +197,11 @@ def _waiting(snapshot: PreReleaseSnapshot, reason: str, *, history_samples: int 
         "estimate": None,
         "probabilities": None,
         "previous": float(snapshot.previous),
-        "consensus": float(snapshot.consensus),
-        "consensus_minus_previous": float(snapshot.consensus) - float(snapshot.previous),
+        "consensus": float(snapshot.consensus) if consensus_ok else None,
+        "consensus_candidate_documentary": float(snapshot.consensus) if not consensus_ok else None,
+        "consensus_minus_previous": (
+            float(snapshot.consensus) - float(snapshot.previous) if consensus_ok else None
+        ),
         "confidence_0_to_10": None,
         "pair_bias": None,
         "automatic_execution": False,
@@ -163,6 +232,9 @@ def estimate_with_previous_context(
         raise ValueError("parâmetros de pesquisa inválidos")
     if not snapshot.previous_original_verified:
         return _waiting(snapshot, "WAIT_PREVIOUS_ORIGINAL")
+    consensus_state = consensus_readiness(snapshot)
+    if consensus_state != "RESEARCH_CANDIDATE_WITH_CLAIMED_EVIDENCE":
+        return _waiting(snapshot, consensus_state)
 
     cutoff = _utc("captured_at", snapshot.captured_at)
     key = (snapshot.country, snapshot.indicator, snapshot.metric, snapshot.unit)
@@ -178,7 +250,8 @@ def estimate_with_previous_context(
             continue
         if _utc("actual_available_at", row.actual_available_at) > cutoff:
             continue
-        if not previous.previous_original_verified or not row.actual_original_verified:
+        if (not previous.previous_original_verified or not row.actual_original_verified
+                or consensus_readiness(previous) != "RESEARCH_CANDIDATE_WITH_CLAIMED_EVIDENCE"):
             continue
         if previous.target_period in seen_periods:
             return _waiting(snapshot, "WAIT_DUPLICATE_HISTORY", history_samples=len(eligible))
@@ -282,6 +355,7 @@ def walk_forward_previous_context(
 
 
 __all__ = [
-    "SCHEMA", "PreReleaseSnapshot", "PastOutcome", "validate_snapshot", "validate_outcome",
+    "SCHEMA", "ConsensusEvidence", "PreReleaseSnapshot", "PastOutcome",
+    "validate_snapshot", "validate_outcome", "consensus_readiness",
     "estimate_with_previous_context", "walk_forward_previous_context",
 ]

@@ -4,8 +4,10 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from atlasquant_news_previous_context_lab import (
+    ConsensusEvidence,
     PastOutcome,
     PreReleaseSnapshot,
+    consensus_readiness,
     estimate_with_previous_context,
     validate_snapshot,
     walk_forward_previous_context,
@@ -33,15 +35,26 @@ def month_pair(index: int) -> tuple[str, str, datetime, datetime, datetime, date
 
 def snapshot(index: int, *, gap: float = 20.0) -> PreReleaseSnapshot:
     target, prior, scheduled, captured, published, prior_captured = month_pair(index)
+    consensus = 100.0 + gap
+    evidence = ConsensusEvidence(
+        country="US", indicator="CPI", metric="YOY", unit="PCT",
+        target_period=target, value=consensus,
+        source_kind="EXACT_EVENT_ANALYST_POLL",
+        source_url="https://poll.example/synthetic-consensus",
+        published_at=captured - timedelta(days=2),
+        captured_at=captured - timedelta(days=1),
+        source_sha256="c" * 64, original_verified=True,
+        public_availability_independently_witnessed=True,
+    )
     return PreReleaseSnapshot(
         country="US", indicator="CPI", metric="YOY", unit="PCT",
         target_period=target, previous_period=prior,
         scheduled_at=scheduled, captured_at=captured,
-        consensus=100.0 + gap, previous=100.0,
+        consensus=consensus, previous=100.0,
         previous_published_at=published, previous_captured_at=prior_captured,
         previous_source_url="https://official.example/synthetic-cpi-vintage",
         previous_sha256="a" * 64, previous_original_verified=True,
-        signal_score=0.0, tolerance=0.05,
+        signal_score=0.0, tolerance=0.05, consensus_evidence=evidence,
     )
 
 
@@ -57,6 +70,15 @@ def synthetic_history(length: int = 50) -> list[PastOutcome]:
             actual_sha256="b" * 64, actual_original_verified=True,
         ))
     return rows
+
+
+def change_identity(row: PastOutcome, **changes) -> PastOutcome:
+    observation = replace(row.snapshot, **changes)
+    evidence = replace(observation.consensus_evidence, **{
+        key: value for key, value in changes.items()
+        if key in ("country", "indicator", "metric", "unit", "target_period")
+    })
+    return replace(row, snapshot=replace(observation, consensus_evidence=evidence))
 
 
 class PreviousContextLabTests(unittest.TestCase):
@@ -84,6 +106,62 @@ class PreviousContextLabTests(unittest.TestCase):
         self.assertEqual(result["state"], "WAIT_PREVIOUS_ORIGINAL")
         self.assertIsNone(result["estimate"])
         self.assertIsNone(result["probabilities"])
+
+    def test_unverified_consensus_candidate_cannot_produce_probabilities(self):
+        target = replace(snapshot(60), consensus_evidence=None)
+        result = estimate_with_previous_context(target, synthetic_history(), gap_scale=20)
+        self.assertEqual(result["state"], "WAIT_EVENT_CONSENSUS_PIT")
+        self.assertIsNone(result["consensus"])
+        self.assertEqual(result["consensus_candidate_documentary"], 120.0)
+        self.assertIsNone(result["estimate"])
+
+    def test_model_nowcast_is_not_exact_market_event_consensus(self):
+        target = snapshot(60)
+        model = replace(target.consensus_evidence, source_kind="MODEL_NOWCAST")
+        target = replace(target, consensus_evidence=model)
+        self.assertEqual(consensus_readiness(target), "WAIT_EXACT_EVENT_ANALYST_POLL")
+        result = estimate_with_previous_context(target, synthetic_history(), gap_scale=20)
+        self.assertEqual(result["state"], "WAIT_EXACT_EVENT_ANALYST_POLL")
+
+    def test_original_poll_bytes_missing_waits_without_inventing_hash(self):
+        target = snapshot(60)
+        missing = replace(target.consensus_evidence,
+                          original_verified=False, source_sha256="")
+        result = estimate_with_previous_context(
+            replace(target, consensus_evidence=missing), synthetic_history(), gap_scale=20,
+        )
+        self.assertEqual(result["state"], "WAIT_CONSENSUS_ORIGINAL")
+
+    def test_poll_without_independent_capture_witness_stays_blocked(self):
+        target = snapshot(60)
+        unobserved = replace(target.consensus_evidence,
+                             public_availability_independently_witnessed=False)
+        result = estimate_with_previous_context(
+            replace(target, consensus_evidence=unobserved), synthetic_history(), gap_scale=20,
+        )
+        self.assertEqual(result["state"], "WAIT_CONSENSUS_ASOF_WITNESS")
+
+    def test_consensus_capture_after_forecast_is_rejected(self):
+        target = snapshot(60)
+        late = replace(target.consensus_evidence, captured_at=target.captured_at + timedelta(minutes=1))
+        with self.assertRaisesRegex(ValueError, "pré-evento"):
+            validate_snapshot(replace(target, consensus_evidence=late))
+
+    def test_consensus_metric_or_value_mismatch_is_rejected(self):
+        target = snapshot(60)
+        for wrong in (replace(target.consensus_evidence, metric="MOM"),
+                      replace(target.consensus_evidence, value=9.0)):
+            with self.assertRaisesRegex(ValueError, "consensus_evidence"):
+                validate_snapshot(replace(target, consensus_evidence=wrong))
+
+    def test_historical_poll_without_pit_witness_is_excluded(self):
+        history = []
+        for row in synthetic_history():
+            evidence = replace(row.snapshot.consensus_evidence,
+                               public_availability_independently_witnessed=False)
+            history.append(replace(row, snapshot=replace(row.snapshot, consensus_evidence=evidence)))
+        result = estimate_with_previous_context(snapshot(60), history, gap_scale=20)
+        self.assertEqual(result["state"], "INSUFFICIENT_VERIFIED_HISTORY")
 
     def test_historical_outcome_without_archive_hash_is_excluded(self):
         history = [replace(row, actual_original_verified=False, actual_sha256="")
@@ -124,10 +202,7 @@ class PreviousContextLabTests(unittest.TestCase):
             validate_snapshot(wrong)
 
     def test_foreign_country_or_metric_are_not_training_analogs(self):
-        foreign = [
-            replace(row, snapshot=replace(row.snapshot, country="CA", metric="MOM"))
-            for row in synthetic_history()
-        ]
+        foreign = [change_identity(row, country="CA", metric="MOM") for row in synthetic_history()]
         result = estimate_with_previous_context(snapshot(60), foreign, gap_scale=20)
         self.assertEqual(result["state"], "INSUFFICIENT_VERIFIED_HISTORY")
 
@@ -162,7 +237,7 @@ class PreviousContextLabTests(unittest.TestCase):
         self.assertEqual(result["state"], "WAIT_DUPLICATE_HISTORY")
 
     def test_wrong_units_and_negative_scale_fail_closed(self):
-        wrong_units = [replace(row, snapshot=replace(row.snapshot, unit="THOUSANDS")) for row in synthetic_history()]
+        wrong_units = [change_identity(row, unit="THOUSANDS") for row in synthetic_history()]
         result = estimate_with_previous_context(snapshot(60), wrong_units, gap_scale=20)
         self.assertEqual(result["state"], "INSUFFICIENT_VERIFIED_HISTORY")
         with self.assertRaisesRegex(ValueError, "parâmetros"):
