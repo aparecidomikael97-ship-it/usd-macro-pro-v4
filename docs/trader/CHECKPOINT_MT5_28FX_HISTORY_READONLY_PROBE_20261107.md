@@ -101,3 +101,47 @@ Os candles e os manifestos de cada lote estão **somente no computador AM12**, n
 4. **NO-GO permanece:** sem mudança na UI publicada, Worker, merge, deploy, dados de conta, pagamentos, ordens, sinais automáticos ou classificação operacional fora de `AGUARDAR`.
 
 A **PR #1851 continua rascunho**; novas verificações locais reais são relatadas separadamente de CI GitHub ou acurácia de previsão.
+
+
+## Adendo 07/11/2026 — separação conservadora de lacunas de calendário
+
+**Prioridade P0, sem mudança de escopo:** feita nova auditoria **somente dos snapshots já arquivados** no AM12 (`%LOCALAPPDATA%\AtlasQuant\LAB\MT5_Snapshots\20261107_AM12`). Não ocorreu nova coleta pesada dos 28 pares, nenhum login, negociação ou alteração de preços. Código em `atlasquant_mt5_calendar_gap_audit_lab.py`, testes em `test_atlasquant_mt5_calendar_gap_audit_lab.py`. O relatório local adicional fica em `calendar_gap_audit_summary.json` no mesmo diretório. **Arquivos de preços não foram enviados ao GitHub**.
+
+### Resultado observado — candidatos, não certificação de sessão
+
+| Intervalo entre velas consecutivas | Quantidade | Tratamento |
+| --- | ---: | --- |
+| M15: padrão de pausa de fim de semana (sexta até domingo/segunda) | **168** | `WEEKEND_CANDIDATE` — só candidato |
+| D1: padrão sexta→segunda (3 dias) ou sexta→domingo (2 dias) | **2.800** | `WEEKEND_CANDIDATE` — só candidato |
+| D1: saltos adicionais em dias de semana | **87** | `REVIEW_UNEXPLAINED` — **não homologado** |
+| W1: saltos superiores ao passo semanal de 7 dias | **0** | Sem lacunas detectadas nessa amostra |
+| **Total de intervalos não nominais** | **2.968** | Não confundir com número de erros |
+
+Os **87 intervalos D1** concentram-se em **cinco datas UTC**; os números abaixo são *contagens de pares afetados*, não eventos macroeconômicos distintos:
+
+- `2024-12-25`: **10 pares**; candidato a fechamento de Natal, sem confirmar calendário da corretora.
+- `2025-01-01`: **20 pares**; candidato a Ano-Novo, sem confirmação.
+- `2025-09-30`: **1 par**, **GBPNZD**; **suspeita isolada prioritária**, sem prova de que seja feriado ou dado inválido.
+- `2025-12-25`: **28 pares**; candidato a Natal, sem confirmação.
+- `2026-01-01`: **28 pares**; candidato a Ano-Novo, sem confirmação.
+
+**Verificação independente e focalizada no MT5:** a consulta somente leitura `copy_rates_range` para 26/09 a 03/10/2025 mostrou **GBPNZD D1 sem candle 30/09/2025**, ao passo que **GBPJPY** e **EURNZD** apresentaram o candle nessa mesma data. Logo, o sistema não deve interpolar, duplicar, usar fechamento da vela seguinte como substituto ou tratar esse trecho como amostra contínua no futuro backtest GBPNZD. A decisão de excluir/segmentar janelas depende de investigação de feed de corretora e comparação com outra fonte legítima, não de adivinhação.
+
+**Regra fail-closed:** a ferramenta devolve `LOCAL_CALENDAR_REVIEW_REQUIRED` enquanto esses intervalos não estiverem comprovados. As classificações `WEEKEND_CANDIDATE` dizem apenas que os **dias extremos do intervalo** são compatíveis com uma pausa típica de fim de semana; **não** provam horário oficial de negociação do broker, horário de verão, ausência de barras intrassessão, disponibilidade P-I-T nem integridade de preço. Calendários de Natal/Ano-Novo devem ser validados por corretora e período antes de converter essas exceções em justificadas.
+
+### Evidência de execução e proteção
+
+- **12/12 testes locais PASS no AM12**, com **11 testes sintéticos da política** e **1 regressão sobre os 84 arquivos e 103.600 velas reais arquivados**.
+- Com os snapshots do projeto, a auditoria reconferiu hashes, cobertura (28/84/103600), monotonicidade, horários dos manifestos, regime de 15 minutos e dias, identificou os 87 intervalos D1 e confirmou o par isolado.
+- Os hashes Git blob de **ambos os scripts** coincidem *exatamente* com o conteúdo executado no AM12; a execução automática do GitHub não foi alegada.
+- `historical_point_in_time_verified=False`, `broker_trading_schedule_verified=False`, `out_of_sample_probability_verified=False`, `trade_authorized=False`, `operational_bias=AGUARDAR`. O período W1/D1 do viés e o M15 de execução continuam com políticas separadas. **Nenhuma nota 0–10, previsão, recomendação ou trade emitida**.
+- Não consultar ou gravar saldo, posições, servidor, login ou credenciais. Não mexer em gráficos, Worker, deploy, merge, orçamento ou produção.
+
+### Próximas tarefas, por ordem
+
+1. Corroborar o calendário de sessão do servidor/broker e de feriados com fontes independentes, especialmente **GBPNZD 30/09/2025** e as mudanças de Natal/Ano-Novo.
+2. Construir partição de dados com **bloqueio explícito de janelas que cruzem lacunas não verificadas**, sem introduzir fill-forward artificial; documentar a decisão de retenção/exclusão.
+3. Confirmar vintage macro bilateral com primeiro horário de captura verificável, validar reagendas e distinguir informações que não existiam na data histórica.
+4. Somente depois definir labels D1/W1, validação cronológica fora da amostra, baselines e nota seletiva 0–10. Geopolítica e micro continuam na fila sem inventar sinais.
+
+**Status desta rodada:** GO-LAB para auditoria estrutural; **NO-GO para backtests definitivos e sinais**. Branch isolada PR #1851 continua rascunho, sem merge/deploy ou custos adicionais.
