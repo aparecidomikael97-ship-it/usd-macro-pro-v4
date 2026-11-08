@@ -254,3 +254,23 @@ O proprietário enviou **captura do painel Navegador do MT5** mostrando **Contas
 **Testes locais:** **42/42 PASS**, reunindo as suítes já existentes de cronologia do par e junção MT5/macro com **12 novos cenários da matriz**. Os dados de teste são inteiramente **sintéticos**: 8 moedas completas geram 28/28 cruzamentos com **cobertura de alegações, não verificação econômica**; retirar CPI de NZD torna **7 pares** incompletos; uma publicação futura de GBP bloqueia **7 pares**; uma captura posterior à decisão e duplicatas de revisão também são recusadas. **Nenhum teste nesta rodada atestou indicadores econômicos reais ou gerou viés.**
 
 **Próxima prova P0:** anexar, com origem verificável, calendários e releases CPI/juros para GBP, EUR, USD, NZD, JPY, CHF, CAD e AUD, preservando período observado, publicação original, primeira captura comprovada e cada revisão. Só depois associar preços e macro por ponto-no-tempo em backtest separado, com embargo e custo operacional. Sem merge, deploy, Worker, pagamento ou ordem.
+
+
+## Incremento LAB — piloto macro real GBP/NZD com horários de divulgação
+
+**Pesquisa em fontes primárias (08/11/2026 UTC), não captura arquivada point-in-time.** Esta etapa confirma quatro valores publicados nas páginas dos próprios órgãos, distinguindo o período da observação econômica da data/hora de divulgação:
+
+| Fonte/documento oficial | Indicador e período | Valor na página | Evidência de disponibilidade local | Limite conservador UTC para pesquisa |
+| --- | --- | --- | --- | --- |
+| ONS, CPI britânico, `https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/consumerpriceinflation/september2026` | CPI 12 meses, setembro/2026 | **3,5%** | página de release ONS: **21/10/2026, 07h Londres (BST)**; `https://www.ons.gov.uk/releases/consumerpriceinflationukseptember2026` | 21/10, **06h00Z** |
+| Stats NZ, `https://www.stats.govt.nz/information-releases/consumers-price-index-september-2026-quarter/` | CPI 12 meses, trimestre encerrado em setembro/2026 | **3,7%** | publicação: **22/10/2026, 10h45 Auckland (NZDT)** | 21/10, **21h45Z** |
+| Bank of England, `https://www.bankofengland.co.uk/monetary-policy-summary-and-minutes/2026/november-2026` | Bank Rate, decisão 05/11/2026 | **4,00%** | publicação específica declara **05/11/2026**, sem horário próprio; política geral registra publicação do MPC às 12h, `https://www.bankofengland.co.uk/monetary-policy` | **06/11, 00h00Z** (início do dia seguinte; **não é horário de divulgação**) |
+| RBNZ, `https://www.rbnz.govt.nz/news-and-events/news/2026/10/ocr-held-at-2-75-percent` | OCR, decisão 28/10/2026 | **2,75%** | página pública de taxa registra **atualizado às 14h NZDT de 28/10** em `https://www.rbnz.govt.nz/monetary-policy/about-monetary-policy/the-official-cash-rate`; **não prova horário de arquivamento da comunicação específica** | 28/10, **01h00Z** |
+
+**Cuidado econômico:** CPI da GBP é mensal e da NZD é trimestral: não são observações de frequência idêntica. Juros nominais, CPI e diferenças de taxas **não produzem, isoladamente, recomendação ou viés**. A data de pesquisa é distinta do período e do horário em que o órgão publicou.
+
+**Código LAB:** `atlasquant_trader_gbp_nzd_official_pilot_lab.py` e `test_atlasquant_trader_gbp_nzd_official_pilot_lab.py`. Uma consulta com corte anterior ao limite UTC **oculta o número futuro**; depois dele, o número é exposto somente em campo rotulado `research_value_percent`, marcado como evidência histórica não atestada. Para a decisão BoE com horário específico não demonstrado, o gate só permite *contexto de pesquisa* no dia seguinte. Para RBNZ, a hora vem da página mutável de taxa, não de uma cópia contemporânea autenticada.
+
+**Testes locais:** **56/56 PASS** (14 novos cenários do piloto + 42 dos gates existentes de matriz/as-of/junção), com dados de relógio sintéticos nos testes. Nenhum arquivo macro original foi baixado e arquivado com cadeia de custódia, nenhum hash de bytes oficiais foi atestado, e não há evidência de primeira captura/revisões para emissão histórica. `historical_capture_attested=False`, `point_in_time_backtest_approved=False`, `operational_bias=AGUARDAR`; preço MT5 e broker seguem bloqueados nos pontos anteriormente identificados. **Sem merge, deploy, Worker, agendamento, cobrança ou ordens.**
+
+**Próximo P0:** capturar versões originais com timestamp independente verificável e revisões, comparar **surpresas** com expectativas disponíveis na época, depois vincular às 28 séries respeitando os gaps e o horário do servidor, antes de backtest fora da amostra.
