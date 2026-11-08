@@ -79,11 +79,22 @@ class PreviousContextLabTests(unittest.TestCase):
         self.assertAlmostEqual(sum(up["probabilities"].values()), 1)
 
     def test_previous_without_authenticated_original_remains_waiting(self):
-        target = replace(snapshot(60), previous_original_verified=False)
+        target = replace(snapshot(60), previous_original_verified=False, previous_sha256="")
         result = estimate_with_previous_context(target, synthetic_history(), gap_scale=20)
         self.assertEqual(result["state"], "WAIT_PREVIOUS_ORIGINAL")
         self.assertIsNone(result["estimate"])
         self.assertIsNone(result["probabilities"])
+
+    def test_historical_outcome_without_archive_hash_is_excluded(self):
+        history = [replace(row, actual_original_verified=False, actual_sha256="")
+                   for row in synthetic_history()]
+        result = estimate_with_previous_context(snapshot(60), history, gap_scale=20)
+        self.assertEqual(result["state"], "INSUFFICIENT_VERIFIED_HISTORY")
+
+    def test_claimed_verification_without_original_hash_is_rejected(self):
+        target = replace(snapshot(60), previous_sha256="")
+        with self.assertRaisesRegex(ValueError, "previous_sha256"):
+            validate_snapshot(target)
 
     def test_string_attestation_cannot_pass_as_verified_boolean(self):
         target = replace(snapshot(60), previous_original_verified="true")

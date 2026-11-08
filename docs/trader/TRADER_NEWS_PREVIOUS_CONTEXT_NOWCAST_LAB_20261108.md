@@ -24,9 +24,11 @@ contextos de valor anterior diferentes, podem selecionar análogos distintos.
    campo `previous` sobrescrito posteriormente por uma API.
 3. Exige horários com fuso e a ordem
    `anterior_publicado <= anterior_capturado <= previsão_capturada < divulgação`.
-4. Requer hash SHA-256 do original e indicação de verificação independente;
-   **preencher o hash ou marcar um booleano não constitui prova**: a custódia
-   real deve ser auditada separadamente antes de alimentar o motor.
+4. Requer hash SHA-256 do original **somente para reivindicar original
+   verificado**; quando o arquivo ainda não foi capturado, o hash pode e deve
+   permanecer vazio e a previsão fica bloqueada. **Preencher o hash ou marcar
+   um booleano não constitui prova**: a custódia real deve ser auditada
+   separadamente antes de alimentar o motor.
 5. História de treino só pode incluir resultados cuja **primeira publicação
    já estava disponível** na data da previsão; casos sem original e duplicatas
    ficam fora ou bloqueiam o cálculo.
@@ -63,6 +65,34 @@ vantagem real. O mínimo de 40 casos históricos e 20 análogos é **provisório
   coleta automática ou cobrança.
 - Resultados novos precisam de testes reais point-in-time, avaliação
   walk-forward/out-of-sample e revisão humana antes de qualquer integração.
+
+## Primeiro piloto documental real: CPI dos EUA (08/11/2026)
+
+Foi preparado o casebook
+`docs/continuidade/TRADER_US_CPI_SEPAUG2026_PREVIOUS_MOM_RESEARCH_LAB_20261108.json`,
+com transcrições **não autenticadas como captura histórica P-I-T** de dois
+comunicados originais do BLS:
+
+| Referência | CPI-U cheio mensal, SA | CPI-U cheio anual, NSA | Comunicado BLS |
+| --- | ---: | ---: | --- |
+| Agosto/2026 | 0,4% | 3,4% | [11/09/2026](https://www.bls.gov/news.release/archives/cpi_09112026.htm) |
+| Setembro/2026 | 0,6% | 3,7% | [14/10/2026](https://www.bls.gov/news.release/archives/cpi_10142026.htm) |
+
+**Para outubro/2026, a divulgação está agendada para 10/11/2026, 13h30 UTC**
+([calendário BLS](https://www.bls.gov/schedule/2026/11_sched_list.htm)).
+Por causa da falta da base de outubro/2025, a comparação anual do CPI-U cheio
+de outubro/2026 não é publicável; verificar [FAQ BLS](https://www.bls.gov/cpi/additional-resources/2025-federal-government-shutdown-impact-cpi-faq.htm).
+
+O módulo `atlasquant_trader_us_cpi_previous_mom_preflight_lab.py` reconhece
+o valor anterior *mensal* de 0,6%, mas mantém **sem consenso exato P-I-T,
+sem hash de bytes originais, sem previsão, sem probabilidade e sem viés**.
+O hash do JSON identifica apenas o **relato de pesquisa**, nunca os bytes do
+BLS. Para evitar retrospectiva falsa, o documento só é visível para instantes
+`as_of >= 09/11/2026 00:00 UTC`; não serve como evidência original de outubro.
+
+Foram adicionados 7 testes específicos ao piloto: pesquisa futura invisível,
+fonte adulterada, fuso, calendário, bloqueio após passar a divulgação e
+zero sinal. A validação local selecionada totalizou **46 testes aprovados**.
 
 ## Verificação local
 

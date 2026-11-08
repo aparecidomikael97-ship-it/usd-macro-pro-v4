@@ -92,10 +92,12 @@ def validate_snapshot(snapshot: PreReleaseSnapshot) -> None:
         raise ValueError("valor anterior não comprovadamente disponível antes da previsão")
     if not str(snapshot.previous_source_url).startswith("https://"):
         raise ValueError("previous_source_url deve identificar fonte HTTPS")
-    if not _SHA256.fullmatch(str(snapshot.previous_sha256)):
-        raise ValueError("previous_sha256 deve identificar os bytes originais")
     if type(snapshot.previous_original_verified) is not bool:
         raise ValueError("previous_original_verified deve ser booleano explícito")
+    if (snapshot.previous_original_verified or str(snapshot.previous_sha256 or "")) and not _SHA256.fullmatch(
+        str(snapshot.previous_sha256)
+    ):
+        raise ValueError("previous_sha256 deve identificar os bytes originais, nunca ser inventado")
     _number("consensus", snapshot.consensus)
     _number("previous", snapshot.previous)
     score = _number("signal_score", snapshot.signal_score)
@@ -110,10 +112,12 @@ def validate_outcome(row: PastOutcome) -> None:
     available = _utc("actual_available_at", row.actual_available_at)
     if available < _utc("scheduled_at", row.snapshot.scheduled_at):
         raise ValueError("actual disponível antes do horário de divulgação declarado")
-    if not _SHA256.fullmatch(str(row.actual_sha256)):
-        raise ValueError("actual_sha256 deve identificar os bytes originais")
     if type(row.actual_original_verified) is not bool:
         raise ValueError("actual_original_verified deve ser booleano explícito")
+    if (row.actual_original_verified or str(row.actual_sha256 or "")) and not _SHA256.fullmatch(
+        str(row.actual_sha256)
+    ):
+        raise ValueError("actual_sha256 deve identificar os bytes originais, nunca ser inventado")
 
 
 def _waiting(snapshot: PreReleaseSnapshot, reason: str, *, history_samples: int = 0) -> dict[str, Any]:
