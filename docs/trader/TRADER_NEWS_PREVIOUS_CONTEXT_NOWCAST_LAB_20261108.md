@@ -106,13 +106,18 @@ fonte adulterada, fuso, calendário, bloqueio após passar a divulgação e
 zero sinal. A etapa seguinte acrescentou testes para bloquear consensos sem
 original, sem testemunho de disponibilidade, com métrica diferente, publicados
 após o corte ou que sejam projeções de modelos confundidas com pesquisas.
-A validação local selecionada totalizou **53 testes aprovados**.
+A validação local selecionada da etapa de consenso totalizou **53 testes aprovados**.
+Em seguida, a custódia pré-evento dos bytes de CPI e pesquisa de analistas
+foi preparada em
+[`TRADER_US_CPI_PRE_EVENT_SOURCE_CUSTODY_LAB_20261108.md`](TRADER_US_CPI_PRE_EVENT_SOURCE_CUSTODY_LAB_20261108.md).
+Essa etapa nova acrescentou 20 testes sintéticos de integridade e horário;
+**63 testes selecionados aprovados** no total, sem liberar dados operacionais.
 
 ## Verificação local
 
 - 25 testes sintéticos de `previous` e consenso, cobrindo elegibilidade temporal,
   hash, duplicação, segregação de país/unidade, ausência de futuros e comparação
-  walk-forward. Executados em 08/11/2026: **15/15 PASS**.
+  walk-forward. Executados em 08/11/2026: **25/25 PASS**.
 - A suíte legada `test_calendar` não pôde carregar neste ambiente pela ausência
   do pacote `requests`; outra suíte de nowcast dependia de um JSON externo não
   presente no checkout. Não atribuir aprovação de toda a regressão a esta etapa.
