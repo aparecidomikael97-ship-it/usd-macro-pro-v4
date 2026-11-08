@@ -1,0 +1,84 @@
+{
+  "schema": "ATLASQUANT_TRADER_G8_POLICY_RELEASE_TIME_EVIDENCE_LAB_V1",
+  "kind": "MANUALLY_RESEARCHED_ISSUER_TIME_CLAIMS_NOT_IMMUTABLE_ORIGINAL_PIT_CAPTURE",
+  "research_calendar_date": "2026-11-08",
+  "conservative_visible_after_utc": "2026-11-09T00:00:00Z",
+  "original_issuer_response_bytes_archived_at_release": false,
+  "independent_first_publication_instant_attested": false,
+  "decision_values_pit_verified": false,
+  "schedule_times_are_not_actual_release_proof": true,
+  "events": [
+    {
+      "currency": "USD",
+      "decision_date": "2026-10-28",
+      "issuer_local_claim_time": "14:00",
+      "iana_zone": "America/New_York",
+      "evidence_class": "ISSUER_EXPLICIT_RELEASE_TIME",
+      "issuer_source_url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+      "evidence_note": "FOMC original statement says For release at 2:00 p.m. EDT; not independently captured at that instant."
+    },
+    {
+      "currency": "EUR",
+      "decision_date": "2026-10-29",
+      "issuer_local_claim_time": "14:15",
+      "iana_zone": "Europe/Berlin",
+      "evidence_class": "ISSUER_SCHEDULED_TIME",
+      "issuer_source_url": "https://www.ecb.europa.eu/press/govcdec/mopo/html/index.en.html",
+      "evidence_note": "ECB states general 14:15 CET publication rule; Oct 29 release gives date but not an original independently timestamped capture."
+    },
+    {
+      "currency": "GBP",
+      "decision_date": "2026-11-05",
+      "issuer_local_claim_time": "12:00",
+      "iana_zone": "Europe/London",
+      "evidence_class": "ISSUER_SCHEDULED_TIME",
+      "issuer_source_url": "https://www.bankofengland.co.uk/monetary-policy",
+      "evidence_note": "BoE says MPC announcements are published at 12 noon; November 5 publication date confirmed separately, no first-publication archive."
+    },
+    {
+      "currency": "CAD",
+      "decision_date": "2026-10-28",
+      "issuer_local_claim_time": "09:45",
+      "iana_zone": "America/Toronto",
+      "evidence_class": "ISSUER_SCHEDULED_TIME",
+      "issuer_source_url": "https://www.bankofcanada.ca/2026/10/fad-announcement-release-mpr-2026-10-28/",
+      "evidence_note": "BoC advance announcement specifies 09:45 Eastern Time; promised release is not an independently verified actual first publication."
+    },
+    {
+      "currency": "AUD",
+      "decision_date": "2026-11-03",
+      "issuer_local_claim_time": "14:30",
+      "iana_zone": "Australia/Sydney",
+      "evidence_class": "ISSUER_SCHEDULED_TIME",
+      "issuer_source_url": "https://www.rba.gov.au/schedules-events/calendar/",
+      "evidence_note": "RBA official calendar lists Nov 3 2026 at 2:30 pm AEDT; scheduled time alone is not timestamped actual delivery."
+    },
+    {
+      "currency": "JPY",
+      "decision_date": "2026-10-30",
+      "issuer_local_claim_time": "12:02",
+      "iana_zone": "Asia/Tokyo",
+      "evidence_class": "ISSUER_EXPLICIT_RELEASE_TIME",
+      "issuer_source_url": "https://www.boj.or.jp/en/mopo/mpmdeci/mpr_2026/k261030a.pdf",
+      "evidence_note": "BoJ original decision PDF, page 3, explicitly records Statement on Monetary Policy -- Friday October 30 at 12:02 JST."
+    },
+    {
+      "currency": "CHF",
+      "decision_date": "2026-09-24",
+      "issuer_local_claim_time": "09:30",
+      "iana_zone": "Europe/Zurich",
+      "evidence_class": "ISSUER_PATTERN_ONLY",
+      "issuer_source_url": "https://www.snb.ch/en/services-events/digital-services/event-schedule",
+      "evidence_note": "Current SNB calendar shows 09:30 for other policy release dates, not a preserved 24 Sep calendar entry; no claimed exact original issue time."
+    },
+    {
+      "currency": "NZD",
+      "decision_date": "2026-10-28",
+      "issuer_local_claim_time": "14:00",
+      "iana_zone": "Pacific/Auckland",
+      "evidence_class": "ISSUER_RECORDED_UPDATE_TIME",
+      "issuer_source_url": "https://www.rbnz.govt.nz/monetary-policy/about-monetary-policy/the-official-cash-rate",
+      "evidence_note": "RBNZ current OCR page explicitly says Updated: 2:00pm 28 Oct 2026; mutable page is not immutable original announcement capture."
+    }
+  ]
+}
