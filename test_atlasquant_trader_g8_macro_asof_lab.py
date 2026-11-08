@@ -127,6 +127,62 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
         self.assert_no_go(r)
 
+    def test_nzd_quarterly_cpi_can_cover_until_next_quarterly_release(self):
+        data = sample("GBP/NZD")
+        data["decision_at_utc"] = "2026-12-30T12:00:00Z"
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row.update(observation_period="2026-Q3", published_at_utc="2026-10-21T21:45:00Z",
+                           captured_at_utc="2026-10-21T21:45:01Z", value="3.7")
+            elif row["indicator"] == "CPI_YOY":
+                row.update(observation_period="2026-11", published_at_utc="2026-12-10T07:00:00Z",
+                           captured_at_utc="2026-12-10T07:00:01Z")
+        r = run(data, as_of=datetime(2026, 12, 30, 12, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(r["selected_observations"]["NZD"]["CPI_YOY"]["observation_frequency"], "QUARTERLY")
+        self.assertEqual(r["selected_observations"]["NZD"]["CPI_YOY"]["freshness_limit_days"], 120)
+        self.assert_no_go(r)
+
+    def test_monthly_cpi_does_not_inherit_quarterly_freshness(self):
+        data = sample()
+        data["decision_at_utc"] = "2026-12-30T12:00:00Z"
+        for row in data["records"]:
+            if row["indicator"] == "POLICY_RATE":
+                row.update(published_at_utc="2026-11-02T12:00:00Z",
+                           captured_at_utc="2026-11-02T12:01:00Z")
+            elif row["currency"] == "EUR":
+                row.update(observation_period="2026-09", published_at_utc="2026-10-21T06:00:00Z",
+                           captured_at_utc="2026-10-21T06:00:01Z")
+            else:
+                row.update(observation_period="2026-11", published_at_utc="2026-12-10T12:00:00Z",
+                           captured_at_utc="2026-12-10T12:01:00Z")
+        r = run(data, as_of=datetime(2026, 12, 30, 12, tzinfo=timezone.utc))
+        self.assertEqual(r["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
+        self.assert_no_go(r)
+
+    def test_future_quarter_is_rejected_even_when_same_year(self):
+        data = sample("GBP/NZD")
+        data["records"][0]["observation_period"] = "2026-Q4"
+        self.assertEqual(run(data)["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+
+    def test_quarterly_policy_rate_is_refused(self):
+        data = sample("GBP/NZD")
+        data["records"][1]["observation_period"] = "2026-Q3"
+        self.assertEqual(run(data)["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+
+    def test_quarter_must_end_before_publication(self):
+        data = sample("GBP/NZD")
+        data["records"][0]["observation_period"] = "2026-Q3"
+        data["records"][0]["published_at_utc"] = "2026-09-29T12:00:00Z"
+        data["records"][0]["captured_at_utc"] = "2026-09-29T12:01:00Z"
+        self.assertEqual(run(data)["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+
+    def test_invalid_quarter_format_refused(self):
+        for period in ("2026-Q0", "2026-Q5", "2026-Q03", "Q3-2026", "2026-q3"):
+            data = sample("GBP/NZD")
+            data["records"][0]["observation_period"] = period
+            self.assertEqual(run(data)["state"], "LAB_BLOCKED", period)
+
     def test_stale_previous_period_is_not_selected_over_fresh_one(self):
         data = sample()
         stale = record("EUR", "CPI_YOY", published="2026-08-01T12:00:00Z",

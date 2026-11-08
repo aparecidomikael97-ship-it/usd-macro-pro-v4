@@ -8,6 +8,7 @@ execution data, scores, statistics of directional accuracy or trading.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from calendar import monthrange
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 import json
@@ -20,6 +21,9 @@ SCHEMA = "ATLASQUANT_TRADER_G8_MACRO_ASOF_PAIR_LAB_V1"
 ENVELOPE = "ATLASQUANT_TRADER_MACRO_RELEASE_RECEIPTS_LAB_V1"
 EXPECTED = ("CPI_YOY", "POLICY_RATE")
 FRESH_DAYS = {"CPI_YOY": 60, "POLICY_RATE": 120}
+# A quarterly CPI is refreshed on a different cadence from a monthly CPI.
+# This is a structural freshness allowance, NOT a source/forecast attestation.
+QUARTERLY_CPI_FRESH_DAYS = 120
 SOURCES = frozenset(("OFFICIAL_STATISTICS_OFFICE", "CENTRAL_BANK"))
 ENVELOPE_FIELDS = frozenset(("schema", "pair", "decision_at_utc", "records"))
 RECORD_FIELDS = frozenset((
@@ -28,6 +32,7 @@ RECORD_FIELDS = frozenset((
 ))
 UTC = re.compile(r"20\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ\Z")
 MONTH = re.compile(r"20\d\d-(?:0[1-9]|1[0-2])\Z")
+QUARTER = re.compile(r"(20\d\d)-Q([1-4])\Z")
 NUMBER = re.compile(r"-?(?:0|[1-9]\d{0,2})(?:\.\d{1,4})?\Z")
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 MAX_BYTES = 48_000
@@ -103,6 +108,28 @@ def _value(raw: Any) -> Decimal | None:
         return None
 
 
+def _observation_period(raw: Any, *, indicator: str, published: datetime) -> tuple[str, int] | None:
+    """Normalize a monthly or CPI-only quarterly period without inventing dates.
+
+    Quarterly observations need a completed quarter before their announced
+    value can plausibly be known. The publication itself still needs separate
+    independent evidence to become eligible for ex-ante use.
+    """
+    if not isinstance(raw, str):
+        return None
+    if MONTH.fullmatch(raw):
+        return ("MONTHLY", FRESH_DAYS[indicator]) if raw <= published.strftime("%Y-%m") else None
+    match = QUARTER.fullmatch(raw)
+    if match is None or indicator != "CPI_YOY":
+        return None
+    year, quarter = int(match.group(1)), int(match.group(2))
+    end_month = quarter * 3
+    end_day = monthrange(year, end_month)[1]
+    if (year, end_month, end_day) > (published.year, published.month, published.day):
+        return None
+    return "QUARTERLY", QUARTERLY_CPI_FRESH_DAYS
+
+
 def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any]:
     """Check metadata for TWO currency sides; do not infer bias from values.
 
@@ -137,15 +164,14 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 or row["source_type"] not in SOURCES
                 or not isinstance(row["source_sha256"], str)
                 or HEX.fullmatch(row["source_sha256"]) is None
-                or not isinstance(row["observation_period"], str)
-                or MONTH.fullmatch(row["observation_period"]) is None
                 or _value(row["value"]) is None):
             out["reason"] = "RELEASE_SOURCE_VALUE_OR_PAIR_INVALID"
             return out
         pub, captured = _time(row["published_at_utc"]), _time(row["captured_at_utc"])
-        if (pub is None or captured is None
-                or not pub <= captured <= decision
-                or row["observation_period"] > pub.strftime("%Y-%m")):
+        frequency = (_observation_period(row["observation_period"], indicator=indicator,
+                                         published=pub) if pub is not None else None)
+        if (pub is None or captured is None or frequency is None
+                or not pub <= captured <= decision):
             out["reason"] = "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID"
             return out
         key = (cur, indicator, row["observation_period"])
@@ -167,14 +193,18 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
             latest = max(candidates, key=lambda r: (
                 r["published_at_utc"], r["observation_period"]))
             published = _time(latest["published_at_utc"])
+            frequency, fresh_days = _observation_period(
+                latest["observation_period"], indicator=indicator, published=published)
             age_days = (decision - published).total_seconds() / 86400
-            if age_days > FRESH_DAYS[indicator]:
+            if age_days > fresh_days:
                 missing.append(f"{currency}:{indicator}:STALE")
                 continue
             # Never include unverified numeric readings in the output: this
             # gate is not a scored source of economic strength or direction.
             selections[currency][indicator] = {
                 "observation_period": latest["observation_period"],
+                "observation_frequency": frequency,
+                "freshness_limit_days": fresh_days,
                 "published_at_utc_claim": latest["published_at_utc"],
                 "captured_at_utc_claim": latest["captured_at_utc"],
                 "source_type_claim": latest["source_type"],
@@ -197,4 +227,5 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
     return out
 
 
-__all__ = ["SCHEMA", "ENVELOPE", "EXPECTED", "inspect_g8_pair_macro_asof_lab"]
+__all__ = ["SCHEMA", "ENVELOPE", "EXPECTED", "QUARTERLY_CPI_FRESH_DAYS",
+           "inspect_g8_pair_macro_asof_lab"]

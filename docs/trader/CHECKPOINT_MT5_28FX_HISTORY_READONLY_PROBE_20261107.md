@@ -274,3 +274,22 @@ O proprietário enviou **captura do painel Navegador do MT5** mostrando **Contas
 **Testes locais:** **56/56 PASS** (14 novos cenários do piloto + 42 dos gates existentes de matriz/as-of/junção), com dados de relógio sintéticos nos testes. Nenhum arquivo macro original foi baixado e arquivado com cadeia de custódia, nenhum hash de bytes oficiais foi atestado, e não há evidência de primeira captura/revisões para emissão histórica. `historical_capture_attested=False`, `point_in_time_backtest_approved=False`, `operational_bias=AGUARDAR`; preço MT5 e broker seguem bloqueados nos pontos anteriormente identificados. **Sem merge, deploy, Worker, agendamento, cobrança ou ordens.**
 
 **Próximo P0:** capturar versões originais com timestamp independente verificável e revisões, comparar **surpresas** com expectativas disponíveis na época, depois vincular às 28 séries respeitando os gaps e o horário do servidor, antes de backtest fora da amostra.
+
+
+## Incremento LAB — correção CPI trimestral e cadeia local de versões macro GBP/NZD
+
+**Problema concreto corrigido:** a porta `atlasquant_trader_g8_macro_asof_lab.py` aceitava período econômico CPI somente como `YYYY-MM` e aplicava 60 dias de validade para todos os CPIs, embora **Stats NZ tenha publicado CPI trimestral `2026-Q3` em 22/10/2026 e agendado a publicação seguinte para 27/01/2027**. Isso provocaria rejeição do período trimestral ou falsa condição `STALE` antes do próximo dado. Fontes: `https://www.stats.govt.nz/information-releases/consumers-price-index-september-2026-quarter/` e `https://www.stats.govt.nz/indicators/consumers-price-index-cpi/`.
+
+**Correção conservadora:**
+
+1. CPI agora aceita `YYYY-MM` (frescor estrutural de 60 dias) ou `YYYY-Q[1-4]` (frescor estrutural de 120 dias). **A regra é determinada pelo formato da observação**, não por moeda fixa: isso evita impor CPI trimestral à NZD após eventual migração da fonte para divulgação mensal em 2027.
+2. Observação trimestral só é estruturalmente aceita depois de **encerrado o trimestre**; `2026-Q4` com publicação em outubro/2026 e `Q0/Q5` são recusados. `POLICY_RATE` continua exigindo `YYYY-MM` e não recebe validade trimestral.
+3. A seleção explicita `observation_frequency` e `freshness_limit_days` por indicador. Esses limites são política de triagem LAB, não garantia de disponibilidade da próxima divulgação. Calendários reais precisam prevalecer; um dado de inflação pode ficar obsoleto por revisão/evento antes desse limite. Nenhuma attestation ou viés foi concedido.
+
+**Novo contrato de versões:** `atlasquant_trader_gbp_nzd_vintage_chain_lab.py` e `test_atlasquant_trader_gbp_nzd_vintage_chain_lab.py`. Aceita apenas bytes **fornecidos pelo chamador**, de uma das **quatro URLs exatas** do piloto GBP/NZD. Checa tamanho, SHA-256 de conteúdo, metadados HTTP alegados, hora de captura alegada, ordenação estrita por documento, ID de revisão único e encadeamento SHA-256 com antecessor. No corte de decisão, seleciona **a última versão alegadamente capturada até aquele momento**, bloqueando contaminação estrutural por revisão posterior. Não interpreta valores econômicos e não registra cópias reais em GitHub.
+
+**Limite de evidência crucial:** nenhum snapshot real das páginas foi capturado ou armazenado nesta etapa; testes usam bytes deliberadamente **sintéticos**. Mesmo uma cadeia consistente pode ser inteiramente remontada e retrodatada por seu próprio emissor. Faltam testemunha independente de horário, arquivo original do servidor, verificações de origem TLS e selo externo de cadeia. Por isso `original_historical_capture_attested=False`, `point_in_time_backtest_approved=False`, `operational_bias=AGUARDAR`, `trade_authorized=False` continuam invariantes. O caso da vela GBPNZD D1 de 30/09/2025 e a proveniência MT5 seguem pendentes, sem preenchimento.
+
+**Validação local:** **78/78 PASS** (56 testes anteriores, 6 novos cenários de CPI trimestral e 16 de cadeia de versões). Cenários incluem revisão posterior à decisão, captura anterior à publicação, duplicata, hash adulterado, clocks inválidos, URL não permitida e ausência de prova independente. PR permanece DRAFT sem merge, deploy, Worker, agendamento, ordens ou custo novo.
+
+**Próxima prova P0:** obter capturas autenticáveis de origem e carimbo externo a partir da data real de coleta (não inventar histórico de captura), conservar vintages e revisões, e só então estudar junção temporal das surpresas macro às 28 séries e separar dados aptos/inaptos a backtest. 
