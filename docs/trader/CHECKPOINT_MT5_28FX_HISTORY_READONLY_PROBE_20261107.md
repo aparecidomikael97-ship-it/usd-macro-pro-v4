@@ -57,3 +57,47 @@ Isso confirma que pelo menos quatro pares permitem amostras maiores, mas **não*
 - **P2:** somente após evidência estatística e paper trading, considerar indicadores de qualidade no Radar; **sem deploy/merge/ordem/Worker** neste checkpoint.
 
 **Foco preservado:** AtlasQuant Trader, abas Início / Radar / Painel Mestre; Forex 28 pares e índices em esteira separada; AION/Negócios/Investimentos congelados. Nenhum custo novo.
+
+
+## Adendo: snapshots locais completos e auditoria independente — 07/11/2026 (AM12)
+
+**Mudança executada, observada no AM12 conectado, sem ordens:** ferramenta `atlasquant_mt5_closedbar_snapshot_lab.py` buscou as 28 moedas/cruzamentos em **7 lotes sequenciais de 4 pares**, evitando consultas pesadas concorrentes. O MT5 já estava aberto e os 28 pares foram habilitados na Observação do Mercado na etapa anterior. O pacote Python `MetaTrader5 5.0.6231` permanece isolado em `%TEMP%\atlasquant_mt5_readonly_20261107`; a leitura utiliza `start_pos=1`, excluindo a barra potencialmente inacabada.
+
+### Resultado observado, não estimado
+
+| Medida | Resultado |
+| --- | --- |
+| Pares Forex G8 | **28/28** |
+| Séries / consultas | **84/84** |
+| Velas M15 por par | **3.000** |
+| Velas D1 por par | **500** |
+| Velas W1 por par | **200** |
+| Total de candles salvos | **103.600** |
+| Arquivos de velas compactados | **84 × CSV.gz** |
+| Manifestos com SHA-256 dos CSV descompactados | **7 JSON**, um por lote |
+| Integridade medida por um segundo programa | **LOCAL_INTEGRITY_PASS; 84 arquivos e 103.600 linhas válidas; zero erros** |
+| Tamanho comprimido somado | **1,556 MiB** |
+| Janela mais antiga de *alguma* série M15 | 24/09/2026, 17:00 UTC |
+| Janela mais antiga de *alguma* série D1 | 02/12/2024, 00:00 UTC |
+| Janela mais antiga de *alguma* série W1 | 01/01/2023, 00:00 UTC |
+| Abertura mais recente observada (por TF) | M15 06/11/2026 23:30 UTC; D1 05/11/2026 00:00 UTC; W1 25/10/2026 00:00 UTC |
+| Intervalos maiores que duração nominal (não necessariamente falhas) | M15 **168**, D1 **2.887**, W1 **0**, agregados nos 28 pares |
+
+`atlasquant_mt5_snapshot_audit_lab.py` foi executado **separadamente e sem acesso ao MT5**. Reabriu as 84 cópias locais, descompactou cada CSV, recalculou SHA-256, conferiu esquema, linhas por timeframe, aberturas UTC inicial/final, monotonicidade, OHLC, positividade e ausência de volumes/spreads negativos. **Zero falhas.**
+
+`atlasquant_mt5_snapshot_integrity_demo_lab.py` fez um teste adversarial sobre uma **cópia temporária dos 84 arquivos e 7 manifestos**: alterou um byte do CSV.gz EURUSD/M15; a auditoria respondeu com código 2 e `LOCAL_INTEGRITY_FAIL` (`CSV_VERIFY_FAILED:EURUSD:M15:EOFError`). O teste terminou **PASS**; todos os arquivos originais permaneceram intactos.
+
+### Local dos dados e proteção de informações
+
+Os candles e os manifestos de cada lote estão **somente no computador AM12**, na pasta privada `%LOCALAPPDATA%\AtlasQuant\LAB\MT5_Snapshots\20261107_AM12`. O relatório de auditoria foi salvo como `audit_summary.json` nesse diretório. O repositório GitHub guarda **somente os scripts e este documento**, e não os candles, as credenciais, o saldo, o número da conta ou o servidor de negociação.
+
+**GATE NÃO LIBERADO:** `LOCAL_INTEGRITY_PASS` garante apenas integridade estrutural das cópias *depois* da captura, não que cotações sejam completas, que o broker esteja autenticado, que o histórico seja ponto-no-tempo verdadeiro, nem que o retorno líquido e as probabilidades tenham vantagem estatística. Os 168/2887 intervalos superiores ao TF incluem fechamentos normais de fins de semana, feriados e mudanças de sessão; para determinar lacunas, é necessário comparar a um calendário específico da corretora e aos históricos independentes. O registro de início mais antigo por TF é o **mínimo observado entre as séries**, não prova de mesma janela em todos os pares.
+
+### Ordem restante antes dos vieses
+
+1. **P0 integridade temporal:** auditar janelas de negociação, alterações de horário/NY close, gaps de sessão, spread histórico e proveniência de outro provedor, sem confundir a data de captura de hoje com disponibilidade em 2023/2024/2025.
+2. **P0 macro ponto-no-tempo:** construir e atestar fontes CPI/juros/expectativas por **ambas as moedas** no instante original da decisão; nunca inferir viés de só um diferencial de inflação.
+3. **P1 pesquisa:** baseline simples por par, rótulos W1/D1, walk-forward com embargo e custo, calibração de probabilidades, regime, micro e geopolítica; depois teste seletivo **0–10** com abstenção.
+4. **NO-GO permanece:** sem mudança na UI publicada, Worker, merge, deploy, dados de conta, pagamentos, ordens, sinais automáticos ou classificação operacional fora de `AGUARDAR`.
+
+A **PR #1851 continua rascunho**; novas verificações locais reais são relatadas separadamente de CI GitHub ou acurácia de previsão.
