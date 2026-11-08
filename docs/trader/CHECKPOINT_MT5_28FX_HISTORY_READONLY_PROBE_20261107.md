@@ -145,3 +145,24 @@ Os **87 intervalos D1** concentram-se em **cinco datas UTC**; os números abaixo
 4. Somente depois definir labels D1/W1, validação cronológica fora da amostra, baselines e nota seletiva 0–10. Geopolítica e micro continuam na fila sem inventar sinais.
 
 **Status desta rodada:** GO-LAB para auditoria estrutural; **NO-GO para backtests definitivos e sinais**. Branch isolada PR #1851 continua rascunho, sem merge/deploy ou custos adicionais.
+
+
+## Adendo 07/11/2026 — proteção fail-closed de janelas para futuros backtests (LAB)
+
+**Código preparado, não executado contra os 103.600 candles originais nesta rodada.** Foi adicionado `atlasquant_mt5_backtest_gap_guard_lab.py` e sua suíte `test_atlasquant_mt5_backtest_gap_guard_lab.py`, na mesma branch da PR #1851. Esta etapa desenvolve uma **porta de segurança temporal para futuros consumidores**, sem ativar o backtest operacional existente ou alterar o aplicativo.
+
+### Contrato do bloqueio
+
+1. Para cada par/timeframe, `partition_series` preserva os índices originais e separa segmentos nos intervalos cuja classificação **não seja `NOMINAL`**. Isso inclui `REVIEW_UNEXPLAINED`, `REVIEW_NON_GRID_DELTA` e `WEEKEND_CANDIDATE`: ainda não existe confirmação independente do horário do servidor. Nada é interpolado, preenchido ou reamostrado.
+2. `window_decision` recebe os índices inclusivos da primeira e última vela do candidato. Se o candidato atravessar uma única lacuna, informa `BLOCKED_UNVERIFIED_GAP`; `require_contiguous_window` interrompe com `UNVERIFIED_GAP_CROSSED`. Em uma janela temporalmente contínua, retorna apenas `CALENDAR_CONTIGUOUS_UNATTESTED`, **nunca** `backtest_approved=True`.
+3. O leitor de arquivo `audit_archive` primeiro executa a auditoria temporal e exige exatamente **28 pares, 84 séries, 103.600 velas e zero erros estruturais**. Depois reabre os mesmos CSV.gz em modo somente leitura, inspeciona esquema/manifestos, constrói as partições e mantém `broker_calendar_verified=False`, `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR` e `trade_authorized=False`. Um arquivo ausente/inválido falha fechado.
+4. O incidente **GBPNZD D1 29/09 → 01/10/2025** fica representado como barreira, caso seja encontrado no arquivo. Não se marca 30/09 como feriado. Os **86 demais intervalos D1** de Natal/Ano-Novo continuam pendentes, assim como **2.881** pausas candidatas de fim de semana. Não são 2.968 defeitos confirmados; são 2.968 cruzamentos que o modo estrito não pode autorizar sem política independente.
+5. O script não acessa a API MT5, conta, credenciais, terminal, ordens, rede ou fontes macro. CLI para execução **futura** no AM12: `python atlasquant_mt5_backtest_gap_guard_lab.py --root <pasta-dos-snapshots>`; saída 3 para intervalos bloqueados, 2 para arquivo inválido. Não cria relatório persistente nem altera candles.
+
+### Verificação deste incremento
+
+- Na cópia de trabalho isolada, **26 testes PASS e 2 SKIP** (regressões reais do AM12 ausentes deste ambiente). Um dos testes monta **103.600 velas sintéticas em 84 arquivos e 7 manifestos temporários** para exercitar o leitor completo, incluindo o caso GBP/NZD e a recusa após adulteração do arquivo temporário. Isso **não** constitui rerun real dos 103.600 candles originais nem CI do GitHub. O teste real continua exigido antes de liberar qualquer integração.
+- A função é intencionalmente separada dos motores legados: **eles não estão automaticamente protegidos por esta nova porta**. Qualquer futuro backtest MT5 deve chamar a porta explicitamente e passar também por auditorias de proveniência de preços, agenda da corretora e dados macro *point-in-time* antes de gerar rótulos/vieses confiáveis.
+- Sem merge, deploy, Worker, cobrança, sinal, probabilidade ou ordem. O material está somente em LAB e a PR continua rascunho.
+
+**Próximo P0:** comprovar feriados/horários da corretora (com evidência datada e comparador independente), rodar a regressão da porta nos 84 snapshots do AM12 sem recopiar preços, e só depois decidir que lacunas podem ser tratadas como pausas legítimas. Integrar as fontes macro bilaterais pelo instante **em que foram publicadas**, não pela data da observação econômica.
