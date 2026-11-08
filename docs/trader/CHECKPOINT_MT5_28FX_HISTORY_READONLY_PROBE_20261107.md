@@ -223,3 +223,17 @@ O proprietário informou **"Pepperstone, se eu não tô enganado"**. É uma hip�
 **Leitura da evidência:** 30/09/2025 foi uma terça-feira e os bancos centrais publicaram taxas de referência GBP/NZD associadas à data (adendo anterior). Assim, **se** o feed for de fato Pepperstone, a falta isolada do candle D1 é incompatível com o padrão semanal geral publicado atualmente e merece investigação como possível falha de cobertura, histórico ou convenção de sessão. **Não** podemos deduzir que Pepperstone cometeu erro, nem preencher OHLC, sem: (1) servidor de origem confirmado sem credenciais; (2) arquivo histórico do calendário/feriados de setembro de 2025; (3) OHLC GBPNZD de fonte independente com regra de fechamento diário comparável.
 
 **Decisão P0 inalterada:** `GBPNZD:D1:2025-09-30=REVIEW_UNEXPLAINED`, barreira `BLOCKED_UNVERIFIED_GAP`, `broker_calendar_verified=False`, `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR`. A PR continua DRAFT, sem merge/deploy, trading, custo ou ativação dos motores legados.
+
+
+## Correção de proveniência após captura enviada pelo proprietário — 07/11/2026
+
+O proprietário enviou **captura do painel Navegador do MT5** mostrando **Contas → MetaQuotes-Demo**. **Pepperstone não aparece nesse recorte**. A imagem continha identificadores de contas, que foram **deliberadamente omitidos** desta documentação; a imagem original **não foi enviada ao GitHub**. A inspeção visual comprova apenas o **rótulo de servidor agrupador visível na interface**, não qual conta estava ativa nem qual servidor originou historicamente os candles coletados.
+
+**Retificação explícita do adendo anterior:** a hipótese declarada verbalmente de Pepperstone **não está confirmada** e **não deve ser aplicada como calendário do histórico do AM12**. O resultado anterior de `terminal_info.company=MetaQuotes Ltd.` identifica a fabricante do software; combinado com o Navegador, é consistente com um ambiente de demonstração MetaQuotes, mas **não é atestado de origem do feed da coleta**. Manter o campo de proveniência `MT5_TERMINAL_UNATTESTED`; não reetiquetar os 103.600 candles como Pepperstone ou MetaQuotes certificado.
+
+**Consequências operacionais:**
+
+1. A ausência isolada `GBPNZD D1 2025-09-30` continua `REVIEW_UNEXPLAINED` e `BLOCKED_UNVERIFIED_GAP`, sem preenchimento ou dedução de erro de corretora.
+2. Calendários gerais da Pepperstone e referências do BCE permanecem **contexto externo**, não certificados do servidor que produziu os arquivos.
+3. A futura verificação de proveniência deve confirmar o **servidor efetivamente conectado na coleta** usando método consentido que não revele login, número de conta, saldo ou credenciais. Se esse dado não puder ser confirmado, preservar `broker_calendar_verified=False` e não liberar backtests.
+4. **GO-LAB apenas para auditoria**; `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR`. Sem merge, deploy, Worker, assinatura, ordens ou custo.
