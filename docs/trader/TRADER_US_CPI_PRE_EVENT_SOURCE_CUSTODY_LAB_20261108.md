@@ -76,6 +76,47 @@ local**, não a ausência de prova de origem, do horário e do conteúdo da
 pesquisa. O módulo não alimenta o nowcast, não infere o resultado e mantém
 `operational_bias=AGUARDAR` também quando o relógio da divulgação passa.
 
+## Capturador manual de **uma fonte por vez** — preparado, não executado
+
+`atlasquant_trader_us_cpi_capture_once_lab.py` foi adicionado para o momento
+em que o operador puder usar o PC. É um **programa de uso voluntário**: exige
+uma pasta LAB **já existente**, a escolha explícita do documento e a opção
+`--manual-one-shot`. Sem a opção, não faz requisição, não grava arquivo e não
+inicia nada em segundo plano. Nem o PC AM12 nem os sites foram consultados
+durante estes testes; a rede foi simulada com respostas artificiais.
+
+- `US_CPI_2026_09_BLS_PREVIOUS`: página arquivada oficial do BLS referente a
+  setembro, observada **agora**, nunca declarada como observação feita em
+  14/10/2026.
+- `US_CPI_2026_10_EXACT_EVENT_ANALYST_POLL`: artigo Reuters que **reporta**
+  a pesquisa; o artigo não autentica a planilha original de respostas nem a
+  identidade dos participantes. Se a página exigir permissão ou retornar erro,
+  parar, **sem contornar bloqueios**.
+
+O programa exige HTTPS com validação padrão de certificados, URL exata e HTTP
+200 sem redirecionamento. O arquivo HTML precisa ter até 1 MiB e ser entregue
+sem compressão HTTP. Os horários vêm do relógio local, não de autoridade
+independente. O nome tem carimbo UTC e prefixo do hash; os dois arquivos
+(`.html` e `.receipt.json`) são criados de forma exclusiva, sem sobrescrever.
+Os arquivos são relidos após a escrita para verificar a correspondência com
+os bytes recebidos. A função de releitura compara os hashes e a identidade
+do documento no nome do arquivo **sem rede**.
+
+**Exemplo para um dia posterior a 09/11/2026 00h UTC, somente quando estiver
+no computador e com uma pasta própria criada:**
+
+```bash
+python atlasquant_trader_us_cpi_capture_once_lab.py \
+  --source-id US_CPI_2026_09_BLS_PREVIOUS \
+  --output-dir CAMINHO_DA_PASTA_LAB_EXISTENTE \
+  --manual-one-shot
+```
+
+Uma captura feita após 10/11 13h30 UTC continua podendo ser arquivada, mas
+fica explicitamente marcada como **posterior à divulgação** e não pode sustentar
+previsão anterior. Não enviar HTML de provedores ou artigos integrais ao
+GitHub. Nenhuma coleta foi programada nem haverá cobrança ou conexão ao MT5.
+
 ## O que ainda falta
 
 - Um registro real, observado prospectivamente, da resposta BLS e do
@@ -94,10 +135,11 @@ pesquisa. O módulo não alimenta o nowcast, não infere o resultado e mantém
 
 ## Testes
 
-**20 testes sintéticos novos** da cadeia do CPI e **10 testes novos** do
-briefing de consenso versus anterior. No conjunto com o nowcast `previous` (25),
+**20 testes sintéticos novos** da cadeia do CPI, **10 testes novos** do
+briefing de consenso versus anterior e **18 testes novos** de coleta manual
+com respostas HTTP falsas e arquivos temporários. No conjunto com o nowcast `previous` (25),
 o pré-flight documental BLS (7) e a custódia de juros G8 (11),
-**73/73 selecionados aprovados** em 08/11/2026. Não representa toda a suíte
+**91/91 selecionados aprovados** em 08/11/2026. Não representa toda a suíte
 legada, que possui dependências e artefatos indisponíveis no checkout.
 
 Sem integração ao app, Radar, MT5, trading, worker, scheduler, deploy, merge

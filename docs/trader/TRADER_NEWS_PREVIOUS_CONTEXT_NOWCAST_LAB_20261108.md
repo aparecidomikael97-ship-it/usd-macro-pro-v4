@@ -113,7 +113,9 @@ foi preparada em
 Essa etapa nova acrescentou 20 testes sintéticos de integridade e horário;
 mais 10 testes de briefing cruzando o último CPI oficial e o consenso mensal
 reportado pela Reuters. **73 testes selecionados aprovados** no total, sem
-liberar dados operacionais.
+liberar dados operacionais. Depois foi preparada uma captura manual de uma
+fonte por vez, sem execução na rede, com mais 18 testes: **91 testes
+selecionados aprovados**.
 
 ## Verificação local
 
