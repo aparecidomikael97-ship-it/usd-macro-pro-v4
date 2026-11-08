@@ -436,3 +436,13 @@ Os marcadores são **heurísticas de conteúdo textual** apoiadas em páginas of
 - Regressão de **13 módulos LAB: 214 testes executados, 213 PASS, 1 SKIP** dependente de arquivos originais do AM12 (offline).
 - IMPORTANTE: duas visões consistentes sobre o mesmo catálogo de pesquisa **não** equivalem a provas independentes do emissor nem a versões históricas point-in-time. Resultado permanece 0 vintages históricos comprovados, 0 backtests autorizados e viés AGUARDAR em todos os 28 pares; probabilidades não calculadas.
 - Nenhum merge, deploy, worker, ordem, API paga ou nova autorização externa. PR #1851 permanece draft.
+
+
+### 2026-11-08 — RBNZ OCR: índice histórico oficial e limitação de atualização (LAB)
+
+- Pesquisa direta nos sites primários oficiais identificou `https://www.rbnz.govt.nz/monetary-policy/monetary-policy-decisions` — o RBNZ publica lista de decisões OCR desde 1999, com links para comunicados por reunião e **avisa que a tabela tem atraso de 24 horas para atualização**. Consulta posterior ao evento não é prova de disponibilidade no momento do comunicado.
+- Comunicado oficial específico de 28/10/2026: `https://www.rbnz.govt.nz/news-and-events/news/2026/10/ocr-held-at-2-75-percent`, que documenta decisão por 4–3 de manutenção da OCR em 2,75%. A página de taxa corrente registra atualização às 14h locais de 28/10, mas não atesta o corpo original publicado exatamente nessa hora; manter `CURRENT_RATE_PAGE_LAST_UPDATED_TIME_NOT_ORIGINAL_ARCHIVE` no piloto existente.
+- Novo catálogo de **13 entradas de pesquisa** da tabela atual do RBNZ (de 19/02/2025 a 28/10/2026): `atlasquant_trader_nzd_ocr_decision_index_lab.py`. Campo de data é dia de **decisão na Nova Zelândia**, não horário de divulgação nem recibo de dados P-I-T. Nenhuma função de replay por instante histórico ou de operação. Não foram capturados bytes dos comunicados nos respectivos instantes.
+- Piloto `atlasquant_trader_gbp_nzd_official_pilot_lab.py` passa a apresentar link ao histórico de decisões e observação de atraso 24h para a OCR da NZD, sem elevar o nível de prova, liberar retroteste ou preencher consenso.
+- Stats NZ expõe página da CPI do trimestre de setembro/2026 com planilhas e CSV por divulgação (`https://www.stats.govt.nz/information-releases/consumers-price-index-september-2026-quarter/`). Possível caminho para capturas futuras, ainda **não** obtidas nem autenticadas no AM12.
+- Regressão LAB de **14 módulos: 226 testes executados, 225 PASS, 1 SKIP** (arquivos AM12 offline). Sem ordens, worker, merge, deploy, API paga ou autenticação de histórico. PR #1851 segue draft. 28/28 pares permanecem `AGUARDAR`; 0 vintages originais P-I-T comprovados.

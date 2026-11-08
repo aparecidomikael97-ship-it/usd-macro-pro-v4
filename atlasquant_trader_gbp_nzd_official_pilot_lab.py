@@ -12,6 +12,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from atlasquant_trader_nzd_ocr_decision_index_lab import INDEX_URL as RBNZ_DECISION_INDEX_URL
+
 SCHEMA = "ATLASQUANT_TRADER_GBP_NZD_OFFICIAL_PUBLICATION_PILOT_LAB_V1"
 RESEARCH_REVIEW_DATE_UTC = "2026-11-08"  # Date of research, NOT a capture receipt.
 
@@ -57,6 +59,11 @@ PILOT = {
         "time_evidence": "CURRENT_RATE_PAGE_LAST_UPDATED_TIME_NOT_ORIGINAL_ARCHIVE",
         "document_url": "https://www.rbnz.govt.nz/news-and-events/news/2026/10/ocr-held-at-2-75-percent",
         "timing_url": "https://www.rbnz.govt.nz/monetary-policy/about-monetary-policy/the-official-cash-rate",
+        # Independent publisher cross-reference for the DECISION and value,
+        # not independent release-second proof or original issue-time bytes.
+        # RBNZ warns that its historic index updates with a 24-hour lag.
+        "decision_history_index_url": RBNZ_DECISION_INDEX_URL,
+        "decision_history_index_delay_hours": 24,
     },
 }
 
@@ -84,6 +91,8 @@ def inspect_gbp_nzd_publisher_pilot_lab(*, decision_at_utc: datetime) -> dict[st
             "currency": source["currency"], "family": source["family"],
             "metric": source["metric"], "observation_period": source["observation_period"],
             "document_url": source["document_url"], "timing_url": source["timing_url"],
+            "decision_history_index_url": source.get("decision_history_index_url"),
+            "decision_history_index_delay_hours": source.get("decision_history_index_delay_hours"),
             "release_local": source["release_local"],
             "availability_floor_utc": source["availability_floor_utc"],
             "time_evidence": source["time_evidence"],
