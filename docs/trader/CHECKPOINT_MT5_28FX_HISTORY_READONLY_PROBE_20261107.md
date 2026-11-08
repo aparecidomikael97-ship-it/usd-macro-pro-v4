@@ -237,3 +237,20 @@ O proprietário enviou **captura do painel Navegador do MT5** mostrando **Contas
 2. Calendários gerais da Pepperstone e referências do BCE permanecem **contexto externo**, não certificados do servidor que produziu os arquivos.
 3. A futura verificação de proveniência deve confirmar o **servidor efetivamente conectado na coleta** usando método consentido que não revele login, número de conta, saldo ou credenciais. Se esse dado não puder ser confirmado, preservar `broker_calendar_verified=False` e não liberar backtests.
 4. **GO-LAB apenas para auditoria**; `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR`. Sem merge, deploy, Worker, assinatura, ordens ou custo.
+
+
+## Incremento LAB — matriz macro bilateral G8 para os 28 pares, D1/W1
+
+**Implementação:** `atlasquant_trader_g8_macro_matrix_pit_lab.py` e `test_atlasquant_trader_g8_macro_matrix_pit_lab.py`. Reaproveita o gate de tempo existente em `atlasquant_trader_g8_macro_asof_lab.py`, sem reescrever o validador individual. **Não foram ingeridos dados macro reais nesta rodada.**
+
+**Contrato conservador:**
+
+1. Uma coleção única de evidências *alegadas* para cada uma das **8 moedas G8** é aplicada consistentemente aos **28 cruzamentos canônicos**. A mesma notícia de uma moeda não pode assumir valores diferentes em pares diferentes apenas por duplicação de formulários.
+2. O processo é chamado separadamente para o instante de decisão **D1** ou **W1**. O gate de cada par exige `published_at_utc <= captured_at_utc <= decision_at_utc <= evaluated_at_utc` para todas as evidências fornecidas. Uma publicação/captura futura **não** é promovida retroativamente a dado conhecido na decisão; o par é rejeitado.
+3. Se falta CPI ou taxa de política monetária de qualquer uma das moedas, o par fica incompleto; **ausência do registro não significa ausência real do indicador**. Cópias divergentes para o mesmo indicador/período são recusadas como *vintage* ambíguo.
+4. Nenhum valor numérico é exportado para um motor de direção; saem apenas contagem e motivos de cobertura **de metadados declarados pelo chamador**. Hash, URL, origem e horários informados **não** constituem autenticação independente. `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR`, `score_0_to_10=None`, `directional_probability=None`, `trade_authorized=False` permanecem fixos.
+5. Este componente **não** substitui nem está conectado ao bloqueio de lacunas do MT5. Os 103.600 candles permanecem na máquina, com origem ainda não certificada e com a exceção GBPNZD bloqueada.
+
+**Testes locais:** **42/42 PASS**, reunindo as suítes já existentes de cronologia do par e junção MT5/macro com **12 novos cenários da matriz**. Os dados de teste são inteiramente **sintéticos**: 8 moedas completas geram 28/28 cruzamentos com **cobertura de alegações, não verificação econômica**; retirar CPI de NZD torna **7 pares** incompletos; uma publicação futura de GBP bloqueia **7 pares**; uma captura posterior à decisão e duplicatas de revisão também são recusadas. **Nenhum teste nesta rodada atestou indicadores econômicos reais ou gerou viés.**
+
+**Próxima prova P0:** anexar, com origem verificável, calendários e releases CPI/juros para GBP, EUR, USD, NZD, JPY, CHF, CAD e AUD, preservando período observado, publicação original, primeira captura comprovada e cada revisão. Só depois associar preços e macro por ponto-no-tempo em backtest separado, com embargo e custo operacional. Sem merge, deploy, Worker, pagamento ou ordem.
