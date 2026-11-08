@@ -25,15 +25,15 @@ class G8OfficialResearchCoverageTests(unittest.TestCase):
         self.assertEqual(set(report["pairs"]), set(OFFICIAL_PAIRS))
         self.assertEqual(set(report["currencies"]), set(CURRENCIES))
 
-    def test_six_currencies_have_two_family_research_today(self) -> None:
+    def test_all_eight_currencies_have_two_family_research_today(self) -> None:
         report = self.audit()
         documented = {c for c, x in report["currencies"].items() if x["two_family_publisher_research"]}
-        self.assertEqual(documented, {"USD", "EUR", "GBP", "NZD", "AUD", "CAD"})
+        self.assertEqual(documented, set(CURRENCIES))
 
-    def test_bilateral_research_counts_fifteen_twelve_one(self) -> None:
+    def test_bilateral_research_counts_twenty_eight(self) -> None:
         report = self.audit()
         self.assertEqual((report["two_sided_research_pairs"], report["one_sided_research_pairs"],
-                          report["zero_sided_research_pairs"]), (15, 12, 1))
+                          report["zero_sided_research_pairs"]), (28, 0, 0))
 
     def test_every_pair_is_only_inventory_never_a_trade(self) -> None:
         report = self.audit()
@@ -49,10 +49,10 @@ class G8OfficialResearchCoverageTests(unittest.TestCase):
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0]["coverage"], "TWO_SIDED_RESEARCH_ONLY")
 
-    def test_missing_currencies_are_explicit(self) -> None:
+    def test_no_currency_missing_two_researched_families_at_current_cutoff(self) -> None:
         report = self.audit()
-        for c in ("CHF", "JPY"):
-            self.assertEqual(report["currencies"][c]["missing_families"], ["INFLATION", "POLICY"])
+        for c in CURRENCIES:
+            self.assertEqual(report["currencies"][c]["missing_families"], [])
 
     def test_both_inflation_vintages_stay_individually_named(self) -> None:
         report = self.audit()
