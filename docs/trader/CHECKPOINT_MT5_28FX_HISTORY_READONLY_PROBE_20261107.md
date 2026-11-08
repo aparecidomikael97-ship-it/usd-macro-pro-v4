@@ -456,3 +456,13 @@ Os marcadores são **heurísticas de conteúdo textual** apoiadas em páginas of
 - Criados `atlasquant_trader_nzd_cpi_quarter_release_catalog_lab.py` e `test_atlasquant_trader_nzd_cpi_quarter_release_catalog_lab.py`. Guarda de fonte exige UTC canônico e recusa trimestre duplicado; cada observação só aparece após seu piso conservador, em pesquisa retrospectiva. Páginas indicam arquivos de download, mas arquivos **não foram baixados nem certificados como bytes da publicação original**.
 - Regressão offline: **15 módulos, 241 testes executados, 240 PASS, 1 SKIP** dependente dos arquivos originais do AM12 (offline). Sem aprovação de P-I-T, retroteste, probabilidade, viés operacional, conta, worker, deploy, merge ou custo novo.
 - Próximo P0: obter e confrontar documentos/arquivos por divulgação com provas de publicação, versões e revisões, somente quando acesso permitido estiver disponível; não tratar tabelas atuais como vintages originais.
+
+
+### 2026-11-08 — Corrigida classificação mensal vs trimestral entre pares G8 (LAB)
+
+- Auditoria de `atlasquant_trader_g8_pair_comparability_gate_lab.py` encontrou lacuna real: a condição antiga `"-Q" in base_period or "-Q" in quote_period` classificava **dois países com CPI trimestral** incorretamente como `MONTHLY_VS_QUARTERLY`.
+- Corrigido com classificador de período estrito `YYYY-MM` (mês 01–12) ou `YYYY-Q1..Q4`. Novas categorias documentais `QUARTERLY_SAME_PERIOD_DOCUMENT_ONLY` e `QUARTERLY_DIFFERENT_PERIOD`; mistura de frequências só quando uma série mensal e outra trimestral. Qualquer formato inválido vira bloqueio `UNRECOGNIZED_CPI_REFERENCE_PERIOD`, sem quadro parcial.
+- Nenhum valor de CPI é subtraído/comparado entre países nem critério de `comparabilidade de metodologia` é aprovado. Mesmo períodos iguais continuam **document only** e não provam sinal ou viés.
+- Recuperados do mesmo branch da PR três JSON de casos SHA-fixados, ausentes no checkout local; os valores não foram reconstruídos/alterados. Para os 28 pares do caso de 06/11, os totais anteriores ficam inalterados: **11 mensal-mesmo período, 10 mensal-período diferente, 7 mensal-vs-trimestral**, 0 trimestre-vs-trimestre neste coorte. Há testes novos separados para dois trimestrais (iguais/diferentes), mistura genuína e período inválido.
+- Regressão de **16 módulos LAB: 257 testes executados, 256 PASS, 1 SKIP** dependente dos arquivos originais do AM12 (offline). Status 28/28 AGUARDAR; 0 vintages originais P-I-T certificados, 0 retrotestes aprovados, 0 probabilidades operacionais.
+- Sem merge, deploy, worker, trades, acesso à conta ou nova cobrança. PR #1851 permanece draft.

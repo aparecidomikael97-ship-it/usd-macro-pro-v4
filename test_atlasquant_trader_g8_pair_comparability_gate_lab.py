@@ -5,7 +5,8 @@ import unittest
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
 from atlasquant_trader_g8_pair_comparability_gate_lab import (
-    EVIDENCE_GATES_NOT_MET, inspect_g8_pair_comparability_gate_lab as inspect,
+    EVIDENCE_GATES_NOT_MET, _classify_inflation_periods,
+    inspect_g8_pair_comparability_gate_lab as inspect,
 )
 
 BASE = Path(__file__).resolve().parent / "docs" / "continuidade"
@@ -60,6 +61,9 @@ class G8PairComparabilityGateTests(unittest.TestCase):
         self.assertEqual(r["mixed_quarterly_monthly_pair_count_document_only"], 7)
         self.assertEqual(r["monthly_different_period_pair_count_document_only"], 10)
         self.assertEqual(r["pairs_missing_cpi_or_policy_asof"], 0)
+        self.assertEqual(r["quarterly_same_period_pair_count_document_only"], 0)
+        self.assertEqual(r["quarterly_different_period_pair_count_document_only"], 0)
+        self.assertEqual(r["unknown_period_format_pair_count_document_only"], 0)
         self.assertEqual(sum((r[k] for k in (
             "monthly_same_period_pair_count_document_only",
             "mixed_quarterly_monthly_pair_count_document_only",
@@ -92,6 +96,30 @@ class G8PairComparabilityGateTests(unittest.TestCase):
         self.assertEqual(p["AUD/NZD"]["inflation_quote_period"], "2026-Q3")
         self.assertEqual(p["NZD/CHF"]["inflation_period_audit"], "MONTHLY_VS_QUARTERLY")
         self.assertEqual(p["NZD/CHF"]["inflation_base_period"], "2026-Q3")
+
+    def test_two_equal_quarters_are_not_called_mixed_frequency(self):
+        status = _classify_inflation_periods("2026-Q3", "2026-Q3", complete=True)
+        self.assertEqual(status, "QUARTERLY_SAME_PERIOD_DOCUMENT_ONLY")
+
+    def test_two_different_quarters_are_not_called_mixed_frequency(self):
+        status = _classify_inflation_periods("2026-Q2", "2026-Q3", complete=True)
+        self.assertEqual(status, "QUARTERLY_DIFFERENT_PERIOD")
+
+    def test_actual_month_quarter_is_still_mixed_frequency(self):
+        for a, b in (("2026-09", "2026-Q3"), ("2026-Q3", "2026-09")):
+            self.assertEqual(_classify_inflation_periods(a, b, complete=True),
+                             "MONTHLY_VS_QUARTERLY")
+
+    def test_invalid_or_ambiguous_reference_period_is_unknown(self):
+        for a, b in (("2026-13", "2026-09"), ("2026-Q5", "2026-Q3"),
+                     ("2026", "2026-09"), (None, "2026-Q3")):
+            with self.subTest(base=a, quote=b):
+                self.assertEqual(_classify_inflation_periods(a, b, complete=True),
+                                 "UNKNOWN_PERIOD_FORMAT")
+
+    def test_incomplete_documents_override_period_matching(self):
+        self.assertEqual(_classify_inflation_periods(
+            "2026-Q3", "2026-Q3", complete=False), "DOCUMENTS_NOT_YET_ADMISSIBLE_ASOF")
 
     def test_all_rows_await_daily_weekly_with_no_fake_accuracy(self):
         for x in run()["pair_rows"]:
