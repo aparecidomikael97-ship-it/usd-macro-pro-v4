@@ -205,6 +205,47 @@ class G8PairMacroAsOfTests(unittest.TestCase):
                          "2026-10-29T12:00:00Z")
         self.assert_no_go(r)
 
+    def test_obsolete_monthly_cpi_republished_now_is_not_fresh_data(self):
+        data = sample()
+        data["records"][0]["observation_period"] = "2025-09"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(r["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
+        self.assert_no_go(r)
+
+    def test_obsolete_policy_rate_observation_republished_now_is_not_fresh(self):
+        data = sample()
+        data["records"][1]["observation_period"] = "2025-07"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(r["missing_or_stale"], ["EUR:POLICY_RATE:STALE"])
+        self.assert_no_go(r)
+
+    def test_obsolete_quarterly_cpi_republished_now_is_not_fresh_data(self):
+        data = sample("GBP/NZD")
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row["observation_period"] = "2025-Q3"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(r["missing_or_stale"], ["NZD:CPI_YOY:STALE"])
+        self.assert_no_go(r)
+
+    def test_observation_period_age_cutoff_has_no_off_by_one(self):
+        data = sample()
+        data["records"][0]["observation_period"] = "2026-07"
+        data["decision_at_utc"] = "2026-11-03T12:00:00Z"  # July 31 + 95 days
+        boundary = run(data)
+        self.assertEqual(boundary["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        row = boundary["selected_observations"]["EUR"]["CPI_YOY"]
+        self.assertEqual(row["observation_period_age_days"], 95)
+        self.assertEqual(row["observation_period_age_limit_days"], 95)
+        self.assert_no_go(boundary)
+        data["decision_at_utc"] = "2026-11-04T12:00:00Z"
+        expired = run(data)
+        self.assertEqual(expired["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
+        self.assert_no_go(expired)
+
     def test_later_republication_of_older_quarter_cannot_replace_newer_quarter(self):
         data = sample("GBP/NZD")
         for row in data["records"]:

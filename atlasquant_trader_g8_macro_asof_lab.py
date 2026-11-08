@@ -24,6 +24,15 @@ FRESH_DAYS = {"CPI_YOY": 60, "POLICY_RATE": 120}
 # A quarterly CPI is refreshed on a different cadence from a monthly CPI.
 # This is a structural freshness allowance, NOT a source/forecast attestation.
 QUARTERLY_CPI_FRESH_DAYS = 120
+# A newly reissued *old* observation is not new economic information.
+# These deliberately conservative LAB ceilings measure time since the end of
+# the observation period; they are NOT issuer-confirmed release schedules.
+# Fail closed when a period is too old even if a page was updated yesterday.
+OBSERVATION_AGE_LIMIT_DAYS = {
+    ("CPI_YOY", "MONTHLY"): 95,
+    ("CPI_YOY", "QUARTERLY"): 125,
+    ("POLICY_RATE", "MONTHLY"): 155,
+}
 SOURCES = frozenset(("OFFICIAL_STATISTICS_OFFICE", "CENTRAL_BANK"))
 ENVELOPE_FIELDS = frozenset(("schema", "pair", "decision_at_utc", "records"))
 RECORD_FIELDS = frozenset((
@@ -144,6 +153,11 @@ def _period_rank(raw: str) -> tuple[int, int]:
     return int(year), int(month)
 
 
+def _period_end_date(raw: str):
+    year, month = _period_rank(raw)
+    return datetime(year, month, monthrange(year, month)[1], tzinfo=timezone.utc).date()
+
+
 def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any]:
     """Check metadata for TWO currency sides; do not infer bias from values.
 
@@ -220,7 +234,10 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
             frequency, fresh_days = _observation_period(
                 latest["observation_period"], indicator=indicator, published=published)
             age_days = (decision - published).total_seconds() / 86400
-            if age_days > fresh_days:
+            period_age_days = (decision.date() - _period_end_date(
+                latest["observation_period"])).days
+            period_limit = OBSERVATION_AGE_LIMIT_DAYS[(indicator, frequency)]
+            if age_days > fresh_days or period_age_days > period_limit:
                 missing.append(f"{currency}:{indicator}:STALE")
                 continue
             # Never include unverified numeric readings in the output: this
@@ -229,6 +246,8 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 "observation_period": latest["observation_period"],
                 "observation_frequency": frequency,
                 "freshness_limit_days": fresh_days,
+                "observation_period_age_days": period_age_days,
+                "observation_period_age_limit_days": period_limit,
                 "published_at_utc_claim": latest["published_at_utc"],
                 "captured_at_utc_claim": latest["captured_at_utc"],
                 "source_type_claim": latest["source_type"],
@@ -252,4 +271,5 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
 
 
 __all__ = ["SCHEMA", "ENVELOPE", "EXPECTED", "QUARTERLY_CPI_FRESH_DAYS",
+           "OBSERVATION_AGE_LIMIT_DAYS",
            "inspect_g8_pair_macro_asof_lab"]
