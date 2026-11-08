@@ -130,6 +130,20 @@ def _observation_period(raw: Any, *, indicator: str, published: datetime) -> tup
     return "QUARTERLY", QUARTERLY_CPI_FRESH_DAYS
 
 
+def _period_rank(raw: str) -> tuple[int, int]:
+    """Sort economic observation periods, NOT the time a page was reissued.
+
+    The caller may supply a later publication of an older observation.
+    Comparing publication timestamps would incorrectly call that older period
+    the latest economic observation.
+    """
+    quarter = QUARTER.fullmatch(raw)
+    if quarter is not None:
+        return int(quarter.group(1)), int(quarter.group(2)) * 3
+    year, month = raw.split("-")
+    return int(year), int(month)
+
+
 def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any]:
     """Check metadata for TWO currency sides; do not infer bias from values.
 
@@ -190,8 +204,18 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
             if not candidates:
                 missing.append(f"{currency}:{indicator}:MISSING")
                 continue
+            frequencies = {
+                _observation_period(r["observation_period"], indicator=indicator,
+                                    published=_time(r["published_at_utc"]))[0]
+                for r in candidates
+            }
+            if len(frequencies) != 1:
+                # Monthly and quarterly inflation are not one continuous
+                # series. A source-methodology transition needs a new gate.
+                out["reason"] = "MIXED_INDICATOR_OBSERVATION_FREQUENCIES"
+                return out
             latest = max(candidates, key=lambda r: (
-                r["published_at_utc"], r["observation_period"]))
+                _period_rank(r["observation_period"]), r["published_at_utc"]))
             published = _time(latest["published_at_utc"])
             frequency, fresh_days = _observation_period(
                 latest["observation_period"], indicator=indicator, published=published)

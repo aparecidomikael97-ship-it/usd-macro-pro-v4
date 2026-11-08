@@ -466,3 +466,11 @@ Os marcadores são **heurísticas de conteúdo textual** apoiadas em páginas of
 - Recuperados do mesmo branch da PR três JSON de casos SHA-fixados, ausentes no checkout local; os valores não foram reconstruídos/alterados. Para os 28 pares do caso de 06/11, os totais anteriores ficam inalterados: **11 mensal-mesmo período, 10 mensal-período diferente, 7 mensal-vs-trimestral**, 0 trimestre-vs-trimestre neste coorte. Há testes novos separados para dois trimestrais (iguais/diferentes), mistura genuína e período inválido.
 - Regressão de **16 módulos LAB: 257 testes executados, 256 PASS, 1 SKIP** dependente dos arquivos originais do AM12 (offline). Status 28/28 AGUARDAR; 0 vintages originais P-I-T certificados, 0 retrotestes aprovados, 0 probabilidades operacionais.
 - Sem merge, deploy, worker, trades, acesso à conta ou nova cobrança. PR #1851 permanece draft.
+
+
+### 2026-11-08 — Seleção temporal macro por período econômico (LAB)
+
+- Corrigida fragilidade em `atlasquant_trader_g8_macro_asof_lab.py`: antes, a seleção da observação mais recente ordenava principalmente por `published_at_utc`. Uma republicação tardia de período antigo podia substituir um CPI de período mais novo. Agora a seleção privilegia a **competência econômica** (`YYYY-MM` ou `YYYY-Qn`) e só usa a publicação para desempate, sem aceitar revisão duplicada do mesmo período.
+- Misturar observações **mensais e trimestrais do mesmo indicador e moeda** no mesmo envelope agora produz `LAB_BLOCKED / MIXED_INDICATOR_OBSERVATION_FREQUENCIES`, exigindo uma decisão explícita sobre mudança de série e metodologia. A regra NÃO afirma comparabilidade entre países nem autenticidade do instante de divulgação.
+- Três testes sintéticos novos cobrem republicação tardia de mês antigo, republicação tardia de trimestre antigo e recusa de frequência mista. Regressão local de 16 módulos: **260 executados, 259 PASS, 1 SKIP** (arquivo real do AM12 não presente aqui). AM12 permanece offline; nenhuma coleta real nova, nenhum dado P-I-T original autenticado nesta rodada.
+- **28/28 pares: AGUARDAR**, sem probabilidade de acerto divulgável, backtest aprovado, operação, worker, deploy, merge ou gasto novo. A PR #1851 continua draft.

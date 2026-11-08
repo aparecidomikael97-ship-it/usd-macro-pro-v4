@@ -192,6 +192,44 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
         self.assertEqual(r["records_seen"], 5)
 
+    def test_later_republication_of_older_month_cannot_replace_newer_observation(self):
+        data = sample()
+        data["records"].append(record(
+            "EUR", "CPI_YOY", published="2026-10-31T12:00:00Z",
+            captured="2026-10-31T12:01:00Z", period="2026-07", value="2.5"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(r["selected_observations"]["EUR"]["CPI_YOY"]["observation_period"],
+                         "2026-09")
+        self.assertEqual(r["selected_observations"]["EUR"]["CPI_YOY"]["published_at_utc_claim"],
+                         "2026-10-29T12:00:00Z")
+        self.assert_no_go(r)
+
+    def test_later_republication_of_older_quarter_cannot_replace_newer_quarter(self):
+        data = sample("GBP/NZD")
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row.update(observation_period="2026-Q3", published_at_utc="2026-10-21T12:00:00Z",
+                           captured_at_utc="2026-10-21T12:01:00Z")
+        data["records"].append(record(
+            "NZD", "CPI_YOY", published="2026-10-31T12:00:00Z",
+            captured="2026-10-31T12:01:00Z", period="2026-Q2"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(r["selected_observations"]["NZD"]["CPI_YOY"]["observation_period"],
+                         "2026-Q3")
+        self.assert_no_go(r)
+
+    def test_mixed_monthly_quarterly_for_same_currency_cpi_fails_closed(self):
+        data = sample("GBP/NZD")
+        data["records"].append(record(
+            "NZD", "CPI_YOY", published="2026-10-31T12:00:00Z",
+            captured="2026-10-31T12:01:00Z", period="2026-Q3"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+        self.assertEqual(r["reason"], "MIXED_INDICATOR_OBSERVATION_FREQUENCIES")
+        self.assert_no_go(r)
+
     def test_duplicate_same_indicator_period_revision_is_blocked(self):
         data = sample()
         data["records"].append(dict(data["records"][0], value="2.3"))
