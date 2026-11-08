@@ -425,3 +425,14 @@ Os marcadores são **heurísticas de conteúdo textual** apoiadas em páginas of
 - Teste de fronteira **para cada uma das 17 observações**: um segundo antes do horário de disponibilidade conservadora não pode ser `research_by_publisher_boundary=true`; no segundo indicado pode ser pesquisa apenas, sem autorizar retroteste ou probabilidade.
 - Regressão offline de 12 módulos concluída: **198 testes, 197 PASS, 1 SKIP** (evidência bruta dependente do AM12). Os sete casos novos são negativos/fronteira e mantêm o estado **AGUARDAR**, 0 fontes históricas originais P-I-T certificadas e 0 pares habilitados a retrotestes.
 - Não houve geração de sinais, merge/deploy, worker, cobrança, nem alteração das provas históricas. PR #1851 continua draft.
+
+
+### 2026-11-08 — Reconciliação independente da apresentação de pesquisa G8↔28 pares (LAB)
+
+- Criado `atlasquant_trader_g8_research_reconciliation_lab.py` com teste próprio `test_atlasquant_trader_g8_research_reconciliation_lab.py`. Funciona inteiramente offline/sem MT5.
+- Compara, para cada corte D1/W1, as 17 observações já catalogadas no auditor de publicação com as chaves de pesquisa INFLATION/POLICY declaradas por moeda na matriz de cobertura. Recalcula as 28 combinações base/quote e os totais de pares com 0, 1 ou 2 lados pesquisados.
+- P0 de segurança: divergência de chave, família, contagem, lado do par, metadados de publicação, falsa atestação histórica, falsa liberação de retroteste ou operação causa `LAB_RESEARCH_RECONCILIATION_BLOCKED` e **nenhum par é exibido como liberado**.
+- Testes incluem fronteiras `t-1s` e `t` dos 17 horários catalogados, corte antes de qualquer publicação, corte intermediário, D1/W1, relógio inválido, fuso -04, adulteração deliberada de cobertura/total/autorizações e ausência de rede/worker/custos.
+- Regressão de **13 módulos LAB: 214 testes executados, 213 PASS, 1 SKIP** dependente de arquivos originais do AM12 (offline).
+- IMPORTANTE: duas visões consistentes sobre o mesmo catálogo de pesquisa **não** equivalem a provas independentes do emissor nem a versões históricas point-in-time. Resultado permanece 0 vintages históricos comprovados, 0 backtests autorizados e viés AGUARDAR em todos os 28 pares; probabilidades não calculadas.
+- Nenhum merge, deploy, worker, ordem, API paga ou nova autorização externa. PR #1851 permanece draft.
