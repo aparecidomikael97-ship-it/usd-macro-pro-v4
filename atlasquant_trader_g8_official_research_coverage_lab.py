@@ -18,6 +18,9 @@ from atlasquant_trader_gbp_nzd_official_pilot_lab import (
 from atlasquant_trader_usd_eur_official_pilot_lab import (
     inspect_usd_eur_official_pilot_lab,
 )
+from atlasquant_trader_aud_cad_official_pilot_lab import (
+    inspect_aud_cad_official_pilot_lab,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_G8_OFFICIAL_RESEARCH_COVERAGE_LAB_V1"
 REQUIRED_FAMILIES = ("INFLATION", "POLICY")
@@ -65,6 +68,7 @@ def inspect_g8_official_research_coverage_lab(
     catalogs = (
         inspect_gbp_nzd_publisher_pilot_lab(decision_at_utc=decision),
         inspect_usd_eur_official_pilot_lab(decision_at_utc=decision),
+        inspect_aud_cad_official_pilot_lab(decision_at_utc=decision),
     )
     currencies: dict[str, dict[str, Any]] = {}
     for currency in CURRENCIES:
