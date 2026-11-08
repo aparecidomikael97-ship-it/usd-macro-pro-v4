@@ -52,6 +52,30 @@ Ele **nunca** retorna uma previsão, probabilidade, nota, viés ou ordem.
 `ready_for_news_nowcast=False`, `ready_for_fx_bias=False`,
 `historical_pit_eligible=False` e `operational_bias=AGUARDAR` são invariantes.
 
+## Novo briefing: expectativa documentada versus último CPI
+
+A checagem de fonte pública encontrou no artigo da própria Reuters,
+[publicado em 06/11/2026](https://www.reuters.com/business/take-five/global-markets-themes-graphic-2026-11-06/),
+uma expectativa de **+0,3% no CPI mensal de outubro**, atribuída à sua pesquisa
+de economistas. O comunicado BLS de setembro traz **+0,6% mês a mês, com
+ajuste sazonal**. Portanto, a **diferença documental entre o consenso
+reportado e o último valor é −0,3 ponto percentual**, não um resultado
+futuro, uma surpresa realizada ou um sinal para comprar/vender dólares.
+
+`atlasquant_trader_us_cpi_pre_event_brief_lab.py` cruza essas duas alegações
+com os documentos de pesquisa já registrados no projeto:
+
+| Estado do briefing | Interpretação permitida |
+| --- | --- |
+| Antes de 09/11 00h UTC | O registro preparado em 08/11 ainda não pode aparecer no passado |
+| De 09/11 até antes de 10/11 13h30 UTC | Apenas contexto: analistas **esperavam desaceleração** mensal |
+| A partir da divulgação agendada | O consenso anterior é histórico; falta o resultado real autenticado |
+
+Os recibos de bytes sintéticos só alteram a indicação de **consistência
+local**, não a ausência de prova de origem, do horário e do conteúdo da
+pesquisa. O módulo não alimenta o nowcast, não infere o resultado e mantém
+`operational_bias=AGUARDAR` também quando o relógio da divulgação passa.
+
 ## O que ainda falta
 
 - Um registro real, observado prospectivamente, da resposta BLS e do
@@ -70,9 +94,10 @@ Ele **nunca** retorna uma previsão, probabilidade, nota, viés ou ordem.
 
 ## Testes
 
-**20 testes sintéticos novos** da cadeia do CPI; no conjunto com o nowcast
-`previous` (25), o pré-flight documental BLS (7) e a custódia de juros G8 (11),
-**63/63 selecionados aprovados** em 08/11/2026. Não representa toda a suíte
+**20 testes sintéticos novos** da cadeia do CPI e **10 testes novos** do
+briefing de consenso versus anterior. No conjunto com o nowcast `previous` (25),
+o pré-flight documental BLS (7) e a custódia de juros G8 (11),
+**73/73 selecionados aprovados** em 08/11/2026. Não representa toda a suíte
 legada, que possui dependências e artefatos indisponíveis no checkout.
 
 Sem integração ao app, Radar, MT5, trading, worker, scheduler, deploy, merge

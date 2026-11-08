@@ -111,7 +111,9 @@ Em seguida, a custódia pré-evento dos bytes de CPI e pesquisa de analistas
 foi preparada em
 [`TRADER_US_CPI_PRE_EVENT_SOURCE_CUSTODY_LAB_20261108.md`](TRADER_US_CPI_PRE_EVENT_SOURCE_CUSTODY_LAB_20261108.md).
 Essa etapa nova acrescentou 20 testes sintéticos de integridade e horário;
-**63 testes selecionados aprovados** no total, sem liberar dados operacionais.
+mais 10 testes de briefing cruzando o último CPI oficial e o consenso mensal
+reportado pela Reuters. **73 testes selecionados aprovados** no total, sem
+liberar dados operacionais.
 
 ## Verificação local
 
