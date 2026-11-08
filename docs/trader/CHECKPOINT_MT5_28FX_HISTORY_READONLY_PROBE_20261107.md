@@ -415,3 +415,13 @@ Os marcadores são **heurísticas de conteúdo textual** apoiadas em páginas of
 - A auditoria **não** certifica histórico revisado, consenso pré-publicação, horários completos nem as versões que eram conhecidas ao mercado em cada data. Resultado: **0 vintages históricos P-I-T comprovados, 0 pares habilitados para backtest/probabilidades, 28/28 pares com cobertura apenas de pesquisa, viés operacional AGUARDAR**.
 - Regressão LAB offline com 12 módulos: **191 testes executados, 190 PASS, 1 SKIP** condicionado aos arquivos locais do AM12; acréscimo de 19 testes desta auditoria.
 - Sem ordens, sinais operacionais, porcentagens de acerto inventadas, worker, execução externa, merge, deploy ou nova cobrança. PR #1851 continua rascunho. Próximo P0: aguardar retorno autorizado do AM12, revalidar os três HTML e avançar comprovação das versões históricas e do calendário da corretora.
+
+
+### 2026-11-08 — Fail-closed de horários do catálogo G8 (LAB)
+
+- AM12 permanece OFFLINE; sem arquivos reais locais montados ou revalidados. Sem MT5/conta/trades.
+- Auditor de evidência de publicação reforçado para **recusar horário sem timezone**, offsets não-canônicos, frações de segundo, datas inválidas e tipos inesperados. Somente horário ISO `YYYY-MM-DDTHH:MM:SSZ` UTC integral é aceito no catálogo. Nenhum fallback pode usar o fuso implícito do host.
+- Campo `time_evidence` com tipo não textual e `source_page_mutable` com valor não booleano agora bloqueiam a auditoria; chave duplicada entre pilotos continua recusada.
+- Teste de fronteira **para cada uma das 17 observações**: um segundo antes do horário de disponibilidade conservadora não pode ser `research_by_publisher_boundary=true`; no segundo indicado pode ser pesquisa apenas, sem autorizar retroteste ou probabilidade.
+- Regressão offline de 12 módulos concluída: **198 testes, 197 PASS, 1 SKIP** (evidência bruta dependente do AM12). Os sete casos novos são negativos/fronteira e mantêm o estado **AGUARDAR**, 0 fontes históricas originais P-I-T certificadas e 0 pares habilitados a retrotestes.
+- Não houve geração de sinais, merge/deploy, worker, cobrança, nem alteração das provas históricas. PR #1851 continua draft.

@@ -9,6 +9,7 @@ No issuer numerical values, economic strength, orders, network or MT5 access.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any
 
 from atlasquant_fx_universe import CURRENCIES
@@ -50,11 +51,18 @@ def _blocked(reason: str) -> dict[str, Any]:
 
 
 def _time(raw: str) -> datetime:
+    # A timezone-less value must never silently inherit the host computer's
+    # local timezone. Keep catalog cutoffs canonical whole-second UTC.
+    if (not isinstance(raw, str)
+            or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", raw) is None):
+        raise ValueError("NONCANONICAL_OR_TIMEZONELESS_AVAILABILITY_FLOOR")
     return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
 def _precision_grade(source: dict[str, Any]) -> str:
     evidence = source["time_evidence"]
+    if not isinstance(evidence, str):
+        raise ValueError("INVALID_TIME_EVIDENCE_TYPE")
     if evidence.startswith("EXACT_"):
         return "PUBLISHER_EXACT_TIME_RESEARCH_ONLY"
     if evidence.startswith("CURRENT_RATE_PAGE_LAST_UPDATED_TIME"):
@@ -98,6 +106,9 @@ def inspect_g8_publication_evidence_lab(
             for key, source in catalog.items():
                 if key in seen or source["currency"] not in currency_rows:
                     return _blocked("DUPLICATE_OR_NONCANONICAL_SOURCE")
+                if ("source_page_mutable" in source
+                        and not isinstance(source["source_page_mutable"], bool)):
+                    return _blocked("NONBOOLEAN_MUTABLE_PAGE_FLAG")
                 seen.add(key)
                 grade = _precision_grade(source)
                 floor = _time(source["availability_floor_utc"])

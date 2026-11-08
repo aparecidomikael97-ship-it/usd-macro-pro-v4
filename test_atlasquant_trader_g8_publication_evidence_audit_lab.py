@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 import unittest
+from unittest.mock import patch
 
 from atlasquant_fx_universe import CURRENCIES
 from atlasquant_trader_g8_publication_evidence_audit_lab import (
     PREVIOUSLY_REPORTED_POST_RELEASE_LOCAL_FILES,
+    SOURCE_CATALOGS,
     inspect_g8_publication_evidence_lab,
 )
 
@@ -73,6 +75,54 @@ class PublicationEvidenceAuditTests(unittest.TestCase):
         b = self.audit("2026-11-05T00:00:00Z")
         self.assertFalse(a["sources"]["EUR_HICP_2026_10_FLASH"]["research_by_publisher_boundary"])
         self.assertTrue(b["sources"]["EUR_HICP_2026_10_FLASH"]["research_by_publisher_boundary"])
+
+    def test_each_of_17_research_entries_flips_only_at_its_floor(self) -> None:
+        for catalog in SOURCE_CATALOGS:
+            for key, source in catalog.items():
+                with self.subTest(source=key):
+                    floor = at(source["availability_floor_utc"])
+                    before = inspect_g8_publication_evidence_lab(
+                        decision_at_utc=floor-timedelta(seconds=1), horizon="D1")
+                    at_floor = inspect_g8_publication_evidence_lab(
+                        decision_at_utc=floor, horizon="D1")
+                    self.assertFalse(before["sources"][key]["research_by_publisher_boundary"])
+                    self.assertTrue(at_floor["sources"][key]["research_by_publisher_boundary"])
+                    self.assertFalse(before["historical_backtest_approved"])
+                    self.assertFalse(at_floor["historical_backtest_approved"])
+
+    def test_naive_source_floor_fails_closed_not_host_local_time(self) -> None:
+        key = "GBP_CPI_2026_09"
+        with patch.dict(SOURCE_CATALOGS[0][key], {
+                "availability_floor_utc": "2026-10-21T06:00:00"}):
+            self.assertEqual(self.audit()["state"], "LAB_EVIDENCE_AUDIT_BLOCKED")
+
+    def test_offset_source_floor_rejected_in_utc_z_catalog(self) -> None:
+        key = "GBP_CPI_2026_09"
+        with patch.dict(SOURCE_CATALOGS[0][key], {
+                "availability_floor_utc": "2026-10-21T06:00:00+00:00"}):
+            self.assertEqual(self.audit()["state"], "LAB_EVIDENCE_AUDIT_BLOCKED")
+
+    def test_fractional_or_calendar_invalid_source_floor_fails_closed(self) -> None:
+        key = "GBP_CPI_2026_09"
+        for value in ("2026-10-21T06:00:00.123Z", "2026-13-21T06:00:00Z", None):
+            with self.subTest(value=value), patch.dict(SOURCE_CATALOGS[0][key], {
+                    "availability_floor_utc": value}):
+                self.assertEqual(self.audit()["state"], "LAB_EVIDENCE_AUDIT_BLOCKED")
+
+    def test_invalid_time_evidence_type_fails_closed(self) -> None:
+        key = "GBP_CPI_2026_09"
+        with patch.dict(SOURCE_CATALOGS[0][key], {"time_evidence": None}):
+            self.assertEqual(self.audit()["state"], "LAB_EVIDENCE_AUDIT_BLOCKED")
+
+    def test_nonboolean_mutable_page_flag_fails_closed(self) -> None:
+        key = "JPY_NATIONAL_CPI_2026_09"
+        with patch.dict(SOURCE_CATALOGS[3][key], {"source_page_mutable": "False"}):
+            self.assertEqual(self.audit()["reason"], "NONBOOLEAN_MUTABLE_PAGE_FLAG")
+
+    def test_duplicate_source_key_across_pilots_fails_closed(self) -> None:
+        key = "GBP_CPI_2026_09"
+        with patch.dict(SOURCE_CATALOGS[1], {key: SOURCE_CATALOGS[0][key]}):
+            self.assertEqual(self.audit()["reason"], "DUPLICATE_OR_NONCANONICAL_SOURCE")
 
     def test_no_numeric_value_or_strength_in_source_output(self) -> None:
         for r in self.audit()["sources"].values():
