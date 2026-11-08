@@ -293,3 +293,26 @@ O proprietário enviou **captura do painel Navegador do MT5** mostrando **Contas
 **Validação local:** **78/78 PASS** (56 testes anteriores, 6 novos cenários de CPI trimestral e 16 de cadeia de versões). Cenários incluem revisão posterior à decisão, captura anterior à publicação, duplicata, hash adulterado, clocks inválidos, URL não permitida e ausência de prova independente. PR permanece DRAFT sem merge, deploy, Worker, agendamento, ordens ou custo novo.
 
 **Próxima prova P0:** obter capturas autenticáveis de origem e carimbo externo a partir da data real de coleta (não inventar histórico de captura), conservar vintages e revisões, e só então estudar junção temporal das surpresas macro às 28 séries e separar dados aptos/inaptos a backtest. 
+
+
+## Incremento LAB — captura HTTP real das publicações GBP/NZD no AM12 (08/11/2026 UTC)
+
+**Resultado observado no AM12, sem conta MT5:** o coletor Python stdlib `atlasquant_trader_gbp_nzd_official_capture_lab.py` foi colocado na pasta LAB isolada `%LOCALAPPDATA%\\AtlasQuant\\LAB\\MacroOfficial\\20261108_GBPNZD_PILOT`. **Hash SHA-256 normalizado do script executado no AM12 = `371291eff2053347eb2db04d12e33cb08e1cdd6977ce20d08f5c9b12b0e18f32`**, idêntico ao arquivo local testado. Nada foi escrito na árvore de preços MT5, arquivos da conta ou configurações operacionais. Apenas páginas públicas fixadas; HTTPS stdlib padrão, sem desabilitar validação de certificado, redirects limitados ao mesmo hostname, GET limitado a 2 MiB, escrita exclusiva (sem sobrescrever arquivo histórico), leitura posterior e comparação SHA-256.
+
+**Três HTMLs reais baixados com HTTP 200 e manifesto JSON local por documento**, registrados abaixo como SHA dos bytes da resposta HTTP recebida, sem envio dos corpos ao GitHub:
+
+| Documento | Captura UTC (relógio AM12) | Bytes | SHA-256 do HTML local | SHA-256 do manifesto JSON local | HTTP Date do servidor | Título HTML observado |
+|---|---|---:|---|---|---|---|
+| ONS CPI GBP setembro/2026 | `2026-11-08T03:00:10Z` | 145100 | `e072c7cb9810acb7fae428e9e25c44d4f682554a0a9a723c585110d877e9b731` | `a6c3a0fe8c3712113492f57f0fc5b6e05a580b3375b869c7536f31ba6704b9fe` | 03:00:15Z | Consumer price inflation, UK - Office for National Statistics |
+| Stats NZ CPI NZD trimestre setembro/2026 | `2026-11-08T03:00:16Z` | 87900 | `60d8a4e18bab2aa456ad4db023f328c9bb91a094f58b6057928450fd22ddb35f` | `c52909a02c17c7154a73c47b0d92281896dd74c4cde7344d2c2d1ea369cb3a6f` | 03:00:18Z | Consumers price index: September 2026 quarter - Stats NZ |
+| BoE Bank Rate GBP novembro/2026 | `2026-11-08T03:00:17Z` | 104879 | `288a9039e016a279fd2ca264dd43628ff124226606060f71d309322b03833433` | `71c91d79c9aaf7f26d3387bdb22710dde5f8aca994a1131a5bc96a04f26b2090` | 03:00:23Z | Bank rate increased to 4% - November 2026 Monetary Policy Summary and Minutes |
+
+HTTP Date ficou de 1 a 5 segundos à frente do horário final observado no AM12; isso **não** é carimbo independente, apenas outro cabeçalho alegado pelo servidor. O script armazena hora inicial/final UTC do sistema, URL de origem/final, status e tipo HTTP, hash/bytes do corpo, metadados e flags NO-GO. Sua execução final informou `LOCAL_INTEGRITY_PASS` para **3/3 manifestos**, zero falha; uma **segunda execução somente de leitura** repetiu `3/3 PASS`. O registro dos digests neste commit GitHub é posterior à coleta e ajuda a detectar alterações futuras, **não** prova que a página exibia esses bytes na data da divulgação de outubro/novembro.
+
+**Quarta fonte bloqueada:** a URL fixada de release RBNZ (`https://www.rbnz.govt.nz/news-and-events/news/2026/10/ocr-held-at-2-75-percent`) devolveu **HTTP 403 Forbidden** para a consulta automatizada, confirmado em diagnóstico read-only. Nenhum HTML dessa fonte foi capturado e **não** foi usada rota alternativa para contornar a restrição. O dado oficial do OCR 2,75% permanece apenas como pesquisa web anterior, não como arquivo bruto com integridade local comprovada.
+
+**Testes de desenvolvimento:** **92/92 PASS locais** (78 anteriores + 14 novos do coletor, com respostas HTTP sintéticas e diretório temporário); casos de corpo adulterado, arquivo órfão, host/redirect inesperado, conteúdo muito grande, HTTP errado, caminho inseguro e duplicidade sem sobrescrita. As três cópias reais foram validadas **no AM12**, separadamente dos testes sintéticos. Nenhum arquivo fonte real foi enviado ao GitHub.
+
+**Regras:** `source_http_body_captured_now=True` apenas nas três fontes; `issuer_document_semantics_verified=False` no coletor, `independent_timestamp_authority_verified=False`, `historical_vintage_at_original_release_verified=False`, `historical_backtest_authorized=False`, `operational_bias=AGUARDAR`, sem confiança estatística, sem merge/deploy/worker/agendamento/trade ou novo custo. Origem MT5 e lacuna GBPNZD D1 30/09/2025 continuam pendentes.
+
+**Próximo P0:** fechar a quarta fonte por canal oficial autorizado (sem contornar HTTP 403); implementar auditoria dos valores dentro dos arquivos HTML que foram guardados, cruzar releases com calendário de revisões e preservar digests em commit de revisão. O corpus capturado agora só pode contribuir, após verificações adicionais, para decisões **posteriores à sua coleta**, nunca provar vintages retroativos de 2025–2026.
