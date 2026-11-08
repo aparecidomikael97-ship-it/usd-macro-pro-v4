@@ -115,7 +115,7 @@ A **PR #1851 continua rascunho**; novas verificações locais reais são relatad
 | D1: padrão sexta→segunda (3 dias) ou sexta→domingo (2 dias) | **2.800** | `WEEKEND_CANDIDATE` — só candidato |
 | D1: saltos adicionais em dias de semana | **87** | `REVIEW_UNEXPLAINED` — **não homologado** |
 | W1: saltos superiores ao passo semanal de 7 dias | **0** | Sem lacunas detectadas nessa amostra |
-| **Total de intervalos não nominais** | **2.968** | Não confundir com número de erros |
+| **Total de intervalos não nominais** | **3.055** | Soma das três linhas; não confundir com número de erros |
 
 Os **87 intervalos D1** concentram-se em **cinco datas UTC**; os números abaixo são *contagens de pares afetados*, não eventos macroeconômicos distintos:
 
@@ -156,7 +156,7 @@ Os **87 intervalos D1** concentram-se em **cinco datas UTC**; os números abaixo
 1. Para cada par/timeframe, `partition_series` preserva os índices originais e separa segmentos nos intervalos cuja classificação **não seja `NOMINAL`**. Isso inclui `REVIEW_UNEXPLAINED`, `REVIEW_NON_GRID_DELTA` e `WEEKEND_CANDIDATE`: ainda não existe confirmação independente do horário do servidor. Nada é interpolado, preenchido ou reamostrado.
 2. `window_decision` recebe os índices inclusivos da primeira e última vela do candidato. Se o candidato atravessar uma única lacuna, informa `BLOCKED_UNVERIFIED_GAP`; `require_contiguous_window` interrompe com `UNVERIFIED_GAP_CROSSED`. Em uma janela temporalmente contínua, retorna apenas `CALENDAR_CONTIGUOUS_UNATTESTED`, **nunca** `backtest_approved=True`.
 3. O leitor de arquivo `audit_archive` primeiro executa a auditoria temporal e exige exatamente **28 pares, 84 séries, 103.600 velas e zero erros estruturais**. Depois reabre os mesmos CSV.gz em modo somente leitura, inspeciona esquema/manifestos, constrói as partições e mantém `broker_calendar_verified=False`, `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR` e `trade_authorized=False`. Um arquivo ausente/inválido falha fechado.
-4. O incidente **GBPNZD D1 29/09 → 01/10/2025** fica representado como barreira, caso seja encontrado no arquivo. Não se marca 30/09 como feriado. Os **86 demais intervalos D1** de Natal/Ano-Novo continuam pendentes, assim como **2.881** pausas candidatas de fim de semana. Não são 2.968 defeitos confirmados; são 2.968 cruzamentos que o modo estrito não pode autorizar sem política independente.
+4. O incidente **GBPNZD D1 29/09 → 01/10/2025** fica representado como barreira, caso seja encontrado no arquivo. Não se marca 30/09 como feriado. Os **86 demais intervalos D1** de Natal/Ano-Novo continuam pendentes, assim como **2.968** pausas candidatas de fim de semana (168 M15 + 2.800 D1). Não são 3.055 defeitos confirmados; são 3.055 cruzamentos que o modo estrito não pode autorizar sem política independente.
 5. O script não acessa a API MT5, conta, credenciais, terminal, ordens, rede ou fontes macro. CLI para execução **futura** no AM12: `python atlasquant_mt5_backtest_gap_guard_lab.py --root <pasta-dos-snapshots>`; saída 3 para intervalos bloqueados, 2 para arquivo inválido. Não cria relatório persistente nem altera candles.
 
 ### Verificação deste incremento
@@ -166,3 +166,29 @@ Os **87 intervalos D1** concentram-se em **cinco datas UTC**; os números abaixo
 - Sem merge, deploy, Worker, cobrança, sinal, probabilidade ou ordem. O material está somente em LAB e a PR continua rascunho.
 
 **Próximo P0:** comprovar feriados/horários da corretora (com evidência datada e comparador independente), rodar a regressão da porta nos 84 snapshots do AM12 sem recopiar preços, e só depois decidir que lacunas podem ser tratadas como pausas legítimas. Integrar as fontes macro bilaterais pelo instante **em que foram publicadas**, não pela data da observação econômica.
+
+
+## Revisão forense no AM12 — 07/11/2026: execução real e correção aritmética
+
+O AM12 voltou a estar online. Foi confirmada a existência dos **84 CSV.gz e 7 manifestos originais** em `%LOCALAPPDATA%\AtlasQuant\LAB\MT5_Snapshots\20261107_AM12`. Os hashes SHA-256 dos scripts de classificação e proteção copiados em pasta temporária separada foram comparados aos arquivos do repositório e coincidiram. Os preços e manifestos **não foram modificados, copiados para a nuvem ou enviados ao GitHub**.
+
+### Resultados observados na execução somente leitura
+
+| Medida | Resultado real |
+| --- | ---: |
+| 28 pares, 84 séries, 103.600 velas | **Confirmados** |
+| Candidatos a fim de semana M15 | **168** |
+| Candidatos a fim de semana D1 | **2.800** |
+| Lacunas D1 com revisão pendente | **87** |
+| **Total de intervalos não nominais** | **3.055** |
+| Segmentos separados em fronteiras não verificadas | **3.139** |
+| GBP/NZD D1 30/09/2025 permanece bloqueado | **Sim** |
+| Estado da porta | `BLOCKED_UNVERIFIED_GAPS` |
+| Aprovado para backtest operacional | **Não** |
+| Erros de integridade reportados pela porta | **0** |
+
+**Retificação de soma:** o valor **2.968** não era o total de intervalos não nominais como descrito no adendo inicial; é a soma dos candidatos de fim de semana (168 + 2.800). As **87** lacunas D1 de revisão são adicionais. Portanto, **2.968 + 87 = 3.055**. A nova regressão real expôs esse erro na expectativa do teste, que foi corrigida. A classificação das 87 pendências, incluindo a exceção do GBPNZD, não mudou.
+
+A primeira execução da nova suíte apresentou **27 PASS / 1 FAIL** devido **exclusivamente à expectativa aritmética incorreta** (`2968 - 87` e contagem de segmentos); a porta retornou os números reais e conservou `backtest_approved=False`. As duas expectativas foram corrigidas, os hashes SHA-256 do teste editado foram conferidos iguais no repositório de trabalho e no AM12, e a suíte foi reexecutada no AM12: **28/28 PASS (2,105 s), sem SKIP**. Também foi executada a CLI da porta diretamente contra o arquivo real: `BLOCKED_UNVERIFIED_GAPS`, **3.139 segmentos**, `gbpnzd_2025_09_30_blocked=True`, `backtest_approved=False`, zero erros de integridade. Nenhuma validação de dados macro P-I-T, calendário oficial do broker, corretora independente, acerto ou probabilidade foi feita nesta etapa.
+
+**Próximo P0 após a regressão real:** buscar evidência oficial do *trading schedule* da corretora/servidor e comparação independente para a vela GBPNZD D1 30/09/2025; criar uma política documentada de exceções só depois dessa prova. Em paralelo, especificar os timestamps de publicação dos indicadores macro das duas moedas para prevenir vazamento de informação futura. Os motores legados de backtest ainda não foram conectados à nova porta de segurança.

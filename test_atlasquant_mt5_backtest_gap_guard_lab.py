@@ -183,10 +183,10 @@ class ArchivedMT5Regression(unittest.TestCase):
         report = audit_archive(DEFAULT_ROOT)
         self.assertEqual(report["status"], "BLOCKED_UNVERIFIED_GAPS")
         self.assertEqual((report["pairs"], report["files"], report["bars"]), (28, 84, 103600))
-        self.assertEqual(report["blocked_interval_counts"].get("WEEKEND_CANDIDATE"), 2968 - 87)
+        self.assertEqual(report["blocked_interval_counts"].get("WEEKEND_CANDIDATE"), 168 + 2800)
         self.assertEqual(report["blocked_interval_counts"].get("REVIEW_UNEXPLAINED"), 87)
         self.assertTrue(report["gbpnzd_2025_09_30_blocked"])
-        self.assertEqual(report["segments_total"], 84 + 2968)
+        self.assertEqual(report["segments_total"], 84 + 168 + 2800 + 87)
         self.assertFalse(report["backtest_approved"])
 
 
