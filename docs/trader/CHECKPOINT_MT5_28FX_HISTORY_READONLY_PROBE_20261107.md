@@ -207,3 +207,19 @@ A primeira execução da nova suíte apresentou **27 PASS / 1 FAIL** devido **ex
 **Conclusão limitada:** há evidência oficial de taxas cambiais das duas moedas associadas a 30/09/2025. Isso enfraquece a hipótese de uma suspensão global das referências nesse dia, mas **não prova** que o servidor MT5/fornecedor deveria ter uma vela diária GBPNZD, nem identifica a causa da ausência. Referências do mesmo sistema BCE, ainda que espelhadas por bancos nacionais, não são duas fontes independentes de preços negociáveis. O caso segue como `REVIEW_UNEXPLAINED` e `BLOCKED_UNVERIFIED_GAP`; `broker_calendar_verified=False`, `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR`.
 
 **Próxima prova que falta:** identificar de forma não sensível o nome da corretora/servidor e obter seu calendário de sessões **daquela época**; confrontar o GBPNZD D1 em uma segunda fonte de barras negociáveis com a mesma convenção de corte diário. Não consultar conta, saldo, posições, credenciais ou enviar ordens para isso. Somente após essa corroboração decidir política explícita de exceção, com hash e data da evidência, sujeita à porta fail-closed.
+
+
+## Hipótese Pepperstone e horário da corretora — 07/11/2026 (LAB)
+
+O proprietário informou **"Pepperstone, se eu não tô enganado"**. É uma hipótese plausível, **não uma identificação certificada do fornecedor que gerou os 84 CSV.gz**.
+
+**Checagem mínima, sem informações de conta:** com o MT5 já aberto no AM12, uma sonda em pasta temporária usou somente `mt5.initialize`, `mt5.terminal_info` (campos `company`, `name`, `build`) e `mt5.shutdown`. Resultado: `company=MetaQuotes Ltd.`, `name=MetaTrader 5`, `build=6308`. **Isso identifica o fornecedor do software/terminal, não comprova se o servidor de preços do histórico é Pepperstone**. Não foram consultados `account_info`, `positions_get`, credenciais ou números de conta; nenhum login, ordem ou alteração de preços.
+
+**Fontes primárias Pepperstone:**
+
+- Página oficial `Market trading hours`, `https://pepperstone.com/en-gb/about-us/trading-hours`: horário Forex padrão de **terça a quinta, 00:01–23:59 no relógio do servidor**, e sexta até 23:55. O próprio site informa **GMT+3 durante o horário de verão dos EUA (março–novembro)** e **GMT+2 no horário padrão**. Trata-se da tabela **atual**, não de um certificado específico de **30/09/2025**. Mercados/pares podem ter exceções e feriados.
+- Página oficial `Platform and tools support`, `https://pepperstone.com/en/support/platforms-and-tools`: a documentação de MT5 menciona, como exemplos, os hosts `mt5-1.pepperstone.com` (real) e `mt5-demo01.pepperstone.com` (demo). **Não** foram usados para autenticar ou modificar o terminal; constam apenas como referências para futura verificação do nome público do servidor, se fornecido pelo proprietário.
+
+**Leitura da evidência:** 30/09/2025 foi uma terça-feira e os bancos centrais publicaram taxas de referência GBP/NZD associadas à data (adendo anterior). Assim, **se** o feed for de fato Pepperstone, a falta isolada do candle D1 é incompatível com o padrão semanal geral publicado atualmente e merece investigação como possível falha de cobertura, histórico ou convenção de sessão. **Não** podemos deduzir que Pepperstone cometeu erro, nem preencher OHLC, sem: (1) servidor de origem confirmado sem credenciais; (2) arquivo histórico do calendário/feriados de setembro de 2025; (3) OHLC GBPNZD de fonte independente com regra de fechamento diário comparável.
+
+**Decisão P0 inalterada:** `GBPNZD:D1:2025-09-30=REVIEW_UNEXPLAINED`, barreira `BLOCKED_UNVERIFIED_GAP`, `broker_calendar_verified=False`, `historical_point_in_time_verified=False`, `backtest_approved=False`, `operational_bias=AGUARDAR`. A PR continua DRAFT, sem merge/deploy, trading, custo ou ativação dos motores legados.
