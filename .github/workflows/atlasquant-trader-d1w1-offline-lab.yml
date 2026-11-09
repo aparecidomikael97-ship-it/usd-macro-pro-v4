@@ -1,0 +1,100 @@
+name: AtlasQuant Trader D1 W1 Offline LAB
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_trader_*_lab.py"
+      - "test_atlasquant_trader_*_lab.py"
+      - "atlasquant_mt5_*_lab.py"
+      - "test_atlasquant_mt5_*_lab.py"
+      - "atlasquant_fx_universe.py"
+      - "atlasquant_instrument_registry.py"
+      - ".github/workflows/atlasquant-trader-d1w1-offline-lab.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlasquant-trader-d1w1-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selective-bias-contracts:
+    name: D1 W1 contracts (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout read-only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify offline dependency availability
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sys
+          from zoneinfo import ZoneInfo
+          from atlasquant_fx_universe import OFFICIAL_PAIRS
+          assert len(OFFICIAL_PAIRS) == len(set(OFFICIAL_PAIRS)) == 28
+          assert ZoneInfo('America/New_York') is not None
+          assert sys.version_info[:2] in ((3, 11), (3, 12))
+          print('OFFLINE_LAB_PYTHON_READY', sys.version)
+          PY
+      - name: Compile selected research contracts
+        shell: bash
+        run: |
+          python -m py_compile \
+            atlasquant_trader_w1_ny17_dst_guard_lab.py \
+            atlasquant_trader_fx_trial_census_lab.py \
+            atlasquant_trader_mt5_closedbar_outcome_lab.py \
+            atlasquant_trader_regime_increment_benchmark_lab.py \
+            atlasquant_trader_mt5_paired_outcome_bridge_lab.py \
+            atlasquant_trader_fx_census_github_anchor_lab.py \
+            atlasquant_trader_first_cohort_readiness_lab.py \
+            atlasquant_trader_fx_nyclose_clock_audit_lab.py \
+            atlasquant_mt5_d1w1_minimal_clock_probe_lab.py \
+            atlasquant_trader_market_regime_veto_lab.py \
+            atlasquant_trader_evidence_join_lab.py \
+            atlasquant_trader_economic_surprise_veto_lab.py \
+            atlasquant_trader_selective_bias_gate_lab.py \
+            atlasquant_trader_policy_expectations_conflict_lab.py \
+            atlasquant_trader_policy_join_veto_lab.py \
+            atlasquant_trader_g8_macro_matrix_pit_lab.py \
+            atlasquant_trader_g8_event_relevance_lab.py \
+            atlasquant_mt5_backtest_gap_guard_lab.py \
+            atlasquant_mt5_calendar_gap_audit_lab.py
+      - name: Run FX and MT5 offline contract tests (no broker, no requests)
+        shell: bash
+        run: |
+          python -m unittest -q \
+            test_atlasquant_trader_w1_ny17_dst_guard_lab \
+            test_atlasquant_trader_fx_trial_census_lab \
+            test_atlasquant_trader_mt5_closedbar_outcome_lab \
+            test_atlasquant_trader_regime_increment_benchmark_lab \
+            test_atlasquant_trader_mt5_paired_outcome_bridge_lab \
+            test_atlasquant_trader_fx_census_github_anchor_lab \
+            test_atlasquant_trader_first_cohort_readiness_lab \
+            test_atlasquant_trader_fx_nyclose_clock_audit_lab \
+            test_atlasquant_mt5_d1w1_minimal_clock_probe_lab \
+            test_atlasquant_trader_market_regime_veto_lab \
+            test_atlasquant_trader_evidence_join_lab \
+            test_atlasquant_trader_economic_surprise_veto_lab \
+            test_atlasquant_trader_selective_bias_gate_lab \
+            test_atlasquant_trader_policy_expectations_conflict_lab \
+            test_atlasquant_trader_policy_join_veto_lab \
+            test_atlasquant_trader_g8_macro_matrix_pit_lab \
+            test_atlasquant_trader_g8_event_relevance_lab \
+            test_atlasquant_mt5_backtest_gap_guard_lab \
+            test_atlasquant_mt5_calendar_gap_audit_lab
