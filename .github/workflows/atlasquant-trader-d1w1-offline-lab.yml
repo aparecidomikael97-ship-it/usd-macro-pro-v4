@@ -58,6 +58,7 @@ jobs:
           python -m py_compile \
             atlasquant_trader_w1_ny17_dst_guard_lab.py \
             atlasquant_trader_fx_trial_census_lab.py \
+            atlasquant_trader_fx_census_bridge_guard_lab.py \
             atlasquant_trader_mt5_closedbar_outcome_lab.py \
             atlasquant_trader_regime_increment_benchmark_lab.py \
             atlasquant_trader_mt5_paired_outcome_bridge_lab.py \
@@ -81,6 +82,7 @@ jobs:
           python -m unittest -q \
             test_atlasquant_trader_w1_ny17_dst_guard_lab \
             test_atlasquant_trader_fx_trial_census_lab \
+            test_atlasquant_trader_fx_census_bridge_guard_lab \
             test_atlasquant_trader_mt5_closedbar_outcome_lab \
             test_atlasquant_trader_regime_increment_benchmark_lab \
             test_atlasquant_trader_mt5_paired_outcome_bridge_lab \
