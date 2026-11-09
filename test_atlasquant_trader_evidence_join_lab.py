@@ -6,6 +6,7 @@ import unittest
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_evidence_join_lab import inspect_fx_evidence_join_lab as join
 from atlasquant_trader_g8_event_relevance_lab import EventSnapshot
+from atlasquant_trader_market_regime_veto_lab import ClosedMarketBar
 from atlasquant_trader_selective_bias_gate_lab import (
     BiasObservation, HoldoutWindow, SelectiveAuditClaims,
 )
@@ -97,6 +98,7 @@ class EvidenceJoinTests(unittest.TestCase):
         self.assertFalse(data["macro_bilateral_values_comparable"])
         self.assertFalse(data["event_forecast_validated"])
         self.assertFalse(data["market_data_historical_pit_verified"])
+        self.assertFalse(data["regime_source_independently_authenticated"])
         self.assertIsNone(data["candidate_direction_for_publication"])
         self.assertIsNone(data["calibrated_direction_probability"])
         self.assertIsNone(data["validated_directional_accuracy"])
@@ -110,7 +112,9 @@ class EvidenceJoinTests(unittest.TestCase):
         self.assertEqual(data["price_calendar_contiguous_claims"], {"D1": True, "W1": True})
         self.assertEqual(data["selective_research_state"],
                          "LAB_INTERNAL_RESEARCH_CANDIDATE_NOT_LIVE")
-        self.assertEqual(len(data["blockers"]), 6)
+        self.assertEqual(len(data["blockers"]), 7)
+        self.assertIn("REGIME_MARKET_REGIME_BARS_MISSING_OR_WRONG_HORIZONS", data["blockers"])
+        self.assertTrue(data["regime_research_veto"])
         self.assertIn("NEWS_ECONOMIC_EVENT_SNAPSHOTS_NOT_SUPPLIED", data["blockers"])
         self.assertTrue(data["news_surprise_research_veto"])
         self.assertIn("POLICY_RATE_EXPECTATION_SNAPSHOTS_NOT_SUPPLIED", data["blockers"])
@@ -285,6 +289,59 @@ class EvidenceJoinTests(unittest.TestCase):
                       result["blockers"])
         self.assertTrue(result["news_surprise_research_veto"])
         self.no_live(result)
+
+
+    def test_regime_complete_aligned_synthetic_bars_never_unlock_cross_layer(self):
+        def bars(horizon):
+            interval = timedelta(days=7 if horizon == "W1" else 1)
+            anchor = (datetime(2026, 10, 26, tzinfo=UTC) if horizon == "W1"
+                      else datetime(2026, 11, 3, tzinfo=UTC))
+            records = []
+            for i in range(46):
+                opened = anchor - (45-i)*interval
+                p = 100 + i
+                records.append(ClosedMarketBar(
+                    opened_at=opened, closed_at=opened+interval,
+                    recorded_at=opened+interval+timedelta(minutes=1),
+                    open=str(p), high=str(p+1.2), low=str(p-0.2),
+                    close=str(p+1), source_sha256_claim="d"*64,
+                ))
+            return records
+
+        data = self.case(regime_bars_by_horizon={"W1": bars("W1"), "D1": bars("D1")})
+        self.assertFalse(data["regime_research_veto"])
+        self.assertEqual(data["regime_research_state"], "LAB_REGIME_ALIGNMENT_DOCUMENTARY_NOT_LIVE")
+        self.assertEqual(data["regime_D1"]["regime"], "TREND")
+        self.assertEqual(data["regime_W1"]["regime"], "TREND")
+        self.assertEqual(data["state"], "LAB_CROSS_LAYER_EVIDENCE_DIAGNOSTIC_NO_GO")
+        self.assertIn("ORIGINAL_ECONOMIC_SOURCES_AND_BILATERAL_VALUES_UNATTESTED", data["blockers"])
+        self.no_live(data)
+
+    def test_regime_range_adds_veto_without_fabricating_probabilities(self):
+        def bars(horizon, lateral=False):
+            interval = timedelta(days=7 if horizon == "W1" else 1)
+            anchor = (datetime(2026, 10, 26, tzinfo=UTC) if horizon == "W1"
+                      else datetime(2026, 11, 3, tzinfo=UTC))
+            records = []
+            prior = 100
+            for i in range(46):
+                opened = anchor - (45-i)*interval
+                next_close = (100 + (1 if i % 2 else 0)) if lateral else prior + 1
+                records.append(ClosedMarketBar(
+                    opened_at=opened, closed_at=opened+interval,
+                    recorded_at=opened+interval+timedelta(minutes=1),
+                    open=str(prior), high=str(max(prior, next_close)+0.2),
+                    low=str(min(prior, next_close)-0.2),
+                    close=str(next_close), source_sha256_claim="d"*64,
+                ))
+                prior = next_close
+            return records
+
+        data = self.case(regime_bars_by_horizon={"W1": bars("W1"), "D1": bars("D1", lateral=True)})
+        self.assertTrue(data["regime_research_veto"])
+        self.assertEqual(data["regime_D1"]["regime"], "RANGE")
+        self.assertIn("REGIME_D1_RANGE_DOES_NOT_SUPPORT_DIRECTIONAL_RESEARCH", data["blockers"])
+        self.no_live(data)
 
 
 if __name__ == "__main__":

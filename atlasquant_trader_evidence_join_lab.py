@@ -15,6 +15,7 @@ from atlasquant_mt5_calendar_gap_audit_lab import BAR_SECONDS
 from atlasquant_trader_g8_macro_matrix_pit_lab import inspect_g8_macro_matrix_pit_lab
 from atlasquant_trader_policy_join_veto_lab import inspect_policy_veto_for_fx_join_lab
 from atlasquant_trader_economic_surprise_veto_lab import inspect_economic_surprise_veto_lab
+from atlasquant_trader_market_regime_veto_lab import inspect_market_regime_veto_lab
 from atlasquant_trader_selective_bias_gate_lab import (
     BiasObservation, assess_selective_bias_lab,
 )
@@ -50,6 +51,11 @@ def _result(reason: str, *, asset: str | None = None) -> dict[str, Any]:
         "news_surprise_W1_events": [],
         "news_surprise_D1_events": [],
         "news_surprise_originals_independently_authenticated": False,
+        "regime_research_state": None,
+        "regime_research_veto": True,
+        "regime_W1": None,
+        "regime_D1": None,
+        "regime_source_independently_authenticated": False,
         "blockers": [],
         "economic_originals_authenticated": False,
         "macro_bilateral_values_comparable": False,
@@ -81,6 +87,7 @@ def inspect_fx_evidence_join_lab(
     rate_expectations_snapshots_by_horizon: Any = None,
     news_events_by_horizon: Any = None,
     news_macro_captured_at_by_horizon: Any = None,
+    regime_bars_by_horizon: Any = None,
 ) -> dict[str, Any]:
     """Join independently prepared LAB observations without issuing a bias.
 
@@ -144,6 +151,20 @@ def inspect_fx_evidence_join_lab(
     out["news_surprise_W1_events"] = surprise["W1_events"]
     out["news_surprise_D1_events"] = surprise["D1_events"]
     out["blockers"].extend("NEWS_" + reason for reason in surprise["blockers"])
+
+    # Research-only, close-bar D1/W1 regime veto. Even complete, aligned
+    # synthetic candles cannot authenticate price vintages or permit trades.
+    regime = inspect_market_regime_veto_lab(
+        candidate=candidate,
+        bars_by_horizon=regime_bars_by_horizon,
+        decision_at_by_horizon=decisions,
+        as_of_utc=current,
+    )
+    out["regime_research_state"] = regime["state"]
+    out["regime_research_veto"] = regime["research_veto"]
+    out["regime_W1"] = regime["W1"]
+    out["regime_D1"] = regime["D1"]
+    out["blockers"].extend("REGIME_" + reason for reason in regime["blockers"])
 
     selective = assess_selective_bias_lab(
         candidate, previous_confirmations, holdout_windows, audit_claims,
