@@ -82,6 +82,28 @@ def _matching_period(metric: str, period: str) -> bool:
         return False
 
 
+def _economic_period_not_after_release(metric: str, period: str,
+                                       scheduled: datetime) -> bool:
+    """Reject impossible future economic periods without claiming true release.
+
+    CPI/PCE/labour reference months cannot follow their purported release
+    month; a GDP quarter cannot even end after the purported release month.
+    Same-month flash estimates remain documentary and source-unattested.
+    Policy meeting/effective-date semantics need a separate issuer gate.
+    """
+    if metric == "POLICY_RATE":
+        return True
+    if metric == "GDP_QOQ":
+        match = _QUARTER.fullmatch(period)
+        return (match is not None and
+                (int(period[:4]), int(period[-1]) * 3) <=
+                (scheduled.year, scheduled.month))
+    match = _MONTH.fullmatch(period)
+    return (match is not None and
+            (int(period[:4]), int(period[5:7])) <=
+            (scheduled.year, scheduled.month))
+
+
 def _blocked(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "LAB_EVENT_ROUTER_BLOCKED", "reason": reason,
@@ -113,6 +135,8 @@ def _event_row(v: EventSnapshot, now: datetime) -> dict[str, Any] | None:
             or METRIC_UNITS.get(v.metric) != v.unit
             or not isinstance(v.target_period, str)
             or not _matching_period(v.metric, v.target_period)
+            or not _economic_period_not_after_release(
+                v.metric, v.target_period, scheduled)
             or not isinstance(v.importance, str)
             or v.importance not in IMPORTANCE):
         return None
