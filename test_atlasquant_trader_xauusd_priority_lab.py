@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import unittest
 from atlasquant_instrument_registry import FX_28, normalize_fx_symbol
 from atlasquant_trader_xauusd_priority_lab import (
-    BIASES, EVIDENCE_DOMAINS, EvidenceReceipt, inspect_xauusd_evidence_lab,
+    BIASES, EVIDENCE_DOMAINS, PRE_DECISION_DOMAINS, POST_OUTCOME_DOMAINS, EvidenceReceipt, inspect_xauusd_evidence_lab,
     plan_xauusd_priority_lab,
 )
 
@@ -13,7 +13,7 @@ FREEZE = NOW - timedelta(hours=1)
 
 def receipts():
     return tuple(EvidenceReceipt(d, NOW-timedelta(days=4), NOW-timedelta(days=3), "a"*64)
-                 for d in EVIDENCE_DOMAINS)
+                 for d in PRE_DECISION_DOMAINS)
 
 class GoldPriorityLabTests(unittest.TestCase):
     def safe(self, result):
@@ -43,17 +43,33 @@ class GoldPriorityLabTests(unittest.TestCase):
         self.assertFalse(p["grade_0_to_10_is_probability"])
         self.assertEqual(p["possible_biases"],["ALTA","BAIXA","AGUARDAR"])
 
+    def test_outcomes_are_post_target_not_predecision(self):
+        self.assertEqual(POST_OUTCOME_DOMAINS, ("XAUUSD_PROSPECTIVE_OUTCOMES",))
+        self.assertEqual(len(PRE_DECISION_DOMAINS), 7)
+        self.assertTrue(set(PRE_DECISION_DOMAINS).isdisjoint(POST_OUTCOME_DOMAINS))
+        p = plan_xauusd_priority_lab()
+        self.assertEqual(p["pre_decision_domains"], list(PRE_DECISION_DOMAINS))
+        self.assertEqual(p["post_outcome_domains"], list(POST_OUTCOME_DOMAINS))
+
+    def test_leaking_outcome_receipt_into_prediction_is_rejected(self):
+        row=EvidenceReceipt("XAUUSD_PROSPECTIVE_OUTCOMES", NOW-timedelta(days=4),
+                            NOW-timedelta(days=3), "b"*64)
+        r=inspect_xauusd_evidence_lab((*receipts(),row),as_of_utc=NOW,decision_freeze_utc=FREEZE)
+        self.assertEqual(r["state"], "LAB_XAUUSD_EVIDENCE_BLOCKED")
+        self.assertEqual(r["reason"], "INVALID_OR_UNSUPPORTED_DOMAIN")
+        self.safe(r)
+
     def test_missing_evidence_blocks(self):
         r=inspect_xauusd_evidence_lab([],as_of_utc=NOW,decision_freeze_utc=FREEZE)
         self.assertEqual(r["state"],"LAB_XAUUSD_EVIDENCE_BLOCKED")
         self.assertEqual(r["domain_count_accepted"],0)
-        self.assertEqual(set(r["missing_or_invalid_domains"]),set(EVIDENCE_DOMAINS))
+        self.assertEqual(set(r["missing_or_invalid_domains"]),set(PRE_DECISION_DOMAINS))
         self.safe(r)
 
-    def test_all_eight_receipts_are_only_documentary(self):
+    def test_all_seven_predecision_receipts_are_only_documentary(self):
         r=inspect_xauusd_evidence_lab(receipts(),as_of_utc=NOW,decision_freeze_utc=FREEZE)
         self.assertEqual(r["state"],"LAB_XAUUSD_DOCUMENTARY_COVERAGE_UNATTESTED")
-        self.assertEqual(r["domain_count_accepted"],8)
+        self.assertEqual(r["domain_count_accepted"],7)
         self.assertEqual(r["missing_or_invalid_domains"],[])
         self.assertFalse(r["broker_symbol_and_session_authenticated"])
         self.assertFalse(r["prospective_outcomes_independently_verified"])
@@ -63,7 +79,7 @@ class GoldPriorityLabTests(unittest.TestCase):
     def test_partial_evidence_still_blocks(self):
         r=inspect_xauusd_evidence_lab(receipts()[:6],as_of_utc=NOW,decision_freeze_utc=FREEZE)
         self.assertEqual(r["domain_count_accepted"],6)
-        self.assertEqual(len(r["missing_or_invalid_domains"]),2)
+        self.assertEqual(len(r["missing_or_invalid_domains"]),1)
         self.safe(r)
 
     def test_post_freeze_capture_rejected(self):

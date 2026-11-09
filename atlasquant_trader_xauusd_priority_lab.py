@@ -25,6 +25,10 @@ EVIDENCE_DOMAINS = (
     "US_MACRO_RELEASES", "GOLD_FLOWS_AND_DEMAND", "GEOPOLITICAL_RISK",
     "XAUUSD_BROKER_PRICE_AND_SESSION", "XAUUSD_PROSPECTIVE_OUTCOMES",
 )
+# Information known only after a forecast is NOT an input to that forecast.
+PRE_DECISION_DOMAINS = EVIDENCE_DOMAINS[:-1]
+POST_OUTCOME_DOMAINS = EVIDENCE_DOMAINS[-1:]
+assert POST_OUTCOME_DOMAINS == ("XAUUSD_PROSPECTIVE_OUTCOMES",)
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -56,6 +60,8 @@ def plan_xauusd_priority_lab() -> dict[str, Any]:
         "monthly_horizon": "CONTEXT_ONLY_NOT_VALIDATED",
         "context_horizons": list(CONTEXT),
         "evidence_domains": list(EVIDENCE_DOMAINS),
+        "pre_decision_domains": list(PRE_DECISION_DOMAINS),
+        "post_outcome_domains": list(POST_OUTCOME_DOMAINS),
         "possible_biases": ["ALTA", "BAIXA", "AGUARDAR"],
         "fx_28_universe_unchanged": len(FX_28) == FX_PAIR_COUNT and XAU_SYMBOL not in FX_28,
         "fx_56_census_unchanged": True,
@@ -73,7 +79,10 @@ def plan_xauusd_priority_lab() -> dict[str, Any]:
 def inspect_xauusd_evidence_lab(
     receipts: Any, *, as_of_utc: Any, decision_freeze_utc: Any,
 ) -> dict[str, Any]:
-    """Validate *claimed* evidence coverage, never authorize a gold signal.
+    """Validate ONLY pre-decision evidence, never authorize a gold signal.
+
+    Prospective outcomes are post-target labels, NOT available as inputs.
+    Do not accept them as forecasting evidence (anti-leakage).
 
     Independent vendor/broker verification and a true prospective holdout are
     out of scope, even when all supplied receipts are structurally consistent.
@@ -81,8 +90,9 @@ def inspect_xauusd_evidence_lab(
     result: dict[str, Any] = {
         "schema": SCHEMA, "canonical_id": XAU_CANONICAL_ID,
         "state": "LAB_XAUUSD_EVIDENCE_BLOCKED", "reason": "MISSING_EVIDENCE",
-        "domain_count_expected": len(EVIDENCE_DOMAINS),
-        "domain_count_accepted": 0, "missing_or_invalid_domains": list(EVIDENCE_DOMAINS),
+        "domain_count_expected": len(PRE_DECISION_DOMAINS),
+        "post_outcome_domains_excluded_from_prediction": list(POST_OUTCOME_DOMAINS),
+        "domain_count_accepted": 0, "missing_or_invalid_domains": list(PRE_DECISION_DOMAINS),
         "source_originals_authenticated": False,
         "broker_symbol_and_session_authenticated": False,
         "prospective_outcomes_independently_verified": False,
@@ -103,7 +113,7 @@ def inspect_xauusd_evidence_lab(
         return result
     accepted = set()
     for row in receipts:
-        if not isinstance(row, EvidenceReceipt) or row.domain not in EVIDENCE_DOMAINS:
+        if not isinstance(row, EvidenceReceipt) or row.domain not in PRE_DECISION_DOMAINS:
             result["reason"] = "INVALID_OR_UNSUPPORTED_DOMAIN"
             return result
         if row.domain in accepted:
@@ -117,7 +127,7 @@ def inspect_xauusd_evidence_lab(
             result["reason"] = "INVALID_SOURCE_VINTAGE_OR_HASH_CLAIM"
             return result
         accepted.add(row.domain)
-    missing = sorted(set(EVIDENCE_DOMAINS) - accepted)
+    missing = sorted(set(PRE_DECISION_DOMAINS) - accepted)
     result["domain_count_accepted"] = len(accepted)
     result["missing_or_invalid_domains"] = missing
     if not missing:
@@ -127,5 +137,5 @@ def inspect_xauusd_evidence_lab(
 
 
 __all__ = ["SCHEMA", "XAU_SYMBOL", "XAU_CANONICAL_ID", "BIASES", "CONTEXT",
-           "EVIDENCE_DOMAINS", "EvidenceReceipt", "plan_xauusd_priority_lab",
+           "EVIDENCE_DOMAINS", "PRE_DECISION_DOMAINS", "POST_OUTCOME_DOMAINS", "EvidenceReceipt", "plan_xauusd_priority_lab",
            "inspect_xauusd_evidence_lab"]
