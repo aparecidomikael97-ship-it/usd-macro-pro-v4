@@ -3,6 +3,9 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import unittest
 from atlasquant_trader_first_cohort_readiness_lab import inspect_first_cohort_readiness_lab
+from atlasquant_trader_fx_nyclose_clock_audit_lab import (
+    FxClockSample, audit_fx_nyclose_clock_lab,
+)
 
 UTC=timezone.utc
 NOW=datetime(2026,11,9,15,tzinfo=UTC)
@@ -27,7 +30,15 @@ def fixture():
             "roster_anchor_body":"\n".join(("slots_expected=56","roster_sha256="+sha("c"))),
             "census_anchor_body":"\n".join(("slots_expected=56","roster_sha256="+sha("c"),"census_sha256="+sha("d"))),
             "roster_precedes_first_decision_claim":True,"census_precedes_target_claim":True}
-    return dict(as_of_utc=NOW,decision_frozen_at=NOW-timedelta(minutes=30),archive_audit=a,broker_session=broker,
+    clock_samples = [FxClockSample(
+        symbol="EURUSD", timeframe=tf,
+        bar_open_at_utc=datetime(2026,11,8,22,tzinfo=UTC),
+        snapshot_observed_at_utc=NOW-timedelta(hours=1),
+        csv_sha256_claim="a"*64,
+    ) for tf in ("D1", "W1")]
+    clock = audit_fx_nyclose_clock_lab(clock_samples, as_of_utc=NOW)
+    return dict(as_of_utc=NOW,decision_frozen_at=NOW-timedelta(minutes=30),
+                archive_audit=a,broker_session=broker,clock_reference_report=clock,
                 macro_receipts=macro,roster_report=roster,census_report=census,
                 github_anchor_report=github)
 
@@ -37,6 +48,7 @@ class ReadinessTests(unittest.TestCase):
         self.assertFalse(r["trade_authorized"])
         self.assertFalse(r["publishable"])
         self.assertFalse(r["live_alert_allowed"])
+        self.assertFalse(r["bar_clock_broker_association_verified"])
         self.assertFalse(r["broker_session_source_authenticated"])
         self.assertFalse(r["macro_originals_authenticated"])
         self.assertFalse(r["github_comments_authenticated_here"])
@@ -49,7 +61,7 @@ class ReadinessTests(unittest.TestCase):
     def test_missing_everything_blocks(self):
         r=inspect_first_cohort_readiness_lab(as_of_utc=NOW)
         self.assertEqual(r["state"],"LAB_FIRST_COHORT_BLOCKED")
-        self.assertEqual(len(r["blockers"]),7)
+        self.assertEqual(len(r["blockers"]),8)
         self.assertIn("FROZEN_56_SLOT_ROSTER_MISSING",r["blockers"])
         self.assertIn("TWO_GITHUB_PRECOMMIT_ANCHORS_MISSING",r["blockers"])
         self.assert_no_trade(r)
@@ -137,10 +149,80 @@ class ReadinessTests(unittest.TestCase):
         self.assertIn("W1_BROKER_CLOCK_PIT_OR_HASH_INVALID",r["blockers"])
 
     def test_invalid_recipient_types_fail_closed(self):
-        for key in ("archive_audit","broker_session","macro_receipts","roster_report","census_report","github_anchor_report"):
+        for key in ("archive_audit","broker_session","clock_reference_report",
+                    "macro_receipts","roster_report","census_report","github_anchor_report"):
             d=fixture();d[key]=True
             r=inspect_first_cohort_readiness_lab(**d)
             self.assertNotEqual(r["blockers"],[])
             self.assert_no_trade(r)
+
+
+    def test_missing_clock_audit_never_ready(self):
+        d=fixture();d["clock_reference_report"]=None
+        r=inspect_first_cohort_readiness_lab(**d)
+        self.assertIn("D1_W1_BAR_CLOCK_REFERENCE_AUDIT_MISSING",r["blockers"])
+        self.assert_no_trade(r)
+
+    def test_actual_mt5_documentary_utc_midnight_discrepancy_veto(self):
+        d=fixture()
+        samples=[
+            FxClockSample("EURUSD","D1",datetime(2026,11,5,tzinfo=UTC),
+                          NOW-timedelta(hours=1),"a"*64),
+            FxClockSample("EURUSD","W1",datetime(2026,10,25,tzinfo=UTC),
+                          NOW-timedelta(hours=1),"b"*64),
+        ]
+        d["clock_reference_report"]=audit_fx_nyclose_clock_lab(samples,as_of_utc=NOW)
+        r=inspect_first_cohort_readiness_lab(**d)
+        self.assertEqual(r["clock_reference_discrepancies"],2)
+        self.assertIn("D1_W1_BAR_CLOCK_REFERENCE_DISCREPANCY_NEEDS_SERVER_REVIEW",r["blockers"])
+        self.assert_no_trade(r)
+
+    def test_partial_clock_report_is_rejected_even_if_one_frame_matches(self):
+        d=fixture()
+        sample=FxClockSample("EURUSD","D1",datetime(2026,11,8,22,tzinfo=UTC),
+                             NOW-timedelta(hours=1),"a"*64)
+        d["clock_reference_report"]=audit_fx_nyclose_clock_lab([sample,sample.__class__(
+            "GBPUSD","D1",sample.bar_open_at_utc,sample.snapshot_observed_at_utc,"a"*64)],
+            as_of_utc=NOW)
+        r=inspect_first_cohort_readiness_lab(**d)
+        self.assertIn("D1_W1_BAR_CLOCK_REFERENCE_INVALID_OR_INCOMPLETE",r["blockers"])
+        self.assert_no_trade(r)
+
+    def test_matching_clock_sample_observed_after_freeze_blocks(self):
+        d=fixture()
+        samples=[FxClockSample("EURUSD",tf,datetime(2026,11,8,22,tzinfo=UTC),
+                               NOW-timedelta(minutes=10),"a"*64) for tf in ("D1","W1")]
+        d["clock_reference_report"]=audit_fx_nyclose_clock_lab(samples,as_of_utc=NOW)
+        r=inspect_first_cohort_readiness_lab(**d)
+        self.assertIn("D1_W1_BAR_CLOCK_SAMPLE_INVALID_OR_LATE",r["blockers"])
+        self.assert_no_trade(r)
+
+    def test_claimed_clock_match_never_authenticates_server(self):
+        r=inspect_first_cohort_readiness_lab(**fixture())
+        self.assertEqual(r["state"],"LAB_DOCUMENTARY_INPUT_INVENTORY_COMPLETE_UNATTESTED")
+        self.assertEqual(r["clock_reference_discrepancies"],0)
+        self.assertFalse(r["bar_clock_broker_association_verified"])
+        self.assert_no_trade(r)
+
+    def test_forged_clock_summary_count_rejected(self):
+        d=fixture();d["clock_reference_report"]["sample_count"]=3
+        r=inspect_first_cohort_readiness_lab(**d)
+        self.assertIn("D1_W1_BAR_CLOCK_REFERENCE_INVALID_OR_INCOMPLETE",r["blockers"])
+        self.assert_no_trade(r)
+
+
+    def test_report_cannot_forge_new_york_timestamp(self):
+        d=fixture()
+        d["clock_reference_report"]["samples"][0]["bar_open_new_york"]="2026-11-08T18:00:00-05:00"
+        r=inspect_first_cohort_readiness_lab(**d)
+        self.assertIn("D1_W1_BAR_CLOCK_REPORT_NOT_REPRODUCIBLE",r["blockers"])
+        self.assert_no_trade(r)
+
+    def test_report_cannot_forge_utc_open_while_claiming_match(self):
+        d=fixture()
+        d["clock_reference_report"]["samples"][0]["bar_open_utc"]="2026-11-05T00:00:00+00:00"
+        r=inspect_first_cohort_readiness_lab(**d)
+        self.assertIn("D1_W1_BAR_CLOCK_REPORT_NOT_REPRODUCIBLE",r["blockers"])
+        self.assert_no_trade(r)
 
 if __name__=="__main__": unittest.main()

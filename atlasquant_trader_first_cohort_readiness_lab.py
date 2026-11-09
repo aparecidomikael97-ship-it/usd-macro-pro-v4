@@ -8,11 +8,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 import re
+from atlasquant_trader_fx_nyclose_clock_audit_lab import (
+    FxClockSample, audit_fx_nyclose_clock_lab,
+)
 
 SCHEMA = "ATLASQUANT_FIRST_FX_COHORT_READINESS_LAB_V1"
 HORIZONS = frozenset(("D1", "W1"))
 CURRENCIES = frozenset(("USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"))
 HEX = re.compile(r"[a-f0-9]{64}\Z")
+CLOCK_SCHEMA = "ATLASQUANT_FX_NY_CLOSE_BAR_CLOCK_REFERENCE_LAB_V1"
 
 
 def _clock(value: Any) -> datetime | None:
@@ -38,6 +42,9 @@ def _base(reason: str) -> dict[str, Any]:
         "census_documentary_status": None,
         "github_anchor_documentary_status": None,
         "macro_currencies_claimed": 0,
+        "clock_reference_documentary_status": None,
+        "clock_reference_discrepancies": None,
+        "bar_clock_broker_association_verified": False,
         "broker_session_source_authenticated": False,
         "macro_originals_authenticated": False,
         "github_comments_authenticated_here": False,
@@ -56,7 +63,8 @@ def _base(reason: str) -> dict[str, Any]:
 
 def inspect_first_cohort_readiness_lab(
     *, as_of_utc: Any, archive_audit: Any = None,
-    broker_session: Any = None, macro_receipts: Any = None,
+    broker_session: Any = None, clock_reference_report: Any = None,
+    macro_receipts: Any = None,
     roster_report: Any = None, census_report: Any = None,
     github_anchor_report: Any = None, decision_frozen_at: Any = None,
 ) -> dict[str, Any]:
@@ -113,6 +121,70 @@ def inspect_first_cohort_readiness_lab(
             else:
                 targets[tf] = target
         # Caller-supplied document references do NOT authenticate the broker.
+
+    # Require a separate clock-pattern audit before the first D1/W1 cohort.
+    # A pattern match remains UNATTESTED: it is neither broker identification
+    # nor proof that a past candle was available at prediction time.
+    clock = clock_reference_report
+    if not isinstance(clock, dict) or clock.get("schema") != CLOCK_SCHEMA:
+        failures.append("D1_W1_BAR_CLOCK_REFERENCE_AUDIT_MISSING")
+    else:
+        out["clock_reference_documentary_status"] = clock.get("state")
+        out["clock_reference_discrepancies"] = clock.get("discrepancy_count")
+        disagreements = clock.get("discrepancy_count")
+        if (type(disagreements) is int and disagreements > 0
+                or clock.get("state") == "LAB_SESSION_CLOCK_REFERENCE_DISCREPANCY_REVIEW"):
+            failures.append("D1_W1_BAR_CLOCK_REFERENCE_DISCREPANCY_NEEDS_SERVER_REVIEW")
+        elif (clock.get("state") != "LAB_NYCLOSE_REFERENCE_MATCH_UNATTESTED"
+              or type(clock.get("sample_count")) is not int
+              or clock["sample_count"] < 2
+              or clock.get("match_count") != clock["sample_count"]
+              or disagreements != 0
+              or clock.get("frames_seen") != ["D1", "W1"]
+              or not isinstance(clock.get("samples"), list)
+              or len(clock["samples"]) != clock["sample_count"]):
+            failures.append("D1_W1_BAR_CLOCK_REFERENCE_INVALID_OR_INCOMPLETE")
+        else:
+            sample_frames = set()
+            rebuilt_samples = []
+            for row in clock["samples"]:
+                if not isinstance(row, dict):
+                    failures.append("D1_W1_BAR_CLOCK_SAMPLE_INVALID_OR_LATE")
+                    break
+                observed, opening = (row.get("snapshot_observed_utc_claim"),
+                                     row.get("bar_open_utc"))
+                try:
+                    captured = _clock(datetime.fromisoformat(observed))
+                    opened = _clock(datetime.fromisoformat(opening))
+                except (ValueError, TypeError, OverflowError):
+                    captured = opened = None
+                tf = row.get("timeframe")
+                if (tf not in HORIZONS or not isinstance(row.get("symbol"), str)
+                        or opened is None or captured is None or freeze_at is None
+                        or captured > freeze_at or captured > now
+                        or row.get("reference_pattern_match") is not True
+                        or not _hash(row.get("csv_sha256_claim"))):
+                    failures.append("D1_W1_BAR_CLOCK_SAMPLE_INVALID_OR_LATE")
+                    break
+                sample_frames.add(tf)
+                rebuilt_samples.append(FxClockSample(
+                    symbol=row["symbol"], timeframe=tf,
+                    bar_open_at_utc=opened, snapshot_observed_at_utc=captured,
+                    csv_sha256_claim=row["csv_sha256_claim"],
+                ))
+            if ("D1_W1_BAR_CLOCK_SAMPLE_INVALID_OR_LATE" not in failures
+                    and sample_frames != HORIZONS):
+                failures.append("D1_W1_BAR_CLOCK_SAMPLE_INVALID_OR_LATE")
+            if "D1_W1_BAR_CLOCK_SAMPLE_INVALID_OR_LATE" not in failures:
+                regenerated = audit_fx_nyclose_clock_lab(
+                    rebuilt_samples, as_of_utc=now)
+                if (regenerated["state"] != "LAB_NYCLOSE_REFERENCE_MATCH_UNATTESTED"
+                        or regenerated["samples"] != clock["samples"]
+                        or regenerated["match_count"] != clock["match_count"]
+                        or regenerated["sample_count"] != clock["sample_count"]):
+                    failures.append("D1_W1_BAR_CLOCK_REPORT_NOT_REPRODUCIBLE")
+        # The report does not authenticate a specific broker server, even if
+        # every timestamp happens to match New York's 17:00 convention.
 
     if not isinstance(macro_receipts, dict) or set(macro_receipts) != CURRENCIES:
         failures.append("EIGHT_CURRENCY_MACRO_RECEIPTS_MISSING")
