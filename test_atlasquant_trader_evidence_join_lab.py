@@ -109,7 +109,9 @@ class EvidenceJoinTests(unittest.TestCase):
         self.assertEqual(data["price_calendar_contiguous_claims"], {"D1": True, "W1": True})
         self.assertEqual(data["selective_research_state"],
                          "LAB_INTERNAL_RESEARCH_CANDIDATE_NOT_LIVE")
-        self.assertEqual(len(data["blockers"]), 4)
+        self.assertEqual(len(data["blockers"]), 5)
+        self.assertIn("POLICY_RATE_EXPECTATION_SNAPSHOTS_NOT_SUPPLIED", data["blockers"])
+        self.assertTrue(data["rate_path_research_veto"])
         self.no_live(data)
 
     def test_pair_scope_uses_g8_28_not_index_reinterpretation(self):

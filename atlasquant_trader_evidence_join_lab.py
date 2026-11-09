@@ -13,6 +13,7 @@ from atlasquant_fx_universe import OFFICIAL_PAIRS
 from atlasquant_mt5_backtest_gap_guard_lab import GapGuardError, window_decision
 from atlasquant_mt5_calendar_gap_audit_lab import BAR_SECONDS
 from atlasquant_trader_g8_macro_matrix_pit_lab import inspect_g8_macro_matrix_pit_lab
+from atlasquant_trader_policy_join_veto_lab import inspect_policy_veto_for_fx_join_lab
 from atlasquant_trader_selective_bias_gate_lab import (
     BiasObservation, assess_selective_bias_lab,
 )
@@ -38,6 +39,11 @@ def _result(reason: str, *, asset: str | None = None) -> dict[str, Any]:
         "price_calendar_contiguous_claims": {"D1": False, "W1": False},
         "selective_research_state": None,
         "selective_research_reason": None,
+        "rate_path_research_state": None,
+        "rate_path_research_veto": True,
+        "rate_path_W1_comparison": None,
+        "rate_path_D1_comparison": None,
+        "rate_path_source_independently_authenticated": False,
         "blockers": [],
         "economic_originals_authenticated": False,
         "macro_bilateral_values_comparable": False,
@@ -66,6 +72,7 @@ def inspect_fx_evidence_join_lab(
     macro_decision_at: Any, price_windows: Any, now: Any,
     high_impact_events: Any = (), unverified_event_actual_pending: bool = False,
     last_alert: Any = None, reversal_catalyst_claimed: bool = False,
+    rate_expectations_snapshots_by_horizon: Any = None,
 ) -> dict[str, Any]:
     """Join independently prepared LAB observations without issuing a bias.
 
@@ -100,6 +107,20 @@ def inspect_fx_evidence_join_lab(
             or decisions["W1"] > decisions["D1"]):
         out["reason"] = "MACRO_DECISIONS_AFTER_PRICE_OR_WRONG_ORDER"
         return out
+
+    # New P0 research-only veto: always use W1 and D1 vintages at their
+    # *own* decision cutoffs. Missing snapshots are an explicit blocker.
+    policy = inspect_policy_veto_for_fx_join_lab(
+        candidate=candidate,
+        snapshots_by_horizon=rate_expectations_snapshots_by_horizon,
+        decision_at_by_horizon=decisions,
+        as_of_utc=current,
+    )
+    out["rate_path_research_state"] = policy["state"]
+    out["rate_path_research_veto"] = policy["research_veto"]
+    out["rate_path_W1_comparison"] = policy["W1_comparison"]
+    out["rate_path_D1_comparison"] = policy["D1_comparison"]
+    out["blockers"].extend("POLICY_" + reason for reason in policy["blockers"])
 
     selective = assess_selective_bias_lab(
         candidate, previous_confirmations, holdout_windows, audit_claims,
