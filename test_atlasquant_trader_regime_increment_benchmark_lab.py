@@ -336,5 +336,20 @@ class RegimeIncrementTests(unittest.TestCase):
                          "INVALID_INPUT_SCHEMA_OR_CLOCK")
 
 
+    def test_weekly_dst_boundary_cannot_enter_paired_accuracy(self):
+        cohort = make_cohort(horizon="W1")
+        cases = list(cohort[0])
+        opened = datetime(2024, 3, 3, 22, tzinfo=UTC)
+        cases[0] = replace(cases[0],
+                           target_open_at=opened,
+                           target_close_at=opened+timedelta(days=7),
+                           actual_observed_at=opened+timedelta(days=7, seconds=2))
+        result = eval_cohort((cases, cohort[1], cohort[2]))
+        self.assertEqual(result["reason"],
+                         "W1_NY17_DST_CLOSE_REQUIRES_BROKER_VERIFICATION")
+        self.assertIsNone(result["validated_directional_accuracy"])
+        self.no_live(result)
+
+
 if __name__ == "__main__":
     unittest.main()

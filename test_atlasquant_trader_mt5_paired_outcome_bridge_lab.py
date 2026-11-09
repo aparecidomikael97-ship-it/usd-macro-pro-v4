@@ -289,5 +289,21 @@ class PairedArchiveFixture(unittest.TestCase):
         self.no_live(r)
 
 
+    def test_w1_ny17_dst_uncertainty_blocks_full_paired_scoring(self):
+        opened = datetime(2026, 3, 1, 22, tzinfo=UTC)
+        cases = [replace(h, horizon="W1") for h in self.hypotheses]
+        cases[0] = replace(cases[0], target_open_epoch=int(opened.timestamp()),
+                           prediction_locked_at=opened-timedelta(hours=6),
+                           decided_at=opened-timedelta(hours=4),
+                           regime_observed_at=opened-timedelta(hours=7))
+        result = self.run_bridge(hypotheses=cases)
+        self.assertEqual(result["reason"], "UNRESOLVED_DECLARED_OUTCOME_NO_SUBSETTING")
+        self.assertEqual(result["detail_documentary"],
+                         "W1_NY17_DST_CLOSE_REQUIRES_BROKER_VERIFICATION")
+        self.assertIsNone(result["benchmark"])
+        self.assertEqual(result["resolved_outcomes"], 0)
+        self.no_live(result)
+
+
 if __name__=="__main__":
     unittest.main()

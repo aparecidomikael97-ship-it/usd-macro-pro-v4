@@ -19,6 +19,7 @@ import re
 from typing import Any
 
 from atlasquant_instrument_registry import FX_28
+from atlasquant_trader_w1_ny17_dst_guard_lab import w1_ny17_dst_crossing_lab
 
 SCHEMA = "ATLASQUANT_TRADER_MT5_CLOSED_BAR_OUTCOME_LAB_V1"
 MT5_SCHEMA = "ATLASQUANT_MT5_CLOSED_BARS_LOCAL_LAB_V1"
@@ -175,6 +176,12 @@ def inspect_mt5_closedbar_outcome_lab(
         return out
     if not locked <= decided < opened < closed <= now:
         return out
+    if horizon == "W1":
+        dst_risk = w1_ny17_dst_crossing_lab(opened, closed)
+        if dst_risk is not False:
+            out["reason"] = ("W1_NY17_DST_CLOSE_REQUIRES_BROKER_VERIFICATION"
+                             if dst_risk else "W1_NY_ZONEINFO_MISSING_OR_INVALID")
+            return out
     if horizon == "D1" and target_open_epoch % 86400:
         return out
     if not isinstance(archive_root, (str, Path)):

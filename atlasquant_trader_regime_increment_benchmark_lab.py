@@ -15,6 +15,7 @@ from typing import Any
 import re
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_w1_ny17_dst_guard_lab import w1_ny17_dst_crossing_lab
 
 SCHEMA = "ATLASQUANT_TRADER_REGIME_INCREMENT_PAIRED_OOS_LAB_V1"
 BAR_DURATION = {"D1": timedelta(days=1), "W1": timedelta(days=7)}
@@ -189,6 +190,12 @@ def evaluate_regime_increment_lab(
                 or end - start != BAR_DURATION[horizon]):
             out["reason"] = "POST_EVENT_OR_LOOKAHEAD_OR_INVALID_TARGET_WINDOW"
             return out
+        if horizon == "W1":
+            dst_risk = w1_ny17_dst_crossing_lab(start, end)
+            if dst_risk is not False:
+                out["reason"] = ("W1_NY17_DST_CLOSE_REQUIRES_BROKER_VERIFICATION"
+                                 if dst_risk else "W1_NY_ZONEINFO_MISSING_OR_INVALID")
+                return out
         if (any(not isinstance(s, str) or HEX64.fullmatch(s) is None for s in (
                 c.decision_sha256_claim, c.regime_source_sha256_claim,
                 c.price_source_sha256_claim))):

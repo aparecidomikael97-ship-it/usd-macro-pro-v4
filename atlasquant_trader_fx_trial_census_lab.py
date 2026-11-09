@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_w1_ny17_dst_guard_lab import w1_ny17_dst_crossing_lab
 
 ROSTER_SCHEMA = "ATLASQUANT_FX_TRIAL_ROSTER_LAB_V1"
 CENSUS_SCHEMA = "ATLASQUANT_FX_FROZEN_DIRECTION_CENSUS_LAB_V1"
@@ -118,6 +119,14 @@ def _roster_payload(cohort_id: Any, periods: Any, plan_frozen_at: Any,
         start, end = _clock(item[0]), _clock(item[1])
         if start is None or end is None or not at < start or end - start != DURATIONS[tf]:
             return None, "INVALID_TARGET_WINDOW"
+        if tf == "W1":
+            # Fixed 168-hour weekly closes are not generally correct across
+            # NY DST transitions; do not predeclare a false close timestamp.
+            dst_risk = w1_ny17_dst_crossing_lab(start, end)
+            if dst_risk is None:
+                return None, "W1_NY_ZONEINFO_MISSING_OR_INVALID"
+            if dst_risk:
+                return None, "W1_NY17_DST_CLOSE_REQUIRES_BROKER_VERIFICATION"
         targets[tf] = (start, end)
         openings[tf] = _stamp(start)
     slots = [

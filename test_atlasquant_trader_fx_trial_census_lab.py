@@ -287,5 +287,25 @@ class TrialCensusTests(unittest.TestCase):
         self.safe(out)
 
 
+    def test_weekly_dst_168_hour_target_is_blocked_before_any_decisions(self):
+        examples = (
+            ("2026-03-01T22:00:00+00:00", "2026-02-27T12:00:00+00:00"),
+            ("2026-10-25T21:00:00+00:00", "2026-10-23T12:00:00+00:00"),
+        )
+        for weekly_text, plan_text in examples:
+            with self.subTest(weekly=weekly_text):
+                weekly = datetime.fromisoformat(weekly_text)
+                planned = datetime.fromisoformat(plan_text)
+                schedule = {
+                    "D1": (weekly + timedelta(days=10), weekly + timedelta(days=11)),
+                    "W1": (weekly, weekly + timedelta(days=7)),
+                }
+                outcome = plan(target_windows_by_horizon=schedule, plan_frozen_at=planned)
+                self.assertEqual(outcome["reason"],
+                                 "W1_NY17_DST_CLOSE_REQUIRES_BROKER_VERIFICATION")
+                self.assertIsNone(outcome["frozen"])
+                self.safe(outcome)
+
+
 if __name__ == "__main__":
     unittest.main()

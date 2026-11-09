@@ -286,5 +286,18 @@ class ArchivedOutcomeTests(unittest.TestCase):
         self.blocked(inspect(**self.args(idx=-3)),"CAPTURE_BEFORE_LATEST_CLOSED_BAR")
 
 
+    def test_weekly_ny17_dst_boundary_never_generates_false_label(self):
+        for opened in (datetime(2026, 3, 1, 22, tzinfo=UTC),
+                       datetime(2026, 10, 25, 21, tzinfo=UTC)):
+            with self.subTest(opened=opened):
+                opts = self.args()
+                opts.update(target_open_epoch=int(opened.timestamp()),
+                            decided_at=opened-timedelta(hours=2),
+                            prediction_locked_at=opened-timedelta(hours=3),
+                            as_of_utc=opened+timedelta(days=8))
+                self.blocked(inspect(**opts),
+                             "W1_NY17_DST_CLOSE_REQUIRES_BROKER_VERIFICATION")
+
+
 if __name__ == "__main__":
     unittest.main()
