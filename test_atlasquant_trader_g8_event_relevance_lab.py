@@ -176,6 +176,39 @@ class G8EventRelevanceTests(unittest.TestCase):
         self.assertEqual(route([replace(policy, target_period="2026-02-31")],
                                as_of_utc=BEFORE)["state"], "LAB_EVENT_ROUTER_BLOCKED")
 
+    def test_future_month_cannot_be_assigned_to_earlier_release(self):
+        # The calendar cannot claim a CPI/PCE/NFP/unemployment measurement
+        # for December was scheduled for publication in November.
+        metrics = {
+            "CPI_MOM": "PERCENT_MOM_SA",
+            "CPI_YOY": "PERCENT_YOY_NSA",
+            "PCE_MOM": "PERCENT_MOM_SA",
+            "NFP_CHANGE": "PERSONS_CHANGE_SA",
+            "UNEMPLOYMENT_RATE": "PERCENT_RATE",
+        }
+        for metric, unit in metrics.items():
+            with self.subTest(metric=metric):
+                future = replace(report(), metric=metric, unit=unit,
+                                 target_period="2026-12")
+                result = route([future], as_of_utc=BEFORE)
+                self.assertEqual(result["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(result)
+
+    def test_future_quarter_cannot_be_attached_to_earlier_gdp_release(self):
+        future = replace(report(), metric="GDP_QOQ", unit="PERCENT_QOQ_SA",
+                         target_period="2026-Q4")
+        self.assertEqual(route([future], as_of_utc=BEFORE)["state"],
+                         "LAB_EVENT_ROUTER_BLOCKED")
+        rollover = replace(future, target_period="2027-Q1")
+        self.assertEqual(route([rollover], as_of_utc=BEFORE)["state"],
+                         "LAB_EVENT_ROUTER_BLOCKED")
+
+    def test_same_month_flash_is_documentary_not_source_attestation(self):
+        flash = replace(report(), target_period="2026-11")
+        result = route([flash], as_of_utc=BEFORE)
+        self.assertEqual(result["event_count"], 1)
+        self.no_live(result)
+
     def test_invalid_numbers_are_not_a_surprise(self):
         for bad_number in ("NaN", "Inf", "1e100", "-1e100", "fifty", 0.3, True, ""):
             with self.subTest(value=bad_number):
