@@ -14,6 +14,7 @@ from atlasquant_mt5_backtest_gap_guard_lab import GapGuardError, window_decision
 from atlasquant_mt5_calendar_gap_audit_lab import BAR_SECONDS
 from atlasquant_trader_g8_macro_matrix_pit_lab import inspect_g8_macro_matrix_pit_lab
 from atlasquant_trader_policy_join_veto_lab import inspect_policy_veto_for_fx_join_lab
+from atlasquant_trader_economic_surprise_veto_lab import inspect_economic_surprise_veto_lab
 from atlasquant_trader_selective_bias_gate_lab import (
     BiasObservation, assess_selective_bias_lab,
 )
@@ -44,6 +45,11 @@ def _result(reason: str, *, asset: str | None = None) -> dict[str, Any]:
         "rate_path_W1_comparison": None,
         "rate_path_D1_comparison": None,
         "rate_path_source_independently_authenticated": False,
+        "news_surprise_research_state": None,
+        "news_surprise_research_veto": True,
+        "news_surprise_W1_events": [],
+        "news_surprise_D1_events": [],
+        "news_surprise_originals_independently_authenticated": False,
         "blockers": [],
         "economic_originals_authenticated": False,
         "macro_bilateral_values_comparable": False,
@@ -73,6 +79,8 @@ def inspect_fx_evidence_join_lab(
     high_impact_events: Any = (), unverified_event_actual_pending: bool = False,
     last_alert: Any = None, reversal_catalyst_claimed: bool = False,
     rate_expectations_snapshots_by_horizon: Any = None,
+    news_events_by_horizon: Any = None,
+    news_macro_captured_at_by_horizon: Any = None,
 ) -> dict[str, Any]:
     """Join independently prepared LAB observations without issuing a bias.
 
@@ -121,6 +129,21 @@ def inspect_fx_evidence_join_lab(
     out["rate_path_W1_comparison"] = policy["W1_comparison"]
     out["rate_path_D1_comparison"] = policy["D1_comparison"]
     out["blockers"].extend("POLICY_" + reason for reason in policy["blockers"])
+
+    # P0: no interpretation of CPI/NFP arithmetic as an automatic currency
+    # direction. W1 and D1 use separate as-of event and macro snapshots.
+    surprise = inspect_economic_surprise_veto_lab(
+        candidate=candidate,
+        events_by_horizon=news_events_by_horizon,
+        decision_at_by_horizon=decisions,
+        macro_captured_at_by_horizon=news_macro_captured_at_by_horizon,
+        as_of_utc=current,
+    )
+    out["news_surprise_research_state"] = surprise["state"]
+    out["news_surprise_research_veto"] = surprise["research_veto"]
+    out["news_surprise_W1_events"] = surprise["W1_events"]
+    out["news_surprise_D1_events"] = surprise["D1_events"]
+    out["blockers"].extend("NEWS_" + reason for reason in surprise["blockers"])
 
     selective = assess_selective_bias_lab(
         candidate, previous_confirmations, holdout_windows, audit_claims,

@@ -5,6 +5,7 @@ import unittest
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_evidence_join_lab import inspect_fx_evidence_join_lab as join
+from atlasquant_trader_g8_event_relevance_lab import EventSnapshot
 from atlasquant_trader_selective_bias_gate_lab import (
     BiasObservation, HoldoutWindow, SelectiveAuditClaims,
 )
@@ -109,7 +110,9 @@ class EvidenceJoinTests(unittest.TestCase):
         self.assertEqual(data["price_calendar_contiguous_claims"], {"D1": True, "W1": True})
         self.assertEqual(data["selective_research_state"],
                          "LAB_INTERNAL_RESEARCH_CANDIDATE_NOT_LIVE")
-        self.assertEqual(len(data["blockers"]), 5)
+        self.assertEqual(len(data["blockers"]), 6)
+        self.assertIn("NEWS_ECONOMIC_EVENT_SNAPSHOTS_NOT_SUPPLIED", data["blockers"])
+        self.assertTrue(data["news_surprise_research_veto"])
         self.assertIn("POLICY_RATE_EXPECTATION_SNAPSHOTS_NOT_SUPPLIED", data["blockers"])
         self.assertTrue(data["rate_path_research_veto"])
         self.no_live(data)
@@ -220,6 +223,68 @@ class EvidenceJoinTests(unittest.TestCase):
                          "INVALID_HORIZON_OR_LAYER_INPUTS")
         self.assertEqual(self.case(candidate(when=NOW + timedelta(seconds=1)))["reason"],
                          "FUTURE_OR_INVALID_CANDIDATE")
+
+
+    def test_high_impact_surprise_is_an_explicit_d1_veto_not_currency_direction(self):
+        release = datetime(2026, 11, 4, 13, 30, tzinfo=UTC)
+        pre = EventSnapshot(
+            event_id="US_CPI_2026_10", currency="USD", metric="CPI_MOM",
+            target_period="2026-10", unit="PERCENT_MOM_SA", importance="HIGH",
+            scheduled_release_at=release,
+            calendar_captured_at=datetime(2026, 11, 2, 10, tzinfo=UTC),
+            consensus_value="0.3",
+            consensus_captured_at=datetime(2026, 11, 2, 11, tzinfo=UTC),
+        )
+        post = replace(
+            pre, actual_value="0.4", actual_published_at=release,
+            actual_captured_at=release + timedelta(minutes=1),
+        )
+        kwargs = {
+            "news_events_by_horizon": {"W1": [pre], "D1": [post]},
+            "news_macro_captured_at_by_horizon": {
+                "W1": datetime(2026, 11, 3, 10, tzinfo=UTC),
+                "D1": datetime(2026, 11, 4, 15, tzinfo=UTC),
+            },
+        }
+        result = self.case(**kwargs)
+        self.assertTrue(result["news_surprise_research_veto"])
+        self.assertIn("NEWS_D1_SURPRISE_DIRECTION_NOT_INTERPRETED_OR_VALIDATED",
+                      result["blockers"])
+        self.assertEqual(result["news_surprise_D1_events"][0]["surprise_documentary"],
+                         "0.1")
+        self.assertIsNone(result["news_surprise_D1_events"][0]["directional_fx_impact"])
+        self.no_live(result)
+
+        no_surprise = self.case(**{**kwargs, "news_events_by_horizon": {
+            "W1": [pre], "D1": [replace(post, actual_value="0.3")]}})
+        self.assertFalse(no_surprise["news_surprise_research_veto"])
+        self.assertEqual(no_surprise["news_surprise_research_state"],
+                         "LAB_SURPRISE_NO_DOCUMENTARY_VETO_NO_GO")
+        self.no_live(no_surprise)
+
+    def test_news_actual_from_daily_cannot_leak_to_weekly_cutoff(self):
+        release = datetime(2026, 11, 4, 13, 30, tzinfo=UTC)
+        event = EventSnapshot(
+            event_id="US_CPI_2026_10", currency="USD", metric="CPI_MOM",
+            target_period="2026-10", unit="PERCENT_MOM_SA", importance="HIGH",
+            scheduled_release_at=release,
+            calendar_captured_at=datetime(2026, 11, 2, 10, tzinfo=UTC),
+            consensus_value="0.3",
+            consensus_captured_at=datetime(2026, 11, 2, 11, tzinfo=UTC),
+            actual_value="0.4", actual_published_at=release,
+            actual_captured_at=release + timedelta(minutes=1),
+        )
+        result = self.case(
+            news_events_by_horizon={"W1": [event], "D1": [event]},
+            news_macro_captured_at_by_horizon={
+                "W1": datetime(2026, 11, 3, 10, tzinfo=UTC),
+                "D1": datetime(2026, 11, 4, 15, tzinfo=UTC),
+            },
+        )
+        self.assertIn("NEWS_W1_EVENT_ROUTE_REJECTED_FUTURE_OR_INVALID",
+                      result["blockers"])
+        self.assertTrue(result["news_surprise_research_veto"])
+        self.no_live(result)
 
 
 if __name__ == "__main__":
