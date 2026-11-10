@@ -128,14 +128,21 @@ def _value(raw: Any) -> Decimal | None:
 def _observation_period(raw: Any, *, indicator: str, published: datetime) -> tuple[str, int] | None:
     """Normalize a monthly or CPI-only quarterly period without inventing dates.
 
-    Quarterly observations need a completed quarter before their announced
-    value can plausibly be known. The publication itself still needs separate
-    independent evidence to become eligible for ex-ante use.
+    Monthly CPI requires a *completed* reference month here. A same-month CPI
+    may be a genuine flash estimate, but this schema has no flash/final or
+    issuer-vintage proof. Exclude it instead of silently treating it as the
+    final monthly reading. Policy rates may be announced within their month.
+    Quarterly CPI likewise requires a completed reference quarter. Even a
+    structurally plausible date still needs independently attested publication.
     """
     if not isinstance(raw, str):
         return None
     if MONTH.fullmatch(raw):
-        return ("MONTHLY", FRESH_DAYS[indicator]) if raw <= published.strftime("%Y-%m") else None
+        period = (int(raw[:4]), int(raw[5:7]))
+        publication_month = (published.year, published.month)
+        if period > publication_month or (indicator == "CPI_YOY" and period == publication_month):
+            return None
+        return "MONTHLY", FRESH_DAYS[indicator]
     match = QUARTER.fullmatch(raw)
     if match is None or indicator != "CPI_YOY":
         return None
