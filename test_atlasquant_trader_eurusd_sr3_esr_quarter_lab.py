@@ -59,6 +59,7 @@ class SR3ESRQuarterTests(unittest.TestCase):
         r = self.get()
         self.assertEqual(r["state"], "LAB_SR3_ESR_MATCHED_QUARTER_NOT_AUTHENTICATED")
         self.assertTrue(r["both_claimed_quotes_same_quarter"])
+        self.assertTrue(r["both_claimed_vintage_dates_and_kinds_aligned"])
         self.assertEqual(r["evidence_by_currency"]["USD"]["imm_reference_end_exclusive"], "2026-12-16")
         self.assertEqual(r["evidence_by_currency"]["USD"]["claimed_underlying_rate_change_bps"], "2.00")
         self.assertEqual(r["evidence_by_currency"]["EUR"]["claimed_underlying_rate_change_bps"], "-3.00")
@@ -127,6 +128,65 @@ class SR3ESRQuarterTests(unittest.TestCase):
         self.assertEqual(self.get(q)["evidence_by_currency"]["EUR"]["status"],
                          "SELF_CLAIMED_VINTAGES_ONLY_NOT_AUTHENTICATED")
         r = self.get(q)
+        self.assertFalse(r["both_claimed_quotes_same_quarter"])
+        self.assert_no_trade(r)
+
+    def test_mismatched_old_trade_dates_not_same_comparison_window(self):
+        # Previous guard matched only latest trade dates; this false-positive
+        # would compare unequal intervals in USD and EUR.
+        q = dataset()
+        q["EUR"][0] = replace(q["EUR"][0],
+            trade_date=date(2026, 11, 12),
+            observed_at_utc=D1 + timedelta(days=1),
+            published_at_utc=D1 + timedelta(days=1, minutes=10),
+            captured_at_utc=D1 + timedelta(days=1, minutes=20))
+        r = self.get(q)
+        self.assertEqual(r["evidence_by_currency"]["EUR"]["status"],
+                         "SELF_CLAIMED_VINTAGES_ONLY_NOT_AUTHENTICATED")
+        self.assertFalse(r["both_claimed_quotes_same_quarter"])
+        self.assertFalse(r["both_claimed_vintage_dates_and_kinds_aligned"])
+        self.assert_no_trade(r)
+
+    def test_mixed_trade_and_settlement_within_one_currency_rejected(self):
+        # Both quotes may be individually time-plausible, yet mixing an
+        # exchange settlement with a last trade is not a comparable delta.
+        q = dataset()
+        q["EUR"][0] = replace(q["EUR"][0],
+            quote_kind="SETTLEMENT",
+            settlement_publication_channel="CME_PUBLIC_WEBSITE_SETTLEMENT",
+            published_at_utc=datetime(2026, 11, 12, 6, 10, tzinfo=UTC),
+            captured_at_utc=datetime(2026, 11, 12, 6, 20, tzinfo=UTC))
+        r = self.get(q)
+        self.assertEqual(r["evidence_by_currency"]["EUR"]["status"], "CLAIMS_INVALID_OR_UNAVAILABLE")
+        self.assertFalse(r["both_claimed_quotes_same_quarter"])
+        self.assert_no_trade(r)
+
+    def test_mixed_trade_and_settlement_between_currencies_not_aligned(self):
+        q = dataset()
+        q["EUR"] = [
+            replace(q["EUR"][0], quote_kind="SETTLEMENT",
+                settlement_publication_channel="CME_PUBLIC_WEBSITE_SETTLEMENT",
+                published_at_utc=datetime(2026, 11, 12, 6, 10, tzinfo=UTC),
+                captured_at_utc=datetime(2026, 11, 12, 6, 20, tzinfo=UTC)),
+            replace(q["EUR"][1], quote_kind="SETTLEMENT",
+                settlement_publication_channel="CME_PUBLIC_WEBSITE_SETTLEMENT",
+                trade_date=date(2026, 11, 12),
+                observed_at_utc=datetime(2026, 11, 12, 15, tzinfo=UTC),
+                published_at_utc=datetime(2026, 11, 13, 6, 10, tzinfo=UTC),
+                captured_at_utc=datetime(2026, 11, 13, 6, 20, tzinfo=UTC)),
+        ]
+        # Align USD dates to isolate kind mismatch; no price signal allowed.
+        q["USD"][1] = replace(q["USD"][1],
+            trade_date=date(2026, 11, 12),
+            observed_at_utc=datetime(2026, 11, 12, 15, tzinfo=UTC),
+            published_at_utc=datetime(2026, 11, 12, 15, 10, tzinfo=UTC),
+            captured_at_utc=datetime(2026, 11, 12, 15, 20, tzinfo=UTC))
+        r = self.get(q)
+        self.assertEqual(r["evidence_by_currency"]["USD"]["status"],
+                         "SELF_CLAIMED_VINTAGES_ONLY_NOT_AUTHENTICATED")
+        self.assertEqual(r["evidence_by_currency"]["EUR"]["status"],
+                         "SELF_CLAIMED_VINTAGES_ONLY_NOT_AUTHENTICATED")
+        self.assertFalse(r["both_claimed_vintage_dates_and_kinds_aligned"])
         self.assertFalse(r["both_claimed_quotes_same_quarter"])
         self.assert_no_trade(r)
 
