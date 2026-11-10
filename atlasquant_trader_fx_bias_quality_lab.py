@@ -18,7 +18,7 @@ from atlasquant_fx_universe import OFFICIAL_PAIRS
 SCHEMA = "ATLASQUANT_TRADER_FX_BIAS_QUALITY_ABSTENTION_LAB_V1"
 HORIZONS = ("D1", "W1", "M1")
 SIDES = ("UP", "DOWN", "ABSTAIN")
-MIN_INDEPENDENT_SIGNALS_FOR_INTERVAL = 100
+MIN_EMITTED_TRIALS_FOR_DESCRIPTIVE_INTERVAL = 100
 _ID = re.compile(r"[A-Z0-9][A-Z0-9_-]{2,63}\Z")
 _PRICE = re.compile(r"[0-9]{1,9}(?:\.[0-9]{1,8})?\Z")
 
@@ -50,7 +50,9 @@ def _blocked(reason: str) -> dict[str, Any]:
         "research_claim_only_coverage_pct": None,
         "research_claim_only_wilson_lower_95_pct": None,
         "research_claim_only_lower_bound_at_least_80pct": False,
+        "minimum_emitted_sample_size_reached": False,
         "minimum_independent_signal_sample_reached": False,
+        "wilson_iid_assumption_verified": False,
         "features_independently_point_in_time_verified": False,
         "broker_prices_independently_verified": False,
         "outcomes_independently_verified": False,
@@ -153,7 +155,7 @@ def inspect_fx_bias_quality_claims_lab(
     misses = emitted - hits
     coverage = round(100 * emitted / opportunities, 2)
     hit_rate = round(100 * hits / emitted, 2) if emitted else None
-    sample_reached = emitted >= MIN_INDEPENDENT_SIGNALS_FOR_INTERVAL
+    sample_reached = emitted >= MIN_EMITTED_TRIALS_FOR_DESCRIPTIVE_INTERVAL
     wilson = (round(100 * _wilson_lower(hits, emitted), 2)
               if sample_reached else None)
     out.update({
@@ -166,7 +168,10 @@ def inspect_fx_bias_quality_claims_lab(
         "neutral_forward_outcomes_counted_as_misses": neutral_misses,
         "research_claim_only_hit_rate_pct": hit_rate,
         "research_claim_only_coverage_pct": coverage,
-        "minimum_independent_signal_sample_reached": sample_reached,
+        "minimum_emitted_sample_size_reached": sample_reached,
+        # Non-overlapping FX outcomes can still share economic shocks/regimes.
+        # Neither a trial count nor a Wilson calculation proves independence.
+        "minimum_independent_signal_sample_reached": False,
         "research_claim_only_wilson_lower_95_pct": wilson,
         "research_claim_only_lower_bound_at_least_80pct": (
             wilson is not None and wilson >= 80),
