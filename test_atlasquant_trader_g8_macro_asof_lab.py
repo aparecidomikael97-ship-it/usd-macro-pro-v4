@@ -323,6 +323,104 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(result["selected_observations"]["EUR"]["POLICY_RATE"]["observation_period"], "2026-11")
         self.assert_no_go(result)
 
+    def test_typed_same_month_flash_is_documentary_not_final_cpi_coverage(self):
+        data = sample()
+        data["records"][0].update(
+            observation_period="2026-10", publication_stage="FLASH",
+            published_at_utc="2026-10-29T12:00:00Z",
+            captured_at_utc="2026-10-29T12:05:00Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(result["missing_or_stale"],
+                         ["EUR:CPI_YOY:FLASH_ONLY_UNATTESTED"])
+        self.assertNotIn("CPI_YOY", result["selected_observations"]["EUR"])
+        self.assert_no_go(result)
+
+    def test_flash_followed_by_final_same_month_is_two_distinct_stages(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10", value="2.1",
+                       published="2026-10-29T12:00:00Z",
+                       captured="2026-10-29T12:05:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10", value="2.2",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-02T12:05:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(result["records_seen"], 6)
+        selected = result["selected_observations"]["EUR"]["CPI_YOY"]
+        self.assertEqual(selected["observation_period"], "2026-10")
+        self.assertEqual(selected["publication_stage_claim"], "FINAL")
+        self.assertNotIn("value", selected)
+        self.assert_no_go(result)
+
+    def test_reversed_flash_final_chronology_rejects_entire_pair(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-03T12:00:00Z",
+                       captured="2026-11-03T12:05:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-02T12:05:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["reason"], "PUBLICATION_STAGE_ORDER_AMBIGUOUS")
+        self.assert_no_go(result)
+
+    def test_flash_captured_after_final_cannot_fake_prior_local_visibility(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-10-29T12:00:00Z",
+                       captured="2026-11-04T12:00:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-03T12:00:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["reason"], "PUBLICATION_STAGE_ORDER_AMBIGUOUS")
+        self.assert_no_go(result)
+
+    def test_equal_capture_clocks_do_not_establish_flash_first_seen_order(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-10-29T12:00:00Z",
+                       captured="2026-11-03T12:00:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-03T12:00:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["reason"], "PUBLICATION_STAGE_ORDER_AMBIGUOUS")
+        self.assert_no_go(result)
+
+    def test_revision_requires_historical_vintage_not_a_caller_label(self):
+        data = sample()
+        data["records"][0]["publication_stage"] = "REVISION"
+        result = run(data)
+        self.assertEqual(result["reason"], "REVISION_VINTAGE_UNATTESTED")
+        self.assert_no_go(result)
+
+    def test_wrong_or_untyped_stage_never_becomes_official_cpi(self):
+        for indicator, stage in (("CPI_YOY", "POLICY_DECISION"),
+                                 ("POLICY_RATE", "FLASH"),
+                                 ("CPI_YOY", ["FINAL"]),
+                                 ("CPI_YOY", "REVISED_2026")):
+            with self.subTest(indicator=indicator, stage=stage):
+                data = sample()
+                row = next(x for x in data["records"] if x["indicator"] == indicator)
+                row["publication_stage"] = stage
+                result = run(data)
+                self.assertEqual(result["reason"], "INDICATOR_PUBLICATION_STAGE_INVALID")
+                self.assert_no_go(result)
+
     def test_unknown_indicator_source_and_hash_rejected(self):
         for column, bad in (("indicator", "PREDICTION"),
                             ("source_type", "RUMOR"),
