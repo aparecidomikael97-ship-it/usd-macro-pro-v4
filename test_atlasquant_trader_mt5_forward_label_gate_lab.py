@@ -121,6 +121,20 @@ class Mt5ForwardLabelGateLabTests(unittest.TestCase):
             self.assertEqual(result["observed_price_direction_only"], expected)
             self.always_no_go(result)
 
+    def test_next_bar_body_can_disagree_with_close_to_close_gap(self):
+        m, b, epochs = fixture(overrides={
+            100: {"open": "1.02", "close": "1.02", "high": "1.03", "low": "1.00"},
+            101: {"open": "1.00", "close": "1.01", "high": "1.02", "low": "0.99"},
+        })
+        result = run(manifest=m, packed=b,
+                     epoch_start=epochs[100], epoch_end=epochs[101])
+        self.assertEqual(result["state"],
+                         "LAB_MT5_FORWARD_PRICE_LABEL_DOCUMENTARY_UNATTESTED")
+        self.assertEqual(result["observed_price_direction_only"], "DOWN")
+        self.assertEqual(result["observed_exit_bar_body_direction_only"], "UP")
+        self.assertEqual(result["exit_bar_open_to_close_bps_documentary"], "100.0000")
+        self.always_no_go(result)
+
     def test_manifests_cannot_change_pair_or_approved_timeframe(self):
         m, b, epochs = fixture()
         for field, bad in (("symbol", "USDJPY"), ("timeframe", "W1"),
