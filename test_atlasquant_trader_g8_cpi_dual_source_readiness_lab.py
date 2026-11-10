@@ -14,6 +14,14 @@ from test_atlasquant_trader_us_bls_cpi_yoy_snapshot_lab import data_row, payload
 AFTER = datetime(2026, 11, 10, 3, 0, tzinfo=timezone.utc)
 BEFORE = datetime(2026, 11, 9, 23, 59, tzinfo=timezone.utc)
 LATER = datetime(2026, 11, 11, 4, 0, tzinfo=timezone.utc)
+AFTER_OCTOBER_RELEASE = datetime(2026, 11, 10, 14, 0, tzinfo=timezone.utc)
+
+
+def postrelease_october_receipt(raw):
+    rec = receipt(raw)
+    rec["local_started_utc_claim"] = "2026-11-10T13:30:00Z"
+    rec["local_finished_utc_claim"] = "2026-11-10T13:30:00Z"
+    return rec
 
 
 def run(*, docs=None, raw=None, rec=None, month="2026-09", horizon="D1",
@@ -78,8 +86,13 @@ class DualSourceCPIReadinessLabTests(unittest.TestCase):
         # BLS 10 Nov 2026 October release: Oct 2025 CPI-U index unavailable.
         # Matching the EUR reference month must not hide this missing year-ago value.
         raw = payload([data_row(2026, 10, "320"), data_row(2025, 10, "310")])
-        r = run(raw=raw, month="2026-10")
+        r = run(raw=raw, rec=postrelease_october_receipt(raw),
+                month="2026-10", decision=AFTER_OCTOBER_RELEASE)
         self.blocked(r, "USD_BLS_BYTES_RECEIPT_OR_PERIOD_INVALID")
+
+    def test_october_2026_receipt_claim_before_0830_est_is_not_eligible(self):
+        self.blocked(run(month="2026-10", decision=AFTER_OCTOBER_RELEASE),
+                     "USD_CAPTURE_CLAIM_BEFORE_KNOWN_BLS_RELEASE")
 
     def test_after_cutoff_capture_is_blocked_not_backfilled(self):
         self.blocked(run(decision=BEFORE), "USD_CAPTURE_AFTER_DECISION_NO_LOOKAHEAD")
@@ -91,7 +104,9 @@ class DualSourceCPIReadinessLabTests(unittest.TestCase):
                              "USD_MONTHLY_OBSERVATION_NOT_YET_ENDED_AT_DECISION")
 
     def test_missing_homologous_index_level_blocks_even_with_hash(self):
-        r = run(month="2026-10")
+        raw = payload()
+        r = run(raw=raw, rec=postrelease_october_receipt(raw),
+                month="2026-10", decision=AFTER_OCTOBER_RELEASE)
         self.blocked(r, "USD_BLS_BYTES_RECEIPT_OR_PERIOD_INVALID")
 
     def test_api_hash_tampering_or_wrong_source_refuses(self):

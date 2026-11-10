@@ -88,9 +88,12 @@ def inspect_g8_cpi_dual_source_readiness_lab(
         reference_period=usd_reference_period,
         decision_at_utc=decision, evaluated_at_utc=evaluated)
     if bls["state"] != "LAB_BLS_CAPTURE_SELF_CONSISTENT_AND_NONFUTURE_UNATTESTED":
-        out["reason"] = ("USD_CAPTURE_AFTER_DECISION_NO_LOOKAHEAD"
-                         if bls["state"] == "LAB_BLS_CAPTURE_NOT_VISIBLE_AT_DECISION"
-                         else "USD_BLS_BYTES_RECEIPT_OR_PERIOD_INVALID")
+        out["reason"] = (
+            "USD_CAPTURE_AFTER_DECISION_NO_LOOKAHEAD"
+            if bls["state"] == "LAB_BLS_CAPTURE_NOT_VISIBLE_AT_DECISION"
+            else "USD_CAPTURE_CLAIM_BEFORE_KNOWN_BLS_RELEASE"
+            if bls["state"] == "LAB_BLS_CAPTURE_CLAIM_PRECEDES_OFFICIAL_RELEASE"
+            else "USD_BLS_BYTES_RECEIPT_OR_PERIOD_INVALID")
         return out
 
     eur_present = "EUR" in eur_coverage["documented_currencies"]

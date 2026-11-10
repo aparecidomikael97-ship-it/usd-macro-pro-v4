@@ -29,12 +29,23 @@ _RECEIPT_FIELDS = frozenset((
     "collector_clock_independently_authenticated",
 ))
 
+# Verified publication embargo boundaries, not proofs of contemporaneous API
+# capture. Oct 14 was EDT (UTC-04); Nov 10 was EST (UTC-05). Keep this
+# deliberately narrow: an unverified release date must not be invented.
+# https://www.bls.gov/news.release/archives/cpi_10142026.htm
+# https://www.bls.gov/news.release/archives/cpi_11102026.htm
+KNOWN_BLS_CPI_RELEASE_FLOORS_UTC = {
+    "2026-09": datetime(2026, 10, 14, 12, 30, tzinfo=timezone.utc),
+    "2026-10": datetime(2026, 11, 10, 13, 30, tzinfo=timezone.utc),
+}
+
 
 def _blocked(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "LAB_BLS_ASOF_BLOCKED", "reason": reason,
         "reference_period": None, "decision_at_utc": None,
         "capture_finished_utc_claim": None, "body_sha256": None,
+        "known_bls_release_floor_utc": None,
         "derived_yoy_percent": None, "local_body_hash_self_consistent": False,
         "source_origin_independently_authenticated": False,
         "publisher_first_release_authenticated": False,
@@ -110,6 +121,17 @@ def inspect_bls_cpi_claimed_snapshot_asof_lab(
             "decision_at_utc": decision.isoformat(),
         })
         return out
+    floor = (KNOWN_BLS_CPI_RELEASE_FLOORS_UTC.get(reference_period)
+             if isinstance(reference_period, str) else None)
+    if floor is not None and (finished < floor or decision < floor):
+        out.update({
+            "state": "LAB_BLS_CAPTURE_CLAIM_PRECEDES_OFFICIAL_RELEASE",
+            "reason": "KNOWN_BLS_CPI_RELEASE_FLOOR_NOT_REACHED",
+            "reference_period": reference_period,
+            "decision_at_utc": decision.isoformat(),
+            "known_bls_release_floor_utc": floor.isoformat(),
+        })
+        return out
     parsed = interpret_bls_cpi_u_snapshot_lab(
         raw_response, reference_period=reference_period)
     if parsed["state"] != "LAB_BLS_CPI_U_DERIVED_YOY_FROM_MUTABLE_API_BYTES_UNATTESTED":
@@ -121,6 +143,7 @@ def inspect_bls_cpi_claimed_snapshot_asof_lab(
         "reference_period": reference_period,
         "decision_at_utc": decision.isoformat(),
         "capture_finished_utc_claim": receipt["local_finished_utc_claim"],
+        "known_bls_release_floor_utc": floor.isoformat() if floor else None,
         "body_sha256": receipt["body_sha256"],
         "local_body_hash_self_consistent": True,
         "derived_yoy_percent": parsed["derived_yoy_percent"],
@@ -128,4 +151,5 @@ def inspect_bls_cpi_claimed_snapshot_asof_lab(
     return out
 
 
-__all__ = ["SCHEMA", "RECEIPT_SCHEMA", "inspect_bls_cpi_claimed_snapshot_asof_lab"]
+__all__ = ["SCHEMA", "RECEIPT_SCHEMA", "KNOWN_BLS_CPI_RELEASE_FLOORS_UTC",
+           "inspect_bls_cpi_claimed_snapshot_asof_lab"]

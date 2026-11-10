@@ -5,7 +5,8 @@ from hashlib import sha256
 import unittest
 
 from atlasquant_trader_us_bls_cpi_snapshot_asof_lab import (
-    RECEIPT_SCHEMA, inspect_bls_cpi_claimed_snapshot_asof_lab as inspect,
+    RECEIPT_SCHEMA, KNOWN_BLS_CPI_RELEASE_FLOORS_UTC,
+    inspect_bls_cpi_claimed_snapshot_asof_lab as inspect,
 )
 from atlasquant_trader_us_bls_cpi_yoy_snapshot_lab import SOURCE_URL_CLAIM
 from test_atlasquant_trader_us_bls_cpi_yoy_snapshot_lab import payload
@@ -61,7 +62,58 @@ class BLSAsOfLabTests(unittest.TestCase):
         self.assertEqual(x["derived_yoy_percent"], "5.000")
         self.assertTrue(x["local_body_hash_self_consistent"])
         self.assertEqual(x["body_sha256"], sha256(raw).hexdigest())
+        self.assertEqual(x["known_bls_release_floor_utc"],
+                         "2026-10-14T12:30:00+00:00")
         self.no_go(x)
+
+    def test_september_2026_fake_early_capture_not_rescued_by_later_decision(self):
+        raw = payload()
+        for claimed_time in ("2026-10-01T12:00:00Z",
+                             "2026-10-14T12:29:59Z"):
+            with self.subTest(claimed_time=claimed_time):
+                rec = receipt(raw)
+                rec["local_started_utc_claim"] = claimed_time
+                rec["local_finished_utc_claim"] = claimed_time
+                result = call(raw, rec, at=AFTER)
+                self.assertEqual(result["state"],
+                                 "LAB_BLS_CAPTURE_CLAIM_PRECEDES_OFFICIAL_RELEASE")
+                self.assertEqual(result["reason"],
+                                 "KNOWN_BLS_CPI_RELEASE_FLOOR_NOT_REACHED")
+                self.assertIsNone(result["derived_yoy_percent"])
+                self.no_go(result)
+
+    def test_september_2026_release_at_0830_edt_is_1230_utc(self):
+        release = KNOWN_BLS_CPI_RELEASE_FLOORS_UTC["2026-09"]
+        self.assertEqual(release.isoformat(), "2026-10-14T12:30:00+00:00")
+        raw = payload()
+        rec = receipt(raw)
+        rec["local_started_utc_claim"] = "2026-10-14T12:30:00Z"
+        rec["local_finished_utc_claim"] = "2026-10-14T12:30:00Z"
+        result = call(raw, rec, at=release)
+        self.assertEqual(result["state"],
+                         "LAB_BLS_CAPTURE_SELF_CONSISTENT_AND_NONFUTURE_UNATTESTED")
+        self.no_go(result)
+
+    def test_october_2026_release_at_0830_est_is_1330_utc(self):
+        release = KNOWN_BLS_CPI_RELEASE_FLOORS_UTC["2026-10"]
+        self.assertEqual(release.isoformat(), "2026-11-10T13:30:00+00:00")
+        # The October 2025 CPI-U year-ago index is officially unavailable.
+        # The publication fence is independent of that separate arithmetic veto.
+        raw = payload()
+        rec = receipt(raw)
+        rec["local_started_utc_claim"] = "2026-11-10T13:29:59Z"
+        rec["local_finished_utc_claim"] = "2026-11-10T13:29:59Z"
+        result = call(raw, rec, at=release, period="2026-10")
+        self.assertEqual(result["state"],
+                         "LAB_BLS_CAPTURE_CLAIM_PRECEDES_OFFICIAL_RELEASE")
+        self.no_go(result)
+
+        rec["local_started_utc_claim"] = "2026-11-10T13:30:00Z"
+        rec["local_finished_utc_claim"] = "2026-11-10T13:30:00Z"
+        result = call(raw, rec, at=release, period="2026-10")
+        self.assertEqual(result["reason"],
+                         "BLS_INDEX_RESPONSE_INVALID_OR_TARGET_MONTH_UNAVAILABLE")
+        self.no_go(result)
 
     def test_capture_after_historical_decision_hides_derived_number(self):
         x = call(payload(), at=BEFORE)
@@ -133,10 +185,20 @@ class BLSAsOfLabTests(unittest.TestCase):
                 self.no_go(x)
 
     def test_missing_t_minus_12_rejects_even_with_valid_hash(self):
-        x = call(payload(), period="2026-10")
+        raw = payload()
+        rec = receipt(raw)
+        rec["local_started_utc_claim"] = "2026-11-10T13:30:00Z"
+        rec["local_finished_utc_claim"] = "2026-11-10T13:30:00Z"
+        x = call(raw, rec, period="2026-10",
+                 at=datetime(2026, 11, 10, 13, 31, tzinfo=timezone.utc))
         self.assertEqual(x["reason"], "BLS_INDEX_RESPONSE_INVALID_OR_TARGET_MONTH_UNAVAILABLE")
         self.assertIsNone(x["derived_yoy_percent"])
         self.no_go(x)
+
+    def test_unhashable_reference_period_fails_closed_without_exception(self):
+        result = call(payload(), period={"month": "2026-09"})
+        self.assertEqual(result["state"], "LAB_BLS_ASOF_BLOCKED")
+        self.no_go(result)
 
     def test_original_input_and_receipt_not_mutated(self):
         raw = payload()
