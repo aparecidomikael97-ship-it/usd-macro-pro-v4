@@ -66,6 +66,20 @@ CPI_ISSUER_HOSTS = {
 # frequency and policy can be independently inspected and versioned.
 CPI_FREQUENCY_2026_LAB = {cur: ("QUARTERLY" if cur == "NZD" else "MONTHLY")
                           for cur in CURRENCIES}
+# Manually verified retrospective publication boundaries for specific issuer
+# CPI reference periods, not historical archived bytes or trusted first
+# availability. A next-UTC-day date-only floor is deliberately conservative.
+# Explicit stages matter: Sep EUR final is not its earlier FLASH release.
+# There is no vetted Oct EUR FINAL floor in this narrow catalog.
+CPI_2026_NON_US_RELEASE_FLOORS_UTC = {
+    ("AUD", "2026-09"): datetime(2026, 10, 28, 0, 30, tzinfo=timezone.utc),
+    ("CAD", "2026-09"): datetime(2026, 10, 20, 0, 0, tzinfo=timezone.utc),
+    ("EUR", "2026-09"): datetime(2026, 10, 17, 0, 0, tzinfo=timezone.utc),
+    ("GBP", "2026-09"): datetime(2026, 10, 21, 6, 0, tzinfo=timezone.utc),
+    ("JPY", "2026-09"): datetime(2026, 10, 24, 0, 0, tzinfo=timezone.utc),
+    ("NZD", "2026-Q3"): datetime(2026, 10, 21, 21, 45, tzinfo=timezone.utc),
+    ("CHF", "2026-10"): datetime(2026, 11, 4, 0, 0, tzinfo=timezone.utc),
+}
 ENVELOPE_FIELDS = frozenset(("schema", "pair", "decision_at_utc", "records"))
 RECORD_FIELDS = frozenset((
     "currency", "indicator", "observation_period", "value",
@@ -319,6 +333,16 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                                                or captured < official_floor):
                 out["reason"] = "USD_CPI_CLAIM_BEFORE_KNOWN_BLS_RELEASE"
                 return out
+        if indicator == "CPI_YOY" and cur != "USD":
+            period = row["observation_period"]
+            known_floor = CPI_2026_NON_US_RELEASE_FLOORS_UTC.get((cur, period))
+            # EUR's September FLASH preceded the final-release date.
+            if cur == "EUR" and period == "2026-09" and stage == "FLASH":
+                known_floor = None
+            if known_floor is not None and (pub < known_floor
+                                            or captured < known_floor):
+                out["reason"] = "CPI_CLAIM_BEFORE_KNOWN_ISSUER_RELEASE_BOUNDARY"
+                return out
         if indicator == "CPI_YOY" and frequency[0] != CPI_FREQUENCY_2026_LAB[cur]:
             out["reason"] = "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH"
             return out
@@ -420,5 +444,5 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
 
 
 __all__ = ["SCHEMA", "ENVELOPE", "EXPECTED", "QUARTERLY_CPI_FRESH_DAYS",
-           "OBSERVATION_AGE_LIMIT_DAYS",
+           "OBSERVATION_AGE_LIMIT_DAYS", "CPI_2026_NON_US_RELEASE_FLOORS_UTC",
            "inspect_g8_pair_macro_asof_lab"]

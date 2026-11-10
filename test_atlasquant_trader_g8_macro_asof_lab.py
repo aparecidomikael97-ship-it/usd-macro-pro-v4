@@ -1,5 +1,5 @@
 """Synthetic as-of release receipts. No authenticated data or backtest accuracy."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import unittest
@@ -7,6 +7,7 @@ import unittest
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_g8_macro_asof_lab import (
     CPI_ISSUER_HOSTS, CPI_FREQUENCY_2026_LAB,
+    CPI_2026_NON_US_RELEASE_FLOORS_UTC,
     ENVELOPE, EXPECTED, inspect_g8_pair_macro_asof_lab as inspect,
 )
 
@@ -159,6 +160,48 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(result["reason"], "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX")
         self.assert_no_go(result)
 
+    def test_seven_other_cpi_issuer_publication_floors_block_pretend_early_receipts(self):
+        # Includes the quarterly NZD reference period and CHF October.
+        cases = (("AUD", "AUD/USD", "2026-09"),
+                 ("CAD", "CAD/JPY", "2026-09"),
+                 ("EUR", "EUR/USD", "2026-09"),
+                 ("GBP", "GBP/USD", "2026-09"),
+                 ("JPY", "USD/JPY", "2026-09"),
+                 ("NZD", "NZD/USD", "2026-Q3"),
+                 ("CHF", "USD/CHF", "2026-10"))
+        self.assertEqual(len(CPI_2026_NON_US_RELEASE_FLOORS_UTC), 7)
+        for currency, pair, period in cases:
+            with self.subTest(currency=currency):
+                floor = CPI_2026_NON_US_RELEASE_FLOORS_UTC[(currency, period)]
+                data = sample(pair)
+                row = next(x for x in data["records"] if x["currency"] == currency
+                           and x["indicator"] == "CPI_YOY")
+                row["observation_period"] = period
+                early = (floor - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                released = floor.strftime("%Y-%m-%dT%H:%M:%SZ")
+                row.update(published_at_utc=early, captured_at_utc=early)
+                rejected = run(data)
+                self.assertEqual(rejected["reason"],
+                                 "CPI_CLAIM_BEFORE_KNOWN_ISSUER_RELEASE_BOUNDARY")
+                self.assert_no_go(rejected)
+                row.update(published_at_utc=released, captured_at_utc=released)
+                permitted = run(data)
+                self.assertEqual(permitted["state"],
+                                 "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+                self.assert_no_go(permitted)
+
+    def test_september_eurostat_flash_is_not_conflated_with_final_release(self):
+        data = sample()
+        data["records"][0].update(
+            observation_period="2026-09", publication_stage="FLASH",
+            published_at_utc="2026-10-02T12:00:00Z",
+            captured_at_utc="2026-10-02T12:00:01Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(result["missing_or_stale"],
+                         ["EUR:CPI_YOY:FLASH_ONLY_UNATTESTED"])
+        self.assert_no_go(result)
+
     def test_capture_after_decision_cannot_retroactively_join(self):
         data = sample()
         data["records"][1]["captured_at_utc"] = "2026-11-05T12:00:01Z"
@@ -309,8 +352,8 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         data = sample("GBP/NZD")
         for row in data["records"]:
             if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
-                row.update(observation_period="2026-Q3", published_at_utc="2026-10-21T12:00:00Z",
-                           captured_at_utc="2026-10-21T12:01:00Z")
+                row.update(observation_period="2026-Q3", published_at_utc="2026-10-21T21:45:00Z",
+                           captured_at_utc="2026-10-21T21:45:01Z")
         data["records"].append(record(
             "NZD", "CPI_YOY", published="2026-10-31T12:00:00Z",
             captured="2026-10-31T12:01:00Z", period="2026-Q2"))

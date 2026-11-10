@@ -151,6 +151,20 @@ class G8MatrixTests(unittest.TestCase):
                                  "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX")
         self.assert_no_go(result)
 
+    def test_pretend_early_australia_cpi_capture_blocks_seven_aud_crosses(self):
+        rows = fixtures()
+        # ABS September 2026 CPI was published Oct 28 at 00:30 UTC.
+        rows["AUD"][0].update(published_at_utc="2026-10-28T00:29:59Z",
+                              captured_at_utc="2026-10-28T00:29:59Z")
+        result = run(rows)
+        self.assertEqual(result["rejected_pairs"], 7)
+        self.assertEqual(result["claim_only_complete_pairs"], 21)
+        for pair, info in result["pairs"].items():
+            if "AUD" in pair:
+                self.assertEqual(info["rejection_reason"],
+                                 "CPI_CLAIM_BEFORE_KNOWN_ISSUER_RELEASE_BOUNDARY")
+        self.assert_no_go(result)
+
     def test_duplicate_vintage_is_never_resolved_silently(self):
         rows = fixtures()
         rows["USD"].append(dict(rows["USD"][0], value="3.0"))
