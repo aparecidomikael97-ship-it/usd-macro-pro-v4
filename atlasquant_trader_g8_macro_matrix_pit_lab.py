@@ -12,7 +12,7 @@ from typing import Any
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_g8_macro_asof_lab import (
-    ENVELOPE, EXPECTED, RECORD_FIELD_VARIANTS,
+    CPI_FREQUENCY_2026_LAB, ENVELOPE, EXPECTED, RECORD_FIELD_VARIANTS,
     inspect_g8_pair_macro_asof_lab,
 )
 
@@ -95,6 +95,9 @@ def inspect_g8_macro_matrix_pit_lab(
     complete = incomplete = rejected = 0
     for pair in OFFICIAL_PAIRS:
         base, quote = split_pair(pair)
+        base_cpi_frequency = CPI_FREQUENCY_2026_LAB[base]
+        quote_cpi_frequency = CPI_FREQUENCY_2026_LAB[quote]
+        mixed_cpi_frequency = base_cpi_frequency != quote_cpi_frequency
         rows = receipts_by_currency[base] + receipts_by_currency[quote]
         if not rows:
             status = "NO_RECEIPTS_FOR_EITHER_CURRENCY"
@@ -129,6 +132,11 @@ def inspect_g8_macro_matrix_pit_lab(
         pairs[pair] = {
             "base": base, "quote": quote, "metadata_claim_state": status,
             "missing_or_stale": missing, "rejection_reason": rejected_reason,
+            "base_cpi_publication_frequency_2026": base_cpi_frequency,
+            "quote_cpi_publication_frequency_2026": quote_cpi_frequency,
+            "cpi_publication_frequency_mismatch": mixed_cpi_frequency,
+            "cpi_raw_yoy_differential_validated": False,
+            "cpi_issuer_methodologies_harmonized": False,
             "economic_values_authenticated": False,
             "calendar_source_verified": False,
             "historical_point_in_time_verified": False,
