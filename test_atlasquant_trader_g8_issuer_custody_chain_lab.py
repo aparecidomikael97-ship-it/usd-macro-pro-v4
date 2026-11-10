@@ -28,6 +28,7 @@ class IssuerCustodyTests(unittest.TestCase):
         self.assertEqual((r["network_requests"], r["file_writes"], r["new_cost_brl"]), (0, 0, 0))
         for field in (
             "original_publisher_bytes_at_release_attested",
+            "original_publisher_revision_attested",
             "issuer_origin_independently_authenticated",
             "collector_clock_independently_authenticated",
             "historical_point_in_time_eligible", "eligible_to_feed_macro_bias",
@@ -51,6 +52,10 @@ class IssuerCustodyTests(unittest.TestCase):
         self.assertEqual(r["state"], "LAB_LOCAL_RECEIPT_BYTES_SELF_CONSISTENT_UNATTESTED")
         self.assertTrue(r["chain_integrity_check"])
         self.assertEqual(r["byte_count"], len(SYNTHETIC))
+        self.assertEqual(r["distinct_body_hashes_local"], 1)
+        self.assertEqual(r["body_change_transitions_local"], 0)
+        self.assertEqual(r["identical_recaptures_local"], 0)
+        self.assertEqual(r["last_body_sha256_local"], receipt["body_sha256"])
         self.assert_never_live(r)
 
     def test_only_future_capture_end_can_be_visible_to_future_asof(self):
@@ -79,6 +84,54 @@ class IssuerCustodyTests(unittest.TestCase):
         self.assertEqual(result["state"], "LAB_LOCAL_APPEND_CHAIN_SELF_CONSISTENT_UNATTESTED")
         self.assertEqual((result["receipt_count"], result["currency"]), (2, "USD"))
         self.assertEqual(result["record_sha256"], second["record_sha256"])
+        self.assertEqual(result["distinct_body_hashes_local"], 2)
+        self.assertEqual(result["body_change_transitions_local"], 1)
+        self.assertEqual(result["identical_recaptures_local"], 0)
+        self.assertEqual(result["last_body_sha256_local"], second["body_sha256"])
+        self.assert_never_live(result)
+
+    def test_identical_byte_recapture_is_not_a_document_change(self):
+        first = self.one()
+        second = self.one(start="2026-11-09T12:01:00Z",
+                          finish="2026-11-09T12:01:02Z", sequence=2,
+                          previous=first["record_sha256"])
+        result = inspect_chain([first, second], as_of_utc=datetime(2026, 11, 9, 12, 2, tzinfo=timezone.utc))
+        self.assertEqual(result["state"], "LAB_LOCAL_APPEND_CHAIN_SELF_CONSISTENT_UNATTESTED")
+        self.assertNotEqual(first["record_sha256"], second["record_sha256"])
+        self.assertEqual(first["body_sha256"], second["body_sha256"])
+        self.assertEqual(result["distinct_body_hashes_local"], 1)
+        self.assertEqual(result["body_change_transitions_local"], 0)
+        self.assertEqual(result["identical_recaptures_local"], 1)
+        self.assert_never_live(result)
+
+    def test_reappearing_prior_body_counts_two_transitions_not_three_versions(self):
+        first = self.one()
+        second = self.one(body=b"synthetic changed bytes", start="2026-11-09T12:01:00Z",
+                          finish="2026-11-09T12:01:02Z", sequence=2,
+                          previous=first["record_sha256"])
+        third = self.one(start="2026-11-09T12:02:00Z",
+                         finish="2026-11-09T12:02:02Z", sequence=3,
+                         previous=second["record_sha256"])
+        result = inspect_chain([first, second, third], as_of_utc=datetime(2026, 11, 9, 12, 3, tzinfo=timezone.utc))
+        self.assertEqual(result["state"], "LAB_LOCAL_APPEND_CHAIN_SELF_CONSISTENT_UNATTESTED")
+        self.assertEqual(result["distinct_body_hashes_local"], 2)
+        self.assertEqual(result["body_change_transitions_local"], 2)
+        self.assertEqual(result["identical_recaptures_local"], 0)
+        self.assertEqual(result["last_body_sha256_local"], first["body_sha256"])
+        self.assert_never_live(result)
+
+    def test_repeated_and_changed_bytes_can_coexist_in_same_local_chain(self):
+        first = self.one()
+        second = self.one(start="2026-11-09T12:01:00Z",
+                          finish="2026-11-09T12:01:02Z", sequence=2,
+                          previous=first["record_sha256"])
+        third = self.one(body=b"synthetic different", start="2026-11-09T12:02:00Z",
+                         finish="2026-11-09T12:02:02Z", sequence=3,
+                         previous=second["record_sha256"])
+        result = inspect_chain([first, second, third], as_of_utc=datetime(2026, 11, 9, 12, 3, tzinfo=timezone.utc))
+        self.assertEqual(result["distinct_body_hashes_local"], 2)
+        self.assertEqual(result["body_change_transitions_local"], 1)
+        self.assertEqual(result["identical_recaptures_local"], 1)
         self.assert_never_live(result)
 
     def test_reordering_or_forging_link_fails_closed(self):
