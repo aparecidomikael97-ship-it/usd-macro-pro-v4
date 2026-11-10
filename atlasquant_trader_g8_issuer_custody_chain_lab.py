@@ -61,6 +61,11 @@ def _refuse(reason: str) -> dict[str, Any]:
         "schema": SCHEMA, "state": "LAB_RECEIPT_BLOCKED", "reason": reason,
         "receipt_count": 0, "currency": None, "record_sha256": None,
         "byte_count": 0, "chain_integrity_check": False,
+        "last_body_sha256_local": None,
+        "distinct_body_hashes_local": 0,
+        "body_change_transitions_local": 0,
+        "identical_recaptures_local": 0,
+        "original_publisher_revision_attested": False,
         "original_publisher_bytes_at_release_attested": False,
         "issuer_origin_independently_authenticated": False,
         "collector_clock_independently_authenticated": False,
@@ -169,6 +174,8 @@ def inspect_local_policy_document_receipt_lab(
         "receipt_count": 1, "currency": currency,
         "record_sha256": record_digest, "byte_count": len(raw),
         "chain_integrity_check": True,
+        "last_body_sha256_local": digest,
+        "distinct_body_hashes_local": 1,
         "issuer_document_url_claim": exact_url,
         "capture_end_local_claim_utc": receipt["collector_finished_at_utc"],
     })
@@ -178,11 +185,15 @@ def inspect_local_policy_document_receipt_lab(
 def inspect_local_policy_document_chain_lab(
     records: Any, *, as_of_utc: Any,
 ) -> dict[str, Any]:
-    """Check local version order and SHA links; not a signed/immutable log."""
+    """Compare local byte snapshots; a byte change is NOT an issuer revision."""
     out = _refuse("INVALID_RECEIPT_CHAIN")
     if not isinstance(records, list) or not 1 <= len(records) <= MAX_CHAIN:
         return out
     prior_digest, prior_end, currency = None, None, None
+    previous_body_hash = None
+    distinct_body_hashes: set[str] = set()
+    body_change_transitions = 0
+    identical_recaptures = 0
     total_bytes = 0
     for number, record in enumerate(records, start=1):
         item = inspect_local_policy_document_receipt_lab(record, as_of_utc=as_of_utc)
@@ -199,6 +210,14 @@ def inspect_local_policy_document_chain_lab(
             out["reason"] = "CHAIN_LINK_ORDER_OR_CURRENCY_MISMATCH"
             return out
         currency = record["currency"]
+        body_hash = record["body_sha256"]
+        if previous_body_hash is not None:
+            if body_hash == previous_body_hash:
+                identical_recaptures += 1
+            else:
+                body_change_transitions += 1
+        distinct_body_hashes.add(body_hash)
+        previous_body_hash = body_hash
         prior_digest = record["record_sha256"]
         prior_end = event_end
         total_bytes += item["byte_count"]
@@ -208,6 +227,10 @@ def inspect_local_policy_document_chain_lab(
         "receipt_count": len(records), "currency": currency,
         "record_sha256": prior_digest, "byte_count": total_bytes,
         "chain_integrity_check": True,
+        "last_body_sha256_local": previous_body_hash,
+        "distinct_body_hashes_local": len(distinct_body_hashes),
+        "body_change_transitions_local": body_change_transitions,
+        "identical_recaptures_local": identical_recaptures,
     })
     return out
 
