@@ -39,6 +39,9 @@ def _base(reason: str, pair: Any, timeframe: Any) -> dict[str, Any]:
         "exit_bar_open_epoch_claim": None,
         "entry_close_price_documentary": None,
         "exit_close_price_documentary": None,
+        "exit_bar_open_price_documentary": None,
+        "exit_bar_open_to_close_bps_documentary": None,
+        "observed_exit_bar_body_direction_only": None,
         "forward_price_change_bps_documentary": None,
         "observed_price_direction_only": None,
         "source_manifest_hash_self_consistent": False,
@@ -143,7 +146,7 @@ def inspect_mt5_forward_label_lab(
         if len(rows) != EXPECTED[timeframe]:
             out["reason"] = "CSV_BAR_COUNT_MISMATCH"
             return out
-        series: list[tuple[int, Decimal]] = []
+        series: list[tuple[int, Decimal, Decimal]] = []
         prev_epoch: int | None = None
         for row in rows:
             if "__extra__" in row or set(row) != set(FIELDS) or any(row[k] is None for k in FIELDS):
@@ -164,7 +167,7 @@ def inspect_mt5_forward_label_lab(
                 if not v.isascii() or not v.isdecimal() or int(v) < 0:
                     out["reason"] = "VOLUME_OR_SPREAD_INVALID"
                     return out
-            series.append((epoch, cl))
+            series.append((epoch, op, cl))
         oldest = datetime.fromtimestamp(series[0][0], timezone.utc).isoformat()
         newest = datetime.fromtimestamp(series[-1][0], timezone.utc).isoformat()
         if (manifest_record.get("earliest_open_utc") != oldest
@@ -190,9 +193,11 @@ def inspect_mt5_forward_label_lab(
     if exit_epoch - entry_epoch != SECONDS[timeframe]:
         out["reason"] = "NON_NOMINAL_TIME_GAP_NO_IMPUTATION"
         return out
-    entry_close = series[start][1]
-    exit_close = series[end][1]
+    entry_close = series[start][2]
+    exit_open = series[end][1]
+    exit_close = series[end][2]
     move = ((exit_close / entry_close) - Decimal(1)) * Decimal(10_000)
+    body_move = ((exit_close / exit_open) - Decimal(1)) * Decimal(10_000)
     out.update({
         "state": "LAB_MT5_FORWARD_PRICE_LABEL_DOCUMENTARY_UNATTESTED",
         "reason": "LOCAL_CSV_INTEGRITY_ONLY_NOT_A_PREDICTION_OR_BACKTEST",
@@ -200,6 +205,10 @@ def inspect_mt5_forward_label_lab(
         "exit_bar_open_epoch_claim": exit_epoch,
         "entry_close_price_documentary": str(entry_close),
         "exit_close_price_documentary": str(exit_close),
+        "exit_bar_open_price_documentary": str(exit_open),
+        "exit_bar_open_to_close_bps_documentary": str(body_move.quantize(Decimal("0.0001"))),
+        "observed_exit_bar_body_direction_only": (
+            "UP" if body_move > 0 else "DOWN" if body_move < 0 else "FLAT"),
         "forward_price_change_bps_documentary": str(move.quantize(Decimal("0.0001"))),
         "observed_price_direction_only": "UP" if move > 0 else "DOWN" if move < 0 else "FLAT",
     })
