@@ -12,7 +12,7 @@ from typing import Any
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_g8_macro_asof_lab import (
-    ENVELOPE, EXPECTED, RECORD_FIELDS, RECORD_FIELDS_WITH_STAGE,
+    ENVELOPE, EXPECTED, RECORD_FIELD_VARIANTS,
     inspect_g8_pair_macro_asof_lab,
 )
 
@@ -73,7 +73,7 @@ def inspect_g8_macro_matrix_pit_lab(
             return out
         for row in rows:
             if (not isinstance(row, dict)
-                    or set(row) not in (RECORD_FIELDS, RECORD_FIELDS_WITH_STAGE)
+                    or frozenset(row) not in RECORD_FIELD_VARIANTS
                     or row.get("currency") != currency
                     or not isinstance(row.get("indicator"), str)
                     or not isinstance(row.get("observation_period"), str)
