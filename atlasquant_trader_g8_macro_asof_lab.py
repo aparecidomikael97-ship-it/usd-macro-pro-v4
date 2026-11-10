@@ -47,6 +47,10 @@ RECORD_FIELDS = frozenset((
     "currency", "indicator", "observation_period", "value",
     "published_at_utc", "captured_at_utc", "source_type", "source_sha256",
 ))
+RECORD_FIELDS_WITH_STAGE = RECORD_FIELDS | frozenset(("publication_stage",))
+# Optional for compatibility with older LAB receipts; neither the stage nor
+# any issuer timestamp is independently attested by this metadata gate.
+CPI_PUBLICATION_STAGES = frozenset(("FLASH", "FINAL", "REVISION"))
 UTC = re.compile(r"20\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ\Z")
 MONTH = re.compile(r"20\d\d-(?:0[1-9]|1[0-2])\Z")
 QUARTER = re.compile(r"(20\d\d)-Q([1-4])\Z")
@@ -125,13 +129,15 @@ def _value(raw: Any) -> Decimal | None:
         return None
 
 
-def _observation_period(raw: Any, *, indicator: str, published: datetime) -> tuple[str, int] | None:
+def _observation_period(raw: Any, *, indicator: str, published: datetime,
+                        stage: str = "UNSPECIFIED") -> tuple[str, int] | None:
     """Normalize a monthly or CPI-only quarterly period without inventing dates.
 
-    Monthly CPI requires a *completed* reference month here. A same-month CPI
-    may be a genuine flash estimate, but this schema has no flash/final or
-    issuer-vintage proof. Exclude it instead of silently treating it as the
-    final monthly reading. Policy rates may be announced within their month.
+    Monthly CPI marked FINAL/UNSPECIFIED requires a completed reference month.
+    A same-month FLASH is allowed as *documentary* metadata but must never
+    satisfy the pair's final-CPI completeness requirement. The caller's stage
+    label does not prove the release's original vintage or authenticity.
+    Policy rates may be announced within their month.
     Quarterly CPI likewise requires a completed reference quarter. Even a
     structurally plausible date still needs independently attested publication.
     """
@@ -140,7 +146,8 @@ def _observation_period(raw: Any, *, indicator: str, published: datetime) -> tup
     if MONTH.fullmatch(raw):
         period = (int(raw[:4]), int(raw[5:7]))
         publication_month = (published.year, published.month)
-        if period > publication_month or (indicator == "CPI_YOY" and period == publication_month):
+        if period > publication_month or (indicator == "CPI_YOY" and period == publication_month
+                                          and stage != "FLASH"):
             return None
         return "MONTHLY", FRESH_DAYS[indicator]
     match = QUARTER.fullmatch(raw)
@@ -195,9 +202,10 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
         return out
     base, quote = split_pair(obj["pair"])
     # Keep only pair-specific economic evidence, never a third currency's data.
-    accepted: dict[tuple[str, str, str], dict[str, Any]] = {}
+    accepted: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for row in obj["records"]:
-        if not isinstance(row, dict) or set(row) != RECORD_FIELDS:
+        if (not isinstance(row, dict)
+                or set(row) not in (RECORD_FIELDS, RECORD_FIELDS_WITH_STAGE)):
             out["reason"] = "RELEASE_SCHEMA_INVALID"
             return out
         cur, indicator = row["currency"], row["indicator"]
@@ -213,32 +221,65 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
         if row["source_type"] != REQUIRED_ISSUER_TYPE[indicator]:
             out["reason"] = "INDICATOR_ORIGINAL_ISSUER_CATEGORY_MISMATCH"
             return out
+        stage = row.get("publication_stage", "UNSPECIFIED")
+        if (not isinstance(stage, str)
+                or (indicator == "CPI_YOY" and stage not in
+                    (CPI_PUBLICATION_STAGES | {"UNSPECIFIED"}))
+                or (indicator == "POLICY_RATE" and stage not in
+                    ("POLICY_DECISION", "UNSPECIFIED"))):
+            out["reason"] = "INDICATOR_PUBLICATION_STAGE_INVALID"
+            return out
+        if stage == "REVISION":
+            # No signed historic vintage chain; never silently replace the
+            # first reading with a later revision.
+            out["reason"] = "REVISION_VINTAGE_UNATTESTED"
+            return out
         pub, captured = _time(row["published_at_utc"]), _time(row["captured_at_utc"])
         frequency = (_observation_period(row["observation_period"], indicator=indicator,
-                                         published=pub) if pub is not None else None)
+                                         published=pub, stage=stage)
+                     if pub is not None else None)
         if (pub is None or captured is None or frequency is None
                 or not pub <= captured <= decision):
             out["reason"] = "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID"
             return out
-        key = (cur, indicator, row["observation_period"])
+        key = (cur, indicator, row["observation_period"], stage)
         if key in accepted:
-            # Never select a revised value silently on an existing period.
+            # Never silently choose one of two purported FINAL/FLASH versions.
             out["reason"] = "DUPLICATE_INDICATOR_PERIOD_REVISION_AMBIGUOUS"
             return out
         accepted[key] = row
+    # A FLASH then a FINAL for the same period is legitimate stage structure.
+    # Reversed chronology or mixing untyped receipts is not.
+    same_period: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for (cur, indicator, period, _stage), row in accepted.items():
+        same_period.setdefault((cur, indicator, period), []).append(row)
+    for (_, indicator, _), variants in same_period.items():
+        if len(variants) == 1:
+            continue
+        by_stage = {row.get("publication_stage", "UNSPECIFIED"): row
+                    for row in variants}
+        if (indicator != "CPI_YOY" or len(variants) != 2
+                or set(by_stage) != {"FLASH", "FINAL"}
+                or _time(by_stage["FLASH"]["published_at_utc"]) >=
+                _time(by_stage["FINAL"]["published_at_utc"])
+                or _time(by_stage["FLASH"]["captured_at_utc"]) >=
+                _time(by_stage["FINAL"]["captured_at_utc"])):
+            out["reason"] = "PUBLICATION_STAGE_ORDER_AMBIGUOUS"
+            return out
     selections: dict[str, dict[str, Any]] = {}
     missing = []
     for currency in (base, quote):
         selections[currency] = {}
         for indicator in EXPECTED:
-            candidates = [r for (cur, name, _), r in accepted.items()
+            candidates = [r for (cur, name, _, _), r in accepted.items()
                           if cur == currency and name == indicator]
             if not candidates:
                 missing.append(f"{currency}:{indicator}:MISSING")
                 continue
             frequencies = {
                 _observation_period(r["observation_period"], indicator=indicator,
-                                    published=_time(r["published_at_utc"]))[0]
+                                    published=_time(r["published_at_utc"]),
+                                    stage=r.get("publication_stage", "UNSPECIFIED"))[0]
                 for r in candidates
             }
             if len(frequencies) != 1:
@@ -248,9 +289,14 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 return out
             latest = max(candidates, key=lambda r: (
                 _period_rank(r["observation_period"]), r["published_at_utc"]))
+            latest_stage = latest.get("publication_stage", "UNSPECIFIED")
+            if indicator == "CPI_YOY" and latest_stage == "FLASH":
+                missing.append(f"{currency}:{indicator}:FLASH_ONLY_UNATTESTED")
+                continue
             published = _time(latest["published_at_utc"])
             frequency, fresh_days = _observation_period(
-                latest["observation_period"], indicator=indicator, published=published)
+                latest["observation_period"], indicator=indicator,
+                published=published, stage=latest_stage)
             age_days = (decision - published).total_seconds() / 86400
             period_age_days = (decision.date() - _period_end_date(
                 latest["observation_period"])).days
@@ -270,6 +316,7 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 "captured_at_utc_claim": latest["captured_at_utc"],
                 "source_type_claim": latest["source_type"],
                 "source_sha256_claim": latest["source_sha256"],
+                "publication_stage_claim": latest_stage,
                 "measurement_verified": False,
             }
     complete = not missing
@@ -277,7 +324,7 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
         "state": ("LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED" if complete
                   else "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED"),
         "reason": ("CALLER_SOURCE_TIMESTAMPS_AND_ORIGIN_UNATTESTED" if complete
-                   else "MISSING_OR_STALE_PAIR_MACRO_EVIDENCE"),
+                   else "MISSING_STALE_OR_PRELIMINARY_PAIR_MACRO_EVIDENCE"),
         "pair": obj["pair"], "decision_at_utc": decision.isoformat(),
         "input_sha256": sha256(raw).hexdigest(),
         "records_seen": len(accepted), "pair_currencies": [base, quote],
