@@ -12,7 +12,8 @@ from typing import Any
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_g8_macro_asof_lab import (
-    ENVELOPE, EXPECTED, RECORD_FIELDS, inspect_g8_pair_macro_asof_lab,
+    ENVELOPE, EXPECTED, RECORD_FIELDS, RECORD_FIELDS_WITH_STAGE,
+    inspect_g8_pair_macro_asof_lab,
 )
 
 SCHEMA = "ATLASQUANT_TRADER_G8_MACRO_MATRIX_PIT_LAB_V1"
@@ -71,14 +72,20 @@ def inspect_g8_macro_matrix_pit_lab(
             out["reason"] = "INVALID_CURRENCY_RECEIPT_COLLECTION"
             return out
         for row in rows:
-            if (not isinstance(row, dict) or set(row) != RECORD_FIELDS
+            if (not isinstance(row, dict)
+                    or set(row) not in (RECORD_FIELDS, RECORD_FIELDS_WITH_STAGE)
                     or row.get("currency") != currency
                     or not isinstance(row.get("indicator"), str)
-                    or not isinstance(row.get("observation_period"), str)):
+                    or not isinstance(row.get("observation_period"), str)
+                    or ("publication_stage" in row and
+                        not isinstance(row["publication_stage"], str))):
                 out["reason"] = "CURRENCY_RECEIPT_SCHEMA_OR_OWNER_INVALID"
                 return out
-            # No period-level revision can be silently reused in many pairs.
-            key = (currency, row.get("indicator"), row.get("observation_period"))
+            # One FLASH plus one later FINAL may share a reference month;
+            # duplicates of the *same stage* cannot be reused in 28 crosses.
+            # The pair gate performs the final stage/chronology checks.
+            key = (currency, row.get("indicator"), row.get("observation_period"),
+                   row.get("publication_stage", "UNSPECIFIED"))
             if key in seen:
                 out["reason"] = "AMBIGUOUS_DUPLICATE_VINTAGE"
                 return out
