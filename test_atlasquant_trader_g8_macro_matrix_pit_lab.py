@@ -9,16 +9,31 @@ from atlasquant_trader_g8_macro_matrix_pit_lab import (
 
 DECISION = datetime(2026, 11, 5, 12, tzinfo=timezone.utc)
 EVALUATED = datetime(2026, 11, 8, tzinfo=timezone.utc)
+CPI_URLS = {
+    "USD": "https://www.bls.gov/cpi/",
+    "EUR": "https://ec.europa.eu/eurostat/web/hicp/information-data",
+    "GBP": "https://www.ons.gov.uk/economy/inflationandpriceindices",
+    "CAD": "https://www150.statcan.gc.ca/n1/daily-quotidien/",
+    "AUD": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/",
+    "JPY": "https://www.stat.go.jp/english/data/cpi/index.htm",
+    "CHF": "https://www.bfs.admin.ch/en/press-releases",
+    "NZD": "https://www.stats.govt.nz/indicators/consumers-price-index-cpi/",
+}
 
 
 def receipt(currency, indicator, *, published="2026-10-29T12:00:00Z",
-            captured="2026-10-29T12:05:00Z", period="2026-09", value="2.0"):
-    return {"currency": currency, "indicator": indicator,
+            captured="2026-10-29T12:05:00Z", period=None, value="2.0"):
+    if period is None:
+        period = "2026-Q3" if currency == "NZD" and indicator == "CPI_YOY" else "2026-09"
+    item = {"currency": currency, "indicator": indicator,
             "observation_period": period, "value": value,
             "published_at_utc": published, "captured_at_utc": captured,
             "source_type": ("CENTRAL_BANK" if indicator == "POLICY_RATE"
                             else "OFFICIAL_STATISTICS_OFFICE"),
             "source_sha256": "a" * 64}
+    if indicator == "CPI_YOY":
+        item["source_url"] = CPI_URLS[currency]
+    return item
 
 
 def fixtures():
@@ -229,6 +244,28 @@ class G8MatrixTests(unittest.TestCase):
         rows["CHF"][0]["publication_stage"] = ["FLASH"]
         result = run(rows)
         self.assertEqual(result["reason"], "CURRENCY_RECEIPT_SCHEMA_OR_OWNER_INVALID")
+        self.assert_no_go(result)
+
+    def test_one_wrong_cpi_issuer_host_rejects_its_seven_crosses(self):
+        rows = fixtures()
+        rows["CAD"][0]["source_url"] = CPI_URLS["USD"]
+        result = run(rows)
+        self.assertEqual((result["claim_only_complete_pairs"], result["rejected_pairs"]), (21, 7))
+        for pair, info in result["pairs"].items():
+            if "CAD" in pair:
+                self.assertEqual(info["rejection_reason"],
+                                 "CPI_ORIGINAL_ISSUER_HOST_CLAIM_MISMATCH")
+        self.assert_no_go(result)
+
+    def test_nzd_monthly_cpi_claim_rejects_seven_crosses_as_of_2026(self):
+        rows = fixtures()
+        rows["NZD"][0]["observation_period"] = "2026-09"
+        result = run(rows)
+        self.assertEqual((result["claim_only_complete_pairs"], result["rejected_pairs"]), (21, 7))
+        for pair, info in result["pairs"].items():
+            if "NZD" in pair:
+                self.assertEqual(info["rejection_reason"],
+                                 "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH")
         self.assert_no_go(result)
 
 
