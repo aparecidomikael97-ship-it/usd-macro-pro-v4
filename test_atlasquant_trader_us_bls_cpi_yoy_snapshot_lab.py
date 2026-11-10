@@ -3,7 +3,9 @@ import json
 import unittest
 
 from atlasquant_trader_us_bls_cpi_yoy_snapshot_lab import (
+    SEPTEMBER_2026_RELEASE_URL_CLAIM,
     interpret_bls_cpi_u_snapshot_lab as parse,
+    reconcile_bls_september_2026_release_lab as reconcile,
 )
 
 
@@ -128,6 +130,55 @@ class BLSYoYLabTests(unittest.TestCase):
         r = parse(raw, reference_period="2026-09")
         self.assertEqual(raw, before)
         self.no_go(r)
+
+    def test_official_bls_september_2026_release_index_arithmetic(self):
+        # Actual printed Table 1 numbers from BLS archived release 14 Oct 2026.
+        # This is a SYNTHETIC API-shaped fixture, not bytes retrieved from API.
+        rows = [data_row(2026, 9, "336.940"), data_row(2025, 9, "324.800")]
+        calculated = parse(payload(rows), reference_period="2026-09")
+        self.assertEqual(calculated["derived_yoy_percent"], "3.738")
+        checked = reconcile(
+            calculated, release_url_claim=SEPTEMBER_2026_RELEASE_URL_CLAIM,
+            published_yoy_percent_claim="3.7")
+        self.assertEqual(checked["state"], "LAB_BLS_RELEASE_ARITHMETIC_MATCHES_CLAIM_UNATTESTED")
+        self.assertTrue(checked["arithmetic_matches_claim"])
+        self.assertEqual(checked["derived_one_decimal_yoy"], "3.7")
+        self.assertFalse(checked["historical_point_in_time_eligible"])
+        self.assertFalse(checked["trade_authorized"])
+
+    def test_official_release_mismatch_blocks_and_hides_rate(self):
+        rows = [data_row(2026, 9, "336.940"), data_row(2025, 9, "324.800")]
+        calculated = parse(payload(rows), reference_period="2026-09")
+        checked = reconcile(calculated,
+                            release_url_claim=SEPTEMBER_2026_RELEASE_URL_CLAIM,
+                            published_yoy_percent_claim="3.6")
+        self.assertEqual(checked["state"], "LAB_BLS_RELEASE_ARITHMETIC_REVIEW_REQUIRED")
+        self.assertIsNone(checked["derived_one_decimal_yoy"])
+        self.assertFalse(checked["can_feed_macro_bias"])
+
+    def test_wrong_release_url_is_not_accepted(self):
+        value = parse(payload(), reference_period="2026-09")
+        for url in ("https://other.example/cpi_10142026.htm",
+                    "http://www.bls.gov/news.release/archives/cpi_10142026.htm",
+                    "https://www.bls.gov/news.release/archives/cpi_10142026.htm?other=1"):
+            with self.subTest(url=url):
+                result = reconcile(value, release_url_claim=url,
+                                   published_yoy_percent_claim="5.0")
+                self.assertFalse(result["arithmetic_matches_claim"])
+
+    def test_wrong_period_or_fake_authenticated_flag_rejected(self):
+        value = parse(payload(), reference_period="2026-09")
+        for key, item in (("reference_period", "2026-10"),
+                          ("historical_point_in_time_eligible", True),
+                          ("issuer_first_release_authenticated", True),
+                          ("can_feed_macro_bias", True),
+                          ("trade_authorized", True)):
+            with self.subTest(key=key):
+                doc = dict(value)
+                doc[key] = item
+                self.assertFalse(reconcile(
+                    doc, release_url_claim=SEPTEMBER_2026_RELEASE_URL_CLAIM,
+                    published_yoy_percent_claim="5.0")["arithmetic_matches_claim"])
 
 
 if __name__ == "__main__":
