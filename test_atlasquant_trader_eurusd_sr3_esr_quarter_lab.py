@@ -91,7 +91,20 @@ class SR3ESRQuarterTests(unittest.TestCase):
 
     def test_settlement_is_not_proof_of_executed_trade(self):
         q = dataset()
-        q["EUR"] = [replace(x, quote_kind="SETTLEMENT", contract_session_volume=None) for x in q["EUR"]]
+        # Settlement publication occurs AFTER the trade date. For this
+        # synthetic test use two midweek trade dates with a day of latency.
+        q["EUR"] = [
+            replace(q["EUR"][0], quote_kind="SETTLEMENT", contract_session_volume=None,
+                    settlement_publication_channel="CME_PUBLIC_WEBSITE_SETTLEMENT",
+                    published_at_utc=datetime(2026, 11, 12, 6, 10, tzinfo=UTC),
+                    captured_at_utc=datetime(2026, 11, 12, 6, 20, tzinfo=UTC)),
+            replace(q["EUR"][1], quote_kind="SETTLEMENT", contract_session_volume=None,
+                    settlement_publication_channel="CME_PUBLIC_WEBSITE_SETTLEMENT",
+                    trade_date=date(2026, 11, 12),
+                    observed_at_utc=datetime(2026, 11, 12, 15, tzinfo=UTC),
+                    published_at_utc=datetime(2026, 11, 13, 6, 10, tzinfo=UTC),
+                    captured_at_utc=datetime(2026, 11, 13, 6, 20, tzinfo=UTC)),
+        ]
         r = self.get(q)
         self.assertEqual(r["evidence_by_currency"]["EUR"]["quote_kind"], "SETTLEMENT")
         self.assertFalse(r["evidence_by_currency"]["EUR"]["volume_from_named_contract_authenticated"])
@@ -168,6 +181,30 @@ class SR3ESRQuarterTests(unittest.TestCase):
     def test_weekend_or_far_future_claim_does_not_create_signal(self):
         q = dataset()
         r = self.get(q, t=datetime(2030,1,1,tzinfo=UTC))
+        self.assert_no_trade(r)
+
+    def test_settlement_before_public_posting_never_completes_eur_quote(self):
+        q = dataset()
+        q["EUR"] = [replace(x, quote_kind="SETTLEMENT",
+                            settlement_publication_channel="CME_PUBLIC_WEBSITE_SETTLEMENT") for x in q["EUR"]]
+        r=self.get(q)
+        self.assertEqual(r["evidence_by_currency"]["EUR"]["status"], "CLAIMS_INVALID_OR_UNAVAILABLE")
+        self.assertFalse(r["both_claimed_quotes_same_quarter"])
+        self.assert_no_trade(r)
+
+    def test_settlement_without_source_channel_rejected(self):
+        q = dataset()
+        q["EUR"] = [replace(x, quote_kind="SETTLEMENT") for x in q["EUR"]]
+        r=self.get(q)
+        self.assertEqual(r["evidence_by_currency"]["EUR"]["status"], "CLAIMS_INVALID_OR_UNAVAILABLE")
+        self.assert_no_trade(r)
+
+    def test_premature_final_bulletin_rejected_even_next_morning(self):
+        q = dataset()
+        q["EUR"] = [replace(x, quote_kind="SETTLEMENT",
+                            settlement_publication_channel="CME_DAILY_BULLETIN_FINAL") for x in q["EUR"]]
+        r=self.get(q)
+        self.assertEqual(r["evidence_by_currency"]["EUR"]["status"], "CLAIMS_INVALID_OR_UNAVAILABLE")
         self.assert_no_trade(r)
 
 
