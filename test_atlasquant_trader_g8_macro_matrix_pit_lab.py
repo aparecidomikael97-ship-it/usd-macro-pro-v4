@@ -163,6 +163,24 @@ class G8MatrixTests(unittest.TestCase):
         self.assertEqual(result["claim_only_complete_pairs"], 21)
         self.assert_no_go(result)
 
+    def test_one_currency_wrong_original_issuer_category_rejects_seven_pairs(self):
+        for currency in CURRENCIES:
+            for indicator, wrong_type in (("CPI_YOY", "CENTRAL_BANK"),
+                                          ("POLICY_RATE", "OFFICIAL_STATISTICS_OFFICE")):
+                with self.subTest(currency=currency, indicator=indicator):
+                    rows = fixtures()
+                    row = next(x for x in rows[currency] if x["indicator"] == indicator)
+                    row["source_type"] = wrong_type
+                    result = run(rows)
+                    self.assertEqual(result["state"], "LAB_G8_MACRO_MATRIX_HAS_REJECTIONS")
+                    self.assertEqual((result["rejected_pairs"],
+                                      result["claim_only_complete_pairs"]), (7, 21))
+                    for pair, info in result["pairs"].items():
+                        if currency in pair:
+                            self.assertEqual(info["rejection_reason"],
+                                             "INDICATOR_ORIGINAL_ISSUER_CATEGORY_MISMATCH")
+                    self.assert_no_go(result)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
