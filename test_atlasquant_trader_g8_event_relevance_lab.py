@@ -12,6 +12,7 @@ UTC = timezone.utc
 RELEASE = datetime(2026, 11, 10, 13, 30, tzinfo=UTC)
 BEFORE = datetime(2026, 11, 9, 12, tzinfo=UTC)
 AFTER = datetime(2026, 11, 10, 14, tzinfo=UTC)
+PREVIOUS_RELEASE = datetime(2026, 10, 14, 12, 30, tzinfo=UTC)
 
 
 def report(*, event_id="US_CPI_2026_10", currency="USD", metric="CPI_MOM",
@@ -36,6 +37,14 @@ def actual_event(*, consensus="0.3", actual="0.4"):
         actual_published=RELEASE,
         actual_captured=RELEASE + timedelta(minutes=1),
     )
+
+
+def with_previous(event, *, value="0.2", period="2026-09",
+                  published=PREVIOUS_RELEASE, captured=BEFORE):
+    return replace(event, previous_value=value,
+                   previous_reference_period=period,
+                   previous_published_at=published,
+                   previous_captured_at=captured)
 
 
 def by_pair(result, pair):
@@ -256,6 +265,76 @@ class G8EventRelevanceTests(unittest.TestCase):
         self.assertEqual(result["events"][0]["unit"], "PERSONS_CHANGE_SA")
         self.assertEqual(result["events"][1]["unit"], "PERCENT_POLICY_RATE")
         self.no_live(result)
+
+    def test_known_previous_is_separate_from_consensus_before_release(self):
+        result = route([with_previous(report())], as_of_utc=BEFORE)
+        row = result["events"][0]
+        self.assertEqual(row["previous_documentary"], "0.2")
+        self.assertEqual(row["consensus_documentary"], "0.3")
+        self.assertIsNone(row["actual_documentary"])
+        self.assertIsNone(row["actual_minus_previous_documentary"])
+        self.assertEqual(row["previous_reference_period"], "2026-09")
+        self.assertFalse(row["previous_result_or_revision_independently_attested"])
+        self.no_live(result)
+
+    def test_after_release_actual_minus_previous_not_directional_signal(self):
+        result = route([with_previous(actual_event())], as_of_utc=AFTER)
+        row = result["events"][0]
+        self.assertEqual(row["actual_minus_consensus_documentary"], "0.1")
+        self.assertEqual(row["actual_minus_previous_documentary"], "0.2")
+        event = by_pair(result, "EUR/USD")["relevant_events_documentary_only"][0]
+        self.assertEqual(event["actual_minus_previous_documentary"], "0.2")
+        self.assertIsNone(event["fx_direction_from_event"])
+        self.no_live(result)
+
+    def test_previous_collected_after_current_release_is_not_preknown(self):
+        bad = with_previous(actual_event(), captured=RELEASE + timedelta(seconds=20))
+        result = route([bad], as_of_utc=AFTER)
+        self.assertEqual(result["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.no_live(result)
+
+    def test_previous_collected_after_asof_cannot_appear_early(self):
+        previous = with_previous(report(), captured=BEFORE + timedelta(minutes=1))
+        result = route([previous], as_of_utc=BEFORE)
+        self.assertEqual(result["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.no_live(result)
+
+    def test_previous_period_must_be_immediate_and_not_same_period(self):
+        for period in ("2026-10", "2026-08", "2027-01", "2026-Q3", "nope"):
+            with self.subTest(period=period):
+                result = route([with_previous(report(), period=period)], as_of_utc=BEFORE)
+                self.assertEqual(result["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(result)
+
+    def test_previous_metadata_must_be_complete_and_temporally_consistent(self):
+        cases = (
+            replace(report(), previous_value="0.2"),
+            replace(report(), previous_captured_at=BEFORE),
+            with_previous(report(), published=BEFORE + timedelta(minutes=1)),
+            with_previous(report(), value="NaN"),
+            with_previous(report(), published=RELEASE + timedelta(seconds=1)),
+        )
+        for event in cases:
+            with self.subTest(event=event):
+                result = route([event], as_of_utc=BEFORE)
+                self.assertEqual(result["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(result)
+
+    def test_previous_month_rollover_is_supported(self):
+        event = replace(report(), target_period="2026-01")
+        result = route([with_previous(event, period="2025-12")], as_of_utc=BEFORE)
+        self.assertEqual(result["event_count"], 1)
+        self.no_live(result)
+
+    def test_previous_gdp_quarter_rollover_is_supported(self):
+        event = replace(report(), metric="GDP_QOQ", unit="PERCENT_QOQ_SA",
+                        target_period="2026-Q1")
+        result = route([with_previous(event, period="2025-Q4")], as_of_utc=BEFORE)
+        self.assertEqual(result["event_count"], 1)
+        bad = route([with_previous(event, period="2025-Q3")], as_of_utc=BEFORE)
+        self.assertEqual(bad["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.no_live(result)
+        self.no_live(bad)
 
 
 if __name__ == "__main__":
