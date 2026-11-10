@@ -18,6 +18,9 @@ SOURCE_URL_CLAIM = "https://api.bls.gov/publicAPI/v2/timeseries/data/CUUR0000SA0
 _MONTH = re.compile(r"20\d\d-(?:0[1-9]|1[0-2])\Z")
 _INDEX = re.compile(r"[1-9][0-9]{0,3}(?:\.[0-9]{1,6})?\Z")
 MAX_RESPONSE_BYTES = 512 * 1024
+SEPTEMBER_2026_RELEASE_URL_CLAIM = (
+    "https://www.bls.gov/news.release/archives/cpi_10142026.htm"
+)
 _NAMES = ("January", "February", "March", "April", "May", "June",
           "July", "August", "September", "October", "November", "December")
 
@@ -141,4 +144,64 @@ def interpret_bls_cpi_u_snapshot_lab(
     return out
 
 
-__all__ = ["SCHEMA", "SERIES", "SOURCE_URL_CLAIM", "interpret_bls_cpi_u_snapshot_lab"]
+def reconcile_bls_september_2026_release_lab(
+    parsed: Any, *, release_url_claim: Any, published_yoy_percent_claim: Any,
+) -> dict[str, Any]:
+    """Compare arithmetic to one *caller-transcribed* BLS release number.
+
+    This is not a publisher-signed API capture. The official September 2026
+    archived release shows unadjusted all-items 324.800 (Sep 2025), 336.940
+    (Sep 2026) and a reported 3.7% 12-month change. All inputs are claims.
+    """
+    out = {
+        "state": "LAB_BLS_RELEASE_ARITHMETIC_REVIEW_REQUIRED",
+        "reason": "INVALID_SOURCE_OR_UNVERIFIED_LEVELS",
+        "reference_period": None, "official_reported_yoy_claim": None,
+        "derived_one_decimal_yoy": None, "arithmetic_matches_claim": False,
+        "release_source_independently_authenticated": False,
+        "source_first_release_authenticated": False,
+        "historical_point_in_time_eligible": False,
+        "can_feed_macro_bias": False, "operational_bias": "AGUARDAR",
+        "trade_authorized": False, "publishable": False,
+        "http_requests": 0, "file_writes": 0, "new_cost_brl": 0,
+    }
+    if (not isinstance(parsed, dict)
+            or parsed.get("schema") != SCHEMA
+            or parsed.get("state") !=
+                "LAB_BLS_CPI_U_DERIVED_YOY_FROM_MUTABLE_API_BYTES_UNATTESTED"
+            or parsed.get("reference_period") != "2026-09"
+            or parsed.get("previous_year_reference_period") != "2025-09"
+            or parsed.get("derived_value_is_official_published_yoy") is not False
+            or parsed.get("historical_point_in_time_eligible") is not False
+            or parsed.get("issuer_first_release_authenticated") is not False
+            or parsed.get("trade_authorized") is not False
+            or parsed.get("can_feed_macro_bias") is not False
+            or release_url_claim != SEPTEMBER_2026_RELEASE_URL_CLAIM
+            or not isinstance(published_yoy_percent_claim, str)
+            or re.fullmatch(r"(?:0|[1-9][0-9]?)\.[0-9]", published_yoy_percent_claim) is None):
+        return out
+    current = _load_positive_index(parsed.get("current_index_level_claim"))
+    previous = _load_positive_index(parsed.get("previous_year_index_level_claim"))
+    if current is None or previous is None:
+        return out
+    computed = ((current / previous - 1) * 100).quantize(
+        Decimal("0.1"), rounding=ROUND_HALF_UP)
+    published = Decimal(published_yoy_percent_claim)
+    if computed != published:
+        out["reason"] = "REPORTED_AND_RECOMPUTED_TWELVE_MONTH_RATES_DIFFER"
+        return out
+    out.update({
+        "state": "LAB_BLS_RELEASE_ARITHMETIC_MATCHES_CLAIM_UNATTESTED",
+        "reason": "ARITHMETIC_MATCH_ONLY_NOT_AUTHENTICATED_SOURCE_OR_PIT",
+        "reference_period": "2026-09",
+        "official_reported_yoy_claim": str(published),
+        "derived_one_decimal_yoy": str(computed),
+        "arithmetic_matches_claim": True,
+    })
+    return out
+
+
+__all__ = ["SCHEMA", "SERIES", "SOURCE_URL_CLAIM",
+           "SEPTEMBER_2026_RELEASE_URL_CLAIM",
+           "interpret_bls_cpi_u_snapshot_lab",
+           "reconcile_bls_september_2026_release_lab"]
