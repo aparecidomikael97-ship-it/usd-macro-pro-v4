@@ -21,6 +21,11 @@ MAX_RESPONSE_BYTES = 512 * 1024
 SEPTEMBER_2026_RELEASE_URL_CLAIM = (
     "https://www.bls.gov/news.release/archives/cpi_10142026.htm"
 )
+# BLS 10 Nov 2026 October release: the October 2025 CPI-U index was not
+# available because of the 2025 appropriations lapse. Do not calculate an
+# October 2026 YoY from a caller-invented previous-year index. Reassess only
+# against a later, independently verified official historical revision.
+KNOWN_UNAVAILABLE_PRIOR_YEAR_INDEX_PERIODS_AS_OF_2026_11_10 = frozenset({"2025-10"})
 _NAMES = ("January", "February", "March", "April", "May", "June",
           "July", "August", "September", "October", "November", "December")
 
@@ -126,6 +131,9 @@ def interpret_bls_cpi_u_snapshot_lab(
 
     year, month = reference_period.split("-")
     prior_period = f"{int(year)-1:04d}-{month}"
+    if prior_period in KNOWN_UNAVAILABLE_PRIOR_YEAR_INDEX_PERIODS_AS_OF_2026_11_10:
+        out["reason"] = "OFFICIAL_2025_10_CPI_U_YEAR_AGO_INDEX_UNAVAILABLE"
+        return out
     current, prior = observations.get(reference_period), observations.get(prior_period)
     if current is None or prior is None:
         out["reason"] = "TARGET_OR_PRIOR_YEAR_SAME_MONTH_INDEX_MISSING"

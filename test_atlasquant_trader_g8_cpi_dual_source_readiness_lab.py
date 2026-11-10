@@ -74,14 +74,12 @@ class DualSourceCPIReadinessLabTests(unittest.TestCase):
             self.assertIs(item["trade_authorized"], False, pair)
         self.no_go(r)
 
-    def test_when_periods_align_methodologies_still_differ(self):
+    def test_october_period_alignment_cannot_invent_missing_us_year_ago_index(self):
+        # BLS 10 Nov 2026 October release: Oct 2025 CPI-U index unavailable.
+        # Matching the EUR reference month must not hide this missing year-ago value.
         raw = payload([data_row(2026, 10, "320"), data_row(2025, 10, "310")])
         r = run(raw=raw, month="2026-10")
-        self.assertEqual(r["state"], "LAB_EUR_DOCUMENT_USD_API_CANDIDATE_ONLY_NO_BIAS")
-        self.assertTrue(r["same_reference_period_for_eur_usd"])
-        self.assertFalse(r["eur_hicp_us_cpi_u_methodology_harmonized"])
-        self.assertFalse(r["two_sided_macro_comparison_allowed"])
-        self.no_go(r)
+        self.blocked(r, "USD_BLS_BYTES_RECEIPT_OR_PERIOD_INVALID")
 
     def test_after_cutoff_capture_is_blocked_not_backfilled(self):
         self.blocked(run(decision=BEFORE), "USD_CAPTURE_AFTER_DECISION_NO_LOOKAHEAD")

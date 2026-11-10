@@ -74,6 +74,18 @@ class BLSYoYLabTests(unittest.TestCase):
         self.assertIsNone(r["derived_yoy_percent"])
         self.no_go(r)
 
+    def test_october_2026_yoy_cannot_use_fabricated_missing_october_2025_index(self):
+        # BLS release 10 Nov 2026 reports Oct 2025 CPI-U values unavailable.
+        # A fabricated API-shaped payload cannot silently fill that gap.
+        rows = [data_row(2026, 10, "337.511"),
+                data_row(2025, 10, "325.000")]
+        result = parse(payload(rows), reference_period="2026-10")
+        self.assertEqual(result["state"], "LAB_BLS_CPI_SNAPSHOT_BLOCKED")
+        self.assertEqual(result["reason"],
+                         "OFFICIAL_2025_10_CPI_U_YEAR_AGO_INDEX_UNAVAILABLE")
+        self.assertIsNone(result["derived_yoy_percent"])
+        self.no_go(result)
+
     def test_duplicate_series_vintage_is_rejected(self):
         rows = [data_row(2026, 9, "315"), data_row(2025, 9, "300"),
                 data_row(2026, 9, "315")]
