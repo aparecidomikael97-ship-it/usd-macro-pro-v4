@@ -181,6 +181,56 @@ class G8MatrixTests(unittest.TestCase):
                                              "INDICATOR_ORIGINAL_ISSUER_CATEGORY_MISMATCH")
                     self.assert_no_go(result)
 
+    def test_one_currency_flash_only_makes_seven_crosses_incomplete(self):
+        rows = fixtures()
+        rows["EUR"][0].update(
+            observation_period="2026-10", publication_stage="FLASH",
+            published_at_utc="2026-10-29T12:00:00Z",
+            captured_at_utc="2026-10-29T12:05:00Z")
+        result = run(rows)
+        self.assertEqual((result["claim_only_complete_pairs"],
+                          result["incomplete_pairs"], result["rejected_pairs"]),
+                         (21, 7, 0))
+        for pair, info in result["pairs"].items():
+            self.assertEqual("EUR:CPI_YOY:FLASH_ONLY_UNATTESTED" in info["missing_or_stale"],
+                             "EUR" in pair)
+        self.assert_no_go(result)
+
+    def test_flash_then_final_for_one_currency_is_consistent_across_seven_crosses(self):
+        rows = fixtures()
+        flash = receipt("EUR", "CPI_YOY", period="2026-10", value="2.1",
+                        published="2026-10-29T12:00:00Z",
+                        captured="2026-10-29T12:05:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = receipt("EUR", "CPI_YOY", period="2026-10", value="2.2",
+                        published="2026-11-02T12:00:00Z",
+                        captured="2026-11-02T12:05:00Z")
+        final["publication_stage"] = "FINAL"
+        rows["EUR"].extend([flash, final])
+        result = run(rows)
+        self.assertEqual((result["claim_only_complete_pairs"],
+                          result["incomplete_pairs"], result["rejected_pairs"]),
+                         (28, 0, 0))
+        self.assert_no_go(result)
+
+    def test_revision_claim_rejects_seven_crosses_without_rewriting_history(self):
+        rows = fixtures()
+        rows["GBP"][0]["publication_stage"] = "REVISION"
+        result = run(rows)
+        self.assertEqual(result["rejected_pairs"], 7)
+        self.assertEqual(result["claim_only_complete_pairs"], 21)
+        for pair, info in result["pairs"].items():
+            if "GBP" in pair:
+                self.assertEqual(info["rejection_reason"], "REVISION_VINTAGE_UNATTESTED")
+        self.assert_no_go(result)
+
+    def test_unhashable_stage_is_blocked_before_matrix_deduplication(self):
+        rows = fixtures()
+        rows["CHF"][0]["publication_stage"] = ["FLASH"]
+        result = run(rows)
+        self.assertEqual(result["reason"], "CURRENCY_RECEIPT_SCHEMA_OR_OWNER_INVALID")
+        self.assert_no_go(result)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
