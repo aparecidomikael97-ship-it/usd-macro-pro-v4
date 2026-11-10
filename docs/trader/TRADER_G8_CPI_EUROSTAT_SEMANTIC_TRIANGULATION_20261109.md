@@ -32,10 +32,24 @@ independente do dado econômico.
   mês ou etapa errados, cabeçalho de tabela manipulado, duplicidade,
   metadados temporais inválidos, HTML não UTF-8, corpo adulterado,
   manifesto de outra origem e conferência de nenhuma escrita.
-- **Pendente:** execução integral do novo leitor no HTML real AM12. O
-  terminal remoto aparece conectado, mas as últimas chamadas de processo
-  esgotaram o timeout. Não marcar esta etapa como validada até obter saída
-  e conferência do hash exato do script no dispositivo.
+- **Executado no HTML real do AM12:** após corrigir uma transferência parcial,
+  o arquivo Python remoto ficou com **9.716 bytes** e SHA-256
+  `d21ef82e44d591752eac2b9fd5c477ba0a8437c0bff0d4676f480f4599ec7a14`,
+  idêntico ao código testado no ambiente de desenvolvimento.
+- O leitor foi executado pelo Python do AM12 sobre o manifesto
+  `EUR_CPI_FLASH_2026-10_20261110T011636Z_7013d492f8af.manifest.json`
+  e retornou `LAB_EUR_CPI_FLASH_DOCUMENTARY_EXTRACTED_UNATTESTED` com
+  `local_archive_integrity_verified=true`,
+  `same_document_value_consistent=true`, `documentary_cpi_yoy_percent=4.0`,
+  `documentary_previous_yoy_percent=3.8`, `reference_period=2026-10`,
+  `publication_stage=FLASH` e `file_writes=0`.
+- O HTML declara `article:published_time=2026-11-04T10:00:00Z`;
+  **esse horário é alegação editorial da própria página, não atestação de
+  primeira divulgação**. Não usar para reconstruir viés antes da captura.
+- A leitura real não cria novos arquivos, não atualiza conta MT5 e mantém
+  `can_feed_macro_bias=false`, `historical_point_in_time_eligible=false`,
+  `value_independently_verified=false`, `trade_authorized=false` e
+  `operational_bias=AGUARDAR`.
 
 ## Limites explícitos
 
@@ -50,8 +64,8 @@ independente do dado econômico.
 
 ## Próxima trava
 
-Quando AM12 responder: comparar SHA-256 do leitor local e remoto, executar
-`python atlasquant_trader_g8_cpi_eurostat_semantics_lab.py <manifesto>` e
-registrar o resultado observado ou corrigir parser para o HTML real. Só
-depois avaliar extrações semelhantes para outras moedas, sempre sem inventar
-vintage ou viés.
+Próximo trabalho: desenhar um contrato de observações macroeconômicas
+**bilaterais** com tempo de disponibilidade atestado por moeda e revisão,
+antes de qualquer ligação ao score de probabilidade ou viés. Para outras
+moedas, usar leitores específicos por emissor; não replicar o formato da
+página Eurostat como se fosse universal. Sem inventar vintage ou viés.
