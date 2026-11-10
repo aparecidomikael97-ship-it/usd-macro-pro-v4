@@ -288,6 +288,41 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         data["records"][0]["observation_period"] = "2026-12"
         self.assertEqual(run(data)["state"], "LAB_BLOCKED")
 
+    def test_same_month_cpi_without_flash_vintage_field_is_rejected(self):
+        # A publication in the same calendar month could be a real flash,
+        # but this envelope does not identify or authenticate flash releases.
+        data = sample()
+        row = data["records"][0]  # EUR CPI
+        row.update(observation_period="2026-10",
+                   published_at_utc="2026-10-29T12:00:00Z",
+                   captured_at_utc="2026-10-29T12:05:00Z")
+        result = run(data)
+        self.assertEqual(result["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+        self.assert_no_go(result)
+
+        # Last calendar day alone does not prove final CPI, either.
+        row.update(published_at_utc="2026-10-31T12:00:00Z",
+                   captured_at_utc="2026-10-31T12:05:00Z")
+        last_day = run(data)
+        self.assertEqual(last_day["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+        self.assert_no_go(last_day)
+
+    def test_prior_month_cpi_and_current_month_policy_rate_remain_structurally_valid(self):
+        data = sample()
+        cpi = data["records"][0]
+        cpi.update(observation_period="2026-10",
+                   published_at_utc="2026-11-01T12:00:00Z",
+                   captured_at_utc="2026-11-01T12:05:00Z")
+        rate = data["records"][1]
+        rate.update(observation_period="2026-11",
+                    published_at_utc="2026-11-02T12:00:00Z",
+                    captured_at_utc="2026-11-02T12:05:00Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(result["selected_observations"]["EUR"]["CPI_YOY"]["observation_period"], "2026-10")
+        self.assertEqual(result["selected_observations"]["EUR"]["POLICY_RATE"]["observation_period"], "2026-11")
+        self.assert_no_go(result)
+
     def test_unknown_indicator_source_and_hash_rejected(self):
         for column, bad in (("indicator", "PREDICTION"),
                             ("source_type", "RUMOR"),
