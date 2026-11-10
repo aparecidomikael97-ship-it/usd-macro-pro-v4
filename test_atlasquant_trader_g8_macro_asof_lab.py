@@ -297,6 +297,20 @@ class G8PairMacroAsOfTests(unittest.TestCase):
             data["records"][0][column] = bad
             self.assertEqual(run(data)["state"], "LAB_BLOCKED", column)
 
+    def test_cpi_and_policy_original_issuer_categories_cannot_be_swapped(self):
+        for indicator, wrong_type in (("CPI_YOY", "CENTRAL_BANK"),
+                                      ("POLICY_RATE", "OFFICIAL_STATISTICS_OFFICE")):
+            for pair in OFFICIAL_PAIRS:
+                with self.subTest(pair=pair, indicator=indicator):
+                    data = sample(pair)
+                    row = next(x for x in data["records"] if x["indicator"] == indicator)
+                    row["source_type"] = wrong_type
+                    r = run(data)
+                    self.assertEqual(r["state"], "LAB_BLOCKED")
+                    self.assertEqual(r["reason"],
+                                     "INDICATOR_ORIGINAL_ISSUER_CATEGORY_MISMATCH")
+                    self.assert_no_go(r)
+
     def test_numeric_economic_value_is_never_sent_to_bias_engine(self):
         for bad in ("NaN", "Infinity", "1e9", 2.0, True, "1,4", "-100", "999", None):
             data = sample()
