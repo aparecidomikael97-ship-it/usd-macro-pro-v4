@@ -107,6 +107,7 @@ def _blocked(state: str, reason: str) -> dict[str, Any]:
         "benchmark_basis_adjusted": False,
         "evidence_by_currency": {},
         "both_claimed_quotes_same_quarter": False,
+        "both_claimed_vintage_dates_and_kinds_aligned": False,
         "claimed_sofr_minus_estr_change_bps": None,
         "independent_issuer_bytes_archived": False,
         "quote_timestamps_independently_attested": False,
@@ -145,6 +146,9 @@ def _check_currency_claims(items: Any, currency: str, now: datetime) -> dict[str
         return failure
     if (a.reference_start_month != b.reference_start_month or
             a.source_sha256_claim == b.source_sha256_claim or
+            a.quote_kind != b.quote_kind or
+            (a.quote_kind == "SETTLEMENT" and
+             a.settlement_publication_channel != b.settlement_publication_channel) or
             a.trade_date >= b.trade_date):
         return failure
     window = imm_quarter_window(a.reference_start_month)
@@ -189,6 +193,7 @@ def _check_currency_claims(items: Any, currency: str, now: datetime) -> dict[str
         "reference_start_month": a.reference_start_month,
         "imm_reference_start": start.isoformat(),
         "imm_reference_end_exclusive": end.isoformat(),
+        "old_trade_date": a.trade_date.isoformat(),
         "new_trade_date": b.trade_date.isoformat(),
         "new_observed_at_utc": new_obs.isoformat(),
         "new_published_at_utc": new_pub.isoformat(),
@@ -219,9 +224,12 @@ def inspect_eurusd_sr3_esr_imm_quarter_lab(*, quotes_by_currency: Any, as_of_utc
         # comparable as overnight *benchmarks*, NOT identical policy rates.
         if (old["imm_reference_start"] == eur["imm_reference_start"] and
                 old["imm_reference_end_exclusive"] == eur["imm_reference_end_exclusive"] and
+                old["old_trade_date"] == eur["old_trade_date"] and
                 old["new_trade_date"] == eur["new_trade_date"] and
+                old["quote_kind"] == eur["quote_kind"] and
                 old["reference_start_month"] == eur["reference_start_month"]):
             out["both_claimed_quotes_same_quarter"] = True
+            out["both_claimed_vintage_dates_and_kinds_aligned"] = True
             # Deliberately keep differential unset until independent issuer
             # snapshots/quote rights/basis are authenticated.
     return out
