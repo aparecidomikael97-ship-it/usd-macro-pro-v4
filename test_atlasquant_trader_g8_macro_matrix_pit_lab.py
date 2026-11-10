@@ -268,6 +268,38 @@ class G8MatrixTests(unittest.TestCase):
                                  "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH")
         self.assert_no_go(result)
 
+    def test_seven_nzd_crosses_are_flagged_monthly_vs_quarterly(self):
+        result = run()
+        self.assertEqual(sum(x["cpi_publication_frequency_mismatch"]
+                             for x in result["pairs"].values()), 7)
+        for pair, info in result["pairs"].items():
+            self.assertEqual(info["cpi_publication_frequency_mismatch"],
+                             "NZD" in pair, pair)
+            if "NZD" in (info["base"], info["quote"]):
+                self.assertIn("QUARTERLY", (
+                    info["base_cpi_publication_frequency_2026"],
+                    info["quote_cpi_publication_frequency_2026"]))
+                self.assertIn("MONTHLY", (
+                    info["base_cpi_publication_frequency_2026"],
+                    info["quote_cpi_publication_frequency_2026"]))
+        self.assert_no_go(result)
+
+    def test_same_monthly_frequency_never_implies_raw_cpi_comparability(self):
+        r = run()
+        for pair, item in r["pairs"].items():
+            self.assertFalse(item["cpi_raw_yoy_differential_validated"], pair)
+            self.assertFalse(item["cpi_issuer_methodologies_harmonized"], pair)
+        self.assertFalse(r["pairs"]["EUR/USD"]["cpi_publication_frequency_mismatch"])
+        self.assertFalse(r["pairs"]["GBP/CAD"]["cpi_publication_frequency_mismatch"])
+        self.assert_no_go(r)
+
+    def test_no_receipt_still_labels_known_frequency_without_assuming_data(self):
+        r = run({currency: [] for currency in CURRENCIES})
+        self.assertEqual(r["incomplete_pairs"], 28)
+        self.assertTrue(r["pairs"]["GBP/NZD"]["cpi_publication_frequency_mismatch"])
+        self.assertFalse(r["pairs"]["GBP/NZD"]["cpi_raw_yoy_differential_validated"])
+        self.assert_no_go(r)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
