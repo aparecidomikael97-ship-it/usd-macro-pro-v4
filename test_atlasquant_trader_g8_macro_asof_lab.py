@@ -119,6 +119,46 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
         self.assert_no_go(r)
 
+    def test_usd_september_cpi_cannot_appear_before_bls_0830_edt_release(self):
+        # The September 2026 BLS embargo expired Oct 14 at 12:30 UTC.
+        data = sample()
+        usd = next(r for r in data["records"]
+                   if r["currency"] == "USD" and r["indicator"] == "CPI_YOY")
+        usd.update(published_at_utc="2026-10-14T12:29:59Z",
+                   captured_at_utc="2026-10-14T12:29:59Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+        self.assertEqual(result["reason"], "USD_CPI_CLAIM_BEFORE_KNOWN_BLS_RELEASE")
+        self.assert_no_go(result)
+
+        usd.update(published_at_utc="2026-10-14T12:30:00Z",
+                   captured_at_utc="2026-10-14T12:30:00Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assert_no_go(result)
+
+    def test_usd_october_cpi_yoy_cannot_invent_missing_2025_index(self):
+        data = sample()
+        data["decision_at_utc"] = "2026-11-12T15:00:00Z"
+        usd = next(r for r in data["records"]
+                   if r["currency"] == "USD" and r["indicator"] == "CPI_YOY")
+        usd.update(observation_period="2026-10",
+                   published_at_utc="2026-11-10T13:30:00Z",
+                   captured_at_utc="2026-11-10T13:30:01Z")
+        result = run(data, as_of=datetime(2026, 11, 12, 16, tzinfo=timezone.utc))
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+        self.assertEqual(result["reason"], "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX")
+        self.assert_no_go(result)
+
+    def test_usd_october_2025_cpi_index_absence_cannot_be_a_valid_yoy_receipt(self):
+        data = sample()
+        usd = next(r for r in data["records"]
+                   if r["currency"] == "USD" and r["indicator"] == "CPI_YOY")
+        usd["observation_period"] = "2025-10"
+        result = run(data)
+        self.assertEqual(result["reason"], "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX")
+        self.assert_no_go(result)
+
     def test_capture_after_decision_cannot_retroactively_join(self):
         data = sample()
         data["records"][1]["captured_at_utc"] = "2026-11-05T12:00:01Z"

@@ -17,6 +17,12 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
+from atlasquant_trader_us_bls_cpi_snapshot_asof_lab import (
+    KNOWN_BLS_CPI_RELEASE_FLOORS_UTC,
+)
+from atlasquant_trader_us_bls_cpi_yoy_snapshot_lab import (
+    KNOWN_UNAVAILABLE_PRIOR_YEAR_INDEX_PERIODS_AS_OF_2026_11_10,
+)
 
 SCHEMA = "ATLASQUANT_TRADER_G8_MACRO_ASOF_PAIR_LAB_V1"
 ENVELOPE = "ATLASQUANT_TRADER_MACRO_RELEASE_RECEIPTS_LAB_V1"
@@ -297,6 +303,22 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 or not pub <= captured <= decision):
             out["reason"] = "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID"
             return out
+        if cur == "USD" and indicator == "CPI_YOY" and frequency[0] == "MONTHLY":
+            period = row["observation_period"]
+            year, month = period.split("-")
+            previous_year = f"{int(year) - 1:04d}-{month}"
+            # Known BLS absence is relevant to BOTH the original index and
+            # any subsequent YoY that requires it. A syntactically plausible
+            # receipt cannot manufacture the missing October 2025 CPI-U.
+            missing = KNOWN_UNAVAILABLE_PRIOR_YEAR_INDEX_PERIODS_AS_OF_2026_11_10
+            if period in missing or previous_year in missing:
+                out["reason"] = "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX"
+                return out
+            official_floor = KNOWN_BLS_CPI_RELEASE_FLOORS_UTC.get(period)
+            if official_floor is not None and (pub < official_floor
+                                               or captured < official_floor):
+                out["reason"] = "USD_CPI_CLAIM_BEFORE_KNOWN_BLS_RELEASE"
+                return out
         if indicator == "CPI_YOY" and frequency[0] != CPI_FREQUENCY_2026_LAB[cur]:
             out["reason"] = "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH"
             return out

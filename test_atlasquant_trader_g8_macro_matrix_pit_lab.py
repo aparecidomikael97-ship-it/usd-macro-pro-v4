@@ -122,10 +122,11 @@ class G8MatrixTests(unittest.TestCase):
 
     def test_same_release_after_daily_cutoff_may_be_claimed_by_later_weekly_cutoff(self):
         rows = fixtures()
-        rows["USD"].append(receipt("USD", "CPI_YOY",
-                                   published="2026-11-06T10:00:00Z",
-                                   captured="2026-11-06T10:05:00Z",
-                                   period="2026-10"))
+        # Test cutoff chronology using a still-valid September 2026 CPI
+        # claim. The October 2026 USD YoY is NOT a valid synthetic substitute:
+        # its official release was Nov 10 and Oct 2025 CPI-U is unavailable.
+        rows["USD"][0].update(published_at_utc="2026-11-06T10:00:00Z",
+                              captured_at_utc="2026-11-06T10:05:00Z")
         daily = run(rows, decision=DECISION, horizon="D1")
         weekly = run(rows, horizon="W1",
                      decision=datetime(2026, 11, 7, 12, tzinfo=timezone.utc))
@@ -134,6 +135,21 @@ class G8MatrixTests(unittest.TestCase):
         self.assertEqual(weekly["claim_only_complete_pairs"], 28)
         self.assert_no_go(daily)
         self.assert_no_go(weekly)
+
+    def test_missing_october_2025_usd_cpi_index_blocks_all_usd_crosses(self):
+        rows = fixtures()
+        rows["USD"][0].update(observation_period="2026-10",
+                              published_at_utc="2026-11-10T13:30:00Z",
+                              captured_at_utc="2026-11-10T13:30:01Z")
+        result = run(rows, decision=datetime(2026, 11, 12, 15, tzinfo=timezone.utc),
+                     evaluated=datetime(2026, 11, 13, tzinfo=timezone.utc))
+        self.assertEqual(result["rejected_pairs"], 7)
+        self.assertEqual(result["claim_only_complete_pairs"], 21)
+        for pair, info in result["pairs"].items():
+            if "USD" in pair:
+                self.assertEqual(info["rejection_reason"],
+                                 "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX")
+        self.assert_no_go(result)
 
     def test_duplicate_vintage_is_never_resolved_silently(self):
         rows = fixtures()
