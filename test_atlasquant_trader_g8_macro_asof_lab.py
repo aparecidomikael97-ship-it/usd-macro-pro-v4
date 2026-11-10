@@ -4,18 +4,31 @@ from hashlib import sha256
 import json
 import unittest
 
-from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_g8_macro_asof_lab import (
+    CPI_ISSUER_HOSTS, CPI_FREQUENCY_2026_LAB,
     ENVELOPE, EXPECTED, inspect_g8_pair_macro_asof_lab as inspect,
 )
 
 NOW = datetime(2026, 11, 6, 14, tzinfo=timezone.utc)
 DECISION = "2026-11-05T12:00:00Z"
+CPI_URLS = {
+    "USD": "https://www.bls.gov/cpi/",
+    "EUR": "https://ec.europa.eu/eurostat/web/hicp/information-data",
+    "GBP": "https://www.ons.gov.uk/economy/inflationandpriceindices",
+    "CAD": "https://www150.statcan.gc.ca/n1/daily-quotidien/",
+    "AUD": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/",
+    "JPY": "https://www.stat.go.jp/english/data/cpi/index.htm",
+    "CHF": "https://www.bfs.admin.ch/en/press-releases",
+    "NZD": "https://www.stats.govt.nz/indicators/consumers-price-index-cpi/",
+}
 
 
 def record(currency, indicator, *, published="2026-10-29T12:00:00Z",
-           captured="2026-10-29T12:05:00Z", period="2026-09", value="2.0"):
-    return {
+           captured="2026-10-29T12:05:00Z", period=None, value="2.0"):
+    if period is None:
+        period = "2026-Q3" if currency == "NZD" and indicator == "CPI_YOY" else "2026-09"
+    item = {
         "currency": currency, "indicator": indicator,
         "observation_period": period, "value": value,
         "published_at_utc": published, "captured_at_utc": captured,
@@ -23,6 +36,9 @@ def record(currency, indicator, *, published="2026-10-29T12:00:00Z",
                         else "OFFICIAL_STATISTICS_OFFICE"),
         "source_sha256": "a" * 64,
     }
+    if indicator == "CPI_YOY" and currency in CPI_URLS:
+        item["source_url"] = CPI_URLS[currency]
+    return item
 
 
 def sample(pair="EUR/USD"):
@@ -69,9 +85,12 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["input_sha256"], sha256(raw(data)).hexdigest())
         for c in ("EUR", "USD"):
             self.assertEqual(set(r["selected_observations"][c]), set(EXPECTED))
-            for obs in r["selected_observations"][c].values():
+            for name, obs in r["selected_observations"][c].items():
                 self.assertFalse(obs["measurement_verified"])
                 self.assertNotIn("value", obs)
+                self.assertFalse(obs["issuer_host_independently_verified"])
+                if name == "CPI_YOY":
+                    self.assertIn(obs["issuer_host_claim"], CPI_ISSUER_HOSTS[c])
         self.assert_no_go(r)
 
     def test_works_for_every_canonical_forex_pair_no_bias(self):
@@ -261,15 +280,82 @@ class G8PairMacroAsOfTests(unittest.TestCase):
                          "2026-Q3")
         self.assert_no_go(r)
 
-    def test_mixed_monthly_quarterly_for_same_currency_cpi_fails_closed(self):
+    def test_nzd_monthly_cpi_in_2026_is_not_mislabelled_as_headline_quarterly(self):
         data = sample("GBP/NZD")
         data["records"].append(record(
             "NZD", "CPI_YOY", published="2026-10-31T12:00:00Z",
-            captured="2026-10-31T12:01:00Z", period="2026-Q3"))
+            captured="2026-10-31T12:01:00Z", period="2026-09"))
         r = run(data)
         self.assertEqual(r["state"], "LAB_BLOCKED")
-        self.assertEqual(r["reason"], "MIXED_INDICATOR_OBSERVATION_FREQUENCIES")
+        self.assertEqual(r["reason"], "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH")
         self.assert_no_go(r)
+
+    def test_official_cpi_issuer_hosts_cover_all_eight_g8_currencies(self):
+        self.assertEqual(set(CPI_ISSUER_HOSTS), set(CURRENCIES))
+        self.assertEqual(set(CPI_FREQUENCY_2026_LAB), set(CURRENCIES))
+        self.assertEqual(CPI_FREQUENCY_2026_LAB["NZD"], "QUARTERLY")
+        self.assertEqual(CPI_FREQUENCY_2026_LAB["AUD"], "MONTHLY")
+
+    def test_2026_nzd_monthly_and_usd_quarterly_headline_cpi_are_rejected(self):
+        for pair, currency, bad_period in (("NZD/USD", "NZD", "2026-09"),
+                                           ("EUR/USD", "USD", "2026-Q3")):
+            with self.subTest(pair=pair, currency=currency):
+                data = sample(pair)
+                row = next(x for x in data["records"]
+                           if x["currency"] == currency and x["indicator"] == "CPI_YOY")
+                row["observation_period"] = bad_period
+                result = run(data)
+                self.assertEqual(result["reason"], "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH")
+                self.assert_no_go(result)
+
+    def test_claimed_issuer_url_must_match_cpi_currency_not_a_mirror(self):
+        for currency, wrong in (("EUR", CPI_URLS["USD"]),
+                                ("USD", CPI_URLS["GBP"]),
+                                ("GBP", CPI_URLS["EUR"])):
+            with self.subTest(currency=currency):
+                pair = next(p for p in OFFICIAL_PAIRS if currency in p.split("/"))
+                data = sample(pair)
+                row = next(x for x in data["records"]
+                           if x["currency"] == currency and x["indicator"] == "CPI_YOY")
+                row["source_url"] = wrong
+                result = run(data)
+                self.assertEqual(result["reason"], "CPI_ORIGINAL_ISSUER_HOST_CLAIM_MISMATCH")
+                self.assert_no_go(result)
+
+    def test_url_tricks_cannot_impersonate_bls_original_issuer(self):
+        for invalid in ("http://www.bls.gov/cpi/",
+                        "https://www.bls.gov.evil.example/cpi/",
+                        "https://evil.example@www.bls.gov/cpi/",
+                        "https://www.bls.gov:443/cpi/",
+                        "https://www.bls.gov/cpi/#release",
+                        "https://www.bls.gov/\\bad", "https://www.bls.gov", 123):
+            with self.subTest(invalid=invalid):
+                data = sample()
+                row = next(x for x in data["records"]
+                           if x["currency"] == "USD" and x["indicator"] == "CPI_YOY")
+                row["source_url"] = invalid
+                result = run(data)
+                self.assertEqual(result["reason"], "CPI_ORIGINAL_ISSUER_HOST_CLAIM_MISMATCH")
+                self.assert_no_go(result)
+
+    def test_typed_cpi_must_name_official_issuer_host_even_in_lab(self):
+        data = sample()
+        row = next(x for x in data["records"]
+                   if x["currency"] == "EUR" and x["indicator"] == "CPI_YOY")
+        row["publication_stage"] = "FINAL"
+        del row["source_url"]
+        result = run(data)
+        self.assertEqual(result["reason"], "CPI_TYPED_ISSUER_URL_CLAIM_MISSING")
+        self.assert_no_go(result)
+
+    def test_cpi_issuer_url_is_not_appropriate_for_policy_decision(self):
+        data = sample()
+        rate = next(x for x in data["records"]
+                    if x["currency"] == "EUR" and x["indicator"] == "POLICY_RATE")
+        rate["source_url"] = CPI_URLS["EUR"]
+        result = run(data)
+        self.assertEqual(result["reason"], "CPI_SOURCE_URL_USED_FOR_POLICY_RATE")
+        self.assert_no_go(result)
 
     def test_duplicate_same_indicator_period_revision_is_blocked(self):
         data = sample()
