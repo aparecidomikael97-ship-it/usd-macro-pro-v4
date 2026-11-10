@@ -13,6 +13,10 @@ from decimal import Decimal, InvalidOperation
 import re
 from typing import Any
 
+from atlasquant_trader_cme_settlement_release_gate_lab import (
+    inspect_cme_settlement_release_gate_lab,
+)
+
 SCHEMA = "ATLASQUANT_TRADER_EURUSD_SR3_ESR_IMM_QUARTER_LAB_V1"
 RESEARCH_VISIBLE_FROM_UTC = datetime(2026, 11, 11, tzinfo=timezone.utc)
 CME_PRODUCT_SLATE_TRADE_DATE = date(2026, 10, 30)
@@ -43,6 +47,7 @@ class QuarterFuturesQuoteClaim:
     contract_session_volume: int | None
     source_sha256_claim: str
     quote_kind: str = "TRADE"  # or SETTLEMENT (which need not be a trade)
+    settlement_publication_channel: str = "UNVERIFIED"
 
 
 def _utc(value: Any) -> datetime | None:
@@ -164,6 +169,20 @@ def _check_currency_claims(items: Any, currency: str, now: datetime) -> dict[str
     if any(x.quote_kind == "TRADE" and (x.contract_session_volume is None or x.contract_session_volume <= 0)
            for x in (a, b)):
         return failure
+    # A publicly viewed end-of-day settlement has a *later* release clock
+    # than its underlying trade date. Do not let self-claimed timestamps
+    # manufacture a settlement known during the preceding trading session.
+    for x in (a, b):
+        if x.quote_kind == "SETTLEMENT":
+            gate = inspect_cme_settlement_release_gate_lab(
+                trade_date=x.trade_date,
+                channel=x.settlement_publication_channel,
+                published_at_utc=x.published_at_utc,
+                captured_at_utc=x.captured_at_utc,
+                as_of_utc=now,
+            )
+            if gate["state"] != "SELF_CLAIMED_PUBLIC_TIMING_PLAUSIBLE_NOT_AUTHENTICATED":
+                return failure
     move = (_price(a.futures_price_index) - _price(b.futures_price_index)) * 100
     return {
         "status": "SELF_CLAIMED_VINTAGES_ONLY_NOT_AUTHENTICATED",
