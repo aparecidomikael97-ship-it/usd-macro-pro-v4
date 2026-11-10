@@ -14,8 +14,9 @@ from hashlib import sha256
 import json
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
-from atlasquant_fx_universe import OFFICIAL_PAIRS, split_pair
+from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 
 SCHEMA = "ATLASQUANT_TRADER_G8_MACRO_ASOF_PAIR_LAB_V1"
 ENVELOPE = "ATLASQUANT_TRADER_MACRO_RELEASE_RECEIPTS_LAB_V1"
@@ -42,12 +43,33 @@ REQUIRED_ISSUER_TYPE = {
     "CPI_YOY": "OFFICIAL_STATISTICS_OFFICE",
     "POLICY_RATE": "CENTRAL_BANK",
 }
+# Source *host claims*, not a network/TLS/original-publication certificate.
+# EUROSTAT represents the euro-area HICP, not a single euro-area country.
+CPI_ISSUER_HOSTS = {
+    "USD": frozenset(("bls.gov", "www.bls.gov")),
+    "EUR": frozenset(("ec.europa.eu", "webgate.ec.europa.eu")),
+    "GBP": frozenset(("ons.gov.uk", "www.ons.gov.uk")),
+    "CAD": frozenset(("statcan.gc.ca", "www.statcan.gc.ca", "www150.statcan.gc.ca")),
+    "AUD": frozenset(("abs.gov.au", "www.abs.gov.au")),
+    "JPY": frozenset(("stat.go.jp", "www.stat.go.jp")),
+    "CHF": frozenset(("bfs.admin.ch", "www.bfs.admin.ch")),
+    "NZD": frozenset(("stats.govt.nz", "www.stats.govt.nz")),
+}
+# As of 2026, Stats NZ headline CPI is quarterly. Monthly publication has
+# been announced for 2027; keep it blocked until its actual release vintage,
+# frequency and policy can be independently inspected and versioned.
+CPI_FREQUENCY_2026_LAB = {cur: ("QUARTERLY" if cur == "NZD" else "MONTHLY")
+                          for cur in CURRENCIES}
 ENVELOPE_FIELDS = frozenset(("schema", "pair", "decision_at_utc", "records"))
 RECORD_FIELDS = frozenset((
     "currency", "indicator", "observation_period", "value",
     "published_at_utc", "captured_at_utc", "source_type", "source_sha256",
 ))
 RECORD_FIELDS_WITH_STAGE = RECORD_FIELDS | frozenset(("publication_stage",))
+RECORD_FIELDS_WITH_URL = RECORD_FIELDS | frozenset(("source_url",))
+RECORD_FIELDS_WITH_STAGE_AND_URL = RECORD_FIELDS_WITH_STAGE | frozenset(("source_url",))
+RECORD_FIELD_VARIANTS = frozenset((RECORD_FIELDS, RECORD_FIELDS_WITH_STAGE,
+                                 RECORD_FIELDS_WITH_URL, RECORD_FIELDS_WITH_STAGE_AND_URL))
 # Optional for compatibility with older LAB receipts; neither the stage nor
 # any issuer timestamp is independently attested by this metadata gate.
 CPI_PUBLICATION_STAGES = frozenset(("FLASH", "FINAL", "REVISION"))
@@ -58,6 +80,27 @@ NUMBER = re.compile(r"-?(?:0|[1-9]\d{0,2})(?:\.\d{1,4})?\Z")
 HEX = re.compile(r"[0-9a-f]{64}\Z")
 MAX_BYTES = 48_000
 MAX_RECORDS = 32
+
+
+def _cpi_issuer_claim_host(currency: str, candidate: Any) -> str | None:
+    """Strictly check caller-claimed HTTPS issuer URL; no HTTP requests."""
+    if (not isinstance(candidate, str) or not 12 <= len(candidate) <= 1024
+            or any(c.isspace() or ord(c) < 32 for c in candidate)
+            or "\\" in candidate):
+        return None
+    try:
+        url = urlsplit(candidate)
+        host = url.hostname
+        if (url.scheme != "https" or url.username is not None
+                or url.password is not None or url.port is not None
+                or not url.path.startswith("/") or url.path.startswith("//")
+                or url.fragment or host not in CPI_ISSUER_HOSTS[currency]):
+            return None
+        if currency == "EUR" and not url.path.startswith("/eurostat/"):
+            return None
+        return host
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def _blocked(reason: str) -> dict[str, Any]:
@@ -205,7 +248,7 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
     accepted: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for row in obj["records"]:
         if (not isinstance(row, dict)
-                or set(row) not in (RECORD_FIELDS, RECORD_FIELDS_WITH_STAGE)):
+                or frozenset(row) not in RECORD_FIELD_VARIANTS):
             out["reason"] = "RELEASE_SCHEMA_INVALID"
             return out
         cur, indicator = row["currency"], row["indicator"]
@@ -234,6 +277,18 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
             # first reading with a later revision.
             out["reason"] = "REVISION_VINTAGE_UNATTESTED"
             return out
+        if indicator == "CPI_YOY":
+            if stage in ("FLASH", "FINAL") and "source_url" not in row:
+                out["reason"] = "CPI_TYPED_ISSUER_URL_CLAIM_MISSING"
+                return out
+            if ("source_url" in row and
+                    _cpi_issuer_claim_host(cur, row["source_url"]) is None):
+                out["reason"] = "CPI_ORIGINAL_ISSUER_HOST_CLAIM_MISMATCH"
+                return out
+        elif "source_url" in row:
+            # Policy decisions have a different issuer (central bank).
+            out["reason"] = "CPI_SOURCE_URL_USED_FOR_POLICY_RATE"
+            return out
         pub, captured = _time(row["published_at_utc"]), _time(row["captured_at_utc"])
         frequency = (_observation_period(row["observation_period"], indicator=indicator,
                                          published=pub, stage=stage)
@@ -241,6 +296,9 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
         if (pub is None or captured is None or frequency is None
                 or not pub <= captured <= decision):
             out["reason"] = "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID"
+            return out
+        if indicator == "CPI_YOY" and frequency[0] != CPI_FREQUENCY_2026_LAB[cur]:
+            out["reason"] = "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH"
             return out
         key = (cur, indicator, row["observation_period"], stage)
         if key in accepted:
@@ -316,6 +374,10 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 "captured_at_utc_claim": latest["captured_at_utc"],
                 "source_type_claim": latest["source_type"],
                 "source_sha256_claim": latest["source_sha256"],
+                "issuer_host_claim": (_cpi_issuer_claim_host(currency, latest["source_url"])
+                                      if indicator == "CPI_YOY" and "source_url" in latest
+                                      else None),
+                "issuer_host_independently_verified": False,
                 "publication_stage_claim": latest_stage,
                 "measurement_verified": False,
             }
