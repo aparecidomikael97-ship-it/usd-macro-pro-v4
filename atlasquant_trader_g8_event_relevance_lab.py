@@ -49,6 +49,10 @@ class EventSnapshot:
     actual_published_at: datetime | None = None
     actual_captured_at: datetime | None = None
     original_sha256_claim: str | None = None
+    previous_value: str | None = None
+    previous_reference_period: str | None = None
+    previous_published_at: datetime | None = None
+    previous_captured_at: datetime | None = None
 
 
 def _utc(v: Any) -> datetime | None:
@@ -104,6 +108,28 @@ def _economic_period_not_after_release(metric: str, period: str,
             (scheduled.year, scheduled.month))
 
 
+def _previous_period_is_immediately_before(metric: str, current: str,
+                                           previous: str) -> bool:
+    """A stale month/quarter is not the 'previous result' for this event."""
+    if metric == "POLICY_RATE":
+        # Meeting intervals are irregular. Enforce older date with matching
+        # precision, never infer which meeting was the actual predecessor.
+        return (len(current) == len(previous)
+                and _matching_period(metric, previous)
+                and previous < current)
+    if metric == "GDP_QOQ":
+        if not _QUARTER.fullmatch(current) or not _QUARTER.fullmatch(previous):
+            return False
+        current_index = int(current[:4]) * 4 + int(current[-1])
+        prior_index = int(previous[:4]) * 4 + int(previous[-1])
+        return current_index - prior_index == 1
+    if not _MONTH.fullmatch(current) or not _MONTH.fullmatch(previous):
+        return False
+    current_index = int(current[:4]) * 12 + int(current[5:7])
+    prior_index = int(previous[:4]) * 12 + int(previous[5:7])
+    return current_index - prior_index == 1
+
+
 def _blocked(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "LAB_EVENT_ROUTER_BLOCKED", "reason": reason,
@@ -152,6 +178,10 @@ def _event_row(v: EventSnapshot, now: datetime) -> dict[str, Any] | None:
     consensus_at = _utc(v.consensus_captured_at)
     published_at = _utc(v.actual_published_at)
     actual_at = _utc(v.actual_captured_at)
+    has_previous = v.previous_value is not None
+    previous = _num(v.previous_value) if has_previous else None
+    previous_published = _utc(v.previous_published_at)
+    previous_at = _utc(v.previous_captured_at)
     if ((has_consensus and (consensus is None or consensus_at is None
                             or consensus_at > now or consensus_at >= scheduled))
             or (not has_consensus and v.consensus_captured_at is not None)
@@ -159,7 +189,18 @@ def _event_row(v: EventSnapshot, now: datetime) -> dict[str, Any] | None:
                                 or published_at < scheduled or published_at > actual_at
                                 or actual_at > now))
             or (not has_actual and (v.actual_published_at is not None
-                                    or v.actual_captured_at is not None))):
+                                    or v.actual_captured_at is not None))
+            or (has_previous and (
+                previous is None or not isinstance(v.previous_reference_period, str)
+                or not _previous_period_is_immediately_before(
+                    v.metric, v.target_period, v.previous_reference_period)
+                or previous_published is None or previous_at is None
+                or previous_published > previous_at
+                or previous_at > now or previous_at >= scheduled))
+            or (not has_previous and (
+                v.previous_reference_period is not None
+                or v.previous_published_at is not None
+                or v.previous_captured_at is not None))):
         return None
 
     # A snapshot containing actual data cannot exist before the release as-of.
@@ -177,15 +218,23 @@ def _event_row(v: EventSnapshot, now: datetime) -> dict[str, Any] | None:
         "importance": v.importance, "scheduled_release_utc": scheduled.isoformat(),
         "phase": phase,
         "consensus_documentary": str(consensus) if consensus is not None else None,
+        "previous_documentary": str(previous) if previous is not None else None,
+        "previous_reference_period": (v.previous_reference_period
+                                       if previous is not None else None),
+        "previous_claimed_captured_utc": (previous_at.isoformat()
+                                          if previous_at is not None else None),
         "actual_documentary": str(actual) if actual is not None else None,
         "actual_minus_consensus_documentary": (
             str(actual - consensus) if actual is not None and consensus is not None else None),
+        "actual_minus_previous_documentary": (
+            str(actual - previous) if actual is not None and previous is not None else None),
         "calendar_claimed_captured_utc": calendar.isoformat(),
         "consensus_claimed_captured_utc": (consensus_at.isoformat()
                                             if consensus_at is not None else None),
         "actual_claimed_captured_utc": (actual_at.isoformat()
                                          if actual_at is not None else None),
         "source_hash_claim_only_not_authenticated": v.original_sha256_claim is not None,
+        "previous_result_or_revision_independently_attested": False,
         "surprise_is_currency_strength_direction": False,
         "release_time_is_independently_verified": False,
     }
@@ -221,6 +270,9 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
              "high_impact": row["importance"] == "HIGH",
              "actual_minus_consensus_documentary": row[
                  "actual_minus_consensus_documentary"],
+             "previous_documentary": row["previous_documentary"],
+             "actual_minus_previous_documentary": row[
+                 "actual_minus_previous_documentary"],
              "fx_direction_from_event": None}
             for row in rows if row["currency"] in (base, quote)
         ]
