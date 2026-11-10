@@ -129,6 +129,27 @@ class ExpectationContradictionsTests(unittest.TestCase):
         self.assertEqual(pair(r, "EUR/USD")["comparison"], "RATE_PATH_EVIDENCE_UNAVAILABLE")
         self.assert_safe(r)
 
+    def test_instrument_id_must_belong_to_declared_currency(self):
+        # Matching self-declared vintage IDs must not rebrand a USD instrument as EUR.
+        for change_second_only in (False, True):
+            with self.subTest(change_second_only=change_second_only):
+                rates = dataset()
+                rates["EUR"] = vintages("EUR", instrument="USD:OIS3M")
+                if change_second_only:
+                    rates["EUR"][0] = replace(rates["EUR"][0], instrument_id="EUR:OIS3M")
+                r = self.run_case(rates)
+                self.assertEqual(
+                    pair(r, "EUR/USD")["comparison"], "RATE_PATH_EVIDENCE_UNAVAILABLE")
+                self.assertEqual(r["pair_context_unavailable"], 7)
+                self.assert_safe(r)
+
+    def test_empty_instrument_suffix_never_authenticates_rate_path(self):
+        rates = dataset()
+        rates["USD"] = vintages("USD", instrument="USD:")
+        r = self.run_case(rates)
+        self.assertEqual(pair(r, "EUR/USD")["comparison"], "RATE_PATH_EVIDENCE_UNAVAILABLE")
+        self.assert_safe(r)
+
     def test_bogus_or_nonfinite_rate_not_used(self):
         for value in ("NaN", "Infinity", "1e999", "5001", True, 300.0, "N/A", ""):
             with self.subTest(value=value):

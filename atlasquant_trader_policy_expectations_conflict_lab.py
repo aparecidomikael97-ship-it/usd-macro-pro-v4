@@ -92,6 +92,8 @@ def _check_two_vintages(rows: Any, currency: str, asof: datetime, horizon: str) 
     if any(x.currency != currency or type(x.tenor_months) is not int
            or x.tenor_months != TENOR_MONTHS or x.methodology_claim != METHODOLOGY
            or not isinstance(x.instrument_id, str) or _ID.fullmatch(x.instrument_id) is None
+           or not x.instrument_id.startswith(f"{currency}:")
+           or len(x.instrument_id) <= len(currency) + 1
            or not isinstance(x.target_month, str) or _MONTH.fullmatch(x.target_month) is None
            or not isinstance(x.source_sha256_claim, str) or _SHA.fullmatch(x.source_sha256_claim) is None
            for x in rows):

@@ -22,6 +22,7 @@ O novo analisador compara hipóteses para os **28 cruzamentos** a partir de duas
 
 - **Nenhum dado real de futuros/OIS foi ingerido neste módulo.** Os inputs dos testes são inteiramente fabricados. Um SHA-256 fornecido pelo chamador não autentica a origem nem o horário da cotação.
 - Instrumentos OIS, futuros e expectativas implícitas precisam de **normalização econômica verificável**; horizonte de três meses não transforma instrumentos diferentes em fontes idênticas.
+- **Novo veto de integridade (10/11):** `instrument_id` precisa ter o prefixo exato da moeda (`USD:...`, `EUR:...` etc.) e sufixo não vazio, nos dois snapshots. Isso impede uma série USD erroneamente rotulada como EUR de participar da comparação, mas **não** autentica que o identificador ou a fonte existem.
 - A cadeia de **consenso independente pré-divulgação** e o efeito **pós-notícia** sobre cada moeda ainda necessitam fonte real, timestamp e validação. A captura de CPI do BLS em outra etapa é contexto econômico, **não** previsão de juros nem consenso de mercado.
 - A pontuação de acerto dos vieses **D1/W1 ainda não foi validada**; devemos avaliar acerto direcional, cobertura e estabilidade em períodos prospectivos fora da amostra, sem seleção posterior dos vencedores.
 - Sem evidência que comprove incremento de qualidade, o filtro não pode ser chamado de fator que aumentou a assertividade. A meta de 65–70% é **objetivo de pesquisa**, não performance.
