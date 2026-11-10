@@ -34,6 +34,14 @@ OBSERVATION_AGE_LIMIT_DAYS = {
     ("POLICY_RATE", "MONTHLY"): 155,
 }
 SOURCES = frozenset(("OFFICIAL_STATISTICS_OFFICE", "CENTRAL_BANK"))
+# These are claimed ORIGINAL ISSUER categories, not the website that happens
+# to mirror the series. A central bank reposting CPI does not make it the G8
+# national statistics issuer; a statistics office does not set policy rates.
+# Even a matching category remains caller-asserted and unauthenticated.
+REQUIRED_ISSUER_TYPE = {
+    "CPI_YOY": "OFFICIAL_STATISTICS_OFFICE",
+    "POLICY_RATE": "CENTRAL_BANK",
+}
 ENVELOPE_FIELDS = frozenset(("schema", "pair", "decision_at_utc", "records"))
 RECORD_FIELDS = frozenset((
     "currency", "indicator", "observation_period", "value",
@@ -194,6 +202,9 @@ def inspect_g8_pair_macro_asof_lab(raw: Any, *, as_of_utc: Any) -> dict[str, Any
                 or HEX.fullmatch(row["source_sha256"]) is None
                 or _value(row["value"]) is None):
             out["reason"] = "RELEASE_SOURCE_VALUE_OR_PAIR_INVALID"
+            return out
+        if row["source_type"] != REQUIRED_ISSUER_TYPE[indicator]:
+            out["reason"] = "INDICATOR_ORIGINAL_ISSUER_CATEGORY_MISMATCH"
             return out
         pub, captured = _time(row["published_at_utc"]), _time(row["captured_at_utc"])
         frequency = (_observation_period(row["observation_period"], indicator=indicator,
