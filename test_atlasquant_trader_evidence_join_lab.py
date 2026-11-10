@@ -49,7 +49,10 @@ def receipts():
         result[curr] = [
             {
                 "currency": curr, "indicator": indicator,
-                "observation_period": "2026-09", "value": "2.0",
+                "observation_period": (
+                    "2026-Q3" if curr == "NZD" and indicator == "CPI_YOY"
+                    else "2026-09"
+                ), "value": "2.0",
                 "published_at_utc": "2026-10-29T12:00:00Z",
                 "captured_at_utc": "2026-10-29T12:05:00Z",
                 "source_type": ("CENTRAL_BANK" if indicator == "POLICY_RATE"
