@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
+import json
 from pathlib import Path
 from unittest.mock import patch
 import csv
@@ -15,6 +16,9 @@ import unittest
 from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
     BASELINE_OPEN_UTC, EVENT_UTC, FIELDS, LAST_REQUIRED_CLOSE_UTC, USD_FX,
     ClaimedLocalPriceArchive,
+)
+from atlasquant_trader_ppi_mt5_m15_capture_lab import (
+    SCHEMA as PRICE_MANIFEST_SCHEMA, SOURCE_KIND as PRICE_SOURCE_KIND,
 )
 from atlasquant_trader_ppi_one_event_study_join_lab import (
     ROOT_EVENT, PpiStudyPacket, inspect_ppi_one_event_study_lab as inspect,
@@ -72,6 +76,33 @@ class OneEventStudyJoinTests(unittest.TestCase):
                 writer.writeheader()
                 writer.writerows(rows)
             hashes[sym] = sha256(path.read_bytes()).hexdigest()
+        # Synthetic, clearly UNATTESTED capture manifest. The real collector
+        # creates the corresponding file after checking MT5 symbol metadata.
+        manifest = {
+            "schema": PRICE_MANIFEST_SCHEMA, "source_kind": PRICE_SOURCE_KIND,
+            "captured_at_utc_local_clock_claim": NOW.isoformat(),
+            "sha256_by_symbol": hashes, "symbol_count": len(USD_FX),
+            "rows_per_symbol": 17,
+            "terminal_company_observation_untrusted": "SYNTHETIC_TEST_TERMINAL",
+            "active_quote_server_independently_verified": False,
+            "symbol_specs_claimed_unattested": {
+                sym: {
+                    "symbol": sym, "currency_base_claim": sym[:3],
+                    "currency_profit_claim": sym[3:],
+                    "digits_claim": 3 if sym.endswith("JPY") else 5,
+                    "point_quote_units_claim":
+                        "0.001" if sym.endswith("JPY") else "0.00001",
+                } for sym in USD_FX
+            },
+            "symbol_specs_observed_locally": True,
+            "broker_identity_independently_authenticated": False,
+            "candle_utc_independently_authenticated": False,
+            "point_in_time_market_data_attested": False,
+            "research_only": True, "operational_bias": "AGUARDAR",
+            "publishable": False, "trade_authorized": False,
+        }
+        (self.root / "ppi_mt5_capture_manifest.json").write_text(
+            json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
         return ClaimedLocalPriceArchive(NOW, hashes)
 
     @contextmanager
@@ -145,11 +176,13 @@ class OneEventStudyJoinTests(unittest.TestCase):
         self.assertTrue(study["m15_bar_spread_aggregation_not_independently_verified"])
         self.assertEqual(study["m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost"]["EURUSD"]
                          ["baseline_m15_bar_spread_sample_points"], 11)
+        self.assertTrue(study["local_mt5_capture_manifest_matched_unattested"])
+        self.assertFalse(study["mt5_server_or_broker_independently_authenticated"])
         self.assertEqual(result["economic_events_authenticated"], 0)
         self.assertEqual(set(result["source_stage_states"]), {
             "TD_PRE_EVENT", "TE_PRE_EVENT", "BLS_FIRST_PRINT",
             "SURPRISE_SAME_METRIC", "SEVEN_FX_M15_WINDOWS",
-            "SPREAD_POINTS_CONTEXT"})
+            "SPREAD_POINTS_CONTEXT", "MT5_CAPTURE_MANIFEST"})
 
     def test_missing_bls_document_blocks_even_with_good_synthetic_previous(self):
         with self.isolated_synthetic_pre_event_receipts():
@@ -195,7 +228,78 @@ class OneEventStudyJoinTests(unittest.TestCase):
                           captured_at_utc=EVENT_UTC + timedelta(hours=2))
         with self.isolated_synthetic_pre_event_receipts():
             result = self.run_study(replace(self.packet, price_archive_receipt=earlier))
-        self.assertEqual(result["reason"], "FULL_SEVEN_PAIR_FX_ARCHIVE_MISSING_OR_FAILED")
+        self.assertEqual(result["reason"], "MT5_MANIFEST_AND_PRICE_RECEIPT_DISAGREE")
+
+    def test_missing_capture_manifest_blocks_consolidated_study(self):
+        (self.root / "ppi_mt5_capture_manifest.json").unlink()
+        with self.isolated_synthetic_pre_event_receipts():
+            report = self.run_study()
+        self.assertEqual(report["reason"], "MT5_CAPTURE_MANIFEST_MISSING_UNSAFE_OR_INVALID")
+        self.assertIsNone(report["one_event_study"])
+
+    def test_replaced_manifest_sha_cannot_pass_even_with_valid_seven_csv_files(self):
+        path = self.root / "ppi_mt5_capture_manifest.json"
+        manifest = json.loads(path.read_text("utf-8"))
+        manifest["sha256_by_symbol"]["EURUSD"] = "f" * 64
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.isolated_synthetic_pre_event_receipts():
+            report = self.run_study()
+        self.assertEqual(report["reason"], "MT5_MANIFEST_AND_PRICE_RECEIPT_DISAGREE")
+        self.assertIsNone(report["one_event_study"])
+
+    def test_wrong_mt5_symbol_specs_refuse_result_before_price_scoring(self):
+        path = self.root / "ppi_mt5_capture_manifest.json"
+        manifest = json.loads(path.read_text("utf-8"))
+        manifest["symbol_specs_claimed_unattested"]["USDJPY"]["currency_profit_claim"] = "EUR"
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.isolated_synthetic_pre_event_receipts():
+            report = self.run_study()
+        self.assertEqual(report["reason"], "MT5_CAPTURE_MANIFEST_MISSING_UNSAFE_OR_INVALID")
+        self.assertIsNone(report["one_event_study"])
+
+    def test_false_broker_attestation_cannot_pass_paperwork(self):
+        path = self.root / "ppi_mt5_capture_manifest.json"
+        manifest = json.loads(path.read_text("utf-8"))
+        manifest["active_quote_server_independently_verified"] = True
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.isolated_synthetic_pre_event_receipts():
+            report = self.run_study()
+        self.assertEqual(report["reason"], "MT5_CAPTURE_MANIFEST_MISSING_UNSAFE_OR_INVALID")
+
+    def test_wrong_manifest_census_or_operational_status_rejected(self):
+        path = self.root / "ppi_mt5_capture_manifest.json"
+        original = json.loads(path.read_text("utf-8"))
+        for field, wrong in (("symbol_count", 6), ("rows_per_symbol", 16),
+                             ("research_only", False), ("publishable", True),
+                             ("trade_authorized", True),
+                             ("point_in_time_market_data_attested", True)):
+            with self.subTest(field=field):
+                manifest = dict(original)
+                manifest[field] = wrong
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                with self.isolated_synthetic_pre_event_receipts():
+                    report = self.run_study()
+                self.assertEqual(report["reason"], "MT5_CAPTURE_MANIFEST_MISSING_UNSAFE_OR_INVALID")
+                self.assertIsNone(report["one_event_study"])
+
+    def test_manifest_capture_clock_before_window_close_rejected(self):
+        path = self.root / "ppi_mt5_capture_manifest.json"
+        manifest = json.loads(path.read_text("utf-8"))
+        manifest["captured_at_utc_local_clock_claim"] = (
+            LAST_REQUIRED_CLOSE_UTC - timedelta(minutes=1)).isoformat()
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.isolated_synthetic_pre_event_receipts():
+            report = self.run_study()
+        self.assertEqual(report["reason"], "MT5_CAPTURE_MANIFEST_MISSING_UNSAFE_OR_INVALID")
+
+    def test_manifest_symlink_is_not_accepted(self):
+        path = self.root / "ppi_mt5_capture_manifest.json"
+        target = self.root / "raw_manifest.json"
+        path.rename(target)
+        path.symlink_to(target)
+        with self.isolated_synthetic_pre_event_receipts():
+            report = self.run_study()
+        self.assertEqual(report["reason"], "MT5_CAPTURE_MANIFEST_MISSING_UNSAFE_OR_INVALID")
 
     def test_future_and_naive_inspection_clocks_block(self):
         for invalid in (None, "2026-11-13T18:00:00Z", NOW.replace(tzinfo=None)):

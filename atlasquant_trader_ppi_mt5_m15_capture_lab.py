@@ -324,12 +324,33 @@ def load_local_receipt_lab(directory: Path) -> ClaimedLocalPriceArchive:
         raise ValueError("MANIFEST_MISSING_OR_UNSAFE")
     try:
         manifest = json.loads(file.read_text(encoding="utf-8"))
+        hashes = manifest.get("sha256_by_symbol")
         if (manifest["schema"] != SCHEMA or manifest["source_kind"] != SOURCE_KIND
-                or set(manifest["sha256_by_symbol"]) != set(USD_FX)):
+                or not isinstance(hashes, dict) or set(hashes) != set(USD_FX)
+                or any(type(v) is not str or re.fullmatch(r"[a-f0-9]{64}", v) is None
+                       for v in hashes.values())
+                or type(manifest.get("symbol_count")) is not int
+                or manifest["symbol_count"] != len(USD_FX)
+                or type(manifest.get("rows_per_symbol")) is not int
+                or manifest["rows_per_symbol"] != ROWS_REQUIRED
+                or manifest.get("research_only") is not True
+                or manifest.get("operational_bias") != "AGUARDAR"
+                or manifest.get("publishable") is not False
+                or manifest.get("trade_authorized") is not False
+                or manifest.get("candle_utc_independently_authenticated") is not False
+                or manifest.get("point_in_time_market_data_attested") is not False):
             raise ValueError("MANIFEST_SCHEMA_OR_COHORT_MISMATCH")
         if not _stored_symbol_specs_valid(manifest):
             raise ValueError("MANIFEST_SYMBOL_SPECS_OR_BROKER_ATTESTATION_INVALID")
-        now = datetime.fromisoformat(manifest["captured_at_utc_local_clock_claim"])
+        raw_clock = manifest.get("captured_at_utc_local_clock_claim")
+        if type(raw_clock) is not str:
+            raise ValueError("MANIFEST_CAPTURE_TIMESTAMP_INVALID")
+        try:
+            now = datetime.fromisoformat(raw_clock)
+        except (ValueError, OverflowError) as exc:
+            raise ValueError("MANIFEST_CAPTURE_TIMESTAMP_INVALID") from exc
+        if now.tzinfo is None or now.utcoffset() is None or now.astimezone(timezone.utc) < LAST_REQUIRED_CLOSE_UTC:
+            raise ValueError("MANIFEST_CAPTURE_TIMESTAMP_INVALID")
         return ClaimedLocalPriceArchive(
             captured_at_utc=now,
             sha256_by_symbol=manifest["sha256_by_symbol"],

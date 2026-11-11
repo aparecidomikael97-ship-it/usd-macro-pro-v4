@@ -362,6 +362,55 @@ class SevenPairCaptureTests(unittest.TestCase):
                         ValueError, "MANIFEST_SYMBOL_SPECS_OR_BROKER_ATTESTATION_INVALID"):
                     load_local_receipt_lab(folder)
 
+    def test_manifest_falsified_counts_and_safety_flags_fail_reload(self):
+        result = self.run_capture()
+        folder = Path(result["directory"])
+        path = folder / "ppi_mt5_capture_manifest.json"
+        original = json.loads(path.read_text("utf-8"))
+        changes = (
+            ("symbol_count", 6), ("symbol_count", True),
+            ("rows_per_symbol", 16), ("rows_per_symbol", True),
+            ("research_only", False), ("operational_bias", "ALTA"),
+            ("publishable", True), ("trade_authorized", True),
+            ("candle_utc_independently_authenticated", True),
+            ("point_in_time_market_data_attested", True),
+        )
+        for field, wrong in changes:
+            with self.subTest(field=field, wrong=wrong):
+                altered = deepcopy(original)
+                altered[field] = wrong
+                path.write_text(json.dumps(altered), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "MANIFEST_SCHEMA_OR_COHORT_MISMATCH"):
+                    load_local_receipt_lab(folder)
+
+    def test_missing_or_oversized_manifest_digest_rejected(self):
+        result = self.run_capture()
+        folder = Path(result["directory"])
+        path = folder / "ppi_mt5_capture_manifest.json"
+        original = json.loads(path.read_text("utf-8"))
+        for digest in (None, "", "A"*64, "e"*63, 999):
+            with self.subTest(digest=digest):
+                altered = deepcopy(original)
+                altered["sha256_by_symbol"]["EURUSD"] = digest
+                path.write_text(json.dumps(altered), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "MANIFEST_SCHEMA_OR_COHORT_MISMATCH"):
+                    load_local_receipt_lab(folder)
+
+    def test_invalid_or_early_manifest_capture_clock_rejected(self):
+        result = self.run_capture()
+        folder = Path(result["directory"])
+        path = folder / "ppi_mt5_capture_manifest.json"
+        original = json.loads(path.read_text("utf-8"))
+        invalids = ("not a date", 3, NOW.replace(tzinfo=None).isoformat(),
+                    (LAST_REQUIRED_CLOSE_UTC-timedelta(minutes=1)).isoformat())
+        for wrong in invalids:
+            with self.subTest(wrong=wrong):
+                altered = deepcopy(original)
+                altered["captured_at_utc_local_clock_claim"] = wrong
+                path.write_text(json.dumps(altered), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "MANIFEST_CAPTURE_TIMESTAMP_INVALID"):
+                    load_local_receipt_lab(folder)
+
     def test_manifest_extra_cohort_rejected(self):
         result = self.run_capture()
         folder = Path(result["directory"])

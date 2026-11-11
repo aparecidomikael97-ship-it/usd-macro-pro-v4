@@ -21,6 +21,7 @@ from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
     TE_PRE_EVENT_HTML_SHA256, USD_FX, ClaimedLocalPriceArchive,
     inspect_ppi_fx_m15_forward_reaction_lab,
 )
+from atlasquant_trader_ppi_mt5_m15_capture_lab import load_local_receipt_lab
 from atlasquant_trader_ppi_m15_spread_context_lab import (
     PASS as SPREAD_OK, inspect_ppi_m15_spread_context_lab,
 )
@@ -133,6 +134,21 @@ def inspect_ppi_one_event_study_lab(
         out["source_stage_states"] = stages
         return out
 
+    # Bind the post-release OHLC receipt to the original MT5 capture manifest.
+    # Valid hashes supplied without that manifest bypass symbol/point checks.
+    try:
+        local_receipt = load_local_receipt_lab(Path(packet.price_archive_root))
+    except (OSError, ValueError, TypeError):
+        out = _blocked("MT5_CAPTURE_MANIFEST_MISSING_UNSAFE_OR_INVALID")
+        out["source_stage_states"] = stages
+        return out
+    if (not isinstance(packet.price_archive_receipt, ClaimedLocalPriceArchive)
+            or packet.price_archive_receipt != local_receipt):
+        out = _blocked("MT5_MANIFEST_AND_PRICE_RECEIPT_DISAGREE")
+        out["source_stage_states"] = stages
+        return out
+    stages["MT5_CAPTURE_MANIFEST"] = "LAB_MANIFEST_RECEIPT_MATCH_DOCUMENTARY_UNATTESTED"
+
     price = inspect_ppi_fx_m15_forward_reaction_lab(
         archive_root=packet.price_archive_root,
         receipt=packet.price_archive_receipt, as_of_utc=now)
@@ -173,6 +189,8 @@ def inspect_ppi_one_event_study_lab(
         "intrabar_max_spread_not_measured": True,
         "broker_price_capture_time_claim_utc": price["archive_captured_at_utc_claim"],
         "price_comparison_is_not_executable_return": True,
+        "local_mt5_capture_manifest_matched_unattested": True,
+        "mt5_server_or_broker_independently_authenticated": False,
     }
     return out
 
