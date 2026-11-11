@@ -17,6 +17,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 import re
 from typing import Any, Callable
 
@@ -43,6 +44,10 @@ def _base(reason: str) -> dict[str, Any]:
         "local_files_written": 0, "mt5_account_information_accessed": False,
         "orders_or_positions_accessed": False, "symbol_visibility_changed": False,
         "broker_identity_independently_authenticated": False,
+        "active_quote_server_independently_verified": False,
+        "terminal_company_observation_untrusted": None,
+        "symbol_specs_observed_locally": False,
+        "symbol_specs_claimed_unattested": None,
         "candle_utc_independently_authenticated": False,
         "point_in_time_market_data_attested": False,
         "operational_bias": "AGUARDAR", "publishable": False,
@@ -83,6 +88,46 @@ def _price(value: Any) -> tuple[Decimal, str]:
             or not re.fullmatch(r"[0-9]{1,7}(?:\.[0-9]{1,9})?", printed)):
         raise ValueError("PRICE_OUTSIDE_FROZEN_CSV_CONTRACT")
     return number, printed
+
+
+def _symbol_spec_for_capture(info: Any, symbol: str) -> dict[str, Any] | None:
+    """Read-only symbol descriptor sanity, not broker/account attestation.
+
+    MetaTrader exposes these via symbol_info(name), and the point is the
+    terminal's declared quote increment, not a historical execution quote.
+    """
+    name = getattr(info, "name", None)
+    base = getattr(info, "currency_base", None)
+    quote = getattr(info, "currency_profit", None)
+    digits = getattr(info, "digits", None)
+    point = getattr(info, "point", None)
+    if (name != symbol or base != symbol[:3] or quote != symbol[3:]
+            or type(digits) is not int or not 2 <= digits <= 6
+            or isinstance(point, (str, bool))):
+        return None
+    try:
+        value = Decimal(str(point))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if (not value.is_finite() or value <= 0
+            or value != Decimal(1).scaleb(-digits)):
+        return None
+    return {
+        "symbol": symbol, "currency_base_claim": base,
+        "currency_profit_claim": quote, "digits_claim": digits,
+        "point_quote_units_claim": format(value, "f"),
+    }
+
+
+def _terminal_company_label(terminal: Any) -> str | None:
+    """Keep only a public vendor label, never paths, account or server data."""
+    company = getattr(terminal, "company", None)
+    if (not isinstance(company, str) or not 1 <= len(company) <= 120
+            or company != company.strip()
+            or any(ord(c) < 32 or ord(c) == 127 for c in company)
+            or "/" in company or chr(92) in company):
+        return None
+    return company
 
 
 def _serialize_exact_window(rates: Any) -> bytes:
@@ -142,17 +187,26 @@ def collect_ppi_mt5_m15_capture_lab(
         report["reason"] = "MT5_TERMINAL_NOT_CONNECTED"
         return report
     pending: dict[str, bytes] = {}
+    specs: dict[str, dict[str, Any]] = {}
+    terminal_company: str | None = None
     try:
         terminal = api.terminal_info()
         if terminal is None or terminal.connected is not True:
             report["reason"] = "MT5_TERMINAL_NOT_CONNECTED"
             return report
+        terminal_company = _terminal_company_label(terminal)
         for symbol in USD_FX:
             info = api.symbol_info(symbol)
             if info is None or info.visible is not True:
                 report["reason"] = "CANONICAL_SYMBOL_NOT_VISIBLE_NO_AUTO_SELECT"
                 report["failed_symbol"] = symbol
                 return report
+            spec = _symbol_spec_for_capture(info, symbol)
+            if spec is None:
+                report["reason"] = "SYMBOL_BASE_QUOTE_DIGITS_OR_POINT_NOT_VERIFIED"
+                report["failed_symbol"] = symbol
+                return report
+            specs[symbol] = spec
             # MT5's range endpoints are UTC-aware, inclusive open timestamps.
             rates = api.copy_rates_range(
                 symbol, api.TIMEFRAME_M15, BASELINE_OPEN_UTC,
@@ -197,6 +251,10 @@ def collect_ppi_mt5_m15_capture_lab(
             "captured_at_utc_local_clock_claim": now.isoformat(),
             "sha256_by_symbol": hashes,
             "symbol_count": len(hashes), "rows_per_symbol": ROWS_REQUIRED,
+            "terminal_company_observation_untrusted": terminal_company,
+            "active_quote_server_independently_verified": False,
+            "symbol_specs_claimed_unattested": specs,
+            "symbol_specs_observed_locally": True,
             "broker_identity_independently_authenticated": False,
             "candle_utc_independently_authenticated": False,
             "point_in_time_market_data_attested": False,
@@ -215,8 +273,46 @@ def collect_ppi_mt5_m15_capture_lab(
         "reason": "LOCAL_HASHES_ONLY_NO_BROKER_PIT_OR_CAUSAL_ATTESTATION",
         "validated_symbols": len(USD_FX), "validated_bars": len(USD_FX) * ROWS_REQUIRED,
         "sha256_by_symbol": hashes, "directory": str(run_dir),
+        "terminal_company_observation_untrusted": terminal_company,
+        "symbol_specs_observed_locally": True,
+        "symbol_specs_claimed_unattested": specs,
     })
     return report
+
+
+def _stored_symbol_specs_valid(manifest: Any) -> bool:
+    """Schema sanity only: local manifest does not authenticate any broker."""
+    if not isinstance(manifest, dict):
+        return False
+    specs = manifest.get("symbol_specs_claimed_unattested")
+    if (manifest.get("symbol_specs_observed_locally") is not True
+            or manifest.get("active_quote_server_independently_verified") is not False
+            or manifest.get("broker_identity_independently_authenticated") is not False
+            or not isinstance(specs, dict) or set(specs) != set(USD_FX)):
+        return False
+    public_label = manifest.get("terminal_company_observation_untrusted")
+    if public_label is not None and _terminal_company_label(
+            SimpleNamespace(company=public_label)) != public_label:
+        return False
+    for symbol, row in specs.items():
+        if (not isinstance(row, dict)
+                or set(row) != {"symbol", "currency_base_claim",
+                                "currency_profit_claim", "digits_claim",
+                                "point_quote_units_claim"}):
+            return False
+        try:
+            observed = SimpleNamespace(
+                name=row["symbol"], currency_base=row["currency_base_claim"],
+                currency_profit=row["currency_profit_claim"],
+                digits=row["digits_claim"],
+                point=(Decimal(row["point_quote_units_claim"])
+                       if type(row["point_quote_units_claim"]) is str else None))
+            expected = _symbol_spec_for_capture(observed, symbol)
+        except (ValueError, InvalidOperation, TypeError):
+            return False
+        if expected is None or expected != row:
+            return False
+    return True
 
 
 def load_local_receipt_lab(directory: Path) -> ClaimedLocalPriceArchive:
@@ -231,6 +327,8 @@ def load_local_receipt_lab(directory: Path) -> ClaimedLocalPriceArchive:
         if (manifest["schema"] != SCHEMA or manifest["source_kind"] != SOURCE_KIND
                 or set(manifest["sha256_by_symbol"]) != set(USD_FX)):
             raise ValueError("MANIFEST_SCHEMA_OR_COHORT_MISMATCH")
+        if not _stored_symbol_specs_valid(manifest):
+            raise ValueError("MANIFEST_SYMBOL_SPECS_OR_BROKER_ATTESTATION_INVALID")
         now = datetime.fromisoformat(manifest["captured_at_utc_local_clock_claim"])
         return ClaimedLocalPriceArchive(
             captured_at_utc=now,

@@ -35,6 +35,15 @@ class FakeMT5:
         self.calls: list[tuple] = []
         self.connected = True
         self.visible = set(USD_FX)
+        self.company = "MetaQuotes Software Corp."
+        self.specs = {
+            sym: {
+                "name": sym, "currency_base": sym[:3],
+                "currency_profit": sym[3:],
+                "digits": 3 if sym.endswith("JPY") else 5,
+                "point": 0.001 if sym.endswith("JPY") else 0.00001,
+            } for sym in USD_FX
+        }
         self.data = {}
         for sym in USD_FX:
             self.data[sym] = [
@@ -49,11 +58,11 @@ class FakeMT5:
 
     def terminal_info(self):
         self.calls.append(("terminal_info",))
-        return SimpleNamespace(connected=self.connected)
+        return SimpleNamespace(connected=self.connected, company=self.company)
 
     def symbol_info(self, sym):
         self.calls.append(("symbol_info", sym))
-        return SimpleNamespace(visible=sym in self.visible)
+        return SimpleNamespace(visible=sym in self.visible, **self.specs[sym])
 
     def copy_rates_range(self, sym, timeframe, begin, end):
         self.calls.append(("copy_rates_range", sym, timeframe, begin, end))
@@ -86,6 +95,7 @@ class SevenPairCaptureTests(unittest.TestCase):
         self.assertFalse(result["orders_or_positions_accessed"])
         self.assertFalse(result["symbol_visibility_changed"])
         self.assertFalse(result["broker_identity_independently_authenticated"])
+        self.assertFalse(result["active_quote_server_independently_verified"])
         self.assertFalse(result["candle_utc_independently_authenticated"])
         self.assertFalse(result["point_in_time_market_data_attested"])
         self.assertEqual(result["operational_bias"], "AGUARDAR")
@@ -107,7 +117,19 @@ class SevenPairCaptureTests(unittest.TestCase):
         self.assertEqual(result["validated_symbols"], 7)
         self.assertEqual(result["validated_bars"], 119, result)
         self.assertEqual(result["local_files_written"], 8)
+        self.assertTrue(result["symbol_specs_observed_locally"])
+        self.assertEqual(result["terminal_company_observation_untrusted"],
+                         "MetaQuotes Software Corp.")
+        self.assertEqual(set(result["symbol_specs_claimed_unattested"]), set(USD_FX))
         folder = Path(result["directory"])
+        stored = json.loads((folder / "ppi_mt5_capture_manifest.json").read_text("utf-8"))
+        self.assertEqual(stored["terminal_company_observation_untrusted"],
+                         "MetaQuotes Software Corp.")
+        self.assertFalse(stored["active_quote_server_independently_verified"])
+        self.assertEqual(stored["symbol_specs_claimed_unattested"]["EURUSD"]["digits_claim"], 5)
+        self.assertEqual(stored["symbol_specs_claimed_unattested"]["EURUSD"]["point_quote_units_claim"], "0.00001")
+        self.assertEqual(stored["symbol_specs_claimed_unattested"]["USDJPY"]["point_quote_units_claim"], "0.001")
+
         self.assertEqual(len(list(folder.iterdir())), 8)
         receipt = load_local_receipt_lab(folder)
         self.assertEqual(set(receipt.sha256_by_symbol), set(USD_FX))
@@ -203,6 +225,48 @@ class SevenPairCaptureTests(unittest.TestCase):
         self.assertEqual(result["failed_symbol"], "USDCHF")
         self.assertEqual(self.api.calls[-1], ("shutdown",))
 
+    def test_wrong_currency_base_or_profit_cannot_be_mistaken_for_forex_pair(self):
+        for attr, bad in (("currency_base", "GBP"), ("currency_profit", "EUR")):
+            with self.subTest(attr=attr):
+                self.api.specs["EURUSD"][attr] = bad
+                result = self.run_capture()
+                self.blocked(result, "SYMBOL_BASE_QUOTE_DIGITS_OR_POINT_NOT_VERIFIED")
+                self.assertEqual(result["failed_symbol"], "EURUSD")
+                self.assertEqual(self.api.calls[-1], ("shutdown",))
+                self.api.specs["EURUSD"][attr] = "EUR" if attr == "currency_base" else "USD"
+
+    def test_wrong_name_digits_point_or_nonfinite_point_blocks_before_file_io(self):
+        for key, bad in (("name", "EURUSD.a"), ("digits", True),
+                         ("digits", 8), ("point", 0.0001),
+                         ("point", float("nan")), ("point", "0.00001")):
+            with self.subTest(key=key,bad=bad):
+                original = self.api.specs["EURUSD"][key]
+                self.api.specs["EURUSD"][key] = bad
+                result = self.run_capture()
+                self.blocked(result, "SYMBOL_BASE_QUOTE_DIGITS_OR_POINT_NOT_VERIFIED")
+                self.api.specs["EURUSD"][key] = original
+
+    def test_terminal_company_is_untrusted_and_no_sensitive_terminal_metadata_copied(self):
+        self.api.company = "Other Brand MT5"
+        result = self.run_capture()
+        self.safe(result)
+        self.assertTrue(result["symbol_specs_observed_locally"])
+        self.assertEqual(result["terminal_company_observation_untrusted"], "Other Brand MT5")
+        self.assertFalse(result["active_quote_server_independently_verified"])
+        manifest = json.loads((Path(result["directory"]) /
+                              "ppi_mt5_capture_manifest.json").read_text("utf-8"))
+        self.assertFalse(any(word in manifest for word in
+                             ('"account"', '"password"', '"data_path"', '"server"')))
+
+    def test_terminal_company_path_like_value_is_not_stored(self):
+        self.api.company = r"C:\\Users\\private"
+        result = self.run_capture()
+        self.safe(result)
+        self.assertIsNone(result["terminal_company_observation_untrusted"])
+        manifest = json.loads((Path(result["directory"]) /
+                              "ppi_mt5_capture_manifest.json").read_text("utf-8"))
+        self.assertIsNone(manifest["terminal_company_observation_untrusted"])
+
     def test_partial_bars_never_write_six_successes(self):
         self.api.data["USDCAD"].pop()
         self.blocked(self.run_capture(), "REQUIRE_EXACTLY_17_M15_BARS")
@@ -264,6 +328,39 @@ class SevenPairCaptureTests(unittest.TestCase):
             archive_root=folder, receipt=receipt, as_of_utc=NOW)
         self.assertEqual(downstream["series_failure"], "ARCHIVE_RAW_SHA256_MISMATCH")
         self.assertEqual(downstream["operational_bias"], "AGUARDAR")
+
+    def test_modified_symbol_metadata_manifest_rejected_on_reload(self):
+        result = self.run_capture()
+        folder = Path(result["directory"])
+        path = folder / "ppi_mt5_capture_manifest.json"
+        original = json.loads(path.read_text(encoding="utf-8"))
+        for field, wrong in (("currency_base_claim", "GBP"),
+                             ("currency_profit_claim", "JPY"),
+                             ("digits_claim", 4),
+                             ("point_quote_units_claim", "0.0001"),
+                             ("point_quote_units_claim", "NaN")):
+            with self.subTest(field=field, wrong=wrong):
+                manifest = deepcopy(original)
+                manifest["symbol_specs_claimed_unattested"]["EURUSD"][field] = wrong
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(
+                        ValueError, "MANIFEST_SYMBOL_SPECS_OR_BROKER_ATTESTATION_INVALID"):
+                    load_local_receipt_lab(folder)
+
+    def test_forged_active_server_attestation_manifest_rejected(self):
+        result = self.run_capture()
+        folder = Path(result["directory"])
+        path = folder / "ppi_mt5_capture_manifest.json"
+        original = json.loads(path.read_text(encoding="utf-8"))
+        for field in ("active_quote_server_independently_verified",
+                      "broker_identity_independently_authenticated"):
+            with self.subTest(field=field):
+                manifest = deepcopy(original)
+                manifest[field] = True
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(
+                        ValueError, "MANIFEST_SYMBOL_SPECS_OR_BROKER_ATTESTATION_INVALID"):
+                    load_local_receipt_lab(folder)
 
     def test_manifest_extra_cohort_rejected(self):
         result = self.run_capture()
