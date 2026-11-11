@@ -21,7 +21,7 @@ from atlasquant_fx_universe import OFFICIAL_PAIRS
 SCHEMA = "ATLASQUANT_TRADER_US_OCT2026_CPI_RELEASE_TEXT_GUARD_LAB_V1"
 URL = "https://www.bls.gov/news.release/archives/cpi_11102026.htm"
 RELEASE_FLOOR_UTC = datetime(2026, 11, 10, 13, 30, tzinfo=timezone.utc)
-MAX_HTML_BYTES = 1024 * 1024
+MAX_HTML_BYTES = 2 * 1024 * 1024
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 _HEAD = re.compile(
     r"Consumer Price Index for All Urban Consumers\s*\(CPI-U\)\s+"
@@ -74,6 +74,7 @@ def _blocked(state: str, reason: str) -> dict[str, Any]:
         "as_of_utc": None, "source_url_claim": URL,
         "bls_release_floor_utc": RELEASE_FLOOR_UTC.isoformat(),
         "body_sha256_self_consistent": False,
+        "non_utf8_source_byte_count": None,
         "headline_oct2026_sa_mom_pct_body_claim": None,
         "core_oct2026_sa_mom_pct_body_claim": None,
         "headline_oct2026_nsa_yoy_pct": None,
@@ -97,7 +98,9 @@ def _blocked(state: str, reason: str) -> dict[str, Any]:
 
 def _single_percentage(pattern: re.Pattern[str], text: str) -> str | None:
     matches = pattern.findall(text)
-    if len(matches) != 1:
+    # BLS repeats the core figure in both summary and detail paragraphs.
+    # Multiple mentions are acceptable only when every number agrees.
+    if not 1 <= len(matches) <= 4 or len(set(matches)) != 1:
         return None
     try:
         n = Decimal(matches[0])
@@ -132,7 +135,14 @@ def inspect_bls_oct2026_release_text_lab(*, raw_html: Any,
         return _blocked("LAB_INVALID_INPUT", "RAW_BODY_SIZE_OR_SHA256_CLAIM_MISMATCH")
     try:
         parser = _TextOnly()
-        parser.feed(raw_html.decode("utf-8", "strict"))
+        # Real browser-saved BLS HTML contains a few legacy 0x9d bytes.
+        # surrogateescape preserves each non-UTF8 byte without silent loss;
+        # refuse heavily malformed HTML instead of guessing an encoding.
+        decoded = raw_html.decode("utf-8", "surrogateescape")
+        malformed = sum(0xDC80 <= ord(ch) <= 0xDCFF for ch in decoded)
+        if malformed > 16:
+            return _blocked("LAB_INVALID_INPUT", "EXCESS_NON_UTF8_SOURCE_BYTES")
+        parser.feed(decoded)
         parser.close()
         text = re.sub(r"\s+", " ", " ".join(parser.chunks)).strip()
     except (UnicodeError, ValueError, TypeError, RecursionError):
@@ -153,6 +163,7 @@ def inspect_bls_oct2026_release_text_lab(*, raw_html: Any,
     out = _blocked("LAB_BLS_HTML_MONTHLY_CONTEXT_UNATTESTED", "TEXT_PARSED_BUT_ISSUER_AND_PUBLICATION_NOT_ATTESTED")
     out.update(
         as_of_utc=now.isoformat(), body_sha256_self_consistent=True,
+        non_utf8_source_byte_count=malformed,
         headline_oct2026_sa_mom_pct_body_claim=headline,
         core_oct2026_sa_mom_pct_body_claim=core,
         headline_yoy_reported_missing_oct2025_baseline=True,
