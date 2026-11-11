@@ -7,14 +7,14 @@ O estudo `atlasquant_trader_ppi_one_event_study_join_lab.py` mede movimentos do 
 A nova auditoria `atlasquant_trader_ppi_m15_spread_context_lab.py` exige que o arquivo completo de sete pares passe novamente pelo guardião original de OHLC, cronologia UTC, hashes e janela fechada. Depois relê cada CSV e revalida seu SHA-256, evitando usar silenciosamente spreads alterados após a auditoria de preços. Não toca no MT5 nem na conta.
 
 Para cada par, entrega **somente valores em pontos do próprio símbolo**:
-- spread no último candle anterior ao anúncio (13h15–13h30 UTC);
-- spread do candle inicial de reação (13h30–13h45 UTC);
-- maior spread dos 16 candles após divulgação (até 17h30 UTC);
-- mediana do spread ao longo desses 16 candles;
-- razão entre máximo e baseline apenas **dentro do mesmo par**, quando o baseline for positivo;
-- quantidade de spreads zero (zero pode ser ausência de informação de cotação, e não ausência de custos).
+- amostra do campo `spread` no candle anterior ao anúncio (13h15–13h30 UTC);
+- amostra do campo `spread` no primeiro candle depois da divulgação (13h30–13h45 UTC);
+- **maior dos 16 valores de `spread` por barra M15** após divulgação (até 17h30 UTC), não maior spread intrabar;
+- mediana dos 16 valores de `spread` por barra;
+- razão entre a maior amostra e a amostra anterior apenas **dentro do mesmo par**, quando a amostra anterior for positiva;
+- quantidade de amostras zero (zero pode indicar ausência de cotação ou outra particularidade do fornecedor; nunca comprova custo zero).
 
-Os pontos de EURUSD, USDJPY etc. **não são diretamente comparáveis** sem verificar o tamanho de ponto, dígitos e convenções do broker. A leitura da barra M15 também **não comprova** bid/ask capturável no momento, liquidez, slippage, comissão ou retorno líquido. Não há limiar arbitrário para declarar uma oportunidade boa ou ruim; o mercado futuro determinará se é possível calibrar algum.
+Esses campos são amostras descritivas das barras e **não necessariamente máximo, média nem fechamento do spread dentro de cada candle**; o método de agregação do servidor MT5 não foi atestado. Os pontos de EURUSD, USDJPY etc. **não são diretamente comparáveis** sem verificar o tamanho de ponto, dígitos e convenções do broker. A leitura da barra M15 também **não comprova** bid/ask capturável no momento, liquidez, slippage, comissão ou retorno líquido. Não há limiar arbitrário para declarar uma oportunidade boa ou ruim; o mercado futuro determinará se é possível calibrar algum.
 
 O relatório conjunto de PPI agora exige esse estágio documental além dos componentes congelados. A origem real das 119 velas e o servidor Pepperstone continuam **não atestados**; o terminal usado em auditoria anterior mostrou MetaQuotes-Demo no navegador e não se pode assumir proveniência.
 
@@ -29,6 +29,12 @@ Todos os relatórios permanecem `operational_bias=AGUARDAR`, `publishable=false`
 
 ## Verificação
 
-Novo teste `test_atlasquant_trader_ppi_m15_spread_context_lab.py` cobre sete pares, spread relativo por símbolo, pico artificial, zeros, janela fechada, corrupção, símbolo faltante, recebimento prematuro, spread inválido e symlink. O teste integrado `test_atlasquant_trader_ppi_one_event_study_join_lab.py` exige o novo estágio e impede classificação de retorno executável.
+Novo teste `test_atlasquant_trader_ppi_m15_spread_context_lab.py` cobre sete pares, spread relativo por símbolo, maior valor entre amostras (não pico intrabar), zeros isolados e totais, janela fechada, corrupção, símbolo faltante, recebimento prematuro, spread inválido e symlink. O teste integrado `test_atlasquant_trader_ppi_one_event_study_join_lab.py` exige o novo estágio e impede classificação de retorno executável.
 
 Todos os testes são sintéticos e não constituem backtest, demonstração causal, acerto preditivo ou recomendação de investimento. Sem automação, merge, publicação, custo ou ordem.
+
+### Revisão da semântica do spread — 11/11/2026
+
+A revisão substitui nomes como `post_release_four_hour_peak_spread_points`, que poderiam sugerir o **pico intrabar real**, por `max_of_16_post_release_m15_bar_spread_samples_points`. O relatório consolidado passa a usar `m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost` e inclui `intrabar_max_spread_not_measured=true`. O módulo mantém `intrabar_peak_spread_verified=false`, `timestamped_bid_ask_quotes_verified=false` e `bar_spread_aggregation_method_verified=false` inclusive quando todos os dados sintéticos passam.
+
+Não se altera a metodologia congelada de preços, nem o calendário do PPI, nem a janela dos 7 pares. São ajustes de interpretação e travas de afirmações de custo. Não converter essas amostras em spreads executáveis ou retornos líquidos.

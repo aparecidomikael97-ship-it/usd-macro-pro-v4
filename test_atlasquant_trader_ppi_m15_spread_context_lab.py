@@ -70,13 +70,13 @@ class PpiM15SpreadContextTests(unittest.TestCase):
         self.assertEqual(out["state"], PASS)
         self.assertEqual(out["pair_count_documentary"],7)
         self.assertTrue(out["all_seven_price_hashes_revalidated"])
-        self.assertFalse(out["all_spread_points_zero_for_any_pair"])
+        self.assertFalse(out["any_pair_all_17_spread_samples_zero"])
         for sym in USD_FX:
-            row = out["per_pair_spread_points"][sym]
-            self.assertEqual(row["baseline_m15_spread_points"], 11)
-            self.assertEqual(row["post_release_four_hour_peak_spread_points"], 11)
-            self.assertEqual(row["post_release_four_hour_median_spread_points"], "11")
-            self.assertEqual(row["peak_over_baseline_same_pair_only"], "1.000")
+            row = out["per_pair_m15_spread_samples_points"][sym]
+            self.assertEqual(row["baseline_m15_bar_spread_sample_points"], 11)
+            self.assertEqual(row["max_of_16_post_release_m15_bar_spread_samples_points"], 11)
+            self.assertEqual(row["median_of_16_post_release_m15_bar_spread_samples_points"], "11")
+            self.assertEqual(row["max_sample_over_baseline_sample_same_pair_only"], "1.000")
 
     def test_event_spread_peak_is_recorded_per_pair_not_market_return(self):
         self.rows["EURUSD"][1]["spread"] = "60"
@@ -84,11 +84,11 @@ class PpiM15SpreadContextTests(unittest.TestCase):
         self.rows["USDJPY"][1]["spread"] = "160"
         self.receipt = self.write()
         out = self.run_audit()
-        eur, jpy = (out["per_pair_spread_points"][s] for s in ("EURUSD","USDJPY"))
-        self.assertEqual(eur["first_post_release_m15_spread_points"],60)
-        self.assertEqual(eur["post_release_four_hour_peak_spread_points"],60)
-        self.assertEqual(eur["peak_over_baseline_same_pair_only"],"5.455")
-        self.assertEqual(jpy["post_release_four_hour_peak_spread_points"],160)
+        eur, jpy = (out["per_pair_m15_spread_samples_points"][s] for s in ("EURUSD","USDJPY"))
+        self.assertEqual(eur["first_post_release_m15_bar_spread_sample_points"],60)
+        self.assertEqual(eur["max_of_16_post_release_m15_bar_spread_samples_points"],60)
+        self.assertEqual(eur["max_sample_over_baseline_sample_same_pair_only"],"5.455")
+        self.assertEqual(jpy["max_of_16_post_release_m15_bar_spread_samples_points"],160)
         self.assertNotIn("net_pnl",out)
 
     def test_all_zero_spread_values_remain_uncertain_not_zero_execution_cost(self):
@@ -97,15 +97,38 @@ class PpiM15SpreadContextTests(unittest.TestCase):
         self.receipt = self.write()
         out = self.run_audit()
         self.assertEqual(out["state"],PASS)
-        self.assertTrue(out["all_spread_points_zero_for_any_pair"])
-        self.assertEqual(out["per_pair_spread_points"]["EURUSD"]["zero_spread_rows_in_17_candles"],17)
-        self.assertIsNone(out["per_pair_spread_points"]["EURUSD"]["peak_over_baseline_same_pair_only"])
+        self.assertTrue(out["any_pair_all_17_spread_samples_zero"])
+        self.assertEqual(out["per_pair_m15_spread_samples_points"]["EURUSD"]["zero_bar_spread_samples_in_17_candles"],17)
+        self.assertIsNone(out["per_pair_m15_spread_samples_points"]["EURUSD"]["max_sample_over_baseline_sample_same_pair_only"])
         self.assertFalse(out["broker_execution_spread_verified"])
+
+    def test_max_of_bar_samples_does_not_pretend_to_be_intrabar_peak(self):
+        self.rows["EURUSD"][3]["spread"] = "99"
+        self.receipt = self.write()
+        out = self.run_audit()
+        samples = out["per_pair_m15_spread_samples_points"]["EURUSD"]
+        self.assertEqual(samples["max_of_16_post_release_m15_bar_spread_samples_points"], 99)
+        self.assertFalse(out["intrabar_peak_spread_verified"])
+        self.assertFalse(out["bar_spread_aggregation_method_verified"])
+        self.assertFalse(out["timestamped_bid_ask_quotes_verified"])
+        self.assertIn("BAR_SPREAD_FIELD", out["spread_observation_kind"])
+        self.assertNotIn("intrabar_peak_spread_points", samples)
+        self.assertNotIn("executable_spread_points", samples)
+
+    def test_one_zero_sample_requires_review_even_if_not_all_zero(self):
+        self.rows["GBPUSD"][8]["spread"] = "0"
+        self.receipt = self.write()
+        out = self.run_audit()
+        self.assertFalse(out["any_pair_all_17_spread_samples_zero"])
+        self.assertEqual(out["per_pair_m15_spread_samples_points"]["GBPUSD"]
+                         ["zero_bar_spread_samples_in_17_candles"], 1)
+        self.assertTrue(out["per_pair_m15_spread_samples_points"]["GBPUSD"]
+                        ["zero_bar_spread_sample_requires_review"])
 
     def test_before_h4_close_cannot_claim_spread_context(self):
         out = self.run_audit(now=LAST_REQUIRED_CLOSE_UTC-timedelta(seconds=1))
         self.assertEqual(out["reason"],"SPREAD_WINDOW_NOT_CLOSED_OR_INVALID_CLOCK")
-        self.assertIsNone(out["per_pair_spread_points"])
+        self.assertIsNone(out["per_pair_m15_spread_samples_points"])
 
     def test_tampered_archive_rejected(self):
         path=self.root / "EURUSD_PPI_20261113_M15.csv"

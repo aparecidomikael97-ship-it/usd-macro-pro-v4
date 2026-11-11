@@ -139,10 +139,12 @@ class OneEventStudyJoinTests(unittest.TestCase):
         self.assertEqual(study["headline_ppi_surprise_percentage_points"], "0.1")
         self.assertEqual(study["core_ex_food_energy_surprise_percentage_points"], "-0.1")
         self.assertEqual(set(study["fx_usd_normalized_m15_h1_h4_bps"]), set(USD_FX))
-        self.assertEqual(set(study["spread_points_context_not_transaction_cost"]), set(USD_FX))
+        self.assertEqual(set(study["m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost"]), set(USD_FX))
         self.assertTrue(study["broker_execution_costs_not_verified"])
-        self.assertEqual(study["spread_points_context_not_transaction_cost"]["EURUSD"]
-                         ["baseline_m15_spread_points"], 11)
+        self.assertTrue(study["intrabar_max_spread_not_measured"])
+        self.assertTrue(study["m15_bar_spread_aggregation_not_independently_verified"])
+        self.assertEqual(study["m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost"]["EURUSD"]
+                         ["baseline_m15_bar_spread_sample_points"], 11)
         self.assertEqual(result["economic_events_authenticated"], 0)
         self.assertEqual(set(result["source_stage_states"]), {
             "TD_PRE_EVENT", "TE_PRE_EVENT", "BLS_FIRST_PRINT",

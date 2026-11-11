@@ -166,9 +166,11 @@ def inspect_ppi_one_event_study_lab(
         "headline_ppi_surprise_percentage_points": surprise["headline_vs_td_pre_event_diff_pp"],
         "core_ex_food_energy_surprise_percentage_points": surprise["core_vs_td_pre_event_diff_pp"],
         "fx_usd_normalized_m15_h1_h4_bps": price["price_reactions_usd_normalized_bps"],
-        "spread_points_context_not_transaction_cost": spread["per_pair_spread_points"],
-        "zero_spread_context_requires_broker_review": spread["all_spread_points_zero_for_any_pair"],
+        "m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost": spread["per_pair_m15_spread_samples_points"],
+        "zero_spread_context_requires_broker_review": spread["any_pair_all_17_spread_samples_zero"],
         "broker_execution_costs_not_verified": True,
+        "m15_bar_spread_aggregation_not_independently_verified": True,
+        "intrabar_max_spread_not_measured": True,
         "broker_price_capture_time_claim_utc": price["archive_captured_at_utc_claim"],
         "price_comparison_is_not_executable_return": True,
     }

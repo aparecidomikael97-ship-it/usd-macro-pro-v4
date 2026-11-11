@@ -1,8 +1,9 @@
 """Read-only PPI M15 spread context; never an executable transaction-cost estimate.
 
-MT5 `spread` is in terminal/broker points and may be zero, missing indicative
-bid/ask history, or broker-specific. No point-size, ask stream, commission,
-slippage, liquidity, causal significance or profit is attested by OHLC bars.
+MT5 M15 `spread` is a broker/terminal-reported bar field in symbol points,
+NOT the maximum spread observed inside the bar and NOT an executable quote.
+It may be zero, stale or broker-specific. No intrabar bid/ask series,
+commission, slippage, liquidity, causality or profit is attested by OHLC bars.
 All seven complete CSV files must first pass the frozen PPI M15 archive gate.
 """
 from __future__ import annotations
@@ -35,10 +36,14 @@ def _utc(value: Any) -> datetime | None:
 def _deny(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "LAB_PPI_SPREAD_CONTEXT_BLOCKED",
-        "reason": reason, "per_pair_spread_points": None,
+        "reason": reason, "per_pair_m15_spread_samples_points": None,
         "pair_count_documentary": 0,
-        "all_spread_points_zero_for_any_pair": None,
+        "any_pair_all_17_spread_samples_zero": None,
         "all_seven_price_hashes_revalidated": False,
+        "spread_observation_kind": "MT5_M15_BAR_SPREAD_FIELD_IN_SYMBOL_POINTS_UNATTESTED",
+        "intrabar_peak_spread_verified": False,
+        "timestamped_bid_ask_quotes_verified": False,
+        "bar_spread_aggregation_method_verified": False,
         "mt5_point_size_or_digits_independently_verified": False,
         "historical_bid_ask_quotes_independently_verified": False,
         "broker_execution_spread_verified": False,
@@ -85,9 +90,10 @@ def inspect_ppi_m15_spread_context_lab(
 ) -> dict[str, Any]:
     """Document per-symbol broker point values only after all price checks pass.
 
-    Comparable spread ratios may be computed *within one pair only*. A raw
-    spread of 20 points on USDJPY is not directly comparable to 20 on EURUSD.
-    No arbitrary high-spread cutoff is treated as a calibrated risk threshold.
+    Comparable sample ratios may be computed *within one pair only*. A raw
+    spread sample of 20 on USDJPY is not directly comparable to 20 on EURUSD.
+    The maximum of 16 bar-field samples is NOT the maximum intrabar spread.
+    No arbitrary cutoff is a calibrated execution-risk threshold.
     """
     now = _utc(as_of_utc)
     if now is None or now < LAST_REQUIRED_CLOSE_UTC:
@@ -117,21 +123,21 @@ def inspect_ppi_m15_spread_context_lab(
         ratio = (str((Decimal(max(post)) / Decimal(baseline)).quantize(Decimal("0.001")))
                  if baseline else None)
         stats[symbol] = {
-            "baseline_m15_spread_points": baseline,
-            "first_post_release_m15_spread_points": post[0],
-            "post_release_four_hour_peak_spread_points": max(post),
-            "post_release_four_hour_median_spread_points": str(median),
-            "peak_over_baseline_same_pair_only": ratio,
-            "zero_spread_rows_in_17_candles": series.count(0),
-            "zero_could_mean_missing_or_unavailable_quote": bool(0 in series),
+            "baseline_m15_bar_spread_sample_points": baseline,
+            "first_post_release_m15_bar_spread_sample_points": post[0],
+            "max_of_16_post_release_m15_bar_spread_samples_points": max(post),
+            "median_of_16_post_release_m15_bar_spread_samples_points": str(median),
+            "max_sample_over_baseline_sample_same_pair_only": ratio,
+            "zero_bar_spread_samples_in_17_candles": series.count(0),
+            "zero_bar_spread_sample_requires_review": bool(0 in series),
         }
     result = _deny("MT5_BAR_SPREAD_POINTS_NOT_EXECUTABLE_BID_ASK_OR_NET_RETURN")
     result.update({
         "state": PASS,
-        "per_pair_spread_points": stats,
+        "per_pair_m15_spread_samples_points": stats,
         "pair_count_documentary": len(stats),
-        "all_spread_points_zero_for_any_pair": any(
-            row["zero_spread_rows_in_17_candles"] == ROWS_REQUIRED for row in stats.values()),
+        "any_pair_all_17_spread_samples_zero": any(
+            row["zero_bar_spread_samples_in_17_candles"] == ROWS_REQUIRED for row in stats.values()),
         "all_seven_price_hashes_revalidated": True,
     })
     return result
