@@ -14,14 +14,15 @@ from typing import Any
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
 from atlasquant_trader_g8_macro_matrix_pit_lab import inspect_g8_macro_matrix_pit_lab
-from atlasquant_trader_precision_gate_orchestrator_lab import (
-    ResearchPacket, inspect_fx_precision_orchestrator_lab,
+from atlasquant_trader_precision_gate_orchestrator_lab import ResearchPacket
+from atlasquant_trader_fx_d1_archive_precision_join_lab import (
+    inspect_d1_archive_precision_join_lab,
 )
 
 SCHEMA = "ATLASQUANT_TRADER_FX_G8_MACRO_BYTES_PRECISION_JOIN_LAB_V1"
 REQUIRED_INDICATORS = frozenset({"CPI_YOY", "POLICY_RATE"})
 MACRO_PAIR_READY = "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED"
-PRECISION_RESEARCH_ONLY = "LAB_PRECISION_RESEARCH_CANDIDATE_UNATTESTED"
+PRECISION_RESEARCH_ONLY = "LAB_D1_ARCHIVE_PRECISION_DOCUMENTARY_CANDIDATE_NO_GO"
 MAX_SOURCE_BODY_BYTES = 2_000_000
 MAX_ALL_BODY_BYTES = 16_000_000
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -46,6 +47,11 @@ def _blocked(reason: str) -> dict[str, Any]:
         "pairs_locally_byte_bound_both_sides": 0,
         "pair_count": 0, "pair_rows": {},
         "precision_stage_reports": {}, "precision_blocking_stages": [],
+        "d1_archive_bytes_gate_state": "NOT_CHECKED",
+        "d1_archive_bytes_gate_reason": None,
+        "d1_archive_series_bytes_matched": 0,
+        "d1_archive_bars_checked": 0,
+        "d1_archive_capture_pit_independently_authenticated": False,
         "precision_research_candidate_without_macro": False,
         "research_candidate_direction": None,
         "official_publisher_bytes_authenticated": False,
@@ -67,9 +73,10 @@ def inspect_fx_macro_precision_bytes_lab(
     *, packet: Any,
     receipts_by_currency: Any,
     original_source_bytes_by_currency: Any,
+    d1_archive_root: Any = None,
     inspected_at_utc: Any,
 ) -> dict[str, Any]:
-    """Re-run two G8 PIT matrices and seven precision guards; bind raw source bytes.
+    """Require local D1 archive bytes, then recompute seven precision guards and macro custody.
 
     Each currency/indicator currently accepts just ONE asserted receipt vintage.
     If FLASH and FINAL coexist, caller must first prepare a documented vintage
@@ -161,14 +168,24 @@ def inspect_fx_macro_precision_bytes_lab(
             or set(weekly.get("pairs", {})) != set(OFFICIAL_PAIRS)):
         return _blocked("INCOMPLETE_OR_INVALID_G8_ASOF_MACRO_MATRICES")
 
-    # Existing seven-stage gate re-runs independent structural checks, including
-    # D1/W1 synthetic agreement, evidence roots and M15 costs. Passing here
-    # cannot validate the original currencies' quantitative strength.
+    # This is the mandatory archival path for the G8 macro+precision join.
+    # A caller's 28-symbol attendance list is not sufficient: the archive
+    # join verifies all D1 bytes/digests/claim clocks, derives real CSV dates,
+    # and *then* recomputes all seven documentary research gates. A missing
+    # archive is never an alternative path to an internal candidate.
     try:
-        precision = inspect_fx_precision_orchestrator_lab(
-            packet=packet, inspected_at_utc=now)
-    except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
-        return _blocked("PRECISION_ORCHESTRATOR_EXCEPTION_BLOCKED")
+        precision = inspect_d1_archive_precision_join_lab(
+            archive_root=d1_archive_root, packet=packet, inspected_at_utc=now)
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError,
+            OSError, RuntimeError):
+        precision = {
+            "state": "LAB_D1_ARCHIVE_PRECISION_JOIN_BLOCKED",
+            "reason": "ARCHIVE_PRECISION_JOIN_EXCEPTION_BLOCKED",
+            "precision_stage_reports": None,
+            "research_candidate_direction": None,
+            "d1_archive_series_bytes_matched": 0,
+            "d1_archive_bars_checked": 0,
+        }
 
     pair_rows = {}
     dcount = wcount = both_count = 0
@@ -201,8 +218,18 @@ def inspect_fx_macro_precision_bytes_lab(
         }
 
     passing_precision = (precision.get("state") == PRECISION_RESEARCH_ONLY
+                         and precision.get("d1_archive_series_bytes_matched") == 28
+                         and precision.get("manifest_records_reconciled") == 84
                          and precision.get("research_candidate_direction")
                          == getattr(candidate, "daily", None))
+    stage_reports = precision.get("precision_stage_reports")
+    if not isinstance(stage_reports, dict):
+        stage_reports = {}
+    stage_blockers = [name for name, row in stage_reports.items()
+                      if not isinstance(row, dict)
+                      or row.get("structurally_accepted") is not True]
+    if precision.get("state") == "LAB_D1_ARCHIVE_PRECISION_JOIN_BLOCKED":
+        stage_blockers.insert(0, "D1_ARCHIVE_BYTES_CUSTODY")
     macro_ready = pair_rows[asset]["state"] == "LAB_PAIR_MACRO_BYTES_LOCALLY_BOUND_UNATTESTED"
     eligible = macro_ready and passing_precision
     out = _blocked("MACRO_SOURCE_CLAIMS_AND_PRECISION_NEVER_ATTEST_OR_AUTHORIZE")
@@ -220,8 +247,12 @@ def inspect_fx_macro_precision_bytes_lab(
         "w1_macro_claim_complete_pairs": wcount,
         "pairs_locally_byte_bound_both_sides": both_count,
         "pair_count": len(pair_rows), "pair_rows": pair_rows,
-        "precision_stage_reports": precision.get("stage_reports", {}),
-        "precision_blocking_stages": precision.get("blocking_stages", []),
+        "precision_stage_reports": stage_reports,
+        "precision_blocking_stages": stage_blockers,
+        "d1_archive_bytes_gate_state": precision.get("state"),
+        "d1_archive_bytes_gate_reason": precision.get("reason"),
+        "d1_archive_series_bytes_matched": precision.get("d1_archive_series_bytes_matched", 0),
+        "d1_archive_bars_checked": precision.get("d1_archive_bars_checked", 0),
         "precision_research_candidate_without_macro": passing_precision,
         "research_candidate_direction": (getattr(candidate, "daily", None) if eligible else None),
     })

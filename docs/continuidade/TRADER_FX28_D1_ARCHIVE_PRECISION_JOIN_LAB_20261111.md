@@ -37,3 +37,15 @@ Os cenários artificiais geram barras todos os dias, inclusive fins de semana, e
 O estudo separado no AM12 recontou, com os manifestos de 07/11, **14.000 candles D1** e as cinco datas com cobertura incompleta (incluindo GBP/NZD 30/09/2025). Os arquivos antigos foram capturados em 08/11/2026 e não podem ser usados como prova **prévia** de uma decisão de 2025. A nova barreira preserva essa distinção.
 
 **Escopo e implantação:** módulo de pesquisas em PR #1851, execução Python 3.11/3.12, sem merge, deploy, trabalho externo, despesas, sinal ou negociação.
+
+## Integração obrigatória do estudo macroeconômico
+
+A revisão seguinte conecta `atlasquant_trader_fx_macro_precision_byte_join_lab.py` diretamente à função de verificação de arquivo, sem invocar o orquestrador de sete estágios por uma via que aceite apenas presença declarada de pares. O argumento `d1_archive_root` é **necessário para qualquer candidato**, embora permaneça opcional na assinatura para que chamadas antigas falhem com `LAB_MACRO_PRECISION_ABSTAIN`, em vez de iniciar um fluxo alternativo. O módulo retorna `d1_archive_bytes_gate_state`, `d1_archive_bars_checked`, `d1_archive_series_bytes_matched` e seus estágios de pesquisa.
+
+Se não houver arquivo, se os horários forem posteriores à decisão ou se qualquer SHA-256 divergir, o relatório mantém os dados macro analisados, **mas não fornece candidato de direção**. A ausência de GBP/NZD comprovada nos arquivos também bloqueia o candidato quando os documentos macro são sinteticamente completos.
+
+O histórico AM12 de novembro não pode autenticar decisões feitas em 2025. A ligação é necessária para pesquisa documental, mas jamais atesta a corretora, o horário de disponibilidade dos preços, a validade dos indicadores macro nem uma taxa de acerto de 80%.
+
+### Escopo da obrigatoriedade
+
+A porta é obrigatória neste **estudo combinado de bytes macro e precisão**. Outros módulos internos podem continuar a executar verificações independentes para depuração e pesquisa, mas seus resultados permanecem `AGUARDAR` e não são um atalho autorizado para radar ou publicação. Qualquer interface pública exigirá sua própria proibição explícita de bypass.
