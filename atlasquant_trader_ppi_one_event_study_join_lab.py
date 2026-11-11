@@ -22,6 +22,9 @@ from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
     inspect_ppi_fx_m15_forward_reaction_lab,
 )
 from atlasquant_trader_ppi_mt5_m15_capture_lab import load_local_receipt_lab
+from atlasquant_trader_ppi_pre_event_protocol_lab import (
+    AFTER as FROZEN_PROTOCOL_OK, inspect_ppi_frozen_research_protocol_lab,
+)
 from atlasquant_trader_ppi_m15_spread_context_lab import (
     PASS as SPREAD_OK, inspect_ppi_m15_spread_context_lab,
 )
@@ -106,11 +109,24 @@ def inspect_ppi_one_event_study_lab(
     if not isinstance(packet, PpiStudyPacket):
         return _blocked("COMPLETE_EIGHT_COMPONENT_PACKET_REQUIRED")
 
+    # Pre-event protocol was committed with ABSTAIN, not a directional model.
+    # A post-news seven-pair reaction must never count as seven forecasts.
+    protocol = inspect_ppi_frozen_research_protocol_lab(as_of_utc=now)
+    stages = {"PPI_PRE_EVENT_ABSTENTION_PROTOCOL": protocol.get("state")}
+    if (protocol.get("state") != FROZEN_PROTOCOL_OK
+            or protocol.get("pre_event_declared_abstention") is not True
+            or protocol.get("pre_event_directional_forecasts_registered") != 0
+            or protocol.get("event_count") != 1):
+        out = _blocked("PRE_EVENT_RESEARCH_ABSTENTION_PROTOCOL_NOT_INTACT")
+        out["source_stage_states"] = stages
+        return out
+
     td = inspect_ppi_pre_event_snapshot_lab(
         raw_html=packet.td_html, receipt=packet.td_capture, as_of_utc=now)
     te = inspect_te_ppi_snapshot_lab(
         raw_html=packet.te_html, capture=packet.te_capture, as_of_utc=now)
-    stages = {"TD_PRE_EVENT": td.get("state"), "TE_PRE_EVENT": te.get("state")}
+    stages.update({"TD_PRE_EVENT": td.get("state"),
+                   "TE_PRE_EVENT": te.get("state")})
     if (td.get("state") != TD_OK or te.get("state") != TE_OK
             or td.get("source_body_sha256") != TD_PRE_EVENT_HTML_SHA256
             or te.get("source_sha256") != TE_PRE_EVENT_HTML_SHA256):
@@ -175,6 +191,11 @@ def inspect_ppi_one_event_study_lab(
     out["one_event_study"] = {
         "root_event_id": ROOT_EVENT,
         "economic_event_count_documentary": 1,
+        "pre_event_research_protocol_sha256": protocol["frozen_protocol_sha256"],
+        "pre_event_research_direction_registered": "ABSTAIN",
+        "pre_event_directional_forecasts_registered": 0,
+        "post_event_price_reactions_count_as_predictive_hits": False,
+        "post_event_descriptive_study_not_predictive_accuracy": True,
         "forex_crosses_observed": len(USD_FX),
         "pre_event_td_sha256": td["source_body_sha256"],
         "pre_event_te_sha256": te["source_sha256"],

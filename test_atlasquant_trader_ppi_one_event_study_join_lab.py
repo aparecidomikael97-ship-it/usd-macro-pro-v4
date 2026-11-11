@@ -23,6 +23,7 @@ from atlasquant_trader_ppi_mt5_m15_capture_lab import (
 from atlasquant_trader_ppi_one_event_study_join_lab import (
     ROOT_EVENT, PpiStudyPacket, inspect_ppi_one_event_study_lab as inspect,
 )
+from atlasquant_trader_ppi_pre_event_protocol_lab import PINNED_PROTOCOL_SHA256
 from test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     raw as ppi_html, receipt as ppi_receipt, td, te,
 )
@@ -165,6 +166,12 @@ class OneEventStudyJoinTests(unittest.TestCase):
                          "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
         study = result["one_event_study"]
         self.assertEqual(study["root_event_id"], ROOT_EVENT)
+        self.assertEqual(study["pre_event_research_protocol_sha256"],
+                         PINNED_PROTOCOL_SHA256)
+        self.assertEqual(study["pre_event_research_direction_registered"], "ABSTAIN")
+        self.assertEqual(study["pre_event_directional_forecasts_registered"], 0)
+        self.assertFalse(study["post_event_price_reactions_count_as_predictive_hits"])
+        self.assertTrue(study["post_event_descriptive_study_not_predictive_accuracy"])
         self.assertEqual((study["economic_event_count_documentary"],
                           study["forex_crosses_observed"]), (1, 7))
         self.assertEqual(study["headline_ppi_surprise_percentage_points"], "0.1")
@@ -182,7 +189,29 @@ class OneEventStudyJoinTests(unittest.TestCase):
         self.assertEqual(set(result["source_stage_states"]), {
             "TD_PRE_EVENT", "TE_PRE_EVENT", "BLS_FIRST_PRINT",
             "SURPRISE_SAME_METRIC", "SEVEN_FX_M15_WINDOWS",
-            "SPREAD_POINTS_CONTEXT", "MT5_CAPTURE_MANIFEST"})
+            "SPREAD_POINTS_CONTEXT", "MT5_CAPTURE_MANIFEST",
+            "PPI_PRE_EVENT_ABSTENTION_PROTOCOL"})
+
+    def test_post_hoc_protocol_direction_flip_blocks_seven_pair_study(self):
+        from atlasquant_trader_ppi_pre_event_protocol_lab import FROZEN_PROTOCOL
+        with patch.dict(FROZEN_PROTOCOL, {"pre_event_research_direction": "USD_UP"}):
+            with self.isolated_synthetic_pre_event_receipts():
+                result = self.run_study()
+        self.assertEqual(result["reason"],
+                         "PRE_EVENT_RESEARCH_ABSTENTION_PROTOCOL_NOT_INTACT")
+        self.assertEqual(result["source_stage_states"]["PPI_PRE_EVENT_ABSTENTION_PROTOCOL"],
+                         "LAB_PPI_PRE_EVENT_PROTOCOL_BLOCKED")
+        self.assertIsNone(result["one_event_study"])
+
+    def test_changed_precommitted_window_cannot_be_hidden_by_price_csv(self):
+        from atlasquant_trader_ppi_pre_event_protocol_lab import FROZEN_PROTOCOL
+        with patch.dict(FROZEN_PROTOCOL, {"reaction_windows_minutes": [1, 15, 60, 240]}):
+            with self.isolated_synthetic_pre_event_receipts():
+                result = self.run_study()
+        self.assertEqual(result["reason"],
+                         "PRE_EVENT_RESEARCH_ABSTENTION_PROTOCOL_NOT_INTACT")
+        self.assertEqual(result["independent_directional_trials_verified"], 0)
+        self.assertIsNone(result["one_event_study"])
 
     def test_missing_bls_document_blocks_even_with_good_synthetic_previous(self):
         with self.isolated_synthetic_pre_event_receipts():
