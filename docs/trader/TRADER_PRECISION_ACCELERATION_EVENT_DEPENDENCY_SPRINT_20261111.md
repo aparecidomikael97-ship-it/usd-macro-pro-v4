@@ -32,6 +32,14 @@ Arquivos de código:
 
 ## Caminho mais rápido sem tornar o sistema pesado
 
+**Complemento LAB de 11/11 — concentração entre pares:** foi acrescentado
+`atlasquant_trader_fx_event_concentration_lab.py`, com 20 testes sintéticos.
+Reagrupa candidatos por evento-raiz declarado: sete pares ligados ao PPI dos EUA
+continuam sendo sete observações de pares, porém **um único evento declarado**,
+sem supor independência estatística ou exposição monetária verificada. A prova
+de origem e de risco segue pendente. Detalhes em
+`docs/trader/TRADER_FX_SHARED_EVENT_CONCENTRATION_LAB_20261111.md`.
+
 **Trilha A — dados (prioridade P0):** automatizar a cobertura de indicadores macro relevantes G8 com controle de UTC, primeira publicação, revisões e concorrência de fontes; reutilizar integrações existentes. PPI 13/11 com TD e TE já capturados antes do evento serve como primeiro exercício prospectivo; calendários/alertas já agendados, não duplicar.
 
 **Trilha B — Precision Gate (P0):** unir, somente depois de provas suficientes, controles existentes: qualidade e antiguidade, macro bilateral, alinhamento D1/W1, evento/risco geopolítico, raiz comum, regime, liquidez/spread e preço estendido. Cada bloqueio terá motivo claro, não um score inflado. Até integração documentada e segura, os módulos novos são **auditorias isoladas**.
