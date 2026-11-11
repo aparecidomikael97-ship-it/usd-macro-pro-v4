@@ -35,3 +35,9 @@ Em 11/11/2026, o AM12 reavaliou os 28 arquivos D1 e **14.000 candles**. Confirmo
 A nova proteção usa presença de símbolos declarada pelo chamador e não abre os arquivos por si só; **não confere a autenticidade dos preços**. A ligação com um leitor verificado e com hashes de fonte e horário real de barra ainda permanece pendente. O resultado de laboratório jamais se converte automaticamente em sinal de trade, atribuição causal, histórico point-in-time ou performance validada.
 
 **Escopo:** 28 FX G8 D1/W1, LAB somente. XAU/USD e índices têm suas próprias regras e não são incluídos como 29º par. Sem merge, deploy, ordens, custo ou publicação.
+
+## Regressão do encadeamento macro → precisão
+
+A execução inicial da CI detectou um teste de integração legado que ainda exigia **seis** filtros do orquestrador. O `atlasquant_trader_fx_macro_precision_byte_join_lab.py` já reexecuta o orquestrador real; por isso ele passou a receber automaticamente a sétima etapa, sem precisar duplicar o cálculo da cobertura. Corrigimos a documentação interna e o teste `test_atlasquant_trader_fx_macro_precision_byte_join_lab.py` para exigir sete filtros.
+
+Adicionado um teste que preserva os 16 arquivos sintéticos de política monetária/CPI e os 28 pares com hashes coerentes, **mas omite GBP/NZD da data D1**. O estudo conjunto deve produzir `LAB_MACRO_PRECISION_ABSTAIN`, sem candidato, e identificar o bloqueio `D1_28FX_DATE_COVERAGE`. Mesmo quando todos os campos sintéticos passam, não existe publicação ou trade.

@@ -58,7 +58,7 @@ class MacroPrecisionCustodyJoinTests(unittest.TestCase):
         self.assertIsNone(x["calibrated_probability"])
         self.assertEqual((x["http_requests"], x["file_writes"], x["new_cost_brl"]), (0, 0, 0))
 
-    def test_all_synthetic_bytes_match_and_six_filters_still_never_trade(self):
+    def test_all_synthetic_bytes_match_and_seven_filters_still_never_trade(self):
         x = run()
         self.assertEqual(x["state"], "LAB_BYTES_BOUND_MACRO_PRECISION_RESEARCH_CANDIDATE_UNATTESTED")
         self.assertEqual((x["pair_count"], x["d1_macro_claim_complete_pairs"],
@@ -66,10 +66,25 @@ class MacroPrecisionCustodyJoinTests(unittest.TestCase):
         self.assertEqual((x["source_body_hashes_supplied"], x["source_body_hashes_matched_local"]), (16, 16))
         self.assertEqual(x["currencies_locally_byte_bound"], 8)
         self.assertEqual(x["pairs_locally_byte_bound_both_sides"], 28)
-        self.assertEqual(len(x["precision_stage_reports"]), 6)
+        self.assertEqual(len(x["precision_stage_reports"]), 7)
+        self.assertTrue(x["precision_stage_reports"]["D1_28FX_DATE_COVERAGE"]["structurally_accepted"])
         self.assertEqual(x["precision_blocking_stages"], [])
         self.assertTrue(x["precision_research_candidate_without_macro"])
         self.assertEqual(x["research_candidate_direction"], "BAIXA")
+        self.safe(x)
+
+    def test_incomplete_d1_archive_blocks_research_even_with_all_macro_bytes(self):
+        p = precision_fixture()
+        subset = tuple(s for s in p.d1_coverage_present_symbols if s != "GBPNZD")
+        x = run(packet=replace(p, d1_coverage_present_symbols=subset))
+        self.assertEqual(x["currencies_locally_byte_bound"], 8)
+        self.assertEqual(x["pairs_locally_byte_bound_both_sides"], 28)
+        self.assertIn("D1_28FX_DATE_COVERAGE", x["precision_blocking_stages"])
+        self.assertEqual(x["precision_stage_reports"]["D1_28FX_DATE_COVERAGE"]["state"],
+                         "LAB_SINGLE_PAIR_D1_MISSING_DATE_QUARANTINE")
+        self.assertFalse(x["precision_research_candidate_without_macro"])
+        self.assertIsNone(x["research_candidate_direction"])
+        self.assertEqual(x["state"], "LAB_MACRO_PRECISION_ABSTAIN")
         self.safe(x)
 
     def test_no_original_source_files_blocks_every_pair_despite_macro_claims(self):

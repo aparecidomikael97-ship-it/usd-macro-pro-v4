@@ -69,7 +69,7 @@ def inspect_fx_macro_precision_bytes_lab(
     original_source_bytes_by_currency: Any,
     inspected_at_utc: Any,
 ) -> dict[str, Any]:
-    """Re-run two G8 PIT matrices and six precision guards; bind raw source bytes.
+    """Re-run two G8 PIT matrices and seven precision guards; bind raw source bytes.
 
     Each currency/indicator currently accepts just ONE asserted receipt vintage.
     If FLASH and FINAL coexist, caller must first prepare a documented vintage
@@ -161,7 +161,7 @@ def inspect_fx_macro_precision_bytes_lab(
             or set(weekly.get("pairs", {})) != set(OFFICIAL_PAIRS)):
         return _blocked("INCOMPLETE_OR_INVALID_G8_ASOF_MACRO_MATRICES")
 
-    # Existing six-stage gate re-runs independent structural checks, including
+    # Existing seven-stage gate re-runs independent structural checks, including
     # D1/W1 synthetic agreement, evidence roots and M15 costs. Passing here
     # cannot validate the original currencies' quantitative strength.
     try:
