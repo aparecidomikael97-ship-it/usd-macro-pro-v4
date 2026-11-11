@@ -21,6 +21,9 @@ from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
     TE_PRE_EVENT_HTML_SHA256, USD_FX, ClaimedLocalPriceArchive,
     inspect_ppi_fx_m15_forward_reaction_lab,
 )
+from atlasquant_trader_ppi_m15_spread_context_lab import (
+    PASS as SPREAD_OK, inspect_ppi_m15_spread_context_lab,
+)
 from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     RELEASE_UTC, ClaimedPostReleaseHTTP,
     compare_ppi_actual_to_frozen_consensus_lab,
@@ -141,6 +144,15 @@ def inspect_ppi_one_event_study_lab(
         out["source_stage_states"] = stages
         return out
 
+    spread = inspect_ppi_m15_spread_context_lab(
+        archive_root=packet.price_archive_root,
+        receipt=packet.price_archive_receipt, as_of_utc=now)
+    stages["SPREAD_POINTS_CONTEXT"] = spread.get("state")
+    if spread.get("state") != SPREAD_OK or spread.get("pair_count_documentary") != len(USD_FX):
+        out = _blocked("FULL_SEVEN_PAIR_SPREAD_CONTEXT_REVALIDATION_FAILED")
+        out["source_stage_states"] = stages
+        return out
+
     out = _blocked("ONE_UNATTESTED_EVENT_NOT_A_PREDICTIVE_SAMPLE",
                    "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
     out["source_stage_states"] = stages
@@ -154,6 +166,9 @@ def inspect_ppi_one_event_study_lab(
         "headline_ppi_surprise_percentage_points": surprise["headline_vs_td_pre_event_diff_pp"],
         "core_ex_food_energy_surprise_percentage_points": surprise["core_vs_td_pre_event_diff_pp"],
         "fx_usd_normalized_m15_h1_h4_bps": price["price_reactions_usd_normalized_bps"],
+        "spread_points_context_not_transaction_cost": spread["per_pair_spread_points"],
+        "zero_spread_context_requires_broker_review": spread["all_spread_points_zero_for_any_pair"],
+        "broker_execution_costs_not_verified": True,
         "broker_price_capture_time_claim_utc": price["archive_captured_at_utc_claim"],
         "price_comparison_is_not_executable_return": True,
     }
