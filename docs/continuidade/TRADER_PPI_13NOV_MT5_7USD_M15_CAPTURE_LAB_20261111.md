@@ -47,6 +47,8 @@ Mesmo quando `result` trouxer reações, o estado permanece **documentário / NO
 
 `test_atlasquant_trader_ppi_mt5_m15_capture_lab.py` usa um MT5 falso em memória: exercita a janela de tempo, apenas métodos de leitura, sequência, volume, OHLC, UTC, sete arquivos/hashes, consumo pelo leitor e resistência a alterações no CSV. **Nenhum terminal real foi conectado**.
 
+**Regressão de formato (acréscimo):** no ambiente local com NumPy, o teste também constrói arrays estruturados com os oito campos e tipos de dados que o MT5 devolve (`time`, OHLC, volumes e spread), confirma o consumo completo de 119 velas e bloqueia um timestamp adulterado. É uma prova de compatibilidade **de formato**, não um teste com conexão real à corretora. No CI offline, os dois testes NumPy são ignorados se essa dependência opcional estiver ausente; os demais continuam obrigatórios.
+
 ## Pendências explícitas
 
 1. Esperar a divulgação real, a janela de quatro horas e as primeiras fontes verificadas do BLS.

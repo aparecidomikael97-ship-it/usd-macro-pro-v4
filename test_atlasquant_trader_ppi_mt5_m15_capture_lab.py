@@ -9,6 +9,11 @@ import json
 import tempfile
 import unittest
 
+try:
+    import numpy as np  # MT5's actual return shape; optional in offline CI.
+except ImportError:
+    np = None
+
 from atlasquant_trader_ppi_mt5_m15_capture_lab import (
     EXPECTED_EPOCHS, SCHEMA, collect_ppi_mt5_m15_capture_lab as collect,
     load_local_receipt_lab,
@@ -100,7 +105,7 @@ class SevenPairCaptureTests(unittest.TestCase):
         self.safe(result)
         self.assertEqual(result["state"], "LAB_PPI_7PAIR_LOCAL_M15_CANDIDATE_UNATTESTED")
         self.assertEqual(result["validated_symbols"], 7)
-        self.assertEqual(result["validated_bars"], 119)
+        self.assertEqual(result["validated_bars"], 119, result)
         self.assertEqual(result["local_files_written"], 8)
         folder = Path(result["directory"])
         self.assertEqual(len(list(folder.iterdir())), 8)
@@ -124,6 +129,51 @@ class SevenPairCaptureTests(unittest.TestCase):
         self.assertEqual(request[3].utcoffset(), timedelta(0))
         self.assertEqual(request[4].utcoffset(), timedelta(0))
         self.assertEqual(self.api.calls[-1], ("shutdown",))
+
+    @unittest.skipUnless(np is not None, "numpy absent: MT5 structured-array regression is local-only")
+    def test_actual_mt5_numpy_structured_array_shape_roundtrips(self):
+        # MetaQuotes' copy_rates_range returns a structured numpy array, not dicts.
+        dtype = [("time", "<i8"), ("open", "<f8"), ("high", "<f8"),
+                 ("low", "<f8"), ("close", "<f8"), ("tick_volume", "<u8"),
+                 ("spread", "<i4"), ("real_volume", "<u8")]
+        for sym in USD_FX:
+            series = np.zeros(17, dtype=dtype)
+            series["time"] = EXPECTED_EPOCHS
+            series["open"] = 145.2 if sym.startswith("USD") else 1.12345
+            # Brokers return decimal tick prices; synthetic float arithmetic
+            # must be rounded to ticks before constructing the test fixture.
+            series["high"] = np.round(series["open"] + 0.02, 5)
+            series["low"] = np.round(series["open"] - 0.02, 5)
+            series["close"] = series["open"]
+            series["tick_volume"] = 73
+            series["spread"] = 8
+            self.api.data[sym] = series
+
+        result = self.run_capture()
+        self.safe(result)
+        self.assertEqual(result["validated_bars"], 119, result)
+        folder = Path(result["directory"])
+        receipt = load_local_receipt_lab(folder)
+        studied = inspect_ppi_fx_m15_forward_reaction_lab(
+            archive_root=folder, receipt=receipt, as_of_utc=NOW)
+        self.assertEqual(studied["state"], "LAB_PPI_FX_7PAIR_FORWARD_REACTION_DOCUMENTARY_NO_GO")
+        self.assertEqual(set(studied["price_reactions_usd_normalized_bps"]), set(USD_FX))
+
+    @unittest.skipUnless(np is not None, "numpy absent: MT5 structured-array regression is local-only")
+    def test_mt5_numpy_structured_array_bad_epoch_does_not_write(self):
+        dtype = [("time", "<i8"), ("open", "<f8"), ("high", "<f8"),
+                 ("low", "<f8"), ("close", "<f8"), ("tick_volume", "<u8"),
+                 ("spread", "<i4"), ("real_volume", "<u8")]
+        series = np.zeros(17, dtype=dtype)
+        series["time"] = EXPECTED_EPOCHS
+        series["time"][8] += 900
+        series["open"] = 1.1
+        series["high"] = 1.11
+        series["low"] = 1.09
+        series["close"] = 1.1
+        series["tick_volume"] = 32
+        self.api.data["NZDUSD"] = series
+        self.blocked(self.run_capture(), "PPI_M15_EPOCH_GAP_DUPLICATE_OR_WRONG_TIMEZONE")
 
     def test_pre_event_and_pre_four_hour_close_never_access_mt5(self):
         for now in (BASELINE_OPEN_UTC, LAST_REQUIRED_CLOSE_UTC - timedelta(microseconds=1)):
