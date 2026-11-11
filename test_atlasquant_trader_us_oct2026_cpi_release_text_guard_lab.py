@@ -140,5 +140,43 @@ class OctBLSReleaseTextGateTests(unittest.TestCase):
         self.assertEqual(x["state"],"LAB_SOURCE_TEXT_INSUFFICIENT")
         self.safe(x)
 
+
+    def test_browser_saved_html_over_one_megabyte_and_six_bad_bytes(self):
+        d = raw().replace(b"</body>", b"<div>" + b"x"*(1024*1024 + 100)
+                          + b"\x9d"*6 + b"</div></body>")
+        x = self.case(data=d)
+        self.assertEqual(x["state"], "LAB_BLS_HTML_MONTHLY_CONTEXT_UNATTESTED")
+        self.assertEqual(x["non_utf8_source_byte_count"], 6)
+        self.assertEqual(x["headline_oct2026_sa_mom_pct_body_claim"], "0.4")
+        self.assertEqual(x["core_oct2026_sa_mom_pct_body_claim"], "0.3")
+        self.safe(x)
+
+    def test_excess_bad_bytes_fails_closed(self):
+        d = raw().replace(b"</body>", b"\x9d"*17 + b"</body>")
+        x = self.case(data=d)
+        self.assertEqual(x["reason"], "EXCESS_NON_UTF8_SOURCE_BYTES")
+        self.safe(x)
+
+    def test_more_than_two_megabytes_rejected(self):
+        d = raw().replace(b"</body>", b"x"*(2*1024*1024) + b"</body>")
+        x = self.case(data=d)
+        self.assertEqual(x["reason"], "RAW_BODY_SIZE_OR_SHA256_CLAIM_MISMATCH")
+        self.safe(x)
+
+    def test_duplicate_core_equal_summary_and_details_allowed(self):
+        d = raw().replace(b"</body>",
+            b" The index for all items less food and energy rose 0.3 percent in October</body>")
+        x = self.case(data=d)
+        self.assertEqual(x["state"], "LAB_BLS_HTML_MONTHLY_CONTEXT_UNATTESTED")
+        self.assertEqual(x["core_oct2026_sa_mom_pct_body_claim"], "0.3")
+        self.safe(x)
+
+    def test_duplicate_core_conflict_blocked(self):
+        d = raw().replace(b"</body>",
+            b" The index for all items less food and energy rose 0.8 percent in October</body>")
+        x = self.case(data=d)
+        self.assertEqual(x["reason"], "EXACT_HEADLINE_OR_CORE_MOM_CLAIM_NOT_EXTRACTED")
+        self.safe(x)
+
 if __name__ == "__main__":
     unittest.main()
