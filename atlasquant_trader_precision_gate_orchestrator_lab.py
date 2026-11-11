@@ -7,10 +7,11 @@ existing gates again rather than trusting caller-supplied "passed" reports.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from typing import Any
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS, split_pair
+from atlasquant_fx_d1_shared_calendar_gate_lab import inspect_d1_date_coverage_lab
 from atlasquant_trader_fx28_d1w1_consensus_guard_lab import inspect_fx28_d1w1_agreement_lab
 from atlasquant_trader_fx_evidence_dependency_gate_lab import inspect_fx_evidence_dependency_lab
 from atlasquant_trader_market_regime_veto_lab import inspect_market_regime_veto_lab
@@ -26,6 +27,9 @@ REGIME_OK = "LAB_REGIME_ALIGNMENT_DOCUMENTARY_NOT_LIVE"
 PRICE_OK = "LAB_PRICE_COST_CONTEXT_NOT_VETOED_UNATTESTED"
 SELECTIVE_OK = "LAB_INTERNAL_RESEARCH_CANDIDATE_NOT_LIVE"
 MAX_REVIEW_AGE = timedelta(hours=12)  # research input freshness, not a calibrated edge
+MAX_D1_COVERAGE_AGE_DAYS = 4  # allows weekend; not a broker session attestation
+FX28_CANONICAL_SYMBOLS = tuple(p.replace("/", "") for p in OFFICIAL_PAIRS)
+D1_COHORT_OK = "LAB_ALL_28_D1_BARS_PRESENT_DOCUMENTARY_UNATTESTED"
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,11 @@ class ResearchPacket:
     unverified_event_actual_pending: bool = False
     last_alert: Any = None
     reversal_catalyst_claimed: bool = False
+    # Required for a candidate to pass the D1 completeness stage. Defaults
+    # keep old packet construction possible but fail closed (not a live signal).
+    d1_coverage_trading_date: date | None = None
+    d1_coverage_present_symbols: Any = None
+    d1_coverage_observed_at_utc: datetime | None = None
 
 
 def _utc(value: Any) -> datetime | None:
@@ -72,6 +81,8 @@ def _result(reason: str) -> dict[str, Any]:
         "broker_bid_ask_executable_verified": False,
         "net_profit_after_costs_verified": False,
         "historical_point_in_time_verified": False,
+        "d1_28fx_coverage_independently_attested": False,
+        "d1_28fx_coverage_claim_not_source_verified": True,
         "validated_accuracy": None, "calibrated_direction_probability": None,
         "operational_bias": "AGUARDAR", "publishable": False,
         "live_alert_allowed": False, "trade_authorized": False,
@@ -81,7 +92,7 @@ def _result(reason: str) -> dict[str, Any]:
 
 
 def inspect_fx_precision_orchestrator_lab(*, packet: Any, inspected_at_utc: Any) -> dict[str, Any]:
-    """Recalculate six lab stages at one as-of cutoff; fail closed.
+    """Recalculate seven lab stages at one as-of cutoff; fail closed.
 
     The 'candidate' output is a research label that must NOT feed a live Radar.
     Each provider timestamp/hash and audit assertion can still be fabricated.
@@ -124,6 +135,48 @@ def inspect_fx_precision_orchestrator_lab(*, packet: Any, inspected_at_utc: Any)
         if not okay:
             blocking.append(name)
             reasons.append(f"{name}:{reason}")
+
+    # The D1 pair matrix MUST be based on a complete declared 28-FX date
+    # cohort, not on cherry-picked surviving pairs. This remains caller-
+    # provided data until source/manifests and server sessions are attested.
+    # Do not equate the D1 trading date to UTC midnight or a broker's NY close.
+    coverage_at = _utc(packet.d1_coverage_observed_at_utc)
+    trading_day = packet.d1_coverage_trading_date
+    cutoff_ok = (
+        type(trading_day) is date
+        and coverage_at is not None
+        and trading_day < daily.date()
+        and 0 < (daily.date() - trading_day).days <= MAX_D1_COVERAGE_AGE_DAYS
+        and datetime.combine(trading_day, datetime.min.time(), timezone.utc)
+            < coverage_at <= daily
+    )
+    if not cutoff_ok:
+        record("D1_28FX_DATE_COVERAGE", "LAB_D1_COVERAGE_CUTOFF_BLOCKED",
+               "MISSING_STALE_FUTURE_OR_POST_DECISION_D1_COVERAGE", False)
+    else:
+        try:
+            coverage = inspect_d1_date_coverage_lab(
+                trading_date=trading_day,
+                present_symbols=packet.d1_coverage_present_symbols,
+                expected_symbols=FX28_CANONICAL_SYMBOLS,
+            )
+            okay = (
+                coverage.get("status") == D1_COHORT_OK
+                and coverage.get("rank_28fx_coverage_complete") is True
+                and coverage.get("observed_count") == 28
+                and coverage.get("missing_count") == 0
+            )
+            record(
+                "D1_28FX_DATE_COVERAGE", str(coverage.get("status")),
+                str(coverage.get("reason", "COVERAGE_REJECTED")), okay,
+                observed_count=coverage.get("observed_count"),
+                missing_symbols=coverage.get("missing_symbols"),
+                d1_bar_date_claim=trading_day.isoformat(),
+                independently_attested=False,
+            )
+        except (ValueError, TypeError, AttributeError, KeyError, OverflowError):
+            record("D1_28FX_DATE_COVERAGE", "LAB_EXCEPTION_BLOCKED",
+                   "INVALID_D1_DATE_COHORT", False)
 
     # Deliberately do not trust precomputed report dictionaries from a caller.
     # The pair matrix is checked in full (not a cherry-picked single pair).
@@ -218,7 +271,7 @@ def inspect_fx_precision_orchestrator_lab(*, packet: Any, inspected_at_utc: Any)
         "stages_structurally_passed": sum(v["structurally_accepted"] for v in stages.values()),
         "claimed_unique_event_roots_across_d1w1_not_independent": len(claimed_roots),
     })
-    if not blocking and len(stages) == 6:
+    if not blocking and len(stages) == 7:
         out.update({
             "state": "LAB_PRECISION_RESEARCH_CANDIDATE_UNATTESTED",
             "reason": "SYNTHETIC_OR_CALLER_CLAIMS_DO_NOT_PROVE_EDGE",

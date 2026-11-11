@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import unittest
 
 from atlasquant_trader_precision_gate_orchestrator_lab import (
-    ResearchPacket, inspect_fx_precision_orchestrator_lab as inspect,
+    FX28_CANONICAL_SYMBOLS, ResearchPacket,
+    inspect_fx_precision_orchestrator_lab as inspect,
 )
 from atlasquant_trader_selective_bias_gate_lab import (
     BiasObservation, SelectiveAuditClaims,
@@ -65,6 +66,9 @@ def fixture() -> ResearchPacket:
         audit_claims=SelectiveAuditClaims(True, True, True, True, True, True),
         calendar_reviewed_at_utc=DECISION + timedelta(hours=1),
         high_impact_events=(),
+        d1_coverage_trading_date=date(2026, 11, 10),
+        d1_coverage_present_symbols=FX28_CANONICAL_SYMBOLS,
+        d1_coverage_observed_at_utc=DECISION-timedelta(minutes=20),
     )
 
 
@@ -87,15 +91,98 @@ class OrchestrationTests(unittest.TestCase):
         self.assertIsNone(r["validated_accuracy"])
         self.assertEqual(r["new_cost_brl"], 0)
 
-    def test_all_six_stages_structurally_pass_but_never_signal(self):
+    def test_all_seven_stages_structurally_pass_but_never_signal(self):
         result = self.check()
         self.assertEqual(result["state"], "LAB_PRECISION_RESEARCH_CANDIDATE_UNATTESTED")
-        self.assertEqual(result["stages_tested"], 6)
-        self.assertEqual(result["stages_structurally_passed"], 6)
+        self.assertEqual(result["stages_tested"], 7)
+        self.assertEqual(result["stages_structurally_passed"], 7)
+        self.assertTrue(result["stage_reports"]["D1_28FX_DATE_COVERAGE"]["structurally_accepted"])
+        self.assertFalse(result["d1_28fx_coverage_independently_attested"])
         self.assertEqual(result["research_candidate_direction"], DIRECTION)
         self.assertEqual(result["claimed_unique_event_roots_across_d1w1_not_independent"], 3)
         self.assertEqual(result["blocking_stages"], [])
         self.no_go(result)
+
+    def test_missing_one_d1_pair_blocks_even_if_six_other_stages_pass(self):
+        p = fixture()
+        rows = tuple(x for x in FX28_CANONICAL_SYMBOLS if x != "GBPNZD")
+        result = self.check(replace(p, d1_coverage_present_symbols=rows))
+        gate = result["stage_reports"]["D1_28FX_DATE_COVERAGE"]
+        self.assertEqual(gate["state"], "LAB_SINGLE_PAIR_D1_MISSING_DATE_QUARANTINE")
+        self.assertEqual(gate["missing_symbols"], ["GBPNZD"])
+        self.assertIn("D1_28FX_DATE_COVERAGE", result["blocking_stages"])
+        self.assertEqual(result["stages_structurally_passed"], 6)
+        self.assertIsNone(result["research_candidate_direction"])
+        self.no_go(result)
+
+    def test_all_28_missing_cannot_be_reclassified_as_a_holiday(self):
+        p = fixture()
+        result = self.check(replace(p, d1_coverage_present_symbols=()))
+        self.assertIn("D1_28FX_DATE_COVERAGE", result["blocking_stages"])
+        self.assertEqual(result["stage_reports"]["D1_28FX_DATE_COVERAGE"]["state"],
+                         "LAB_SHARED_28FX_NO_D1_BARS_CALENDAR_UNVERIFIED")
+        self.no_go(result)
+
+    def test_partial_date_coverage_blocks_complete_fx28_bias_matrix(self):
+        p = fixture()
+        for n in (8, 18, 26):
+            with self.subTest(observed_count=n):
+                result = self.check(replace(p, d1_coverage_present_symbols=FX28_CANONICAL_SYMBOLS[:n]))
+                self.assertIn("D1_28FX_DATE_COVERAGE", result["blocking_stages"])
+                self.assertEqual(result["stage_reports"]["D1_28FX_DATE_COVERAGE"]["observed_count"], n)
+                self.assertIsNone(result["research_candidate_direction"])
+                self.no_go(result)
+
+    def test_missing_date_or_coverage_clock_defaults_fail_closed(self):
+        p = fixture()
+        for edited in (
+            replace(p, d1_coverage_trading_date=None),
+            replace(p, d1_coverage_observed_at_utc=None),
+            replace(p, d1_coverage_present_symbols=None),
+        ):
+            with self.subTest(edited=edited.d1_coverage_trading_date,
+                              clock=edited.d1_coverage_observed_at_utc):
+                result = self.check(edited)
+                self.assertIn("D1_28FX_DATE_COVERAGE", result["blocking_stages"])
+                self.no_go(result)
+
+    def test_future_same_day_or_stale_coverage_date_blocked(self):
+        p = fixture()
+        for day in (date(2026,11,11), date(2026,11,12), date(2026,11,1)):
+            with self.subTest(day=day):
+                result = self.check(replace(p, d1_coverage_trading_date=day))
+                self.assertEqual(result["stage_reports"]["D1_28FX_DATE_COVERAGE"]["state"],
+                                 "LAB_D1_COVERAGE_CUTOFF_BLOCKED")
+                self.no_go(result)
+
+    def test_coverage_seen_after_decision_cannot_rewrite_prior_bias(self):
+        p = fixture()
+        result = self.check(replace(
+            p, d1_coverage_observed_at_utc=DECISION+timedelta(seconds=1)))
+        self.assertEqual(result["stage_reports"]["D1_28FX_DATE_COVERAGE"]["state"],
+                         "LAB_D1_COVERAGE_CUTOFF_BLOCKED")
+        self.assertIsNone(result["research_candidate_direction"])
+        self.no_go(result)
+
+    def test_claimed_complete_date_still_not_real_provenance_or_edge(self):
+        result = self.check()
+        report = result["stage_reports"]["D1_28FX_DATE_COVERAGE"]
+        self.assertFalse(report["independently_attested"])
+        self.assertFalse(result["d1_28fx_coverage_independently_attested"])
+        self.assertTrue(result["d1_28fx_coverage_claim_not_source_verified"])
+        self.assertIsNone(result["validated_accuracy"])
+        self.no_go(result)
+
+    def test_duplicate_or_unknown_symbol_rejected_by_new_date_gate(self):
+        p = fixture()
+        for syms in (
+            FX28_CANONICAL_SYMBOLS[:-1] + (FX28_CANONICAL_SYMBOLS[0],),
+            FX28_CANONICAL_SYMBOLS[:-1] + ("XAUUSD",),
+        ):
+            with self.subTest(syms=syms[-1]):
+                result = self.check(replace(p, d1_coverage_present_symbols=syms))
+                self.assertIn("D1_28FX_DATE_COVERAGE", result["blocking_stages"])
+                self.no_go(result)
 
     def test_no_bid_ask_requires_abstention(self):
         p = replace(fixture(), indicative_quote=None)
