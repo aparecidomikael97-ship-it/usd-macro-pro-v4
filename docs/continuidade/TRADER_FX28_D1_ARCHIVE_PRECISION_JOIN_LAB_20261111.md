@@ -49,3 +49,9 @@ O histórico AM12 de novembro não pode autenticar decisões feitas em 2025. A l
 ### Escopo da obrigatoriedade
 
 A porta é obrigatória neste **estudo combinado de bytes macro e precisão**. Outros módulos internos podem continuar a executar verificações independentes para depuração e pesquisa, mas seus resultados permanecem `AGUARDAR` e não são um atalho autorizado para radar ou publicação. Qualquer interface pública exigirá sua própria proibição explícita de bypass.
+
+### Segundo ponto de integração: CPI semântico
+
+A bateria revelou que `atlasquant_trader_g8_cpi_semantic_byte_join_lab.py` chamava o estudo macro sem repassar o caminho do arquivo D1. Agora o argumento opcional `d1_archive_root` é transmitido a ele. **Omitir esse argumento não produz qualquer candidato**; o estágio `D1_ARCHIVE_BYTES_CUSTODY` bloqueia a pesquisa. Quando a fixture sintética tem sete manifestos e 28 CSVs válidos, os testes conseguem alcançar e conferir separadamente o veto posterior `M15_PRICE_COST`.
+
+O relatório semântico preserva `upstream_d1_archive_bytes_gate_state` e marca a proveniência/cronologia como não autenticadas. Um status de valor CPI conciliado com bytes do próprio chamador **não equivale** a uma hipótese direcional ou prova independente da fonte.

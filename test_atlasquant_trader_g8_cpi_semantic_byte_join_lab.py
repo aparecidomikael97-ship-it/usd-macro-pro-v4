@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from dataclasses import replace
 import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
@@ -12,6 +14,7 @@ from atlasquant_trader_g8_cpi_semantic_byte_join_lab import (
     inspect_g8_cpi_value_custody_precision_lab as inspect,
 )
 from test_atlasquant_trader_fx_macro_precision_byte_join_lab import evidence
+from test_atlasquant_trader_fx_d1_archive_precision_join_lab import synthetic_archive
 from test_atlasquant_trader_precision_gate_orchestrator_lab import fixture as precision_packet, NOW
 from test_atlasquant_trader_g8_numeric_inflation_coverage_lab import (
     run as numeric_run, EUR_CAPTURE, USD_CAPTURE,
@@ -69,13 +72,13 @@ def all_countries():
     return rec,bodies
 
 
-def run(*, rec=None, bodies=None, packet=None, as_of=NOW):
+def run(*, rec=None, bodies=None, packet=None, as_of=NOW, archive_root=None):
     a,b=two_countries()
     return inspect(
         packet=precision_packet() if packet is None else packet,
         receipts_by_currency=a if rec is None else rec,
         original_source_bytes_by_currency=b if bodies is None else bodies,
-        inspected_at_utc=as_of,
+        d1_archive_root=archive_root, inspected_at_utc=as_of,
     )
 
 
@@ -232,9 +235,27 @@ class G8CpiValueJoinTests(unittest.TestCase):
         rec,bodies=all_countries()
         p=precision_packet()
         q=replace(p.indicative_quote,ask="1.10200")
-        x=run(rec=rec,bodies=bodies,packet=replace(p,indicative_quote=q))
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            synthetic_archive(root)
+            x=run(rec=rec,bodies=bodies,packet=replace(p,indicative_quote=q),
+                  archive_root=root)
         self.assertIn("M15_PRICE_COST",x["upstream_precision_blocking_stages"])
+        self.assertEqual(x["upstream_d1_archive_bytes_gate_state"],
+                         "LAB_D1_ARCHIVE_PRECISION_ABSTAIN")
         self.assertIsNone(x["macro_bias"])
+        self.safe(x)
+
+    def test_missing_d1_archive_blocks_macro_precision_even_when_cpi_matches(self):
+        rec,bodies=all_countries()
+        x=run(rec=rec,bodies=bodies)
+        self.assertEqual(x["upstream_d1_archive_bytes_gate_state"],
+                         "LAB_D1_ARCHIVE_PRECISION_JOIN_BLOCKED")
+        self.assertIn("D1_ARCHIVE_BYTES_CUSTODY",
+                      x["upstream_precision_blocking_stages"])
+        self.assertEqual(x["cpi_values_locally_reconciled_currencies"], 8)
+        self.assertIsNone(x["research_candidate_direction"])
+        self.assertFalse(x["upstream_d1_archive_bytes_pit_authenticated"])
         self.safe(x)
 
     def test_read_only_no_trade_even_if_precise_score_10_claimed(self):

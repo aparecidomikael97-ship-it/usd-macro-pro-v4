@@ -184,6 +184,7 @@ def _check_cpi_currency(*, currency: str, receipts: Any, bodies: Any,
 def inspect_g8_cpi_value_custody_precision_lab(
     *, packet: Any, receipts_by_currency: Any,
     original_source_bytes_by_currency: Any,
+    d1_archive_root: Any = None,
     inspected_at_utc: Any,
 ) -> dict[str, Any]:
     """Recalculate G8 macro+precision AND CPI source semantics for all G8.
@@ -200,7 +201,7 @@ def inspect_g8_cpi_value_custody_precision_lab(
         macro = inspect_fx_macro_precision_bytes_lab(
             packet=packet, receipts_by_currency=receipts_by_currency,
             original_source_bytes_by_currency=original_source_bytes_by_currency,
-            inspected_at_utc=now)
+            d1_archive_root=d1_archive_root, inspected_at_utc=now)
     except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
         return _empty("MACRO_PRECISION_COMPOSITION_ERROR")
     if macro.get("pair_count") != 28 or set(macro.get("pair_rows", {})) != set(OFFICIAL_PAIRS):
@@ -247,6 +248,9 @@ def inspect_g8_cpi_value_custody_precision_lab(
         "upstream_precision_stage_reports": macro.get("precision_stage_reports", {}),
         "upstream_precision_blocking_stages": macro.get("precision_blocking_stages", []),
         "upstream_macro_structural_state": macro.get("state"),
+        "upstream_d1_archive_bytes_gate_state": macro.get("d1_archive_bytes_gate_state"),
+        "upstream_d1_archive_bytes_gate_reason": macro.get("d1_archive_bytes_gate_reason"),
+        "upstream_d1_archive_bytes_pit_authenticated": False,
         "upstream_economic_values_still_unverified": True,
     })
     return out
