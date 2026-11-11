@@ -55,3 +55,12 @@ Em `C:\Users\apare\Documents\AtlasQuant\Trader\PPI_US_20261113_PRE_EVENT_LAB\`:
 5. Repetir prospectivamente muitos eventos antes de inferir efeito incremental sobre viés diário/semanal ou de comercializar qualquer probabilidade.
 
 **Status:** GO-LAB sem custo novo. NO-GO sinais operacionais, implantação ou operação real. PR #1851 permanece em rascunho.
+
+## Adendo técnico de 11/11/2026 — ligação documental, sem alterar a coorte congelada
+
+O módulo `atlasquant_trader_ppi_one_event_study_join_lab.py` foi preparado para
+revalidar em conjunto os bytes de consenso anterior, o PPI realizado do BLS e
+os sete arquivos M15, somente depois de todas as janelas fecharem. A coorte,
+os horários, os valores e os hashes congelados em 10/11 **não foram alterados**.
+O novo relatório fica em `AGUARDAR` até receber fontes reais válidas; detalhes
+em `docs/trader/TRADER_US_PPI_ONE_EVENT_SEVEN_FX_JOIN_LAB_20261111.md`.
