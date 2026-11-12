@@ -26,6 +26,7 @@ METRIC_UNITS = {
     "PCE_CORE_MOM": "PERCENT_MOM_SA",
     "PCE_CORE_YOY": "PERCENT_YOY_NSA",
     "PPI_MOM": "PERCENT_MOM_SA",
+    "PPI_YOY": "PERCENT_YOY_NSA",
     "PPI_CORE_MOM": "PERCENT_MOM_SA",
     "NFP_CHANGE": "PERSONS_CHANGE_SA",
     "POLICY_RATE": "PERCENT_POLICY_RATE",
@@ -33,7 +34,7 @@ METRIC_UNITS = {
     "GDP_QOQ": "PERCENT_QOQ_SA",
 }
 IMPORTANCE = frozenset(("HIGH", "MEDIUM", "LOW"))
-PPI_RELEASE_METRICS = frozenset(("PPI_MOM", "PPI_CORE_MOM"))
+PPI_RELEASE_METRICS = frozenset(("PPI_MOM", "PPI_CORE_MOM", "PPI_YOY"))
 _ID = re.compile(r"[A-Z0-9][A-Z0-9_\-]{2,63}\Z")
 _MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])\Z")
 _QUARTER = re.compile(r"\d{4}-Q[1-4]\Z")

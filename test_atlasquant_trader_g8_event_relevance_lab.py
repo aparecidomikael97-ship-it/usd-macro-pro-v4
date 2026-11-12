@@ -560,5 +560,47 @@ class G8EventRelevanceTests(unittest.TestCase):
                 self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
                 self.no_live(blocked)
 
+
+    def test_ppi_headline_annual_shared_root_with_monthly(self):
+        # Same claimed USD PPI release, not two independent macro catalysts.
+        monthly = replace(
+            report(event_id="US_PPI_MOM_2026_10"),
+            metric="PPI_MOM", unit="PERCENT_MOM_SA",
+        )
+        annual = replace(
+            report(event_id="US_PPI_YOY_2026_10"),
+            metric="PPI_YOY", unit="PERCENT_YOY_NSA",
+        )
+        result = route([monthly, annual], as_of_utc=BEFORE)
+        self.assertEqual(
+            result["state"], "LAB_G8_EVENT_RELEVANCE_DOCUMENTARY_ONLY_NO_BIAS"
+        )
+        self.assertEqual(result["event_count"], 2)
+        self.assertEqual(result["claimed_release_root_count"], 1)
+        self.assertIsNone(result["independent_event_trial_count"])
+        self.assertEqual(
+            {row["claimed_release_root"] for row in result["events"]},
+            {"USD_PPI_2026-10"},
+        )
+        self.assertEqual(sum(row["event_count"] for row in result["pair_rows"]), 14)
+        self.assertEqual(by_pair(result, "EUR/USD")["event_count"], 2)
+        self.assertEqual(by_pair(result, "AUD/NZD")["event_count"], 0)
+        self.no_live(result)
+
+        for invalid in (
+            replace(annual, unit="PERCENT_MOM_SA"),
+            replace(monthly, unit="PERCENT_YOY_NSA"),
+        ):
+            with self.subTest(metric=invalid.metric):
+                blocked = route([invalid], as_of_utc=BEFORE)
+                self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(blocked)
+
+        # Same PPI release cannot claim conflicting release times.
+        moved = replace(annual, scheduled_release_at=RELEASE + timedelta(minutes=1))
+        blocked = route([monthly, moved], as_of_utc=BEFORE)
+        self.assertEqual(blocked["reason"], "PPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT")
+        self.no_live(blocked)
+
 if __name__ == "__main__":
     unittest.main()
