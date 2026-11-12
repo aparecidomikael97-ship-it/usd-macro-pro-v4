@@ -303,7 +303,7 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
         r["windows"][1]["start_utc"] = ny(10).isoformat()
         r["windows"][1]["end_utc"] = ny(11).isoformat()
         report = audit(r, claims(r))
-        self.assertEqual(report["reason"], "NONCANONICAL_OR_INCOMPLETE_PRICE_WINDOW")
+        self.assertEqual(report["reason"], "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS")
         self.safe(report)
 
     def test_range_without_exact_ny17_bounds_rejected(self):
