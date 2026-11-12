@@ -525,5 +525,40 @@ class G8EventRelevanceTests(unittest.TestCase):
                 self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
                 self.no_live(blocked)
 
+
+    def test_headline_pce_yoy_unit_and_usd_pair_relevance_no_bias(self):
+        # PCE annual headline is a distinct metric, not a second independent release.
+        annual = replace(
+            report(event_id="US_PCE_YOY_2026_10"),
+            metric="PCE_YOY", unit="PERCENT_YOY_NSA",
+        )
+        monthly = replace(
+            report(event_id="US_PCE_MOM_2026_10"),
+            metric="PCE_MOM", unit="PERCENT_MOM_SA",
+        )
+        result = route([annual, monthly], as_of_utc=BEFORE)
+        self.assertEqual(
+            result["state"], "LAB_G8_EVENT_RELEVANCE_DOCUMENTARY_ONLY_NO_BIAS"
+        )
+        self.assertEqual(result["event_count"], 2)
+        self.assertEqual(sum(x["event_count"] for x in result["pair_rows"]), 14)
+        self.assertEqual(by_pair(result, "EUR/USD")["event_count"], 2)
+        self.assertEqual(by_pair(result, "AUD/NZD")["event_count"], 0)
+        self.assertEqual(
+            {x["unit"] for x in result["events"]},
+            {"PERCENT_YOY_NSA", "PERCENT_MOM_SA"},
+        )
+        self.assertIsNone(result["independent_event_trial_count"])
+        self.no_live(result)
+
+        for invalid in (
+            replace(annual, unit="PERCENT_MOM_SA"),
+            replace(monthly, unit="PERCENT_YOY_NSA"),
+        ):
+            with self.subTest(metric=invalid.metric):
+                blocked = route([invalid], as_of_utc=BEFORE)
+                self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(blocked)
+
 if __name__ == "__main__":
     unittest.main()
