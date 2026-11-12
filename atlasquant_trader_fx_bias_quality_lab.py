@@ -7,7 +7,7 @@ Caller-supplied rows are NEVER a validated hit rate or profitability proof.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 import math
 import re
@@ -16,7 +16,7 @@ from typing import Any
 from atlasquant_fx_universe import OFFICIAL_PAIRS
 
 SCHEMA = "ATLASQUANT_TRADER_FX_BIAS_QUALITY_ABSTENTION_LAB_V1"
-HORIZONS = ("D1", "W1", "M1")
+HORIZONS = ("D1", "W1", "MN1")  # MN1 is monthly; M1 means one minute.
 SIDES = ("UP", "DOWN", "ABSTAIN")
 MIN_EMITTED_TRIALS_FOR_DESCRIPTIVE_INTERVAL = 100
 _ID = re.compile(r"[A-Z0-9][A-Z0-9_-]{2,63}\Z")
@@ -43,6 +43,7 @@ def _blocked(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "LAB_BIAS_QUALITY_BLOCKED", "reason": reason,
         "pair": None, "horizon": None,
+        "monthly_session_calendar_independently_verified": False,
         "total_decision_opportunities": 0, "emitted_biases": 0,
         "abstentions": 0, "hits": 0, "misses": 0,
         "neutral_forward_outcomes_counted_as_misses": 0,
@@ -130,6 +131,15 @@ def inspect_fx_bias_quality_claims_lab(
         if (features > issued or entry_captured > issued
                 or not issued < start < end <= captured <= evaluated):
             out["reason"] = "FUTURE_LEAKAGE_OR_UNRESOLVED_OUTCOME"
+            return out
+        # Do not let an M15, H1 or daily move masquerade as a monthly hit.
+        # These are conservative research checks, NOT official FX monthly
+        # session-boundary attestation or evidence that the prices are real.
+        if horizon == "MN1" and (
+            not timedelta(days=25) <= end - start <= timedelta(days=35)
+            or end.year * 12 + end.month - (start.year * 12 + start.month) != 1
+        ):
+            out["reason"] = "MN1_OUTCOME_NOT_ONE_CALENDAR_MONTH_WINDOW"
             return out
         entry, exit_price = (_number(v.entry_close_price_claim),
                              _number(v.exit_close_price_claim))
