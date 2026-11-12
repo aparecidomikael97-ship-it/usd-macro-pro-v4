@@ -14,10 +14,11 @@ period must be verified independently in a later separate process.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import re
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
 from atlasquant_trader_fx_ny_rollover_lab import inspect_fx_ny_close_window_lab
@@ -35,6 +36,8 @@ ABSTAIN_REASONS = frozenset((
 SHA64 = re.compile(r"[a-f0-9]{64}\Z")
 ID = re.compile(r"[A-Z0-9][A-Z0-9_-]{3,79}\Z")
 MAX_WINDOWS = 40
+MAX_SPAN_DAYS = 60
+NY = ZoneInfo("America/New_York")
 MAX_SLOTS = 28 * MAX_WINDOWS
 
 
@@ -71,6 +74,59 @@ def _price(value: Any) -> Decimal | None:
     return v if v.is_finite() and Decimal(0) < v < Decimal("1000000000") else None
 
 
+def _complete_nominal_ny17_windows(
+    *, roster: dict[str, Any], horizon: str, planned: datetime, now: datetime,
+) -> list[tuple[datetime, datetime]] | None:
+    """Rebuild every nominal session from declared bounds, not caller's rows.
+
+    This verifies coverage ONLY within the locally claimed range. It cannot
+    prove the range was externally frozen before the market or that a broker
+    was actually open for every nominal session.
+    """
+    try:
+        raw_start, raw_end = roster["range_start_utc"], roster["range_end_utc"]
+        if (not isinstance(raw_start, str) or not isinstance(raw_end, str)
+                or max(len(raw_start), len(raw_end)) > 40):
+            return None
+        start = _clock(datetime.fromisoformat(raw_start))
+        end = _clock(datetime.fromisoformat(raw_end))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+    if (start is None or end is None or not planned < start < end <= now
+            or end - start > timedelta(days=MAX_SPAN_DAYS)):
+        return None
+    first_ny, last_ny = start.astimezone(NY), end.astimezone(NY)
+    if any((d.hour, d.minute, d.second, d.microsecond) != (17, 0, 0, 0)
+           for d in (first_ny, last_ny)):
+        return None
+    if horizon == "W1":
+        if first_ny.weekday() != 6 or last_ny.weekday() != 4:
+            return None
+    elif horizon == "D1":
+        if (first_ny.weekday() not in (6, 0, 1, 2, 3)
+                or last_ny.weekday() not in (0, 1, 2, 3, 4)):
+            return None
+    else:
+        return None
+
+    expected: list[tuple[datetime, datetime]] = []
+    current_day = first_ny.date()
+    while current_day <= last_ny.date():
+        weekday = current_day.weekday()
+        if weekday == 6 if horizon == "W1" else weekday in (6, 0, 1, 2, 3):
+            begin = datetime.combine(current_day, time(17), tzinfo=NY).astimezone(timezone.utc)
+            finish = datetime.combine(
+                current_day + timedelta(days=5 if horizon == "W1" else 1),
+                time(17), tzinfo=NY,
+            ).astimezone(timezone.utc)
+            if begin >= start and finish <= end:
+                expected.append((begin, finish))
+                if len(expected) > MAX_WINDOWS:
+                    return None
+        current_day += timedelta(days=1)
+    return expected if expected else None
+
+
 def _blocked(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
@@ -85,6 +141,8 @@ def _blocked(reason: str) -> dict[str, Any]:
         "documentary_flat_outcomes_count": None,
         "rows_documentary": [],
         "full_28fx_all_window_manifest_reconciled": False,
+        "nominal_window_census_recomputed_locally": False,
+        "range_precommitted_by_external_witness": False,
         "price_archive_source_independently_authenticated": False,
         "broker_session_calendar_independently_authenticated": False,
         "forecast_pre_event_witness_independently_authenticated": False,
@@ -137,6 +195,15 @@ def inspect_ny17_full_forecast_outcome_join_lab(
         out["reason"] = "FULL_28FX_WINDOW_AND_FORECAST_CENSUS_REQUIRED"
         return out
 
+    expected_windows = _complete_nominal_ny17_windows(
+        roster=price_roster, horizon=horizon, planned=planned, now=now)
+    if expected_windows is None:
+        out["reason"] = "INVALID_OR_UNVERIFIABLE_NY17_DECLARED_RANGE"
+        return out
+    if len(expected_windows) != len(windows):
+        out["reason"] = "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS"
+        return out
+
     sessions: dict[datetime, tuple[datetime, dict[str, Any]]] = {}
     last_end = None
     for index, w in enumerate(windows, 1):
@@ -163,6 +230,9 @@ def inspect_ny17_full_forecast_outcome_join_lab(
             horizon=horizon, start_at_utc=start, end_at_utc=end)
         if calendar["state"] != NY17_COMPLETE:
             out["reason"] = "INVALID_NY17_WINDOW_" + calendar["reason"]
+            return out
+        if (start, end) != expected_windows[index - 1]:
+            out["reason"] = "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS"
             return out
         moves = w.get("price_movements_documentary_by_pair")
         if not isinstance(moves, dict) or set(moves) != set(OFFICIAL_PAIRS):
@@ -298,6 +368,7 @@ def inspect_ny17_full_forecast_outcome_join_lab(
         "documentary_flat_outcomes_count": flat,
         "rows_documentary": rows,
         "full_28fx_all_window_manifest_reconciled": True,
+        "nominal_window_census_recomputed_locally": True,
     })
     return out
 

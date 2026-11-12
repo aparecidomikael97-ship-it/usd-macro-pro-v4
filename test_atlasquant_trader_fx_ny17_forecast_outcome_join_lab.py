@@ -64,6 +64,8 @@ def roster(*, horizon="D1", days=(8,), outcome="UP"):
         "total_expected_pair_window_checks": len(windows) * 28,
         "local_pair_window_checks_complete": len(windows) * 28,
         "blocked_or_unverifiable_pair_window_checks": 0,
+        "range_start_utc": windows[0]["start_utc"],
+        "range_end_utc": windows[-1]["end_utc"],
         "windows": windows,
     }
 
@@ -115,6 +117,7 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
         self.assertEqual((r["http_requests"], r["file_writes"],
                           r["new_cost_brl"]), (0, 0, 0))
         self.assertTrue(r["research_only"])
+        self.assertFalse(r["range_precommitted_by_external_witness"])
 
     def test_full_28_pair_one_day_claims_join_without_accuracy(self):
         r = audit()
@@ -127,6 +130,7 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
         self.assertEqual(r["documentary_opposite_direction_count"], 0)
         self.assertEqual(len(r["rows_documentary"]), 28)
         self.assertTrue(r["full_28fx_all_window_manifest_reconciled"])
+        self.assertTrue(r["nominal_window_census_recomputed_locally"])
         self.assertTrue(all(not v["external_precommit_verified"]
                             for v in r["rows_documentary"]))
         self.safe(r)
@@ -266,6 +270,63 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
         self.assertEqual(report["expected_opportunities"], 56)
         self.assertEqual(len(report["rows_documentary"]), 56)
         self.assertEqual(report["documentary_same_direction_count"], 56)
+        self.safe(report)
+
+    def test_omitted_middle_daily_session_rejected_even_when_all_claims_match(self):
+        # Sunday and Tuesday are both fully populated; Monday is hidden.
+        # Old join accepted these 56 claimed slots as a "complete" 28-FX roster.
+        r = roster(days=(8, 10))
+        result = audit(r)
+        self.assertEqual(result["reason"],
+                         "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS")
+        self.assertFalse(result["nominal_window_census_recomputed_locally"])
+        self.assertEqual(result["rows_documentary"], [])
+        self.safe(result)
+
+    def test_omitted_middle_weekly_session_rejected(self):
+        r = roster(horizon="W1", days=(8, 22))
+        result = audit(r)
+        self.assertEqual(result["reason"],
+                         "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS")
+        self.safe(result)
+
+    def test_tampered_declared_range_rejected(self):
+        r = roster(days=(8, 9))
+        r["range_end_utc"] = ny(9).isoformat()
+        report = audit(r)
+        self.assertEqual(report["reason"],
+                         "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS")
+        self.safe(report)
+
+    def test_swapped_in_session_fails_even_if_total_count_is_unchanged(self):
+        r = roster(days=(8, 9))
+        r["windows"][1]["start_utc"] = ny(10).isoformat()
+        r["windows"][1]["end_utc"] = ny(11).isoformat()
+        report = audit(r, claims(r))
+        self.assertEqual(report["reason"], "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS")
+        self.safe(report)
+
+    def test_range_without_exact_ny17_bounds_rejected(self):
+        for key, value in (
+            ("range_start_utc", "no-date"),
+            ("range_start_utc", (ny(8) + timedelta(hours=1)).isoformat()),
+            ("range_end_utc", ny(8).isoformat()),
+        ):
+            with self.subTest(key=key, value=value):
+                r = roster()
+                r[key] = value
+                report = audit(r)
+                self.assertEqual(report["reason"],
+                                 "INVALID_OR_UNVERIFIABLE_NY17_DECLARED_RANGE")
+                self.safe(report)
+
+    def test_two_consecutive_weekly_sessions_reconcile(self):
+        r = roster(horizon="W1", days=(8, 15))
+        report = audit(r)
+        self.assertEqual(report["declared_window_count"], 2)
+        self.assertEqual(report["expected_opportunities"], 56)
+        self.assertEqual(len(report["rows_documentary"]), 56)
+        self.assertTrue(report["nominal_window_census_recomputed_locally"])
         self.safe(report)
 
     def test_weekly_28_forecasts_same_canonical_session(self):
