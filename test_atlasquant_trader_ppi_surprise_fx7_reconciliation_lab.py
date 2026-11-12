@@ -21,6 +21,7 @@ from test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
 
 UTC = timezone.utc
 NOW = LAST_REQUIRED_CLOSE_UTC + timedelta(hours=1)
+_UNSET = object()
 
 
 def mock_comparison(*, headline="0.5", core="0.2"):
@@ -52,10 +53,10 @@ class PpiFx7ReconciliationTests(unittest.TestCase):
         self.ppi = mock_comparison()
         self.fx = mock_fx7()
 
-    def run_join(self, *, ppi=None, fx=None, clock=NOW):
+    def run_join(self, *, ppi=_UNSET, fx=_UNSET, clock=NOW):
         return reconcile(
-            ppi_comparison=self.ppi if ppi is None else ppi,
-            fx7_reaction=self.fx if fx is None else fx,
+            ppi_comparison=self.ppi if ppi is _UNSET else ppi,
+            fx7_reaction=self.fx if fx is _UNSET else fx,
             as_of_utc=clock)
 
     def safe(self, r):
