@@ -7,6 +7,8 @@ import unittest
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+from atlasquant_fx_universe import OFFICIAL_PAIRS
+
 from atlasquant_trader_mt5_28fx_full_roster_lab import (
     inspect_am12_ny17_full_roster_lab as audit,
     main,
@@ -28,7 +30,10 @@ def fake_ok(**kwargs):
         "reason": "LOCAL",
         "batch_result": {
             "coverage_claim_complete_pairs": 28,
-            "pair_results": {},
+            "pair_results": {
+                pair: {"state": "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO"}
+                for pair in OFFICIAL_PAIRS
+            },
         },
     }
 
@@ -40,7 +45,13 @@ def fake_gap(**kwargs):
         "batch_result": {
             "coverage_claim_complete_pairs": 27,
             "pair_results": {
-                "EUR/USD": {"state": "LAB_MT5_M15_ARCHIVE_NY17_JOIN_BLOCKED"},
+                pair: ({
+                    "state": "LAB_MT5_M15_ARCHIVE_NY17_JOIN_BLOCKED",
+                    "reason": "M15_MISSING_ONE_EPOCH",
+                } if pair == "EUR/USD" else {
+                    "state": "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO"
+                })
+                for pair in OFFICIAL_PAIRS
             },
         },
     }
@@ -92,6 +103,10 @@ class FullNy17RosterTests(unittest.TestCase):
         self.assertEqual(result["total_expected_pair_window_checks"], 140)
         self.assertEqual(result["local_pair_window_checks_complete"], 140)
         self.assertEqual(reader.call_count, 5)
+        self.assertEqual(set(result["complete_window_counts_by_pair"]), set(OFFICIAL_PAIRS))
+        self.assertEqual(set(result["unverifiable_window_counts_by_pair"]), set(OFFICIAL_PAIRS))
+        self.assertTrue(all(v == 5 for v in result["complete_window_counts_by_pair"].values()))
+        self.assertTrue(all(v == 0 for v in result["unverifiable_window_counts_by_pair"].values()))
         self.assertEqual(
             [x["start_utc"] for x in result["windows"]],
             [ny(day).isoformat() for day in (8, 9, 10, 11, 12)],
@@ -129,6 +144,11 @@ class FullNy17RosterTests(unittest.TestCase):
         self.assertEqual(result["local_pair_window_checks_complete"], 139)
         self.assertEqual(result["blocked_or_unverifiable_pair_window_checks"], 1)
         self.assertEqual(result["windows"][2]["blocked_pairs"], ["EUR/USD"])
+        self.assertEqual(result["windows"][2]["unverifiable_pair_reasons"],
+                         {"EUR/USD": "M15_MISSING_ONE_EPOCH"})
+        self.assertEqual(result["unverifiable_window_counts_by_pair"]["EUR/USD"], 1)
+        self.assertEqual(result["complete_window_counts_by_pair"]["EUR/USD"], 4)
+        self.assertEqual(result["complete_window_counts_by_pair"]["GBP/USD"], 5)
         self.assertFalse(result["all_nominal_windows_locally_checked_complete"])
         self.safe(result)
 
@@ -145,9 +165,42 @@ class FullNy17RosterTests(unittest.TestCase):
         self.assertEqual(result["local_pair_window_checks_complete"], 0)
         self.assertEqual(result["blocked_or_unverifiable_pair_window_checks"], 140)
         self.assertEqual(result["blocked_or_incomplete_window_count"], 5)
+        self.assertEqual(set(result["windows"][0]["blocked_pairs"]), set(OFFICIAL_PAIRS))
+        self.assertEqual(set(result["windows"][0]["unverifiable_pair_reasons"]),
+                         set(OFFICIAL_PAIRS))
+        self.assertTrue(all(v == 5 for v in result["unverifiable_window_counts_by_pair"].values()))
+        self.assertTrue(all(v == 0 for v in result["complete_window_counts_by_pair"].values()))
         self.assertEqual(result["windows"][0]["local_archive_check_reason"],
                          "SEVEN_BATCH_MANIFESTS_REQUIRED")
         self.safe(result)
+
+    def test_inconsistent_green_count_without_pair_level_proof_blocks(self):
+        forged = fake_ok()
+        forged["batch_result"] = {
+            "coverage_claim_complete_pairs": 28, "pair_results": {}
+        }
+        with patch(
+            "atlasquant_trader_mt5_28fx_full_roster_lab.inspect_local_am12_28fx_lab",
+            return_value=forged,
+        ):
+            r = run()
+        self.assertEqual(r["state"], "LAB_AM12_NY17_FULL_ROSTER_BLOCKED")
+        self.assertEqual(r["reason"], "INCOMPLETE_PAIR_DIAGNOSTICS_FROM_BATCH")
+        self.assertEqual(r["local_pair_window_checks_complete"], 0)
+        self.safe(r)
+
+    def test_claimed_28_cannot_override_27_complete_pair_rows(self):
+        inconsistent = fake_gap()
+        inconsistent["batch_result"]["coverage_claim_complete_pairs"] = 28
+        inconsistent["state"] = "LAB_AM12_LOCAL_M15_WINDOW_CHECKS_ONLY_NO_GO"
+        with patch(
+            "atlasquant_trader_mt5_28fx_full_roster_lab.inspect_local_am12_28fx_lab",
+            return_value=inconsistent,
+        ):
+            r = run()
+        self.assertEqual(r["state"], "LAB_AM12_NY17_FULL_ROSTER_BLOCKED")
+        self.assertEqual(r["reason"], "INCONSISTENT_BATCH_COUNTS")
+        self.safe(r)
 
     def test_naive_or_subsecond_ny17_bounds_fail_before_reader(self):
         for start in (
