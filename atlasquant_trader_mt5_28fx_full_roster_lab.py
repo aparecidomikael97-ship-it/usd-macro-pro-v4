@@ -10,7 +10,7 @@ or broker holiday calendar. No signal, probability, or market accuracy here.
 Use from the connected AM12 terminal (no write, no MT5/API access):
   python -B atlasquant_trader_mt5_28fx_full_roster_lab.py \\
     --root "<AM12 folder>" --horizon D1 \\
-    --start-utc "2026-11-01T21:00:00+00:00" \\
+    --start-utc "2026-11-01T22:00:00+00:00" \\
     --end-utc "2026-11-06T22:00:00+00:00" \\
     --as-of-utc "2026-11-12T13:00:00+00:00"
 
