@@ -181,6 +181,18 @@ def inspect_am12_ny17_full_roster_lab(
                     return out
                 state = row.get("state")
                 if state == "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO":
+                    # A green price window cannot silently omit the actual
+                    # documentary movement. Still NOT an authenticated bias.
+                    if (row.get("price_movement_direction_documentary")
+                            not in ("UP", "DOWN", "FLAT")
+                            or any(not isinstance(row.get(k), str)
+                                   for k in (
+                                       "price_open_to_close_bps_documentary",
+                                       "price_window_start_open_documentary",
+                                       "price_window_end_close_documentary",
+                                   ))):
+                        out["reason"] = "COMPLETE_PAIR_MISSING_DOCUMENTARY_PRICE_LABEL"
+                        return out
                     complete_in_rows += 1
                 else:
                     pair_reasons[pair] = str(row.get("reason") or "PAIR_REJECTED_NO_REASON")
