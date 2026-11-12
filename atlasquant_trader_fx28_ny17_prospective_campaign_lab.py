@@ -12,10 +12,13 @@ The result is a documentary completeness check ONLY. No PnL or live biases.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, time, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import re
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_trader_fx_ny17_forecast_outcome_join_lab import _price
 
 SCHEMA = "ATLASQUANT_TRADER_FX28_NY17_PROSPECTIVE_BOUNDARY_LAB_V1"
 ROSTER_SCHEMA = "ATLASQUANT_TRADER_MT5_FULL_NY17_WINDOW_ROSTER_LAB_V1"
@@ -69,6 +72,32 @@ def _nominal_windows(horizon: str) -> list[tuple[datetime, datetime]]:
                 out.append((beginning, ending))
         current += timedelta(days=1)
     return out
+
+
+def _valid_documentary_price_movement(value: Any) -> bool:
+    """Local self-consistency only, NEVER evidence of real broker prices."""
+    if not isinstance(value, dict):
+        return False
+    opening = _price(value.get("start_open_documentary"))
+    closing = _price(value.get("end_close_documentary"))
+    raw_bps = value.get("change_bps_documentary")
+    direction = value.get("direction_documentary")
+    if (opening is None or closing is None
+            or not isinstance(raw_bps, str)
+            or re.fullmatch(r"-?[0-9]{1,7}\.[0-9]{4}", raw_bps) is None
+            or direction not in ("UP", "DOWN", "FLAT")
+            or closing > opening * Decimal("101")):
+        return False
+    try:
+        expected = ((closing / opening - 1) * Decimal("10000")).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        expected_direction = ("UP" if closing > opening else
+                              "DOWN" if closing < opening else "FLAT")
+        return (abs(expected) <= Decimal("1000000")
+                and expected == Decimal(raw_bps)
+                and expected_direction == direction)
+    except (InvalidOperation, OverflowError, ZeroDivisionError):
+        return False
 
 
 def _base(reason: str) -> dict[str, Any]:
@@ -137,7 +166,7 @@ def inspect_frozen_fx28_ny17_campaign_lab(
             return out
         if (_iso(r.get("range_start_utc")) != FROZEN_START_UTC
                 or _iso(r.get("range_end_utc")) != FROZEN_END_UTC):
-            out["reason"] = horizon + "_CAMP_AIGN_BOUNDS_MISMATCH".replace("CAMP_AIGN", "CAMPAIGN")
+            out["reason"] = horizon + "_CAMPAIGN_BOUNDS_MISMATCH"
             return out
         rows = r.get("windows")
         if (r.get("horizon") != horizon
@@ -172,7 +201,9 @@ def inspect_frozen_fx28_ny17_campaign_lab(
                     or not set(blocked) <= set(OFFICIAL_PAIRS)
                     or set(reasons) != set(blocked)
                     or set(movements) != set(OFFICIAL_PAIRS).difference(blocked)
-                    or any(not isinstance(x, str) or not x for x in reasons.values())):
+                    or any(not isinstance(x, str) or not x for x in reasons.values())
+                    or any(not _valid_documentary_price_movement(v)
+                           for v in movements.values())):
                 out["reason"] = horizon + "_PER_PAIR_MISSING_PRICE_DIAGNOSTICS"
                 return out
             complete = 28 - len(blocked)
