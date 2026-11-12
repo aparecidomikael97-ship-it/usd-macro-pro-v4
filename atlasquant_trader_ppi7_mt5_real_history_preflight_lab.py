@@ -41,6 +41,10 @@ def _base(reason: str) -> dict[str, Any]:
         "pair_results": {},
         "hidden_pairs_with_valid_history": [],
         "history_warmup_attempted": [],
+        "pairs_with_zero_stored_bar_spreads": [],
+        "execution_bid_ask_spreads_independently_verified": False,
+        "bar_spread_zero_means_free_execution": False,
+        "cost_adjusted_reaction_ready": False,
         "only_closed_bars_allowed": True,
         "files_written": 0,
         "http_requests": 0,
@@ -144,13 +148,20 @@ def inspect_pre_event_mt5_m15_history_lab(
                 result["failed_symbol"] = sym
                 return result
             spreads = [int(row["spread"]) for row in bars]
+            zero_bars = spreads.count(0)
             result["pair_results"][sym] = {
                 "closed_m15_bars": ROWS_REQUIRED,
                 "visible_in_market_watch": visible,
                 "median_stored_bar_spread_points": median(spreads),
                 "max_stored_bar_spread_points": max(spreads),
+                "zero_stored_bar_spread_count": zero_bars,
+                "spread_interpretation": (
+                    "ZERO_RECORDED_SPREAD_UNUSABLE_AS_EXECUTION_COST" if zero_bars
+                    else "NONZERO_RECORDED_SPREAD_NOT_EXECUTION_COST"),
                 "price_bytes_or_ohlc_retained": False,
             }
+            if zero_bars:
+                result["pairs_with_zero_stored_bar_spreads"].append(sym)
             if not visible:
                 result["hidden_pairs_with_valid_history"].append(sym)
             result["checked_pairs"] += 1
