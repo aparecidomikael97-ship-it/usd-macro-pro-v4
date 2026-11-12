@@ -157,6 +157,11 @@ def inspect_mt5_m15_archive_ny17_join_lab(
             epoch = int(t)
             if epoch <= 0 or epochs and epoch <= epochs[-1]:
                 raise ValueError("CSV_EPOCH_DUPLICATE_OR_NON_MONOTONIC")
+            # Validate every archived M15 timestamp, not just the requested
+            # NY17 window: a shifted candle elsewhere still invalidates the
+            # integrity claim of the full supplied snapshot.
+            if epoch % FRAME_SECONDS != 0:
+                raise ValueError("CSV_M15_EPOCH_NOT_ON_UTC_QUARTER_HOUR")
             prices = [_positive(row[k]) for k in ("open", "high", "low", "close")]
             if any(p is None for p in prices):
                 raise ValueError("CSV_PRICE_INVALID")
