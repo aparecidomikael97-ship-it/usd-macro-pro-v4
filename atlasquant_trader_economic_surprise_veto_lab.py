@@ -100,6 +100,10 @@ def inspect_economic_surprise_veto_lab(
         # missing actuals and surprise arithmetic. No post-cutoff values may pass.
         routed = inspect_g8_event_relevance_lab(events, as_of_utc=cutoff)
         if routed["state"] != EXPECTED_ROUTE_STATE or routed["pair_count"] != 28:
+            # Preserve the established domain-specific duplicate veto when
+            # the upstream router rejects a second semantic copy early.
+            if routed.get("reason") == "DUPLICATE_ECONOMIC_METRIC_PERIOD_NOT_NEW_EVIDENCE":
+                return _blocked(horizon + "_DUPLICATE_ECONOMIC_RELEASE", asset=asset)
             return _blocked(horizon + "_EVENT_ROUTE_REJECTED_FUTURE_OR_INVALID", asset=asset)
         unique_identities = set()
         for event in events:
