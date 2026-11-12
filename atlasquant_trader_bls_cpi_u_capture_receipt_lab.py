@@ -26,7 +26,7 @@ from pathlib import Path
 import re
 import sys
 from typing import Any
-from zipfile import ZipFile, ZIP_STORED
+from zipfile import BadZipFile, ZipFile, ZIP_STORED
 
 from atlasquant_trader_bls_cpi_u_official_bytes_readonly_lab import (
     SERIES, URL, inspect_bls_cpi_u_v1_bytes_lab,
@@ -184,7 +184,7 @@ def save_bls_cpi_u_source_receipt_once_lab(
                 or manifest.get("schema") != SCHEMA):
             out["reason"] = "ALTERED_ZIP_MANIFEST_OR_SOURCE_BYTES"
             return out
-    except (OSError, UnicodeError, ValueError, TypeError, KeyError):
+    except (OSError, UnicodeError, ValueError, TypeError, KeyError, BadZipFile):
         out["reason"] = "BROKEN_OR_UNREADABLE_ARCHIVE"
         return out
 
