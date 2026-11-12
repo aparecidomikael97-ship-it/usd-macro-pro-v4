@@ -642,8 +642,8 @@ class G8EventRelevanceTests(unittest.TestCase):
         usd = replace(report(event_id="US_CPI_OCT"), metric="CPI_MOM")
         gbp = replace(report(event_id="UK_CPI_OCT", currency="GBP"),
                       metric="CPI_MOM")
-        sep = replace(report(event_id="US_CPI_SEP", target_period="2026-09"),
-                      metric="CPI_MOM")
+        sep = replace(report(event_id="US_CPI_SEP"),
+                      target_period="2026-09", metric="CPI_MOM")
         result = route([usd, gbp, sep], as_of_utc=BEFORE)
         self.assertEqual(result["claimed_release_root_count"], 3)
         self.assertEqual(by_pair(result, "GBP/USD")["claimed_release_root_count"], 3)
