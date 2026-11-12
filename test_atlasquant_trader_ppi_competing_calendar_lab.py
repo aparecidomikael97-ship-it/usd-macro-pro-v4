@@ -131,7 +131,6 @@ class PpiCompetingCalendarTests(unittest.TestCase):
     def test_missing_completeness_or_broken_coverage_blocks_not_empty(self):
         base = sample()
         for changed in (
-            replace(base, claims_complete_for_covered_period=False),
             replace(base, covered_from_utc=EVENT_UTC),
             replace(base, covered_until_utc=EVENT_UTC + timedelta(hours=1)),
             replace(base, source_sha256_claim="not-a-hash"),
@@ -141,6 +140,46 @@ class PpiCompetingCalendarTests(unittest.TestCase):
                 self.assertEqual(r["reason"],
                                  "PRE_EVENT_CALENDAR_CAPTURE_COVERAGE_OR_HASH_INVALID")
                 self.assertIsNone(r["candidate_competing_root_count_documentary"])
+
+    def test_partial_official_source_set_is_not_a_full_market_calendar(self):
+        # These UTC schedule times were checked against pre-event official
+        # EIA, Fed Board and SF Fed pages. This is not market impact proof.
+        ev = (
+            claim("US_EIA_NATGAS_STORAGE_20261113", 120,
+                  currency="USD", category="MACRO_DATA", impact="UNASSESSED"),
+            claim("US_FED_BOWMAN_DISCUSSION_20261113", 140,
+                  currency="USD", category="POLICY_SPEECH", impact="UNASSESSED"),
+            claim("US_SF_FED_DALY_UNLV_20261113", 210,
+                  currency="USD", category="POLICY_SPEECH", impact="UNASSESSED"),
+        )
+        calendar = replace(sample(*ev), claims_complete_for_covered_period=False)
+        r = self.run_lab(calendar)
+        self.assertEqual(r["state"],
+                         "LAB_PPI_PARTIAL_COMPETING_ROOTS_DOCUMENTARY_REVIEW_REQUIRED")
+        self.assertEqual(r["candidate_competing_root_count_documentary"], 3)
+        self.assertFalse(r["calendar_period_claims_complete_unattested"])
+        self.assertEqual(r["candidate_baseline_contamination_roots_documentary"], [])
+        self.assertEqual(r["candidate_competing_roots_by_reaction_window"]["M15"], [])
+        self.assertEqual(r["candidate_competing_roots_by_reaction_window"]["H1"], [])
+        self.assertEqual(len(r["candidate_competing_roots_by_reaction_window"]["H4"]), 3)
+        self.assertFalse(r["causal_isolation_of_ppi_verified"])
+
+    def test_empty_partial_calendar_not_a_no_news_claim(self):
+        r = self.run_lab(replace(
+            sample(), claims_complete_for_covered_period=False))
+        self.assertEqual(r["state"],
+                         "LAB_PPI_PARTIAL_COMPETING_LIST_UNATTESTED_REVIEW_REQUIRED")
+        self.assertFalse(r["calendar_period_claims_complete_unattested"])
+        self.assertEqual(r["candidate_competing_root_count_documentary"], 0)
+        self.assertFalse(r["no_competing_events_proven"])
+
+    def test_nonboolean_completeness_claim_is_rejected(self):
+        for wrong in (None, 1, "true"):
+            with self.subTest(wrong=wrong):
+                r = self.run_lab(replace(
+                    sample(), claims_complete_for_covered_period=wrong))
+                self.assertEqual(r["reason"],
+                                 "PRE_EVENT_CALENDAR_CAPTURE_COVERAGE_OR_HASH_INVALID")
 
     def test_post_release_calendar_cannot_be_recast_as_pre_event(self):
         for changed in (

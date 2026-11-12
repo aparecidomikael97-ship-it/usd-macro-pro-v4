@@ -27,6 +27,10 @@ from atlasquant_trader_ppi_pre_event_protocol_lab import PINNED_PROTOCOL_SHA256
 from test_atlasquant_trader_ppi_competing_calendar_lab import (
     claim as concurrent_claim, sample as calendar_sample,
 )
+from atlasquant_trader_ppi_official_schedule_archive_lab import PINNED_SOURCES
+from test_atlasquant_trader_ppi_official_schedule_archive_lab import (
+    synthetic_official_archive,
+)
 from test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     raw as ppi_html, receipt as ppi_receipt, td, te,
 )
@@ -309,6 +313,57 @@ class OneEventStudyJoinTests(unittest.TestCase):
         self.assertIsNone(result["one_event_study"])
         self.assertEqual(result["source_stage_states"]["PRE_EVENT_CONCURRENT_MACRO_CALENDAR"],
                          "LAB_PPI_COMPETING_CALENDAR_BLOCKED")
+
+    def test_official_three_original_pages_revalidated_before_calendar_claim(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            pins, _ = synthetic_official_archive(root)
+            packet = replace(self.packet,
+                             pre_event_official_calendar_archive_root=root)
+            with patch.dict(PINNED_SOURCES, pins, clear=True):
+                with self.isolated_synthetic_pre_event_receipts():
+                    result = self.run_study(packet)
+        self.assertEqual(result["state"], "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
+        study = result["one_event_study"]
+        self.assertEqual(study["official_schedule_html_files_original_sha_matched_locally"], 3)
+        self.assertEqual(study["competing_macro_calendar_context_documentary"]
+                         ["candidate_other_root_count"], 3)
+        self.assertEqual(len(study["competing_macro_calendar_context_documentary"]
+                             ["candidate_other_roots_by_window"]["H4"]), 3)
+        self.assertFalse(study["official_schedule_captured_time_attested_externally"])
+        self.assertTrue(study["descriptive_reaction_cannot_be_exclusively_attributed_to_ppi"])
+        self.assertFalse(result["causal_effect_estimated"])
+
+    def test_official_pages_reject_caller_calendar_that_rewrites_partial_evidence(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            pins, _ = synthetic_official_archive(root)
+            packet = replace(
+                self.packet,
+                pre_event_official_calendar_archive_root=root,
+                pre_event_calendar=calendar_sample(),
+            )
+            with patch.dict(PINNED_SOURCES, pins, clear=True):
+                with self.isolated_synthetic_pre_event_receipts():
+                    result = self.run_study(packet)
+        self.assertEqual(result["reason"],
+                         "CALENDAR_CLAIM_DIFFERS_FROM_FROZEN_OFFICIAL_SOURCES")
+        self.assertIsNone(result["one_event_study"])
+
+    def test_official_page_changed_blocks_before_pricing_even_if_macro_matches(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            pins, _ = synthetic_official_archive(root)
+            page = root / "FED_BOARD_NOVEMBER.html"
+            page.write_bytes(page.read_bytes()+b"altered")
+            packet = replace(
+                self.packet, pre_event_official_calendar_archive_root=root)
+            with patch.dict(PINNED_SOURCES, pins, clear=True):
+                with self.isolated_synthetic_pre_event_receipts():
+                    result = self.run_study(packet)
+        self.assertEqual(result["reason"],
+                         "PRE_EVENT_SCHEDULE_ORIGINAL_SOURCE_BYTES_INVALID")
+        self.assertIsNone(result["one_event_study"])
 
     def test_missing_bls_document_blocks_even_with_good_synthetic_previous(self):
         with self.isolated_synthetic_pre_event_receipts():

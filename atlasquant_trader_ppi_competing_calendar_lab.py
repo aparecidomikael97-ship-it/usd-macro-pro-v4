@@ -104,7 +104,7 @@ def audit_ppi_competing_calendar_lab(
             or captured > now or captured >= EVENT_UTC
             or begin > BASELINE_OPEN_UTC or end < LAST_REQUIRED_CLOSE_UTC
             or begin >= end
-            or calendar.claims_complete_for_covered_period is not True
+            or type(calendar.claims_complete_for_covered_period) is not bool
             or not isinstance(calendar.source_sha256_claim, str)
             or HEX.fullmatch(calendar.source_sha256_claim) is None
             or not isinstance(calendar.events, tuple)
@@ -159,15 +159,23 @@ def audit_ppi_competing_calendar_lab(
         } for root, signature in sorted(competing.items())
     ]
     has_competing = bool(competing)
-    out = _base(
-        "CONCURRENT_EVENT_CANDIDATES_NOT_CAUSAL_ESTIMATES" if has_competing
-        else "NO_COMPETING_ROOTS_LISTED_IN_ONE_UNVERIFIED_CALENDAR",
-        "LAB_PPI_COMPETING_ROOTS_DOCUMENTARY_REVIEW_REQUIRED" if has_competing
-        else "LAB_PPI_EMPTY_COMPETING_LIST_UNATTESTED_REVIEW_REQUIRED",
-    )
+    complete_claim = calendar.claims_complete_for_covered_period
+    if has_competing:
+        reason = "CONCURRENT_EVENT_CANDIDATES_NOT_CAUSAL_ESTIMATES"
+        state = ("LAB_PPI_COMPETING_ROOTS_DOCUMENTARY_REVIEW_REQUIRED"
+                 if complete_claim else
+                 "LAB_PPI_PARTIAL_COMPETING_ROOTS_DOCUMENTARY_REVIEW_REQUIRED")
+    else:
+        reason = ("NO_COMPETING_ROOTS_LISTED_IN_ONE_UNVERIFIED_CALENDAR"
+                  if complete_claim else
+                  "PARTIAL_CALENDAR_CANNOT_DETERMINE_OTHER_EVENTS")
+        state = ("LAB_PPI_EMPTY_COMPETING_LIST_UNATTESTED_REVIEW_REQUIRED"
+                 if complete_claim else
+                 "LAB_PPI_PARTIAL_COMPETING_LIST_UNATTESTED_REVIEW_REQUIRED")
+    out = _base(reason, state)
     out.update({
         "calendar_captured_pre_release_claim": True,
-        "calendar_period_claims_complete_unattested": True,
+        "calendar_period_claims_complete_unattested": complete_claim,
         "calendar_sha256_format_valid_only": True,
         "candidate_competing_root_count_documentary": len(competing),
         "candidate_baseline_contamination_roots_documentary": baseline,

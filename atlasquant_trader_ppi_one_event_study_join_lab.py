@@ -34,6 +34,9 @@ from atlasquant_trader_ppi_fx_breadth_lab import (
 from atlasquant_trader_ppi_competing_calendar_lab import (
     PreEventCalendarClaim, audit_ppi_competing_calendar_lab,
 )
+from atlasquant_trader_ppi_official_schedule_archive_lab import (
+    inspect_ppi_three_official_schedule_files_lab,
+)
 from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     RELEASE_UTC, ClaimedPostReleaseHTTP,
     compare_ppi_actual_to_frozen_consensus_lab,
@@ -67,6 +70,9 @@ class PpiStudyPacket:
     price_archive_receipt: ClaimedLocalPriceArchive
     # Missing means unknown calendar, NOT "no other events".
     pre_event_calendar: PreEventCalendarClaim | None = None
+    # If provided, re-open the original local publisher HTML + SHA receipt.
+    # This remains partial: not an attested whole-market event calendar.
+    pre_event_official_calendar_archive_root: Path | str | None = None
 
 
 def _utc(value: Any) -> datetime | None:
@@ -132,8 +138,29 @@ def inspect_ppi_one_event_study_lab(
     # The calendar is optional only for descriptive price measurements.
     # Missing ≠ no competing releases. Malformed purported provenance blocks
     # the study rather than being silently converted into "clean" windows.
+    calendar_input = packet.pre_event_calendar
+    official_calendar_custody = None
+    if packet.pre_event_official_calendar_archive_root is not None:
+        official_calendar_custody = inspect_ppi_three_official_schedule_files_lab(
+            archive_root=packet.pre_event_official_calendar_archive_root,
+            as_of_utc=now,
+        )
+        stages["THREE_OFFICIAL_PRE_EVENT_SCHEDULE_ARCHIVES"] = (
+            official_calendar_custody.get("state"))
+        if (official_calendar_custody.get("state") !=
+                "LAB_PPI_THREE_OFFICIAL_SCHEDULES_LOCAL_SHA_MATCH_NO_GO"
+                or official_calendar_custody.get("files_with_pinned_original_sha") != 3):
+            out = _blocked("PRE_EVENT_SCHEDULE_ORIGINAL_SOURCE_BYTES_INVALID")
+            out["source_stage_states"] = stages
+            return out
+        frozen_calendar_claim = official_calendar_custody["calendar_claim"]
+        if calendar_input is not None and calendar_input != frozen_calendar_claim:
+            out = _blocked("CALENDAR_CLAIM_DIFFERS_FROM_FROZEN_OFFICIAL_SOURCES")
+            out["source_stage_states"] = stages
+            return out
+        calendar_input = frozen_calendar_claim
     competing = audit_ppi_competing_calendar_lab(
-        calendar=packet.pre_event_calendar, as_of_utc=now)
+        calendar=calendar_input, as_of_utc=now)
     stages["PRE_EVENT_CONCURRENT_MACRO_CALENDAR"] = competing.get("state")
     if competing.get("state") == "LAB_PPI_COMPETING_CALENDAR_BLOCKED":
         out = _blocked("COMPETING_EVENT_CALENDAR_INVALID_NO_CAUSAL_INTERPRETATION")
@@ -252,6 +279,10 @@ def inspect_ppi_one_event_study_lab(
             "requires_human_calendar_review": True,
         },
         "descriptive_reaction_cannot_be_exclusively_attributed_to_ppi": True,
+        "official_schedule_html_files_original_sha_matched_locally": (
+            3 if official_calendar_custody is not None else 0),
+        "official_schedule_captured_time_attested_externally": False,
+        "official_source_pages_do_not_prove_complete_news_calendar": True,
         "m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost": spread["per_pair_m15_spread_samples_points"],
         "zero_spread_context_requires_broker_review": spread["any_pair_all_17_spread_samples_zero"],
         "broker_execution_costs_not_verified": True,
