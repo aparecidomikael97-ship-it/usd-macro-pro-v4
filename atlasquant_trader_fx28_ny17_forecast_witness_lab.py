@@ -173,6 +173,8 @@ def prepare_window_witness_body_lab(
     """Construct a hash-only anchor BODY, but NEVER publish it to GitHub."""
     out = {"state": "LAB_WITNESS_BODY_BLOCKED", "reason": "INVALID_WINDOW_OR_FORECASTS",
            "body": None, "forecast_roster_sha256": None,
+           "canonical_forecast_json": None,
+           "canonical_forecast_payload_retained_externally": False,
            "body_posted_on_github": False, "external_precommit_verified": False}
     now, start, end = _utc(prepared_at), _utc(start_at), _utc(end_at)
     if now is None or start is None or end is None or not now < start:
@@ -184,11 +186,14 @@ def prepare_window_witness_body_lab(
     if valid is None:
         return out
     roster, _ = valid
-    digest = sha256(json.dumps({
+    # Preserve the exact canonical bytes behind the public digest. A GitHub
+    # comment with only a SHA-256 is not enough if these bytes disappear.
+    canonical_json = json.dumps({
         "schema": SCHEMA, "campaign_id": CAMPAIGN_ID,
         "horizon": horizon, "start_utc": _stamp(start),
         "end_utc": _stamp(end), "pairs": roster,
-    }, sort_keys=True, ensure_ascii=True, separators=(",", ":")).encode("ascii")).hexdigest()
+    }, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    digest = sha256(canonical_json.encode("ascii")).hexdigest()
     body = "\n".join((
         HEADER, "campaign_id=" + CAMPAIGN_ID,
         "horizon=" + horizon, "start_utc=" + _stamp(start),
@@ -198,7 +203,8 @@ def prepare_window_witness_body_lab(
     ))
     out.update(state="LAB_WITNESS_BODY_PREPARED_NOT_POSTED",
                reason="HASH_ONLY_DOES_NOT_PROVE_TIMESTAMP_OR_SOURCE",
-               body=body, forecast_roster_sha256=digest)
+               body=body, forecast_roster_sha256=digest,
+               canonical_forecast_json=canonical_json)
     return out
 
 
