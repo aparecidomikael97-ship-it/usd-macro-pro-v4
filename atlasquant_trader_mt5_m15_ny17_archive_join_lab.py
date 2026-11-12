@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import gzip
 from hashlib import sha256
 from io import BytesIO, StringIO
@@ -63,6 +63,11 @@ def _base(reason: str) -> dict[str, Any]:
         "window_expected_m15_rows": None,
         "first_mismatch_index": None,
         "window_coverage": None,
+        "price_window_start_open_documentary": None,
+        "price_window_end_close_documentary": None,
+        "price_open_to_close_bps_documentary": None,
+        "price_movement_direction_documentary": None,
+        "price_window_label_method": "FIRST_M15_OPEN_TO_LAST_M15_CLOSE",
         "original_archive_bytes_provided_by_caller": False,
         "source_independently_authenticated": False,
         "source_broker_identity_verified": False,
@@ -146,6 +151,8 @@ def inspect_mt5_m15_archive_ny17_join_lab(
         if tuple(reader.fieldnames or ()) != FIELDS:
             raise ValueError("CSV_HEADER_MISMATCH")
         epochs: list[int] = []
+        window_price_points: dict[int, tuple[Decimal, Decimal]] = {}
+        start_epoch, end_epoch = int(start.timestamp()), int(end.timestamp())
         for row in reader:
             if ("__extra__" in row or set(row) != set(FIELDS)
                     or any(row[k] is None for k in FIELDS)):
@@ -174,6 +181,8 @@ def inspect_mt5_m15_archive_ny17_join_lab(
                         or len(value) > 24):
                     raise ValueError("CSV_VOLUME_OR_SPREAD_INVALID")
             epochs.append(epoch)
+            if start_epoch <= epoch < end_epoch:
+                window_price_points[epoch] = (op, cl)
             if len(epochs) > EXPECTED[FRAME]:
                 raise ValueError("CSV_ROW_COUNT_INVALID")
         if len(epochs) != EXPECTED[FRAME]:
@@ -208,7 +217,28 @@ def inspect_mt5_m15_archive_ny17_join_lab(
         out["reason"] = "M15_NY17_COVERAGE_" + covered["reason"]
         return out
 
+    # Price movement is the OPEN of the first M15 bar to the CLOSE of
+    # the final *closed* M15 bar. It is NOT a close-to-close return,
+    # executable trade, spread-adjusted P&L, or direction forecast.
+    try:
+        first_open = window_price_points[start_epoch][0]
+        final_close = window_price_points[end_epoch - FRAME_SECONDS][1]
+        raw_bps = (final_close / first_open - 1) * Decimal("10000")
+        if abs(raw_bps) > Decimal("1000000"):
+            out["reason"] = "DOCUMENTARY_PRICE_RATIO_OUTSIDE_RESEARCH_GUARDRAIL"
+            return out
+        bps = raw_bps.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    except (KeyError, InvalidOperation, OverflowError, ZeroDivisionError):
+        out["reason"] = "DOCUMENTARY_PRICE_LABEL_UNAVAILABLE_OR_INVALID"
+        return out
+    direction = "UP" if final_close > first_open else (
+        "DOWN" if final_close < first_open else "FLAT")
+
     out.update({
+        "price_window_start_open_documentary": str(first_open),
+        "price_window_end_close_documentary": str(final_close),
+        "price_open_to_close_bps_documentary": str(bps),
+        "price_movement_direction_documentary": direction,
         "state": "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO",
         "reason": "LOCAL_ARCHIVE_AND_NY17_SHAPE_ONLY_NOT_BROKER_ATTESTATION",
         "window_coverage": covered,
