@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 import re
 from typing import Any
 
@@ -41,6 +42,39 @@ def _utc(value: Any) -> datetime | None:
     except (ValueError, OverflowError):
         return None
 
+
+
+def _pair_evidence_digest(
+    *, pair: str, horizon: str, cutoff: datetime,
+    receipts_by_currency: dict[str, list[dict[str, Any]]],
+    raw_source_bytes_by_currency: dict[str, dict[str, bytes]],
+) -> str:
+    """Local deterministic binding of four claimed releases and their bytes.
+
+    Not an issuer signature, proof of first availability or model quality.
+    A missing original body is represented as None (never fabricated).
+    """
+    entries = []
+    for currency in split_pair(pair):
+        for indicator in sorted(REQUIRED):
+            matching_rows = [
+                row for row in receipts_by_currency[currency]
+                if row.get("indicator") == indicator
+            ]
+            original = raw_source_bytes_by_currency[currency].get(indicator)
+            entries.append({
+                "currency": currency, "indicator": indicator,
+                "receipt_claims": matching_rows,
+                "original_bytes_sha256_local":
+                    sha256(original).hexdigest() if isinstance(original, bytes) else None,
+            })
+    canonical = json.dumps({
+        "schema": SCHEMA, "pair": pair, "horizon": horizon,
+        "feature_cutoff_utc": cutoff.isoformat(),
+        "bilateral_source_claims": entries,
+    }, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+       allow_nan=False)
+    return sha256(canonical.encode("ascii")).hexdigest()
 
 def _blocked(reason: str) -> dict[str, Any]:
     return {
@@ -188,6 +222,21 @@ def inspect_fx28_macro_pit_forecast_preflight_lab(
         local_complete += int(local_complete_for_pair)
         missing_pairs += int(not local_complete_for_pair)
         forecast = by_pair[pair]
+        # Bind every claimed forecast to the exact 2-currency source records
+        # and the local originals present at this frozen cutoff. An arbitrary
+        # 64-hex evidence field must never be accepted as a matching digest.
+        try:
+            expected_evidence_sha256 = _pair_evidence_digest(
+                pair=pair, horizon=horizon, cutoff=cutoff,
+                receipts_by_currency=receipts_by_currency,
+                raw_source_bytes_by_currency=raw_source_bytes_by_currency,
+            )
+        except (TypeError, ValueError, OverflowError, RecursionError):
+            out["reason"] = "PAIR_MACRO_SOURCE_DIGEST_NOT_CANONICAL"
+            return out
+        if forecast.evidence_sha256_claim != expected_evidence_sha256:
+            out["reason"] = "FORECAST_EVIDENCE_DIGEST_NOT_BOUND_TO_BILATERAL_SOURCES"
+            return out
         if forecast.direction not in ("UP", "DOWN", "ABSTAIN"):
             out["reason"] = "INVALID_FORECAST_DIRECTION"
             return out
@@ -249,4 +298,5 @@ def inspect_fx28_macro_pit_forecast_preflight_lab(
     return out
 
 
-__all__ = ("SCHEMA", "inspect_fx28_macro_pit_forecast_preflight_lab")
+__all__ = ("SCHEMA", "_pair_evidence_digest",
+           "inspect_fx28_macro_pit_forecast_preflight_lab")
