@@ -23,7 +23,7 @@ def ny(day, *, hour=17):
 
 
 def archive(*, pair="EUR/USD", missing_at=None, duplicate_at=None,
-            malformed_at=None):
+            malformed_at=None, off_grid_at=None):
     """Construct 3000 synthetic M15 bars, not a broker calendar."""
     start_epoch = int(ny(8).timestamp())
     times = []
@@ -33,6 +33,8 @@ def archive(*, pair="EUR/USD", missing_at=None, duplicate_at=None,
             stamp += 900
         if duplicate_at is not None and i == duplicate_at:
             stamp = start_epoch + (i - 1) * 900
+        if off_grid_at is not None and i == off_grid_at:
+            stamp += 60  # still ordered; not a valid 15-minute opening
         times.append(stamp)
     s = StringIO(newline="")
     w = csv.DictWriter(s, fieldnames=FIELDS, lineterminator="\n")
@@ -151,6 +153,18 @@ class ArchiveJoinTests(unittest.TestCase):
         self.assertEqual(r["reason"], "CSV_EPOCH_DUPLICATE_OR_NON_MONOTONIC")
         self.assertTrue(r["manifest_local_hash_consistent"])
         self.safety(r)
+
+    def test_off_grid_m15_epoch_fails_even_outside_ny17_window(self):
+        for index in (25, 120):
+            with self.subTest(index=index):
+                m, gz, captured = archive(off_grid_at=index)
+                r = inspect_case(manifest=m, packed=gz, captured=captured)
+                self.assertEqual(
+                    r["reason"], "CSV_M15_EPOCH_NOT_ON_UTC_QUARTER_HOUR"
+                )
+                self.assertTrue(r["manifest_local_hash_consistent"])
+                self.assertFalse(r["csv_full_row_count_and_order_verified_locally"])
+                self.safety(r)
 
     def test_bad_ohlc_fails_even_when_manifest_hash_matches(self):
         m, gz, captured = archive(malformed_at=25)
