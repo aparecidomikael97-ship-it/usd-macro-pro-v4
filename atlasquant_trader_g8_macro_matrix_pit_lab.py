@@ -2,7 +2,8 @@
 
 Reuses the established pair-level publication/capture chronology gate. No
 source authentication, live bias, probability, backtest approval or broker IO.
-Run separately at each D1/W1 decision cutoff with receipts available THEN.
+Run separately at each D1/W1/MN1 cutoff using only receipts available THEN.
+MN1 means monthly research context, NOT an M1 one-minute trading signal.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from atlasquant_trader_g8_macro_asof_lab import (
 )
 
 SCHEMA = "ATLASQUANT_TRADER_G8_MACRO_MATRIX_PIT_LAB_V1"
-HORIZONS = ("D1", "W1")
+HORIZONS = ("D1", "W1", "MN1")
 MAX_RECORDS_PER_CURRENCY = 12
 MAX_PAIR_ENVELOPE_BYTES = 48_000
 
@@ -33,6 +34,8 @@ def _blocked(reason: str) -> dict[str, Any]:
         "broker_price_source_verified": False, "backtest_approved": False,
         "validated_prediction_count": 0, "validated_accuracy": None,
         "directional_probability": None, "score_0_to_10": None,
+        "monthly_directional_bias": None,
+        "monthly_bias_validated_for_publication": False,
         "operational_bias": "AGUARDAR", "trade_authorized": False,
         "worker_enabled": False, "scheduler_enabled": False,
         "publishable": False, "http_requests": 0, "new_cost_brl": 0,
