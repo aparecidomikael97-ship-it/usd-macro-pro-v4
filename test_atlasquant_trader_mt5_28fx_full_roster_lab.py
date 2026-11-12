@@ -31,7 +31,13 @@ def fake_ok(**kwargs):
         "batch_result": {
             "coverage_claim_complete_pairs": 28,
             "pair_results": {
-                pair: {"state": "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO"}
+                pair: {
+                    "state": "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO",
+                    "price_movement_direction_documentary": "UP",
+                    "price_open_to_close_bps_documentary": "10.0000",
+                    "price_window_start_open_documentary": "1.0000",
+                    "price_window_end_close_documentary": "1.0010",
+                }
                 for pair in OFFICIAL_PAIRS
             },
         },
@@ -49,7 +55,11 @@ def fake_gap(**kwargs):
                     "state": "LAB_MT5_M15_ARCHIVE_NY17_JOIN_BLOCKED",
                     "reason": "M15_MISSING_ONE_EPOCH",
                 } if pair == "EUR/USD" else {
-                    "state": "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO"
+                    "state": "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO",
+                    "price_movement_direction_documentary": "UP",
+                    "price_open_to_close_bps_documentary": "10.0000",
+                    "price_window_start_open_documentary": "1.0000",
+                    "price_window_end_close_documentary": "1.0010",
                 })
                 for pair in OFFICIAL_PAIRS
             },
@@ -144,6 +154,8 @@ class FullNy17RosterTests(unittest.TestCase):
         self.assertEqual(result["local_pair_window_checks_complete"], 139)
         self.assertEqual(result["blocked_or_unverifiable_pair_window_checks"], 1)
         self.assertEqual(result["windows"][2]["blocked_pairs"], ["EUR/USD"])
+        self.assertNotIn("EUR/USD", result["windows"][2]["price_movements_documentary_by_pair"])
+        self.assertEqual(result["windows"][2]["price_movements_documentary_by_pair"]["GBP/USD"]["change_bps_documentary"], "10.0000")
         self.assertEqual(result["windows"][2]["unverifiable_pair_reasons"],
                          {"EUR/USD": "M15_MISSING_ONE_EPOCH"})
         self.assertEqual(result["unverifiable_window_counts_by_pair"]["EUR/USD"], 1)
@@ -201,6 +213,20 @@ class FullNy17RosterTests(unittest.TestCase):
         self.assertEqual(r["state"], "LAB_AM12_NY17_FULL_ROSTER_BLOCKED")
         self.assertEqual(r["reason"], "INCONSISTENT_BATCH_COUNTS")
         self.safe(r)
+
+    def test_green_window_without_documentary_price_label_is_blocked(self):
+        forged = fake_ok()
+        forged["batch_result"]["pair_results"]["EUR/USD"].pop(
+            "price_open_to_close_bps_documentary")
+        with patch(
+            "atlasquant_trader_mt5_28fx_full_roster_lab.inspect_local_am12_28fx_lab",
+            return_value=forged,
+        ):
+            result = run()
+        self.assertEqual(result["state"], "LAB_AM12_NY17_FULL_ROSTER_BLOCKED")
+        self.assertEqual(result["reason"],
+                         "COMPLETE_PAIR_MISSING_DOCUMENTARY_PRICE_LABEL")
+        self.safe(result)
 
     def test_naive_or_subsecond_ny17_bounds_fail_before_reader(self):
         for start in (
@@ -272,6 +298,10 @@ class FullNy17RosterTests(unittest.TestCase):
                              "LAB_AM12_NY17_FULL_ROSTER_LOCAL_CLAIMS_ONLY_NO_GO")
             self.assertEqual(result["nominal_window_count"], 1)
             self.assertEqual(result["local_pair_window_checks_complete"], 28)
+            movement = result["windows"][0]["price_movements_documentary_by_pair"]["EUR/USD"]
+            self.assertEqual(movement["direction_documentary"], "UP")
+            self.assertEqual(movement["change_bps_documentary"], "10.0000")
+            self.assertIsNone(result["directional_accuracy_validated"])
             self.assertEqual({p.name for p in path.iterdir()}, before)
             self.safe(result)
 
