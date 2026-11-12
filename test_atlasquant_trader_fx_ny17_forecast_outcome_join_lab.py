@@ -222,6 +222,23 @@ class FullFxForecastPriceJoinTests(unittest.TestCase):
                                  "DOCUMENTARY_PRICE_DIRECTION_OR_BPS_MISMATCH")
                 self.safe(response)
 
+    def test_extreme_price_ratio_is_blocked_without_decimal_exception(self):
+        price = roster()
+        price["windows"][0]["price_movements_documentary_by_pair"][
+            OFFICIAL_PAIRS[5]] = {
+                "start_open_documentary": "0.000000000001",
+                "end_close_documentary": "999999999.999999",
+                "change_bps_documentary": "10.0000",
+                "direction_documentary": "UP",
+            }
+        report = audit(price)
+        self.assertEqual(report["state"],
+                         "LAB_NY17_FORECAST_OUTCOME_JOIN_BLOCKED")
+        self.assertEqual(report["reason"],
+                         "DOCUMENTARY_PRICE_RATIO_OUTSIDE_RESEARCH_GUARDRAIL")
+        self.assertEqual(report["rows_documentary"], [])
+        self.safe(report)
+
     def test_missing_pair_price_label_or_wrong_week_is_rejected(self):
         r = roster()
         del r["windows"][0]["price_movements_documentary_by_pair"][
