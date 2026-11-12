@@ -183,8 +183,18 @@ def inspect_ny17_full_forecast_outcome_join_lab(
                     or not re.fullmatch(r"-?[0-9]{1,7}\.[0-9]{4}", raw_bps)):
                 out["reason"] = "INVALID_DOCUMENTARY_PRICE_ROW"
                 return out
-            expected_bps = ((closing / opening - 1) * Decimal("10000")).quantize(
-                Decimal("0.0001"), rounding=ROUND_HALF_UP)
+            # A caller can supply a near-zero opening price: reject absurd
+            # ratios BEFORE Decimal quantization (which may overflow its
+            # working precision). No thrown exception or fabricated result.
+            if closing > opening * Decimal("101"):
+                out["reason"] = "DOCUMENTARY_PRICE_RATIO_OUTSIDE_RESEARCH_GUARDRAIL"
+                return out
+            try:
+                expected_bps = ((closing / opening - 1) * Decimal("10000")).quantize(
+                    Decimal("0.0001"), rounding=ROUND_HALF_UP)
+            except (InvalidOperation, ZeroDivisionError, OverflowError):
+                out["reason"] = "DOCUMENTARY_PRICE_ARITHMETIC_INVALID"
+                return out
             expected_direction = ("UP" if closing > opening else
                                   "DOWN" if closing < opening else "FLAT")
             if (abs(expected_bps) > Decimal("1000000")
