@@ -8,6 +8,7 @@ No cross-currency numeric subtraction, HTTP, signals, or live publication.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any
 
 from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS, split_pair
@@ -37,6 +38,35 @@ EVIDENCE_GATES_NOT_MET = (
 )
 
 
+def _period_kind(period: Any) -> str | None:
+    """Classify a source reference period without assuming it is monthly."""
+    if not isinstance(period, str):
+        return None
+    if re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", period):
+        return "MONTHLY"
+    if re.fullmatch(r"\d{4}-Q[1-4]", period):
+        return "QUARTERLY"
+    return None
+
+
+def _classify_inflation_periods(
+    base_period: Any, quote_period: Any, *, complete: bool,
+) -> str:
+    """A matching period means metadata agreement only, never macro parity."""
+    if not complete:
+        return "DOCUMENTS_NOT_YET_ADMISSIBLE_ASOF"
+    bk, qk = _period_kind(base_period), _period_kind(quote_period)
+    if bk is None or qk is None:
+        return "UNKNOWN_PERIOD_FORMAT"
+    if bk != qk:
+        return "MONTHLY_VS_QUARTERLY"
+    if bk == "QUARTERLY":
+        return ("QUARTERLY_SAME_PERIOD_DOCUMENT_ONLY" if base_period == quote_period
+                else "QUARTERLY_DIFFERENT_PERIOD")
+    return ("MONTHLY_SAME_PERIOD_DOCUMENT_ONLY" if base_period == quote_period
+            else "MONTHLY_DIFFERENT_PERIOD")
+
+
 def _blocked(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "LAB_BLOCKED", "reason": reason,
@@ -45,6 +75,9 @@ def _blocked(reason: str) -> dict[str, Any]:
         "monthly_same_period_pair_count_document_only": 0,
         "monthly_different_period_pair_count_document_only": 0,
         "mixed_quarterly_monthly_pair_count_document_only": 0,
+        "quarterly_same_period_pair_count_document_only": 0,
+        "quarterly_different_period_pair_count_document_only": 0,
+        "unknown_period_format_pair_count_document_only": 0,
         "pairs_missing_cpi_or_policy_asof": 0,
         "pair_rows": [], "evidence_gates_not_met": list(EVIDENCE_GATES_NOT_MET),
         "original_source_bytes_attested": False,
@@ -95,6 +128,9 @@ def inspect_g8_pair_comparability_gate_lab(
     counter = {"MONTHLY_SAME_PERIOD_DOCUMENT_ONLY": 0,
                "MONTHLY_DIFFERENT_PERIOD": 0,
                "MONTHLY_VS_QUARTERLY": 0,
+               "QUARTERLY_SAME_PERIOD_DOCUMENT_ONLY": 0,
+               "QUARTERLY_DIFFERENT_PERIOD": 0,
+               "UNKNOWN_PERIOD_FORMAT": 0,
                "DOCUMENTS_NOT_YET_ADMISSIBLE_ASOF": 0}
     rows = []
     for pair in OFFICIAL_PAIRS:
@@ -104,14 +140,7 @@ def inspect_g8_pair_comparability_gate_lab(
                                                   q["INFLATION"], q["POLICY"]))
         bp = b["INFLATION"]["reference_period"] if b["INFLATION"] else None
         qp = q["INFLATION"]["reference_period"] if q["INFLATION"] else None
-        if not complete:
-            status = "DOCUMENTS_NOT_YET_ADMISSIBLE_ASOF"
-        elif "-Q" in bp or "-Q" in qp:
-            status = "MONTHLY_VS_QUARTERLY"
-        elif bp == qp:
-            status = "MONTHLY_SAME_PERIOD_DOCUMENT_ONLY"
-        else:
-            status = "MONTHLY_DIFFERENT_PERIOD"
+        status = _classify_inflation_periods(bp, qp, complete=complete)
         counter[status] += 1
         rows.append({
             "pair": pair, "base": base, "quote": quote,
@@ -124,6 +153,9 @@ def inspect_g8_pair_comparability_gate_lab(
             "macro_score_available": False,
             "D1": "AGUARDAR", "W1": "AGUARDAR", "trade_authorized": False,
         })
+
+    if counter["UNKNOWN_PERIOD_FORMAT"]:
+        return _blocked("UNRECOGNIZED_CPI_REFERENCE_PERIOD")
 
     visible = sum(r["visible_document_count"] for r in reports)
     out.update({
@@ -139,6 +171,12 @@ def inspect_g8_pair_comparability_gate_lab(
             "MONTHLY_DIFFERENT_PERIOD"],
         "mixed_quarterly_monthly_pair_count_document_only": counter[
             "MONTHLY_VS_QUARTERLY"],
+        "quarterly_same_period_pair_count_document_only": counter[
+            "QUARTERLY_SAME_PERIOD_DOCUMENT_ONLY"],
+        "quarterly_different_period_pair_count_document_only": counter[
+            "QUARTERLY_DIFFERENT_PERIOD"],
+        "unknown_period_format_pair_count_document_only": counter[
+            "UNKNOWN_PERIOD_FORMAT"],
         "pairs_missing_cpi_or_policy_asof": counter[
             "DOCUMENTS_NOT_YET_ADMISSIBLE_ASOF"],
         "pair_rows": rows,

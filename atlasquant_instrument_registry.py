@@ -48,6 +48,26 @@ FX_INSTRUMENTS: tuple[Instrument, ...] = tuple(_instrument(s) for s in FX_28)
 FX_BY_SYMBOL: dict[str, Instrument] = {i.symbol: i for i in FX_INSTRUMENTS}
 FX_BY_ID: dict[str, Instrument] = {i.canonical_id: i for i in FX_INSTRUMENTS}
 
+# Gold is NOT a ninth G8 currency and is NOT a 29th FOREX cross.
+# The canonical reference does not assert any broker's tradable contract spec.
+GOLD_REFERENCE = Instrument(
+    canonical_id="METAL:XAUUSD", symbol="XAUUSD", market="METAL_REFERENCE",
+    base="XAU", quote="USD",
+)
+
+
+def get_gold_reference(value: str) -> Instrument:
+    """Recognize the research instrument without touching FX_28 membership."""
+    if not isinstance(value, str):
+        raise ValueError("Invalid gold instrument")
+    text = value.strip().upper()
+    if text.startswith("METAL:"):
+        text = text[6:]
+    text = text.replace("/", "").replace("-", "")
+    if text != "XAUUSD":
+        raise ValueError(f"Unsupported gold instrument: {value!r}")
+    return GOLD_REFERENCE
+
 def normalize_fx_symbol(value: str) -> str:
     """Normalize EUR/USD, EUR-USD, eurusd and FX:EURUSD to EURUSD."""
     raw = str(value or "").strip().upper()

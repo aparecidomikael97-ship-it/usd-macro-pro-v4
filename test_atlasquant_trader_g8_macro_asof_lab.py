@@ -1,21 +1,35 @@
 """Synthetic as-of release receipts. No authenticated data or backtest accuracy."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import unittest
 
-from atlasquant_fx_universe import OFFICIAL_PAIRS
+from atlasquant_fx_universe import CURRENCIES, OFFICIAL_PAIRS
 from atlasquant_trader_g8_macro_asof_lab import (
+    CPI_ISSUER_HOSTS, CPI_FREQUENCY_2026_LAB,
+    CPI_2026_NON_US_RELEASE_FLOORS_UTC,
     ENVELOPE, EXPECTED, inspect_g8_pair_macro_asof_lab as inspect,
 )
 
 NOW = datetime(2026, 11, 6, 14, tzinfo=timezone.utc)
 DECISION = "2026-11-05T12:00:00Z"
+CPI_URLS = {
+    "USD": "https://www.bls.gov/cpi/",
+    "EUR": "https://ec.europa.eu/eurostat/web/hicp/information-data",
+    "GBP": "https://www.ons.gov.uk/economy/inflationandpriceindices",
+    "CAD": "https://www150.statcan.gc.ca/n1/daily-quotidien/",
+    "AUD": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/",
+    "JPY": "https://www.stat.go.jp/english/data/cpi/index.htm",
+    "CHF": "https://www.bfs.admin.ch/en/press-releases",
+    "NZD": "https://www.stats.govt.nz/indicators/consumers-price-index-cpi/",
+}
 
 
 def record(currency, indicator, *, published="2026-10-29T12:00:00Z",
-           captured="2026-10-29T12:05:00Z", period="2026-09", value="2.0"):
-    return {
+           captured="2026-10-29T12:05:00Z", period=None, value="2.0"):
+    if period is None:
+        period = "2026-Q3" if currency == "NZD" and indicator == "CPI_YOY" else "2026-09"
+    item = {
         "currency": currency, "indicator": indicator,
         "observation_period": period, "value": value,
         "published_at_utc": published, "captured_at_utc": captured,
@@ -23,6 +37,9 @@ def record(currency, indicator, *, published="2026-10-29T12:00:00Z",
                         else "OFFICIAL_STATISTICS_OFFICE"),
         "source_sha256": "a" * 64,
     }
+    if indicator == "CPI_YOY" and currency in CPI_URLS:
+        item["source_url"] = CPI_URLS[currency]
+    return item
 
 
 def sample(pair="EUR/USD"):
@@ -69,9 +86,12 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["input_sha256"], sha256(raw(data)).hexdigest())
         for c in ("EUR", "USD"):
             self.assertEqual(set(r["selected_observations"][c]), set(EXPECTED))
-            for obs in r["selected_observations"][c].values():
+            for name, obs in r["selected_observations"][c].items():
                 self.assertFalse(obs["measurement_verified"])
                 self.assertNotIn("value", obs)
+                self.assertFalse(obs["issuer_host_independently_verified"])
+                if name == "CPI_YOY":
+                    self.assertIn(obs["issuer_host_claim"], CPI_ISSUER_HOSTS[c])
         self.assert_no_go(r)
 
     def test_works_for_every_canonical_forex_pair_no_bias(self):
@@ -100,6 +120,88 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
         self.assert_no_go(r)
 
+    def test_usd_september_cpi_cannot_appear_before_bls_0830_edt_release(self):
+        # The September 2026 BLS embargo expired Oct 14 at 12:30 UTC.
+        data = sample()
+        usd = next(r for r in data["records"]
+                   if r["currency"] == "USD" and r["indicator"] == "CPI_YOY")
+        usd.update(published_at_utc="2026-10-14T12:29:59Z",
+                   captured_at_utc="2026-10-14T12:29:59Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+        self.assertEqual(result["reason"], "USD_CPI_CLAIM_BEFORE_KNOWN_BLS_RELEASE")
+        self.assert_no_go(result)
+
+        usd.update(published_at_utc="2026-10-14T12:30:00Z",
+                   captured_at_utc="2026-10-14T12:30:00Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assert_no_go(result)
+
+    def test_usd_october_cpi_yoy_cannot_invent_missing_2025_index(self):
+        data = sample()
+        data["decision_at_utc"] = "2026-11-12T15:00:00Z"
+        usd = next(r for r in data["records"]
+                   if r["currency"] == "USD" and r["indicator"] == "CPI_YOY")
+        usd.update(observation_period="2026-10",
+                   published_at_utc="2026-11-10T13:30:00Z",
+                   captured_at_utc="2026-11-10T13:30:01Z")
+        result = run(data, as_of=datetime(2026, 11, 12, 16, tzinfo=timezone.utc))
+        self.assertEqual(result["state"], "LAB_BLOCKED")
+        self.assertEqual(result["reason"], "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX")
+        self.assert_no_go(result)
+
+    def test_usd_october_2025_cpi_index_absence_cannot_be_a_valid_yoy_receipt(self):
+        data = sample()
+        usd = next(r for r in data["records"]
+                   if r["currency"] == "USD" and r["indicator"] == "CPI_YOY")
+        usd["observation_period"] = "2025-10"
+        result = run(data)
+        self.assertEqual(result["reason"], "USD_CPI_YOY_KNOWN_MISSING_OFFICIAL_INDEX")
+        self.assert_no_go(result)
+
+    def test_seven_other_cpi_issuer_publication_floors_block_pretend_early_receipts(self):
+        # Includes the quarterly NZD reference period and CHF October.
+        cases = (("AUD", "AUD/USD", "2026-09"),
+                 ("CAD", "CAD/JPY", "2026-09"),
+                 ("EUR", "EUR/USD", "2026-09"),
+                 ("GBP", "GBP/USD", "2026-09"),
+                 ("JPY", "USD/JPY", "2026-09"),
+                 ("NZD", "NZD/USD", "2026-Q3"),
+                 ("CHF", "USD/CHF", "2026-10"))
+        self.assertEqual(len(CPI_2026_NON_US_RELEASE_FLOORS_UTC), 7)
+        for currency, pair, period in cases:
+            with self.subTest(currency=currency):
+                floor = CPI_2026_NON_US_RELEASE_FLOORS_UTC[(currency, period)]
+                data = sample(pair)
+                row = next(x for x in data["records"] if x["currency"] == currency
+                           and x["indicator"] == "CPI_YOY")
+                row["observation_period"] = period
+                early = (floor - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                released = floor.strftime("%Y-%m-%dT%H:%M:%SZ")
+                row.update(published_at_utc=early, captured_at_utc=early)
+                rejected = run(data)
+                self.assertEqual(rejected["reason"],
+                                 "CPI_CLAIM_BEFORE_KNOWN_ISSUER_RELEASE_BOUNDARY")
+                self.assert_no_go(rejected)
+                row.update(published_at_utc=released, captured_at_utc=released)
+                permitted = run(data)
+                self.assertEqual(permitted["state"],
+                                 "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+                self.assert_no_go(permitted)
+
+    def test_september_eurostat_flash_is_not_conflated_with_final_release(self):
+        data = sample()
+        data["records"][0].update(
+            observation_period="2026-09", publication_stage="FLASH",
+            published_at_utc="2026-10-02T12:00:00Z",
+            captured_at_utc="2026-10-02T12:00:01Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(result["missing_or_stale"],
+                         ["EUR:CPI_YOY:FLASH_ONLY_UNATTESTED"])
+        self.assert_no_go(result)
+
     def test_capture_after_decision_cannot_retroactively_join(self):
         data = sample()
         data["records"][1]["captured_at_utc"] = "2026-11-05T12:00:01Z"
@@ -127,6 +229,62 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         self.assertEqual(r["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
         self.assert_no_go(r)
 
+    def test_nzd_quarterly_cpi_can_cover_until_next_quarterly_release(self):
+        data = sample("GBP/NZD")
+        data["decision_at_utc"] = "2026-12-30T12:00:00Z"
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row.update(observation_period="2026-Q3", published_at_utc="2026-10-21T21:45:00Z",
+                           captured_at_utc="2026-10-21T21:45:01Z", value="3.7")
+            elif row["indicator"] == "CPI_YOY":
+                row.update(observation_period="2026-11", published_at_utc="2026-12-10T07:00:00Z",
+                           captured_at_utc="2026-12-10T07:00:01Z")
+        r = run(data, as_of=datetime(2026, 12, 30, 12, tzinfo=timezone.utc))
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(r["selected_observations"]["NZD"]["CPI_YOY"]["observation_frequency"], "QUARTERLY")
+        self.assertEqual(r["selected_observations"]["NZD"]["CPI_YOY"]["freshness_limit_days"], 120)
+        self.assert_no_go(r)
+
+    def test_monthly_cpi_does_not_inherit_quarterly_freshness(self):
+        data = sample()
+        data["decision_at_utc"] = "2026-12-30T12:00:00Z"
+        for row in data["records"]:
+            if row["indicator"] == "POLICY_RATE":
+                row.update(published_at_utc="2026-11-02T12:00:00Z",
+                           captured_at_utc="2026-11-02T12:01:00Z")
+            elif row["currency"] == "EUR":
+                row.update(observation_period="2026-09", published_at_utc="2026-10-21T06:00:00Z",
+                           captured_at_utc="2026-10-21T06:00:01Z")
+            else:
+                row.update(observation_period="2026-11", published_at_utc="2026-12-10T12:00:00Z",
+                           captured_at_utc="2026-12-10T12:01:00Z")
+        r = run(data, as_of=datetime(2026, 12, 30, 12, tzinfo=timezone.utc))
+        self.assertEqual(r["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
+        self.assert_no_go(r)
+
+    def test_future_quarter_is_rejected_even_when_same_year(self):
+        data = sample("GBP/NZD")
+        data["records"][0]["observation_period"] = "2026-Q4"
+        self.assertEqual(run(data)["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+
+    def test_quarterly_policy_rate_is_refused(self):
+        data = sample("GBP/NZD")
+        data["records"][1]["observation_period"] = "2026-Q3"
+        self.assertEqual(run(data)["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+
+    def test_quarter_must_end_before_publication(self):
+        data = sample("GBP/NZD")
+        data["records"][0]["observation_period"] = "2026-Q3"
+        data["records"][0]["published_at_utc"] = "2026-09-29T12:00:00Z"
+        data["records"][0]["captured_at_utc"] = "2026-09-29T12:01:00Z"
+        self.assertEqual(run(data)["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+
+    def test_invalid_quarter_format_refused(self):
+        for period in ("2026-Q0", "2026-Q5", "2026-Q03", "Q3-2026", "2026-q3"):
+            data = sample("GBP/NZD")
+            data["records"][0]["observation_period"] = period
+            self.assertEqual(run(data)["state"], "LAB_BLOCKED", period)
+
     def test_stale_previous_period_is_not_selected_over_fresh_one(self):
         data = sample()
         stale = record("EUR", "CPI_YOY", published="2026-08-01T12:00:00Z",
@@ -135,6 +293,152 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         r = run(data)
         self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
         self.assertEqual(r["records_seen"], 5)
+
+    def test_later_republication_of_older_month_cannot_replace_newer_observation(self):
+        data = sample()
+        data["records"].append(record(
+            "EUR", "CPI_YOY", published="2026-10-31T12:00:00Z",
+            captured="2026-10-31T12:01:00Z", period="2026-07", value="2.5"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(r["selected_observations"]["EUR"]["CPI_YOY"]["observation_period"],
+                         "2026-09")
+        self.assertEqual(r["selected_observations"]["EUR"]["CPI_YOY"]["published_at_utc_claim"],
+                         "2026-10-29T12:00:00Z")
+        self.assert_no_go(r)
+
+    def test_obsolete_monthly_cpi_republished_now_is_not_fresh_data(self):
+        data = sample()
+        data["records"][0]["observation_period"] = "2025-09"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(r["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
+        self.assert_no_go(r)
+
+    def test_obsolete_policy_rate_observation_republished_now_is_not_fresh(self):
+        data = sample()
+        data["records"][1]["observation_period"] = "2025-07"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(r["missing_or_stale"], ["EUR:POLICY_RATE:STALE"])
+        self.assert_no_go(r)
+
+    def test_obsolete_quarterly_cpi_republished_now_is_not_fresh_data(self):
+        data = sample("GBP/NZD")
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row["observation_period"] = "2025-Q3"
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(r["missing_or_stale"], ["NZD:CPI_YOY:STALE"])
+        self.assert_no_go(r)
+
+    def test_observation_period_age_cutoff_has_no_off_by_one(self):
+        data = sample()
+        data["records"][0]["observation_period"] = "2026-07"
+        data["decision_at_utc"] = "2026-11-03T12:00:00Z"  # July 31 + 95 days
+        boundary = run(data)
+        self.assertEqual(boundary["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        row = boundary["selected_observations"]["EUR"]["CPI_YOY"]
+        self.assertEqual(row["observation_period_age_days"], 95)
+        self.assertEqual(row["observation_period_age_limit_days"], 95)
+        self.assert_no_go(boundary)
+        data["decision_at_utc"] = "2026-11-04T12:00:00Z"
+        expired = run(data)
+        self.assertEqual(expired["missing_or_stale"], ["EUR:CPI_YOY:STALE"])
+        self.assert_no_go(expired)
+
+    def test_later_republication_of_older_quarter_cannot_replace_newer_quarter(self):
+        data = sample("GBP/NZD")
+        for row in data["records"]:
+            if row["currency"] == "NZD" and row["indicator"] == "CPI_YOY":
+                row.update(observation_period="2026-Q3", published_at_utc="2026-10-21T21:45:00Z",
+                           captured_at_utc="2026-10-21T21:45:01Z")
+        data["records"].append(record(
+            "NZD", "CPI_YOY", published="2026-10-31T12:00:00Z",
+            captured="2026-10-31T12:01:00Z", period="2026-Q2"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(r["selected_observations"]["NZD"]["CPI_YOY"]["observation_period"],
+                         "2026-Q3")
+        self.assert_no_go(r)
+
+    def test_nzd_monthly_cpi_in_2026_is_not_mislabelled_as_headline_quarterly(self):
+        data = sample("GBP/NZD")
+        data["records"].append(record(
+            "NZD", "CPI_YOY", published="2026-10-31T12:00:00Z",
+            captured="2026-10-31T12:01:00Z", period="2026-09"))
+        r = run(data)
+        self.assertEqual(r["state"], "LAB_BLOCKED")
+        self.assertEqual(r["reason"], "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH")
+        self.assert_no_go(r)
+
+    def test_official_cpi_issuer_hosts_cover_all_eight_g8_currencies(self):
+        self.assertEqual(set(CPI_ISSUER_HOSTS), set(CURRENCIES))
+        self.assertEqual(set(CPI_FREQUENCY_2026_LAB), set(CURRENCIES))
+        self.assertEqual(CPI_FREQUENCY_2026_LAB["NZD"], "QUARTERLY")
+        self.assertEqual(CPI_FREQUENCY_2026_LAB["AUD"], "MONTHLY")
+
+    def test_2026_nzd_monthly_and_usd_quarterly_headline_cpi_are_rejected(self):
+        for pair, currency, bad_period in (("NZD/USD", "NZD", "2026-09"),
+                                           ("EUR/USD", "USD", "2026-Q3")):
+            with self.subTest(pair=pair, currency=currency):
+                data = sample(pair)
+                row = next(x for x in data["records"]
+                           if x["currency"] == currency and x["indicator"] == "CPI_YOY")
+                row["observation_period"] = bad_period
+                result = run(data)
+                self.assertEqual(result["reason"], "CPI_CURRENCY_OBSERVATION_FREQUENCY_MISMATCH")
+                self.assert_no_go(result)
+
+    def test_claimed_issuer_url_must_match_cpi_currency_not_a_mirror(self):
+        for currency, wrong in (("EUR", CPI_URLS["USD"]),
+                                ("USD", CPI_URLS["GBP"]),
+                                ("GBP", CPI_URLS["EUR"])):
+            with self.subTest(currency=currency):
+                pair = next(p for p in OFFICIAL_PAIRS if currency in p.split("/"))
+                data = sample(pair)
+                row = next(x for x in data["records"]
+                           if x["currency"] == currency and x["indicator"] == "CPI_YOY")
+                row["source_url"] = wrong
+                result = run(data)
+                self.assertEqual(result["reason"], "CPI_ORIGINAL_ISSUER_HOST_CLAIM_MISMATCH")
+                self.assert_no_go(result)
+
+    def test_url_tricks_cannot_impersonate_bls_original_issuer(self):
+        for invalid in ("http://www.bls.gov/cpi/",
+                        "https://www.bls.gov.evil.example/cpi/",
+                        "https://evil.example@www.bls.gov/cpi/",
+                        "https://www.bls.gov:443/cpi/",
+                        "https://www.bls.gov/cpi/#release",
+                        "https://www.bls.gov/\\bad", "https://www.bls.gov", 123):
+            with self.subTest(invalid=invalid):
+                data = sample()
+                row = next(x for x in data["records"]
+                           if x["currency"] == "USD" and x["indicator"] == "CPI_YOY")
+                row["source_url"] = invalid
+                result = run(data)
+                self.assertEqual(result["reason"], "CPI_ORIGINAL_ISSUER_HOST_CLAIM_MISMATCH")
+                self.assert_no_go(result)
+
+    def test_typed_cpi_must_name_official_issuer_host_even_in_lab(self):
+        data = sample()
+        row = next(x for x in data["records"]
+                   if x["currency"] == "EUR" and x["indicator"] == "CPI_YOY")
+        row["publication_stage"] = "FINAL"
+        del row["source_url"]
+        result = run(data)
+        self.assertEqual(result["reason"], "CPI_TYPED_ISSUER_URL_CLAIM_MISSING")
+        self.assert_no_go(result)
+
+    def test_cpi_issuer_url_is_not_appropriate_for_policy_decision(self):
+        data = sample()
+        rate = next(x for x in data["records"]
+                    if x["currency"] == "EUR" and x["indicator"] == "POLICY_RATE")
+        rate["source_url"] = CPI_URLS["EUR"]
+        result = run(data)
+        self.assertEqual(result["reason"], "CPI_SOURCE_URL_USED_FOR_POLICY_RATE")
+        self.assert_no_go(result)
 
     def test_duplicate_same_indicator_period_revision_is_blocked(self):
         data = sample()
@@ -153,6 +457,139 @@ class G8PairMacroAsOfTests(unittest.TestCase):
         data["records"][0]["observation_period"] = "2026-12"
         self.assertEqual(run(data)["state"], "LAB_BLOCKED")
 
+    def test_same_month_cpi_without_flash_vintage_field_is_rejected(self):
+        # A publication in the same calendar month could be a real flash,
+        # but this envelope does not identify or authenticate flash releases.
+        data = sample()
+        row = data["records"][0]  # EUR CPI
+        row.update(observation_period="2026-10",
+                   published_at_utc="2026-10-29T12:00:00Z",
+                   captured_at_utc="2026-10-29T12:05:00Z")
+        result = run(data)
+        self.assertEqual(result["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+        self.assert_no_go(result)
+
+        # Last calendar day alone does not prove final CPI, either.
+        row.update(published_at_utc="2026-10-31T12:00:00Z",
+                   captured_at_utc="2026-10-31T12:05:00Z")
+        last_day = run(data)
+        self.assertEqual(last_day["reason"], "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID")
+        self.assert_no_go(last_day)
+
+    def test_prior_month_cpi_and_current_month_policy_rate_remain_structurally_valid(self):
+        data = sample()
+        cpi = data["records"][0]
+        cpi.update(observation_period="2026-10",
+                   published_at_utc="2026-11-01T12:00:00Z",
+                   captured_at_utc="2026-11-01T12:05:00Z")
+        rate = data["records"][1]
+        rate.update(observation_period="2026-11",
+                    published_at_utc="2026-11-02T12:00:00Z",
+                    captured_at_utc="2026-11-02T12:05:00Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(result["selected_observations"]["EUR"]["CPI_YOY"]["observation_period"], "2026-10")
+        self.assertEqual(result["selected_observations"]["EUR"]["POLICY_RATE"]["observation_period"], "2026-11")
+        self.assert_no_go(result)
+
+    def test_typed_same_month_flash_is_documentary_not_final_cpi_coverage(self):
+        data = sample()
+        data["records"][0].update(
+            observation_period="2026-10", publication_stage="FLASH",
+            published_at_utc="2026-10-29T12:00:00Z",
+            captured_at_utc="2026-10-29T12:05:00Z")
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_INCOMPLETE_UNATTESTED")
+        self.assertEqual(result["missing_or_stale"],
+                         ["EUR:CPI_YOY:FLASH_ONLY_UNATTESTED"])
+        self.assertNotIn("CPI_YOY", result["selected_observations"]["EUR"])
+        self.assert_no_go(result)
+
+    def test_flash_followed_by_final_same_month_is_two_distinct_stages(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10", value="2.1",
+                       published="2026-10-29T12:00:00Z",
+                       captured="2026-10-29T12:05:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10", value="2.2",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-02T12:05:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["state"], "LAB_PAIR_MACRO_METADATA_COMPLETE_UNATTESTED")
+        self.assertEqual(result["records_seen"], 6)
+        selected = result["selected_observations"]["EUR"]["CPI_YOY"]
+        self.assertEqual(selected["observation_period"], "2026-10")
+        self.assertEqual(selected["publication_stage_claim"], "FINAL")
+        self.assertNotIn("value", selected)
+        self.assert_no_go(result)
+
+    def test_reversed_flash_final_chronology_rejects_entire_pair(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-03T12:00:00Z",
+                       captured="2026-11-03T12:05:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-02T12:05:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["reason"], "PUBLICATION_STAGE_ORDER_AMBIGUOUS")
+        self.assert_no_go(result)
+
+    def test_flash_captured_after_final_cannot_fake_prior_local_visibility(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-10-29T12:00:00Z",
+                       captured="2026-11-04T12:00:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-03T12:00:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["reason"], "PUBLICATION_STAGE_ORDER_AMBIGUOUS")
+        self.assert_no_go(result)
+
+    def test_equal_capture_clocks_do_not_establish_flash_first_seen_order(self):
+        data = sample()
+        flash = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-10-29T12:00:00Z",
+                       captured="2026-11-03T12:00:00Z")
+        flash["publication_stage"] = "FLASH"
+        final = record("EUR", "CPI_YOY", period="2026-10",
+                       published="2026-11-02T12:00:00Z",
+                       captured="2026-11-03T12:00:00Z")
+        final["publication_stage"] = "FINAL"
+        data["records"].extend([flash, final])
+        result = run(data)
+        self.assertEqual(result["reason"], "PUBLICATION_STAGE_ORDER_AMBIGUOUS")
+        self.assert_no_go(result)
+
+    def test_revision_requires_historical_vintage_not_a_caller_label(self):
+        data = sample()
+        data["records"][0]["publication_stage"] = "REVISION"
+        result = run(data)
+        self.assertEqual(result["reason"], "REVISION_VINTAGE_UNATTESTED")
+        self.assert_no_go(result)
+
+    def test_wrong_or_untyped_stage_never_becomes_official_cpi(self):
+        for indicator, stage in (("CPI_YOY", "POLICY_DECISION"),
+                                 ("POLICY_RATE", "FLASH"),
+                                 ("CPI_YOY", ["FINAL"]),
+                                 ("CPI_YOY", "REVISED_2026")):
+            with self.subTest(indicator=indicator, stage=stage):
+                data = sample()
+                row = next(x for x in data["records"] if x["indicator"] == indicator)
+                row["publication_stage"] = stage
+                result = run(data)
+                self.assertEqual(result["reason"], "INDICATOR_PUBLICATION_STAGE_INVALID")
+                self.assert_no_go(result)
+
     def test_unknown_indicator_source_and_hash_rejected(self):
         for column, bad in (("indicator", "PREDICTION"),
                             ("source_type", "RUMOR"),
@@ -161,6 +598,20 @@ class G8PairMacroAsOfTests(unittest.TestCase):
             data = sample()
             data["records"][0][column] = bad
             self.assertEqual(run(data)["state"], "LAB_BLOCKED", column)
+
+    def test_cpi_and_policy_original_issuer_categories_cannot_be_swapped(self):
+        for indicator, wrong_type in (("CPI_YOY", "CENTRAL_BANK"),
+                                      ("POLICY_RATE", "OFFICIAL_STATISTICS_OFFICE")):
+            for pair in OFFICIAL_PAIRS:
+                with self.subTest(pair=pair, indicator=indicator):
+                    data = sample(pair)
+                    row = next(x for x in data["records"] if x["indicator"] == indicator)
+                    row["source_type"] = wrong_type
+                    r = run(data)
+                    self.assertEqual(r["state"], "LAB_BLOCKED")
+                    self.assertEqual(r["reason"],
+                                     "INDICATOR_ORIGINAL_ISSUER_CATEGORY_MISMATCH")
+                    self.assert_no_go(r)
 
     def test_numeric_economic_value_is_never_sent_to_bias_engine(self):
         for bad in ("NaN", "Infinity", "1e9", 2.0, True, "1,4", "-100", "999", None):

@@ -1,0 +1,182 @@
+name: AtlasQuant Trader D1 W1 Offline LAB
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "atlasquant_trader_*_lab.py"
+      - "test_atlasquant_trader_*_lab.py"
+      - "atlasquant_mt5_*_lab.py"
+      - "test_atlasquant_mt5_*_lab.py"
+      - "atlasquant_fx_universe.py"
+      - "atlasquant_instrument_registry.py"
+      - ".github/workflows/atlasquant-trader-d1w1-offline-lab.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlasquant-trader-d1w1-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selective-bias-contracts:
+    name: D1 W1 contracts (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout read-only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify offline dependency availability
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sys
+          from zoneinfo import ZoneInfo
+          from atlasquant_fx_universe import OFFICIAL_PAIRS
+          assert len(OFFICIAL_PAIRS) == len(set(OFFICIAL_PAIRS)) == 28
+          assert ZoneInfo('America/New_York') is not None
+          assert sys.version_info[:2] in ((3, 11), (3, 12))
+          print('OFFLINE_LAB_PYTHON_READY', sys.version)
+          PY
+      - name: Compile selected research contracts
+        shell: bash
+        run: |
+          python -m py_compile \
+            atlasquant_trader_w1_ny17_dst_guard_lab.py \
+            atlasquant_trader_fx_trial_census_lab.py \
+            atlasquant_trader_fx_census_bridge_guard_lab.py \
+            atlasquant_trader_fx_multicohort_ledger_lab.py \
+            atlasquant_trader_fx_campaign_precommit_lab.py \
+            atlasquant_trader_xauusd_priority_lab.py \
+            atlasquant_trader_xauusd_us_treasury_yields_lab.py \
+            atlasquant_trader_xauusd_us_macro_release_join_lab.py \
+            atlasquant_trader_mt5_closedbar_outcome_lab.py \
+            atlasquant_trader_regime_increment_benchmark_lab.py \
+            atlasquant_trader_mt5_paired_outcome_bridge_lab.py \
+            atlasquant_trader_fx_census_github_anchor_lab.py \
+            atlasquant_trader_first_cohort_readiness_lab.py \
+            atlasquant_trader_fx_nyclose_clock_audit_lab.py \
+            atlasquant_mt5_d1w1_minimal_clock_probe_lab.py \
+            atlasquant_trader_market_regime_veto_lab.py \
+            atlasquant_trader_evidence_join_lab.py \
+            atlasquant_trader_economic_surprise_veto_lab.py \
+            atlasquant_trader_selective_bias_gate_lab.py \
+            atlasquant_trader_selective_event_root_oos_audit_lab.py \
+            atlasquant_trader_selective_precommit_bridge_lab.py \
+            atlasquant_trader_event_root_precommit_guard_lab.py \
+            atlasquant_fx_d1_shared_calendar_gate_lab.py \
+            atlasquant_trader_fx_d1_archive_precision_join_lab.py \
+            atlasquant_trader_fx_bias_quality_lab.py \
+            atlasquant_trader_us_bls_cpi_yoy_snapshot_lab.py \
+            atlasquant_trader_us_bls_cpi_snapshot_asof_lab.py \
+            atlasquant_trader_us_oct2026_cpi_release_text_guard_lab.py \
+            atlasquant_trader_us_oct2026_cpi_documentary_comparison_lab.py \
+            atlasquant_trader_us_ppi_pre_event_preview_lab.py \
+            atlasquant_trader_us_ppi_te_second_consensus_lab.py \
+            atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab.py \
+            atlasquant_trader_ppi_usd_fx_forward_reaction_lab.py \
+            atlasquant_trader_ppi_m15_spread_context_lab.py \
+            atlasquant_trader_ppi_one_event_study_join_lab.py \
+            atlasquant_trader_ppi_pre_event_protocol_lab.py \
+            atlasquant_trader_ppi_fx_breadth_lab.py \
+            atlasquant_trader_ppi_competing_calendar_lab.py \
+            atlasquant_trader_ppi_official_schedule_archive_lab.py \
+            atlasquant_trader_ppi_preflight_lab.py \
+            atlasquant_trader_ppi_mt5_m15_capture_lab.py \
+            atlasquant_trader_g8_cpi_dual_source_readiness_lab.py \
+            atlasquant_trader_policy_expectations_conflict_lab.py \
+            atlasquant_trader_policy_survey_source_readiness_lab.py \
+            atlasquant_trader_eurusd_futures_basis_guard_lab.py \
+            atlasquant_trader_eurusd_sr3_esr_quarter_lab.py \
+            atlasquant_trader_cme_settlement_release_gate_lab.py \
+            atlasquant_trader_policy_join_veto_lab.py \
+            atlasquant_trader_g8_macro_matrix_pit_lab.py \
+            atlasquant_trader_fx28_bilateral_symmetry_guard_lab.py \
+            atlasquant_trader_fx28_d1w1_consensus_guard_lab.py \
+            atlasquant_trader_fx_evidence_dependency_gate_lab.py \
+            atlasquant_trader_fx_event_concentration_lab.py \
+            atlasquant_trader_fx_m15_price_cost_veto_lab.py \
+            atlasquant_trader_precision_gate_orchestrator_lab.py \
+            atlasquant_trader_fx_macro_precision_byte_join_lab.py \
+            atlasquant_trader_g8_cpi_semantic_byte_join_lab.py \
+            atlasquant_trader_g8_event_relevance_lab.py \
+            atlasquant_mt5_backtest_gap_guard_lab.py \
+            atlasquant_mt5_calendar_gap_audit_lab.py
+      - name: Run FX and MT5 offline contract tests (no broker, no requests)
+        shell: bash
+        run: |
+          python -m unittest -q \
+            test_atlasquant_trader_w1_ny17_dst_guard_lab \
+            test_atlasquant_trader_fx_trial_census_lab \
+            test_atlasquant_trader_fx_census_bridge_guard_lab \
+            test_atlasquant_trader_fx_multicohort_ledger_lab \
+            test_atlasquant_trader_fx_campaign_precommit_lab \
+            test_atlasquant_trader_xauusd_priority_lab \
+            test_atlasquant_trader_xauusd_us_treasury_yields_lab \
+            test_atlasquant_trader_xauusd_us_macro_release_join_lab \
+            test_atlasquant_trader_mt5_closedbar_outcome_lab \
+            test_atlasquant_trader_regime_increment_benchmark_lab \
+            test_atlasquant_trader_mt5_paired_outcome_bridge_lab \
+            test_atlasquant_trader_fx_census_github_anchor_lab \
+            test_atlasquant_trader_first_cohort_readiness_lab \
+            test_atlasquant_trader_fx_nyclose_clock_audit_lab \
+            test_atlasquant_mt5_d1w1_minimal_clock_probe_lab \
+            test_atlasquant_trader_market_regime_veto_lab \
+            test_atlasquant_trader_evidence_join_lab \
+            test_atlasquant_trader_economic_surprise_veto_lab \
+            test_atlasquant_trader_selective_bias_gate_lab \
+            test_atlasquant_trader_selective_event_root_oos_audit_lab \
+            test_atlasquant_trader_selective_precommit_bridge_lab \
+            test_atlasquant_trader_event_root_precommit_guard_lab \
+            test_atlasquant_fx_d1_shared_calendar_gate_lab \
+            test_atlasquant_trader_fx_d1_archive_precision_join_lab \
+            test_atlasquant_trader_fx_bias_quality_lab \
+            test_atlasquant_trader_us_bls_cpi_yoy_snapshot_lab \
+            test_atlasquant_trader_us_bls_cpi_snapshot_asof_lab \
+            test_atlasquant_trader_us_oct2026_cpi_release_text_guard_lab \
+            test_atlasquant_trader_us_oct2026_cpi_documentary_comparison_lab \
+            test_atlasquant_trader_us_ppi_pre_event_preview_lab \
+            test_atlasquant_trader_us_ppi_te_second_consensus_lab \
+            test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab \
+            test_atlasquant_trader_ppi_usd_fx_forward_reaction_lab \
+            test_atlasquant_trader_ppi_m15_spread_context_lab \
+            test_atlasquant_trader_ppi_one_event_study_join_lab \
+            test_atlasquant_trader_ppi_pre_event_protocol_lab \
+            test_atlasquant_trader_ppi_fx_breadth_lab \
+            test_atlasquant_trader_ppi_competing_calendar_lab \
+            test_atlasquant_trader_ppi_official_schedule_archive_lab \
+            test_atlasquant_trader_ppi_preflight_lab \
+            test_atlasquant_trader_ppi_mt5_m15_capture_lab \
+            test_atlasquant_trader_g8_cpi_dual_source_readiness_lab \
+            test_atlasquant_trader_policy_expectations_conflict_lab \
+            test_atlasquant_trader_policy_survey_source_readiness_lab \
+            test_atlasquant_trader_eurusd_futures_basis_guard_lab \
+            test_atlasquant_trader_eurusd_sr3_esr_quarter_lab \
+            test_atlasquant_trader_cme_settlement_release_gate_lab \
+            test_atlasquant_trader_policy_join_veto_lab \
+            test_atlasquant_trader_g8_macro_matrix_pit_lab \
+            test_atlasquant_trader_fx28_bilateral_symmetry_guard_lab \
+            test_atlasquant_trader_fx28_d1w1_consensus_guard_lab \
+            test_atlasquant_trader_fx_evidence_dependency_gate_lab \
+            test_atlasquant_trader_fx_event_concentration_lab \
+            test_atlasquant_trader_fx_m15_price_cost_veto_lab \
+            test_atlasquant_trader_precision_gate_orchestrator_lab \
+            test_atlasquant_trader_fx_macro_precision_byte_join_lab \
+            test_atlasquant_trader_g8_cpi_semantic_byte_join_lab \
+            test_atlasquant_trader_g8_event_relevance_lab \
+            test_atlasquant_mt5_backtest_gap_guard_lab \
+            test_atlasquant_mt5_calendar_gap_audit_lab
