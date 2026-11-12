@@ -36,6 +36,7 @@ METRIC_UNITS = {
 IMPORTANCE = frozenset(("HIGH", "MEDIUM", "LOW"))
 PPI_RELEASE_METRICS = frozenset(("PPI_MOM", "PPI_CORE_MOM", "PPI_YOY"))
 CPI_RELEASE_METRICS = frozenset(("CPI_MOM", "CPI_CORE_MOM", "CPI_YOY", "CPI_CORE_YOY"))
+PCE_RELEASE_METRICS = frozenset(("PCE_MOM", "PCE_CORE_MOM", "PCE_YOY", "PCE_CORE_YOY"))
 _ID = re.compile(r"[A-Z0-9][A-Z0-9_\-]{2,63}\Z")
 _MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])\Z")
 _QUARTER = re.compile(r"\d{4}-Q[1-4]\Z")
@@ -226,13 +227,15 @@ def _event_row(v: EventSnapshot, now: datetime) -> dict[str, Any] | None:
     return {
         "event_id": v.event_id, "currency": v.currency,
         "metric": v.metric, "target_period": v.target_period, "unit": v.unit,
-        # Headline/core and MoM/YoY of one CPI or PPI report are not
+        # Headline/core and MoM/YoY of one CPI, PCE or PPI report are not
         # independent releases. Caller metadata is NOT source authentication.
         "claimed_release_root": (
             f"{v.currency}_PPI_{v.target_period}"
             if v.metric in PPI_RELEASE_METRICS else
             f"{v.currency}_CPI_{v.target_period}"
-            if v.metric in CPI_RELEASE_METRICS else v.event_id),
+            if v.metric in CPI_RELEASE_METRICS else
+            f"{v.currency}_PCE_{v.target_period}"
+            if v.metric in PCE_RELEASE_METRICS else v.event_id),
         "importance": v.importance, "scheduled_release_utc": scheduled.isoformat(),
         "phase": phase,
         "consensus_documentary": str(consensus) if consensus is not None else None,
@@ -283,7 +286,7 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
             out["reason"] = "DUPLICATE_ECONOMIC_METRIC_PERIOD_NOT_NEW_EVIDENCE"
             return out
         seen_metric_periods.add(key)
-        if row["metric"] in PPI_RELEASE_METRICS | CPI_RELEASE_METRICS:
+        if row["metric"] in PPI_RELEASE_METRICS | CPI_RELEASE_METRICS | PCE_RELEASE_METRICS:
             root = row["claimed_release_root"]
             previous_clock = inflation_release_times.setdefault(
                 root, row["scheduled_release_utc"])
@@ -291,7 +294,9 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
                 out["reason"] = (
                     "PPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT"
                     if row["metric"] in PPI_RELEASE_METRICS else
-                    "CPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT")
+                    "CPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT"
+                    if row["metric"] in CPI_RELEASE_METRICS else
+                    "PCE_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT")
                 return out
         rows.append(row)
 
