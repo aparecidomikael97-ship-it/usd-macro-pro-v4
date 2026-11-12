@@ -75,7 +75,12 @@ def _expected_epochs(start: datetime) -> tuple[int, ...]:
 
 
 def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, Any]:
-    """Strict 96-bar expected timestamp inventory; never interpolate."""
+    """Strict 96/480-bar timestamp inventory for D1/W1; never interpolate."""
+    if (type(epochs) is not tuple or len(epochs) not in (96, 480)
+            or any(type(t) is not int or t <= 0 for t in epochs)
+            or any(epochs[i + 1] - epochs[i] != 900
+                   for i in range(len(epochs) - 1))):
+        raise ValueError("INVALID_FROZEN_D1_W1_M15_EPOCH_GRID")
     if rates is None:
         return {
             "reason": "HISTORY_NULL", "returned_bars": None,
@@ -85,7 +90,13 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
                 for t in epochs[:MAX_GAP_TIMESTAMPS]],
             "valid_candles": 0,
         }
-    if len(rates) > BARS_PER_SESSION:
+    if len(rates) == 0:
+        return {
+            "reason": "HISTORY_EMPTY_NOT_EVIDENCE_OF_MARKET_CLOSURE",
+            "returned_bars": 0, "missing_count": None,
+            "first_missing_utc": [], "valid_candles": 0,
+        }
+    if len(rates) > len(epochs):
         return {
             "reason": "EXCESS_ROWS_OR_UNEXPECTED_TIMEFRAME",
             "returned_bars": len(rates), "missing_count": None,
@@ -110,6 +121,28 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
         }
     have = set(times)
     gaps = [t for t in epochs if t not in have]
+    # Validate all available OHLC observations BEFORE classifying missing
+    # slots. Otherwise an invalid price in a 479-bar week would be hidden
+    # behind the missing-bar status, falsely reporting a valid partial series.
+    try:
+        for x in rates:
+            o, h, lo, c = [
+                _price(x[k], quote_digits=digits)[0]
+                for k in ("open", "high", "low", "close")]
+            if not lo <= min(o, c) <= max(o, c) <= h:
+                raise ValueError("INCONSISTENT_CANDLE_OHLC")
+            _integer(x["tick_volume"], strictly_positive=True)
+            _integer(x["spread"], strictly_positive=False)
+            _integer(x["real_volume"], strictly_positive=False)
+    except (ValueError, KeyError, TypeError, OverflowError, IndexError):
+        return {
+            "reason": "M15_PRICE_OR_VOLUME_INVALID",
+            "returned_bars": len(rates), "missing_count": len(gaps),
+            "first_missing_utc": [
+                datetime.fromtimestamp(t, timezone.utc).isoformat()
+                for t in gaps[:MAX_GAP_TIMESTAMPS]],
+            "valid_candles": 0,
+        }
     if gaps:
         return {
             "reason": "EXACT_M15_CANDLES_MISSING_NO_FILL",
@@ -125,27 +158,11 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
             "returned_bars": len(rates), "missing_count": None,
             "first_missing_utc": [], "valid_candles": 0,
         }
-    try:
-        for x in rates:
-            o, h, lo, c = [
-                _price(x[k], quote_digits=digits)[0]
-                for k in ("open", "high", "low", "close")]
-            if not lo <= min(o, c) <= max(o, c) <= h:
-                raise ValueError("INCONSISTENT_CANDLE_OHLC")
-            _integer(x["tick_volume"], strictly_positive=True)
-            _integer(x["spread"], strictly_positive=False)
-            _integer(x["real_volume"], strictly_positive=False)
-    except (ValueError, KeyError, TypeError, OverflowError, IndexError):
-        return {
-            "reason": "M15_PRICE_OR_VOLUME_INVALID",
-            "returned_bars": len(rates), "missing_count": 0,
-            "first_missing_utc": [], "valid_candles": 0,
-        }
     return {
         "reason": "COMPLETE_HISTORICAL_SERIES_UNATTESTED",
         "returned_bars": len(rates),
         "missing_count": 0, "first_missing_utc": [],
-        "valid_candles": BARS_PER_SESSION,
+        "valid_candles": len(epochs),
     }
 
 
