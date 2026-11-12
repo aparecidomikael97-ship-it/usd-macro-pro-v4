@@ -419,5 +419,43 @@ class G8EventRelevanceTests(unittest.TestCase):
         self.assertEqual(by_pair(result, "GBP/USD")["claimed_release_root_count"], 2)
         self.no_live(result)
 
+
+    def test_core_cpi_and_pce_monthly_route_without_direction(self):
+        # Synthetic core inflation metrics are relevance only; no signal.
+        for metric in ("CPI_CORE_MOM", "PCE_CORE_MOM"):
+            with self.subTest(metric=metric):
+                event = replace(report(event_id=f"US_{metric}_2026_10"),
+                                metric=metric, unit="PERCENT_MOM_SA")
+                result = route([event], as_of_utc=BEFORE)
+                self.assertEqual(
+                    result["state"],
+                    "LAB_G8_EVENT_RELEVANCE_DOCUMENTARY_ONLY_NO_BIAS")
+                self.assertEqual(result["events"][0]["metric"], metric)
+                self.assertEqual(result["events"][0]["unit"], "PERCENT_MOM_SA")
+                self.assertEqual(
+                    sum(row["event_count"] for row in result["pair_rows"]), 7)
+                self.assertEqual(by_pair(result, "AUD/NZD")["event_count"], 0)
+                self.no_live(result)
+                # Core monthly units cannot be silently confused with YoY.
+                invalid = replace(event, unit="PERCENT_YOY_NSA")
+                blocked = route([invalid], as_of_utc=BEFORE)
+                self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(blocked)
+
+    def test_core_and_headline_are_distinct_metrics_not_duplicate_releases(self):
+        for headline, core in (("CPI_MOM", "CPI_CORE_MOM"),
+                               ("PCE_MOM", "PCE_CORE_MOM")):
+            with self.subTest(headline=headline):
+                events = [
+                    replace(report(event_id=f"US_{headline}_2026_10"),
+                            metric=headline),
+                    replace(report(event_id=f"US_{core}_2026_10"),
+                            metric=core),
+                ]
+                result = route(events, as_of_utc=BEFORE)
+                self.assertEqual(result["event_count"], 2)
+                self.assertEqual(by_pair(result, "EUR/USD")["event_count"], 2)
+                self.no_live(result)
+
 if __name__ == "__main__":
     unittest.main()
