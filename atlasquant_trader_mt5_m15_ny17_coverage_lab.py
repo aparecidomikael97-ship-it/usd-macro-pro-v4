@@ -27,7 +27,7 @@ VALID_NY17 = "LAB_FX_NY_ROLLOVER_WINDOW_STRUCTURALLY_VALID"
 
 def _utc(x: Any) -> datetime | None:
     if (not isinstance(x, datetime) or x.tzinfo is None
-            or x.utcoffset() is None or x.microsecond != 0):
+            or x.utcoffset() is None):
         return None
     return x.astimezone(timezone.utc)
 

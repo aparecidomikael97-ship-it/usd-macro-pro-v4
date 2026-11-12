@@ -37,7 +37,7 @@ TARGET_STATE = "LAB_M15_NY17_TIMESTAMP_COVERAGE_CLAIM_ONLY_NO_GO"
 
 def _utc(value: Any) -> datetime | None:
     if (not isinstance(value, datetime) or value.tzinfo is None
-            or value.utcoffset() is None or value.microsecond != 0):
+            or value.utcoffset() is None):
         return None
     return value.astimezone(timezone.utc)
 
