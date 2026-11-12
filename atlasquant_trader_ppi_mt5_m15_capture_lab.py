@@ -11,10 +11,11 @@ from __future__ import annotations
 import argparse
 import csv
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from hashlib import sha256
 from io import StringIO
 import json
+import math
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -77,16 +78,37 @@ def _integer(value: Any, *, strictly_positive: bool = False) -> int:
     return number
 
 
-def _price(value: Any) -> tuple[Decimal, str]:
+def _price(value: Any, *, quote_digits: int | None = None) -> tuple[Decimal, str]:
+    """Exact quote-grid normalization of IEEE-754 transport noise only.
+
+    MetaTrader5 can return numpy.float64(1.1137299999999999) for a 5-digit
+    broker quote of 1.11373. Allow rounding ONLY if the distance to the
+    declared tick is <= two binary64 ULPs. This is NOT general price rounding:
+    true off-tick quotes are rejected. No interpolation or invented prices.
+    """
     if isinstance(value, (bool, str)):
         raise ValueError("NON_NUMERIC_PRICE")
     try:
         number = Decimal(str(value))
     except (InvalidOperation, ValueError, TypeError) as exc:
         raise ValueError("NON_NUMERIC_PRICE") from exc
-    # No rounding, extrapolation or scientific notation: exact downstream CSV contract.
+    if not number.is_finite() or number <= 0:
+        raise ValueError("PRICE_OUTSIDE_FROZEN_CSV_CONTRACT")
+    if quote_digits is not None:
+        if type(quote_digits) is not int or not 2 <= quote_digits <= 6:
+            raise ValueError("INVALID_SYMBOL_QUOTE_PRECISION")
+        tick = Decimal(1).scaleb(-quote_digits)
+        snapped = number.quantize(tick, rounding=ROUND_HALF_UP)
+        try:
+            tolerance = Decimal(str(math.ulp(float(value)))) * 2
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("PRICE_OUTSIDE_FROZEN_CSV_CONTRACT") from exc
+        if (not tolerance.is_finite() or tolerance <= 0
+                or abs(number - snapped) > tolerance):
+            raise ValueError("PRICE_OUTSIDE_FROZEN_CSV_CONTRACT")
+        number = snapped
     printed = format(number, "f")
-    if (not number.is_finite() or number <= 0 or len(printed) > 20
+    if (len(printed) > 20
             or not re.fullmatch(r"[0-9]{1,7}(?:\.[0-9]{1,9})?", printed)):
         raise ValueError("PRICE_OUTSIDE_FROZEN_CSV_CONTRACT")
     return number, printed
@@ -132,7 +154,22 @@ def _terminal_company_label(terminal: Any) -> str | None:
     return company
 
 
-def _serialize_exact_window(rates: Any) -> bytes:
+def _serialize_exact_window(
+    rates: Any, *, expected_epochs: tuple[int, ...] = EXPECTED_EPOCHS,
+    quote_digits: int | None = None,
+) -> bytes:
+    """Validate any explicitly predeclared 17-bar M15 window, same schema.
+
+    The operational PPI capture uses the frozen default epochs. A separate
+    read-only preflight may pass a *past* window without mocking/fabricating
+    future PPI candles; no timestamps are inferred from returned price data.
+    """
+    if (not isinstance(expected_epochs, tuple)
+            or len(expected_epochs) != ROWS_REQUIRED
+            or any(type(e) is not int or e <= 0 for e in expected_epochs)
+            or any(expected_epochs[i + 1] - expected_epochs[i] != 900
+                   for i in range(ROWS_REQUIRED - 1))):
+        raise ValueError("INVALID_PREDECLARED_M15_WINDOW")
     if rates is None or len(rates) != ROWS_REQUIRED:
         raise ValueError("REQUIRE_EXACTLY_17_M15_BARS")
     output = StringIO(newline="")
@@ -141,9 +178,10 @@ def _serialize_exact_window(rates: Any) -> bytes:
     try:
         for i, bar in enumerate(rates):
             epoch = _integer(bar["time"], strictly_positive=True)
-            if epoch != EXPECTED_EPOCHS[i]:
+            if epoch != expected_epochs[i]:
                 raise ValueError("PPI_M15_EPOCH_GAP_DUPLICATE_OR_WRONG_TIMEZONE")
-            values = [_price(bar[field]) for field in ("open", "high", "low", "close")]
+            values = [_price(bar[field], quote_digits=quote_digits)
+                      for field in ("open", "high", "low", "close")]
             (op, hi, lo, cl) = (value[0] for value in values)
             if not lo <= min(op, cl) <= max(op, cl) <= hi:
                 raise ValueError("PPI_OHLC_INCONSISTENT")
@@ -243,7 +281,8 @@ def collect_ppi_mt5_m15_capture_lab(
                 report["failed_symbol"] = symbol
                 return report
             try:
-                pending[symbol] = _serialize_exact_window(rates)
+                pending[symbol] = _serialize_exact_window(
+                    rates, quote_digits=spec["digits_claim"])
                 if not visible_before:
                     report["hidden_symbols_read_from_history"].append(symbol)
             except ValueError as exc:
