@@ -365,5 +365,59 @@ class G8EventRelevanceTests(unittest.TestCase):
                 self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
                 self.no_live(blocked)
 
+    def test_ppi_headline_and_core_share_one_claimed_release_root(self):
+        headline = replace(report(event_id="US_PPI_HEAD_2026_10"),
+                           metric="PPI_MOM")
+        core = replace(report(event_id="US_PPI_CORE_2026_10"),
+                       metric="PPI_CORE_MOM")
+        result = route([headline, core], as_of_utc=BEFORE)
+        self.assertEqual(result["event_count"], 2)
+        self.assertEqual(result["claimed_release_root_count"], 1)
+        self.assertIsNone(result["independent_event_trial_count"])
+        self.assertEqual({e["claimed_release_root"] for e in result["events"]},
+                         {"USD_PPI_2026-10"})
+        for pair in OFFICIAL_PAIRS:
+            row = by_pair(result, pair)
+            if "USD" in pair:
+                self.assertEqual(row["event_count"], 2)
+                self.assertEqual(row["claimed_release_root_count"], 1)
+                self.assertEqual({e["claimed_release_root"] for e in
+                                  row["relevant_events_documentary_only"]},
+                                 {"USD_PPI_2026-10"})
+            else:
+                self.assertEqual((row["event_count"],
+                                  row["claimed_release_root_count"]), (0, 0))
+        self.no_live(result)
+
+    def test_ppi_headline_core_conflicting_release_times_blocked(self):
+        headline = replace(report(event_id="US_PPI_HEAD_2026_10"),
+                           metric="PPI_MOM")
+        core = replace(report(event_id="US_PPI_CORE_2026_10"),
+                       metric="PPI_CORE_MOM",
+                       scheduled_release_at=RELEASE + timedelta(minutes=15))
+        result = route([headline, core], as_of_utc=BEFORE)
+        self.assertEqual(result["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.assertEqual(result["reason"],
+                         "PPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT")
+        self.no_live(result)
+
+    def test_duplicate_metric_period_different_ids_not_two_trials(self):
+        first = replace(report(event_id="US_PPI_HEAD_A"), metric="PPI_MOM")
+        second = replace(first, event_id="US_PPI_HEAD_B")
+        result = route([first, second], as_of_utc=BEFORE)
+        self.assertEqual(result["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.assertEqual(result["reason"],
+                         "DUPLICATE_ECONOMIC_METRIC_PERIOD_NOT_NEW_EVIDENCE")
+        self.no_live(result)
+
+    def test_ppi_release_roots_not_merged_between_currencies(self):
+        usd = replace(report(event_id="US_PPI_OCT"), metric="PPI_MOM")
+        gbp = replace(report(event_id="UK_PPI_OCT", currency="GBP"),
+                      metric="PPI_MOM")
+        result = route([usd, gbp], as_of_utc=BEFORE)
+        self.assertEqual(result["claimed_release_root_count"], 2)
+        self.assertEqual(by_pair(result, "GBP/USD")["claimed_release_root_count"], 2)
+        self.no_live(result)
+
 if __name__ == "__main__":
     unittest.main()
