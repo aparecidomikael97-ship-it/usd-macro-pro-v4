@@ -192,22 +192,25 @@ class GithubReadonlyWitnessTests(unittest.TestCase):
                 self.safe(r)
 
     def test_unauthenticated_no_token_must_not_access_network(self):
-        with patch("atlasquant_trader_fx28_github_witness_reader_lab.urlopen") as client:
+        with patch("atlasquant_trader_fx28_github_witness_reader_lab.build_opener") as factory:
             r = fetch(token=None)
-            client.assert_not_called()
+            factory.assert_not_called()
         self.assertEqual(r["reason"], "MISSING_OR_INVALID_GITHUB_READ_TOKEN_NO_HTTP")
         self.safe(r)
 
     def test_bounded_get_with_fake_http_still_not_forecast_authentication(self):
         raw = b"[]"
         response = FakeResponse(raw)
-        with patch("atlasquant_trader_fx28_github_witness_reader_lab.urlopen",
-                   return_value=response) as client:
+        with patch("atlasquant_trader_fx28_github_witness_reader_lab.build_opener") as factory:
+            factory.return_value.open.return_value = response
             r = fetch(token="synthetic-test-token")
-            client.assert_called_once()
-            request = client.call_args.args[0]
+            factory.assert_called_once()
+            factory.return_value.open.assert_called_once()
+            request = factory.return_value.open.call_args.args[0]
             self.assertEqual(request.get_method(), "GET")
             self.assertTrue(request.full_url.startswith(API))
+            self.assertEqual(type(factory.call_args.args[0]).__name__,
+                             "_RejectRedirects")
         self.assertEqual(r["state"], "LAB_GITHUB_WITNESS_RECEIPTS_DOCUMENTARY_ONLY_NO_GO")
         self.assertTrue(r["actual_https_get_completed"])  # mocked and not attested
         self.assertEqual(r["http_requests"], 1)
@@ -215,10 +218,19 @@ class GithubReadonlyWitnessTests(unittest.TestCase):
         self.assertFalse(r["external_comment_witness_independently_verified"])
         self.safe(r)
 
+    def test_redirect_handler_does_not_forward_credential(self):
+        from atlasquant_trader_fx28_github_witness_reader_lab import _RejectRedirects
+        from urllib.request import Request
+        handler = _RejectRedirects()
+        req = Request(API, headers={"Authorization": "Bearer synthetic-secret"})
+        other = handler.redirect_request(
+            req, None, 302, "Found", {}, "https://untrusted.example/steal")
+        self.assertIsNone(other)
+
     def test_live_get_non_json_is_blocked_no_fallback(self):
         response = FakeResponse(b"<html>error</html>", content_type="text/html")
-        with patch("atlasquant_trader_fx28_github_witness_reader_lab.urlopen",
-                   return_value=response):
+        with patch("atlasquant_trader_fx28_github_witness_reader_lab.build_opener") as factory:
+            factory.return_value.open.return_value = response
             r = fetch(token="synthetic-test-token")
         self.assertEqual(r["reason"], "GITHUB_API_NOT_JSON")
         self.assertFalse(r["actual_https_get_completed"])
