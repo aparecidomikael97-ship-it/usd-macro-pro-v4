@@ -110,7 +110,14 @@ def prepare_bls_cpi_u_sha_witness_body_lab(
     if parsed["state"] != "LAB_ARCHIVED_BLS_CPI_U_TWO_LEVEL_YOY_UNATTESTED":
         out["reason"] = "ARCHIVE_OR_SAME_RESPONSE_YOY_NOT_READY_" + parsed["reason"]
         return out
-    captured = _github_utc(parsed["capture_utc_claim"].replace("+00:00", "Z"))
+    # The BLS capture clock can include microseconds. GitHub's created_at
+    # is second-granular, but custody must retain the full original precision.
+    try:
+        captured_raw = datetime.fromisoformat(parsed["capture_utc_claim"])
+        captured = (captured_raw.astimezone(timezone.utc)
+                    if captured_raw.utcoffset() is not None else None)
+    except (TypeError, ValueError, OverflowError):
+        captured = None
     if captured is None or not captured <= prepared < cutoff:
         out["reason"] = "CAPTURE_PREPARATION_OR_CUTOFF_CHRONOLOGY_INVALID"
         return out
