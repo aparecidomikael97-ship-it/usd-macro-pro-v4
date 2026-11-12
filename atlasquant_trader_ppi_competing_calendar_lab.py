@@ -50,7 +50,7 @@ class PreEventCalendarClaim:
 
 def _utc(value: Any) -> datetime | None:
     if (not isinstance(value, datetime) or value.tzinfo is None
-            or value.utcoffset() is None or value.microsecond):
+            or value.utcoffset() is None):
         return None
     return value.astimezone(timezone.utc)
 
@@ -104,6 +104,7 @@ def audit_ppi_competing_calendar_lab(
             or captured > now or captured >= EVENT_UTC
             or begin > BASELINE_OPEN_UTC or end < LAST_REQUIRED_CLOSE_UTC
             or begin >= end
+            or begin.microsecond != 0 or end.microsecond != 0
             or type(calendar.claims_complete_for_covered_period) is not bool
             or not isinstance(calendar.source_sha256_claim, str)
             or HEX.fullmatch(calendar.source_sha256_claim) is None
@@ -116,7 +117,8 @@ def audit_ppi_competing_calendar_lab(
         if not isinstance(event, CompetingEventClaim):
             return _base("INVALID_COMPETING_EVENT_RECORD")
         when = _utc(event.scheduled_at_utc)
-        if (when is None or not isinstance(event.root_id, str)
+        if (when is None or when.microsecond != 0
+                or not isinstance(event.root_id, str)
                 or IDENT.fullmatch(event.root_id) is None
                 or event.currency_or_global not in ALLOWED_CURRENCIES
                 or event.category not in CATEGORIES

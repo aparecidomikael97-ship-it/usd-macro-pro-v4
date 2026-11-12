@@ -15,7 +15,7 @@ from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import (
     EVENT_UTC, LAST_REQUIRED_CLOSE_UTC,
 )
 
-CAPTURE = datetime(2026, 11, 12, 0, 34, tzinfo=timezone.utc)
+CAPTURE = datetime(2026, 11, 12, 0, 34, 32, 488940, tzinfo=timezone.utc)
 OBSERVE = LAST_REQUIRED_CLOSE_UTC + timedelta(minutes=15)
 RAW = {
     "EIA_NATGAS_HOLIDAY": (
@@ -118,6 +118,14 @@ class OfficialCalendarArchiveTests(unittest.TestCase):
         self.assertFalse(claim.claims_complete_for_covered_period)
         self.assertEqual(claim.captured_at_utc, CAPTURE)
         self.assertEqual(len(claim.events), 3)
+
+    def test_local_realistic_subsecond_capture_receipt_does_not_fail(self):
+        result = self.run_lab(now=OBSERVE.replace(microsecond=123456))
+        self.assertEqual(
+            result["state"],
+            "LAB_PPI_THREE_OFFICIAL_SCHEDULES_LOCAL_SHA_MATCH_NO_GO")
+        self.assertTrue(result["latest_captured_at_utc_local_clock_claim"]
+                        .endswith("488940+00:00"))
 
     def test_tampered_page_rejected_against_pinned_sha(self):
         file = self.root / "EIA_NATGAS_HOLIDAY.html"

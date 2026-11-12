@@ -52,3 +52,9 @@ O módulo não faz downloads ao rodar nem envia ordens; o registro de fonte real
 Sempre retornar `operational_bias=AGUARDAR`, `validated_accuracy=null`, `trade_authorized=false`, `publishable=false`, `causal_isolation_of_ppi_verified=false`.
 
 **O foco permanece o viés seletivo e verificável dos 28 pares e índices, não sinais frequentes.** Este episódio serve para medir limites da evidência antes de qualquer estudo de assertividade.
+
+## Reauditoria com os arquivos reais: precisão do timestamp
+
+A primeira execução do leitor oficial contra o AM12 detectou `INVALID_INSPECTION_CLOCK` na porta de calendário. A rotina aceitava apenas timestamps sem parte fracionária, embora o manifesto de captura registrasse microssegundos (por exemplo, 00:34:32.488940 UTC). O problema não ocorria nas fixtures iniciais com segundos inteiros.
+
+Correção: **captura e horário de inspeção podem ter microssegundos**; **horários agendados de eventos e limites de janela continuam estritamente em segundos inteiros**. Testes com relógio realista foram acrescentados ao parser do calendário e ao leitor de fontes. Nenhuma alteração nas três páginas preservadas, nos SHA-256, na raiz econômica ou na conclusão causal foi necessária. A verificação operacional com páginas reais é obrigatória antes de declarar esta revisão pronta.

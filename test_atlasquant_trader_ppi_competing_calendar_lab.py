@@ -181,6 +181,32 @@ class PpiCompetingCalendarTests(unittest.TestCase):
                 self.assertEqual(r["reason"],
                                  "PRE_EVENT_CALENDAR_CAPTURE_COVERAGE_OR_HASH_INVALID")
 
+    def test_realistic_capture_and_inspection_microseconds_are_allowed(self):
+        base = sample(claim("US_EIA_NATGAS_STORAGE_20261113", 120))
+        partial = replace(
+            base, claims_complete_for_covered_period=False,
+            captured_at_utc=base.captured_at_utc.replace(microsecond=488940))
+        r = self.run_lab(
+            partial, now=OBSERVED.replace(microsecond=789123))
+        self.assertEqual(
+            r["state"], "LAB_PPI_PARTIAL_COMPETING_ROOTS_DOCUMENTARY_REVIEW_REQUIRED")
+        self.assertEqual(r["candidate_competing_root_count_documentary"], 1)
+        self.assertFalse(r["no_competing_events_proven"])
+
+    def test_subsecond_scheduled_release_still_rejected(self):
+        bad = replace(
+            claim("US_EIA_NATGAS_STORAGE_20261113", 120),
+            scheduled_at_utc=EVENT_UTC.replace(microsecond=1))
+        r = self.run_lab(sample(bad))
+        self.assertEqual(r["reason"], "INVALID_EVENT_ID_CURRENCY_CATEGORY_OR_TIME")
+
+    def test_subsecond_coverage_boundary_still_rejected(self):
+        x = replace(
+            sample(), covered_from_utc=BASELINE_OPEN_UTC.replace(microsecond=1))
+        self.assertEqual(
+            self.run_lab(x)["reason"],
+            "PRE_EVENT_CALENDAR_CAPTURE_COVERAGE_OR_HASH_INVALID")
+
     def test_post_release_calendar_cannot_be_recast_as_pre_event(self):
         for changed in (
             replace(sample(), captured_at_utc=EVENT_UTC),
