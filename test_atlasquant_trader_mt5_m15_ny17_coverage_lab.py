@@ -186,7 +186,9 @@ class Ny17M15CoverageTests(unittest.TestCase):
             {"end": ny(2026, 11, 8)},
         ):
             with self.subTest(kw=kw):
-                r = audit(**kw)
+                # Invalid clocks must reach the fail-closed gate without
+                # the synthetic fixture trying naive-aware subtraction.
+                r = audit(epochs=[], **kw)
                 self.assertEqual(r["state"], "LAB_M15_NY17_COVERAGE_BLOCKED")
                 self.safe(r)
 
