@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_STORED
 
 from atlasquant_trader_bls_cpi_u_official_bytes_readonly_lab import (
     inspect_bls_cpi_u_v1_bytes_lab as inspect,
@@ -146,6 +146,74 @@ class BlsSourceReceiptZipTests(unittest.TestCase):
                     self.assertFalse(report["artifact_written"])
                     self.assertEqual(list(Path(tmp).iterdir()), [])
                     self.safe(report)
+
+    def test_forged_provenance_flag_with_rehashed_manifest_cannot_be_saved(self):
+        receipt = prepare(fetched=fetched())
+        with ZipFile(BytesIO(receipt["capture_bundle_zip"])) as archive:
+            original = archive.read("bls_cpi_u_v1_original_response.json")
+            manifest = json.loads(archive.read("capture_manifest.json"))
+        # An attacker can re-hash their modified metadata; hashes alone are
+        # never proof that "first publication verified" is an honest claim.
+        for key in ("first_publication_proven", "historical_vintage_proven",
+                    "official_yoy_validated", "fx28_directional_forecast_authorized"):
+            with self.subTest(key=key):
+                forged = dict(manifest, **{key: True})
+                manifest_raw = json.dumps(
+                    forged, sort_keys=True, separators=(",", ":"),
+                    ensure_ascii=True).encode("ascii")
+                buf = BytesIO()
+                with ZipFile(buf, "w", compression=ZIP_STORED) as out:
+                    out.writestr("bls_cpi_u_v1_original_response.json", original)
+                    out.writestr("capture_manifest.json", manifest_raw)
+                modified = dict(
+                    receipt,
+                    capture_bundle_zip=buf.getvalue(),
+                    capture_manifest_json=manifest_raw.decode("ascii"),
+                    capture_manifest_sha256=sha256(manifest_raw).hexdigest(),
+                )
+                with tempfile.TemporaryDirectory() as tmp:
+                    result = save(prepared=modified, directory=tmp)
+                    self.assertFalse(result["artifact_written"])
+                    self.assertEqual(result["reason"],
+                                     "ALTERED_ZIP_MANIFEST_OR_SOURCE_BYTES")
+                    self.assertEqual(list(Path(tmp).iterdir()), [])
+                    self.safe(result)
+
+    def test_zip_duplicate_member_cannot_hide_under_a_set_of_names(self):
+        receipt = prepare(fetched=fetched())
+        with ZipFile(BytesIO(receipt["capture_bundle_zip"])) as archive:
+            original = archive.read("bls_cpi_u_v1_original_response.json")
+            manifest_raw = archive.read("capture_manifest.json")
+        import warnings
+        buf = BytesIO()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            with ZipFile(buf, "w", compression=ZIP_STORED) as out:
+                out.writestr("bls_cpi_u_v1_original_response.json", original)
+                out.writestr("capture_manifest.json", manifest_raw)
+                out.writestr("capture_manifest.json", manifest_raw)
+        modified = dict(receipt, capture_bundle_zip=buf.getvalue())
+        with tempfile.TemporaryDirectory() as tmp:
+            result = save(prepared=modified, directory=tmp)
+            self.assertFalse(result["artifact_written"])
+            self.assertEqual(result["reason"], "UNEXPECTED_OR_DUPLICATE_ARCHIVE_MEMBER")
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+            self.safe(result)
+
+    def test_valid_zip_under_false_receipt_filename_is_blocked(self):
+        receipt = prepare(fetched=fetched())
+        # Still looks like a permitted name but falsely claims a different UTC time.
+        forged = dict(
+            receipt,
+            filename="atlasquant_bls_cpi_u_20261112T193200Z_" +
+                     receipt["source_sha256"][:12] + ".zip",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            result = save(prepared=forged, directory=tmp)
+            self.assertFalse(result["artifact_written"])
+            self.assertEqual(result["reason"], "ALTERED_ZIP_MANIFEST_OR_SOURCE_BYTES")
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+            self.safe(result)
 
     def test_path_traversal_not_permitted(self):
         out = prepare(fetched=fetched())
