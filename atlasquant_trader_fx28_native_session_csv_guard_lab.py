@@ -190,7 +190,7 @@ def inspect_fx28_native_session_csv_lab(
         r.update({
             "state": "LAB_FX28_NATIVE_MT5_SESSION_METADATA_CLAIM_ONLY_NO_GO",
             "reason": "CURRENT_TERMINAL_SCHEDULE_NOT_HISTORICAL_VINTAGE_OR_BROKER_ATTESTATION",
-            "verified_metadata_keys": PAIR_DAYS_KIN,
+            "verified_metadata_keys": PAIR_DAYS_KINDS,
             "returned_native_session_rows": native_session_rows,
             "no_session_returned_count": no_sessions,
             "symbols_with_no_session_returned": [
