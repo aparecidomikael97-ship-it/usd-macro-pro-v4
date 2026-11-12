@@ -457,5 +457,39 @@ class G8EventRelevanceTests(unittest.TestCase):
                 self.assertEqual(by_pair(result, "EUR/USD")["event_count"], 2)
                 self.no_live(result)
 
+
+    def test_core_cpi_annual_is_distinct_from_monthly_and_fail_closed(self):
+        # Synthetic G8 event relevance only. CPI core YoY is NSA; MoM is SA.
+        annual = replace(
+            report(event_id="US_CPI_CORE_YOY_2026_10"),
+            metric="CPI_CORE_YOY", unit="PERCENT_YOY_NSA",
+        )
+        monthly = replace(
+            report(event_id="US_CPI_CORE_MOM_2026_10"),
+            metric="CPI_CORE_MOM", unit="PERCENT_MOM_SA",
+        )
+        result = route([annual, monthly], as_of_utc=BEFORE)
+        self.assertEqual(
+            result["state"], "LAB_G8_EVENT_RELEVANCE_DOCUMENTARY_ONLY_NO_BIAS"
+        )
+        self.assertEqual(result["event_count"], 2)
+        self.assertEqual(sum(x["event_count"] for x in result["pair_rows"]), 14)
+        self.assertEqual(by_pair(result, "EUR/USD")["event_count"], 2)
+        self.assertEqual(by_pair(result, "AUD/NZD")["event_count"], 0)
+        self.assertEqual(
+            {x["unit"] for x in result["events"]},
+            {"PERCENT_YOY_NSA", "PERCENT_MOM_SA"},
+        )
+        self.no_live(result)
+
+        for wrong in (
+            replace(annual, unit="PERCENT_MOM_SA"),
+            replace(monthly, unit="PERCENT_YOY_NSA"),
+        ):
+            with self.subTest(metric=wrong.metric):
+                blocked = route([wrong], as_of_utc=BEFORE)
+                self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(blocked)
+
 if __name__ == "__main__":
     unittest.main()
