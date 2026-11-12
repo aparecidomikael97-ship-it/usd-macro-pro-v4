@@ -189,6 +189,112 @@ def prepare_ny17_full_forecast_anchor_lab(
     return out
 
 
+
+
+def _parse_stamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or len(value) > 35:
+        return None
+    try:
+        return _utc(datetime.fromisoformat(value.replace("Z", "+00:00")))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _check_canonical_prepared_claim(
+    prepared: dict[str, Any], target: datetime,
+) -> tuple[dict[str, Any], str, str, str, datetime] | None:
+    """Re-validate every field behind the digest, not just its 64 hex chars.
+
+    No caller can promote a changed 28-row payload with duplicated pairs,
+    false abstention totals or another campaign to a locally complete report.
+    It remains a *claim*, not an externally observed GitHub event.
+    """
+    raw = prepared.get("forecast_json")
+    digest = prepared.get("forecast_sha256")
+    if (not isinstance(raw, str) or len(raw) > 30000
+            or not isinstance(digest, str) or SHA64.fullmatch(digest) is None):
+        return None
+    try:
+        payload = json.loads(raw)
+        if (not isinstance(payload, dict) or set(payload) != {
+                "schema", "campaign_id", "horizon", "start_utc",
+                "end_utc", "prepared_utc_claim", "pairs"}):
+            return None
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True, allow_nan=False)
+        if (canonical != raw or sha256(raw.encode("ascii")).hexdigest() != digest
+                or payload["schema"] != SCHEMA
+                or payload["campaign_id"] != CAMPAIGN_ID
+                or payload["horizon"] not in ("D1", "W1")):
+            return None
+        start, end, issued_at = (
+            _parse_stamp(payload[k]) for k in
+            ("start_utc", "end_utc", "prepared_utc_claim"))
+        if (start != target or end is None or issued_at is None
+                or not issued_at < start
+                or (start, end) not in _nominal_windows(payload["horizon"])):
+            return None
+        pairs = payload["pairs"]
+        if (not isinstance(pairs, list) or len(pairs) != 28
+                or prepared.get("pair_count") != 28
+                or prepared.get("horizon") != payload["horizon"]
+                or prepared.get("forecast_scope_locally_complete") is not True):
+            return None
+        seen_ids: set[str] = set()
+        abstentions = 0
+        for ix, row in enumerate(pairs):
+            if (not isinstance(row, dict) or set(row) != {
+                    "opportunity_id", "pair", "direction_claim_unattested",
+                    "abstain_reason", "features_cutoff_utc_claim",
+                    "issued_utc_claim", "model_sha256_claim",
+                    "evidence_sha256_claim"}):
+                return None
+            oid = row["opportunity_id"]
+            direction = row["direction_claim_unattested"]
+            cutoff = _parse_stamp(row["features_cutoff_utc_claim"])
+            issued = _parse_stamp(row["issued_utc_claim"])
+            if (not isinstance(oid, str) or ID_PATTERN.fullmatch(oid) is None
+                    or oid in seen_ids
+                    or row["pair"] != OFFICIAL_PAIRS[ix]
+                    or direction not in SIDES
+                    or not isinstance(row["model_sha256_claim"], str)
+                    or SHA64.fullmatch(row["model_sha256_claim"]) is None
+                    or not isinstance(row["evidence_sha256_claim"], str)
+                    or SHA64.fullmatch(row["evidence_sha256_claim"]) is None
+                    or cutoff is None or issued is None
+                    or not cutoff <= issued <= issued_at
+                    or (direction == "ABSTAIN"
+                        and row["abstain_reason"] not in ABSTAIN_REASONS)
+                    or (direction != "ABSTAIN"
+                        and row["abstain_reason"] is not None)):
+                return None
+            seen_ids.add(oid)
+            abstentions += direction == "ABSTAIN"
+        directional = 28 - abstentions
+        if (type(prepared.get("directional_claims")) is not int
+                or prepared["directional_claims"] != directional
+                or type(prepared.get("abstentions")) is not int
+                or prepared["abstentions"] != abstentions):
+            return None
+        body = "\n".join((
+            HEADER, "repository=" + REPO,
+            "issue_number=" + str(ISSUE_NUMBER),
+            "campaign_id=" + CAMPAIGN_ID,
+            "horizon=" + payload["horizon"],
+            "window_start_utc=" + _stamp(start),
+            "window_end_utc=" + _stamp(end),
+            "slots=28", "directional_claims=" + str(directional),
+            "abstentions=" + str(abstentions),
+            "forecast_json_sha256=" + digest,
+            "research_only=true", "trade_authorized=false",
+        ))
+        if prepared.get("anchor_comment_body") != body:
+            return None
+        return payload, raw, digest, body, issued_at
+    except (ValueError, KeyError, TypeError, UnicodeError, OverflowError):
+        return None
+
+
 def inspect_ny17_forecast_github_comment_claim_lab(
     *, prepared: Any, start_at_utc: Any,
     comment: Any, inspected_at_utc: Any,
@@ -207,24 +313,11 @@ def inspect_ny17_forecast_github_comment_claim_lab(
             or target is None or now is None
             or not isinstance(comment, GitHubCommentClaim)):
         return out
-    try:
-        payload_raw = prepared["forecast_json"]
-        digest = prepared["forecast_sha256"]
-        payload = json.loads(payload_raw)
-        start = _utc(datetime.fromisoformat(payload["start_utc"].replace("Z", "+00:00")))
-        body = prepared["anchor_comment_body"]
-        if (not isinstance(payload_raw, str) or not isinstance(digest, str)
-                or SHA64.fullmatch(digest) is None
-                or sha256(payload_raw.encode("ascii")).hexdigest() != digest
-                or not isinstance(payload, dict)
-                or len(payload["pairs"]) != 28
-                or start != target or not isinstance(body, str)
-                or "forecast_json_sha256=" + digest not in body):
-            out["reason"] = "TAMPERED_FROZEN_FORECAST_JSON_OR_DIGEST"
-            return out
-    except (ValueError, KeyError, TypeError, UnicodeError, OverflowError):
+    verified = _check_canonical_prepared_claim(prepared, target)
+    if verified is None:
         out["reason"] = "TAMPERED_FROZEN_FORECAST_JSON_OR_DIGEST"
         return out
+    payload, payload_raw, digest, body, prepared_claim = verified
 
     if (type(comment.comment_id) is not int or not 1 <= comment.comment_id <= 10**15
             or comment.body != body
@@ -238,8 +331,6 @@ def inspect_ny17_forecast_github_comment_claim_lab(
         _utc(x) for x in (comment.created_at, comment.updated_at,
                           comment.retrieved_at)
     )
-    prepared_claim = _utc(datetime.fromisoformat(
-        payload["prepared_utc_claim"].replace("Z", "+00:00")))
     if (created is None or updated is None or retrieved is None
             or prepared_claim is None
             or not prepared_claim <= created <= retrieved <= now
