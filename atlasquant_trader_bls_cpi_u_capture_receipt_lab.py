@@ -68,6 +68,31 @@ def _parsed_clock(value: Any) -> datetime | None:
         return None
 
 
+def _canonical_manifest(*, checked: dict[str, Any], captured: datetime,
+                        server: datetime, digest: str, raw: bytes) -> dict[str, Any]:
+    """One authoritative schema for construction AND verification of custody."""
+    manifest = {
+        "schema": SCHEMA,
+        "capture_method_claim": "BLS_PUBLIC_API_V1_SINGLE_SERIES_GET",
+        "source_url": URL, "series_id": SERIES,
+        "measurement": "CPI_U_NSA_MONTHLY_INDEX_LEVEL_NOT_YOY",
+        "observed_local_utc_claim": captured.isoformat(),
+        "http_server_date_utc_claim": server.isoformat(),
+        "raw_response_sha256": digest,
+        "raw_response_length_bytes": len(raw),
+        "last_monthly_period_documentary": checked["last_monthly_period_documentary"],
+        "last_index_level_documentary": checked["last_index_level_documentary"],
+        "months_returned": checked["monthly_observation_count"],
+        "first_publication_proven": False,
+        "historical_vintage_proven": False,
+        "official_yoy_validated": False,
+        "fx28_directional_forecast_authorized": False,
+        "research_only": True,
+    }
+    return manifest
+
+
+
 def prepare_bls_cpi_u_source_receipt_lab(*, fetched: Any) -> dict[str, Any]:
     """Validate the full, original BLS byte sequence and make one ZIP in memory.
 
@@ -108,24 +133,8 @@ def prepare_bls_cpi_u_source_receipt_lab(*, fetched: Any) -> dict[str, Any]:
                 fetched.get("monthly_observation_count")):
         out["reason"] = "SOURCE_REPARSE_OR_SUMMARY_MISMATCH"
         return out
-    manifest = {
-        "schema": SCHEMA,
-        "capture_method_claim": "BLS_PUBLIC_API_V1_SINGLE_SERIES_GET",
-        "source_url": URL, "series_id": SERIES,
-        "measurement": "CPI_U_NSA_MONTHLY_INDEX_LEVEL_NOT_YOY",
-        "observed_local_utc_claim": captured.isoformat(),
-        "http_server_date_utc_claim": server.isoformat(),
-        "raw_response_sha256": digest,
-        "raw_response_length_bytes": len(raw),
-        "last_monthly_period_documentary": checked["last_monthly_period_documentary"],
-        "last_index_level_documentary": checked["last_index_level_documentary"],
-        "months_returned": checked["monthly_observation_count"],
-        "first_publication_proven": False,
-        "historical_vintage_proven": False,
-        "official_yoy_validated": False,
-        "fx28_directional_forecast_authorized": False,
-        "research_only": True,
-    }
+    manifest = _canonical_manifest(
+        checked=checked, captured=captured, server=server, digest=digest, raw=raw)
     manifest_bytes = json.dumps(
         manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
     ).encode("ascii")
@@ -168,20 +177,49 @@ def save_bls_cpi_u_source_receipt_once_lab(
         return out
     try:
         with ZipFile(BytesIO(blob), "r") as archive:
-            if set(archive.namelist()) != {
-                    "bls_cpi_u_v1_original_response.json", "capture_manifest.json"}:
+            # A set alone hides duplicate ZIP members: fail closed on duplicates.
+            entries = archive.infolist()
+            required = {"bls_cpi_u_v1_original_response.json", "capture_manifest.json"}
+            if (len(entries) != 2 or {item.filename for item in entries} != required
+                    or any(item.is_dir() or item.compress_type != ZIP_STORED
+                           or item.file_size > (
+                               512_000 if item.filename.startswith("bls_") else 8_192
+                           ) for item in entries)):
+                out["reason"] = "UNEXPECTED_OR_DUPLICATE_ARCHIVE_MEMBER"
                 return out
             raw = archive.read("bls_cpi_u_v1_original_response.json")
             manifest_bytes = archive.read("capture_manifest.json")
             manifest = json.loads(manifest_bytes.decode("ascii"))
-        if (sha256(raw).hexdigest() != prepared.get("source_sha256")
+        if not isinstance(manifest, dict):
+            out["reason"] = "ALTERED_ZIP_MANIFEST_OR_SOURCE_BYTES"
+            return out
+        captured = _parsed_clock(manifest.get("observed_local_utc_claim"))
+        server = _parsed_clock(manifest.get("http_server_date_utc_claim"))
+        if captured is None or server is None:
+            out["reason"] = "ALTERED_ZIP_MANIFEST_OR_SOURCE_BYTES"
+            return out
+        checked = inspect_bls_cpi_u_v1_bytes_lab(
+            original_bytes=raw, captured_at_utc=captured, server_date_at_utc=server)
+        if checked["state"] != "LAB_BLS_CPI_U_INDEX_BYTES_INSPECTED_UNATTESTED":
+            out["reason"] = "ARCHIVED_BLS_RESPONSE_FAILED_REPARSE"
+            return out
+        digest = sha256(raw).hexdigest()
+        expected_manifest = _canonical_manifest(
+            checked=checked, captured=captured, server=server, digest=digest, raw=raw)
+        expected_bytes = json.dumps(
+            expected_manifest, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=True).encode("ascii")
+        expected_filename = (
+            f"atlasquant_bls_cpi_u_{captured.strftime('%Y%m%dT%H%M%SZ')}_"
+            f"{digest[:12]}.zip"
+        )
+        if (manifest_bytes != expected_bytes
+                or expected_filename != prepared["filename"]
+                or sha256(raw).hexdigest() != prepared.get("source_sha256")
                 or sha256(manifest_bytes).hexdigest() !=
                     prepared.get("capture_manifest_sha256")
                 or manifest_bytes.decode("ascii") !=
-                    prepared.get("capture_manifest_json")
-                or manifest.get("raw_response_sha256") != sha256(raw).hexdigest()
-                or manifest.get("raw_response_length_bytes") != len(raw)
-                or manifest.get("schema") != SCHEMA):
+                    prepared.get("capture_manifest_json")):
             out["reason"] = "ALTERED_ZIP_MANIFEST_OR_SOURCE_BYTES"
             return out
     except (OSError, UnicodeError, ValueError, TypeError, KeyError, BadZipFile):
