@@ -146,6 +146,66 @@ class BiasQualityLabTests(unittest.TestCase):
                 self.assertEqual(r["state"], "LAB_BIAS_QUALITY_BLOCKED")
                 self.no_go(r)
 
+    def test_m1_minute_must_not_be_mistaken_for_mn1_monthly(self):
+        row = trial(0, horizon="M1")
+        result = evaluate([row], horizon="M1")
+        self.assertEqual(result["state"], "LAB_BIAS_QUALITY_BLOCKED")
+        self.assertEqual(result["reason"], "INVALID_TRIALS_OR_CLOCK")
+        self.no_go(result)
+
+    def test_monthly_trial_cannot_use_one_day_price_move(self):
+        row = trial(0, horizon="MN1")
+        result = evaluate([row], horizon="MN1")
+        self.assertEqual(result["state"], "LAB_BIAS_QUALITY_BLOCKED")
+        self.assertEqual(result["reason"], "MN1_OUTCOME_NOT_ONE_CALENDAR_MONTH_WINDOW")
+        self.no_go(result)
+
+    def test_monthly_documentary_30_day_window_is_not_real_accuracy(self):
+        row = trial(0, horizon="MN1")
+        month_end = row.outcome_start_at + timedelta(days=30)
+        row = replace(row, outcome_end_at=month_end,
+                      outcome_captured_at=month_end + timedelta(minutes=1))
+        result = evaluate([row], horizon="MN1")
+        self.assertEqual(result["state"],
+                         "LAB_BIAS_QUALITY_SYNTHETIC_OR_CALLER_CLAIM_ACCOUNTED_NO_GO")
+        self.assertEqual(result["horizon"], "MN1")
+        self.assertEqual(result["hits"], 1)
+        self.assertFalse(result["monthly_session_calendar_independently_verified"])
+        self.no_go(result)
+
+    def test_monthly_same_calendar_month_or_wrong_length_rejected(self):
+        row = trial(0, horizon="MN1")
+        for days in (24, 60):
+            with self.subTest(days=days):
+                month_end = row.outcome_start_at + timedelta(days=days)
+                item = replace(row, outcome_end_at=month_end,
+                               outcome_captured_at=month_end + timedelta(minutes=1))
+                result = evaluate([item], horizon="MN1")
+                self.assertEqual(result["reason"],
+                                 "MN1_OUTCOME_NOT_ONE_CALENDAR_MONTH_WINDOW")
+                self.no_go(result)
+        # A 29-day period entirely within December is not a monthly
+        # December-to-January label; length alone is insufficient.
+        start = datetime(2026, 12, 1, tzinfo=timezone.utc)
+        end = start + timedelta(days=29)
+        same_month = replace(row, outcome_start_at=start,
+                             outcome_end_at=end,
+                             outcome_captured_at=end + timedelta(minutes=1))
+        result = evaluate([same_month], horizon="MN1")
+        self.assertEqual(result["reason"],
+                         "MN1_OUTCOME_NOT_ONE_CALENDAR_MONTH_WINDOW")
+        self.no_go(result)
+
+    def test_monthly_crossover_december_to_january_can_pass_documentary(self):
+        row = trial(30, horizon="MN1")  # December 10, 2026
+        month_end = row.outcome_start_at + timedelta(days=31)
+        row = replace(row, outcome_end_at=month_end,
+                      outcome_captured_at=month_end + timedelta(minutes=1))
+        result = evaluate([row], horizon="MN1")
+        self.assertEqual(result["horizon"], "MN1")
+        self.assertEqual(result["total_decision_opportunities"], 1)
+        self.no_go(result)
+
     def test_empty_trial_set_is_not_a_backtest(self):
         r = evaluate([])
         self.assertEqual(r["state"], "LAB_BIAS_QUALITY_BLOCKED")
