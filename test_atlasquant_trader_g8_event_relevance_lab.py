@@ -703,5 +703,46 @@ class G8EventRelevanceTests(unittest.TestCase):
         )
         self.no_live(result)
 
+
+    def test_ppi_four_components_share_one_claimed_release_root(self):
+        metrics = (
+            ("PPI_MOM", "PERCENT_MOM_SA"),
+            ("PPI_CORE_MOM", "PERCENT_MOM_SA"),
+            ("PPI_YOY", "PERCENT_YOY_NSA"),
+            ("PPI_CORE_YOY", "PERCENT_YOY_NSA"),
+        )
+        events = [
+            replace(report(event_id=f"US_{metric}_2026_10"),
+                    metric=metric, unit=unit)
+            for metric, unit in metrics
+        ]
+        result = route(events, as_of_utc=BEFORE)
+        self.assertEqual(result["state"],
+                         "LAB_G8_EVENT_RELEVANCE_DOCUMENTARY_ONLY_NO_BIAS")
+        self.assertEqual(result["event_count"], 4)
+        self.assertEqual(result["claimed_release_root_count"], 1)
+        self.assertIsNone(result["independent_event_trial_count"])
+        self.assertEqual({e["claimed_release_root"] for e in result["events"]},
+                         {"USD_PPI_2026-10"})
+        for pair in OFFICIAL_PAIRS:
+            row = by_pair(result, pair)
+            self.assertEqual(row["event_count"], 4 if "USD" in pair else 0)
+            self.assertEqual(row["claimed_release_root_count"],
+                             1 if "USD" in pair else 0)
+        self.no_live(result)
+
+        bad_unit = replace(events[-1], unit="PERCENT_MOM_SA")
+        rejected = route(events[:-1] + [bad_unit], as_of_utc=BEFORE)
+        self.assertEqual(rejected["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.no_live(rejected)
+
+        moved = replace(events[-1],
+                        scheduled_release_at=RELEASE + timedelta(minutes=1))
+        blocked = route(events[:-1] + [moved], as_of_utc=BEFORE)
+        self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.assertEqual(blocked["reason"],
+                         "PPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT")
+        self.no_live(blocked)
+
 if __name__ == "__main__":
     unittest.main()
