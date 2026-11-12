@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from io import StringIO
@@ -43,6 +43,8 @@ def _base(reason: str) -> dict[str, Any]:
         "directory": None, "sha256_by_symbol": None,
         "local_files_written": 0, "mt5_account_information_accessed": False,
         "orders_or_positions_accessed": False, "symbol_visibility_changed": False,
+        "hidden_symbols_read_from_history": [],
+        "bounded_history_warmup_attempted": [],
         "broker_identity_independently_authenticated": False,
         "active_quote_server_independently_verified": False,
         "terminal_company_observation_untrusted": None,
@@ -197,8 +199,15 @@ def collect_ppi_mt5_m15_capture_lab(
         terminal_company = _terminal_company_label(terminal)
         for symbol in USD_FX:
             info = api.symbol_info(symbol)
-            if info is None or info.visible is not True:
-                report["reason"] = "CANONICAL_SYMBOL_NOT_VISIBLE_NO_AUTO_SELECT"
+            # Historical bars can be readable even for a symbol not displayed
+            # in Market Watch. Never call symbol_select or alter visibility.
+            if info is None:
+                report["reason"] = "CANONICAL_SYMBOL_MISSING_NO_AUTO_SELECT"
+                report["failed_symbol"] = symbol
+                return report
+            visible_before = info.visible
+            if type(visible_before) is not bool:
+                report["reason"] = "SYMBOL_VISIBILITY_METADATA_INVALID"
                 report["failed_symbol"] = symbol
                 return report
             spec = _symbol_spec_for_capture(info, symbol)
@@ -208,12 +217,35 @@ def collect_ppi_mt5_m15_capture_lab(
                 return report
             specs[symbol] = spec
             # MT5's range endpoints are UTC-aware, inclusive open timestamps.
+            end_open = datetime.fromtimestamp(
+                EXPECTED_EPOCHS[-1], tz=timezone.utc)
             rates = api.copy_rates_range(
-                symbol, api.TIMEFRAME_M15, BASELINE_OPEN_UTC,
-                datetime.fromtimestamp(EXPECTED_EPOCHS[-1], tz=timezone.utc),
-            )
+                symbol, api.TIMEFRAME_M15, BASELINE_OPEN_UTC, end_open)
+            if rates is None or len(rates) == 0:
+                # A fresh terminal may return zero on the first history read
+                # even when the broker later supplies all bars. One bounded,
+                # READ-ONLY two-day warm-up; then recheck exact 17. Never
+                # interpolate missing bars or retry partial/corrupt windows.
+                report["bounded_history_warmup_attempted"].append(symbol)
+                api.copy_rates_range(
+                    symbol, api.TIMEFRAME_M15,
+                    BASELINE_OPEN_UTC - timedelta(days=2), end_open)
+                rates = api.copy_rates_range(
+                    symbol, api.TIMEFRAME_M15, BASELINE_OPEN_UTC, end_open)
+            info_after = api.symbol_info(symbol)
+            if info_after is None or type(info_after.visible) is not bool:
+                report["reason"] = "SYMBOL_VISIBILITY_POSTREAD_UNVERIFIABLE"
+                report["failed_symbol"] = symbol
+                return report
+            if info_after.visible != visible_before:
+                report["reason"] = "SYMBOL_VISIBILITY_CHANGED_DURING_READONLY_CAPTURE"
+                report["symbol_visibility_changed"] = True
+                report["failed_symbol"] = symbol
+                return report
             try:
                 pending[symbol] = _serialize_exact_window(rates)
+                if not visible_before:
+                    report["hidden_symbols_read_from_history"].append(symbol)
             except ValueError as exc:
                 report["reason"] = str(exc)
                 report["failed_symbol"] = symbol
