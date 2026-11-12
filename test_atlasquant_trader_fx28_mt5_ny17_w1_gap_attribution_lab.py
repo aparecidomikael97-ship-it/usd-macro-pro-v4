@@ -199,6 +199,47 @@ class WeekGapAttributionTests(unittest.TestCase):
         self.assertFalse(r["all_expected_weekly_m15_slots_present"])
         self.assertEqual(r["complete_480_pairs"], 0)
 
+    def test_entirely_empty_symbol_is_not_480_proven_market_closed_candles(self):
+        self.api.data["CHFJPY"] = []
+        r = self.run_probe()
+        self.safety(r)
+        self.assertEqual(r["state"], "LAB_FX28_W1_READONLY_AUDIT_BLOCKED")
+        self.assertEqual(r["pair_diagnostics"]["CHFJPY"]["reason"],
+                         "HISTORY_EMPTY_NOT_EVIDENCE_OF_MARKET_CLOSURE")
+        self.assertIsNone(r["shared_missing_utc_slot_count"])
+        self.assertIsNone(r["missing_slots_total"])
+
+    def test_observed_bad_ohlc_in_incomplete_week_blocks_entire_attribution(self):
+        for sym in FX_28:
+            self.api.data[sym] = self.api.data[sym][8:]
+        self.api.data["EURUSD"][0]["high"] = 0.1
+        r = self.run_probe()
+        self.safety(r)
+        self.assertEqual(r["state"], "LAB_FX28_W1_READONLY_AUDIT_BLOCKED")
+        self.assertEqual(r["pair_diagnostics"]["EURUSD"]["reason"],
+                         "M15_PRICE_OR_VOLUME_INVALID")
+        self.assertIsNone(r["shared_missing_utc_slot_count"])
+        self.assertFalse(r["all_pairs_timeseries_structurally_valid"])
+
+    def test_edt_previous_week_twelve_early_shared_m15_slots(self):
+        # The NY17 Sunday UTC anchor is 21:00 on 2026-10-25, not 22:00.
+        old_epoch = int(datetime(2026, 10, 25, 21, tzinfo=UTC).timestamp())
+        delta = old_epoch - EPOCHS[0]
+        for sym in FX_28:
+            for bar in self.api.data[sym]:
+                bar["time"] += delta
+            self.api.data[sym] = self.api.data[sym][12:]
+        r = self.run_probe(day="2026-10-25")
+        self.safety(r)
+        self.assertEqual(r["state"], "LAB_FX28_W1_NY17_SHARED_AND_PAIR_GAPS_NO_GO")
+        self.assertEqual(r["shared_missing_utc_slot_count"], 12)
+        self.assertEqual(r["missing_slots_total"], 336)
+        self.assertEqual(r["shared_missing_pair_slots_total"], 336)
+        self.assertEqual(r["pair_specific_missing_slots_total"], 0)
+        self.assertEqual(r["shared_missing_utc_first"][0],
+                         "2026-10-25T21:00:00+00:00")
+        self.assertFalse(r["all_expected_weekly_m15_slots_present"])
+
     def test_visible_hidden_state_preserved_on_success(self):
         original = set(self.api.visible)
         r = self.run_probe()
