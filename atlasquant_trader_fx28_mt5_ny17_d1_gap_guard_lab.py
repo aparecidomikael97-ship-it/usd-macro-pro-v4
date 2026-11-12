@@ -75,7 +75,12 @@ def _expected_epochs(start: datetime) -> tuple[int, ...]:
 
 
 def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, Any]:
-    """Strict 96-bar expected timestamp inventory; never interpolate."""
+    """Strict 96/480-bar timestamp inventory for D1/W1; never interpolate."""
+    if (type(epochs) is not tuple or len(epochs) not in (96, 480)
+            or any(type(t) is not int or t <= 0 for t in epochs)
+            or any(epochs[i + 1] - epochs[i] != 900
+                   for i in range(len(epochs) - 1))):
+        raise ValueError("INVALID_FROZEN_D1_W1_M15_EPOCH_GRID")
     if rates is None:
         return {
             "reason": "HISTORY_NULL", "returned_bars": None,
@@ -85,7 +90,7 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
                 for t in epochs[:MAX_GAP_TIMESTAMPS]],
             "valid_candles": 0,
         }
-    if len(rates) > BARS_PER_SESSION:
+    if len(rates) > len(epochs):
         return {
             "reason": "EXCESS_ROWS_OR_UNEXPECTED_TIMEFRAME",
             "returned_bars": len(rates), "missing_count": None,
@@ -145,7 +150,7 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
         "reason": "COMPLETE_HISTORICAL_SERIES_UNATTESTED",
         "returned_bars": len(rates),
         "missing_count": 0, "first_missing_utc": [],
-        "valid_candles": BARS_PER_SESSION,
+        "valid_candles": len(epochs),
     }
 
 
