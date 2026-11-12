@@ -47,7 +47,7 @@ class QuoteQualityTests(unittest.TestCase):
     def setUp(self):
         self.api = TickFake()
 
-    def run(self, *, api=None, day="2026-11-11", now=NOW):
+    def probe(self, *, api=None, day="2026-11-11", now=NOW):
         return inspect(
             self.api if api is None else api,
             terminal_path=TERMINAL, reference_day=day, clock=lambda: now)
@@ -71,7 +71,7 @@ class QuoteQualityTests(unittest.TestCase):
         self.assertFalse(x["market_watch_changed_by_script"])
 
     def test_seven_pairs_and_only_readonly_mt5_methods(self):
-        r = self.run()
+        r = self.probe()
         self.safe(r)
         self.assertEqual(r["state"], "LAB_REAL_LOCAL_BIDASK_TICK_SAMPLE_UNATTESTED")
         self.assertEqual(r["pairs_checked"], 7)
@@ -94,7 +94,7 @@ class QuoteQualityTests(unittest.TestCase):
 
     def test_zero_bid_ask_spread_is_not_free_trading(self):
         self.api.ticks["EURUSD"][0]["ask"] = self.api.ticks["EURUSD"][0]["bid"]
-        r = self.run()
+        r = self.probe()
         self.safe(r)
         self.assertEqual(r["state"], "LAB_REAL_LOCAL_BIDASK_TICK_SAMPLE_UNATTESTED")
         self.assertEqual(r["total_zero_spread_snapshots"], 1)
@@ -105,18 +105,18 @@ class QuoteQualityTests(unittest.TestCase):
             r["pair_results"]["EURUSD"]["spread_samples_are_not_verified_execution_costs"])
 
     def test_crossed_quote_and_off_tick_price_fail_closed(self):
-        for value in (1.10, 1.113736, 0.0, float("nan")):
+        for value in (1.11376, 1.113736, 0.0, float("nan")):
             with self.subTest(bid=value):
                 self.api = TickFake()
                 self.api.ticks["EURUSD"][0]["bid"] = value
-                r = self.run()
+                r = self.probe()
                 self.safe(r)
                 self.assertEqual(r["state"], "LAB_HISTORIC_TICK_SAMPLE_BLOCKED")
                 self.assertEqual(r["failed_symbol"], "EURUSD")
 
     def test_ieee754_transport_noise_is_quantized_only_to_real_tick(self):
         self.api.ticks["EURUSD"][0]["bid"] = 1.1137299999999999
-        r = self.run()
+        r = self.probe()
         self.safe(r)
         self.assertEqual(r["pairs_with_ticks"], 7)
 
@@ -126,21 +126,21 @@ class QuoteQualityTests(unittest.TestCase):
             with self.subTest(ms=bad):
                 self.api = TickFake()
                 self.api.ticks["EURUSD"][1]["time_msc"] = bad
-                r = self.run()
+                r = self.probe()
                 self.safe(r)
                 self.assertEqual(r["state"], "LAB_HISTORIC_TICK_SAMPLE_BLOCKED")
                 self.assertEqual(r["failed_symbol"], "EURUSD")
 
     def test_stored_unix_seconds_must_match_milliseconds(self):
         self.api.ticks["USDJPY"][0]["time"] += 10
-        r = self.run()
+        r = self.probe()
         self.safe(r)
         self.assertEqual(r["failed_symbol"], "USDJPY")
         self.assertIn("TICK_TIME_ORDER_OR_WINDOW", r["reason"])
 
     def test_empty_pair_rejected_no_spread_fabricated(self):
         self.api.ticks["USDCHF"] = []
-        r = self.run()
+        r = self.probe()
         self.safe(r)
         self.assertEqual(r["failed_symbol"], "USDCHF")
         self.assertEqual(r["state"], "LAB_HISTORIC_TICK_SAMPLE_BLOCKED")
@@ -162,14 +162,14 @@ class QuoteQualityTests(unittest.TestCase):
         ):
             with self.subTest(day=day, now=now):
                 self.api = TickFake()
-                r = self.run(day=day, now=now)
+                r = self.probe(day=day, now=now)
                 self.safe(r)
                 self.assertEqual(r["state"], "LAB_HISTORIC_TICK_SAMPLE_BLOCKED")
                 self.assertEqual(self.api.calls, [])
 
     def test_hidden_symbol_spec_bad_blocks_without_selection(self):
         self.api.specs["NZDUSD"]["currency_profit"] = "JPY"
-        r = self.run()
+        r = self.probe()
         self.safe(r)
         self.assertEqual(r["failed_symbol"], "NZDUSD")
         self.assertEqual(r["reason"], "CANONICAL_SYMBOL_SPEC_NOT_VALID")
