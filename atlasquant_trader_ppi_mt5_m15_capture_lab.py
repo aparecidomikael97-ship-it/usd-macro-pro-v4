@@ -132,7 +132,21 @@ def _terminal_company_label(terminal: Any) -> str | None:
     return company
 
 
-def _serialize_exact_window(rates: Any) -> bytes:
+def _serialize_exact_window(
+    rates: Any, *, expected_epochs: tuple[int, ...] = EXPECTED_EPOCHS,
+) -> bytes:
+    """Validate any explicitly predeclared 17-bar M15 window, same schema.
+
+    The operational PPI capture uses the frozen default epochs. A separate
+    read-only preflight may pass a *past* window without mocking/fabricating
+    future PPI candles; no timestamps are inferred from returned price data.
+    """
+    if (not isinstance(expected_epochs, tuple)
+            or len(expected_epochs) != ROWS_REQUIRED
+            or any(type(e) is not int or e <= 0 for e in expected_epochs)
+            or any(expected_epochs[i + 1] - expected_epochs[i] != 900
+                   for i in range(ROWS_REQUIRED - 1))):
+        raise ValueError("INVALID_PREDECLARED_M15_WINDOW")
     if rates is None or len(rates) != ROWS_REQUIRED:
         raise ValueError("REQUIRE_EXACTLY_17_M15_BARS")
     output = StringIO(newline="")
@@ -141,7 +155,7 @@ def _serialize_exact_window(rates: Any) -> bytes:
     try:
         for i, bar in enumerate(rates):
             epoch = _integer(bar["time"], strictly_positive=True)
-            if epoch != EXPECTED_EPOCHS[i]:
+            if epoch != expected_epochs[i]:
                 raise ValueError("PPI_M15_EPOCH_GAP_DUPLICATE_OR_WRONG_TIMEZONE")
             values = [_price(bar[field]) for field in ("open", "high", "low", "close")]
             (op, hi, lo, cl) = (value[0] for value in values)
