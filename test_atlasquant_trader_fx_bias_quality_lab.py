@@ -173,9 +173,9 @@ class BiasQualityLabTests(unittest.TestCase):
         self.assertFalse(result["monthly_session_calendar_independently_verified"])
         self.no_go(result)
 
-    def test_monthly_same_calendar_month_or_double_length_rejected(self):
+    def test_monthly_same_calendar_month_or_wrong_length_rejected(self):
         row = trial(0, horizon="MN1")
-        for days in (26, 60):
+        for days in (24, 60):
             with self.subTest(days=days):
                 month_end = row.outcome_start_at + timedelta(days=days)
                 item = replace(row, outcome_end_at=month_end,
@@ -184,6 +184,17 @@ class BiasQualityLabTests(unittest.TestCase):
                 self.assertEqual(result["reason"],
                                  "MN1_OUTCOME_NOT_ONE_CALENDAR_MONTH_WINDOW")
                 self.no_go(result)
+        # A 29-day period entirely within December is not a monthly
+        # December-to-January label; length alone is insufficient.
+        start = datetime(2026, 12, 1, tzinfo=timezone.utc)
+        end = start + timedelta(days=29)
+        same_month = replace(row, outcome_start_at=start,
+                             outcome_end_at=end,
+                             outcome_captured_at=end + timedelta(minutes=1))
+        result = evaluate([same_month], horizon="MN1")
+        self.assertEqual(result["reason"],
+                         "MN1_OUTCOME_NOT_ONE_CALENDAR_MONTH_WINDOW")
+        self.no_go(result)
 
     def test_monthly_crossover_december_to_january_can_pass_documentary(self):
         row = trial(30, horizon="MN1")  # December 10, 2026
