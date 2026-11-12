@@ -41,7 +41,7 @@ def _utc(v: Any) -> datetime | None:
 def _blocked(reason: str) -> dict[str, Any]:
     return {
         "schema": SCHEMA, "state": "LAB_BENCHMARK_BLOCKED", "reason": reason,
-        "metric": None, "unit": None, "as_of_utc": None,
+        "currency": None, "metric": None, "unit": None, "as_of_utc": None,
         "registered_events": 0, "scored_events_documentary": 0,
         "waiting_for_release": 0, "missing_actual_after_release": 0,
         "with_model_estimate_registered": 0, "without_model_estimate_registered": 0,
@@ -95,7 +95,9 @@ def evaluate_event_forecast_cohort_lab(
 
     seen_event_ids: set[str] = set()
     seen_observations: set[tuple[str, str, str, str]] = set()
-    series_key: tuple[str, str] | None = None
+    # Same metric/unit across two countries is not one comparable series.
+    # CPI definitions, seasonal adjustments and publication vintages differ.
+    series_key: tuple[str, str, str] | None = None
     rows: list[dict[str, Any]] = []
     sums_model: list[Decimal] = []
     sums_consensus: list[Decimal] = []
@@ -120,8 +122,10 @@ def evaluate_event_forecast_cohort_lab(
             return _blocked("DUPLICATE_ECONOMIC_EVENT_IN_COHORT")
         seen_event_ids.add(data["event_id"])
         seen_observations.add(observation_key)
-        metric_unit = (data["metric"], data["unit"])
-        if series_key is not None and metric_unit != series_key:
+        metric_unit = (data["currency"], data["metric"], data["unit"])
+        if series_key is not None and metric_unit[0] != series_key[0]:
+            return _blocked("MIXED_CURRENCY_FORECAST_ERRORS_NOT_COMPARABLE")
+        if series_key is not None and metric_unit[1:] != series_key[1:]:
             return _blocked("MIXED_METRIC_OR_UNIT_MAE_NOT_COMPARABLE")
         series_key = metric_unit
 
@@ -193,7 +197,8 @@ def evaluate_event_forecast_cohort_lab(
                   else "LAB_INCOMPLETE_OR_SMALL_COHORT_NO_PERFORMANCE_CLAIM"),
         "reason": ("ALL_SOURCES_AND_WITNESSES_STILL_UNATTESTED" if eligible
                    else "COUNT_MISSING_RESULTS_AND_REQUIRE_SUFFICIENT_PAIRED_EVENTS"),
-        "metric": series_key[0], "unit": series_key[1],
+        "currency": series_key[0], "metric": series_key[1],
+        "unit": series_key[2],
         "as_of_utc": now.isoformat(),
         "registered_events": len(rows),
         "scored_events_documentary": scored,
