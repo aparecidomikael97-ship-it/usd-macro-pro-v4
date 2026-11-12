@@ -99,6 +99,10 @@ def inspect_28fx_m15_archive_batch_lab(
                 "m15_rows_examined": 0,
                 "window_m15_rows_found": 0,
                 "window_expected_m15_rows": None,
+                "price_movement_direction_documentary": None,
+                "price_open_to_close_bps_documentary": None,
+                "price_window_start_open_documentary": None,
+                "price_window_end_close_documentary": None,
             }
             continue
         result = inspect_mt5_m15_archive_ny17_join_lab(
@@ -117,6 +121,16 @@ def inspect_28fx_m15_archive_batch_lab(
             "window_expected_m15_rows": result["window_expected_m15_rows"],
             "manifest_local_hash_consistent": result[
                 "manifest_local_hash_consistent"],
+            # Price labels are documentary and available ONLY after the
+            # complete per-pair NY17 M15 coverage has passed.
+            "price_movement_direction_documentary": result[
+                "price_movement_direction_documentary"],
+            "price_open_to_close_bps_documentary": result[
+                "price_open_to_close_bps_documentary"],
+            "price_window_start_open_documentary": result[
+                "price_window_start_open_documentary"],
+            "price_window_end_close_documentary": result[
+                "price_window_end_close_documentary"],
         }
 
     # 'All checks passed' refers only to locally consistent *claims* and

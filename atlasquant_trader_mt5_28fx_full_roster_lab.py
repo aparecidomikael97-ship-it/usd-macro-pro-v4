@@ -181,6 +181,18 @@ def inspect_am12_ny17_full_roster_lab(
                     return out
                 state = row.get("state")
                 if state == "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO":
+                    # A green price window cannot silently omit the actual
+                    # documentary movement. Still NOT an authenticated bias.
+                    if (row.get("price_movement_direction_documentary")
+                            not in ("UP", "DOWN", "FLAT")
+                            or any(not isinstance(row.get(k), str)
+                                   for k in (
+                                       "price_open_to_close_bps_documentary",
+                                       "price_window_start_open_documentary",
+                                       "price_window_end_close_documentary",
+                                   ))):
+                        out["reason"] = "COMPLETE_PAIR_MISSING_DOCUMENTARY_PRICE_LABEL"
+                        return out
                     complete_in_rows += 1
                 else:
                     pair_reasons[pair] = str(row.get("reason") or "PAIR_REJECTED_NO_REASON")
@@ -201,6 +213,21 @@ def inspect_am12_ny17_full_roster_lab(
             else:
                 counts_complete[pair] += 1
         blocked_pairs = [pair for pair in OFFICIAL_PAIRS if pair in pair_reasons]
+        # Documentary OPEN->CLOSE movements are not independently sourced
+        # forecasts, accuracies, profits or tradable signals.
+        price_movements = ({
+            pair: {
+                "direction_documentary": batch["pair_results"][pair].get(
+                    "price_movement_direction_documentary"),
+                "change_bps_documentary": batch["pair_results"][pair].get(
+                    "price_open_to_close_bps_documentary"),
+                "start_open_documentary": batch["pair_results"][pair].get(
+                    "price_window_start_open_documentary"),
+                "end_close_documentary": batch["pair_results"][pair].get(
+                    "price_window_end_close_documentary"),
+            }
+            for pair in OFFICIAL_PAIRS if pair not in pair_reasons
+        } if isinstance(batch, dict) else {})
         summaries.append({
             "window_number": n,
             "start_utc": first.isoformat(),
@@ -211,6 +238,7 @@ def inspect_am12_ny17_full_roster_lab(
             "pair_checks_blocked_or_unverifiable": 28 - count,
             "blocked_pairs": blocked_pairs,
             "unverifiable_pair_reasons": pair_reasons,
+            "price_movements_documentary_by_pair": price_movements,
             "broker_provenance_attested": False,
             "directional_outcome": None,
         })

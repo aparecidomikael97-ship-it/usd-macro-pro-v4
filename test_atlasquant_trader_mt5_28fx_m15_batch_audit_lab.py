@@ -67,6 +67,8 @@ class BatchFx28M15ArchiveTests(unittest.TestCase):
             self.assertEqual(row["window_m15_rows_found"], 96, pair)
             self.assertEqual(row["window_expected_m15_rows"], 96, pair)
             self.assertTrue(row["manifest_local_hash_consistent"], pair)
+            self.assertEqual(row["price_movement_direction_documentary"], "UP", pair)
+            self.assertEqual(row["price_open_to_close_bps_documentary"], "10.0000", pair)
         self.no_trade(r)
 
     def test_all_28_have_consistent_synthetic_weekly_window(self):
@@ -94,6 +96,8 @@ class BatchFx28M15ArchiveTests(unittest.TestCase):
         self.assertFalse(r["all_28_local_archive_window_checks_passed"])
         self.assertEqual(r["pair_results"][pair]["reason"],
                          "ARCHIVE_MANIFEST_LOCAL_HASH_MISMATCH")
+        self.assertIsNone(r["pair_results"][pair]["price_movement_direction_documentary"])
+        self.assertIsNone(r["pair_results"][pair]["price_open_to_close_bps_documentary"])
         self.no_trade(r)
 
     def test_missing_pair_is_hard_block_before_a_passing_total(self):
@@ -128,6 +132,7 @@ class BatchFx28M15ArchiveTests(unittest.TestCase):
         self.assertEqual(r["coverage_claim_blocked_pairs"], 1)
         self.assertEqual(r["pair_results"][pair]["reason"],
                          "INVALID_ARCHIVE_PAYLOAD_KEYS_OR_TYPE")
+        self.assertIsNone(r["pair_results"][pair]["price_movement_direction_documentary"])
         self.no_trade(r)
 
     def test_future_snapshot_evaluation_blocks_all_28(self):

@@ -127,6 +127,78 @@ class ArchiveJoinTests(unittest.TestCase):
         self.assertEqual(r["window_expected_m15_rows"], 480)
         self.safety(r)
 
+    def test_daily_documentary_open_to_close_is_ten_bps_not_accuracy(self):
+        m, packed, captured = archive()
+        r = inspect_case(manifest=m, packed=packed, captured=captured)
+        self.assertEqual(r["state"],
+                         "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO")
+        self.assertEqual(r["price_window_label_method"],
+                         "FIRST_M15_OPEN_TO_LAST_M15_CLOSE")
+        self.assertEqual(r["price_window_start_open_documentary"], "1.0000")
+        self.assertEqual(r["price_window_end_close_documentary"], "1.0010")
+        self.assertEqual(r["price_open_to_close_bps_documentary"], "10.0000")
+        self.assertEqual(r["price_movement_direction_documentary"], "UP")
+        self.assertIsNone(r["market_direction_from_archive"])
+        self.safety(r)
+
+    def test_weekly_uses_friday_last_closed_m15_not_next_candle(self):
+        m, packed, captured = archive()
+        raw = gzip.decompress(packed).decode("utf-8")
+        rows = list(csv.DictReader(StringIO(raw)))
+        # The 480th M15 candle closes at Friday 17h NY. The next
+        # candle is OUTSIDE the weekly label even if it is in the archive.
+        rows[479]["close"] = "0.9980"
+        rows[480]["close"] = "1.0150"
+        buf = StringIO(newline="")
+        w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+        raw2 = buf.getvalue().encode("utf-8")
+        m2 = {**m, "sha256_uncompressed_csv": sha256(raw2).hexdigest()}
+        result = inspect_case(
+            manifest=m2, packed=gzip.compress(raw2, mtime=0),
+            captured=captured, horizon="W1", start=ny(8), end=ny(13))
+        self.assertEqual(result["state"],
+                         "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO")
+        self.assertEqual(result["price_window_end_close_documentary"], "0.9980")
+        self.assertEqual(result["price_open_to_close_bps_documentary"], "-20.0000")
+        self.assertEqual(result["price_movement_direction_documentary"], "DOWN")
+        self.safety(result)
+
+    def test_flat_window_and_first_open_not_first_close(self):
+        m, packed, captured = archive()
+        rows = list(csv.DictReader(StringIO(gzip.decompress(packed).decode("utf-8"))))
+        rows[0]["open"] = "1.0020"
+        rows[95]["close"] = "1.0020"
+        buf = StringIO(newline="")
+        w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+        changed = buf.getvalue().encode("utf-8")
+        m2 = {**m, "sha256_uncompressed_csv": sha256(changed).hexdigest()}
+        result = inspect_case(
+            manifest=m2, packed=gzip.compress(changed, mtime=0), captured=captured)
+        self.assertEqual(result["state"],
+                         "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO")
+        self.assertEqual(result["price_window_start_open_documentary"], "1.0020")
+        self.assertEqual(result["price_open_to_close_bps_documentary"], "0.0000")
+        self.assertEqual(result["price_movement_direction_documentary"], "FLAT")
+        self.safety(result)
+
+    def test_corrupt_archive_exposes_no_price_move(self):
+        m, gz, captured = archive()
+        bad = {**m, "sha256_uncompressed_csv": "f" * 64}
+        result = inspect_case(manifest=bad, packed=gz, captured=captured)
+        self.assertEqual(result["state"], "LAB_MT5_M15_ARCHIVE_NY17_JOIN_BLOCKED")
+        for field in (
+            "price_window_start_open_documentary",
+            "price_window_end_close_documentary",
+            "price_open_to_close_bps_documentary",
+            "price_movement_direction_documentary",
+        ):
+            self.assertIsNone(result[field], field)
+        self.safety(result)
+
     def test_gap_inside_daily_and_weekly_cannot_be_imputed(self):
         m, gz, captured = archive(missing_at=50)
         for horizon, end in (("D1", ny(9)), ("W1", ny(13))):
