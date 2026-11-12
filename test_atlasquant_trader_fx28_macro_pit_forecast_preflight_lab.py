@@ -10,6 +10,7 @@ from atlasquant_trader_fx28_ny17_prospective_campaign_lab import _nominal_window
 from atlasquant_trader_fx28_ny17_forecast_witness_lab import PairForecastClaim
 from atlasquant_trader_fx28_macro_pit_forecast_preflight_lab import (
     inspect_fx28_macro_pit_forecast_preflight_lab as inspect,
+    _pair_evidence_digest,
 )
 from test_atlasquant_trader_g8_macro_matrix_pit_lab import fixtures
 
@@ -34,15 +35,21 @@ def all_sources():
     return rows, originals
 
 
-def claims(*, horizon="D1", abstentions=None, direction="UP"):
+def claims(*, horizon="D1", abstentions=None, direction="UP", rows=None, originals=None):
     abstentions = abstentions or {}
+    if rows is None or originals is None:
+        rows, originals = all_sources()
     return tuple(PairForecastClaim(
         pair=pair,
         direction="ABSTAIN" if pair in abstentions else direction,
         abstain_reason=abstentions.get(pair),
         feature_cutoff_at=CUTOFF,
         forecast_issued_at=PREPARED - timedelta(minutes=2),
-        model_sha256_claim=MODEL, evidence_sha256_claim=EVIDENCE,
+        model_sha256_claim=MODEL,
+        evidence_sha256_claim=_pair_evidence_digest(
+            pair=pair, horizon=horizon, cutoff=CUTOFF,
+            receipts_by_currency=rows, raw_source_bytes_by_currency=originals,
+        ),
     ) for pair in OFFICIAL_PAIRS)
 
 
@@ -54,9 +61,12 @@ def call(rows=None, originals=None, roster=None, **kwargs):
         horizon="D1", window_start_at=START, window_end_at=END,
         feature_cutoff_at=CUTOFF, prepared_at=PREPARED,
         receipts_by_currency=rows, raw_source_bytes_by_currency=originals,
-        forecast_roster=claims() if roster is None else roster,
+        forecast_roster=roster,
     )
     params.update(kwargs)
+    if roster is None:
+        params["forecast_roster"] = claims(
+            horizon=params["horizon"], rows=rows, originals=originals)
     return inspect(**params)
 
 
@@ -105,7 +115,8 @@ class MacroToForecastPreflightTests(unittest.TestCase):
         del originals["NZD"]["CPI_YOY"]
         affected = {p for p in OFFICIAL_PAIRS if "NZD" in p}
         r = call(rows, originals,
-                 roster=claims(abstentions={p: "MISSING_MACRO" for p in affected}))
+                 roster=claims(rows=rows, originals=originals,
+                               abstentions={p: "MISSING_MACRO" for p in affected}))
         self.assertEqual(r["macro_local_bytes_complete_pairs"], 21)
         self.assertEqual(r["macro_missing_or_unverifiable_pairs"], 7)
         self.assertEqual(r["directional_claims_research_only"], 21)
@@ -120,7 +131,8 @@ class MacroToForecastPreflightTests(unittest.TestCase):
         del originals["GBP"]["POLICY_RATE"]
         affected = {p for p in OFFICIAL_PAIRS if "GBP" in p}
         r = call(rows, originals,
-                 roster=claims(abstentions={p: "UNVERIFIED_SOURCE" for p in affected}))
+                 roster=claims(rows=rows, originals=originals,
+                               abstentions={p: "UNVERIFIED_SOURCE" for p in affected}))
         self.assertEqual(r["macro_metadata_claim_complete_pairs"], 28)
         self.assertEqual(r["macro_local_bytes_complete_pairs"], 21)
         self.assertEqual(r["source_bytes_mismatched_or_missing_claims"], 1)
@@ -141,7 +153,7 @@ class MacroToForecastPreflightTests(unittest.TestCase):
         rows, originals = all_sources()
         originals["AUD"]["CPI_YOY"] = b"tampered synthetic bytes"
         affected = {p for p in OFFICIAL_PAIRS if "AUD" in p}
-        result = call(rows, originals, roster=claims(
+        result = call(rows, originals, roster=claims(rows=rows, originals=originals,
             abstentions={p: "UNVERIFIED_SOURCE" for p in affected}))
         self.assertEqual(result["macro_local_bytes_complete_pairs"], 21)
         self.assertEqual(result["explicit_abstentions"], 7)
@@ -153,7 +165,7 @@ class MacroToForecastPreflightTests(unittest.TestCase):
         rows, originals = all_sources()
         rows["EUR"][0]["captured_at_utc"] = "2026-11-15T00:00:01Z"
         affected = {p for p in OFFICIAL_PAIRS if "EUR" in p}
-        result = call(rows, originals, roster=claims(
+        result = call(rows, originals, roster=claims(rows=rows, originals=originals,
             abstentions={p: "UNVERIFIED_SOURCE" for p in affected}))
         self.assertEqual(result["macro_metadata_claim_complete_pairs"], 21)
         self.assertEqual(result["macro_missing_or_unverifiable_pairs"], 7)
@@ -162,7 +174,7 @@ class MacroToForecastPreflightTests(unittest.TestCase):
     def test_zero_macros_can_only_support_28_explicit_abstentions(self):
         rows = {c: [] for c in CURRENCIES}
         originals = {c: {} for c in CURRENCIES}
-        r = call(rows, originals, roster=claims(
+        r = call(rows, originals, roster=claims(rows=rows, originals=originals,
             abstentions={p: "MISSING_MACRO" for p in OFFICIAL_PAIRS}))
         self.assertEqual(r["macro_local_bytes_complete_pairs"], 0)
         self.assertEqual(r["directional_claims_research_only"], 0)
@@ -181,7 +193,7 @@ class MacroToForecastPreflightTests(unittest.TestCase):
         rows, originals = all_sources()
         del originals["USD"]["POLICY_RATE"]
         affected = {p for p in OFFICIAL_PAIRS if "USD" in p}
-        r = call(rows, originals, roster=claims(
+        r = call(rows, originals, roster=claims(rows=rows, originals=originals,
             abstentions={p: "MISSING_MACRO" for p in affected}))
         self.assertEqual(
             r["reason"], "UNSUPPORTED_DIRECTION_OR_WRONG_MISSING_MACRO_REASON")
@@ -247,6 +259,27 @@ class MacroToForecastPreflightTests(unittest.TestCase):
         self.assertEqual(r["reason"],
                          "G8_PIT_MACRO_MATRIX_REJECTED_OR_INCOMPLETE_SCHEMA")
         self.safe(r)
+
+
+    def test_arbitrary_forecast_evidence_sha_is_rejected_even_when_macro_ready(self):
+        rows, originals = all_sources()
+        cohort = claims(rows=rows, originals=originals)
+        forged = replace(cohort[0], evidence_sha256_claim="d" * 64)
+        report = call(rows, originals, roster=(forged,) + cohort[1:])
+        self.assertEqual(report["reason"],
+                         "FORECAST_EVIDENCE_DIGEST_NOT_BOUND_TO_BILATERAL_SOURCES")
+        self.assertIsNone(report["anchor_comment_body_unposted"])
+        self.safe(report)
+
+    def test_macro_receipt_changed_after_forecast_hash_must_block(self):
+        rows, originals = all_sources()
+        pre_frozen = claims(rows=rows, originals=originals)
+        rows["GBP"][0]["value"] = "3.0"
+        report = call(rows, originals, roster=pre_frozen)
+        self.assertEqual(report["reason"],
+                         "FORECAST_EVIDENCE_DIGEST_NOT_BOUND_TO_BILATERAL_SOURCES")
+        self.assertFalse(report["all_28_forecasts_locally_reconciled"])
+        self.safe(report)
 
 
 if __name__ == "__main__":
