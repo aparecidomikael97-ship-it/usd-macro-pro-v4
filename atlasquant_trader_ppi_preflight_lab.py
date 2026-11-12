@@ -30,7 +30,7 @@ from atlasquant_trader_ppi_official_schedule_archive_lab import (
 )
 
 SCHEMA = "ATLASQUANT_PPI_AM12_SEVEN_FX_READONLY_PREFLIGHT_LAB_V1"
-MAX_SOURCE_BYTES = 750_000
+MAX_SOURCE_BYTES = 2_000_000  # archived TE HTML is ~1.4 MB; cap stays bounded
 SOURCES = {
     "TD_ECONOMICS": TD_PRE_EVENT_HTML_SHA256,
     "TRADING_ECONOMICS": TE_PRE_EVENT_HTML_SHA256,

@@ -118,6 +118,24 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(out["mt5_symbols_checked"], 0)
         self.assertEqual(self.api.calls, [])
 
+    def test_actual_te_like_html_size_1_4mb_remains_accepted(self):
+        # A real saved TE HTML has ~1.4 MB. A smaller arbitrary cap had
+        # incorrectly blocked its valid frozen SHA before reaching MT5.
+        self.te.write_bytes(b"x" * 1_401_914)
+        self.sources["TRADING_ECONOMICS"] = sha256(self.te.read_bytes()).hexdigest()
+        out = self.check()
+        self.assertEqual(out["td_te_source_hashes_matched_locally"], 2)
+        self.assertEqual(out["mt5_symbols_checked"], 7)
+        self.assertEqual(out["state"], "LAB_PPI_PREFLIGHT_7FX_VISIBLE_READONLY_WAIT")
+
+    def test_extremely_oversized_html_blocks_before_mt5(self):
+        self.te.write_bytes(b"x" * 2_000_001)
+        self.sources["TRADING_ECONOMICS"] = sha256(self.te.read_bytes()).hexdigest()
+        out = self.check()
+        self.assertEqual(out["reason"],
+                         "PRE_EVENT_TD_TE_ORIGINAL_SOURCE_BYTES_MISSING_OR_CHANGED")
+        self.assertEqual(self.api.calls, [])
+
     def test_missing_official_archives_cannot_be_hidden(self):
         out = self.check(calendar_state="LAB_OFFICIAL_CALENDAR_ARCHIVE_BLOCKED")
         self.assertEqual(out["reason"],

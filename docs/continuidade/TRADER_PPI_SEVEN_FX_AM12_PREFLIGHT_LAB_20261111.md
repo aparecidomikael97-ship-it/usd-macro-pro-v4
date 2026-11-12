@@ -32,3 +32,23 @@ A verificação não certifica a Pepperstone, o servidor de cotações, a dispon
 Quando os três pares permanecerem ocultos: abrir Observação do Mercado com `Ctrl+M`, botão direito, `Mostrar Tudo`. Isso altera apenas a exibição da lista e **não envia ordens**. O usuário pode fazer a alteração manualmente; o preflight nunca a faz.
 
 **Nenhum merge, publicação, operação real, histórico futuro fabricado ou custo adicional.**
+
+## Resultado do teste com fontes reais no AM12
+
+Executado diretamente no terminal Pepperstone MetaTrader 5 com Python 3.12 isolado, sem acesso a conta, tick ou candles.
+
+A primeira execução bloqueou cedo porque o limite artificial de HTML era 750 KB, enquanto o arquivo **Trading Economics congelado** possui **1.401.914 bytes**. Os dois hashes originais continuavam exatamente iguais aos documentos previamente arquivados. A correção elevou o limite a **2.000.000 bytes**, mantendo teto e conferência SHA; dois testes sintéticos cobrem HTML de ~1,4 MB e excesso de 2 MB.
+
+Nova execução local real:
+- Protocolo pré-evento `ABSTAIN`: válido documentalmente;
+- TD e Trading Economics: **2/2 hashes válidos**;
+- EIA, Fed Board, SF Fed: **3/3 arquivos oficiais originais válidos**, mas agenda incompleta do mercado;
+- MetaTrader 5: conectado e **7/7 símbolos com metadados coerentes**;
+- **EURUSD, GBPUSD, AUDUSD, USDJPY visíveis**;
+- **NZDUSD, USDCHF, USDCAD ocultos**;
+- Estado `LAB_PPI_PREFLIGHT_VISIBILITY_OR_SPEC_INCOMPLETE_NO_GO`;
+- Zero candles e ticks lidos, zero operações e contas consultadas, nenhum símbolo selecionado automaticamente.
+
+O problema está apenas na exibição dos três símbolos para o fluxo de captura estritamente local; isso **não** autentica o feed ou garante a futura disponibilidade das 17 barras M15. O usuário deverá usar manualmente `Ctrl+M` → Observação do Mercado → Mostrar Tudo, e depois repetir o preflight quando desejar.
+
+A alteração ainda não permite a captura antes de 13/11/2026 às 17h30 UTC (13h30 MT), nem cria qualquer previsão ou resultado do PPI antes da publicação oficial.
