@@ -140,7 +140,22 @@ class PPIEventBidAskBoundaryTests(unittest.TestCase):
         self.safe(r)
         self.assertEqual(r["state"], "LAB_PPI7_EVENT_BIDASK_BLOCKED")
         self.assertEqual(r["failed_symbol"], "AUDUSD")
-        self.assertEqual(r["observed_sample_widened_2x_pair_count"], 0)
+        self.assertIsNone(r["observed_sample_widened_2x_pair_count"])
+        self.assertEqual(r["pair_results"], {})
+        self.assertEqual(r["pairs_with_complete_local_samples"], 0)
+        self.assertEqual(r["before_quote_snapshots"], 0)
+        self.assertEqual(r["after_quote_snapshots"], 0)
+
+    def test_missing_last_pair_discards_first_six_stats(self):
+        self.api.segments["USDCAD"]["post"] = []
+        r = self.probe()
+        self.safe(r)
+        self.assertEqual(r["state"], "LAB_PPI7_EVENT_BIDASK_BLOCKED")
+        self.assertEqual(r["failed_symbol"], "USDCAD")
+        self.assertEqual(r["pair_results"], {})
+        self.assertIsNone(r["observed_sample_widened_2x_pair_count"])
+        self.assertEqual(r["before_quote_snapshots"], 0)
+        self.assertEqual(r["after_quote_snapshots"], 0)
 
     def test_zero_spreads_reduce_confidence_not_cost(self):
         self.api.segments["GBPUSD"]["pre"] = quotes(
@@ -153,6 +168,7 @@ class PPIEventBidAskBoundaryTests(unittest.TestCase):
         self.assertEqual(r["pair_results"]["GBPUSD"]["before_zero_spread_snapshots"], 2)
         self.assertIsNone(r["pair_results"]["GBPUSD"]["sample_spread_ratio_post_over_pre"])
         self.assertIn("GBPUSD", r["pairs_insufficient_for_ratio"])
+        self.assertIsNone(r["observed_sample_widened_2x_pair_count"])
         self.assertFalse(r["all_pairs_have_complete_20s_boundaries"])
         self.assertFalse(r["post_event_blackout_or_trade_signal_authorized"])
 
