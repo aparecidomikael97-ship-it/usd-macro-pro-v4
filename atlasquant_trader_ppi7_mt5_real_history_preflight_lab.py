@@ -136,7 +136,8 @@ def inspect_pre_event_mt5_m15_history_lab(
                 result["failed_symbol"] = sym
                 return result
             try:
-                _serialize_exact_window(bars, expected_epochs=epochs)
+                _serialize_exact_window(
+                    bars, expected_epochs=epochs, quote_digits=before.digits)
             except (TypeError, ValueError, OverflowError, IndexError) as exc:
                 result["reason"] = ("M15_HISTORY_FAILED_STRICT_SERIALIZER:"
                                     + str(exc)[:90])
