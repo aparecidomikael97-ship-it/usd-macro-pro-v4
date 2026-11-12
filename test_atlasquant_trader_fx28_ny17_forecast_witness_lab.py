@@ -1,5 +1,7 @@
 """No live forecasts: all Github metadata and directions in tests are synthetic."""
 from dataclasses import replace
+from hashlib import sha256
+import json
 from datetime import datetime, timedelta, timezone
 import unittest
 
@@ -201,6 +203,47 @@ class ProspectiveWitnessCensusTests(unittest.TestCase):
         self.assertEqual(result["not_yet_due_slots"], 672)
         self.assertEqual(result["due_witness_claim_only_slots"], 0)
         self.safe(result)
+
+    def test_canonical_28_forecasts_are_returned_for_external_preservation(self):
+        claim = make_claim()
+        receipt = prepare(horizon=claim.horizon, start_at=claim.start_at,
+                          end_at=claim.end_at,
+                          forecast_roster=claim.forecast_roster,
+                          prepared_at=CREATED)
+        raw = receipt["canonical_forecast_json"]
+        self.assertIsInstance(raw, str)
+        self.assertEqual(sha256(raw.encode("ascii")).hexdigest(),
+                         receipt["forecast_roster_sha256"])
+        self.assertEqual(len(json.loads(raw)["pairs"]), 28)
+        self.assertFalse(receipt["canonical_forecast_payload_retained_externally"])
+        self.assertFalse(receipt["body_posted_on_github"])
+
+    def test_changing_one_forecast_changes_public_witness_digest(self):
+        claim = make_claim()
+        first = prepare(horizon=claim.horizon, start_at=claim.start_at,
+                        end_at=claim.end_at,
+                        forecast_roster=claim.forecast_roster,
+                        prepared_at=CREATED)
+        different = replace(claim.forecast_roster[0], direction="DOWN")
+        altered = prepare(horizon=claim.horizon, start_at=claim.start_at,
+                          end_at=claim.end_at,
+                          forecast_roster=(different,) + claim.forecast_roster[1:],
+                          prepared_at=CREATED)
+        self.assertNotEqual(first["forecast_roster_sha256"],
+                            altered["forecast_roster_sha256"])
+        self.assertNotEqual(first["canonical_forecast_json"],
+                            altered["canonical_forecast_json"])
+
+    def test_weekly_ny17_session_is_five_days_and_anchor_is_accepted(self):
+        claim = make_claim(horizon="W1", comment_id=7007)
+        self.assertEqual(claim.end_at - claim.start_at, timedelta(days=5))
+        receipt = prepare(horizon="W1", start_at=claim.start_at,
+                          end_at=claim.end_at,
+                          forecast_roster=claim.forecast_roster,
+                          prepared_at=claim.github_witness.created_at)
+        self.assertEqual(receipt["state"], "LAB_WITNESS_BODY_PREPARED_NOT_POSTED")
+        self.assertEqual(len(json.loads(receipt["canonical_forecast_json"])["pairs"]), 28)
+        self.assertFalse(receipt["external_precommit_verified"])
 
     def test_prepare_only_never_claims_published_comment(self):
         claim = make_claim()
