@@ -65,6 +65,22 @@ def comment_for(output, **kw):
     return GitHubCommentClaim(**fields)
 
 
+def mutate_and_rehash(result, edited_payload):
+    """Adversarial caller rewrites both JSON and its local SHA-256 receipt."""
+    out = dict(result)
+    old_digest = out["forecast_sha256"]
+    raw = json.dumps(edited_payload, sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=True, allow_nan=False)
+    digest = sha256(raw.encode("ascii")).hexdigest()
+    out["forecast_json"] = raw
+    out["forecast_sha256"] = digest
+    out["anchor_comment_body"] = out["anchor_comment_body"].replace(
+        "forecast_json_sha256=" + old_digest,
+        "forecast_json_sha256=" + digest,
+    )
+    return out
+
+
 class Ny17ForecastAnchorTests(unittest.TestCase):
     def no_go(self, r):
         self.assertIsNone(r["forecast_accuracy_validated"])
@@ -220,6 +236,77 @@ class Ny17ForecastAnchorTests(unittest.TestCase):
         rows[0] = replace(rows[0], model_sha256_claim="x" * 64)
         r = prepared(rows=rows)
         self.assertEqual(r["state"], "LAB_NY17_PRE_EVENT_ANCHOR_BLOCKED")
+        self.no_go(r)
+
+
+    def test_rehashed_duplicate_pair_must_not_pass_local_inspector(self):
+        p = prepared()
+        payload = json.loads(p["forecast_json"])
+        payload["pairs"][1]["pair"] = payload["pairs"][0]["pair"]
+        changed = mutate_and_rehash(p, payload)
+        start = _nominal_windows("D1")[0][0]
+        r = check_comment(prepared=changed, start_at_utc=start,
+                          comment=comment_for(changed), inspected_at_utc=INSPECTED)
+        self.assertEqual(r["reason"], "TAMPERED_FROZEN_FORECAST_JSON_OR_DIGEST")
+        self.assertFalse(r["forecast_scope_locally_complete"])
+        self.no_go(r)
+
+    def test_rehashed_other_campaign_and_swapped_pair_order_fail(self):
+        for mutant in ("campaign", "pair_order", "source_hash", "duplicate_id"):
+            with self.subTest(mutant=mutant):
+                p = prepared()
+                payload = json.loads(p["forecast_json"])
+                if mutant == "campaign":
+                    payload["campaign_id"] = "SYNTHETIC_OTHER_CAMPAIGN"
+                elif mutant == "pair_order":
+                    payload["pairs"][0], payload["pairs"][1] = (
+                        payload["pairs"][1], payload["pairs"][0])
+                elif mutant == "source_hash":
+                    payload["pairs"][0]["model_sha256_claim"] = "not-a-sha"
+                else:
+                    payload["pairs"][1]["opportunity_id"] = (
+                        payload["pairs"][0]["opportunity_id"])
+                changed = mutate_and_rehash(p, payload)
+                start = _nominal_windows("D1")[0][0]
+                r = check_comment(prepared=changed, start_at_utc=start,
+                                  comment=comment_for(changed),
+                                  inspected_at_utc=INSPECTED)
+                self.assertEqual(r["state"], "LAB_NY17_PRE_EVENT_ANCHOR_BLOCKED")
+                self.no_go(r)
+
+    def test_caller_can_not_change_abstention_totals_even_with_matching_comment(self):
+        p = prepared()
+        p["abstentions"] = 1
+        p["directional_claims"] = 27
+        p["anchor_comment_body"] = p["anchor_comment_body"].replace(
+            "directional_claims=28\nabstentions=0",
+            "directional_claims=27\nabstentions=1",
+        )
+        start = _nominal_windows("D1")[0][0]
+        r = check_comment(prepared=p, start_at_utc=start,
+                          comment=comment_for(p), inspected_at_utc=INSPECTED)
+        self.assertEqual(r["reason"], "TAMPERED_FROZEN_FORECAST_JSON_OR_DIGEST")
+        self.no_go(r)
+
+    def test_rehashed_future_preparation_time_fails(self):
+        p = prepared()
+        payload = json.loads(p["forecast_json"])
+        payload["prepared_utc_claim"] = (
+            PREPARED + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+        changed = mutate_and_rehash(p, payload)
+        start = _nominal_windows("D1")[0][0]
+        r = check_comment(prepared=changed, start_at_utc=start,
+                          comment=comment_for(changed), inspected_at_utc=INSPECTED)
+        self.assertEqual(r["state"], "LAB_NY17_PRE_EVENT_ANCHOR_BLOCKED")
+        self.no_go(r)
+
+    def test_exact_comment_body_required_not_just_hash_substring(self):
+        p = prepared()
+        p["anchor_comment_body"] += "\nunsafe_claim=real_probability_99%"
+        start = _nominal_windows("D1")[0][0]
+        r = check_comment(prepared=p, start_at_utc=start,
+                          comment=comment_for(p), inspected_at_utc=INSPECTED)
+        self.assertEqual(r["reason"], "TAMPERED_FROZEN_FORECAST_JSON_OR_DIGEST")
         self.no_go(r)
 
 
