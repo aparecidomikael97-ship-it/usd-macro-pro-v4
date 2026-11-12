@@ -150,7 +150,7 @@ class ArchiveJoinTests(unittest.TestCase):
         rows[479]["close"] = "0.9980"
         rows[480]["close"] = "1.0150"
         buf = StringIO(newline="")
-        w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\\n")
+        w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
         raw2 = buf.getvalue().encode("utf-8")
@@ -171,7 +171,7 @@ class ArchiveJoinTests(unittest.TestCase):
         rows[0]["open"] = "1.0020"
         rows[95]["close"] = "1.0020"
         buf = StringIO(newline="")
-        w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\\n")
+        w = csv.DictWriter(buf, fieldnames=FIELDS, lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
         changed = buf.getvalue().encode("utf-8")
