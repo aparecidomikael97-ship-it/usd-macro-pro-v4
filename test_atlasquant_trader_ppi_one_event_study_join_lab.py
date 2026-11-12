@@ -24,6 +24,9 @@ from atlasquant_trader_ppi_one_event_study_join_lab import (
     ROOT_EVENT, PpiStudyPacket, inspect_ppi_one_event_study_lab as inspect,
 )
 from atlasquant_trader_ppi_pre_event_protocol_lab import PINNED_PROTOCOL_SHA256
+from test_atlasquant_trader_ppi_competing_calendar_lab import (
+    claim as concurrent_claim, sample as calendar_sample,
+)
 from test_atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     raw as ppi_html, receipt as ppi_receipt, td, te,
 )
@@ -187,6 +190,14 @@ class OneEventStudyJoinTests(unittest.TestCase):
                              "SEVEN_POSITIVE_USD_NORMALIZED_PRICE_MOVES")
         self.assertEqual(study["m15_to_h4_opposing_spot_sign_pairs_documentary"], [])
         self.assertTrue(study["seven_spot_observations_not_seven_independent_trials"])
+        self.assertTrue(
+            study["descriptive_reaction_cannot_be_exclusively_attributed_to_ppi"])
+        self.assertEqual(study["competing_macro_calendar_context_documentary"]["state"],
+                         "LAB_PPI_COMPETING_CALENDAR_UNKNOWN_REVIEW_REQUIRED")
+        self.assertIsNone(study["competing_macro_calendar_context_documentary"]
+                          ["candidate_other_root_count"])
+        self.assertFalse(study["competing_macro_calendar_context_documentary"]
+                         ["no_competing_events_proven"])
         self.assertEqual(set(study["m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost"]), set(USD_FX))
         self.assertTrue(study["broker_execution_costs_not_verified"])
         self.assertTrue(study["intrabar_max_spread_not_measured"])
@@ -201,7 +212,8 @@ class OneEventStudyJoinTests(unittest.TestCase):
             "SURPRISE_SAME_METRIC", "SEVEN_FX_M15_WINDOWS",
             "SPREAD_POINTS_CONTEXT", "MT5_CAPTURE_MANIFEST",
             "PPI_PRE_EVENT_ABSTENTION_PROTOCOL",
-            "SEVEN_FX_USD_NORMALIZED_BREADTH"})
+            "SEVEN_FX_USD_NORMALIZED_BREADTH",
+            "PRE_EVENT_CONCURRENT_MACRO_CALENDAR"})
 
     def test_post_hoc_protocol_direction_flip_blocks_seven_pair_study(self):
         from atlasquant_trader_ppi_pre_event_protocol_lab import FROZEN_PROTOCOL
@@ -253,6 +265,50 @@ class OneEventStudyJoinTests(unittest.TestCase):
         self.assertEqual(result["reason"],
                          "FULL_SEVEN_PAIR_DESCRIPTIVE_BREADTH_INVALID")
         self.assertIsNone(result["one_event_study"])
+
+    def test_concurrent_other_usd_release_is_in_every_price_window_not_ppi_only(self):
+        packet = replace(
+            self.packet, pre_event_calendar=calendar_sample(
+                concurrent_claim("US_OTHER_MACRO_1", 0),
+                concurrent_claim("US_PPI_OCT2026", 0),
+            ))
+        with self.isolated_synthetic_pre_event_receipts():
+            result = self.run_study(packet)
+        self.assertEqual(result["state"],
+                         "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
+        context = result["one_event_study"]["competing_macro_calendar_context_documentary"]
+        self.assertEqual(context["candidate_other_root_count"], 1)
+        self.assertEqual(context["candidate_other_roots_by_window"],
+                         {"M15": ["US_OTHER_MACRO_1"],
+                          "H1": ["US_OTHER_MACRO_1"],
+                          "H4": ["US_OTHER_MACRO_1"]})
+        self.assertTrue(context["requires_human_calendar_review"])
+        self.assertFalse(context["ppi_causal_isolation_verified"])
+        self.assertFalse(result["causal_effect_estimated"])
+
+    def test_claimed_empty_calendar_does_not_make_clean_ppi_causal_window(self):
+        packet = replace(self.packet, pre_event_calendar=calendar_sample())
+        with self.isolated_synthetic_pre_event_receipts():
+            result = self.run_study(packet)
+        self.assertEqual(result["state"],
+                         "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
+        context = result["one_event_study"]["competing_macro_calendar_context_documentary"]
+        self.assertEqual(context["candidate_other_root_count"], 0)
+        self.assertFalse(context["no_competing_events_proven"])
+        self.assertFalse(context["ppi_causal_isolation_verified"])
+
+    def test_post_release_calendar_capture_blocks_not_assumed_pre_event(self):
+        from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import EVENT_UTC
+        snapshot = replace(calendar_sample(),
+                           captured_at_utc=EVENT_UTC+timedelta(seconds=1))
+        packet = replace(self.packet, pre_event_calendar=snapshot)
+        with self.isolated_synthetic_pre_event_receipts():
+            result = self.run_study(packet)
+        self.assertEqual(result["reason"],
+                         "COMPETING_EVENT_CALENDAR_INVALID_NO_CAUSAL_INTERPRETATION")
+        self.assertIsNone(result["one_event_study"])
+        self.assertEqual(result["source_stage_states"]["PRE_EVENT_CONCURRENT_MACRO_CALENDAR"],
+                         "LAB_PPI_COMPETING_CALENDAR_BLOCKED")
 
     def test_missing_bls_document_blocks_even_with_good_synthetic_previous(self):
         with self.isolated_synthetic_pre_event_receipts():

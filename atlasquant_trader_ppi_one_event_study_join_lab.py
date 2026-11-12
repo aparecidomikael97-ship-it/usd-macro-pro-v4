@@ -31,6 +31,9 @@ from atlasquant_trader_ppi_m15_spread_context_lab import (
 from atlasquant_trader_ppi_fx_breadth_lab import (
     DOCUMENTARY as BREADTH_OK, summarize_ppi_7fx_breadth_lab,
 )
+from atlasquant_trader_ppi_competing_calendar_lab import (
+    PreEventCalendarClaim, audit_ppi_competing_calendar_lab,
+)
 from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     RELEASE_UTC, ClaimedPostReleaseHTTP,
     compare_ppi_actual_to_frozen_consensus_lab,
@@ -62,6 +65,8 @@ class PpiStudyPacket:
     bls_capture: ClaimedPostReleaseHTTP
     price_archive_root: Path | str
     price_archive_receipt: ClaimedLocalPriceArchive
+    # Missing means unknown calendar, NOT "no other events".
+    pre_event_calendar: PreEventCalendarClaim | None = None
 
 
 def _utc(value: Any) -> datetime | None:
@@ -121,6 +126,17 @@ def inspect_ppi_one_event_study_lab(
             or protocol.get("pre_event_directional_forecasts_registered") != 0
             or protocol.get("event_count") != 1):
         out = _blocked("PRE_EVENT_RESEARCH_ABSTENTION_PROTOCOL_NOT_INTACT")
+        out["source_stage_states"] = stages
+        return out
+
+    # The calendar is optional only for descriptive price measurements.
+    # Missing ≠ no competing releases. Malformed purported provenance blocks
+    # the study rather than being silently converted into "clean" windows.
+    competing = audit_ppi_competing_calendar_lab(
+        calendar=packet.pre_event_calendar, as_of_utc=now)
+    stages["PRE_EVENT_CONCURRENT_MACRO_CALENDAR"] = competing.get("state")
+    if competing.get("state") == "LAB_PPI_COMPETING_CALENDAR_BLOCKED":
+        out = _blocked("COMPETING_EVENT_CALENDAR_INVALID_NO_CAUSAL_INTERPRETATION")
         out["source_stage_states"] = stages
         return out
 
@@ -225,6 +241,17 @@ def inspect_ppi_one_event_study_lab(
         "m15_to_h4_opposing_spot_sign_pairs_documentary":
             breadth["cross_horizon_m15_to_h4_sign_reversals"],
         "seven_spot_observations_not_seven_independent_trials": True,
+        "competing_macro_calendar_context_documentary": {
+            "state": competing["state"],
+            "candidate_other_root_count": competing["candidate_competing_root_count_documentary"],
+            "candidate_other_roots_in_baseline": competing["candidate_baseline_contamination_roots_documentary"],
+            "candidate_other_roots_by_window": competing["candidate_competing_roots_by_reaction_window"],
+            "source_and_event_times_independently_verified": False,
+            "ppi_causal_isolation_verified": False,
+            "no_competing_events_proven": False,
+            "requires_human_calendar_review": True,
+        },
+        "descriptive_reaction_cannot_be_exclusively_attributed_to_ppi": True,
         "m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost": spread["per_pair_m15_spread_samples_points"],
         "zero_spread_context_requires_broker_review": spread["any_pair_all_17_spread_samples_zero"],
         "broker_execution_costs_not_verified": True,
