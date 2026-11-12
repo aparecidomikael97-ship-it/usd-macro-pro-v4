@@ -43,7 +43,7 @@ def _base(reason: str) -> dict[str, Any]:
         "pairs_with_complete_local_samples": 0,
         "before_quote_snapshots": 0, "after_quote_snapshots": 0,
         "before_zero_spread_snapshots": 0, "after_zero_spread_snapshots": 0,
-        "observed_sample_widened_2x_pair_count": 0,
+        "observed_sample_widened_2x_pair_count": None,
         "pairs_insufficient_for_ratio": [],
         "all_pairs_have_complete_20s_boundaries": False,
         "no_event_time_lookahead": False,
@@ -212,12 +212,15 @@ def inspect_ppi7_pre_post_bidask_lab(
             out["after_zero_spread_snapshots"] += after["zero_spread_snapshots"]
             if details["sample_spread_ratio_post_over_pre"] is None:
                 out["pairs_insufficient_for_ratio"].append(sym)
-            if details["observational_risk_state"].startswith("POST_SAMPLE_SPREAD_"):
-                out["observed_sample_widened_2x_pair_count"] += 1
-
         out["all_pairs_have_complete_20s_boundaries"] = (
             out["pairs_with_complete_local_samples"] == len(USD_FX)
             and not out["pairs_insufficient_for_ratio"])
+        # A missing/undercovered pair must NEVER look like zero widened
+        # markets or an apparently complete cross-asset risk conclusion.
+        if out["all_pairs_have_complete_20s_boundaries"]:
+            out["observed_sample_widened_2x_pair_count"] = sum(
+                row["observational_risk_state"].startswith("POST_SAMPLE_SPREAD_")
+                for row in out["pair_results"].values())
         out["state"] = "LAB_PPI7_PRE_POST_BIDASK_QUALITY_DESCRIPTIVE_NO_GO"
         out["reason"] = "NOT_BLS_SURPRISE_OR_EXECUTION_COST_OR_SIGNAL"
         return out
@@ -230,6 +233,18 @@ def inspect_ppi7_pre_post_bidask_lab(
         except (AttributeError, OSError, RuntimeError, ValueError, TypeError):
             out["state"] = "LAB_PPI7_EVENT_BIDASK_BLOCKED"
             out["reason"] = "MT5_SHUTDOWN_FAILED"
+        if out["state"] == "LAB_PPI7_EVENT_BIDASK_BLOCKED":
+            # Fail closed as a COHORT: partial first-six-pair stats are
+            # diagnostic artifacts, not findings. Preserve failed_symbol and
+            # the blocking reason but clear all partial success metrics.
+            out["pair_results"] = {}
+            out["pairs_with_complete_local_samples"] = 0
+            out["before_quote_snapshots"] = 0
+            out["after_quote_snapshots"] = 0
+            out["before_zero_spread_snapshots"] = 0
+            out["after_zero_spread_snapshots"] = 0
+            out["observed_sample_widened_2x_pair_count"] = None
+            out["pairs_insufficient_for_ratio"] = []
             out["all_pairs_have_complete_20s_boundaries"] = False
 
 
