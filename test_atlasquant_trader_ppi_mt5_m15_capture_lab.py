@@ -357,6 +357,34 @@ class SevenPairCaptureTests(unittest.TestCase):
         self.api.data["AUDUSD"][2]["spread"] = -1
         self.blocked(self.run_capture(), "INVALID_VOLUME_OR_EPOCH")
 
+    def test_real_binary64_transport_drift_is_normalized_to_quote_tick(self):
+        # Observed on AM12: MT5 numpy float64 1.1137299999999999
+        # represents the valid five-digit broker quote 1.11373.
+        for field in ("open", "high", "low", "close"):
+            self.api.data["EURUSD"][0][field] = 1.1137299999999999
+        result = self.run_capture()
+        self.safe(result)
+        self.assertEqual(result["validated_bars"], 119)
+        from pathlib import Path
+        import csv
+        file = Path(result["directory"]) / "EURUSD_PPI_20261113_M15.csv"
+        rows = list(csv.DictReader(file.open(newline="", encoding="utf-8")))
+        self.assertEqual(rows[0]["open"], "1.11373")
+        self.assertEqual(rows[0]["high"], "1.11373")
+        self.assertEqual(rows[0]["low"], "1.11373")
+        self.assertEqual(rows[0]["close"], "1.11373")
+
+    def test_real_off_quote_tick_data_remains_blocked_without_rounding(self):
+        for field in ("open", "high", "low", "close"):
+            self.api.data["EURUSD"][0][field] = 1.113736
+        self.blocked(self.run_capture(), "PRICE_OUTSIDE_FROZEN_CSV_CONTRACT")
+
+    def test_one_thousandth_of_point_off_tick_is_not_ulp(self):
+        # 1.11373001 is close visually but still intentionally off tick.
+        for field in ("open", "high", "low", "close"):
+            self.api.data["EURUSD"][0][field] = 1.11373001
+        self.blocked(self.run_capture(), "PRICE_OUTSIDE_FROZEN_CSV_CONTRACT")
+
     def test_nonfinite_and_overprecise_prices_rejected(self):
         self.api.data["NZDUSD"][2]["open"] = float("nan")
         self.blocked(self.run_capture(), "PRICE_OUTSIDE_FROZEN_CSV_CONTRACT")
