@@ -218,12 +218,73 @@ class SevenPairCaptureTests(unittest.TestCase):
         self.blocked(self.run_capture(), "MT5_TERMINAL_NOT_CONNECTED")
         self.assertEqual([x[0] for x in self.api.calls], ["initialize"])
 
-    def test_symbol_not_visible_blocks_without_autoselect(self):
+    def test_symbol_hidden_but_valid_history_is_accepted_without_autoselect(self):
         self.api.visible.remove("USDCHF")
+        self.api.visible.remove("NZDUSD")
         result = self.run_capture()
-        self.blocked(result, "CANONICAL_SYMBOL_NOT_VISIBLE_NO_AUTO_SELECT")
+        self.safe(result)
+        self.assertEqual(result["validated_bars"], 119)
+        self.assertEqual(result["hidden_symbols_read_from_history"],
+                         ["NZDUSD", "USDCHF"])
+        self.assertFalse(any(call[0] in ("symbol_select", "order_send", "account_info")
+                             for call in self.api.calls))
+        self.assertEqual(self.api.visible, set(USD_FX) - {"NZDUSD", "USDCHF"})
+        self.assertEqual(result["bounded_history_warmup_attempted"], [])
+
+    def test_missing_canonical_symbol_still_blocks_no_auto_selection(self):
+        class MissingSymbolMT5(FakeMT5):
+            def symbol_info(self, sym):
+                if sym == "USDCHF":
+                    self.calls.append(("symbol_info", sym))
+                    return None
+                return super().symbol_info(sym)
+
+        api = MissingSymbolMT5()
+        result = self.run_capture(api=api)
+        self.blocked(result, "CANONICAL_SYMBOL_MISSING_NO_AUTO_SELECT")
         self.assertEqual(result["failed_symbol"], "USDCHF")
-        self.assertEqual(self.api.calls[-1], ("shutdown",))
+        self.assertEqual(api.calls[-1], ("shutdown",))
+
+    def test_once_empty_history_gets_one_bounded_readonly_warmup(self):
+        class LazilyLoadedHistoryMT5(FakeMT5):
+            def __init__(self):
+                super().__init__()
+                self.empty_once = True
+
+            def copy_rates_range(self, sym, timeframe, begin, end):
+                rows = super().copy_rates_range(sym, timeframe, begin, end)
+                if sym == "GBPUSD" and begin == BASELINE_OPEN_UTC and self.empty_once:
+                    self.empty_once = False
+                    return []
+                return rows
+
+        api = LazilyLoadedHistoryMT5()
+        result = self.run_capture(api=api)
+        self.safe(result)
+        self.assertEqual(result["validated_bars"], 119)
+        self.assertEqual(result["bounded_history_warmup_attempted"], ["GBPUSD"])
+        gbp_reads = [x for x in api.calls
+                     if x[0] == "copy_rates_range" and x[1] == "GBPUSD"]
+        self.assertEqual(len(gbp_reads), 3)
+        self.assertEqual(gbp_reads[1][3],
+                         BASELINE_OPEN_UTC - timedelta(days=2))
+        self.assertEqual(gbp_reads[2][3], BASELINE_OPEN_UTC)
+        self.assertEqual(api.calls[-1], ("shutdown",))
+
+    def test_permanently_empty_history_still_blocks_without_partial_files(self):
+        class NeverLoadedHistoryMT5(FakeMT5):
+            def copy_rates_range(self, sym, timeframe, begin, end):
+                rows = super().copy_rates_range(sym, timeframe, begin, end)
+                if sym == "USDJPY" and begin == BASELINE_OPEN_UTC:
+                    return []
+                return rows
+
+        api = NeverLoadedHistoryMT5()
+        result = self.run_capture(api=api)
+        self.blocked(result, "REQUIRE_EXACTLY_17_M15_BARS")
+        self.assertEqual(result["failed_symbol"], "USDJPY")
+        self.assertEqual(result["bounded_history_warmup_attempted"], ["USDJPY"])
+        self.assertEqual(api.calls[-1], ("shutdown",))
 
     def test_wrong_currency_base_or_profit_cannot_be_mistaken_for_forex_pair(self):
         for attr, bad in (("currency_base", "GBP"), ("currency_profit", "EUR")):
