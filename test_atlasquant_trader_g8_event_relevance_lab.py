@@ -337,5 +337,33 @@ class G8EventRelevanceTests(unittest.TestCase):
         self.no_live(bad)
 
 
+
+    def test_ppi_headline_and_core_monthly_route_only_as_context(self):
+        # Synthetic contracts: both PPI releases are percent MoM SA, not a bias.
+        for metric in ("PPI_MOM", "PPI_CORE_MOM"):
+            with self.subTest(metric=metric):
+                event = replace(
+                    report(event_id=f"US_{metric}_2026_10"),
+                    metric=metric, unit="PERCENT_MOM_SA",
+                )
+                result = route([event], as_of_utc=BEFORE)
+                self.assertEqual(
+                    result["state"],
+                    "LAB_G8_EVENT_RELEVANCE_DOCUMENTARY_ONLY_NO_BIAS",
+                )
+                self.assertEqual(result["events"][0]["metric"], metric)
+                self.assertEqual(result["events"][0]["unit"], "PERCENT_MOM_SA")
+                self.assertEqual(
+                    sum(row["event_count"] == 1 for row in result["pair_rows"]), 7
+                )
+                self.assertEqual(by_pair(result, "AUD/NZD")["event_count"], 0)
+                self.no_live(result)
+
+                # Annual percentage units must not silently pass as monthly.
+                invalid = replace(event, unit="PERCENT_YOY_NSA")
+                blocked = route([invalid], as_of_utc=BEFORE)
+                self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
+                self.no_live(blocked)
+
 if __name__ == "__main__":
     unittest.main()
