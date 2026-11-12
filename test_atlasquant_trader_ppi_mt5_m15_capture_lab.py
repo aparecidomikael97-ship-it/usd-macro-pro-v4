@@ -368,7 +368,8 @@ class SevenPairCaptureTests(unittest.TestCase):
         from pathlib import Path
         import csv
         file = Path(result["directory"]) / "EURUSD_PPI_20261113_M15.csv"
-        rows = list(csv.DictReader(file.open(newline="", encoding="utf-8")))
+        with file.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
         self.assertEqual(rows[0]["open"], "1.11373")
         self.assertEqual(rows[0]["high"], "1.11373")
         self.assertEqual(rows[0]["low"], "1.11373")
