@@ -38,6 +38,7 @@ def _blocked(reason: str) -> dict[str, Any]:
         "bid_ask_execution_costs_verified": False,
         "pre_event_directional_forecast_registered": False,
         "validated_prediction_count": 0,
+        "independent_prediction_trials_verified": 0,
         "validated_directional_accuracy": None,
         "calibrated_direction_probability": None,
         "market_bias": None,
