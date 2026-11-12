@@ -17,6 +17,7 @@ from typing import Any, Mapping
 from aion_chat.models import Scope
 from aion_chat.store import HEALTHY, SQLiteChatStore, StorageUnavailableError
 from atlasquant_aion_chat_product_bridge import validate_product_binding
+from atlasquant_aion_chat_entrypoint_guard import require_chat_host_session
 from atlasquant_aion_chat_storage_resilience import (
     STAGING_RPO_SECONDS,
     STAGING_RTO_SECONDS,
@@ -338,6 +339,20 @@ def build_streamlit_staged_binding(
 ) -> dict[str, Any] | None:
     """Host-facing entrypoint used by the real Streamlit shell."""
     config = streamlit_staged_config(st)
+    if not staged_feature_enabled(config):
+        return None
+    # Deny before allocating or reusing a SQLite handle. A revoked or
+    # swapped session must also lose existing staging handles, not only UI access.
+    try:
+        require_chat_host_session(st, access)
+    except PermissionError:
+        try:
+            close_all_staged_host_stores(st.session_state)
+        except Exception:
+            # Never turn failed cleanup into permission or allow the caller
+            # to reuse the old chat handle from this entrypoint.
+            pass
+        raise
     return build_staged_host_binding(
         st.session_state,
         access,

@@ -16,6 +16,7 @@ from typing import Any, Mapping
 
 from aion_chat.models import Scope
 from atlasquant_aion_chat_product_bridge import validate_product_binding
+from atlasquant_aion_chat_entrypoint_guard import require_chat_host_session
 from atlasquant_aion_chat_render_production_composition_v1 import (
     ENABLED_KEY,
     HOST_KEY,
@@ -193,6 +194,9 @@ def build_streamlit_production_binding(
     config = streamlit_production_config(st)
     if not production_feature_enabled(config):
         return None
+    # Do not allocate a production DB connection without revalidating the
+    # current server session against the configured user registry.
+    require_chat_host_session(st, access)
     return build_production_host_binding(
         access,
         config=config,
