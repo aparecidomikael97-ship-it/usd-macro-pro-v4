@@ -90,6 +90,12 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
                 for t in epochs[:MAX_GAP_TIMESTAMPS]],
             "valid_candles": 0,
         }
+    if len(rates) == 0:
+        return {
+            "reason": "HISTORY_EMPTY_NOT_EVIDENCE_OF_MARKET_CLOSURE",
+            "returned_bars": 0, "missing_count": None,
+            "first_missing_utc": [], "valid_candles": 0,
+        }
     if len(rates) > len(epochs):
         return {
             "reason": "EXCESS_ROWS_OR_UNEXPECTED_TIMEFRAME",
@@ -115,21 +121,9 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
         }
     have = set(times)
     gaps = [t for t in epochs if t not in have]
-    if gaps:
-        return {
-            "reason": "EXACT_M15_CANDLES_MISSING_NO_FILL",
-            "returned_bars": len(rates), "missing_count": len(gaps),
-            "first_missing_utc": [
-                datetime.fromtimestamp(t, timezone.utc).isoformat()
-                for t in gaps[:MAX_GAP_TIMESTAMPS]],
-            "valid_candles": 0,
-        }
-    if times != list(epochs):
-        return {
-            "reason": "M15_CANDLE_TIMESTAMPS_MISMATCH",
-            "returned_bars": len(rates), "missing_count": None,
-            "first_missing_utc": [], "valid_candles": 0,
-        }
+    # Validate all available OHLC observations BEFORE classifying missing
+    # slots. Otherwise an invalid price in a 479-bar week would be hidden
+    # behind the missing-bar status, falsely reporting a valid partial series.
     try:
         for x in rates:
             o, h, lo, c = [
@@ -143,7 +137,25 @@ def _audit_rates(rates: Any, epochs: tuple[int, ...], digits: int) -> dict[str, 
     except (ValueError, KeyError, TypeError, OverflowError, IndexError):
         return {
             "reason": "M15_PRICE_OR_VOLUME_INVALID",
-            "returned_bars": len(rates), "missing_count": 0,
+            "returned_bars": len(rates), "missing_count": len(gaps),
+            "first_missing_utc": [
+                datetime.fromtimestamp(t, timezone.utc).isoformat()
+                for t in gaps[:MAX_GAP_TIMESTAMPS]],
+            "valid_candles": 0,
+        }
+    if gaps:
+        return {
+            "reason": "EXACT_M15_CANDLES_MISSING_NO_FILL",
+            "returned_bars": len(rates), "missing_count": len(gaps),
+            "first_missing_utc": [
+                datetime.fromtimestamp(t, timezone.utc).isoformat()
+                for t in gaps[:MAX_GAP_TIMESTAMPS]],
+            "valid_candles": 0,
+        }
+    if times != list(epochs):
+        return {
+            "reason": "M15_CANDLE_TIMESTAMPS_MISMATCH",
+            "returned_bars": len(rates), "missing_count": None,
             "first_missing_utc": [], "valid_candles": 0,
         }
     return {
