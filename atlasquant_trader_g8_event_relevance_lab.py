@@ -20,12 +20,15 @@ METRIC_UNITS = {
     "CPI_MOM": "PERCENT_MOM_SA",
     "CPI_YOY": "PERCENT_YOY_NSA",
     "PCE_MOM": "PERCENT_MOM_SA",
+    "PPI_MOM": "PERCENT_MOM_SA",
+    "PPI_CORE_MOM": "PERCENT_MOM_SA",
     "NFP_CHANGE": "PERSONS_CHANGE_SA",
     "POLICY_RATE": "PERCENT_POLICY_RATE",
     "UNEMPLOYMENT_RATE": "PERCENT_RATE",
     "GDP_QOQ": "PERCENT_QOQ_SA",
 }
 IMPORTANCE = frozenset(("HIGH", "MEDIUM", "LOW"))
+PPI_RELEASE_METRICS = frozenset(("PPI_MOM", "PPI_CORE_MOM"))
 _ID = re.compile(r"[A-Z0-9][A-Z0-9_\-]{2,63}\Z")
 _MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])\Z")
 _QUARTER = re.compile(r"\d{4}-Q[1-4]\Z")
@@ -135,6 +138,7 @@ def _blocked(reason: str) -> dict[str, Any]:
         "schema": SCHEMA, "state": "LAB_EVENT_ROUTER_BLOCKED", "reason": reason,
         "as_of_utc": None, "currency_count": 0, "pair_count": 0,
         "event_count": 0, "events": [], "pair_rows": [],
+        "claimed_release_root_count": 0, "independent_event_trial_count": None,
         "event_calendar_completeness_verified": False,
         "source_original_bytes_authenticated": False,
         "pre_event_consensus_independently_attested": False,
@@ -215,6 +219,11 @@ def _event_row(v: EventSnapshot, now: datetime) -> dict[str, Any] | None:
     return {
         "event_id": v.event_id, "currency": v.currency,
         "metric": v.metric, "target_period": v.target_period, "unit": v.unit,
+        # Headline/core PPI are components of ONE report, not two trials.
+        # A root identifier is a caller-metadata claim, NOT causal evidence.
+        "claimed_release_root": (
+            f"{v.currency}_PPI_{v.target_period}"
+            if v.metric in PPI_RELEASE_METRICS else v.event_id),
         "importance": v.importance, "scheduled_release_utc": scheduled.isoformat(),
         "phase": phase,
         "consensus_documentary": str(consensus) if consensus is not None else None,
@@ -250,6 +259,8 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
         return out
     rows = []
     seen_ids = set()
+    seen_metric_periods = set()
+    ppi_release_times = {}
     for item in events:
         if not isinstance(item, EventSnapshot):
             return out
@@ -258,6 +269,17 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
             out["reason"] = "INVALID_EVENT_SEMANTICS_PIT_OR_DUPLICATE"
             return out
         seen_ids.add(row["event_id"])
+        key = (row["currency"], row["metric"], row["target_period"])
+        if key in seen_metric_periods:
+            out["reason"] = "DUPLICATE_ECONOMIC_METRIC_PERIOD_NOT_NEW_EVIDENCE"
+            return out
+        seen_metric_periods.add(key)
+        if row["metric"] in PPI_RELEASE_METRICS:
+            root = row["claimed_release_root"]
+            previous_clock = ppi_release_times.setdefault(root, row["scheduled_release_utc"])
+            if previous_clock != row["scheduled_release_utc"]:
+                out["reason"] = "PPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT"
+                return out
         rows.append(row)
 
     pairs = []
@@ -265,6 +287,7 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
         base, quote = split_pair(pair)
         relevant = [
             {"event_id": row["event_id"], "currency": row["currency"],
+             "claimed_release_root": row["claimed_release_root"],
              "role": "BASE" if row["currency"] == base else "QUOTE",
              "phase": row["phase"],
              "high_impact": row["importance"] == "HIGH",
@@ -280,6 +303,8 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
             "pair": pair, "base": base, "quote": quote,
             "relevant_events_documentary_only": relevant,
             "event_count": len(relevant),
+            "claimed_release_root_count": len({
+                item["claimed_release_root"] for item in relevant}),
             "needs_actual_or_source_review": any(
                 x["phase"] == "RELEASE_PASSED_ACTUAL_NOT_AVAILABLE"
                 for x in relevant),
@@ -294,6 +319,9 @@ def inspect_g8_event_relevance_lab(events: Any, *, as_of_utc: Any) -> dict[str, 
         "as_of_utc": now.isoformat(),
         "currency_count": 8, "pair_count": len(pairs),
         "event_count": len(rows), "events": rows, "pair_rows": pairs,
+        "claimed_release_root_count": len({
+            item["claimed_release_root"] for item in rows}),
+        "independent_event_trial_count": None,
     })
     return out
 

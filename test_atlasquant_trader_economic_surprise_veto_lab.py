@@ -157,6 +157,24 @@ class SurpriseVetoTests(unittest.TestCase):
         self.assertFalse(r["research_veto"])
         self.safe(r)
 
+    def test_ppi_headline_and_core_share_release_without_duplicate_veto(self):
+        # Two indicators in one PPI release; both remain unverified and
+        # cannot become two independent economic trials or live FX signals.
+        before = [
+            news(event_id="US_PPI_HEAD", metric="PPI_MOM"),
+            news(event_id="US_PPI_CORE", metric="PPI_CORE_MOM"),
+        ]
+        after = [
+            news(event_id="US_PPI_HEAD", metric="PPI_MOM", actual="0.4"),
+            news(event_id="US_PPI_CORE", metric="PPI_CORE_MOM", actual="0.4"),
+        ]
+        r = inspect(events={"W1": before, "D1": after})
+        self.assertEqual(r["D1_event_count"], 2)
+        self.assertNotIn("D1_DUPLICATE_ECONOMIC_RELEASE", r["blockers"])
+        self.assertIn("D1_SURPRISE_DIRECTION_NOT_INTERPRETED_OR_VALIDATED",
+                      r["blockers"])
+        self.safe(r)
+
     def test_duplicate_real_event_hidden_behind_two_ids_is_blocked(self):
         e = catalog(actual="0.3")
         e["D1"].append(replace(e["D1"][0], event_id="US_CPI_ANOTHER_ID"))
