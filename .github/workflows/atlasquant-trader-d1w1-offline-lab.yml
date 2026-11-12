@@ -180,3 +180,18 @@ jobs:
             test_atlasquant_trader_g8_event_relevance_lab \
             test_atlasquant_mt5_backtest_gap_guard_lab \
             test_atlasquant_mt5_calendar_gap_audit_lab
+      - name: Record research-only CI evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## AtlasQuant Trader — Offline LAB"
+            echo ""
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Ref: \`${GITHUB_REF}\`"
+            echo "- Python: \`${{ matrix.python-version }}\`"
+            echo "- Job outcome: \`${{ job.status }}\`"
+            echo "- No broker access, paid API calls, orders, deploy or publish in this workflow."
+            echo "- CI tests prove software contracts only; they do NOT prove market accuracy or profitability."
+            echo "- Source data, independent P-I-T custody and prospectively calibrated bias remain separate GO/NO-GO gates."
+          } >> "$GITHUB_STEP_SUMMARY"
