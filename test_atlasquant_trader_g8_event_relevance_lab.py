@@ -602,5 +602,52 @@ class G8EventRelevanceTests(unittest.TestCase):
         self.assertEqual(blocked["reason"], "PPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT")
         self.no_live(blocked)
 
+
+    def test_cpi_components_one_claimed_release_not_four_trials(self):
+        metrics = (
+            ("CPI_MOM", "PERCENT_MOM_SA"),
+            ("CPI_CORE_MOM", "PERCENT_MOM_SA"),
+            ("CPI_YOY", "PERCENT_YOY_NSA"),
+            ("CPI_CORE_YOY", "PERCENT_YOY_NSA"),
+        )
+        events = [
+            replace(report(event_id=f"US_{metric}_2026_10"),
+                    metric=metric, unit=unit)
+            for metric, unit in metrics
+        ]
+        result = route(events, as_of_utc=BEFORE)
+        self.assertEqual(result["state"],
+                         "LAB_G8_EVENT_RELEVANCE_DOCUMENTARY_ONLY_NO_BIAS")
+        self.assertEqual(result["event_count"], 4)
+        self.assertEqual(result["claimed_release_root_count"], 1)
+        self.assertIsNone(result["independent_event_trial_count"])
+        self.assertEqual({e["claimed_release_root"] for e in result["events"]},
+                         {"USD_CPI_2026-10"})
+        for pair in OFFICIAL_PAIRS:
+            row = by_pair(result, pair)
+            self.assertEqual(row["event_count"], 4 if "USD" in pair else 0)
+            self.assertEqual(row["claimed_release_root_count"],
+                             1 if "USD" in pair else 0)
+        self.no_live(result)
+
+        moved = replace(events[-1],
+                        scheduled_release_at=RELEASE + timedelta(minutes=1))
+        blocked = route(events[:-1] + [moved], as_of_utc=BEFORE)
+        self.assertEqual(blocked["state"], "LAB_EVENT_ROUTER_BLOCKED")
+        self.assertEqual(blocked["reason"],
+                         "CPI_HEADLINE_CORE_RELEASE_CLOCK_CONFLICT")
+        self.no_live(blocked)
+
+    def test_cpi_roots_separate_currency_and_reference_month(self):
+        usd = replace(report(event_id="US_CPI_OCT"), metric="CPI_MOM")
+        gbp = replace(report(event_id="UK_CPI_OCT", currency="GBP"),
+                      metric="CPI_MOM")
+        sep = replace(report(event_id="US_CPI_SEP", target_period="2026-09"),
+                      metric="CPI_MOM")
+        result = route([usd, gbp, sep], as_of_utc=BEFORE)
+        self.assertEqual(result["claimed_release_root_count"], 3)
+        self.assertEqual(by_pair(result, "GBP/USD")["claimed_release_root_count"], 3)
+        self.no_live(result)
+
 if __name__ == "__main__":
     unittest.main()
