@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from atlasquant_fx_universe import OFFICIAL_PAIRS
+
 from atlasquant_trader_mt5_28fx_archive_reader_lab import (
     _iso_utc, inspect_local_am12_28fx_lab,
 )
@@ -52,6 +54,8 @@ def _base(reason: str) -> dict[str, Any]:
         "blocked_or_unverifiable_pair_window_checks": 0,
         "all_nominal_windows_locally_checked_complete": False,
         "windows": [],
+        "unverifiable_window_counts_by_pair": {},
+        "complete_window_counts_by_pair": {},
         "weekend_and_holiday_calendar_independently_attested": False,
         "historical_broker_price_provenance_verified": False,
         "source_capture_clock_independently_verified": False,
@@ -147,6 +151,8 @@ def inspect_am12_ny17_full_roster_lab(
     summaries = []
     local_complete = 0
     local_pair_complete = 0
+    counts_unverifiable = {pair: 0 for pair in OFFICIAL_PAIRS}
+    counts_complete = {pair: 0 for pair in OFFICIAL_PAIRS}
     for n, (first, last) in enumerate(candidates, 1):
         result = inspect_local_am12_28fx_lab(
             root=root, horizon=horizon,
@@ -158,15 +164,43 @@ def inspect_am12_ny17_full_roster_lab(
         batch = result.get("batch_result")
         count = (batch.get("coverage_claim_complete_pairs", 0)
                  if isinstance(batch, dict) else 0)
-        # Never count unverified files as checked when inventory fails.
-        if not isinstance(count, int) or not 0 <= count <= 28:
-            out["reason"] = "INCONSISTENT_BATCH_COUNTS"
-            return out
+        # A missing inventory makes ALL 28 pairs unverifiable. Do not return
+        # an empty blocked_pairs list just because no pair results exist.
+        if isinstance(batch, dict):
+            rows = batch.get("pair_results")
+            if (not isinstance(rows, dict)
+                    or set(rows) != set(OFFICIAL_PAIRS)):
+                out["reason"] = "INCOMPLETE_PAIR_DIAGNOSTICS_FROM_BATCH"
+                return out
+            pair_reasons = {}
+            complete_in_rows = 0
+            for pair in OFFICIAL_PAIRS:
+                row = rows[pair]
+                if not isinstance(row, dict):
+                    out["reason"] = "INVALID_PAIR_RESULT"
+                    return out
+                state = row.get("state")
+                if state == "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO":
+                    complete_in_rows += 1
+                else:
+                    pair_reasons[pair] = str(row.get("reason") or "PAIR_REJECTED_NO_REASON")
+            if (type(count) is not int or count != complete_in_rows
+                    or (complete and count != 28)):
+                out["reason"] = "INCONSISTENT_BATCH_COUNTS"
+                return out
+        else:
+            if complete:
+                out["reason"] = "MISSING_BATCH_FOR_COMPLETE_WINDOW"
+                return out
+            pair_reasons = {pair: result["reason"] for pair in OFFICIAL_PAIRS}
+            count = 0
         local_pair_complete += count
-        blocked_pairs = ([
-            pair for pair, info in batch["pair_results"].items()
-            if info["state"] != "LAB_MT5_M15_ARCHIVE_NY17_LOCAL_JOIN_NO_GO"
-        ] if isinstance(batch, dict) else [])
+        for pair in OFFICIAL_PAIRS:
+            if pair in pair_reasons:
+                counts_unverifiable[pair] += 1
+            else:
+                counts_complete[pair] += 1
+        blocked_pairs = [pair for pair in OFFICIAL_PAIRS if pair in pair_reasons]
         summaries.append({
             "window_number": n,
             "start_utc": first.isoformat(),
@@ -176,6 +210,7 @@ def inspect_am12_ny17_full_roster_lab(
             "pair_checks_complete_claim_only": count,
             "pair_checks_blocked_or_unverifiable": 28 - count,
             "blocked_pairs": blocked_pairs,
+            "unverifiable_pair_reasons": pair_reasons,
             "broker_provenance_attested": False,
             "directional_outcome": None,
         })
@@ -195,6 +230,8 @@ def inspect_am12_ny17_full_roster_lab(
         all_nominal_windows_locally_checked_complete=(
             local_complete == len(candidates)),
         windows=summaries,
+        unverifiable_window_counts_by_pair=counts_unverifiable,
+        complete_window_counts_by_pair=counts_complete,
     )
     return out
 
