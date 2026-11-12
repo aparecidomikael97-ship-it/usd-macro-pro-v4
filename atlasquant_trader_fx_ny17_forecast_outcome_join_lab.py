@@ -218,7 +218,6 @@ def inspect_ny17_full_forecast_outcome_join_lab(
         if (start is None or end is None or not start < end <= now
                 or not planned < start
                 or last_end is not None and start < last_end
-                or (start, end) != expected_windows[index - 1]
                 or start in sessions or w.get("window_number") != index
                 or w.get("local_archive_check_state") != WINDOW_COMPLETE
                 or w.get("pair_checks_complete_claim_only") != 28
@@ -231,6 +230,9 @@ def inspect_ny17_full_forecast_outcome_join_lab(
             horizon=horizon, start_at_utc=start, end_at_utc=end)
         if calendar["state"] != NY17_COMPLETE:
             out["reason"] = "INVALID_NY17_WINDOW_" + calendar["reason"]
+            return out
+        if (start, end) != expected_windows[index - 1]:
+            out["reason"] = "OMITTED_OR_EXTRA_NOMINAL_NY17_SESSIONS"
             return out
         moves = w.get("price_movements_documentary_by_pair")
         if not isinstance(moves, dict) or set(moves) != set(OFFICIAL_PAIRS):
