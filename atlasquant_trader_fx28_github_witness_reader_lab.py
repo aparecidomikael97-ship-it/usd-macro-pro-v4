@@ -19,7 +19,7 @@ import json
 import re
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from atlasquant_trader_fx28_ny17_prospective_campaign_lab import (
     CAMPAIGN_ID, FROZEN_START_UTC, FROZEN_END_UTC, _nominal_windows,
@@ -259,6 +259,13 @@ def inspect_github_campaign_comment_pages_lab(
     return out
 
 
+class _RejectRedirects(HTTPRedirectHandler):
+    """Never forward a bearer token to a redirected destination."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def fetch_github_campaign_receipts_readonly_lab(*, token: Any) -> dict[str, Any]:
     """Live GET only: GitHub Actions can call with read-only GITHUB_TOKEN.
 
@@ -269,6 +276,7 @@ def fetch_github_campaign_receipts_readonly_lab(*, token: Any) -> dict[str, Any]
         return _base("MISSING_OR_INVALID_GITHUB_READ_TOKEN_NO_HTTP")
     pages: list[bytes] = []
     requests = 0
+    opener = build_opener(_RejectRedirects())
     for number in range(1, MAX_PAGES + 1):
         url = f"{API}?per_page={PAGE_SIZE}&page={number}"
         request = Request(url, method="GET", headers={
@@ -280,7 +288,7 @@ def fetch_github_campaign_receipts_readonly_lab(*, token: Any) -> dict[str, Any]
         })
         requests += 1
         try:
-            with urlopen(request, timeout=10) as resp:
+            with opener.open(request, timeout=10) as resp:
                 if resp.getcode() != 200:
                     return _base("GITHUB_API_NON_200_RESPONSE")
                 content_type = resp.headers.get("Content-Type", "").lower()
