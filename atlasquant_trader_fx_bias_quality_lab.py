@@ -44,6 +44,7 @@ def _blocked(reason: str) -> dict[str, Any]:
         "schema": SCHEMA, "state": "LAB_BIAS_QUALITY_BLOCKED", "reason": reason,
         "pair": None, "horizon": None,
         "monthly_session_calendar_independently_verified": False,
+        "fx_ny17_session_boundary_independently_verified": False,
         "total_decision_opportunities": 0, "emitted_biases": 0,
         "abstentions": 0, "hits": 0, "misses": 0,
         "neutral_forward_outcomes_counted_as_misses": 0,
@@ -131,6 +132,20 @@ def inspect_fx_bias_quality_claims_lab(
         if (features > issued or entry_captured > issued
                 or not issued < start < end <= captured <= evaluated):
             out["reason"] = "FUTURE_LEAKAGE_OR_UNRESOLVED_OUTCOME"
+            return out
+        # Horizon plausibility is a conservative DURATION gate, not proof
+        # of broker-session boundaries, official trading calendars or prices.
+        # A 15-minute reaction cannot be counted as a D1/W1 hit.
+        duration = end - start
+        if horizon == "D1" and not (
+            timedelta(hours=23) <= duration <= timedelta(hours=25)
+        ):
+            out["reason"] = "D1_OUTCOME_NOT_DAILY_RESEARCH_WINDOW"
+            return out
+        if horizon == "W1" and not (
+            timedelta(hours=119) <= duration <= timedelta(hours=121)
+        ):
+            out["reason"] = "W1_OUTCOME_NOT_WEEKLY_RESEARCH_WINDOW"
             return out
         # Do not let an M15, H1 or daily move masquerade as a monthly hit.
         # These are conservative research checks, NOT official FX monthly

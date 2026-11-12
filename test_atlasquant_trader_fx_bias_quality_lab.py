@@ -40,7 +40,8 @@ class BiasQualityLabTests(unittest.TestCase):
                     "independent_out_of_sample_validation_completed",
                     "transaction_costs_accounted_for", "can_feed_live_radar",
                     "trade_authorized", "publishable", "scheduler_enabled",
-                    "worker_enabled"):
+                    "worker_enabled",
+                    "fx_ny17_session_boundary_independently_verified"):
             self.assertIs(r[key], False, key)
         self.assertEqual(r["operational_bias"], "AGUARDAR")
         self.assertIsNone(r["calibrated_probability"])
@@ -145,6 +146,62 @@ class BiasQualityLabTests(unittest.TestCase):
                 r = evaluate([trial(0)], **kwargs)
                 self.assertEqual(r["state"], "LAB_BIAS_QUALITY_BLOCKED")
                 self.no_go(r)
+
+    def test_daily_bias_cannot_be_scored_using_m15_or_h1_price_move(self):
+        row = trial(0, horizon="D1")
+        for delta in (timedelta(minutes=15), timedelta(hours=1),
+                      timedelta(hours=4), timedelta(days=5)):
+            with self.subTest(delta=delta):
+                end = row.outcome_start_at + delta
+                short_or_long = replace(
+                    row, outcome_end_at=end,
+                    outcome_captured_at=end + timedelta(minutes=1))
+                result = evaluate([short_or_long])
+                self.assertEqual(result["state"], "LAB_BIAS_QUALITY_BLOCKED")
+                self.assertEqual(result["reason"],
+                                 "D1_OUTCOME_NOT_DAILY_RESEARCH_WINDOW")
+                self.no_go(result)
+
+    def test_weekly_bias_cannot_be_scored_using_daily_price_move(self):
+        row = trial(0, horizon="W1")
+        for delta in (timedelta(minutes=15), timedelta(days=1),
+                      timedelta(days=4), timedelta(days=6)):
+            with self.subTest(delta=delta):
+                end = row.outcome_start_at + delta
+                fake = replace(row, outcome_end_at=end,
+                               outcome_captured_at=end + timedelta(minutes=1))
+                result = evaluate([fake], horizon="W1")
+                self.assertEqual(result["state"], "LAB_BIAS_QUALITY_BLOCKED")
+                self.assertEqual(result["reason"],
+                                 "W1_OUTCOME_NOT_WEEKLY_RESEARCH_WINDOW")
+                self.no_go(result)
+
+    def test_daily_near_24h_is_only_documentary_with_dst_tolerance(self):
+        row = trial(0, horizon="D1")
+        for hours in (23, 24, 25):
+            with self.subTest(hours=hours):
+                end = row.outcome_start_at + timedelta(hours=hours)
+                item = replace(row, outcome_end_at=end,
+                               outcome_captured_at=end + timedelta(minutes=1))
+                result = evaluate([item])
+                self.assertEqual(result["state"],
+                                 "LAB_BIAS_QUALITY_SYNTHETIC_OR_CALLER_CLAIM_ACCOUNTED_NO_GO")
+                self.assertEqual(result["hits"], 1)
+                self.no_go(result)
+
+    def test_weekly_near_five_days_is_only_documentary_with_dst_tolerance(self):
+        row = trial(0, horizon="W1")
+        for hours in (119, 120, 121):
+            with self.subTest(hours=hours):
+                end = row.outcome_start_at + timedelta(hours=hours)
+                item = replace(row, outcome_end_at=end,
+                               outcome_captured_at=end + timedelta(minutes=1))
+                result = evaluate([item], horizon="W1")
+                self.assertEqual(result["state"],
+                                 "LAB_BIAS_QUALITY_SYNTHETIC_OR_CALLER_CLAIM_ACCOUNTED_NO_GO")
+                self.assertEqual(result["horizon"], "W1")
+                self.assertEqual(result["total_decision_opportunities"], 1)
+                self.no_go(result)
 
     def test_m1_minute_must_not_be_mistaken_for_mn1_monthly(self):
         row = trial(0, horizon="M1")
