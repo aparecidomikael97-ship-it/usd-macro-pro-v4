@@ -18,14 +18,15 @@ ASOF = datetime(2026, 11, 8, 20, tzinfo=UTC)
 
 
 def event(i: int, *, actual="0.4", model="0.35", consensus="0.3",
-          metric="CPI_MOM", event_id_override=None) -> BenchmarkCase:
+          metric="CPI_MOM", event_id_override=None,
+          currency="USD") -> BenchmarkCase:
     # These are deliberately invented data, not historical economic releases.
     year, month = 2023 + i // 12, 1 + i % 12
     release = datetime(year, month, 10, 13, 30, tzinfo=UTC)
     captured = release - timedelta(days=2)
     draft = ForecastDraft(
         event_id=event_id_override or f"SYNTH_{year}_{month:02d}",
-        currency="USD", metric=metric,
+        currency=currency, metric=metric,
         target_period=f"{year}-{month:02d}", unit="PERCENT_MOM_SA",
         scheduled_release_at=release, forecast_captured_at=captured,
         previous_value="0.6", previous_available_at=captured - timedelta(days=10),
@@ -37,7 +38,7 @@ def event(i: int, *, actual="0.4", model="0.35", consensus="0.3",
     )
     locked = freeze_pre_event_forecast_lab(draft, as_of_utc=captured)["lock"]
     claim = ActualClaim(
-        event_id=draft.event_id, currency="USD", metric=metric,
+        event_id=draft.event_id, currency=currency, metric=metric,
         target_period=draft.target_period, unit=draft.unit, value=actual,
         first_published_at=release, captured_at=release + timedelta(minutes=2),
         source_sha256_claim="c" * 64,
@@ -74,6 +75,7 @@ class BenchmarkTests(unittest.TestCase):
         r = evaluate(cohort(), as_of_utc=ASOF)
         self.assertEqual(r["state"], "LAB_DOCUMENTARY_PAIRED_BENCHMARK_UNVERIFIED")
         self.assertEqual(r["registered_events"], 30)
+        self.assertEqual(r["currency"], "USD")
         self.assertEqual(r["scored_events_documentary"], 30)
         self.assertEqual(r["matched_model_and_consensus_scored"], 30)
         self.assertEqual(r["anchor_claim_missing"], 30)
@@ -167,6 +169,31 @@ class BenchmarkTests(unittest.TestCase):
         r = evaluate(c, as_of_utc=ASOF)
         self.assertEqual(r["reason"], "DUPLICATE_ECONOMIC_EVENT_IN_COHORT")
         self.assert_no_go(r)
+
+    def test_different_currency_same_metric_unit_must_not_pool_forecast_errors(self):
+        cases = cohort(30)
+        # The prior comparator grouped by metric/unit alone, so it could
+        # average a synthetic EUR CPI observation with USD CPI observations.
+        cases[7] = event(7, currency="EUR")
+        result = evaluate(cases, as_of_utc=ASOF)
+        self.assertEqual(result["state"], "LAB_BENCHMARK_BLOCKED")
+        self.assertEqual(result["reason"],
+                         "MIXED_CURRENCY_FORECAST_ERRORS_NOT_COMPARABLE")
+        self.assertIsNone(result["mae_model_matched_documentary"])
+        self.assertIsNone(result["paired_model_closer_share_documentary"])
+        self.assertIsNone(result["currency"])
+        self.assert_no_go(result)
+
+    def test_single_eur_cohort_is_permitted_only_as_synthetic_documentary(self):
+        cases = cohort(30, currency="EUR")
+        result = evaluate(cases, as_of_utc=ASOF)
+        self.assertEqual(result["currency"], "EUR")
+        self.assertEqual(result["metric"], "CPI_MOM")
+        self.assertEqual(result["unit"], "PERCENT_MOM_SA")
+        self.assertEqual(result["matched_model_and_consensus_scored"], 30)
+        self.assertEqual(result["state"],
+                         "LAB_DOCUMENTARY_PAIRED_BENCHMARK_UNVERIFIED")
+        self.assert_no_go(result)
 
     def test_mixed_incompatible_indicators_cannot_average_mae(self):
         c = cohort(30)
