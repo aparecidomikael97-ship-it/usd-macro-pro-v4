@@ -43,6 +43,9 @@ class RealHistoryReadOnlyTests(unittest.TestCase):
         self.assertFalse(r["live_alert_allowed"])
         self.assertFalse(r["broker_identity_independently_authenticated"])
         self.assertFalse(r["market_data_point_in_time_authenticated"])
+        self.assertFalse(r["execution_bid_ask_spreads_independently_verified"])
+        self.assertFalse(r["bar_spread_zero_means_free_execution"])
+        self.assertFalse(r["cost_adjusted_reaction_ready"])
         self.assertFalse(r["future_ppi_event_candles_available"])
         self.assertFalse(r["event_reaction_measured"])
         self.assertIsNone(r["validated_bias_accuracy"])
@@ -63,12 +66,29 @@ class RealHistoryReadOnlyTests(unittest.TestCase):
             self.assertEqual(r["pair_results"][sym]["closed_m15_bars"], 17)
             self.assertEqual(r["pair_results"][sym]["median_stored_bar_spread_points"], 8)
             self.assertEqual(r["pair_results"][sym]["max_stored_bar_spread_points"], 8)
+            self.assertEqual(r["pair_results"][sym]["zero_stored_bar_spread_count"], 0)
+            self.assertEqual(r["pair_results"][sym]["spread_interpretation"],
+                             "NONZERO_RECORDED_SPREAD_NOT_EXECUTION_COST")
             self.assertFalse(r["pair_results"][sym]["price_bytes_or_ohlc_retained"])
         self.assertEqual(
             {x[0] for x in self.api.calls},
             {"initialize", "terminal_info", "symbol_info", "copy_rates_range",
              "shutdown"},
         )
+
+    def test_zero_stored_m15_spread_is_unknown_cost_not_free_trading(self):
+        for row in self.api.data["EURUSD"]:
+            row["spread"] = 0
+        self.api.data["USDJPY"][0]["spread"] = 0
+        r = self.run_probe()
+        self.safe(r)
+        self.assertEqual(r["validated_bars"], 119)
+        self.assertEqual(r["pairs_with_zero_stored_bar_spreads"],
+                         ["EURUSD", "USDJPY"])
+        self.assertEqual(r["pair_results"]["EURUSD"]["zero_stored_bar_spread_count"], 17)
+        self.assertEqual(r["pair_results"]["USDJPY"]["zero_stored_bar_spread_count"], 1)
+        self.assertEqual(r["pair_results"]["EURUSD"]["spread_interpretation"],
+                         "ZERO_RECORDED_SPREAD_UNUSABLE_AS_EXECUTION_COST")
 
     def test_hidden_symbol_does_not_need_market_watch_change(self):
         self.api.visible -= {"NZDUSD", "USDCHF", "USDCAD"}
