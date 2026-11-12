@@ -69,6 +69,7 @@ def _base(reason: str) -> dict[str, Any]:
         "broker_m15_epoch_timezone_independently_verified": False,
         "broker_session_calendar_verified": False,
         "holiday_gap_classification_verified": False,
+        "source_ohlc_independently_verified": False,
         "history_point_in_time_verified": False,
         "model_prediction_externally_precommitted": False,
         "market_direction_from_archive": None,
