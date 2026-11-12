@@ -187,7 +187,7 @@ class G8MatrixTests(unittest.TestCase):
         for kwargs in (
             {"decision": datetime(2026, 11, 5, 12)},
             {"evaluated": datetime(2026, 11, 4, tzinfo=timezone.utc)},
-            {"horizon": "MN1"},
+            {"horizon": "M1"},  # one-minute chart is NOT a monthly macro horizon
         ):
             with self.subTest(kwargs=kwargs):
                 self.assertEqual(run(**kwargs)["state"], "LAB_BLOCKED")
@@ -330,6 +330,58 @@ class G8MatrixTests(unittest.TestCase):
         self.assertFalse(r["pairs"]["GBP/NZD"]["cpi_raw_yoy_differential_validated"])
         self.assert_no_go(r)
 
+
+
+    def test_monthly_mn1_is_a_metadata_audit_not_a_price_signal(self):
+        monthly = run(horizon="MN1")
+        self.assertEqual(monthly["horizon"], "MN1")
+        self.assertEqual(monthly["state"], "LAB_G8_MACRO_MATRIX_CLAIMS_ONLY")
+        self.assertEqual(monthly["pair_count"], 28)
+        self.assertEqual(monthly["claim_only_complete_pairs"], 28)
+        self.assertIsNone(monthly["monthly_directional_bias"])
+        self.assertFalse(monthly["monthly_bias_validated_for_publication"])
+        self.assert_no_go(monthly)
+        # The same source claims reused on D1 and MN1 are not two
+        # independent predictive trials.
+        daily = run(horizon="D1")
+        self.assertEqual(daily["pairs"], monthly["pairs"])
+        self.assert_no_go(daily)
+
+    def test_monthly_cutoff_fails_closed_for_post_cutoff_cpi(self):
+        rows = fixtures()
+        rows["CAD"][0].update(
+            published_at_utc="2026-11-05T12:00:01Z",
+            captured_at_utc="2026-11-05T12:00:02Z",
+        )
+        monthly = run(rows, horizon="MN1")
+        self.assertEqual(monthly["state"], "LAB_G8_MACRO_MATRIX_HAS_REJECTIONS")
+        self.assertEqual(monthly["rejected_pairs"], 7)
+        self.assertEqual(monthly["claim_only_complete_pairs"], 21)
+        self.assertTrue(all(info["rejection_reason"] ==
+                            "RELEASE_LOOKAHEAD_OR_CHRONOLOGY_INVALID"
+                            for pair, info in monthly["pairs"].items()
+                            if "CAD" in pair))
+        self.assert_no_go(monthly)
+
+    def test_monthly_snapshot_rejects_future_capture_after_monthly_cutoff(self):
+        rows = fixtures()
+        # An earlier month-start checkpoint cannot read a receipt obtained
+        # after that point even if inspected much later.
+        cutoff = datetime(2026, 11, 1, tzinfo=timezone.utc)
+        rows["EUR"][0]["captured_at_utc"] = "2026-11-01T00:00:01Z"
+        monthly = run(rows, horizon="MN1", decision=cutoff)
+        self.assertEqual(monthly["rejected_pairs"], 7)
+        self.assertEqual(monthly["claim_only_complete_pairs"], 21)
+        self.assert_no_go(monthly)
+
+    def test_monthly_missing_one_currency_remains_incomplete(self):
+        rows = fixtures()
+        rows["NZD"] = []
+        monthly = run(rows, horizon="MN1")
+        self.assertEqual(monthly["incomplete_pairs"], 7)
+        self.assertEqual(monthly["claim_only_complete_pairs"], 21)
+        self.assertIsNone(monthly["monthly_directional_bias"])
+        self.assert_no_go(monthly)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
