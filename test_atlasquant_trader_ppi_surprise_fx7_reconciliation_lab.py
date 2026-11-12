@@ -243,10 +243,13 @@ class PpiFx7ReconciliationTests(unittest.TestCase):
             r = self.run_join(clock=clock)
             self.safe(r)
             self.assertEqual(r["reason"], "INVALID_AS_OF_CLOCK")
-        for value in ({}, None):
+        for value, expected_reason in (
+            ({}, "PPI_ACTUAL_VS_CONSENSUS_NOT_ACCEPTED"),
+            (None, "REQUIRED_DOCUMENTARY_SOURCE_REPORTS_MISSING"),
+        ):
             r = self.run_join(ppi=value)
             self.safe(r)
-            self.assertEqual(r["reason"], "REQUIRED_DOCUMENTARY_SOURCE_REPORTS_MISSING")
+            self.assertEqual(r["reason"], expected_reason)
 
 
 if __name__ == "__main__":
