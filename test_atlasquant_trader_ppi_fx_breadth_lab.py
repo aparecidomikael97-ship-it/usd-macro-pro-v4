@@ -9,6 +9,8 @@ from atlasquant_trader_ppi_fx_breadth_lab import (
 )
 from atlasquant_trader_ppi_usd_fx_forward_reaction_lab import USD_FX
 
+_UNSET = object()
+
 
 def fixture():
     rows = {}
@@ -28,8 +30,8 @@ def fixture():
 
 
 class PpiBreadthTests(unittest.TestCase):
-    def run_lab(self, report=None):
-        result = summarize(price_reaction_report=fixture() if report is None else report)
+    def run_lab(self, report=_UNSET):
+        result = summarize(price_reaction_report=fixture() if report is _UNSET else report)
         self.assertEqual(result["operational_bias"], "AGUARDAR")
         self.assertFalse(result["trade_authorized"])
         self.assertFalse(result["publishable"])
