@@ -28,6 +28,9 @@ from atlasquant_trader_ppi_pre_event_protocol_lab import (
 from atlasquant_trader_ppi_m15_spread_context_lab import (
     PASS as SPREAD_OK, inspect_ppi_m15_spread_context_lab,
 )
+from atlasquant_trader_ppi_fx_breadth_lab import (
+    DOCUMENTARY as BREADTH_OK, summarize_ppi_7fx_breadth_lab,
+)
 from atlasquant_trader_us_ppi_oct2026_actual_table_guard_lab import (
     RELEASE_UTC, ClaimedPostReleaseHTTP,
     compare_ppi_actual_to_frozen_consensus_lab,
@@ -185,6 +188,20 @@ def inspect_ppi_one_event_study_lab(
         out["source_stage_states"] = stages
         return out
 
+    # Read the already checked, USD-normalized price reaction from the full
+    # source/manifest-validated stage. This is descriptive breadth, NEVER
+    # seven independent votes, a currency forecast, or a causal estimate.
+    breadth = summarize_ppi_7fx_breadth_lab(price_reaction_report=price)
+    stages["SEVEN_FX_USD_NORMALIZED_BREADTH"] = breadth.get("state")
+    if (breadth.get("state") != BREADTH_OK
+            or breadth.get("fx_pair_count_documentary") != len(USD_FX)
+            or set((breadth.get("cross_pair_breadth_by_horizon") or {}))
+               != {"M15", "H1", "H4"}
+            or breadth.get("economic_event_count_documentary") != 1):
+        out = _blocked("FULL_SEVEN_PAIR_DESCRIPTIVE_BREADTH_INVALID")
+        out["source_stage_states"] = stages
+        return out
+
     out = _blocked("ONE_UNATTESTED_EVENT_NOT_A_PREDICTIVE_SAMPLE",
                    "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
     out["source_stage_states"] = stages
@@ -203,6 +220,11 @@ def inspect_ppi_one_event_study_lab(
         "headline_ppi_surprise_percentage_points": surprise["headline_vs_td_pre_event_diff_pp"],
         "core_ex_food_energy_surprise_percentage_points": surprise["core_vs_td_pre_event_diff_pp"],
         "fx_usd_normalized_m15_h1_h4_bps": price["price_reactions_usd_normalized_bps"],
+        "usd_normalized_breadth_descriptive_not_forecast":
+            breadth["cross_pair_breadth_by_horizon"],
+        "m15_to_h4_opposing_spot_sign_pairs_documentary":
+            breadth["cross_horizon_m15_to_h4_sign_reversals"],
+        "seven_spot_observations_not_seven_independent_trials": True,
         "m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost": spread["per_pair_m15_spread_samples_points"],
         "zero_spread_context_requires_broker_review": spread["any_pair_all_17_spread_samples_zero"],
         "broker_execution_costs_not_verified": True,

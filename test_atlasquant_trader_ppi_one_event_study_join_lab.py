@@ -177,6 +177,16 @@ class OneEventStudyJoinTests(unittest.TestCase):
         self.assertEqual(study["headline_ppi_surprise_percentage_points"], "0.1")
         self.assertEqual(study["core_ex_food_energy_surprise_percentage_points"], "-0.1")
         self.assertEqual(set(study["fx_usd_normalized_m15_h1_h4_bps"]), set(USD_FX))
+        self.assertEqual(set(study["usd_normalized_breadth_descriptive_not_forecast"]),
+                         {"M15", "H1", "H4"})
+        for horizon, row in study["usd_normalized_breadth_descriptive_not_forecast"].items():
+            self.assertEqual(row["positive_usd_normalized_move_count"], 7)
+            self.assertEqual(row["negative_usd_normalized_move_count"], 0)
+            self.assertEqual(row["independent_event_trials"], 0)
+            self.assertEqual(row["sign_pattern_documentary_not_predictive"],
+                             "SEVEN_POSITIVE_USD_NORMALIZED_PRICE_MOVES")
+        self.assertEqual(study["m15_to_h4_opposing_spot_sign_pairs_documentary"], [])
+        self.assertTrue(study["seven_spot_observations_not_seven_independent_trials"])
         self.assertEqual(set(study["m15_bar_spread_samples_not_intrabar_peak_or_transaction_cost"]), set(USD_FX))
         self.assertTrue(study["broker_execution_costs_not_verified"])
         self.assertTrue(study["intrabar_max_spread_not_measured"])
@@ -190,7 +200,8 @@ class OneEventStudyJoinTests(unittest.TestCase):
             "TD_PRE_EVENT", "TE_PRE_EVENT", "BLS_FIRST_PRINT",
             "SURPRISE_SAME_METRIC", "SEVEN_FX_M15_WINDOWS",
             "SPREAD_POINTS_CONTEXT", "MT5_CAPTURE_MANIFEST",
-            "PPI_PRE_EVENT_ABSTENTION_PROTOCOL"})
+            "PPI_PRE_EVENT_ABSTENTION_PROTOCOL",
+            "SEVEN_FX_USD_NORMALIZED_BREADTH"})
 
     def test_post_hoc_protocol_direction_flip_blocks_seven_pair_study(self):
         from atlasquant_trader_ppi_pre_event_protocol_lab import FROZEN_PROTOCOL
@@ -211,6 +222,36 @@ class OneEventStudyJoinTests(unittest.TestCase):
         self.assertEqual(result["reason"],
                          "PRE_EVENT_RESEARCH_ABSTENTION_PROTOCOL_NOT_INTACT")
         self.assertEqual(result["independent_directional_trials_verified"], 0)
+        self.assertIsNone(result["one_event_study"])
+
+    def test_integrated_one_pair_h4_sign_reversal_is_reported_without_prediction(self):
+        # All values here are deliberately fictional; original identity and
+        # MT5 local SHA receipts are regenerated for the synthetic fixture.
+        changed = self.rows["USDJPY"][16]
+        changed.update(open="0.990", high="0.992", low="0.988", close="0.990")
+        self.price_receipt = self.write_prices()
+        self.packet = replace(self.packet, price_archive_receipt=self.price_receipt)
+        with self.isolated_synthetic_pre_event_receipts():
+            result = self.run_study()
+        self.assertEqual(result["state"],
+                         "LAB_PPI_ONE_EVENT_SEVEN_FX_DOCUMENTARY_NO_GO")
+        study = result["one_event_study"]
+        self.assertEqual(study["m15_to_h4_opposing_spot_sign_pairs_documentary"],
+                         ["USDJPY"])
+        self.assertEqual(study["usd_normalized_breadth_descriptive_not_forecast"]
+                         ["H4"]["negative_pair_symbols"], ["USDJPY"])
+        self.assertEqual(result["independent_directional_trials_verified"], 0)
+        self.assertIsNone(result["directional_forecast"])
+
+    def test_breadth_helper_failure_cannot_be_silently_ignored(self):
+        with self.isolated_synthetic_pre_event_receipts():
+            with patch("atlasquant_trader_ppi_one_event_study_join_lab."
+                       "summarize_ppi_7fx_breadth_lab", return_value={
+                           "state": "LAB_PPI_7FX_CROSS_PAIR_BREADTH_BLOCKED"
+                       }):
+                result = self.run_study()
+        self.assertEqual(result["reason"],
+                         "FULL_SEVEN_PAIR_DESCRIPTIVE_BREADTH_INVALID")
         self.assertIsNone(result["one_event_study"])
 
     def test_missing_bls_document_blocks_even_with_good_synthetic_previous(self):
