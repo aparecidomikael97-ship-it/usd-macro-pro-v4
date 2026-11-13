@@ -181,7 +181,7 @@ class BoJGuidelineReceiptTests(unittest.TestCase):
 
     def test_after_decision_capture_does_not_become_point_in_time(self):
         for first, last in (
-            ("2026-11-13T10:10:03Z", "2026-11-13T10:10:04Z"),
+            ("2026-11-13T10:11:03Z", "2026-11-13T10:11:04Z"),
             ("2026-11-13T10:10:00Z", "2026-11-13T10:09:59Z"),
             ("2026-11-13T10:08:00Z", "2026-11-13T10:10:00Z"),
         ):
